@@ -33,17 +33,24 @@ function isDailyLimitsShaped(value: unknown): boolean {
   );
 }
 
-// Backfills `firstSeen` on a plain card-state object parsed from localStorage.
-// No-op if `firstSeen` is already present (post-fix sessions) or if the state
-// blob is corrupted (non-object); a corrupted state will fail isReviewCardShaped
-// downstream and the whole session will be rejected, but we don't want to throw
-// in this helper while we're still in the validation pipeline.
-// Best-effort: uses `lastReview` as the approximation for existing cards.
-function migrateReviewState(state: unknown): void {
+// Backfills missing fields on a plain card-state object parsed from localStorage.
+// No-op on fields that are already present. If the state blob is corrupted
+// (non-object), this is a no-op — the card will fail isReviewCardShaped
+// downstream and the whole session will be rejected.
+//
+// Migrations applied in order:
+//   1. `firstSeen` (introduced before learningStep): backfill from lastReview.
+//   2. `learningStep` (new field): backfill to null (graduated / not in a step).
+export function migrateReviewState(state: unknown): void {
   if (typeof state !== "object" || state === null) return;
   const s = state as Record<string, unknown>;
+  // Migration 1: firstSeen
   if (s.firstSeen === undefined) {
     s.firstSeen = typeof s.lastReview === "string" ? s.lastReview : null;
+  }
+  // Migration 2: learningStep
+  if (s.learningStep === undefined) {
+    s.learningStep = null;
   }
 }
 

@@ -103,17 +103,29 @@ export function stableShuffleForDay(
 }
 
 /**
- * Computes both queues and today's counters from the full card set + limits.
+ * Computes all queues and today's counters from the full card set + limits.
  *
- * - reviewQueue: IDs of cards where lastReview !== null AND dueDate <= today,
- *   EXCLUDING any card whose lastReview === today (already done today),
+ * - learningCardIds: IDs of all cards currently in a learning or relearning
+ *   step (learningStep !== null). These are managed entirely by the UI
+ *   component's in-memory learning queue — the component pairs each ID with a
+ *   wall-clock `dueAt` timestamp. On a fresh page load, all such cards are
+ *   restarted at step 0 (component sets dueAt = Date.now() + steps[0]). The
+ *   scheduler-side `learningStep` value is preserved across reloads.
+ *   Learning cards are excluded from both reviewQueue and newQueue.
+ * - reviewQueue: IDs of graduated cards due today or earlier,
+ *   EXCLUDING any card whose lastReview === today (already done today)
+ *   and EXCLUDING learning-step cards,
  *   capped at max(0, maxReviewsPerDay - reviewsDoneToday),
  *   then stableShuffleForDay'd.
- * - newQueue: IDs of cards where lastReview === null,
+ * - newQueue: IDs of brand-new cards (lastReview === null AND learningStep === null),
  *   capped at max(0, maxNewPerDay - newIntroducedToday),
  *   then stableShuffleForDay'd.
  * - newIntroducedToday: count of cards where firstSeen === today.
  * - reviewsDoneToday: count of cards where lastReview === today AND firstSeen !== today.
+ *
+ * Note: getNextCardId serves review/new ordering only. The component layers
+ * learning-queue priority on top — learning cards are always shown before
+ * review or new cards.
  *
  * Pure — no I/O.
  */
@@ -122,6 +134,7 @@ export function buildSessionQueues(
   limits: DailyLimits,
   today: string,
 ): {
+  learningCardIds: number[];
   reviewQueue: number[];
   newQueue: number[];
   newIntroducedToday: number;
@@ -139,11 +152,18 @@ export function buildSessionQueues(
     (c) => c.state.lastReview === today && c.state.firstSeen !== today,
   ).length;
 
-  // Review candidates: has been reviewed before, due today or earlier,
-  // but NOT already reviewed today.
+  // Learning queue: all cards currently in a learning or relearning step.
+  // These are handled by the component's in-memory queue, not the SRS queues.
+  const learningCardIds = cards
+    .filter((c) => c.state.learningStep !== null)
+    .map((c) => c.id);
+
+  // Review candidates: has been reviewed before (graduated), due today or
+  // earlier, not already reviewed today, and NOT in a learning step.
   const reviewCandidateIds = cards
     .filter(
       (c) =>
+        c.state.learningStep === null &&
         c.state.lastReview !== null &&
         c.state.dueDate <= today &&
         c.state.lastReview !== today,
@@ -156,9 +176,13 @@ export function buildSessionQueues(
     reviewSlots,
   );
 
-  // New candidates: never reviewed.
+  // New candidates: never reviewed AND not currently in a learning step.
+  // (A card in a learning step has lastReview === null but learningStep !== null —
+  // it belongs in learningCardIds, not the newQueue.)
   const newCandidateIds = cards
-    .filter((c) => c.state.lastReview === null)
+    .filter(
+      (c) => c.state.learningStep === null && c.state.lastReview === null,
+    )
     .map((c) => c.id);
 
   const newSlots = Math.max(0, limits.maxNewPerDay - newIntroducedToday);
@@ -167,12 +191,18 @@ export function buildSessionQueues(
     newSlots,
   );
 
-  return { reviewQueue, newQueue, newIntroducedToday, reviewsDoneToday };
+  return { learningCardIds, reviewQueue, newQueue, newIntroducedToday, reviewsDoneToday };
 }
 
 /**
- * Get next card to show. Drains reviewQueue first, then newQueue.
+ * Get next card to show from the review and new queues.
+ * Drains reviewQueue first, then newQueue.
  * Returns null when both queues are empty.
+ *
+ * Note: the component layers learning-queue priority on top of this — it checks
+ * the in-memory learning queue before calling getNextCardId. This function
+ * handles only the review/new ordering.
+ *
  * Pure.
  */
 export function getNextCardId(

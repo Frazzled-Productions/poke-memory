@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
@@ -17,12 +17,36 @@ import {
 } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
+import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type EndState = "SESSION_COMPLETE" | "REVIEW_SOFT_WALL" | "NEW_CARDS_LOCKED";
+
+type LearningQueueEntry = { cardId: number; dueAt: number };
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function stepDurationMs(lastReview: string | null, stepIndex: number): number {
+  const steps =
+    lastReview === null ? LEARNING_STEPS_MS : RELEARNING_STEPS_MS;
+  return steps[Math.min(stepIndex, steps.length - 1)];
+}
+
+/**
+ * Format milliseconds as "Xm Ys" (e.g. "1m 23s") or just "Xs" when under 1m.
+ */
+function formatCountdown(ms: number): string {
+  const totalSecs = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSecs / 60);
+  const seconds = totalSecs % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${seconds}s`;
+}
 
 // ---------------------------------------------------------------------------
 // Sub-components: end states
@@ -130,6 +154,46 @@ function NewCardsLockedScreen({
   );
 }
 
+function CountdownScreen({
+  dueAt,
+  newIntroducedToday,
+  reviewsDoneToday,
+}: {
+  dueAt: number;
+  newIntroducedToday: number;
+  reviewsDoneToday: number;
+}) {
+  const [remaining, setRemaining] = useState(() => dueAt - Date.now());
+
+  useEffect(() => {
+    setRemaining(dueAt - Date.now());
+    const id = setInterval(() => {
+      setRemaining(dueAt - Date.now());
+    }, 1000);
+    return () => clearInterval(id);
+  }, [dueAt]);
+
+  return (
+    <div className="flex flex-col items-center gap-4 text-center">
+      <p className="text-2xl font-semibold text-foreground">Next card in</p>
+      <p
+        className="text-4xl font-bold tabular-nums text-foreground"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {formatCountdown(remaining)}
+      </p>
+      <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
+        Hang tight — a learning card will be ready shortly.
+      </p>
+      <TodayPill
+        newIntroducedToday={newIntroducedToday}
+        reviewsDoneToday={reviewsDoneToday}
+      />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -144,24 +208,88 @@ export function ReviewSession() {
   // Not persisted — resets on every page load by design.
   const [extendedReview, setExtendedReview] = useState(false);
 
+  // In-memory learning queue: cards currently in a learning or relearning step.
+  // Initialized at mount from learningCardIds; updated on every grade.
+  const [learningQueue, setLearningQueue] = useState<LearningQueueEntry[]>([]);
+
+  // Ref for the timeout that fires when the earliest pending learning card is due.
+  const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     const saved = loadSession();
+    let sessionCards: ReviewCard[];
+    let sessionLimits: DailyLimits;
+
     if (saved !== null) {
       // Merge any seed cards added since the last save.
       const hydrated = hydrateSession(saved.cards, SEED_POKEMON);
-      const newLimits = saved.limits;
+      sessionLimits = saved.limits;
       if (hydrated.length !== saved.cards.length) {
-        saveSession({ cards: hydrated, limits: newLimits });
+        saveSession({ cards: hydrated, limits: sessionLimits });
       }
-      setCards(hydrated);
-      setLimits(newLimits);
+      sessionCards = hydrated;
     } else {
       const fresh = buildSession(SEED_POKEMON);
       saveSession({ cards: fresh, limits: DEFAULT_LIMITS });
-      setCards(fresh);
-      setLimits(DEFAULT_LIMITS);
+      sessionCards = fresh;
+      sessionLimits = DEFAULT_LIMITS;
     }
+
+    setCards(sessionCards);
+    setLimits(sessionLimits);
+
+    // Initialize the learning queue from persisted learning-step cards.
+    // On reload, dueAt is freshly computed from step 0 (Option A behavior).
+    const today = todayString(new Date());
+    const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today);
+
+    const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
+      const card = sessionCards.find((c) => c.id === cardId)!;
+      // Wall-clock dueAt is freshly computed on reload (Option A); but the
+      // persisted learningStep is preserved, so we use it here. This keeps the
+      // in-memory timing consistent with the step the card is actually on —
+      // a card persisted at step 1 waits its step-1 duration, not step 0.
+      const stepMs = stepDurationMs(
+        card.state.lastReview,
+        card.state.learningStep ?? 0,
+      );
+      return { cardId, dueAt: Date.now() + stepMs };
+    });
+
+    setLearningQueue(initialLearning);
   }, []);
+
+  // Schedule a timeout to re-render when the earliest pending learning card is due.
+  // Re-runs whenever learningQueue changes.
+  useEffect(() => {
+    if (countdownTimeoutRef.current !== null) {
+      clearTimeout(countdownTimeoutRef.current);
+      countdownTimeoutRef.current = null;
+    }
+
+    const now = Date.now();
+    const futureDue = learningQueue.filter((e) => e.dueAt > now);
+    if (futureDue.length === 0) return;
+
+    const earliest = Math.min(...futureDue.map((e) => e.dueAt));
+    const delay = Math.max(0, earliest - now);
+
+    countdownTimeoutRef.current = setTimeout(() => {
+      countdownTimeoutRef.current = null;
+      // Force a re-render so the now-due learning card is picked up. Bumping
+      // a fresh array reference re-runs this effect, which is harmless: the
+      // newly-due entry is filtered out of `futureDue`, and any remaining
+      // future entries chain onto the next setTimeout.
+      setLearningQueue((q) => [...q]);
+    }, delay);
+
+    return () => {
+      if (countdownTimeoutRef.current !== null) {
+        clearTimeout(countdownTimeoutRef.current);
+        countdownTimeoutRef.current = null;
+      }
+    };
+  }, [learningQueue]);
 
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
@@ -190,10 +318,22 @@ export function ReviewSession() {
   const { reviewQueue, newQueue, newIntroducedToday, reviewsDoneToday } =
     buildSessionQueues(cards, effectiveLimits, today);
 
-  // Cursor-free approach: always read from position 0.
-  // A card that was just graded sets lastReview=today, so it drops out of
-  // both queues on the next render naturally.
-  const currentCardId = getNextCardId(reviewQueue, newQueue);
+  // --- Learning-queue priority ---
+  const now = Date.now();
+  const dueLearning = learningQueue
+    .filter((e) => e.dueAt <= now)
+    .sort((a, b) => a.dueAt - b.dueAt);
+
+  const currentLearningEntry = dueLearning.length > 0 ? dueLearning[0] : null;
+
+  // Resolve the current card: learning first, then review/new.
+  let currentCardId: number | null;
+  if (currentLearningEntry !== null) {
+    currentCardId = currentLearningEntry.cardId;
+  } else {
+    currentCardId = getNextCardId(reviewQueue, newQueue);
+  }
+
   const currentCard =
     currentCardId !== null ? cards.find((c) => c.id === currentCardId) ?? null : null;
 
@@ -215,7 +355,12 @@ export function ReviewSession() {
       return "REVIEW_SOFT_WALL";
     }
 
-    const hasMoreNewCards = cards!.some((c) => c.state.lastReview === null);
+    // Only count truly-new cards (never touched). A card already in new-card
+    // learning has lastReview === null but learningStep !== null, and is
+    // tracked by the learning queue, not by the new-cards-locked screen.
+    const hasMoreNewCards = cards!.some(
+      (c) => c.state.lastReview === null && c.state.learningStep === null,
+    );
 
     if (newIntroducedToday >= limits.maxNewPerDay && hasMoreNewCards) {
       return "NEW_CARDS_LOCKED";
@@ -225,6 +370,18 @@ export function ReviewSession() {
   }
 
   if (currentCard === null) {
+    // If there are pending (future-due) learning cards, show the countdown.
+    if (learningQueue.length > 0) {
+      const earliestDueAt = Math.min(...learningQueue.map((e) => e.dueAt));
+      return (
+        <CountdownScreen
+          dueAt={earliestDueAt}
+          newIntroducedToday={newIntroducedToday}
+          reviewsDoneToday={reviewsDoneToday}
+        />
+      );
+    }
+
     const endState = resolveEndState();
 
     if (endState === "REVIEW_SOFT_WALL") {
@@ -267,13 +424,39 @@ export function ReviewSession() {
     if (cards === null) return;
     setGrading(true);
 
-    const newState = nextReview(currentCard.state, grade, new Date());
+    const nextState = nextReview(currentCard.state, grade, new Date());
     const newCards = cards.map((card) =>
-      card.id === currentCard.id ? { ...card, state: newState } : card,
+      card.id === currentCard.id ? { ...card, state: nextState } : card,
     );
 
     saveSession({ cards: newCards, limits });
     setCards(newCards);
+
+    // Update the learning queue based on the new state.
+    setLearningQueue((prev) => {
+      if (nextState.learningStep !== null) {
+        // Card is in (or remains in) a learning/relearning step.
+        // Distinction: new-card learning has lastReview === null after grading.
+        const stepMs = stepDurationMs(nextState.lastReview, nextState.learningStep);
+        const newEntry: LearningQueueEntry = {
+          cardId: currentCard.id,
+          dueAt: Date.now() + stepMs,
+        };
+
+        // Replace existing entry or add new one.
+        const exists = prev.some((e) => e.cardId === currentCard.id);
+        if (exists) {
+          return prev.map((e) =>
+            e.cardId === currentCard.id ? newEntry : e,
+          );
+        }
+        return [...prev, newEntry];
+      } else {
+        // Card has graduated or is in a non-learning state — remove from queue.
+        return prev.filter((e) => e.cardId !== currentCard.id);
+      }
+    });
+
     setRevealed(false);
     setGrading(false);
   }
