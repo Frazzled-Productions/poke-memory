@@ -87,6 +87,48 @@ jobs:
                "Reply with `/go` to proceed."
                "To change scope, post a comment describing the changes (or include them in your `/go` comment) — the implement stage treats follow-up comments as authoritative over this plan."
 
+      - name: Surface tool denials
+        if: always()
+        env:
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -u
+          if [ ! -f "$LOG" ]; then exit 0; fi
+
+          DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          if [ "$DENIAL_COUNT" = "0" ] || [ -z "$DENIAL_COUNT" ]; then
+            echo "No tool denials."
+            exit 0
+          fi
+
+          DENIAL_DETAILS=$(jq -r '
+            def text_of:
+              if type == "string" then .
+              elif type == "array" then map(.text // "" | tostring) | join(" ")
+              else tostring end;
+            select(.type == "user")
+            | .message.content[]?
+            | select(.type == "tool_result")
+            | select((.is_error // false) == true)
+            | (.content | text_of) as $c
+            | select($c | test("permission|denied|not allowed"; "i"))
+            | $c | gsub("\\s+"; " ") | .[0:240]
+          ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+
+          {
+            printf '<!-- auto-denials -->\n'
+            printf '## %s tool denial(s) during the plan run\n\n' "$DENIAL_COUNT"
+            printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
+            if [ -n "$DENIAL_DETAILS" ]; then
+              printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+            fi
+          } > /tmp/denials.md
+
+          gh issue comment "$ISSUE" --repo "$REPO" --body-file /tmp/denials.md
+
   implement:
     name: Implement
     if: |
@@ -115,6 +157,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Record starting SHA
+        id: start
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: anthropics/claude-code-action@v1
         with:
@@ -146,9 +192,16 @@ jobs:
             Also wrap each phase in `::group::Phase: <name>` / `::endgroup::`
             on stdout so the Actions log gets collapsible sections.
 
-            At the very end, edit the status comment one final time to
-            "Done — opened PR #N" with the link and a one-line summary. If you
-            hit a blocker, edit it to "Blocked: <reason>" before stopping.
+            **Do not write the final "Done" status yourself.** A post-step runs
+            after this action finishes and verifies the actual outcome (was a
+            PR opened? was auto-review #1 posted? what tools got denied?), then
+            overwrites the status comment with the verified result. Just leave
+            the status in whatever in-progress state you reached.
+
+            If you hit a blocker, edit the status comment so its **second line**
+            (the line after the `<!-- auto-status -->` marker) starts with
+            `Blocked: <reason>`. The post-step preserves any body whose second
+            line starts with `Blocked:` and only appends a tool-denial summary.
 
             Workflow:
             1. Load the issue and existing comments:
@@ -200,3 +253,101 @@ jobs:
 
             If you hit a blocker you can't resolve, post a comment on the issue
             explaining what's blocked and stop — don't push half-done work.
+
+      - name: Verify outcome and surface tool denials
+        if: always()
+        env:
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          START_SHA: ${{ steps.start.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -u
+
+          STATUS_ID=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-status -->"))] | last | .id // empty')
+
+          if [ -z "$STATUS_ID" ]; then
+            echo "No live status comment found — orchestrator never posted one. Nothing to update."
+            exit 0
+          fi
+          echo "Live status comment ID: $STATUS_ID"
+
+          EXISTING_BODY=$(gh api "repos/$REPO/issues/comments/$STATUS_ID" --jq '.body')
+          SECOND_LINE=$(printf '%s\n' "$EXISTING_BODY" | sed -n '2p')
+          if printf '%s' "$SECOND_LINE" | grep -q '^Blocked:'; then
+            ORCH_BLOCKED=1
+          else
+            ORCH_BLOCKED=0
+          fi
+
+          # Find the PR opened from this issue's auto branch. Match on branch
+          # name (the orchestrator creates `auto/issue-N-<slug>`) — robust
+          # against body-content variations like `Closes`/`fixes`/`resolves`.
+          PR_NUMBER=$(gh pr list --repo "$REPO" --state all --limit 100 \
+            --json number,headRefName,createdAt \
+            --jq --arg prefix "auto/issue-$ISSUE-" '
+              [.[] | select(.headRefName | startswith($prefix))]
+              | sort_by(.createdAt) | last | .number // empty
+            ')
+
+          if [ -n "$PR_NUMBER" ]; then
+            REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+              --jq '[.[] | select(.body | startswith("<!-- auto-review:1 -->"))] | length')
+          else
+            REVIEW_FOUND=0
+          fi
+
+          git fetch origin --quiet 2>/dev/null || true
+          if [ -n "$START_SHA" ] && git rev-parse "$START_SHA" >/dev/null 2>&1; then
+            COMMITS=$(git rev-list --count "$START_SHA..HEAD" 2>/dev/null || echo 0)
+          else
+            COMMITS=0
+          fi
+
+          DENIAL_COUNT=0
+          DENIAL_DETAILS=""
+          if [ -f "$LOG" ]; then
+            DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+            DENIAL_DETAILS=$(jq -r '
+              def text_of:
+                if type == "string" then .
+                elif type == "array" then map(.text // "" | tostring) | join(" ")
+                else tostring end;
+              select(.type == "user")
+              | .message.content[]?
+              | select(.type == "tool_result")
+              | select((.is_error // false) == true)
+              | (.content | text_of) as $c
+              | select($c | test("permission|denied|not allowed"; "i"))
+              | $c | gsub("\\s+"; " ") | .[0:240]
+            ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+          fi
+
+          {
+            printf '<!-- auto-status -->\n'
+            if [ "$ORCH_BLOCKED" = "1" ]; then
+              printf '%s' "$EXISTING_BODY" | tail -n +2
+            elif [ -n "$PR_NUMBER" ] && [ "$REVIEW_FOUND" -gt 0 ]; then
+              printf 'Done — opened PR #%s, posted auto-review #1.\n' "$PR_NUMBER"
+            elif [ -n "$PR_NUMBER" ]; then
+              printf '**Outcome unclear** — opened PR #%s but auto-review #1 was not posted. See [run logs](%s).\n' "$PR_NUMBER" "$RUN_URL"
+            elif [ "$COMMITS" -gt 0 ]; then
+              printf '**Outcome unclear** — pushed %s commit(s) but no PR was opened. See [run logs](%s).\n' "$COMMITS" "$RUN_URL"
+            else
+              printf 'No PR opened. See [run logs](%s).\n' "$RUN_URL"
+            fi
+            if [ "$DENIAL_COUNT" != "0" ]; then
+              printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
+              printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted.\n'
+              if [ -n "$DENIAL_DETAILS" ]; then
+                printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+              else
+                printf '\n_(unable to extract per-call detail; see [run logs](%s))_\n' "$RUN_URL"
+              fi
+              printf '\n</details>\n'
+            fi
+          } > /tmp/status-body.md
+
+          gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -f body=@/tmp/status-body.md
