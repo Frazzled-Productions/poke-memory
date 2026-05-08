@@ -193,7 +193,7 @@ export function ReviewSession() {
   // Cursor-free approach: always read from position 0.
   // A card that was just graded sets lastReview=today, so it drops out of
   // both queues on the next render naturally.
-  const currentCardId = getNextCardId(reviewQueue, newQueue, 0, 0);
+  const currentCardId = getNextCardId(reviewQueue, newQueue);
   const currentCard =
     currentCardId !== null ? cards.find((c) => c.id === currentCardId) ?? null : null;
 

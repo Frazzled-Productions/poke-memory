@@ -32,6 +32,7 @@ export type ReviewState = {
   easeFactor: number;
   dueDate: string;          // ISO 8601 "YYYY-MM-DD"
   lastReview: string | null;
+  firstSeen: string | null; // ISO date of first-ever review. Set once; never overwritten.
 };
 
 export type Grade = 1 | 2 | 4 | 5;
@@ -41,8 +42,8 @@ const MIN_EASE_FACTOR = 1.3;
 
 // Returns the date `days` after `date` as an ISO date string ("YYYY-MM-DD").
 // Note: this combines local-time `setDate` with `toISOString` (UTC). The
-// inconsistency is intentional and consistent with how `getNextDueCard`
-// derives "today" — both sides slice toISOString, so the comparison is
+// inconsistency is intentional and consistent with how due-date comparisons
+// derive "today" — both sides slice toISOString, so the comparison is
 // internally coherent. Don't switch one side to a local-timezone format
 // without updating both, or you'll introduce off-by-one due-date bugs in
 // negative-UTC-offset timezones.
@@ -58,6 +59,8 @@ export function nextReview(
   now: Date,
 ): ReviewState {
   const passed = grade >= 3;
+  const today = now.toISOString().slice(0, 10);
+  const firstSeen = state.lastReview === null ? today : state.firstSeen;
 
   const newEaseFactor = Math.max(
     MIN_EASE_FACTOR,
@@ -70,7 +73,8 @@ export function nextReview(
       interval: 1,
       easeFactor: newEaseFactor,
       dueDate: addDays(now, 1),
-      lastReview: now.toISOString().slice(0, 10),
+      lastReview: today,
+      firstSeen,
     };
   }
 
@@ -85,7 +89,8 @@ export function nextReview(
     interval: newInterval,
     easeFactor: newEaseFactor,
     dueDate: addDays(now, newInterval),
-    lastReview: now.toISOString().slice(0, 10),
+    lastReview: today,
+    firstSeen,
   };
 }
 
@@ -96,5 +101,6 @@ export function initialReviewState(now: Date = new Date()): ReviewState {
     easeFactor: DEFAULT_EASE_FACTOR,
     dueDate: now.toISOString().slice(0, 10),
     lastReview: null,
+    firstSeen: null,
   };
 }

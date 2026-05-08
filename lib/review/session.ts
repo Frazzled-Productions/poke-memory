@@ -42,26 +42,6 @@ export function hydrateSession(
   return [...saved, ...additions];
 }
 
-// Return the card with the earliest dueDate that is <= today (ISO date string).
-// If multiple cards share the earliest dueDate, return the one with the lowest id (stable tiebreak).
-// Return undefined if no cards are currently due.
-// @deprecated — use buildSessionQueues + getNextCardId instead.
-export function getNextDueCard(
-  cards: readonly ReviewCard[],
-  now: Date,
-): ReviewCard | undefined {
-  const today = now.toISOString().slice(0, 10);
-
-  const due = cards.filter((card) => card.state.dueDate <= today);
-
-  if (due.length === 0) return undefined;
-
-  return due.reduce((earliest, card) => {
-    if (card.state.dueDate < earliest.state.dueDate) return card;
-    if (card.state.dueDate === earliest.state.dueDate && card.id < earliest.id) return card;
-    return earliest;
-  });
-}
 
 /**
  * Today as YYYY-MM-DD. Pure helper.
@@ -133,8 +113,8 @@ export function stableShuffleForDay(
  * - newQueue: IDs of cards where lastReview === null,
  *   capped at max(0, maxNewPerDay - newIntroducedToday),
  *   then stableShuffleForDay'd.
- * - newIntroducedToday: count of cards where lastReview === today AND repetitions === 1.
- * - reviewsDoneToday: count of cards where lastReview === today AND repetitions > 1.
+ * - newIntroducedToday: count of cards where firstSeen === today.
+ * - reviewsDoneToday: count of cards where lastReview === today AND firstSeen !== today.
  *
  * Pure — no I/O.
  */
@@ -149,11 +129,11 @@ export function buildSessionQueues(
   reviewsDoneToday: number;
 } {
   const newIntroducedToday = cards.filter(
-    (c) => c.state.lastReview === today && c.state.repetitions === 1,
+    (c) => c.state.firstSeen === today,
   ).length;
 
   const reviewsDoneToday = cards.filter(
-    (c) => c.state.lastReview === today && c.state.repetitions > 1,
+    (c) => c.state.lastReview === today && c.state.firstSeen !== today,
   ).length;
 
   // Review candidates: has been reviewed before, due today or earlier,
@@ -188,21 +168,15 @@ export function buildSessionQueues(
 }
 
 /**
- * Get next card to show. Drains reviewQueue first by index, then newQueue.
- * Returns null when both cursors have run past their queue lengths.
+ * Get next card to show. Drains reviewQueue first, then newQueue.
+ * Returns null when both queues are empty.
  * Pure.
  */
 export function getNextCardId(
   reviewQueue: readonly number[],
   newQueue: readonly number[],
-  reviewCursor: number,
-  newCursor: number,
 ): number | null {
-  if (reviewCursor < reviewQueue.length) {
-    return reviewQueue[reviewCursor];
-  }
-  if (newCursor < newQueue.length) {
-    return newQueue[newCursor];
-  }
+  if (reviewQueue.length > 0) return reviewQueue[0];
+  if (newQueue.length > 0) return newQueue[0];
   return null;
 }

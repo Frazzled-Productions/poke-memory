@@ -1,6 +1,5 @@
-import type { ReviewCard } from "@/lib/review/session";
+import type { ReviewCard, DailyLimits } from "@/lib/review/session";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
-import type { DailyLimits } from "@/lib/review/session";
 
 export type { DailyLimits };
 
@@ -34,6 +33,17 @@ function isDailyLimitsShaped(value: unknown): boolean {
   );
 }
 
+// Backfills `firstSeen` on a plain card-state object parsed from localStorage.
+// No-op if `firstSeen` is already present (post-fix sessions).
+// Best-effort: uses `lastReview` as the approximation for existing cards.
+function migrateReviewState(state: Record<string, unknown>): void {
+  if (state.firstSeen === undefined) {
+    state.firstSeen = typeof state.lastReview === "string"
+      ? state.lastReview
+      : null;
+  }
+}
+
 // Returns null if no saved session exists, called on the server, or data is
 // corrupted. Silently migrates legacy v1 format (bare ReviewCard[]) to the
 // new SavedSession shape by wrapping it with DEFAULT_LIMITS.
@@ -51,6 +61,9 @@ export function loadSession(): SavedSession | null {
       if (parsed.length > 0 && !isReviewCardShaped(parsed[0])) {
         return null;
       }
+      for (const card of parsed) {
+        migrateReviewState((card as Record<string, unknown>).state as Record<string, unknown>);
+      }
       return {
         cards: parsed as ReviewCard[],
         limits: DEFAULT_LIMITS,
@@ -66,6 +79,9 @@ export function loadSession(): SavedSession | null {
       ) {
         if (obj.cards.length > 0 && !isReviewCardShaped(obj.cards[0])) {
           return null;
+        }
+        for (const card of obj.cards) {
+          migrateReviewState((card as Record<string, unknown>).state as Record<string, unknown>);
         }
         return {
           cards: obj.cards as ReviewCard[],
