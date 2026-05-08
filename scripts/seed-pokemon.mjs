@@ -18,7 +18,7 @@ const MAX_RETRIES = 3;
 const BACKOFF_MS = [500, 1000, 2000];
 const PROGRESS_INTERVAL = 50;
 
-const FLAVOR_VERSION_PRIORITY = ["scarlet","violet","sword","shield","x","y"];
+const FLAVOR_TEXTS_MAX = 12;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,14 +98,19 @@ async function fetchWithRetry(url, label) {
 }
 
 
-function extractFlavorText(flavorTextEntries) {
+function extractFlavorTexts(flavorTextEntries) {
   const en = (flavorTextEntries ?? []).filter(e => e.language?.name === "en");
-  if (en.length === 0) return "";
-  for (const v of FLAVOR_VERSION_PRIORITY) {
-    const e = en.find(x => x.version?.name === v);
-    if (e) return normalizeFlavorText(e.flavor_text);
+  if (en.length === 0) return [];
+  const seen = new Set();
+  const results = [];
+  for (const entry of en) {
+    const normalized = normalizeFlavorText(entry.flavor_text);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    results.push(normalized);
+    if (results.length >= FLAVOR_TEXTS_MAX) break;
   }
-  return normalizeFlavorText(en[0].flavor_text);
+  return results;
 }
 
 function normalizeFlavorText(text) {
@@ -155,8 +160,19 @@ async function processSpecies(id) {
     return null;
   }
   const name = englishEntry.name;
-  const flavorText = extractFlavorText(speciesData.flavor_text_entries);
+  const flavorTexts = extractFlavorTexts(speciesData.flavor_text_entries);
+  const flavorText = flavorTexts[0] ?? "";
   const evolutionChainUrl = speciesData.evolution_chain?.url ?? null;
+
+  const genus = speciesData.genera?.find(g => g.language?.name === "en")?.genus ?? null;
+  const generation = speciesData.generation?.name ?? null;
+  const captureRate = speciesData.capture_rate ?? null;
+  const baseHappiness = speciesData.base_happiness ?? null;
+  const growthRate = speciesData.growth_rate?.name ?? null;
+  const habitat = speciesData.habitat?.name ?? null;
+  const genderRate = speciesData.gender_rate ?? null;
+  const isLegendary = speciesData.is_legendary ?? false;
+  const isMythical = speciesData.is_mythical ?? false;
 
   // 2. Fetch the base form's Pokémon data for the sprite
   const pokemonUrl = speciesData.varieties?.[0]?.pokemon?.url;
@@ -200,7 +216,18 @@ async function processSpecies(id) {
     speed: statsMap["speed"] ?? 0,
   };
 
-  return { id, name, spriteUrl, types, stats, flavorText, evolutionChainUrl };
+  const height = pokemonData.height ?? null;
+  const weight = pokemonData.weight ?? null;
+  const baseExperience = pokemonData.base_experience ?? null;
+
+  return {
+    id, name, spriteUrl,
+    height, weight, baseExperience,
+    types, stats, flavorText, flavorTexts,
+    genus, generation, captureRate, baseHappiness,
+    growthRate, habitat, genderRate, isLegendary, isMythical,
+    evolutionChainUrl,
+  };
 }
 
 // ---------------------------------------------------------------------------

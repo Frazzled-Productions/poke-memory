@@ -19,6 +19,7 @@ import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
+import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -208,6 +209,9 @@ export function ReviewSession() {
   // Transient flag: user chose "Keep reviewing" at the soft wall.
   // Not persisted — resets on every page load by design.
   const [extendedReview, setExtendedReview] = useState(false);
+
+  // Fact shown after card reveal — randomised on each reveal.
+  const [currentFact, setCurrentFact] = useState<PokemonFact | null>(null);
 
   // In-memory learning queue: cards currently in a learning or relearning step.
   // Initialized at mount from learningCardIds; updated on every grade.
@@ -421,6 +425,8 @@ export function ReviewSession() {
   // --- Handlers ---
 
   function handleReveal() {
+    const facts = getPokemonFacts(currentCard);
+    setCurrentFact(selectFact(facts));
     setRevealed(true);
   }
 
@@ -464,6 +470,7 @@ export function ReviewSession() {
       }
     });
 
+    setCurrentFact(null);
     setRevealed(false);
     setGrading(false);
   }
@@ -475,6 +482,7 @@ export function ReviewSession() {
         spriteUrl={currentCard.spriteUrl}
         name={currentCard.name}
         revealed={revealed}
+        fact={currentFact}
       />
 
       {revealed ? (
