@@ -75,14 +75,14 @@ export default async function PokemonDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: idStr } = await params;
-  const id = parseInt(idStr, 10);
+  const id = Number(idStr);
 
-  if (!Number.isInteger(id) || id < 1 || id > 1025) notFound();
+  if (!Number.isInteger(id) || id < 1 || id > 1025) return notFound();
 
   const pokemon = SEED_POKEMON.find((p) => p.id === id);
-  if (!pokemon) notFound();
+  if (!pokemon) return notFound();
 
-  const { name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon!;
+  const { name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
 
   const stages = buildStages(evolutionChain);
   const showEvolution = stages.length > 1;
