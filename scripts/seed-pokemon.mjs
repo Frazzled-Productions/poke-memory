@@ -18,6 +18,8 @@ const MAX_RETRIES = 3;
 const BACKOFF_MS = [500, 1000, 2000];
 const PROGRESS_INTERVAL = 50;
 
+const FLAVOR_VERSION_PRIORITY = ["scarlet","violet","sword","shield","x","y"];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -95,6 +97,39 @@ async function fetchWithRetry(url, label) {
   }
 }
 
+
+function extractFlavorText(flavorTextEntries) {
+  const en = (flavorTextEntries ?? []).filter(e => e.language?.name === "en");
+  if (en.length === 0) return "";
+  for (const v of FLAVOR_VERSION_PRIORITY) {
+    const e = en.find(x => x.version?.name === v);
+    if (e) return normalizeFlavorText(e.flavor_text);
+  }
+  return normalizeFlavorText(en[0].flavor_text);
+}
+
+function normalizeFlavorText(text) {
+  if (!text) return "";
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    out += (code === 12 || code === 10 || code === 13) ? " " : text[i];
+  }
+  return out.replace(/  +/g, " ").trim();
+}
+
+function flattenChain(node, evolvesFromId, idToName) {
+  const url = node.species?.url ?? "";
+  const parts = url.split("/").filter(Boolean);
+  const speciesId = parseInt(parts[parts.length - 1] || parts[parts.length - 2], 10);
+  if (!speciesId || isNaN(speciesId)) return [];
+  const name = idToName.get(speciesId) ?? node.species.name;
+  const nodes = [{ speciesId, name, evolvesFromId }];
+  for (const child of (node.evolves_to ?? [])) {
+    nodes.push(...flattenChain(child, speciesId, idToName));
+  }
+  return nodes;
+}
 /**
  * Process a single species ID. Returns a record object or null if it should
  * be skipped.
@@ -120,6 +155,8 @@ async function processSpecies(id) {
     return null;
   }
   const name = englishEntry.name;
+  const flavorText = extractFlavorText(speciesData.flavor_text_entries);
+  const evolutionChainUrl = speciesData.evolution_chain?.url ?? null;
 
   // 2. Fetch the base form's Pokémon data for the sprite
   const pokemonUrl = speciesData.varieties?.[0]?.pokemon?.url;
@@ -148,7 +185,22 @@ async function processSpecies(id) {
     return null;
   }
 
-  return { id, name, spriteUrl };
+  const types = (pokemonData.types ?? []).map(t => t.type.name);
+
+  const statsMap = {};
+  for (const s of (pokemonData.stats ?? [])) {
+    statsMap[s.stat.name] = s.base_stat;
+  }
+  const stats = {
+    hp: statsMap["hp"] ?? 0,
+    attack: statsMap["attack"] ?? 0,
+    defense: statsMap["defense"] ?? 0,
+    specialAttack: statsMap["special-attack"] ?? 0,
+    specialDefense: statsMap["special-defense"] ?? 0,
+    speed: statsMap["speed"] ?? 0,
+  };
+
+  return { id, name, spriteUrl, types, stats, flavorText, evolutionChainUrl };
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +264,7 @@ async function main() {
   // ------------------------------------------------------------------
   // Step 2: Process species in batches with concurrency cap
   // ------------------------------------------------------------------
-  const records = [];
+  const partialRecords = [];
   let done = 0;
   let skipped = 0;
 
@@ -226,7 +278,7 @@ async function main() {
       if (record === null) {
         skipped++;
       } else {
-        records.push(record);
+        partialRecords.push(record);
         // Progress every PROGRESS_INTERVAL species
         if (done % PROGRESS_INTERVAL === 0) {
           process.stderr.write(
@@ -237,21 +289,71 @@ async function main() {
     }
   }
 
+  process.stderr.write(
+    `[seed] Phase 1 complete: ${partialRecords.length} records, ${skipped} skipped
+`
+  );
+
   // ------------------------------------------------------------------
-  // Step 3: Sort and write output
+  // Step 3: Fetch evolution chains (deduped by URL)
   // ------------------------------------------------------------------
+  const idToName = new Map(partialRecords.map(r => [r.id, r.name]));
+  const uniqueChainUrls = [...new Set(partialRecords.map(r => r.evolutionChainUrl).filter(Boolean))];
+
+  process.stderr.write(
+    `[seed] Fetching ${uniqueChainUrls.length} unique evolution chains...
+`
+  );
+
+  const chainDataMap = new Map();
+  let chainsDone = 0;
+
+  for (let i = 0; i < uniqueChainUrls.length; i += CONCURRENCY) {
+    const batch = uniqueChainUrls.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(async url => {
+        const result = await fetchWithRetry(url, url);
+        return { url, result };
+      })
+    );
+    for (const { url, result } of batchResults) {
+      chainsDone++;
+      if (result.ok) {
+        chainDataMap.set(url, flattenChain(result.data.chain, null, idToName));
+      } else {
+        chainDataMap.set(url, []);
+      }
+      if (chainsDone % 100 === 0) {
+        process.stderr.write(
+          `[seed] [phase 2] ${chainsDone}/${uniqueChainUrls.length} chains
+`
+        );
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Step 4: Merge chains, sort, and write output
+  // ------------------------------------------------------------------
+  const records = partialRecords.map(({ evolutionChainUrl: _url, ...rest }) => ({
+    ...rest,
+    evolutionChain: _url ? (chainDataMap.get(_url) ?? []) : [],
+  }));
+
   records.sort((a, b) => a.id - b.id);
 
   const json = JSON.stringify(records, null, 2);
   await writeFile(outputPath, json, "utf-8");
 
   process.stderr.write(
-    `[seed] Wrote ${records.length} records to lib/pokemon/generated.json\n`
+    `[seed] Wrote ${records.length} records to lib/pokemon/generated.json
+`
   );
 
   if (skipped > 0) {
     process.stderr.write(
-      `[seed] Skipped ${skipped} species (warnings logged above)\n`
+      `[seed] Skipped ${skipped} species (warnings logged above)
+`
     );
   }
 }
