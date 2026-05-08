@@ -58,8 +58,9 @@ jobs:
                into the plan.
             3. Post the plan as a comment on the issue:
                `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
-            4. The comment must end with this exact line, on its own:
-               "Reply with `/go` to proceed, or edit scope in this thread first."
+            4. The comment must end with these two lines, on their own:
+               "Reply with `/go` to proceed."
+               "To change scope, post a comment describing the changes (or include them in your `/go` comment) — the implement stage treats follow-up comments as authoritative over this plan."
 
   implement:
     name: Implement
