@@ -57,4 +57,42 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 
 ## Conventions
 
-*(To be filled in as the project develops. Don't fabricate conventions here — add them only when adopted through actual code decisions.)*
+These are decisions made through deliberate research/discussion, not guesses. Add to this section only when a real decision is locked in.
+
+### Caching
+
+- **Cache Components is enabled** (`cacheComponents: true` in `next.config.ts`). All cache APIs assume this model.
+- For read-your-own-writes after a Server Action mutation (e.g. user grades a card → must immediately see updated state), use `updateTag(tag)`. Server Actions only.
+- For background SWR-style invalidation from Route Handlers, use `revalidateTag(tag, 'max')`. The single-argument form is deprecated and produces a TS error.
+- Use `revalidatePath('/path')` only when invalidating path-level data, not specific tags.
+- Tag the underlying cached fetches with `cacheTag(...)` inside `'use cache'` functions — without that, there is nothing for `updateTag` to invalidate.
+
+### Page params
+
+- `params` and `searchParams` are `Promise` — always `await` them. Synchronous access from earlier Next.js versions is fully removed.
+- Prefer the generated `PageProps<'/path/[seg]'>` helper for page components after `next typegen` / first `next dev` / first `next build` has run. The manual inline `params: Promise<{ slug: string }>` always works without that step.
+
+### PokéAPI integration
+
+- **Seed at build time, not request time.** Run a one-off seed script that fetches `/pokemon-species` (master list) → `/pokemon/{id}` (sprites) → `/pokemon-species/{id}` (display name + chain URL) → `/evolution-chain/{id}` (deduped) and writes a local store. The Pokédex list page never hits PokéAPI at runtime.
+- **Canonical Pokémon set comes from `/pokemon-species`** (~1025 species), not `/pokemon` (~1300+ which includes Megas, regional variants, Gigantamax forms with IDs 10001+). For each species, resolve to `varieties[0]` for the primary pokemon record.
+- **Display name** lives on `pokemon-species.names[]` filtered to `language.name === "en"`. The `name` field on `/pokemon` is a kebab-case slug, not a display name.
+- **Default sprite**: `sprites.other["official-artwork"].front_default`. Fall back to `sprites.front_default` when null. Self-host before production (PokéAPI sprites live on `raw.githubusercontent.com`).
+- **Evolution chains are trees**, not lists — `evolves_to[]` may have multiple entries (Eevee → 8 forms). Walk recursively.
+- **Rate limit**: ~100/min advised. Seed scripts should cap concurrency at ~20–30 and not aggressively retry on 429.
+
+### Spaced repetition
+
+- **Algorithm**: SM-2.
+- **Grading UX**: 4 buttons mapping to SM-2 grades — `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). Anki-equivalent collapse.
+- **Per-card review state**:
+  ```ts
+  type ReviewState = {
+    repetitions: number;       // consecutive successful reviews
+    interval: number;          // days until next review
+    easeFactor: number;        // multiplier, min 1.3, default 2.5
+    dueDate: string;           // ISO 8601 date "YYYY-MM-DD"
+    lastReview: string | null; // null sentinel = never reviewed
+  };
+  ```
+- Dates as `"YYYY-MM-DD"` strings (string-comparable, no timezone math). The `nextReview` scheduler is a pure function and lives in `lib/srs/`.
