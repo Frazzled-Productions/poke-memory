@@ -158,13 +158,15 @@ jobs:
 
                    <bulleted punch list of findings, or "No significant issues.">
 
-                   Verdict: LGTM
+                   Verdict: Looks good to me
 
                The first line MUST be the HTML marker `<!-- auto-review:1 -->`
                exactly. The last line MUST start with `Verdict: ` followed by
-               either `LGTM` (no significant issues) or `needs fixes` (one or
-               more issues that should be addressed). The maintainer comments
-               `/fix` on the PR to have those findings addressed.
+               either `Looks good to me` (no significant issues) or
+               `Needs fixes` (one or more issues that should be addressed).
+               Use those whole-word phrases verbatim — no acronyms. The
+               maintainer comments `/fix` on the PR to have those findings
+               addressed.
             8. Post a brief comment on the issue linking the PR.
 
             If you hit a blocker you can't resolve, post a comment on the issue

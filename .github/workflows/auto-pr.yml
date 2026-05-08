@@ -128,9 +128,11 @@ jobs:
                `gh pr view ${{ github.event.issue.number }} --json title,body,comments,headRefName,baseRefName`
                The latest auto-review is the most recent comment whose body
                starts with `<!-- auto-review:N -->`. Use the highest N.
-            2. **LGTM short-circuit.** If that review's verdict line is
-               `Verdict: LGTM`, post a PR comment saying "Latest review was LGTM —
-               nothing to fix" and stop. Do not push, do not post a new review.
+            2. **Approval short-circuit.** If that review's verdict line
+               expresses approval (`Verdict: Looks good to me`, or the legacy
+               `Verdict: LGTM` for older reviews), post a PR comment saying
+               "Latest review was approving — nothing to fix" and stop.
+               Do not push, do not post a new review.
             3. Otherwise, address each finding in the punch list:
                - Use the AGENTS.md playbook (specialists / coders as needed).
                - Make the smallest correct change for each finding.
@@ -160,11 +162,12 @@ jobs:
 
                      <bulleted punch list, or "No significant issues.">
 
-                     Verdict: LGTM
+                     Verdict: Looks good to me
 
                  The first line MUST be the marker exactly as shown. The verdict
-                 line MUST start with `Verdict: ` and be either `LGTM` or
-                 `needs fixes`.
+                 line MUST start with `Verdict: ` and be either
+                 `Looks good to me` or `Needs fixes`. Use those whole-word
+                 phrases verbatim — no acronyms.
 
             If you hit a blocker, post a PR comment explaining what's blocked
             and stop — don't push half-done work.
