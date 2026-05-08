@@ -69,15 +69,20 @@ function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
   return stages;
 }
 
+export function generateStaticParams() {
+  return SEED_POKEMON.map((p) => ({ id: String(p.id) }));
+}
+
 export default async function PokemonDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id: idStr } = await params;
+  if (!/^\d+$/.test(idStr)) return notFound();
   const id = Number(idStr);
 
-  if (!Number.isInteger(id) || id < 1 || id > 1025) return notFound();
+  if (id < 1 || id > 1025) return notFound();
 
   const pokemon = SEED_POKEMON.find((p) => p.id === id);
   if (!pokemon) return notFound();
