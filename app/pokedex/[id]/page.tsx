@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { EvolutionNode } from "@/lib/pokemon/seed";
+import { getPokemonFacts } from "@/lib/pokemon/facts";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -89,6 +90,8 @@ export default async function PokemonDetailPage({
 
   const { name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
 
+  const facts = getPokemonFacts(pokemon);
+
   const stages = buildStages(evolutionChain);
   const showEvolution = stages.length > 1;
 
@@ -145,6 +148,23 @@ export default async function PokemonDetailPage({
                 </div>
               );
             })}
+          </dl>
+        </section>
+
+
+        <section aria-labelledby="facts-heading" className="mt-10">
+          <h2 id="facts-heading" className="mb-3 text-sm font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            Facts
+          </h2>
+          <dl className="flex flex-col gap-2">
+            {facts.map((fact, i) => (
+              <div key={i} className="flex gap-3 text-sm">
+                <dt className="w-32 shrink-0 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 pt-0.5">
+                  {fact.label}
+                </dt>
+                <dd className="text-zinc-700 dark:text-zinc-200">{fact.value}</dd>
+              </div>
+            ))}
           </dl>
         </section>
 
