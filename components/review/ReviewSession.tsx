@@ -425,6 +425,7 @@ export function ReviewSession() {
   // --- Handlers ---
 
   function handleReveal() {
+    if (currentCard === null) return;
     const facts = getPokemonFacts(currentCard);
     setCurrentFact(selectFact(facts));
     setRevealed(true);
