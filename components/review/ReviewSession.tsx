@@ -221,6 +221,9 @@ export function ReviewSession() {
     let sessionCards: ReviewCard[];
     let sessionLimits: DailyLimits;
 
+    // poke-memory:settings:v1 is the source of truth for limits.
+    // saved.limits (from the session) is intentionally ignored — settings
+    // take effect on the next page load, which is the definition of "next session".
     const { maxNewPerDay, maxReviewsPerDay } = loadSettings();
     const settingsLimits = { maxNewPerDay, maxReviewsPerDay };
 

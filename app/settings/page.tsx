@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
 
@@ -57,29 +57,34 @@ const FIELDS: FieldConfig[] = [
 export default function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [saved, setSaved] = useState(false);
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setSettings(loadSettings());
+    return () => {
+      if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
+    };
   }, []);
 
   function handleChange(key: keyof UserSettings, raw: string) {
     if (settings === null) return;
     const value = parseInt(raw, 10);
-    if (isNaN(value)) return;
-    setSettings({ ...settings, [key]: value });
+    setSettings({ ...settings, [key]: isNaN(value) ? settings[key] : value });
   }
 
   function handleSave() {
     if (settings === null) return;
-    const clamped: UserSettings = {
-      masteryRepetitions: Math.max(1, Math.min(10, settings.masteryRepetitions)),
-      maxNewPerDay: Math.max(1, Math.min(50, settings.maxNewPerDay)),
-      maxReviewsPerDay: Math.max(1, Math.min(500, settings.maxReviewsPerDay)),
-    };
+    const clamped = Object.fromEntries(
+      FIELDS.map(({ key, min, max }) => [key, Math.max(min, Math.min(max, settings[key]))])
+    ) as UserSettings;
     saveSettings(clamped);
     setSettings(clamped);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
+    savedTimeoutRef.current = setTimeout(() => {
+      savedTimeoutRef.current = null;
+      setSaved(false);
+    }, 2000);
   }
 
   return (

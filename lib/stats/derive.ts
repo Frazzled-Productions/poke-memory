@@ -72,7 +72,7 @@ export type GenerationStats = {
   name: string;
   total: number;       // species in this generation
   introduced: number;  // count where lastReview !== null
-  mastered: number;    // count where repetitions >= MASTERY_REPETITIONS
+  mastered: number;    // count where repetitions >= masteryRepetitions
 };
 
 export type StrugglingCard = {
@@ -87,7 +87,7 @@ export type StatsResult = {
   totalCards: number;                    // SEED_POKEMON.length, typically 1025
   introduced: number;                    // lastReview !== null
   learning: number;                      // introduced && !mastered
-  mastered: number;                      // repetitions >= MASTERY_REPETITIONS
+  mastered: number;                      // repetitions >= masteryRepetitions param
   locked: number;                        // lastReview === null (== totalCards - introduced)
   dueToday: number;                      // dueDate <= today AND lastReview !== today
   dueTomorrow: number;                   // dueDate === tomorrow's ISO date
