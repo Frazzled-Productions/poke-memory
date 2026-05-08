@@ -341,10 +341,10 @@ jobs:
           # against body-content variations like `Closes`/`fixes`/`resolves`.
           PR_NUMBER=$(gh pr list --repo "$REPO" --state all --limit 100 \
             --json number,headRefName,createdAt \
-            --jq --arg prefix "auto/issue-$ISSUE-" '
-              [.[] | select(.headRefName | startswith($prefix))]
-              | sort_by(.createdAt) | last | .number // empty
-            ')
+            | jq -r --arg prefix "auto/issue-$ISSUE-" '
+                [.[] | select(.headRefName | startswith($prefix))]
+                | sort_by(.createdAt) | last | .number // empty
+              ')
 
           if [ -n "$PR_NUMBER" ]; then
             REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \

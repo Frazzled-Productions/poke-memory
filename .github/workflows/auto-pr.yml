@@ -242,7 +242,7 @@ jobs:
           fi
 
           REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq --arg n "$NEXT" '[.[] | select(.body | startswith("<!-- auto-review:" + $n + " -->"))] | length')
+            | jq -r --arg n "$NEXT" '[.[] | select(.body | startswith("<!-- auto-review:" + $n + " -->"))] | length')
 
           git fetch origin --quiet 2>/dev/null || true
           if [ -n "$START_SHA" ] && git rev-parse "$START_SHA" >/dev/null 2>&1; then
