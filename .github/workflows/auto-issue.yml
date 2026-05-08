@@ -402,6 +402,11 @@ jobs:
           fi
           echo "Live status comment ID: $STATUS_ID"
 
+          # Preserve the existing TodoWrite-driven body so the task list survives
+          # into the final outcome comment. We APPEND a "Run finished" section
+          # rather than overwriting the body.
+          CURRENT_BODY=$(gh api "repos/$REPO/issues/comments/$STATUS_ID" --jq '.body')
+
           # Find the PR opened from this issue's auto branch. Match on branch
           # name (the orchestrator creates `auto/issue-N-<slug>`) — robust
           # against body-content variations like `Closes`/`fixes`/`resolves`.
@@ -426,6 +431,18 @@ jobs:
             COMMITS=0
           fi
 
+          # Branch name (only shown if it matches the auto/issue-N-* pattern)
+          # and last-commit subject for the recovery footer.
+          BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+          case "$BRANCH" in
+            "auto/issue-${ISSUE}-"*) ;;
+            *) BRANCH="" ;;
+          esac
+          LAST_COMMIT=""
+          if [ "$COMMITS" -gt 0 ]; then
+            LAST_COMMIT=$(git log --format='%h %s' -n 1 2>/dev/null || echo "")
+          fi
+
           DENIAL_COUNT=0
           DENIAL_DETAILS=""
           if [ -f "$LOG" ]; then
@@ -445,16 +462,43 @@ jobs:
             ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
           fi
 
+          # Halt cases: any time we end without an open PR (whether or not
+          # commits were pushed). On halt we surface branch + last commit + how
+          # to recover, so the maintainer can pick up the work without spelunking
+          # the run logs.
+          HALTED=false
+          if [ -z "$PR_NUMBER" ]; then
+            HALTED=true
+          fi
+
           {
-            printf '<!-- auto-status -->\n'
+            # Preserve existing task list / placeholder body verbatim
+            printf '%s\n\n---\n\n## Run finished\n\n' "$CURRENT_BODY"
             if [ -n "$PR_NUMBER" ] && [ "$REVIEW_FOUND" -gt 0 ]; then
               printf 'Done — opened PR #%s, posted auto-review #1.\n' "$PR_NUMBER"
             elif [ -n "$PR_NUMBER" ]; then
               printf '**Outcome unclear** — opened PR #%s but auto-review #1 was not posted. See [run logs](%s).\n' "$PR_NUMBER" "$RUN_URL"
             elif [ "$COMMITS" -gt 0 ]; then
-              printf '**Outcome unclear** — pushed %s commit(s) but no PR was opened. See [run logs](%s).\n' "$COMMITS" "$RUN_URL"
+              printf '**Run halted** — pushed %s commit(s) but no PR was opened. See [run logs](%s).\n' "$COMMITS" "$RUN_URL"
             else
-              printf 'No PR opened. See [run logs](%s).\n' "$RUN_URL"
+              printf '**Run halted** — no PR opened, no commits pushed. See [run logs](%s).\n' "$RUN_URL"
+            fi
+            if [ "$HALTED" = true ]; then
+              printf '\n### How to recover\n\n'
+              if [ -n "$BRANCH" ]; then
+                printf 'Branch: `%s`\n' "$BRANCH"
+              fi
+              if [ -n "$LAST_COMMIT" ]; then
+                printf 'Last commit: `%s`\n' "$LAST_COMMIT"
+              fi
+              if [ -n "$BRANCH" ] || [ -n "$LAST_COMMIT" ]; then
+                printf '\n'
+              fi
+              printf 'Comment `/go` to start over with a fresh branch.'
+              if [ -n "$BRANCH" ]; then
+                printf ' To pick up where this left off, check out the branch above and continue manually.'
+              fi
+              printf '\n'
             fi
             if [ "$DENIAL_COUNT" != "0" ]; then
               printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
