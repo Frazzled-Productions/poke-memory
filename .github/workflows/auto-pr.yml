@@ -309,7 +309,7 @@ jobs:
             fi
           } > /tmp/status-body.md
 
-          gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -f body=@/tmp/status-body.md
+          gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -F body=@/tmp/status-body.md
 
       - name: Move issue to PR / Ready to merge based on review verdict
         if: always() && env.stopped != 'true' && steps.linked.outputs.issue != ''
