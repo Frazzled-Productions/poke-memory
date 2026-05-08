@@ -29,7 +29,6 @@ export default function AppleIcon() {
             display: "flex",
             alignItems: "flex-start",
             justifyContent: "flex-start",
-            position: "relative",
           }}
         >
           {/* Highlight reflection — upper-left */}
@@ -58,7 +57,7 @@ export default function AppleIcon() {
               width: 16,
               height: 16,
               borderRadius: "50%",
-              backgroundColor: "#E63946",
+              backgroundColor: "#FF3B47",
             }}
           />
           <div

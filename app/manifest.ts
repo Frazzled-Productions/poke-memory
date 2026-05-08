@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "poke-memory",
-    short_name: "poke-memory",
+    name: "Poké Memory",
+    short_name: "Poké Memory",
     description:
       "Spaced-repetition Pokémon flashcards for learning the names of all 1025 Pokémon.",
     start_url: "/",
