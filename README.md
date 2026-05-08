@@ -17,9 +17,9 @@ Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the 
 ## What's in it
 
 - All 1025 canonical Pokémon (gen 1 through gen 9, no alternate forms).
-- **Three pages**: **Practice** (the daily review loop), **Stats** (mastery distribution, due forecast, per-generation progress, struggling-card list), and **Pokédex** — a 1025-cell grid that fills in as you learn, with locked Pokémon shown as silhouettes and names hidden until you've seen them.
+- **Four pages**: **Practice** (the daily review loop), **Stats** (mastery distribution, due forecast, per-generation progress, struggling-card list), **Pokédex** — a 1025-cell grid that fills in as you learn, and **Settings** — configure mastery threshold, new-card cap, and review cap.
 - SM-2 scheduling — well-known algorithm, fully spec'd math, no ML constants to tune.
-- Daily limits: 10 new cards and 100 reviews per day by default. Keeps the load sustainable.
+- Daily limits: 10 new cards and 100 reviews per day by default, adjustable in Settings. Keeps the load sustainable.
 - Stable per-day shuffle — order rotates daily so the same Pokémon doesn't always lead, but stays stable while you're working through a session.
 - All state lives in your browser's `localStorage`. Nothing is sent anywhere.
 
