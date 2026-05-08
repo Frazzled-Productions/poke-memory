@@ -160,13 +160,17 @@ jobs:
 
                    Verdict: Looks good to me
 
+                   _Reply with `/fix` to have these findings addressed._
+
                The first line MUST be the HTML marker `<!-- auto-review:1 -->`
-               exactly. The last line MUST start with `Verdict: ` followed by
-               either `Looks good to me` (no significant issues) or
-               `Needs fixes` (one or more issues that should be addressed).
-               Use those whole-word phrases verbatim — no acronyms. The
-               maintainer comments `/fix` on the PR to have those findings
-               addressed.
+               exactly. A verdict line starting with `Verdict: ` MUST be
+               present, followed by either `Looks good to me` (no significant
+               issues) or `Needs fixes` (one or more issues that should be
+               addressed). Use those whole-word phrases verbatim — no acronyms.
+               When (and only when) the verdict is `Needs fixes`, append the
+               italicised footer line shown above so the maintainer knows how
+               to trigger a fix run. Omit the footer when the verdict is
+               `Looks good to me`.
             8. Post a brief comment on the issue linking the PR.
 
             If you hit a blocker you can't resolve, post a comment on the issue

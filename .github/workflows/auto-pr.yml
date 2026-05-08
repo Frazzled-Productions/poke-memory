@@ -164,10 +164,15 @@ jobs:
 
                      Verdict: Looks good to me
 
-                 The first line MUST be the marker exactly as shown. The verdict
-                 line MUST start with `Verdict: ` and be either
+                     _Reply with `/fix` to have these findings addressed._
+
+                 The first line MUST be the marker exactly as shown. A verdict
+                 line starting with `Verdict: ` MUST be present, with either
                  `Looks good to me` or `Needs fixes`. Use those whole-word
-                 phrases verbatim — no acronyms.
+                 phrases verbatim — no acronyms. When (and only when) the
+                 verdict is `Needs fixes`, append the italicised footer line
+                 shown above so the maintainer knows how to trigger a fix
+                 run. Omit the footer when the verdict is `Looks good to me`.
 
             If you hit a blocker, post a PR comment explaining what's blocked
             and stop — don't push half-done work.
