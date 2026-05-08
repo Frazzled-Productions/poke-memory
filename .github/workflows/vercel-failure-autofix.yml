@@ -1,0 +1,143 @@
+name: Auto-fix Vercel deployment failures
+
+# When Vercel reports a deployment failure on an auto-issue PR branch,
+# fetch the build error excerpt and post a `/fix` comment on the PR.
+# auto-pr.yml then handles the actual fix cycle.
+#
+# Required secret: VERCEL_TOKEN (Vercel personal access token, read access
+# to deployments). If unset, this workflow is a no-op.
+
+on:
+  deployment_status: {}
+
+concurrency:
+  group: vercel-autofix-${{ github.event.deployment.id }}
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    name: Trigger /fix on Vercel failure
+    if: |
+      github.event.deployment_status.state == 'failure' &&
+      startsWith(github.event.deployment.ref, 'auto/issue-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Check Vercel token availability
+        id: token
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN secret not set — skipping Vercel auto-fix."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find PR for branch
+        id: pr
+        if: steps.token.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.event.deployment.ref }}
+        run: |
+          set -uo pipefail
+          PR=$(gh pr list --repo "$REPO" --head "$REF" --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            echo "No open PR for ref $REF — nothing to fix."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Idempotency check
+        id: idem
+        if: steps.token.outputs.skip != 'true' && steps.pr.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.pr }}
+        run: |
+          set -uo pipefail
+          # Skip if we already posted a vercel-autofix /fix in the last 10
+          # minutes — Vercel sometimes sends multiple failure events for one
+          # deployment (preview vs production builds, transient retries).
+          NOW=$(date -u +%s)
+          THRESHOLD=$((NOW - 600))
+          RECENT=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '[.[]
+              | select(.body | startswith("<!-- vercel-autofix -->"))
+              | {created: (.created_at | fromdateiso8601)}
+              | select(.created > '"$THRESHOLD"')] | length')
+          if [ "$RECENT" -gt 0 ]; then
+            echo "Recent vercel-autofix /fix comment exists — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch deployment logs
+        id: logs
+        if: steps.token.outputs.skip != 'true' && steps.pr.outputs.skip != 'true' && steps.idem.outputs.skip != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          TARGET_URL: ${{ github.event.deployment_status.target_url }}
+        run: |
+          set -uo pipefail
+          DPL=$(printf '%s' "$TARGET_URL" | grep -oE 'dpl_[A-Za-z0-9]+' | head -1)
+          if [ -z "$DPL" ]; then
+            echo "Could not extract deployment ID from target_url=$TARGET_URL — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Deployment ID: $DPL"
+          if ! curl -fsSL \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v3/deployments/$DPL/events?limit=-1" \
+            > /tmp/events.json; then
+            echo "Vercel events fetch failed — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          jq -r '
+            .[]
+            | select(.type == "stderr" or (.text // "" | test("Error|error|Failed|failed"; "")))
+            | (.text // "")
+          ' /tmp/events.json | tail -60 > /tmp/error-excerpt.txt
+          if [ ! -s /tmp/error-excerpt.txt ]; then
+            jq -r '.[] | (.text // "")' /tmp/events.json | tail -60 > /tmp/error-excerpt.txt
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Post /fix comment on PR
+        if: steps.token.outputs.skip != 'true' && steps.pr.outputs.skip != 'true' && steps.idem.outputs.skip != 'true' && steps.logs.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.pr }}
+          TARGET_URL: ${{ github.event.deployment_status.target_url }}
+        run: |
+          {
+            printf '<!-- vercel-autofix -->\n'
+            printf '/fix\n\n'
+            printf 'Vercel deployment failed. Error excerpt:\n\n'
+            printf '```\n'
+            cat /tmp/error-excerpt.txt
+            printf '\n```\n\n'
+            printf '_Full logs: %s_\n' "$TARGET_URL"
+          } > /tmp/comment.md
+          gh pr comment "$PR" --repo "$REPO" --body-file /tmp/comment.md
