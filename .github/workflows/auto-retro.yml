@@ -1,0 +1,217 @@
+name: Auto Retro
+
+# When an issue closes via a merged PR, post a one-comment retrospective
+# focused on which sub-agents earned their keep on that change. The point
+# of this repo is practising sub-agent workflows — capturing a structured
+# reflection per change is what makes the practice compound.
+#
+# Skips:
+#   - issues closed as `not_planned` (wontfix / dupe — nothing to retro)
+#   - issues with no linked merged PR (manual close without code)
+#   - issues that already have an `<!-- auto-retro -->` comment (idempotent)
+#
+# Output: a single `<!-- auto-retro -->` comment on the closed issue.
+# Status field is owned by `auto-status.yml` — this workflow does not
+# touch the project board.
+
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: auto-retro-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  retro:
+    name: Retrospective
+    if: github.event.issue.state_reason != 'not_planned'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Find linked merged PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          NAME: ${{ github.event.repository.name }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          # `closedByPullRequestsReferences` is GraphQL-only; the REST issue
+          # payload doesn't expose the closing PR. Fetch via gh api graphql.
+          PR=$(gh api graphql \
+            -f query='
+              query($owner: String!, $name: String!, $issue: Int!) {
+                repository(owner: $owner, name: $name) {
+                  issue(number: $issue) {
+                    closedByPullRequestsReferences(first: 10, includeClosedPrs: true) {
+                      nodes { number state }
+                    }
+                  }
+                }
+              }' \
+            -F owner="$OWNER" -F name="$NAME" -F issue="$ISSUE" \
+            --jq '.data.repository.issue.closedByPullRequestsReferences.nodes
+                  | map(select(.state == "MERGED"))
+                  | sort_by(.number) | last | .number // empty')
+
+          if [ -z "$PR" ]; then
+            echo "No merged PR linked to issue #$ISSUE — skipping retro."
+            echo "skip=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "RETRO_PR=$PR" >> "$GITHUB_ENV"
+          echo "Linked merged PR: #$PR"
+
+      - name: Skip if retro already posted
+        if: env.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          EXISTS=$(gh api \
+            "repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-retro -->"))] | length')
+          if [ "$EXISTS" -gt 0 ]; then
+            echo "Retro already posted on issue #${{ github.event.issue.number }} — skipping."
+            echo "skip=true" >> "$GITHUB_ENV"
+          fi
+
+      - uses: anthropics/claude-code-action@v1
+        if: env.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 20
+          prompt: |
+            You are writing a retrospective on issue #${{ github.event.issue.number }},
+            which just closed via merged PR #${{ env.RETRO_PR }}.
+
+            **Goal:** capture which sub-agents earned their keep on this
+            change, which were overhead, and one transferable lesson. This
+            is process reflection, not code review — do not recommend code
+            changes.
+
+            Read AGENTS.md (loaded via CLAUDE.md) for the sub-agent roster
+            and orchestration playbook. Frame the retro against the playbook
+            so deviations are visible.
+
+            ## Inputs to gather
+
+            1. Issue body + comments:
+               `gh issue view ${{ github.event.issue.number }} --json title,body,comments`
+               The planner's plan, if one ran, is the issue comment ending
+               with the line: `Reply with \`/go\` to proceed.` Mid-flight
+               scope changes show up as later comments before `/go`. The
+               issue may have closed without an `auto`-label flow at all
+               (manual orchestrator work) — if there's no planner comment,
+               note that in the retro and reflect on the direct path
+               instead.
+
+            2. PR metadata + comments:
+               `gh pr view ${{ env.RETRO_PR }} --json title,body,comments,commits`
+               All `<!-- auto-review:N -->` comments are auto-review cycles.
+               The final `<!-- auto-status -->` comment summarises the
+               implement run's outcome (commits pushed, denials, etc.).
+
+            3. PR diff (cap at ~300 lines for context — pipe through `head -300`):
+               `gh pr diff ${{ env.RETRO_PR }} | head -300`
+
+            ## Output format
+
+            Post a single comment on the issue. The marker MUST be the
+            first line of the comment body:
+
+                <!-- auto-retro -->
+                ## Retrospective
+
+                **Agents used:** <one line. Name each sub-agent that ran,
+                inferred from planner output, orchestrator behaviour, and
+                review cycles. If only the orchestrator ran directly, say
+                so.>
+
+                **What worked:** <2–3 short bullets. Be specific — name the
+                agent and what it caught or did well. Tie to concrete
+                evidence (a review finding, a planner question that
+                surfaced a real risk, etc.).>
+
+                **What didn't / overhead:** <2–3 short bullets. Where did
+                a round-trip cost more than it returned? Where did an agent
+                duplicate work the orchestrator was already doing? If
+                everything fired cleanly, say so plainly — don't
+                manufacture criticism.>
+
+                **Lesson:** <single bullet. One transferable rule for
+                future changes, framed as a rule. Example: "Skip
+                code-reviewer for pure CHANGELOG/AGENTS edits — the diff
+                is self-evident."  Avoid generic platitudes.>
+
+            Keep the whole comment under 250 words. Don't summarise what
+            changed (the diff already does that).
+
+            Post via:
+            `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
+
+            If you hit a blocker (e.g., the linked PR can't be fetched),
+            post a short comment explaining the blocker and stop — don't
+            post a partial retro.
+
+      - name: Surface tool denials
+        if: always() && env.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -u
+          if [ ! -f "$LOG" ]; then exit 0; fi
+
+          DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          if [ "$DENIAL_COUNT" = "0" ] || [ -z "$DENIAL_COUNT" ]; then
+            echo "No tool denials."
+            exit 0
+          fi
+
+          DENIAL_DETAILS=$(jq -r '
+            def text_of:
+              if type == "string" then .
+              elif type == "array" then map(.text // "" | tostring) | join(" ")
+              else tostring end;
+            select(.type == "user")
+            | .message.content[]?
+            | select(.type == "tool_result")
+            | select((.is_error // false) == true)
+            | (.content | text_of) as $c
+            | select($c | test("permission|denied|not allowed"; "i"))
+            | $c | gsub("\\s+"; " ") | .[0:240]
+          ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+
+          {
+            printf '<!-- auto-denials:retro -->\n'
+            printf '## %s tool denial(s) during retro run\n\n' "$DENIAL_COUNT"
+            printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
+            if [ -n "$DENIAL_DETAILS" ]; then
+              printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+            fi
+          } > /tmp/denials.md
+
+          gh issue comment "$ISSUE" --repo "$REPO" --body-file /tmp/denials.md
