@@ -55,7 +55,6 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 | SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
 | `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
-| `BACKLOG.md` | **user** — orchestrator reads only; never reorders or removes items without explicit user direction |
 
 ## Conventions
 
@@ -112,11 +111,18 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
 
 ### Backlog / process
 
-- [BACKLOG.md](./BACKLOG.md) is the user's running list of ideas, organised into `Now` / `Next` / `Later` sections by rough priority. The user owns it — they add, reorder, and remove items freely.
-- When starting a new slice, the orchestrator reads `BACKLOG.md` and either picks the top `Now` item or asks the user to choose.
-- **Never reorder or delete items without the user's explicit say-so.** Priorities are the user's call, not the orchestrator's.
-- When a slice is in progress and a related-but-out-of-scope idea comes up, add it to `Later` (or `Next` if clearly higher-priority). Better to capture than lose, but don't promote items to `Now` without asking.
-- The user is encouraged to dump ideas into BACKLOG.md while the orchestrator is mid-slice — that's the whole point. Means they don't have to wait for a chat response, and ideas don't get lost in conversation scroll.
+The backlog lives on GitHub:
+
+- **Issues**: every idea, bug, or queued slice is a GitHub issue, labelled with `priority:now` / `priority:next` / `priority:later`. Issues are user-owned; anyone the user grants access can file new ones. Phone-accessible via the GitHub mobile app.
+- **Project board** ([Poké Memory roadmap](https://github.com/users/fraserbrookhouse/projects/2)): kanban view with a `Priority` field (Now / Next / Later) corresponding to the labels. Same source data as Issues, visualised.
+
+When starting a new slice, the orchestrator runs `gh issue list --label "priority:now"` (or checks the project board) to find candidates. Usually grabs the top `priority:now` item; otherwise asks the user to pick.
+
+**The user owns priorities.** Don't move issues between priority labels (or columns) without explicit user direction. Items that come up mid-slice as out-of-scope captures get filed as new issues with `priority:later` (or `priority:next` if clearly higher) — never auto-promoted to `priority:now`.
+
+**The user can file ideas any time** — phone, web, anywhere they have GitHub access — without waiting for a chat response. That's the point of moving off a chat-only workflow.
+
+When a slice closes an issue, reference it in the commit message (`closes #N`) so it auto-closes on push.
 
 ### Privacy
 
