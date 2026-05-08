@@ -88,6 +88,29 @@ jobs:
         if: env.stopped != 'true'
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve linked issue number
+        id: linked
+        if: env.stopped != 'true'
+        run: |
+          # PR head branches are `auto/issue-N-...` — extract N. If no match,
+          # fall back to parsing `closes #N` from the PR body.
+          BRANCH="${{ steps.pr.outputs.branch }}"
+          ISSUE=""
+          if [[ "$BRANCH" =~ ^auto/issue-([0-9]+)- ]]; then
+            ISSUE="${BASH_REMATCH[1]}"
+          else
+            ISSUE=$(gh pr view ${{ github.event.issue.number }} --json body \
+              --jq '.body' | grep -oiE 'closes #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
+          fi
+          echo "issue=$ISSUE" >> "$GITHUB_OUTPUT"
+          echo "Linked issue: ${ISSUE:-none}"
+
+      - name: Move issue to In Progress
+        if: env.stopped != 'true' && steps.linked.outputs.issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: .github/scripts/set-project-status.sh "${{ steps.linked.outputs.issue }}" "In Progress"
+
       - uses: anthropics/claude-code-action@v1
         if: env.stopped != 'true'
         with:
@@ -271,3 +294,28 @@ jobs:
           } > /tmp/status-body.md
 
           gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -f body=@/tmp/status-body.md
+
+      - name: Move issue to PR / Ready to merge based on review verdict
+        if: always() && env.stopped != 'true' && steps.linked.outputs.issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: |
+          set -euo pipefail
+          ISSUE="${{ steps.linked.outputs.issue }}"
+          # If the issue closed mid-run (PR auto-merged), let auto-status own Done.
+          STATE=$(gh issue view "$ISSUE" --json state --jq '.state')
+          if [[ "$STATE" != "OPEN" ]]; then
+            echo "Issue #$ISSUE is $STATE — auto-status owns Done; skipping."
+            exit 0
+          fi
+          PR="${{ github.event.issue.number }}"
+          VERDICT=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))]
+                  | sort_by(.created_at) | last | .body // ""' \
+            | grep -E '^Verdict:' | head -1 || true)
+          if [[ "$VERDICT" == *"Looks good to me"* ]]; then
+            STATUS="Ready to merge"
+          else
+            STATUS="PR"
+          fi
+          .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"

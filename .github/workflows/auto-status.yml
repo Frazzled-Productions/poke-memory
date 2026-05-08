@@ -1,0 +1,29 @@
+name: Auto Status
+
+# Sets the project Status to Done when an issue closes (whether merged via
+# `closes #N` on a PR, manually closed, or closed as not-planned). The other
+# transitions (Planned, In Progress, PR, Ready to merge) are driven from
+# auto-issue.yml and auto-pr.yml at the matching workflow phases.
+
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: auto-status-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  done:
+    name: Mark Done
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Move issue to Done
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "Done"

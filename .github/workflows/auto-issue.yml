@@ -129,6 +129,11 @@ jobs:
 
           gh issue comment "$ISSUE" --repo "$REPO" --body-file /tmp/denials.md
 
+      - name: Move issue to Planned
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "Planned"
+
   implement:
     name: Implement
     if: |
@@ -202,6 +207,11 @@ jobs:
       - name: Record starting SHA
         id: start
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Move issue to In Progress
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "In Progress"
 
       - uses: anthropics/claude-code-action@v1
         with:
@@ -395,3 +405,34 @@ jobs:
           } > /tmp/status-body.md
 
           gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -f body=@/tmp/status-body.md
+
+      - name: Move issue to PR / Ready to merge based on review verdict
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: |
+          set -euo pipefail
+          ISSUE="${{ github.event.issue.number }}"
+          # If the issue closed mid-run (e.g. PR auto-merged), the auto-status
+          # workflow owns the Done transition — don't fight it.
+          STATE=$(gh issue view "$ISSUE" --json state --jq '.state')
+          if [[ "$STATE" != "OPEN" ]]; then
+            echo "Issue #$ISSUE is $STATE — auto-status owns Done; skipping."
+            exit 0
+          fi
+          PR=$(gh pr list --state open --limit 200 --json number,headRefName \
+            --jq "[.[] | select(.headRefName | startswith(\"auto/issue-${ISSUE}-\"))][0].number")
+          if [[ -z "$PR" || "$PR" == "null" ]]; then
+            echo "No open PR found for issue #$ISSUE — leaving status at In Progress."
+            exit 0
+          fi
+          VERDICT=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))]
+                  | sort_by(.created_at) | last | .body // ""' \
+            | grep -E '^Verdict:' | head -1 || true)
+          if [[ "$VERDICT" == *"Looks good to me"* ]]; then
+            STATUS="Ready to merge"
+          else
+            STATUS="PR"
+          fi
+          .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
