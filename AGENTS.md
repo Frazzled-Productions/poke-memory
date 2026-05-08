@@ -54,6 +54,7 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 | Server Actions | data-coder (implementation), ui-coder (call sites) |
 | SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
+| `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
 
 ## Conventions
 
@@ -93,6 +94,24 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
     easeFactor: number;        // multiplier, min 1.3, default 2.5
     dueDate: string;           // ISO 8601 date "YYYY-MM-DD"
     lastReview: string | null; // null sentinel = never reviewed
+    firstSeen: string | null;  // ISO date of first-ever grade; set once, never overwritten
   };
   ```
 - Dates as `"YYYY-MM-DD"` strings (string-comparable, no timezone math). The `nextReview` scheduler is a pure function and lives in `lib/srs/`.
+- **Queue policy**: two queues — review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today` (stable for the day, rotates daily).
+- **Daily limits**: 10 new cards/day (hard wall — exceeding inflates tomorrow's review queue), 100 reviews/day (soft wall with "Keep reviewing" override). Counters: `newIntroducedToday = firstSeen === today`; `reviewsDoneToday = lastReview === today && firstSeen !== today`.
+- **Persisted session shape**: `{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` silently migrates the legacy bare-`ReviewCard[]` shape and backfills `firstSeen` from `lastReview` on existing cards.
+
+### Documentation
+
+- **README.md** is the user-facing entry point — audience is a curious visitor or contributor. Concise, scannable, includes run-locally instructions.
+- **CHANGELOG.md** tracks notable user-facing changes. Loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Add an entry under `## [Unreleased]` whenever a commit changes user-facing behavior or adds a feature.
+- **Both files are updated as part of the same commit that lands the change** — no separate docs-only commit. Orchestrator handles the edit inline; no specialist agent.
+- Internal conventions (this file, `AGENTS.md`) are kept separate from user-facing docs. Don't merge them.
+
+### Privacy
+
+- **No personal data leaves the user's browser without explicit consent.** All session state lives in `localStorage`; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
+- This is a hard project constraint. While the app stays fully client-side and processes no personal data, GDPR / UK-GDPR obligations are minimal — we are not a data controller for any user data.
+- When we add a backend, accounts, analytics, or any third-party service that processes personal data, this section gets updated and we do a one-off review pass to identify obligations (privacy notice, consent UI, data-processing agreements). Until then, no per-commit legal review is needed.
+- Sprite URLs are fetched directly by the user's browser from `raw.githubusercontent.com` (PokéAPI's CDN). We don't proxy them, so no information about which Pokémon a user is learning passes through any infrastructure we control.
