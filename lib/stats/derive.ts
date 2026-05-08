@@ -14,9 +14,9 @@ export const MASTERY_REPETITIONS = 3;
  * Learning: graded at least once, but repetitions < MASTERY_REPETITIONS.
  * Mastered: repetitions >= MASTERY_REPETITIONS.
  */
-export function classifyCard(card: ReviewCard): CardClass {
+export function classifyCard(card: ReviewCard, masteryRepetitions = MASTERY_REPETITIONS): CardClass {
   if (card.state.lastReview === null) return "locked";
-  if (card.state.repetitions >= MASTERY_REPETITIONS) return "mastered";
+  if (card.state.repetitions >= masteryRepetitions) return "mastered";
   return "learning";
 }
 
@@ -135,6 +135,7 @@ export function computeStats(
   cards: readonly ReviewCard[],
   today: string,
   strugglingLimit = 10,
+  masteryRepetitions = MASTERY_REPETITIONS,
 ): StatsResult {
   const tomorrow = tomorrowString(today);
 
@@ -155,7 +156,7 @@ export function computeStats(
   for (const card of cards) {
     const state = card.state;
     const isIntroduced = state.lastReview !== null;
-    const isMastered   = state.repetitions >= MASTERY_REPETITIONS;
+    const isMastered   = state.repetitions >= masteryRepetitions;
 
     // Mastery / learning / locked tallies.
     if (isIntroduced) {

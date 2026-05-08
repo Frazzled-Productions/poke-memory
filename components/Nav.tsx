@@ -7,6 +7,7 @@ const NAV_LINKS = [
   { href: "/", label: "Practice" },
   { href: "/stats", label: "Stats" },
   { href: "/pokedex", label: "Pokédex" },
+  { href: "/settings", label: "Settings" },
 ] as const;
 
 export function Nav() {

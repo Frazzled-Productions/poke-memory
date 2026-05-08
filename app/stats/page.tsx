@@ -8,6 +8,7 @@ import { loadSession } from "@/lib/review/persistence";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
+import { loadSettings } from "@/lib/settings/persistence";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -327,6 +328,7 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 
 export default function StatsPage() {
   const [cards, setCards] = useState<ReviewCard[] | null>(null);
+  const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
 
   useEffect(() => {
     const saved = loadSession();
@@ -335,10 +337,14 @@ export default function StatsPage() {
     } else {
       setCards(buildSession(SEED_POKEMON));
     }
+    const settings = loadSettings();
+    setMasteryRepetitions(settings.masteryRepetitions);
   }, []);
 
   const stats: StatsResult | null =
-    cards !== null ? computeStats(cards, todayString(new Date())) : null;
+    cards !== null && masteryRepetitions !== null
+      ? computeStats(cards, todayString(new Date()), 10, masteryRepetitions)
+      : null;
 
   return (
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">

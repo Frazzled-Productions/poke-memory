@@ -16,6 +16,7 @@ import {
   DEFAULT_LIMITS,
 } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
+import { loadSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 
@@ -220,19 +221,22 @@ export function ReviewSession() {
     let sessionCards: ReviewCard[];
     let sessionLimits: DailyLimits;
 
+    const { maxNewPerDay, maxReviewsPerDay } = loadSettings();
+    const settingsLimits = { maxNewPerDay, maxReviewsPerDay };
+
     if (saved !== null) {
       // Merge any seed cards added since the last save.
       const hydrated = hydrateSession(saved.cards, SEED_POKEMON);
-      sessionLimits = saved.limits;
+      sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
         saveSession({ cards: hydrated, limits: sessionLimits });
       }
       sessionCards = hydrated;
     } else {
       const fresh = buildSession(SEED_POKEMON);
-      saveSession({ cards: fresh, limits: DEFAULT_LIMITS });
+      saveSession({ cards: fresh, limits: settingsLimits });
       sessionCards = fresh;
-      sessionLimits = DEFAULT_LIMITS;
+      sessionLimits = settingsLimits;
     }
 
     setCards(sessionCards);
