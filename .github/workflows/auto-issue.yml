@@ -52,10 +52,26 @@ jobs:
             1. Load the issue:
                `gh issue view ${{ github.event.issue.number }} --json title,body,labels`
             2. Invoke the `planner` sub-agent (Agent tool, subagent_type "planner")
-               with the issue title and body. If the planner flags unknowns that
-               warrant a specialist (next16-expert, pokeapi-expert, srs-expert,
-               researcher), invoke those in parallel and fold their findings
-               into the plan.
+               with the issue title and body. The planner tags each open question
+               as one of: `[EXPERT-RESEARCH]`, `[USER-DECISION + RESEARCH]`, or
+               `[USER-DECISION]`. Handle each tag as follows:
+
+               - `[EXPERT-RESEARCH]`: dispatch the named specialist immediately
+                 (`next16-expert`, `pokeapi-expert`, or `srs-expert`). Fold the
+                 answer into the plan as a resolved decision. Do NOT surface the
+                 question to the maintainer — they should see the decided
+                 direction with a one-line rationale, not the question.
+               - `[USER-DECISION + RESEARCH]`: dispatch `researcher` to produce
+                 a project-specific options brief (current ecosystem state,
+                 comparative tradeoffs against this codebase's constraints, a
+                 recommendation). Present the brief inline in the plan with a
+                 clear decision frame for the maintainer.
+               - `[USER-DECISION]`: present the question as-is.
+
+               Run dispatches in parallel where the questions are independent.
+               The plan you post MUST NOT contain any unanswered
+               `[EXPERT-RESEARCH]` items, and every `[USER-DECISION + RESEARCH]`
+               item MUST include the researcher's brief inline.
             3. Post the plan as a comment on the issue:
                `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
             4. The comment must end with these two lines, on their own:
