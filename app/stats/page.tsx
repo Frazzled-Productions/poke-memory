@@ -70,9 +70,12 @@ function StatCard({
 
 function MasteryBar({ stats }: { stats: StatsResult }) {
   const { totalCards, locked, learning, mastered } = stats;
-  const lockedPct = pct(locked, totalCards);
-  const learningPct = pct(learning, totalCards);
+  // Compute mastered + learning by rounding, then derive locked as the
+  // remainder so the three segments always sum to exactly 100% — three
+  // independent Math.rounds can leave a 1px gap or 1px overflow in the bar.
   const masteredPct = pct(mastered, totalCards);
+  const learningPct = pct(learning, totalCards);
+  const lockedPct = Math.max(0, 100 - masteredPct - learningPct);
 
   return (
     <section aria-labelledby="mastery-heading">

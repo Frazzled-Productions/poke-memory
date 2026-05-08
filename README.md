@@ -13,6 +13,7 @@ Hosted on Vercel; auto-deploys on every push to `main`. Your progress lives in t
 ## What's in it
 
 - All 1025 canonical Pokémon (gen 1 through gen 9, no alternate forms).
+- **Three pages**: **Practice** (the daily review loop), **Stats** (mastery distribution, due forecast, per-generation progress, struggling-card list), and **Pokédex** — a 1025-cell grid that fills in as you learn, with locked Pokémon shown as silhouettes and names hidden until you've seen them.
 - SM-2 scheduling — well-known algorithm, fully spec'd math, no ML constants to tune.
 - Daily limits: 10 new cards and 100 reviews per day by default. Keeps the load sustainable.
 - Stable per-day shuffle — order rotates daily so the same Pokémon doesn't always lead, but stays stable while you're working through a session.

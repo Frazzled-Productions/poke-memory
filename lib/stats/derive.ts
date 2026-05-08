@@ -101,16 +101,15 @@ export type StatsResult = {
 
 /**
  * Compute tomorrow's ISO date string from today's "YYYY-MM-DD" string.
- * Uses Date.UTC to stay consistent with the UTC-based date strings used
- * throughout the codebase (mirrors the `addDays` pattern in lib/srs/scheduler.ts).
+ * Mirrors the `addDays` pattern in lib/srs/scheduler.ts exactly: parse to
+ * Date, increment via local-time `setDate`, format via UTC `toISOString`.
+ * The two halves of the codebase must use the same date arithmetic to
+ * avoid divergent results in negative-UTC offset timezones.
  */
 function tomorrowString(today: string): string {
-  const [yearStr, monthStr, dayStr] = today.split("-");
-  const year = Number(yearStr);
-  const month = Number(monthStr) - 1; // Date.UTC months are 0-based
-  const day = Number(dayStr);
-  const ms = Date.UTC(year, month, day + 1);
-  return new Date(ms).toISOString().slice(0, 10);
+  const result = new Date(today);
+  result.setDate(result.getDate() + 1);
+  return result.toISOString().slice(0, 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,8 +168,15 @@ export function computeStats(
       introducedCards.push(card);
     }
 
-    // Due-date tallies.
-    if (state.dueDate <= today && state.lastReview !== today) {
+    // Due-date tallies. Match the queue policy in `buildSessionQueues`:
+    // a card is "due today" only if it has been reviewed before — locked
+    // (never-reviewed) cards go into the new queue, not the review queue,
+    // so they shouldn't inflate this count on a fresh load.
+    if (
+      state.lastReview !== null &&
+      state.dueDate <= today &&
+      state.lastReview !== today
+    ) {
       dueToday++;
     }
     if (state.dueDate === tomorrow) {

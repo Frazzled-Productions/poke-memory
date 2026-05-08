@@ -6,7 +6,7 @@ import type { ReviewCard } from "@/lib/review/session";
 import { loadSession } from "@/lib/review/persistence";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
-import { classifyCard, GEN_RANGES } from "@/lib/stats/derive";
+import { classifyCard, GEN_RANGES, generationOf } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,9 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
           />
         )}
 
-        {/* Sprite */}
+        {/* Sprite — using a plain <img> rather than next/image because we render
+            1025 of these at fixed 64×64 sizes, where next/image's automatic
+            sizing wrapper adds DOM overhead per cell with no responsive benefit. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={spriteUrl}
@@ -217,17 +219,14 @@ export default function PokedexPage() {
     cardClass: cardClassById.get(p.id) ?? "locked",
   }));
 
-  // Group by generation using GEN_RANGES
+  // Group by generation. Defer to the shared `generationOf` helper so the
+  // page doesn't re-implement the lookup logic that already lives in lib/.
   const byGen: Map<number, PokemonCellData[]> = new Map(
     GEN_RANGES.map((r) => [r.gen, []]),
   );
   for (const p of enrichedPokemon) {
-    for (const range of GEN_RANGES) {
-      if (p.id >= range.first && p.id <= range.last) {
-        byGen.get(range.gen)!.push(p);
-        break;
-      }
-    }
+    const gen = generationOf(p.id);
+    if (gen >= 1 && gen <= 9) byGen.get(gen)!.push(p);
   }
 
   return (
