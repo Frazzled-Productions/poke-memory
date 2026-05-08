@@ -1,0 +1,147 @@
+name: Auto PR Fix
+
+# Triggered when a maintainer comments `/fix` on a PR that has an auto-review
+# comment. The orchestrator addresses the latest review's findings, pushes
+# fixes to the PR branch, then re-runs the reviewer and posts a new review
+# comment so the maintainer can decide whether to `/fix` again or merge.
+#
+# Loop bounds:
+#   - Hard cap: 3 auto-review cycles per PR (counted by `<!-- auto-review:N -->`
+#     markers on existing PR comments).
+#   - LGTM short-circuit: if the latest review's verdict is LGTM, no fix runs.
+#   - No-progress guard: if a fix cycle produces zero commits, no new review
+#     is posted — the chain stops naturally.
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: auto-pr-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    name: Fix
+    if: |
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, '/fix') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Resolve PR head branch
+        id: pr
+        run: |
+          BRANCH=$(gh pr view ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} \
+            --json headRefName --jq '.headRefName')
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.branch }}
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Count auto-review cycles
+        id: cycles
+        run: |
+          # Count comments whose body starts with the auto-review marker.
+          COUNT=$(gh api \
+            "repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))] | length')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "next=$((COUNT + 1))" >> "$GITHUB_OUTPUT"
+          echo "Found $COUNT existing auto-review comment(s); next would be #$((COUNT + 1))."
+
+      - name: Stop — no auto-review on this PR
+        if: fromJSON(steps.cycles.outputs.count) == 0
+        run: |
+          gh pr comment ${{ github.event.issue.number }} \
+            --body "\`/fix\` only works on PRs that have an auto-review comment. This PR has none — it likely wasn't opened by the auto-issue workflow."
+          echo "stopped=true" >> "$GITHUB_ENV"
+
+      - name: Stop — cycle cap reached
+        if: fromJSON(steps.cycles.outputs.count) >= 3
+        run: |
+          gh pr comment ${{ github.event.issue.number }} \
+            --body "Hit the auto-review iteration cap (3 cycles). Leaving this PR for human attention — please review and merge or push fixes manually."
+          echo "stopped=true" >> "$GITHUB_ENV"
+
+      - uses: anthropics/claude-code-action@v1
+        if: env.stopped != 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 80
+          prompt: |
+            You are the orchestrator on PR #${{ github.event.issue.number }}.
+            The maintainer commented `/fix` requesting that the latest auto-review
+            findings be addressed.
+
+            Read AGENTS.md (loaded via CLAUDE.md) for project conventions.
+
+            **Cycle context:** there are currently ${{ steps.cycles.outputs.count }}
+            auto-review comment(s) on this PR. The new review you'll post after
+            fixing is review #${{ steps.cycles.outputs.next }}. The cap is 3 —
+            this is allowed because count < 3.
+
+            Workflow:
+            1. Load the PR and its comments:
+               `gh pr view ${{ github.event.issue.number }} --json title,body,comments,headRefName,baseRefName`
+               The latest auto-review is the most recent comment whose body
+               starts with `<!-- auto-review:N -->`. Use the highest N.
+            2. **LGTM short-circuit.** If that review's verdict line is
+               `Verdict: LGTM`, post a PR comment saying "Latest review was LGTM —
+               nothing to fix" and stop. Do not push, do not post a new review.
+            3. Otherwise, address each finding in the punch list:
+               - Use the AGENTS.md playbook (specialists / coders as needed).
+               - Make the smallest correct change for each finding.
+               - If a finding is wrong (out of scope, based on a misread, or
+                 subjective and you disagree), do NOT silently ignore it —
+                 record your reasoning to include in your response comment.
+               - If the review is stale because the PR has commits after the
+                 review, reconcile against the current diff (not the original
+                 review wording).
+            4. **No-progress guard.** If you made no commits (every finding was
+               rejected as wrong, or all were already addressed), post a single
+               PR comment explaining your reasoning per finding and stop.
+               Do not post a new auto-review comment. The chain ends here.
+            5. If you made changes:
+               - Commit. **Do NOT add a Co-Authored-By trailer.** No Claude
+                 attribution in commit messages.
+               - Push to the PR branch (the current checkout is already on it).
+               - Run the `code-reviewer` sub-agent (Agent tool, subagent_type
+                 "code-reviewer") against the new diff
+                 (`git diff origin/${{ github.event.repository.default_branch }}...HEAD`).
+               - Post a new PR comment via
+                 `gh pr comment ${{ github.event.issue.number }} --body-file <path>`
+                 formatted exactly like this (no content before the marker):
+
+                     <!-- auto-review:${{ steps.cycles.outputs.next }} -->
+                     ## Auto-review #${{ steps.cycles.outputs.next }}
+
+                     <bulleted punch list, or "No significant issues.">
+
+                     Verdict: LGTM
+
+                 The first line MUST be the marker exactly as shown. The verdict
+                 line MUST start with `Verdict: ` and be either `LGTM` or
+                 `needs fixes`.
+
+            If you hit a blocker, post a PR comment explaining what's blocked
+            and stop — don't push half-done work.

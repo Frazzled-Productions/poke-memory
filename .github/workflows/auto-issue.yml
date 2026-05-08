@@ -3,7 +3,10 @@ name: Auto Issue Worker
 # Stage 1 (plan): when an issue is labeled `auto`, the planner sub-agent
 # drafts a plan and posts it as a comment.
 # Stage 2 (implement): when a maintainer replies `/go` on that issue,
-# the orchestrator runs the AGENTS.md playbook and opens a PR.
+# the orchestrator runs the AGENTS.md playbook, opens a PR, runs the
+# code-reviewer against the diff, and posts the findings as a PR comment.
+# The maintainer reads the review and comments `/fix` on the PR to trigger
+# fix cycles (handled by auto-pr.yml).
 
 on:
   issues:
@@ -105,23 +108,40 @@ jobs:
                edited / followed up with scope changes in their `/go` comment or
                nearby comments, treat those as authoritative over the original plan.
             2. Create a feature branch named `auto/issue-${{ github.event.issue.number }}-<short-kebab-slug>`.
-            3. Run the orchestration playbook from AGENTS.md:
+            3. Run the orchestration playbook from AGENTS.md (excluding
+               code-reviewer at this stage — it runs after PR creation):
                - Specialists in parallel where their questions are independent.
                - ui-coder and/or data-coder for implementation, in parallel when
                  their work is independent.
                - Update README.md and CHANGELOG.md inline if user-facing behavior
                  changed (per AGENTS.md "Documentation" section).
-               - Run code-reviewer at the end. Iterate on its punch list before
-                 opening the PR.
             4. Commit. **Do NOT add a Co-Authored-By trailer.** No Claude
                attribution in commit messages.
             5. Push the branch.
             6. Open the PR:
                `gh pr create --title "<title>" --body "<body>" --base main`
                The body MUST contain `closes #${{ github.event.issue.number }}`
-               so the issue auto-closes on merge. Summarise what changed and
-               note any review-cycle iterations.
-            7. Post a comment on the issue linking the PR.
+               so the issue auto-closes on merge. Summarise what changed.
+               Capture the new PR number for the next step.
+            7. Run the `code-reviewer` sub-agent (Agent tool, subagent_type
+               "code-reviewer") against the diff
+               (`git diff origin/main...HEAD`). Then post its findings on the PR
+               via `gh pr comment <pr-number> --body-file <path>`, formatted
+               exactly like this (no other content before the marker):
+
+                   <!-- auto-review:1 -->
+                   ## Auto-review #1
+
+                   <bulleted punch list of findings, or "No significant issues.">
+
+                   Verdict: LGTM
+
+               The first line MUST be the HTML marker `<!-- auto-review:1 -->`
+               exactly. The last line MUST start with `Verdict: ` followed by
+               either `LGTM` (no significant issues) or `needs fixes` (one or
+               more issues that should be addressed). The maintainer comments
+               `/fix` on the PR to have those findings addressed.
+            8. Post a brief comment on the issue linking the PR.
 
             If you hit a blocker you can't resolve, post a comment on the issue
             explaining what's blocked and stop — don't push half-done work.
