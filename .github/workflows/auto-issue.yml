@@ -260,6 +260,14 @@ jobs:
           git config user.name "${APP_SLUG}[bot]"
           git config user.email "${{ vars.BOT_APP_ID }}+${APP_SLUG}[bot]@users.noreply.github.com"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Record starting SHA
         id: start
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -330,12 +338,21 @@ jobs:
             4. Commit. **Do NOT add a Co-Authored-By trailer.** No Claude
                attribution in commit messages.
             5. Push the branch.
-            6. Open the PR:
+            6. **Build gate.** Run
+               `npm run typecheck && npm run build 2>&1 | tee /tmp/build-output.txt`.
+               If exit code is non-zero, read the output, apply a targeted fix,
+               commit, push, and re-run. Allow up to two fix attempts. If the
+               build still fails after the second fix attempt, post a comment
+               on the issue with the last 80 lines of `/tmp/build-output.txt`
+               and stop — do NOT open a PR. The branch stays pushed for
+               manual inspection. (`npm ci` has already run as a workflow
+               step, so dependencies are in place.)
+            7. Open the PR:
                `gh pr create --title "<title>" --body "<body>" --base main`
                The body MUST contain `closes #${{ github.event.issue.number }}`
                so the issue auto-closes on merge. Summarise what changed.
                Capture the new PR number for the next step.
-            7. Run the `code-reviewer` sub-agent (Agent tool, subagent_type
+            8. Run the `code-reviewer` sub-agent (Agent tool, subagent_type
                "code-reviewer") against the diff
                (`git diff origin/main...HEAD`). Then post its findings on the PR
                via `gh pr comment <pr-number> --body-file <path>`, formatted
@@ -359,7 +376,7 @@ jobs:
                italicised footer line shown above so the maintainer knows how
                to trigger a fix run. Omit the footer when the verdict is
                `Looks good to me`.
-            8. Post a brief comment on the issue linking the PR.
+            9. Post a brief comment on the issue linking the PR.
 
             If you hit a blocker you can't resolve, post a comment on the issue
             explaining what's blocked and stop — don't push half-done work.

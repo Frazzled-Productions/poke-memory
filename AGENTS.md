@@ -127,6 +127,10 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 **Retrospectives.** When an issue closes via a merged PR, `auto-retro.yml` posts a single `<!-- auto-retro -->` comment on the closed issue answering: which sub-agents earned their keep, which were overhead, and one transferable lesson. Skipped for `not_planned` closures and issues with no linked merged PR. The retro is *process reflection* — it does not recommend code changes. Aggregating retros into convention is left manual for now; if a pattern recurs across several retros, promote it into this file by hand.
 
+**Pre-PR build gate.** `auto-issue.yml`'s implement job runs `npm ci` and instructs the orchestrator to run `npm run typecheck && npm run build` after pushing the branch but before opening the PR. If the build fails, the orchestrator is allowed up to two targeted fix attempts (commit + push + retry). After the second failure, it posts a comment with the last 80 lines of build output and stops without opening a PR — the branch stays pushed for manual inspection. The goal: catch type/build errors in the same run that produced them, instead of finding out via Vercel after the PR is open.
+
+**Vercel auto-fix.** When a Vercel deployment fails on an `auto/issue-*` branch, `vercel-failure-autofix.yml` fetches the error excerpt from Vercel's events API and posts it as a `/fix` comment on the PR, which triggers `auto-pr.yml`'s usual fix cycle (subject to its 3-cycle cap). Requires the `VERCEL_TOKEN` repo secret (Vercel personal access token scoped to the account that owns the deployment — Vercel tokens are scoped by team/account, not by permission); without it the workflow is a no-op. Idempotent within a 10-minute window per PR — Vercel sometimes fires multiple `failure` events for one deployment.
+
 ### Privacy
 
 - **No personal data leaves the user's browser without explicit consent.** All session state lives in `localStorage`; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
