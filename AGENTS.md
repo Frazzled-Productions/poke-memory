@@ -55,6 +55,7 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 | SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
 | `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
+| `BACKLOG.md` | **user** — orchestrator reads only; never reorders or removes items without explicit user direction |
 
 ## Conventions
 
@@ -108,6 +109,14 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
 - **CHANGELOG.md** tracks notable user-facing changes. Loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Add an entry under `## [Unreleased]` whenever a commit changes user-facing behavior or adds a feature.
 - **Both files are updated as part of the same commit that lands the change** — no separate docs-only commit. Orchestrator handles the edit inline; no specialist agent.
 - Internal conventions (this file, `AGENTS.md`) are kept separate from user-facing docs. Don't merge them.
+
+### Backlog / process
+
+- [BACKLOG.md](./BACKLOG.md) is the user's running list of ideas, organised into `Now` / `Next` / `Later` sections by rough priority. The user owns it — they add, reorder, and remove items freely.
+- When starting a new slice, the orchestrator reads `BACKLOG.md` and either picks the top `Now` item or asks the user to choose.
+- **Never reorder or delete items without the user's explicit say-so.** Priorities are the user's call, not the orchestrator's.
+- When a slice is in progress and a related-but-out-of-scope idea comes up, add it to `Later` (or `Next` if clearly higher-priority). Better to capture than lose, but don't promote items to `Now` without asking.
+- The user is encouraged to dump ideas into BACKLOG.md while the orchestrator is mid-slice — that's the whole point. Means they don't have to wait for a chat response, and ideas don't get lost in conversation scroll.
 
 ### Privacy
 
