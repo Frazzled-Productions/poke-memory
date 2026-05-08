@@ -34,13 +34,16 @@ function isDailyLimitsShaped(value: unknown): boolean {
 }
 
 // Backfills `firstSeen` on a plain card-state object parsed from localStorage.
-// No-op if `firstSeen` is already present (post-fix sessions).
+// No-op if `firstSeen` is already present (post-fix sessions) or if the state
+// blob is corrupted (non-object); a corrupted state will fail isReviewCardShaped
+// downstream and the whole session will be rejected, but we don't want to throw
+// in this helper while we're still in the validation pipeline.
 // Best-effort: uses `lastReview` as the approximation for existing cards.
-function migrateReviewState(state: Record<string, unknown>): void {
-  if (state.firstSeen === undefined) {
-    state.firstSeen = typeof state.lastReview === "string"
-      ? state.lastReview
-      : null;
+function migrateReviewState(state: unknown): void {
+  if (typeof state !== "object" || state === null) return;
+  const s = state as Record<string, unknown>;
+  if (s.firstSeen === undefined) {
+    s.firstSeen = typeof s.lastReview === "string" ? s.lastReview : null;
   }
 }
 
@@ -62,7 +65,7 @@ export function loadSession(): SavedSession | null {
         return null;
       }
       for (const card of parsed) {
-        migrateReviewState((card as Record<string, unknown>).state as Record<string, unknown>);
+        migrateReviewState((card as Record<string, unknown>).state);
       }
       return {
         cards: parsed as ReviewCard[],
@@ -81,7 +84,7 @@ export function loadSession(): SavedSession | null {
           return null;
         }
         for (const card of obj.cards) {
-          migrateReviewState((card as Record<string, unknown>).state as Record<string, unknown>);
+          migrateReviewState((card as Record<string, unknown>).state);
         }
         return {
           cards: obj.cards as ReviewCard[],

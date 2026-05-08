@@ -42,7 +42,6 @@ export function hydrateSession(
   return [...saved, ...additions];
 }
 
-
 /**
  * Today as YYYY-MM-DD. Pure helper.
  */
@@ -132,6 +131,10 @@ export function buildSessionQueues(
     (c) => c.state.firstSeen === today,
   ).length;
 
+  // A card introduced today is counted only as "new" — even if it was lapsed
+  // and re-graded the same day. The `firstSeen !== today` guard deliberately
+  // excludes these from `reviewsDoneToday`; same-day re-views of a brand-new
+  // card are still part of "introducing" it, not a return review.
   const reviewsDoneToday = cards.filter(
     (c) => c.state.lastReview === today && c.state.firstSeen !== today,
   ).length;
