@@ -4,8 +4,9 @@ name: Auto-fix Vercel deployment failures
 # fetch the build error excerpt and post a `/fix` comment on the PR.
 # auto-pr.yml then handles the actual fix cycle.
 #
-# Required secret: VERCEL_TOKEN (Vercel personal access token, read access
-# to deployments). If unset, this workflow is a no-op.
+# Required secret: VERCEL_TOKEN (Vercel personal access token scoped to the
+# account that owns the deployment — Vercel tokens are scoped by team/account,
+# not by permission). If unset, this workflow is a no-op.
 
 on:
   deployment_status: {}
