@@ -14,10 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "poke-memory",
+  title: "Poké Memory",
   description: "Spaced-repetition Pokémon flashcards",
   appleWebApp: {
-    title: "poke-memory",
+    title: "Poké Memory",
     statusBarStyle: "black-translucent",
   },
 };
