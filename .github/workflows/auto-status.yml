@@ -20,10 +20,27 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
+      - name: Mint repo-scoped App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Mint org-scoped App token
+        id: org-app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          owner: Frazzled-Productions
+
       - name: Move issue to Done
         env:
-          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          GH_TOKEN: ${{ steps.org-app-token.outputs.token }}
+          GH_TOKEN_REPO: ${{ steps.app-token.outputs.token }}
         run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "Done"

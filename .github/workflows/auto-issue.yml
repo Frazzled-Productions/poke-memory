@@ -30,14 +30,41 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      issues: write
       id-token: write
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Mint org-scoped App token (for project mutations)
+        id: org-app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          owner: Frazzled-Productions
+
+      - name: Post initial status comment
+        id: status
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          ID=$(gh api -X POST \
+            "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            -f body=$'<!-- auto-status -->\n## Working on this\n\n_(Starting up — task list will appear here as planning progresses.)_' \
+            --jq '.id')
+          echo "comment_id=$ID" >> "$GITHUB_OUTPUT"
+
       - uses: anthropics/claude-code-action@v1
+        env:
+          AUTO_STATUS_COMMENT_ID: ${{ steps.status.outputs.comment_id }}
+          AUTO_STATUS_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 20
@@ -47,6 +74,18 @@ jobs:
             Read AGENTS.md (loaded via CLAUDE.md) for the playbook and conventions.
 
             **Plan only — do not modify any files, do not branch, do not implement.**
+
+            **Live status reporting:** The runtime maintains a live status
+            comment on the issue that mirrors your TodoWrite list — a hook
+            fires on every TodoWrite call and PATCHes the comment with the
+            rendered checklist. Use TodoWrite as your visible progress board:
+            keep a granular task list, update statuses
+            (pending / in_progress / completed) as you go, and the issue
+            timeline tracks along automatically. Do NOT post or PATCH the
+            status comment yourself — the hook owns it. Optional: wrap each
+            phase in `::group::Phase: <name>` / `::endgroup::` on stdout for
+            collapsible Actions-log sections. If you hit a blocker, post a
+            separate comment explaining what's blocked and stop.
 
             Steps:
             1. Load the issue:
@@ -90,6 +129,7 @@ jobs:
       - name: Surface tool denials
         if: always()
         env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           ISSUE: ${{ github.event.issue.number }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -131,7 +171,8 @@ jobs:
 
       - name: Move issue to Planned
         env:
-          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          GH_TOKEN: ${{ steps.org-app-token.outputs.token }}
+          GH_TOKEN_REPO: ${{ steps.app-token.outputs.token }}
         run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "Planned"
 
   implement:
@@ -148,14 +189,26 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
-      issues: write
-      pull-requests: write
       id-token: write
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Mint org-scoped App token (for project mutations)
+        id: org-app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          owner: Frazzled-Productions
+
       - name: Conflict gate
         env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           ISSUE: ${{ github.event.issue.number }}
           REPO: ${{ github.repository }}
         run: |
@@ -198,11 +251,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure git identity
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+${APP_SLUG}[bot]@users.noreply.github.com"
 
       - name: Record starting SHA
         id: start
@@ -210,10 +266,26 @@ jobs:
 
       - name: Move issue to In Progress
         env:
-          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          GH_TOKEN: ${{ steps.org-app-token.outputs.token }}
+          GH_TOKEN_REPO: ${{ steps.app-token.outputs.token }}
         run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "In Progress"
 
+      - name: Post initial status comment
+        id: status
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          ID=$(gh api -X POST \
+            "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            -f body=$'<!-- auto-status -->\n## Working on this\n\n_(Starting up — task list will appear here as work progresses.)_' \
+            --jq '.id')
+          echo "comment_id=$ID" >> "$GITHUB_OUTPUT"
+
       - uses: anthropics/claude-code-action@v1
+        env:
+          AUTO_STATUS_COMMENT_ID: ${{ steps.status.outputs.comment_id }}
+          AUTO_STATUS_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 80
@@ -224,35 +296,19 @@ jobs:
             Read AGENTS.md (loaded via CLAUDE.md) for the playbook and conventions.
             Follow it strictly.
 
-            **Live status reporting (do this throughout):**
-
-            Maintain a single live status comment on the issue so the maintainer
-            can follow progress without tailing the Actions log. As your first
-            action after loading the issue, post a comment with a hidden marker
-            and capture its ID:
-
-                ID=$(gh api -X POST \
-                  /repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-                  -f body=$'<!-- auto-status -->\n## Working on this\n\n- [ ] Research\n- [ ] Implement\n- [ ] Push branch\n- [ ] Open PR\n- [ ] Code review' \
-                  --jq '.id')
-
-            At each phase transition, PATCH the comment with the new state
-            (tick the boxes, optionally add a one-line note about what you're
-            doing). Endpoint: `gh api -X PATCH /repos/${{ github.repository }}/issues/comments/$ID -f body='...'`.
-
-            Also wrap each phase in `::group::Phase: <name>` / `::endgroup::`
-            on stdout so the Actions log gets collapsible sections.
-
-            **Do not write the final "Done" status yourself.** A post-step runs
-            after this action finishes and verifies the actual outcome (was a
-            PR opened? was auto-review #1 posted? what tools got denied?), then
-            overwrites the status comment with the verified result. Just leave
-            the status in whatever in-progress state you reached.
-
-            If you hit a blocker, edit the status comment so its **second line**
-            (the line after the `<!-- auto-status -->` marker) starts with
-            `Blocked: <reason>`. The post-step preserves any body whose second
-            line starts with `Blocked:` and only appends a tool-denial summary.
+            **Live status reporting:** The runtime maintains a live status
+            comment on the issue that mirrors your TodoWrite list — a hook
+            fires on every TodoWrite call and PATCHes the comment with the
+            rendered checklist. Use TodoWrite as your visible progress board:
+            keep a granular task list, update statuses
+            (pending / in_progress / completed) as you go, and the issue
+            timeline tracks along automatically. Do NOT post or PATCH the
+            status comment yourself — the hook owns it. Optional: wrap each
+            phase in `::group::Phase: <name>` / `::endgroup::` on stdout for
+            collapsible Actions-log sections. If you hit a blocker, post a
+            separate comment explaining what's blocked, then stop — don't
+            push half-done work. The post-step takes over the status comment
+            at the end of the run with a verified outcome summary.
 
             Workflow:
             1. Load the issue and existing comments:
@@ -311,6 +367,7 @@ jobs:
       - name: Verify outcome and surface tool denials
         if: always()
         env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           ISSUE: ${{ github.event.issue.number }}
           START_SHA: ${{ steps.start.outputs.sha }}
@@ -327,14 +384,6 @@ jobs:
             exit 0
           fi
           echo "Live status comment ID: $STATUS_ID"
-
-          EXISTING_BODY=$(gh api "repos/$REPO/issues/comments/$STATUS_ID" --jq '.body')
-          SECOND_LINE=$(printf '%s\n' "$EXISTING_BODY" | sed -n '2p')
-          if printf '%s' "$SECOND_LINE" | grep -q '^Blocked:'; then
-            ORCH_BLOCKED=1
-          else
-            ORCH_BLOCKED=0
-          fi
 
           # Find the PR opened from this issue's auto branch. Match on branch
           # name (the orchestrator creates `auto/issue-N-<slug>`) — robust
@@ -381,9 +430,7 @@ jobs:
 
           {
             printf '<!-- auto-status -->\n'
-            if [ "$ORCH_BLOCKED" = "1" ]; then
-              printf '%s' "$EXISTING_BODY" | tail -n +2
-            elif [ -n "$PR_NUMBER" ] && [ "$REVIEW_FOUND" -gt 0 ]; then
+            if [ -n "$PR_NUMBER" ] && [ "$REVIEW_FOUND" -gt 0 ]; then
               printf 'Done — opened PR #%s, posted auto-review #1.\n' "$PR_NUMBER"
             elif [ -n "$PR_NUMBER" ]; then
               printf '**Outcome unclear** — opened PR #%s but auto-review #1 was not posted. See [run logs](%s).\n' "$PR_NUMBER" "$RUN_URL"
@@ -409,7 +456,10 @@ jobs:
       - name: Move issue to PR / Ready to merge based on review verdict
         if: always()
         env:
-          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          # Issue/PR queries use the repo-scoped App token; the script call
+          # below overrides to the org-scoped token because the project lives
+          # in Frazzled-Productions.
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
           ISSUE="${{ github.event.issue.number }}"
@@ -435,4 +485,6 @@ jobs:
           else
             STATUS="PR"
           fi
-          .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
+          GH_TOKEN="${{ steps.org-app-token.outputs.token }}" \
+          GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
+            .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"

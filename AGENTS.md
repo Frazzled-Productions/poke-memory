@@ -114,7 +114,7 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
 The backlog lives on GitHub:
 
 - **Issues**: every idea, bug, or queued change is a GitHub issue, labelled with `priority:now` / `priority:next` / `priority:later`. Issues are user-owned; anyone the user grants access can file new ones. Phone-accessible via the GitHub mobile app.
-- **Project board** ([Poké Memory roadmap](https://github.com/users/fraserbrookhouse/projects/2)): kanban view with a `Priority` field (Now / Next / Later) corresponding to the labels. Same source data as Issues, visualised.
+- **Project board** ([Poké Memory roadmap](https://github.com/orgs/Frazzled-Productions/projects/1)): kanban view with a `Priority` field (Now / Next / Later) corresponding to the labels. Same source data as Issues, visualised. The project lives under the `Frazzled-Productions` org so a GitHub App can mutate it (Apps cannot write user-owned Projects v2).
 - **Status field** drives the kanban columns and is moved automatically by the auto-issue / auto-pr workflows: `Todo` → `Planned` (planner posted) → `In Progress` (`/go` triggered) → `PR` (PR open, awaiting review or `Needs fixes`) → `Ready to merge` (latest auto-review verdict is `Looks good to me`) → `Done` (issue closed). The `auto-status.yml` workflow handles the close-to-Done transition; the other transitions live alongside the matching workflow phases.
 
 When starting a new change, the orchestrator runs `gh issue list --label "priority:now"` (or checks the project board) to find candidates. Usually grabs the top `priority:now` item; otherwise asks the user to pick.

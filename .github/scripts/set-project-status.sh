@@ -8,8 +8,13 @@
 # Status names: Todo | Planned | In Progress | PR | Ready to merge | Done
 #
 # Required env:
-#   GH_TOKEN  — must carry `project` scope (default GITHUB_TOKEN does not for
-#               user-owned projects). Use a PAT secret like PROJECTS_TOKEN.
+#   GH_TOKEN       — org-scoped installation token (App installed on
+#                    Frazzled-Productions, with Org Projects: write).
+#                    Used for the GraphQL project mutations.
+#   GH_TOKEN_REPO  — repo-scoped installation token (App installed on the
+#                    repo's owner). Used for the REST node-ID lookup of
+#                    the issue/PR. Required because the org-scoped token
+#                    can't see issues in a user-owned repo.
 #   GITHUB_REPOSITORY (set by Actions automatically)
 
 set -euo pipefail
@@ -17,23 +22,26 @@ set -euo pipefail
 NUMBER="${1:?issue or PR number required}"
 STATUS_NAME="${2:?status name required}"
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be set (owner/repo)}"
+: "${GH_TOKEN:?GH_TOKEN must be set (org-scoped App token)}"
+: "${GH_TOKEN_REPO:?GH_TOKEN_REPO must be set (repo-scoped App token)}"
 
-PROJECT_ID="PVT_kwHOAsv3zc4BXGBo"
-STATUS_FIELD_ID="PVTSSF_lAHOAsv3zc4BXGBozhSVUac"
+PROJECT_ID="PVT_kwDOEN1Tuc4BXHrG"
+STATUS_FIELD_ID="PVTSSF_lADOEN1Tuc4BXHrGzhSWyi0"
 
 case "$STATUS_NAME" in
   "Todo")           OPTION_ID="f75ad846" ;;
-  "Planned")        OPTION_ID="caff8240" ;;
+  "Planned")        OPTION_ID="3ef076f8" ;;
   "In Progress")    OPTION_ID="47fc9ee4" ;;
-  "PR")             OPTION_ID="927aaab7" ;;
-  "Ready to merge") OPTION_ID="00d0a95b" ;;
+  "PR")             OPTION_ID="53f585e0" ;;
+  "Ready to merge") OPTION_ID="eefa8005" ;;
   "Done")           OPTION_ID="98236657" ;;
   *) echo "Unknown status: $STATUS_NAME" >&2; exit 1 ;;
 esac
 
 # /issues/{N} works for both issues and PRs (PRs are issues in REST).
 # `node_id` is the GraphQL Relay ID — same value GraphQL would return.
-NODE_ID=$(gh api "/repos/$GITHUB_REPOSITORY/issues/$NUMBER" --jq '.node_id')
+# Use the repo-scoped token here; the org-scoped one can't see this repo.
+NODE_ID=$(GH_TOKEN="$GH_TOKEN_REPO" gh api "/repos/$GITHUB_REPOSITORY/issues/$NUMBER" --jq '.node_id')
 
 if [[ -z "$NODE_ID" || "$NODE_ID" == "null" ]]; then
   echo "Could not resolve node ID for #$NUMBER in $GITHUB_REPOSITORY" >&2
@@ -47,7 +55,7 @@ ITEM_ID=$(gh api graphql \
         item { id }
       }
     }' \
-  -F project="$PROJECT_ID" -F content="$NODE_ID" \
+  -f project="$PROJECT_ID" -f content="$NODE_ID" \
   --jq '.data.addProjectV2ItemById.item.id')
 
 if [[ -z "$ITEM_ID" || "$ITEM_ID" == "null" ]]; then
@@ -67,7 +75,7 @@ gh api graphql \
         projectV2Item { id }
       }
     }' \
-  -F project="$PROJECT_ID" -F item="$ITEM_ID" -F field="$STATUS_FIELD_ID" -F value="$OPTION_ID" \
+  -f project="$PROJECT_ID" -f item="$ITEM_ID" -f field="$STATUS_FIELD_ID" -f value="$OPTION_ID" \
   --jq 'if .errors then error("graphql errors: " + (.errors | tostring)) else .data.updateProjectV2ItemFieldValue.projectV2Item.id end' \
   >/dev/null
 
