@@ -16,6 +16,10 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
    - `[EXPERT-RESEARCH]` — has an objectively-correct answer a domain specialist can produce. Name the specialist (`next16-expert`, `pokeapi-expert`, or `srs-expert`). Example: "what conflict resolution rule preserves SM-2 scheduling integrity?" → srs-expert.
    - `[USER-DECISION + RESEARCH]` — needs maintainer judgment, but a project-specific options brief from `researcher` would meaningfully improve the decision (comparative tradeoffs, current ecosystem state, what fits this codebase). Example: "which backend provider?" → researcher surveys options against this project's constraints.
    - `[USER-DECISION]` — pure preference; no research helps. Use sparingly — most "user calls" benefit from a brief.
+
+   Disambiguation:
+   - If a question is expert-answerable but no named specialist fits, use `[USER-DECISION + RESEARCH]` — `researcher` handles the gap.
+   - If a question plausibly fits both `[EXPERT-RESEARCH]` and `[USER-DECISION]` (e.g. a technical default with a possible preference override), prefer `[EXPERT-RESEARCH]` — the expert's answer often resolves the apparent preference.
 3. Break work into ordered, atomic steps. Each step has:
    - **What** — one sentence
    - **Where** — file paths
@@ -25,7 +29,7 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 
 ## Output format
 1. **Goal** — one sentence.
-2. **Open questions** — list, each prefixed with its tag (`[EXPERT-RESEARCH]`, `[USER-DECISION + RESEARCH]`, or `[USER-DECISION]`) and the named agent where applicable. The orchestrator uses the tag to decide whether to dispatch a specialist, dispatch the researcher, or pass the question through to the maintainer as-is.
+2. **Open questions** — list, each prefixed with its tag. Always name the specialist for `[EXPERT-RESEARCH]`; always note `researcher` for `[USER-DECISION + RESEARCH]`; omit the agent for `[USER-DECISION]`. The orchestrator uses the tag to decide whether to dispatch a specialist, dispatch the researcher, or pass the question through to the maintainer as-is.
 3. **Plan** — numbered steps. Use ⚡ for parallelizable groups.
 4. **Risks** — bullet list.
 5. **Out of scope** — explicit list of what this plan does NOT do.
