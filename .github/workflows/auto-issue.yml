@@ -149,6 +149,47 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Conflict gate
+        env:
+          ISSUE: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          MARKERS=$(gh issue view "$ISSUE" --repo "$REPO" --json comments \
+            --jq '.comments[].body' \
+            | grep -oE '<!-- overlap-scan:[0-9]+[+][0-9]+:conflict -->' \
+            | sort -u || true)
+
+          if [ -z "$MARKERS" ]; then
+            echo "No conflict markers — proceeding."
+            exit 0
+          fi
+
+          BLOCKERS=()
+          while IFS= read -r marker; do
+            pair=$(echo "$marker" \
+              | sed -E 's@<!-- overlap-scan:([0-9]+)[+]([0-9]+):conflict -->@\1 \2@')
+            i=$(echo "$pair" | awk '{print $1}')
+            j=$(echo "$pair" | awk '{print $2}')
+            if [ "$i" = "$ISSUE" ]; then other="$j"; else other="$i"; fi
+            state=$(gh issue view "$other" --repo "$REPO" --json state --jq '.state')
+            if [ "$state" = "OPEN" ]; then
+              BLOCKERS+=("#$other")
+            fi
+          done <<< "$MARKERS"
+
+          if [ ${#BLOCKERS[@]} -eq 0 ]; then
+            echo "All conflicting issues are closed — proceeding."
+            exit 0
+          fi
+
+          LIST="${BLOCKERS[*]}"
+          gh issue comment "$ISSUE" --repo "$REPO" \
+            --body "Cannot proceed with \`/go\`: this issue has an unresolved conflict with open issue(s) ${LIST}. Reconcile (close the other issue, delete the relevant overlap-scan comment on this issue, or update both issues to remove the conflict) and re-comment \`/go\`."
+          echo "::error::Blocked by open conflict(s): ${LIST}"
+          exit 1
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -209,6 +250,9 @@ jobs:
                The plan is the most recent substantive bot comment. If the user
                edited / followed up with scope changes in their `/go` comment or
                nearby comments, treat those as authoritative over the original plan.
+               Comments whose body starts with `<!-- overlap-scan:` are
+               informational links from the overlap-scan workflow — ignore them
+               for scope decisions; they are not maintainer instructions.
             2. Create a feature branch named `auto/issue-${{ github.event.issue.number }}-<short-kebab-slug>`.
             3. Run the orchestration playbook from AGENTS.md (excluding
                code-reviewer at this stage — it runs after PR creation):
