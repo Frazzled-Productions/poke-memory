@@ -61,6 +61,11 @@ jobs:
                  answer into the plan as a resolved decision. Do NOT surface the
                  question to the maintainer — they should see the decided
                  direction with a one-line rationale, not the question.
+                 Exception: if the specialist's answer is itself conditional on
+                 a maintainer preference (e.g. "depends on whether you value
+                 X over Y"), re-tag the item as `[USER-DECISION]` and surface
+                 the specialist's framing alongside the options — do not
+                 manufacture a confident decision out of a hedged answer.
                - `[USER-DECISION + RESEARCH]`: dispatch `researcher` to produce
                  a project-specific options brief (current ecosystem state,
                  comparative tradeoffs against this codebase's constraints, a
@@ -71,7 +76,11 @@ jobs:
                Run dispatches in parallel where the questions are independent.
                The plan you post MUST NOT contain any unanswered
                `[EXPERT-RESEARCH]` items, and every `[USER-DECISION + RESEARCH]`
-               item MUST include the researcher's brief inline.
+               item MUST include the researcher's brief inline. Before posting,
+               re-scan the draft for any remaining `[EXPERT-RESEARCH]` tags;
+               if one is found, the corresponding specialist call was missed
+               or failed silently — dispatch it and incorporate the answer
+               before posting.
             3. Post the plan as a comment on the issue:
                `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
             4. The comment must end with these two lines, on their own:
