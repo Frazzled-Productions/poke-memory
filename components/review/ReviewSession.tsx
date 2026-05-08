@@ -17,6 +17,7 @@ export function ReviewSession() {
   // null means "not yet initialised" (SSR + first client tick).
   const [cards, setCards] = useState<ReviewCard[] | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [grading, setGrading] = useState(false);
 
   useEffect(() => {
     const saved = loadSession();
@@ -57,16 +58,21 @@ export function ReviewSession() {
   }
 
   function handleGrade(grade: Grade) {
-    if (!currentCard) return;
+    if (!currentCard || grading) return;
+    // Re-narrow cards inside the closure — TS doesn't carry the outer
+    // null-check through a function that captures a useState variable.
+    if (cards === null) return;
+    setGrading(true);
 
     const newState = nextReview(currentCard.state, grade, new Date());
-    const newCards = (cards ?? []).map((card) =>
+    const newCards = cards.map((card) =>
       card.id === currentCard.id ? { ...card, state: newState } : card,
     );
 
     saveSession(newCards);
     setCards(newCards);
     setRevealed(false);
+    setGrading(false);
   }
 
   return (
@@ -78,7 +84,7 @@ export function ReviewSession() {
       />
 
       {revealed ? (
-        <GradeButtons onGrade={handleGrade} />
+        <GradeButtons onGrade={handleGrade} disabled={grading} />
       ) : (
         <button
           type="button"

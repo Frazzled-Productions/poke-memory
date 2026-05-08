@@ -12,7 +12,23 @@ export function loadSession(): ReviewCard[] | null {
   if (raw === null) return null;
 
   try {
-    return JSON.parse(raw) as ReviewCard[];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    // Spot-check the first record's shape so a schema drift (e.g. cards
+    // saved by an older app version) is treated as no state, not silently
+    // returned with `undefined` fields that crash the scheduler.
+    if (parsed.length > 0) {
+      const first = parsed[0];
+      if (
+        typeof first?.id !== "number" ||
+        typeof first?.name !== "string" ||
+        typeof first?.spriteUrl !== "string" ||
+        typeof first?.state?.dueDate !== "string"
+      ) {
+        return null;
+      }
+    }
+    return parsed as ReviewCard[];
   } catch {
     return null;
   }

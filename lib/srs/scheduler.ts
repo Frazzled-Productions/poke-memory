@@ -39,6 +39,13 @@ export type Grade = 1 | 2 | 4 | 5;
 const DEFAULT_EASE_FACTOR = 2.5;
 const MIN_EASE_FACTOR = 1.3;
 
+// Returns the date `days` after `date` as an ISO date string ("YYYY-MM-DD").
+// Note: this combines local-time `setDate` with `toISOString` (UTC). The
+// inconsistency is intentional and consistent with how `getNextDueCard`
+// derives "today" — both sides slice toISOString, so the comparison is
+// internally coherent. Don't switch one side to a local-timezone format
+// without updating both, or you'll introduce off-by-one due-date bugs in
+// negative-UTC-offset timezones.
 function addDays(date: Date, days: number): string {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
@@ -82,12 +89,12 @@ export function nextReview(
   };
 }
 
-export function initialReviewState(): ReviewState {
+export function initialReviewState(now: Date = new Date()): ReviewState {
   return {
     repetitions: 0,
     interval: 0,
     easeFactor: DEFAULT_EASE_FACTOR,
-    dueDate: new Date().toISOString().slice(0, 10),
+    dueDate: now.toISOString().slice(0, 10),
     lastReview: null,
   };
 }
