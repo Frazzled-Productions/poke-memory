@@ -317,7 +317,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LOG: /home/runner/work/_temp/claude-execution-output.json
         run: |
-          set -u
+          set -euo pipefail
 
           STATUS_ID=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
             --jq '[.[] | select(.body | startswith("<!-- auto-status -->"))] | last | .id // empty')
@@ -341,10 +341,10 @@ jobs:
           # against body-content variations like `Closes`/`fixes`/`resolves`.
           PR_NUMBER=$(gh pr list --repo "$REPO" --state all --limit 100 \
             --json number,headRefName,createdAt \
-            --jq --arg prefix "auto/issue-$ISSUE-" '
-              [.[] | select(.headRefName | startswith($prefix))]
-              | sort_by(.createdAt) | last | .number // empty
-            ')
+            | jq -r --arg prefix "auto/issue-$ISSUE-" '
+                [.[] | select(.headRefName | startswith($prefix))]
+                | sort_by(.createdAt) | last | .number // empty
+              ')
 
           if [ -n "$PR_NUMBER" ]; then
             REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \

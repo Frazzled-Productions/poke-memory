@@ -222,7 +222,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LOG: /home/runner/work/_temp/claude-execution-output.json
         run: |
-          set -u
+          set -euo pipefail
 
           STATUS_ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             --jq '[.[] | select(.body | startswith("<!-- auto-status -->"))] | last | .id // empty')
@@ -242,7 +242,7 @@ jobs:
           fi
 
           REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq --arg n "$NEXT" '[.[] | select(.body | startswith("<!-- auto-review:" + $n + " -->"))] | length')
+            | jq -r --arg n "$NEXT" '[.[] | select(.body | startswith("<!-- auto-review:" + $n + " -->"))] | length')
 
           git fetch origin --quiet 2>/dev/null || true
           if [ -n "$START_SHA" ] && git rev-parse "$START_SHA" >/dev/null 2>&1; then
