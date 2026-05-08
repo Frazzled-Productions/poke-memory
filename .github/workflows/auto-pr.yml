@@ -250,7 +250,7 @@ jobs:
           {
             printf '<!-- auto-status -->\n'
             if [ "$ORCH_BLOCKED" = "1" ]; then
-              printf '%s\n' "$EXISTING_BODY" | tail -n +2
+              printf '%s' "$EXISTING_BODY" | tail -n +2
             elif [ "$REVIEW_FOUND" -gt 0 ]; then
               printf 'Done — pushed %s commit(s), posted auto-review #%s.\n' "$COMMITS" "$NEXT"
             elif [ "$COMMITS" -gt 0 ]; then
@@ -258,7 +258,7 @@ jobs:
             else
               printf 'No commits pushed and no auto-review posted. See [run logs](%s).\n' "$RUN_URL"
             fi
-            if [ "$DENIAL_COUNT" != "0" ] && [ -n "$DENIAL_COUNT" ]; then
+            if [ "$DENIAL_COUNT" != "0" ]; then
               printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
               printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted.\n'
               if [ -n "$DENIAL_DETAILS" ]; then

@@ -282,10 +282,15 @@ jobs:
             ORCH_BLOCKED=0
           fi
 
-          # Find the PR opened from this issue's auto branch.
-          PR_NUMBER=$(gh pr list --repo "$REPO" --state all \
-            --search "in:body closes #$ISSUE" --json number,createdAt \
-            --jq 'sort_by(.createdAt) | last | .number // empty')
+          # Find the PR opened from this issue's auto branch. Match on branch
+          # name (the orchestrator creates `auto/issue-N-<slug>`) — robust
+          # against body-content variations like `Closes`/`fixes`/`resolves`.
+          PR_NUMBER=$(gh pr list --repo "$REPO" --state all --limit 100 \
+            --json number,headRefName,createdAt \
+            --jq --arg prefix "auto/issue-$ISSUE-" '
+              [.[] | select(.headRefName | startswith($prefix))]
+              | sort_by(.createdAt) | last | .number // empty
+            ')
 
           if [ -n "$PR_NUMBER" ]; then
             REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
@@ -323,7 +328,7 @@ jobs:
           {
             printf '<!-- auto-status -->\n'
             if [ "$ORCH_BLOCKED" = "1" ]; then
-              printf '%s\n' "$EXISTING_BODY" | tail -n +2
+              printf '%s' "$EXISTING_BODY" | tail -n +2
             elif [ -n "$PR_NUMBER" ] && [ "$REVIEW_FOUND" -gt 0 ]; then
               printf 'Done — opened PR #%s, posted auto-review #1.\n' "$PR_NUMBER"
             elif [ -n "$PR_NUMBER" ]; then
@@ -333,7 +338,7 @@ jobs:
             else
               printf 'No PR opened. See [run logs](%s).\n' "$RUN_URL"
             fi
-            if [ "$DENIAL_COUNT" != "0" ] && [ -n "$DENIAL_COUNT" ]; then
+            if [ "$DENIAL_COUNT" != "0" ]; then
               printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
               printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted.\n'
               if [ -n "$DENIAL_DETAILS" ]; then
