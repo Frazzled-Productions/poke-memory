@@ -1,0 +1,127 @@
+name: Auto Issue Worker
+
+# Stage 1 (plan): when an issue is labeled `auto`, the planner sub-agent
+# drafts a plan and posts it as a comment.
+# Stage 2 (implement): when a maintainer replies `/go` on that issue,
+# the orchestrator runs the AGENTS.md playbook and opens a PR.
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+# Don't let two runs on the same issue race each other.
+concurrency:
+  group: auto-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan
+    if: |
+      github.event_name == 'issues' &&
+      github.event.label.name == 'auto' &&
+      github.event.issue.state == 'open'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 20
+          prompt: |
+            You are the orchestrator for issue #${{ github.event.issue.number }}.
+
+            Read AGENTS.md (loaded via CLAUDE.md) for the playbook and conventions.
+
+            **Plan only — do not modify any files, do not branch, do not implement.**
+
+            Steps:
+            1. Load the issue:
+               `gh issue view ${{ github.event.issue.number }} --json title,body,labels`
+            2. Invoke the `planner` sub-agent (Agent tool, subagent_type "planner")
+               with the issue title and body. If the planner flags unknowns that
+               warrant a specialist (next16-expert, pokeapi-expert, srs-expert,
+               researcher), invoke those in parallel and fold their findings
+               into the plan.
+            3. Post the plan as a comment on the issue:
+               `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
+            4. The comment must end with this exact line, on its own:
+               "Reply with `/go` to proceed, or edit scope in this thread first."
+
+  implement:
+    name: Implement
+    if: |
+      github.event_name == 'issue_comment' &&
+      !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'auto') &&
+      contains(github.event.comment.body, '/go') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 80
+          prompt: |
+            You are the orchestrator for issue #${{ github.event.issue.number }}.
+            The maintainer approved the plan with `/go`. Implement and open a PR.
+
+            Read AGENTS.md (loaded via CLAUDE.md) for the playbook and conventions.
+            Follow it strictly.
+
+            Workflow:
+            1. Load the issue and existing comments:
+               `gh issue view ${{ github.event.issue.number }} --json title,body,comments`
+               The plan is the most recent substantive bot comment. If the user
+               edited / followed up with scope changes in their `/go` comment or
+               nearby comments, treat those as authoritative over the original plan.
+            2. Create a feature branch named `auto/issue-${{ github.event.issue.number }}-<short-kebab-slug>`.
+            3. Run the orchestration playbook from AGENTS.md:
+               - Specialists in parallel where their questions are independent.
+               - ui-coder and/or data-coder for implementation, in parallel when
+                 their work is independent.
+               - Update README.md and CHANGELOG.md inline if user-facing behavior
+                 changed (per AGENTS.md "Documentation" section).
+               - Run code-reviewer at the end. Iterate on its punch list before
+                 opening the PR.
+            4. Commit. **Do NOT add a Co-Authored-By trailer.** No Claude
+               attribution in commit messages.
+            5. Push the branch.
+            6. Open the PR:
+               `gh pr create --title "<title>" --body "<body>" --base main`
+               The body MUST contain `closes #${{ github.event.issue.number }}`
+               so the issue auto-closes on merge. Summarise what changed and
+               note any review-cycle iterations.
+            7. Post a comment on the issue linking the PR.
+
+            If you hit a blocker you can't resolve, post a comment on the issue
+            explaining what's blocked and stop — don't push half-done work.
