@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
@@ -16,6 +16,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "poke-memory",
   description: "Spaced-repetition Pokémon flashcards",
+  appleWebApp: {
+    title: "poke-memory",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#DC0A2D" },
+    { media: "(prefers-color-scheme: dark)", color: "#8b0000" },
+  ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({

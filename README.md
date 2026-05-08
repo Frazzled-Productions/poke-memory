@@ -10,6 +10,10 @@ You see a sprite, mentally answer, hit **Reveal**, and grade yourself with one o
 
 Hosted on Vercel; auto-deploys on every push to `main`. Your progress lives in the browser's `localStorage`, so it's per-device and starts fresh on a different machine.
 
+### Install on iPhone
+
+Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the icon opens the app in standalone mode — no Safari chrome — with a Pokédex-themed icon. It looks and feels like a native app, but everything still runs in the browser.
+
 ## What's in it
 
 - All 1025 canonical Pokémon (gen 1 through gen 9, no alternate forms).
