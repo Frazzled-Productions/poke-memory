@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewCard } from "@/lib/review/session";
 import { loadSession } from "@/lib/review/persistence";
@@ -36,9 +37,14 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
 
   return (
     <li className="flex flex-col items-center gap-1">
-      <div
-        className={[
-          "relative flex h-20 w-full items-center justify-center rounded-xl border transition-colors",
+      <Link
+        href={"/pokedex/" + id}
+        aria-label={isLocked ? "Pokémon #" + zeroPad(id) : name}
+        className="block w-full"
+      >
+        <div
+          className={[
+            "relative flex h-20 w-full items-center justify-center rounded-xl border transition-colors",
           isMastered
             ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
             : isLearning
@@ -99,8 +105,9 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
           className="absolute bottom-1 left-1.5 text-[10px] font-mono tabular-nums text-zinc-400 dark:text-zinc-600"
         >
           #{zeroPad(id)}
-        </span>
-      </div>
+          </span>
+        </div>
+      </Link>
 
       {/* Name — visible for learning/mastered, sr-only for locked */}
       {isLocked ? (
