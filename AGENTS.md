@@ -125,6 +125,8 @@ When starting a new change, the orchestrator runs `gh issue list --label "priori
 
 When a change closes an issue, reference it in the commit message (`closes #N`) so it auto-closes on push.
 
+**Retrospectives.** When an issue closes via a merged PR, `auto-retro.yml` posts a single `<!-- auto-retro -->` comment on the closed issue answering: which sub-agents earned their keep, which were overhead, and one transferable lesson. Skipped for `not_planned` closures and issues with no linked merged PR. The retro is *process reflection* — it does not recommend code changes. Aggregating retros into convention is left manual for now; if a pattern recurs across several retros, promote it into this file by hand.
+
 ### Privacy
 
 - **No personal data leaves the user's browser without explicit consent.** All session state lives in `localStorage`; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
