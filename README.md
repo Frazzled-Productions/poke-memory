@@ -6,7 +6,9 @@ You see a sprite, mentally answer, hit **Reveal**, and grade yourself with one o
 
 ## Live demo
 
-_TBD — add Vercel URL once deployed._
+**[poke-memory-alpha.vercel.app](https://poke-memory-alpha.vercel.app)**
+
+Hosted on Vercel; auto-deploys on every push to `main`. Your progress lives in the browser's `localStorage`, so it's per-device and starts fresh on a different machine.
 
 ## What's in it
 
