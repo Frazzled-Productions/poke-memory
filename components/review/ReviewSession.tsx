@@ -7,6 +7,7 @@ import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import {
   buildSession,
   getNextDueCard,
+  hydrateSession,
   type ReviewCard,
   type Grade,
 } from "@/lib/review/session";
@@ -22,7 +23,13 @@ export function ReviewSession() {
   useEffect(() => {
     const saved = loadSession();
     if (saved !== null) {
-      setCards(saved);
+      // Merge in any seed cards added since the session was last saved
+      // (e.g. after a regenerate-seed that added new species).
+      const merged = hydrateSession(saved, SEED_POKEMON);
+      if (merged.length !== saved.length) {
+        saveSession(merged);
+      }
+      setCards(merged);
     } else {
       const fresh = buildSession(SEED_POKEMON);
       saveSession(fresh);
