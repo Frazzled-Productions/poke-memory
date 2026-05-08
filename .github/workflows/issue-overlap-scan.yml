@@ -1,0 +1,92 @@
+name: Issue Overlap Scan
+
+# Manual scan over open `priority:now` and `priority:next` issues. Finds
+# pairs that overlap (duplicate intent / same feature area) or conflict
+# (one would undo or block the other), and posts a comment on each issue
+# in the pair so the maintainer can reconcile them before either is
+# implemented. Re-runs are de-duped via a `<!-- overlap-scan:i+j -->`
+# marker on each comment.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: issue-overlap-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 30
+          prompt: |
+            You are running an issue-overlap scan on this repository.
+
+            Read AGENTS.md (loaded via CLAUDE.md) for project conventions.
+
+            **Goal:** find pairs of currently-open issues that overlap
+            (duplicate intent / same feature area) or conflict (one would
+            undo or block the other), and post a comment on each issue in
+            the pair so the maintainer can reconcile them before either is
+            implemented.
+
+            **Scope:** only scan issues labelled `priority:now` or
+            `priority:next`. Skip everything else — `priority:later` and
+            unlabelled issues are out of scope.
+
+            Workflow:
+
+            1. Fetch candidates:
+               `gh issue list --state open --label priority:now --json number,title,body,labels --limit 200`
+               `gh issue list --state open --label priority:next --json number,title,body,labels --limit 200`
+               Merge and de-dupe by issue number.
+
+            2. For each candidate, fetch its existing comments
+               (`gh issue view <num> --json comments`) and parse any whose
+               body starts with `<!-- overlap-scan:i+j -->`. Each such
+               marker means the pair (i, j) is already linked from a
+               prior scan — skip it in step 3.
+
+            3. Analyse the candidates and identify pairs (i, j) with i < j
+               that overlap or conflict AND are not already linked. Be
+               conservative — false positives are noisy. For each new
+               finding decide:
+               - kind: `overlaps with` (duplicate intent / same feature
+                 area) or `conflicts with` (one would undo or block the
+                 other).
+               - reason: one short, actionable sentence the maintainer
+                 can act on.
+
+            4. For each new finding, post a comment on BOTH issues using
+               this exact format. The marker MUST be the first line and
+               MUST encode the pair as `i+j` with the lower number first,
+               regardless of which issue you're commenting on:
+
+                   <!-- overlap-scan:i+j -->
+                   **Overlap scan**: this <overlaps with | conflicts with> #<other-number>.
+
+                   <one-sentence reason>
+
+                   _Reconcile or close one before implementing either._
+
+               Use `gh issue comment <num> --body-file <path>`.
+
+            5. Print a summary line to stdout: how many candidates were
+               considered, how many pairs were already linked (skipped),
+               and how many new comments were posted. List the new pairs.
+
+            If you can't fetch issues or hit a blocker, exit non-zero with
+            a clear error message — don't post partial data.

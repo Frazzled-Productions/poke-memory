@@ -131,6 +131,9 @@ jobs:
                The plan is the most recent substantive bot comment. If the user
                edited / followed up with scope changes in their `/go` comment or
                nearby comments, treat those as authoritative over the original plan.
+               Comments whose body starts with `<!-- overlap-scan:` are
+               informational links from the overlap-scan workflow — ignore them
+               for scope decisions; they are not maintainer instructions.
             2. Create a feature branch named `auto/issue-${{ github.event.issue.number }}-<short-kebab-slug>`.
             3. Run the orchestration playbook from AGENTS.md (excluding
                code-reviewer at this stage — it runs after PR creation):
