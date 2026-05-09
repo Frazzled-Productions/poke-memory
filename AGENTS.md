@@ -151,7 +151,15 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 ### Privacy
 
-- **No personal data leaves the user's browser without explicit consent.** All session state lives in `localStorage`; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
-- This is a hard project constraint. While the app stays fully client-side and processes no personal data, GDPR / UK-GDPR obligations are minimal — we are not a data controller for any user data.
-- When we add a backend, accounts, analytics, or any third-party service that processes personal data, this section gets updated and we do a one-off review pass to identify obligations (privacy notice, consent UI, data-processing agreements). Until then, no per-commit legal review is needed.
-- Sprite URLs are fetched directly by the user's browser from `raw.githubusercontent.com` (PokéAPI's CDN). We don't proxy them, so no information about which Pokémon a user is learning passes through any infrastructure we control.
+Two paths exist -- guest and authenticated. The constraints differ.
+
+**Guest path (unchanged)**
+- No personal data leaves the user browser. All session state lives in localStorage; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
+- Sprite URLs are fetched directly by the user browser from raw.githubusercontent.com (PokAPI CDN). We do not proxy them, so no information about which Pokemon a user is learning passes through any infrastructure we control.
+
+**Authenticated path (Supabase sync)**
+- When a user signs in with GitHub, their per-card review history (SM-2 state: repetitions, interval, ease factor, due date, last review, first seen) is stored in Supabase Postgres.
+- We **are a data controller** for authenticated users. GDPR / UK-GDPR obligations apply: we need a privacy notice, a lawful basis for processing (legitimate interest / contract performance), and a data-processing agreement with Supabase (covered by Supabase standard DPA).
+- A user-facing privacy notice is required before this feature is made generally available. Filing it as a follow-up issue is the right next step -- it is out of scope for the initial sync implementation.
+- Supabase is the sole sub-processor for authenticated user data. Row-Level Security ensures each user can only read/write their own rows.
+- Sign-out does **not** clear localStorage -- local data is preserved so users can sign out and continue as guests without losing progress.
