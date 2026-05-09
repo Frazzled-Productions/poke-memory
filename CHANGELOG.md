@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- **Evolution card type** — a second question format is now mixed into the review session: "What does X evolve into?" Using the same SM-2 spaced-repetition algorithm and daily limits (10 new / 100 review), evolution cards interleave with name cards in one unified queue. Branching evolutions (Eevee → 8 forms) show all valid answers on reveal. Single-stage Pokémon (legendaries, Ditto, Lapras, etc.) produce no evolution card. Existing sessions migrate automatically — the ~457 new cards are appended with fresh SM-2 state on first load after the update. Closes #3.
+
 ### Deployment
 
 - **Live at [poke-memory-alpha.vercel.app](https://poke-memory-alpha.vercel.app)** — hosted on Vercel, auto-deploys on every push to `main`.

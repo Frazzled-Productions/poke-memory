@@ -1,12 +1,23 @@
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
-import type { SeedPokemon } from "@/lib/pokemon/seed";
+import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
+import { SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
 export type { Grade };
 
-export type ReviewCard = SeedPokemon & {
+export type NameReviewCard = SeedPokemon & {
+  cardType: "name";
   state: ReviewState;
 };
+
+export type EvolutionReviewCard = EvolutionCard & {
+  state: ReviewState;
+};
+
+export type ReviewableCard = NameReviewCard | EvolutionReviewCard;
+
+// Backward-compat alias
+export type ReviewCard = ReviewableCard;
 
 export type DailyLimits = {
   maxNewPerDay: number;
@@ -18,57 +29,75 @@ export const DEFAULT_LIMITS: DailyLimits = {
   maxReviewsPerDay: 100,
 };
 
-// Build a fresh session by initialising every seed card to default SM-2 state.
-export function buildSession(seed: readonly SeedPokemon[]): ReviewCard[] {
-  return seed.map((pokemon) => ({
+export function buildSession(
+  seed: readonly SeedPokemon[],
+  evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
+  now: Date = new Date(),
+): ReviewableCard[] {
+  const nameCards: NameReviewCard[] = seed.map((pokemon) => ({
     ...pokemon,
-    state: initialReviewState(),
+    cardType: "name",
+    state: initialReviewState(now),
   }));
+  const evoCards: EvolutionReviewCard[] = evoSeed.map((evo) => ({
+    ...evo,
+    state: initialReviewState(now),
+  }));
+  return [...nameCards, ...evoCards];
 }
 
-// Merge any seed cards not yet in the saved session (e.g. after a seed
-// regeneration that added new species). Existing cards keep their progress;
-// missing seed entries are appended at initialReviewState — due immediately.
-// Also refreshes seed fields on existing persisted cards so stale localStorage
-// snapshots always reflect current seed data (e.g. picks up flavorTexts added
-// after the card was first saved).
 export function hydrateSession(
-  saved: readonly ReviewCard[],
+  saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
+  evoSeedOrNow?: readonly EvolutionCard[] | Date,
   now: Date = new Date(),
-): ReviewCard[] {
+): ReviewableCard[] {
+  let evoSeed: readonly EvolutionCard[];
+  if (evoSeedOrNow instanceof Date) {
+    now = evoSeedOrNow;
+    evoSeed = SEED_EVOLUTION_CARDS;
+  } else {
+    evoSeed = evoSeedOrNow ?? SEED_EVOLUTION_CARDS;
+  }
+
   const seedById = new Map(seed.map((p) => [p.id, p]));
-  const refreshed: ReviewCard[] = saved.map((card) => {
-    const fresh = seedById.get(card.id);
-    if (!fresh) return card;
-    return { ...fresh, state: card.state };
+  const evoSeedById = new Map(evoSeed.map((e) => [e.id, e]));
+
+  const refreshed: ReviewableCard[] = saved.map((card) => {
+    if (card.cardType === "evolution") {
+      const fresh = evoSeedById.get(card.id);
+      if (!fresh) return card;
+      return { ...fresh, state: card.state };
+    } else {
+      const fresh = seedById.get(card.id);
+      if (!fresh) return card;
+      return { ...fresh, cardType: "name", state: card.state };
+    }
   });
-  const savedIds = new Set(saved.map((card) => card.id));
-  const additions = seed
-    .filter((pokemon) => !savedIds.has(pokemon.id))
-    .map((pokemon) => ({ ...pokemon, state: initialReviewState(now) }));
+
+  const savedIds = new Set(saved.map((c) => c.id));
+
+  const nameAdditions: NameReviewCard[] = seed
+    .filter((p) => !savedIds.has(p.id))
+    .map((p) => ({ ...p, cardType: "name", state: initialReviewState(now) }));
+
+  const evoAdditions: EvolutionReviewCard[] = evoSeed
+    .filter((e) => !savedIds.has(e.id))
+    .map((e) => ({ ...e, state: initialReviewState(now) }));
+
+  const additions = [...nameAdditions, ...evoAdditions];
   if (additions.length === 0) return refreshed;
   return [...refreshed, ...additions];
 }
 
-/**
- * Today as YYYY-MM-DD. Pure helper.
- */
 export function todayString(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 
-/**
- * Stable per-day shuffle using a deterministic FNV-1a-inspired hash of
- * (id, today). Same (ids, today) → same output; different today → different
- * ordering. Pure — no Math.random.
- */
 export function stableShuffleForDay(
   ids: readonly number[],
   today: string,
 ): number[] {
-  // Derive a numeric salt from the date string by hashing its characters.
-  // FNV-1a 32-bit: offset_basis=2166136261, prime=16777619
   const FNV_PRIME = 16777619;
   const FNV_OFFSET = 2166136261;
 
@@ -76,7 +105,6 @@ export function stableShuffleForDay(
     let hash = FNV_OFFSET;
     for (let i = 0; i < s.length; i++) {
       hash ^= s.charCodeAt(i);
-      // Keep within 32-bit unsigned range using >>> 0
       hash = Math.imul(hash, FNV_PRIME) >>> 0;
     }
     return hash;
@@ -84,9 +112,7 @@ export function stableShuffleForDay(
 
   const daySalt = fnv1a(today);
 
-  // Assign each id a deterministic sort key derived from (id, daySalt).
   const keyed = ids.map((id) => {
-    // Mix id and daySalt with another FNV-1a round.
     let hash = FNV_OFFSET;
     hash ^= id & 0xff;
     hash = Math.imul(hash, FNV_PRIME) >>> 0;
@@ -111,36 +137,8 @@ export function stableShuffleForDay(
   return keyed.map((item) => item.id);
 }
 
-/**
- * Computes all queues and today's counters from the full card set + limits.
- *
- * - learningCardIds: IDs of all cards currently in a learning or relearning
- *   step (learningStep !== null). These are managed entirely by the UI
- *   component's in-memory learning queue — the component pairs each ID with a
- *   wall-clock `dueAt` timestamp. On remount, the component reconstructs
- *   `dueAt = stepStartedAt + stepDurationMs` from persisted state so the
- *   countdown resumes correctly after navigation. The scheduler-side
- *   `learningStep` and `stepStartedAt` values are preserved across reloads.
- *   Learning cards are excluded from both reviewQueue and newQueue.
- * - reviewQueue: IDs of graduated cards due today or earlier,
- *   EXCLUDING any card whose lastReview === today (already done today)
- *   and EXCLUDING learning-step cards,
- *   capped at max(0, maxReviewsPerDay - reviewsDoneToday),
- *   then stableShuffleForDay'd.
- * - newQueue: IDs of brand-new cards (lastReview === null AND learningStep === null),
- *   capped at max(0, maxNewPerDay - newIntroducedToday),
- *   then stableShuffleForDay'd.
- * - newIntroducedToday: count of cards where firstSeen === today.
- * - reviewsDoneToday: count of cards where lastReview === today AND firstSeen !== today.
- *
- * Note: getNextCardId serves review/new ordering only. The component layers
- * learning-queue priority on top — learning cards are always shown before
- * review or new cards.
- *
- * Pure — no I/O.
- */
 export function buildSessionQueues(
-  cards: readonly ReviewCard[],
+  cards: readonly ReviewableCard[],
   limits: DailyLimits,
   today: string,
 ): {
@@ -154,22 +152,14 @@ export function buildSessionQueues(
     (c) => c.state.firstSeen === today,
   ).length;
 
-  // A card introduced today is counted only as "new" — even if it was lapsed
-  // and re-graded the same day. The `firstSeen !== today` guard deliberately
-  // excludes these from `reviewsDoneToday`; same-day re-views of a brand-new
-  // card are still part of "introducing" it, not a return review.
   const reviewsDoneToday = cards.filter(
     (c) => c.state.lastReview === today && c.state.firstSeen !== today,
   ).length;
 
-  // Learning queue: all cards currently in a learning or relearning step.
-  // These are handled by the component's in-memory queue, not the SRS queues.
   const learningCardIds = cards
     .filter((c) => c.state.learningStep !== null)
     .map((c) => c.id);
 
-  // Review candidates: has been reviewed before (graduated), due today or
-  // earlier, not already reviewed today, and NOT in a learning step.
   const reviewCandidateIds = cards
     .filter(
       (c) =>
@@ -186,9 +176,6 @@ export function buildSessionQueues(
     reviewSlots,
   );
 
-  // New candidates: never reviewed AND not currently in a learning step.
-  // (A card in a learning step has lastReview === null but learningStep !== null —
-  // it belongs in learningCardIds, not the newQueue.)
   const newCandidateIds = cards
     .filter(
       (c) => c.state.learningStep === null && c.state.lastReview === null,
@@ -204,17 +191,6 @@ export function buildSessionQueues(
   return { learningCardIds, reviewQueue, newQueue, newIntroducedToday, reviewsDoneToday };
 }
 
-/**
- * Get next card to show from the review and new queues.
- * Drains reviewQueue first, then newQueue.
- * Returns null when both queues are empty.
- *
- * Note: the component layers learning-queue priority on top of this — it checks
- * the in-memory learning queue before calling getNextCardId. This function
- * handles only the review/new ordering.
- *
- * Pure.
- */
 export function getNextCardId(
   reviewQueue: readonly number[],
   newQueue: readonly number[],

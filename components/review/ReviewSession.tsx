@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
+import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { GradeButtons } from "@/components/review/GradeButtons";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import {
   buildSession,
   buildSessionQueues,
@@ -11,7 +12,7 @@ import {
   hydrateSession,
   todayString,
   type DailyLimits,
-  type ReviewCard,
+  type ReviewableCard,
   type Grade,
   DEFAULT_LIMITS,
 } from "@/lib/review/session";
@@ -203,7 +204,7 @@ function CountdownScreen({
 
 export function ReviewSession() {
   // null = SSR / not-yet-hydrated. Same pattern as before.
-  const [cards, setCards] = useState<ReviewCard[] | null>(null);
+  const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
   const [revealed, setRevealed] = useState(false);
   const [grading, setGrading] = useState(false);
@@ -223,7 +224,7 @@ export function ReviewSession() {
 
   useEffect(() => {
     const saved = loadSession();
-    let sessionCards: ReviewCard[];
+    let sessionCards: ReviewableCard[];
     let sessionLimits: DailyLimits;
 
     // poke-memory:settings:v1 is the source of truth for limits.
@@ -234,14 +235,14 @@ export function ReviewSession() {
 
     if (saved !== null) {
       // Merge any seed cards added since the last save.
-      const hydrated = hydrateSession(saved.cards, SEED_POKEMON);
+      const hydrated = hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS);
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
         saveSession({ cards: hydrated, limits: sessionLimits });
       }
       sessionCards = hydrated;
     } else {
-      const fresh = buildSession(SEED_POKEMON);
+      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS);
       saveSession({ cards: fresh, limits: settingsLimits });
       sessionCards = fresh;
       sessionLimits = settingsLimits;
@@ -428,8 +429,10 @@ export function ReviewSession() {
 
   function handleReveal() {
     if (currentCard === null) return;
-    const facts = getPokemonFacts(currentCard);
-    setCurrentFact(selectFact(facts));
+    if (currentCard.cardType === "name") {
+      const facts = getPokemonFacts(currentCard);
+      setCurrentFact(selectFact(facts));
+    }
     setRevealed(true);
   }
 
@@ -483,12 +486,21 @@ export function ReviewSession() {
   // --- Active review UI ---
   return (
     <div className="flex flex-col items-center gap-8">
-      <PokemonCard
-        spriteUrl={currentCard.spriteUrl}
-        name={currentCard.name}
-        revealed={revealed}
-        fact={currentFact}
-      />
+      {currentCard.cardType === "evolution" ? (
+        <EvolutionCard
+          spriteUrl={currentCard.spriteUrl}
+          name={currentCard.name}
+          evolvesIntoNames={currentCard.evolvesIntoNames}
+          revealed={revealed}
+        />
+      ) : (
+        <PokemonCard
+          spriteUrl={currentCard.spriteUrl}
+          name={currentCard.name}
+          revealed={revealed}
+          fact={currentFact}
+        />
+      )}
 
       {revealed ? (
         <GradeButtons onGrade={handleGrade} disabled={grading} />

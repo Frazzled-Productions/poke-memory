@@ -1,4 +1,4 @@
-import type { ReviewCard } from "@/lib/review/session";
+import type { ReviewableCard } from "@/lib/review/session";
 
 // ---------------------------------------------------------------------------
 // Mastery classification
@@ -14,7 +14,7 @@ export const MASTERY_REPETITIONS = 3;
  * Learning: graded at least once, but repetitions < MASTERY_REPETITIONS.
  * Mastered: repetitions >= MASTERY_REPETITIONS.
  */
-export function classifyCard(card: ReviewCard, masteryRepetitions = MASTERY_REPETITIONS): CardClass {
+export function classifyCard(card: ReviewableCard, masteryRepetitions = MASTERY_REPETITIONS): CardClass {
   if (card.state.lastReview === null) return "locked";
   if (card.state.repetitions >= masteryRepetitions) return "mastered";
   return "learning";
@@ -132,7 +132,7 @@ function tomorrowString(today: string): string {
  *   - `perGeneration` covers all 9 generations even when introduced=0.
  */
 export function computeStats(
-  cards: readonly ReviewCard[],
+  cards: readonly ReviewableCard[],
   today: string,
   strugglingLimit = 10,
   masteryRepetitions = MASTERY_REPETITIONS,
@@ -151,7 +151,7 @@ export function computeStats(
   let dueTomorrow = 0;
 
   // Cards eligible for "struggling" — introduced cards only.
-  const introducedCards: ReviewCard[] = [];
+  const introducedCards: ReviewableCard[] = [];
 
   for (const card of cards) {
     const state = card.state;
