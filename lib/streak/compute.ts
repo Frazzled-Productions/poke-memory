@@ -1,5 +1,6 @@
 /**
- * Count the current streak from a sorted array of reviewed dates.
+ * Count the current streak from an array of reviewed dates. Order and
+ * duplicates don't matter — the function builds a Set internally.
  *
  * Grace window: if today has no entry but yesterday does, the streak is
  * still alive (the user hasn't reviewed yet today).

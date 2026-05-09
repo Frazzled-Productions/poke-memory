@@ -1,14 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { computeStreak, loadStreakData } from "@/lib/streak";
+import {
+  computeStreak,
+  loadStreakData,
+  STREAK_UPDATED_EVENT,
+} from "@/lib/streak";
 import { todayString } from "@/lib/review/session";
 
 export function StreakBadge() {
   const [streak, setStreak] = useState<number | null>(null);
 
   useEffect(() => {
-    setStreak(computeStreak(loadStreakData(), todayString(new Date())));
+    function refresh() {
+      setStreak(computeStreak(loadStreakData(), todayString(new Date())));
+    }
+    refresh();
+    window.addEventListener(STREAK_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(STREAK_UPDATED_EVENT, refresh);
   }, []);
 
   if (streak === null) return null;

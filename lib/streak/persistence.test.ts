@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { loadStreakData, saveStreakData, recordReview } from "./persistence";
+import { loadStreakData, saveStreakData, recordReview, STREAK_UPDATED_EVENT } from "./persistence";
 
 function makeMockStorage() {
   const store: Record<string, string> = {};
@@ -18,7 +18,7 @@ describe("loadStreakData", () => {
 
   beforeEach(() => {
     storage = makeMockStorage();
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
     vi.stubGlobal("localStorage", storage);
   });
 
@@ -56,7 +56,7 @@ describe("recordReview", () => {
 
   beforeEach(() => {
     storage = makeMockStorage();
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
     vi.stubGlobal("localStorage", storage);
   });
 
@@ -91,5 +91,21 @@ describe("recordReview", () => {
   it("is a no-op when window is undefined (SSR guard)", () => {
     vi.unstubAllGlobals();
     expect(() => recordReview("2026-05-09")).not.toThrow();
+  });
+
+  it("dispatches a STREAK_UPDATED_EVENT on a new date", () => {
+    recordReview("2026-05-09");
+    const dispatchEvent = (globalThis as unknown as { window: { dispatchEvent: ReturnType<typeof vi.fn> } }).window.dispatchEvent;
+    expect(dispatchEvent).toHaveBeenCalledTimes(1);
+    expect(dispatchEvent.mock.calls[0][0]).toBeInstanceOf(Event);
+    expect((dispatchEvent.mock.calls[0][0] as Event).type).toBe(STREAK_UPDATED_EVENT);
+  });
+
+  it("does not dispatch on a duplicate date (no-op early return)", () => {
+    recordReview("2026-05-09");
+    const dispatchEvent = (globalThis as unknown as { window: { dispatchEvent: ReturnType<typeof vi.fn> } }).window.dispatchEvent;
+    dispatchEvent.mockClear();
+    recordReview("2026-05-09");
+    expect(dispatchEvent).not.toHaveBeenCalled();
   });
 });

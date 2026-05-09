@@ -1,6 +1,7 @@
 import type { StreakData } from "./types";
 
 const STREAK_KEY = "poke-memory:streak:v1";
+export const STREAK_UPDATED_EVENT = "poke-memory:streak-updated";
 
 export function loadStreakData(): StreakData {
   if (typeof window === "undefined") return [];
@@ -32,4 +33,7 @@ export function recordReview(date: string): void {
   data.push(date);
   data.sort();
   saveStreakData(data);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
+  }
 }
