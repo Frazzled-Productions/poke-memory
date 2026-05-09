@@ -23,7 +23,19 @@ Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the 
 - SM-2 scheduling — well-known algorithm, fully spec'd math, no ML constants to tune.
 - Daily limits: 10 new cards and 100 reviews per day by default, adjustable in Settings. Keeps the load sustainable.
 - Stable per-day shuffle — order rotates daily so the same Pokémon doesn't always lead, but stays stable while you're working through a session.
-- All state lives in your browser's `localStorage`. Nothing is sent anywhere.
+- All state lives in your browser's `localStorage` by default. Sign in with GitHub to sync your progress across devices.
+
+
+## Sync your progress
+
+Sign in with GitHub (the **Sign in** button in the nav) to sync your review history across devices. Once signed in, your progress is pushed to the cloud at the end of each session.
+
+- **Guest mode** -- no account needed; everything stays in your browser.
+- **Sign in** -- ties your session to a GitHub account via Supabase Auth; data stored in Postgres.
+- **Conflict picker** -- if you have local progress *and* cloud progress when you sign in, you will be asked which to keep.
+- Signing out leaves your local localStorage intact; you can continue as a guest without losing anything.
+
+> **Note:** Supabase project URL and anon key must be configured (see `.env.local.example`). GitHub OAuth redirect URIs must be added in the Supabase dashboard.
 
 ## Run locally
 

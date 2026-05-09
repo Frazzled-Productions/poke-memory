@@ -22,6 +22,9 @@ import { loadSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -221,6 +224,9 @@ export function ReviewSession() {
 
   // Ref for the timeout that fires when the earliest pending learning card is due.
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sync on page unload when user is signed in.
+  const { user, supabase } = useAuth();
+  useSyncOnUnload(supabase, user?.id ?? null, cards);
 
   useEffect(() => {
     const saved = loadSession();

@@ -53,7 +53,9 @@
       "Bash(pwd)",
       "Bash(test *)",
       "Bash(true)",
-      "Bash(false)"
+      "Bash(false)",
+      "Edit(*)",
+      "Write(*)"
     ]
   }
 }

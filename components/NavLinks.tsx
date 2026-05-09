@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AuthButton } from "@/components/auth/AuthButton";
 
 const NAV_LINKS = [
   { href: "/", label: "Practice" },
@@ -16,27 +17,30 @@ const LINK_BASE =
 export function NavLinks() {
   const pathname = usePathname();
   return (
-    <ul className="flex items-center gap-1" role="list">
-      {NAV_LINKS.map(({ href, label }) => {
-        const isActive = pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
-        return (
-          <li key={href}>
-            <Link
-              href={href}
-              aria-current={isActive ? "page" : undefined}
-              className={[
-                LINK_BASE,
-                isActive
-                  ? "bg-foreground text-background"
-                  : "text-zinc-600 hover:text-foreground dark:text-zinc-400 dark:hover:text-foreground",
-              ].join(" ")}
-            >
-              {label}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <ul className="flex items-center gap-1" role="list">
+        {NAV_LINKS.map(({ href, label }) => {
+          const isActive = pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
+          return (
+            <li key={href}>
+              <Link
+                href={href}
+                aria-current={isActive ? "page" : undefined}
+                className={[
+                  LINK_BASE,
+                  isActive
+                    ? "bg-foreground text-background"
+                    : "text-zinc-600 hover:text-foreground dark:text-zinc-400 dark:hover:text-foreground",
+                ].join(" ")}
+              >
+                {label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <AuthButton />
+    </>
   );
 }
 
