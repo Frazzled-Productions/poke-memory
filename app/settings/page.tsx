@@ -68,7 +68,7 @@ type ConflictState = {
 function SyncAccountSection() {
   const { data: session, status } = useSession();
   const [conflict, setConflict] = useState<ConflictState | null>(null);
-  const prevStatusRef = useRef<string>("loading");
+  const prevStatusRef = useRef<"loading" | "authenticated" | "unauthenticated">("loading");
 
   useEffect(() => {
     const prevStatus = prevStatusRef.current;

@@ -333,7 +333,12 @@ export function ReviewSession() {
     const activeCardId = activeLearningEntry !== null ? activeLearningEntry.cardId : getNextCardId(rq, nq);
 
     if (activeCardId !== null) {
-      // A card is still active — reset the guard so we push when the session ends.
+      hasPushedRef.current = false;
+      return;
+    }
+
+    // Mirror render path: CountdownScreen is showing when future-due learning cards exist.
+    if (learningQueue.some((e) => e.dueAt > nowMs)) {
       hasPushedRef.current = false;
       return;
     }
