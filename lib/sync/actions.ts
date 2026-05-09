@@ -44,5 +44,6 @@ export async function resolveConflict(
   }
 
   const cloudData = await redis.get<CloudSyncPayload>(syncKey(session.user.id));
-  return cloudData ?? localPayload;
+  if (cloudData === null) throw new Error('Cloud data was not found — it may have been cleared. Please try again.');
+  return cloudData;
 }

@@ -68,6 +68,7 @@ type ConflictState = {
 function SyncAccountSection() {
   const { data: session, status } = useSession();
   const [conflict, setConflict] = useState<ConflictState | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const prevStatusRef = useRef<"loading" | "authenticated" | "unauthenticated">("loading");
 
   useEffect(() => {
@@ -76,17 +77,21 @@ function SyncAccountSection() {
     if (prevStatus === status || status !== "authenticated") return;
 
     void (async () => {
-      const cloudPayload = await loadCloudSync();
-      if (cloudPayload === null) return;
-      const localSession = loadSession();
-      if (localSession === null) return;
-      const localPayload: CloudSyncPayload = {
-        session: localSession,
-        streak: loadStreakData(),
-        settings: loadSettings(),
-        syncedAt: new Date().toISOString(),
-      };
-      setConflict({ localPayload, cloudPayload });
+      try {
+        const cloudPayload = await loadCloudSync();
+        if (cloudPayload === null) return;
+        const localSession = loadSession();
+        if (localSession === null) return;
+        const localPayload: CloudSyncPayload = {
+          session: localSession,
+          streak: loadStreakData(),
+          settings: loadSettings(),
+          syncedAt: new Date().toISOString(),
+        };
+        setConflict({ localPayload, cloudPayload });
+      } catch {
+        setSyncError("Could not check for cloud data. Your local progress is safe.");
+      }
     })();
   }, [status]);
 
@@ -131,6 +136,14 @@ function SyncAccountSection() {
           cloudPayload={conflict.cloudPayload}
           onResolved={() => setConflict(null)}
         />
+      )}
+      {syncError !== null && (
+        <p
+          className="mb-0 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400"
+          role="alert"
+        >
+          {syncError}
+        </p>
       )}
       <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
         <p className="text-sm font-medium text-foreground">Sync account</p>
