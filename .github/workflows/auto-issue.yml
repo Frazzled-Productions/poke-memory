@@ -165,8 +165,18 @@ jobs:
                than the cost of a wrongly-offered split (two PRs that don't
                compose).
 
-            4. Post the plan as a comment on the issue:
-               `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
+            4. Write the plan body to `/tmp/plan-body.md` with a hidden
+               marker as the very first line, then post it:
+               ```
+               printf '<!-- auto-plan -->\n' > /tmp/plan-body.md
+               cat <<'PLAN' >> /tmp/plan-body.md
+               <plan content here>
+               PLAN
+               gh issue comment ${{ github.event.issue.number }} --body-file /tmp/plan-body.md
+               ```
+               The marker is required — the post-step uses it to detect
+               whether the plan landed and salvages `/tmp/plan-body.md` to
+               the issue if the run halts before this step runs.
 
                The comment body must end in one of three ways:
 
@@ -208,6 +218,77 @@ jobs:
                "To change scope, post a comment describing the changes (or include them in your `/go` comment) — the implement stage treats follow-up comments as authoritative over this plan."
 
                Pick exactly one ending — never multiple, never none.
+
+      - name: Salvage plan and finalise status
+        # If the orchestrator step times out, runs out of turns, or errors
+        # right at the gh-comment call, the drafted plan is stranded on the
+        # runner and the live status comment is left mid-flight. This step
+        # detects whether the plan landed (via the `<!-- auto-plan -->`
+        # marker), salvages `/tmp/plan-body.md` if it didn't, and appends a
+        # "Run finished" section to the status comment so the maintainer
+        # always sees a real outcome instead of a hung in_progress checkbox.
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          STATUS_ID: ${{ steps.status.outputs.comment_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PLAN_FILE: /tmp/plan-body.md
+        run: |
+          set -uo pipefail
+
+          # Did the orchestrator already post the plan in THIS run? A prior
+          # planner run may have left an `<!-- auto-plan -->` comment, so we
+          # restrict the count to comments newer than the status comment
+          # (which is created at the start of every run). Comment IDs are
+          # monotonically increasing on GitHub.
+          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq --argjson statusId "${STATUS_ID:-0}" \
+              '[.[] | select(.id > $statusId) | select(.body | startswith("<!-- auto-plan -->"))] | length')
+
+          SALVAGED=false
+          if [ "${PLAN_POSTED:-0}" = "0" ] && [ -s "$PLAN_FILE" ]; then
+            # Ensure the marker is present so a follow-up run doesn't
+            # double-salvage the same body.
+            if ! head -n 1 "$PLAN_FILE" | grep -q '^<!-- auto-plan -->$'; then
+              { printf '<!-- auto-plan -->\n'; cat "$PLAN_FILE"; } > /tmp/plan-body-marked.md
+              PLAN_FILE=/tmp/plan-body-marked.md
+            fi
+            if gh issue comment "$ISSUE" --repo "$REPO" --body-file "$PLAN_FILE"; then
+              SALVAGED=true
+              PLAN_POSTED=1
+            else
+              echo "::warning::Salvage post of /tmp/plan-body.md failed"
+            fi
+          fi
+
+          # Update the live status comment with a Run finished section.
+          if [ -z "${STATUS_ID:-}" ]; then
+            echo "No status comment id captured — nothing to finalise."
+            exit 0
+          fi
+
+          CURRENT_BODY=$(gh api "repos/$REPO/issues/comments/$STATUS_ID" --jq '.body' 2>/dev/null || echo "")
+          if [ -z "$CURRENT_BODY" ]; then
+            echo "Status comment $STATUS_ID not readable — skipping finalise."
+            exit 0
+          fi
+
+          {
+            printf '%s\n\n---\n\n## Run finished\n\n' "$CURRENT_BODY"
+            if [ "$SALVAGED" = true ]; then
+              printf 'Plan run halted before posting, but the draft was salvaged from `/tmp/plan-body.md` and posted above. See [run logs](%s) for what halted the run.\n' "$RUN_URL"
+              printf '\nReply `/go` to proceed with the salvaged plan.\n'
+            elif [ "${PLAN_POSTED:-0}" != "0" ]; then
+              printf 'Done — plan posted. Reply `/go` to proceed.\n'
+            else
+              printf '**Run halted** — no plan was posted and no draft was found on the runner. See [run logs](%s).\n' "$RUN_URL"
+              printf '\n### How to recover\n\nRemove and re-add the `auto` label to re-trigger the planner.\n'
+            fi
+          } > /tmp/status-body.md
+
+          gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -F body=@/tmp/status-body.md
 
       - name: Surface tool denials
         if: always()
@@ -253,10 +334,30 @@ jobs:
           gh issue comment "$ISSUE" --repo "$REPO" --body-file /tmp/denials.md
 
       - name: Move issue to Planned
+        # Run even if the orchestrator step failed — the salvage step above
+        # may still have posted the plan from `/tmp/plan-body.md`. Gate on
+        # whether an `<!-- auto-plan -->` comment was posted in THIS run
+        # (id > STATUS_ID) so we don't promote on the strength of a prior
+        # run's plan when the current run never produced one.
+        if: always()
         env:
-          GH_TOKEN: ${{ steps.org-app-token.outputs.token }}
-          GH_TOKEN_REPO: ${{ steps.app-token.outputs.token }}
-        run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "Planned"
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ORG_TOKEN: ${{ steps.org-app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          STATUS_ID: ${{ steps.status.outputs.comment_id }}
+        run: |
+          set -uo pipefail
+          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq --argjson statusId "${STATUS_ID:-0}" \
+              '[.[] | select(.id > $statusId) | select(.body | startswith("<!-- auto-plan -->"))] | length')
+          if [ "${PLAN_POSTED:-0}" = "0" ]; then
+            echo "No plan posted in this run — leaving project status unchanged."
+            exit 0
+          fi
+          GH_TOKEN="$ORG_TOKEN" \
+          GH_TOKEN_REPO="$GH_TOKEN" \
+            .github/scripts/set-project-status.sh "$ISSUE" "Planned"
 
   implement:
     name: Implement
