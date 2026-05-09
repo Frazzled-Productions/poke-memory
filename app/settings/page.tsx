@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { exportProgress, importProgress } from "@/lib/backup/io";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { deleteAllCloudProgress } from "@/lib/sync/cloud";
@@ -101,7 +102,9 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSettings(loadSettings());
@@ -123,6 +126,29 @@ export default function SettingsPage() {
     }
     clearLocalProgress();
     router.replace("/");
+  }
+
+  function handleExport() {
+    exportProgress();
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const result = await importProgress(file);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    setImportError(null);
+    const confirmed = window.confirm(
+      "Replace your current progress with this backup?"
+    );
+    if (confirmed) {
+      window.location.reload();
+    }
   }
 
   function handleSave() {
@@ -196,6 +222,64 @@ export default function SettingsPage() {
                   ))}
                 </section>
               ))}
+
+              <section className="flex flex-col gap-4" aria-labelledby="backup-heading">
+                <h2
+                  id="backup-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Backup
+                </h2>
+
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Export progress</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Downloads a JSON backup of all your card progress and settings.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleExport}
+                      className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      Export
+                    </button>
+                  </div>
+
+                  <hr className="border-zinc-200 dark:border-zinc-800" />
+
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Import progress</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Restore from a previously exported backup. Replaces current progress after confirmation.
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json"
+                      className="sr-only"
+                      aria-hidden="true"
+                      tabIndex={-1}
+                      onChange={handleImport}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      Import
+                    </button>
+                    {importError !== null && (
+                      <p
+                        role="alert"
+                        className="mt-2 text-xs font-medium text-red-600 dark:text-red-400"
+                      >
+                        {importError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
 
               <div className="flex items-center gap-4 pt-2">
                 <button

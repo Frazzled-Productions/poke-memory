@@ -6,6 +6,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Backup export and import** — a new "Backup" section on the Settings page lets you download your card progress and settings as a JSON file, and restore from a previously exported backup. Invalid files are rejected with an inline error without touching localStorage; valid imports require explicit confirmation before overwriting current progress. Closes [#57](https://github.com/fraserbrookhouse/poke-memory/issues/57).
+
 - **Reset all progress** — a "Danger zone" section at the bottom of Settings lets you erase all your review history with a typed-confirmation dialog (you must type `RESET` to proceed). For signed-in users, cloud data in Supabase is deleted too. Closes [#58](https://github.com/fraserbrookhouse/poke-memory/issues/58).
 
 ### Fixed
