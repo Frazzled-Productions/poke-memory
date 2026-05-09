@@ -96,7 +96,6 @@ describe('hydrateSession', () => {
         name: 'bulbasaur',
         spriteUrl: '',
         evolvesIntoNames: ['ivysaur'],
-        evolvesIntoIds: [2],
       },
     ];
     const result = hydrateSession(saved, seed, evoSeed, NOW);
@@ -115,7 +114,6 @@ describe('buildSession', () => {
       name: 'bulbasaur',
       spriteUrl: '',
       evolvesIntoNames: ['ivysaur'],
-      evolvesIntoIds: [2],
     },
   ];
 

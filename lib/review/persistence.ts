@@ -78,7 +78,7 @@ export function loadSession(): SavedSession | null {
     const parsed: unknown = JSON.parse(raw);
 
     if (Array.isArray(parsed)) {
-      if (parsed.length > 0 && !isReviewCardShaped(parsed[0])) {
+      if (!parsed.every(isReviewCardShaped)) {
         return null;
       }
       for (const card of parsed) {
@@ -96,7 +96,7 @@ export function loadSession(): SavedSession | null {
         Array.isArray(obj.cards) &&
         isDailyLimitsShaped(obj.limits)
       ) {
-        if (obj.cards.length > 0 && !isReviewCardShaped(obj.cards[0])) {
+        if (!obj.cards.every(isReviewCardShaped)) {
           return null;
         }
         for (const card of obj.cards) {

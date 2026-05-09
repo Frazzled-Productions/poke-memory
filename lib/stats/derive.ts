@@ -1,4 +1,4 @@
-import type { ReviewableCard } from "@/lib/review/session";
+import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 
 // ---------------------------------------------------------------------------
 // Mastery classification
@@ -132,7 +132,7 @@ function tomorrowString(today: string): string {
  *   - `perGeneration` covers all 9 generations even when introduced=0.
  */
 export function computeStats(
-  cards: readonly ReviewableCard[],
+  cards: readonly NameReviewCard[],
   today: string,
   strugglingLimit = 10,
   masteryRepetitions = MASTERY_REPETITIONS,
@@ -151,7 +151,7 @@ export function computeStats(
   let dueTomorrow = 0;
 
   // Cards eligible for "struggling" — introduced cards only.
-  const introducedCards: ReviewableCard[] = [];
+  const introducedCards: NameReviewCard[] = [];
 
   for (const card of cards) {
     const state = card.state;

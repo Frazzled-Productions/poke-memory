@@ -47,7 +47,6 @@ export type EvolutionCard = {
   name: string;
   spriteUrl: string;
   evolvesIntoNames: string[];
-  evolvesIntoIds: number[];
 };
 
 export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
@@ -64,7 +63,6 @@ export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
       name: pokemon.name,
       spriteUrl: pokemon.spriteUrl,
       evolvesIntoNames: directEvolutions.map((n) => n.name),
-      evolvesIntoIds: directEvolutions.map((n) => n.speciesId),
     });
   }
   return cards;

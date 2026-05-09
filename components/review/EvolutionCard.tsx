@@ -7,6 +7,10 @@ type Props = {
   revealed: boolean;
 };
 
+function toDisplayName(s: string): string {
+  return s.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
 export function EvolutionCard({ spriteUrl, name, evolvesIntoNames, revealed }: Props) {
   return (
     <div className="flex flex-col items-center gap-4">
@@ -20,15 +24,15 @@ export function EvolutionCard({ spriteUrl, name, evolvesIntoNames, revealed }: P
       />
       <div className="flex flex-col items-center gap-1">
         <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          What does <span className="capitalize">{name}</span> evolve into?
+          What does {toDisplayName(name)} evolve into?
         </p>
         <div className="min-h-[2.5rem] flex flex-col items-center justify-center" aria-live="polite">
           {revealed ? (
             <div className="flex flex-wrap gap-x-2 gap-y-1 justify-center">
               {evolvesIntoNames.map((evoName, idx) => (
                 <span key={evoName}>
-                  <span className="text-3xl font-semibold tracking-wide capitalize text-foreground">
-                    {evoName}
+                  <span className="text-3xl font-semibold tracking-wide text-foreground">
+                    {toDisplayName(evoName)}
                   </span>
                   {idx < evolvesIntoNames.length - 1 && (
                     <span className="text-3xl font-semibold text-zinc-300 dark:text-zinc-600 select-none mx-1">
