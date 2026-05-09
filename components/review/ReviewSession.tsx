@@ -224,6 +224,7 @@ export function ReviewSession() {
 
   useEffect(() => {
     const saved = loadSession();
+    const now = new Date();
     let sessionCards: ReviewableCard[];
     let sessionLimits: DailyLimits;
 
@@ -234,14 +235,14 @@ export function ReviewSession() {
 
     if (saved !== null) {
       // Merge any seed cards added since the last save.
-      const hydrated = hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS);
+      const hydrated = hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, now);
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
         saveSession({ cards: hydrated, limits: sessionLimits });
       }
       sessionCards = hydrated;
     } else {
-      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS);
+      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now);
       saveSession({ cards: fresh, limits: settingsLimits });
       sessionCards = fresh;
       sessionLimits = settingsLimits;
@@ -253,7 +254,7 @@ export function ReviewSession() {
     // Initialize the learning queue from persisted learning-step cards.
     // Use stepStartedAt from persisted state so the countdown resumes correctly
     // after navigation instead of resetting to the full step duration.
-    const today = todayString(new Date());
+    const today = todayString(now);
     const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today);
 
     const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
@@ -364,9 +365,14 @@ export function ReviewSession() {
     // serving cards from the type that still has budget; the end-state UI
     // appears only when no type has any work left.
     function hasMoreDueReviewsOf(type: "name" | "evolution"): boolean {
+      // Mirror the candidate filter in buildSessionQueues — cards in a
+      // learning/relearning step are served via the in-memory learning
+      // queue, not the review queue, and must not count toward "more due
+      // reviews exist" or the soft-wall would fire spuriously.
       return cards!.some(
         (c) =>
           c.cardType === type &&
+          c.state.learningStep === null &&
           c.state.lastReview !== null &&
           c.state.dueDate <= today &&
           c.state.lastReview !== today,
