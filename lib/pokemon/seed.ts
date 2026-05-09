@@ -46,7 +46,7 @@ export type EvolutionCard = {
   pokemonId: number;
   name: string;
   spriteUrl: string;
-  evolvesIntoNames: string[];
+  evolvesInto: { name: string; spriteUrl: string }[];
 };
 
 // Evolution-card IDs live in the [EVOLUTION_ID_OFFSET, EVOLUTION_ID_OFFSET +
@@ -58,6 +58,7 @@ const MAX_NAME_ID = EVOLUTION_ID_OFFSET - 1;
 
 export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
   const cards: EvolutionCard[] = [];
+  const spriteById = new Map(SEED_POKEMON.map((p) => [p.id, p.spriteUrl]));
   for (const pokemon of SEED_POKEMON) {
     if (pokemon.id <= 0 || pokemon.id > MAX_NAME_ID) {
       throw new Error(
@@ -74,7 +75,13 @@ export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
       pokemonId: pokemon.id,
       name: pokemon.name,
       spriteUrl: pokemon.spriteUrl,
-      evolvesIntoNames: directEvolutions.map((n) => n.name),
+      evolvesInto: directEvolutions
+        .map((n) => {
+          const sprite = spriteById.get(n.speciesId);
+          if (sprite === undefined) return null;
+          return { name: n.name, spriteUrl: sprite };
+        })
+        .filter((e): e is { name: string; spriteUrl: string } => e !== null),
     });
   }
   return cards;
