@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Poké Memory",
     description:
       "Spaced-repetition Pokémon flashcards for learning the names of all 1025 Pokémon.",
-    start_url: "/",
+    start_url: "/?source=pwa",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#DC0A2D",
