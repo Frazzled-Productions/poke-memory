@@ -130,13 +130,16 @@ describe("ReviewSession reveal flow", () => {
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
 
-    const goodBtn = screen.getByRole("button", { name: /good/i });
-    await user.click(goodBtn);
+    // Grade "Easy" (grade 5) so the card graduates immediately (Case A2:
+    // brand-new + Easy → no learning step). "Good" (grade 4) would send the
+    // card into learningStep 0 and show CountdownScreen instead.
+    const easyBtn = screen.getByRole("button", { name: /easy/i });
+    await user.click(easyBtn);
 
-    // After grading the only card the session-complete screen should appear.
+    // After graduating the only card the session-complete screen should appear.
     await waitFor(() =>
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
     );
-    expect(screen.queryByRole("button", { name: /good/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
   });
 });
