@@ -102,7 +102,7 @@ describe('hydrateSession', () => {
         pokemonId: 1,
         name: 'bulbasaur',
         spriteUrl: '',
-        evolvesIntoNames: ['ivysaur'],
+        evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
       },
     ];
     const result = hydrateSession(saved, seed, evoSeed, NOW);
@@ -120,7 +120,7 @@ describe('buildSession', () => {
       pokemonId: 1,
       name: 'bulbasaur',
       spriteUrl: '',
-      evolvesIntoNames: ['ivysaur'],
+      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
     },
   ];
 
@@ -145,14 +145,14 @@ describe('buildSession', () => {
 });
 
 describe('hydrateSession (evolution refresh)', () => {
-  it('refreshes stale evolvesIntoNames on existing evolution cards', () => {
+  it('refreshes stale evolvesInto on existing evolution cards', () => {
     const stale: EvolutionReviewCard = {
       cardType: 'evolution',
       id: 1_000_001,
       pokemonId: 1,
       name: 'bulbasaur',
       spriteUrl: 'old-url',
-      evolvesIntoNames: ['ivysaur'],
+      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
       state: { ...initialReviewState(NOW), repetitions: 7, interval: 30 },
     };
     const freshEvo: EvolutionCard = {
@@ -161,13 +161,13 @@ describe('hydrateSession (evolution refresh)', () => {
       pokemonId: 1,
       name: 'bulbasaur',
       spriteUrl: 'new-url',
-      evolvesIntoNames: ['ivysaur', 'venusaur'],
+      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }, { name: 'venusaur', spriteUrl: '' }],
     };
     const result = hydrateSession([stale], [], [freshEvo], NOW);
     expect(result).toHaveLength(1);
     const card = result[0];
     if (card.cardType !== 'evolution') throw new Error('Expected evolution card');
-    expect(card.evolvesIntoNames).toEqual(['ivysaur', 'venusaur']);
+    expect(card.evolvesInto.map((e) => e.name)).toEqual(['ivysaur', 'venusaur']);
     expect(card.spriteUrl).toBe('new-url');
     expect(card.state.repetitions).toBe(7);
     expect(card.state.interval).toBe(30);
@@ -201,7 +201,7 @@ describe('migrateReviewCard', () => {
       id: 1_000_001,
       name: 'bulbasaur',
       spriteUrl: '',
-      evolvesIntoNames: ['ivysaur'],
+      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
       state: {
         repetitions: 0,
         interval: 0,
@@ -260,7 +260,7 @@ describe('buildSessionQueues (per-type budgets)', () => {
       pokemonId: id - 1_000_000,
       name: 'name-' + id,
       spriteUrl: '',
-      evolvesIntoNames: ['evo-of-' + id],
+      evolvesInto: [{ name: 'evo-of-' + id, spriteUrl: '' }],
       state: { ...initialReviewState(NOW), ...partialState },
     };
   }
