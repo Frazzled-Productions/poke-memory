@@ -17,10 +17,13 @@ import {
 } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { recordReview } from "@/lib/streak";
-import { loadSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
+import { useSession } from "next-auth/react";
+import { saveCloudSync } from "@/lib/sync/actions";
+import { loadStreakData } from "@/lib/streak/persistence";
+import { loadSettings } from "@/lib/settings/persistence";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -220,6 +223,10 @@ export function ReviewSession() {
 
   // Ref for the timeout that fires when the earliest pending learning card is due.
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track whether we have already pushed to cloud in this session (avoid repeat pushes).
+  const hasPushedRef = useRef<boolean>(false);
+
+  const { status: sessionStatus } = useSession();
 
   useEffect(() => {
     const saved = loadSession();
@@ -304,6 +311,51 @@ export function ReviewSession() {
     };
   }, [learningQueue]);
 
+  // --- Push to cloud on session end ---
+  // Fires whenever cards or learningQueue change (i.e. after each grade).
+  // Checks whether there is an active card; if not, this is an end state and we push.
+  // Uses a ref guard so we only push once per session end (not on every re-render).
+  useEffect(() => {
+    if (cards === null) return;
+    if (sessionStatus !== "authenticated") return;
+
+    // Compute whether a card is currently active using the same logic as the render path.
+    const todayVal = todayString(new Date());
+    const effectiveLimitsForEffect: DailyLimits = extendedReview
+      ? { ...limits, maxReviewsPerDay: Number.POSITIVE_INFINITY }
+      : limits;
+    const { reviewQueue: rq, newQueue: nq } = buildSessionQueues(cards, effectiveLimitsForEffect, todayVal);
+    const nowMs = Date.now();
+    const dueLearningForEffect = learningQueue
+      .filter((e) => e.dueAt <= nowMs)
+      .sort((a, b) => a.dueAt - b.dueAt);
+    const activeLearningEntry = dueLearningForEffect.length > 0 ? dueLearningForEffect[0] : null;
+    const activeCardId = activeLearningEntry !== null ? activeLearningEntry.cardId : getNextCardId(rq, nq);
+
+    if (activeCardId !== null) {
+      // A card is still active — reset the guard so we push when the session ends.
+      hasPushedRef.current = false;
+      return;
+    }
+
+    // End state reached. Push once.
+    if (hasPushedRef.current) return;
+    hasPushedRef.current = true;
+
+    void (async () => {
+      const streak = loadStreakData();
+      const settings = loadSettings();
+      const saved = loadSession();
+      if (saved === null) return;
+      await saveCloudSync({
+        session: saved,
+        streak,
+        settings,
+        syncedAt: new Date().toISOString(),
+      });
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, learningQueue, sessionStatus]);
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
     return (

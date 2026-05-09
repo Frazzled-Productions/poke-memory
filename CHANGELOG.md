@@ -14,6 +14,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Optional cloud sync** — sign in with GitHub on the Settings page to sync your review progress, streak, and settings across all your devices. Your data is stored in Upstash Redis keyed to your GitHub account. When you sign in with data on both the device and the cloud, a conflict picker lets you choose which to keep. Sync pushes to the cloud at session end (when the end screen appears). Local-only users are completely unaffected. Closes [#9](https://github.com/fraserbrookhouse/poke-memory/issues/9).
+
 - **Daily streak counter** — the home page now shows a "N days streak" badge above the practice session, and the stats page has a Current streak card. A streak counts consecutive days you reviewed at least one card; missing today doesn't break the streak as long as you reviewed yesterday (grace window). Reviewed dates are persisted to `localStorage` independently from session state. Closes [#41](https://github.com/fraserbrookhouse/poke-memory/issues/41) and [#42](https://github.com/fraserbrookhouse/poke-memory/issues/42).
 
 - **Pokémon facts on card flip** — when you hit Reveal on a review card, a randomly-selected fact about that Pokémon appears below the name alongside the grading buttons. Facts cover height, weight, type, genus (e.g. "Seed Pokémon"), generation, catch difficulty, base happiness, growth rate, habitat, gender ratio, base experience, strongest stat, and Pokédex flavour text entries. A new random fact is picked on every flip, so repeated "Again" cards show fresh information. The same facts are accessible on the Pokédex detail page in a new Facts panel. Closes [#11](https://github.com/fraserbrookhouse/poke-memory/issues/11).

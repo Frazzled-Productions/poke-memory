@@ -8,7 +8,7 @@ You see a sprite, mentally answer, hit **Reveal**, and grade yourself with one o
 
 **[poke-memory-alpha.vercel.app](https://poke-memory-alpha.vercel.app)**
 
-Hosted on Vercel; auto-deploys on every push to `main`. Your progress lives in the browser's `localStorage`, so it's per-device and starts fresh on a different machine.
+Hosted on Vercel; auto-deploys on every push to `main`. Your progress lives in the browser's `localStorage` by default. Sign in with GitHub on the Settings page to sync your progress across devices.
 
 ### Install on iPhone
 
@@ -23,7 +23,8 @@ Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the 
 - SM-2 scheduling — well-known algorithm, fully spec'd math, no ML constants to tune.
 - Daily limits: 10 new cards and 100 reviews per day by default, adjustable in Settings. Keeps the load sustainable.
 - Stable per-day shuffle — order rotates daily so the same Pokémon doesn't always lead, but stays stable while you're working through a session.
-- All state lives in your browser's `localStorage`. Nothing is sent anywhere.
+- All state lives in your browser's `localStorage` by default. Nothing is sent anywhere unless you sign in.
+- **Optional cloud sync** — sign in with GitHub on the Settings page to sync your review progress, streak, and settings across all your devices. Your data is stored in Upstash Redis, keyed to your GitHub account. Signing out returns to local-only mode. Users without an account are unaffected.
 
 ## Run locally
 
