@@ -65,6 +65,12 @@ export type ReviewState = {
    *          (LEARNING_STEPS_MS for new cards, RELEARNING_STEPS_MS for lapses)
    */
   learningStep: number | null;
+  /**
+   * Wall-clock epoch (ms) when the card entered its current learning step.
+   * null when graduated or not yet graded.
+   * Used on remount to reconstruct residual countdown: dueAt = stepStartedAt + stepDurationMs.
+   */
+  stepStartedAt: number | null;
 };
 
 export type Grade = 1 | 2 | 4 | 5;
@@ -135,15 +141,16 @@ export function nextReview(
         : RELEARNING_STEPS_MS.length; // relearning after lapse
 
     if (grade === 1) {
-      // Again → reset to step 0
+      // B1: Again → reset to step 0
       return {
         ...state,
         learningStep: 0,
+        stepStartedAt: now.getTime(),
       };
     }
 
     if (grade === 2) {
-      // Hard → repeat current step
+      // B2: Hard → repeat current step (preserve existing stepStartedAt)
       return { ...state };
     }
 
@@ -151,15 +158,18 @@ export function nextReview(
       // Good → advance one step, or graduate
       const nextStep = state.learningStep + 1;
       if (nextStep < numSteps) {
+        // B3 advance: move to next step
         return {
           ...state,
           learningStep: nextStep,
+          stepStartedAt: now.getTime(),
         };
       }
-      // Graduate
+      // B3 graduate: last step reached
       return {
         ...state,
         learningStep: null,
+        stepStartedAt: null,
         repetitions: 1,
         interval: GRAD_INTERVAL_GOOD,
         dueDate: addDays(now, GRAD_INTERVAL_GOOD),
@@ -168,10 +178,11 @@ export function nextReview(
       };
     }
 
-    // grade === 5: Easy → graduate immediately
+    // grade === 5: B4: Easy → graduate immediately
     return {
       ...state,
       learningStep: null,
+      stepStartedAt: null,
       repetitions: 1,
       interval: GRAD_INTERVAL_EASY,
       dueDate: addDays(now, GRAD_INTERVAL_EASY),
@@ -194,6 +205,7 @@ export function nextReview(
       return {
         ...state,
         learningStep: null,
+        stepStartedAt: null,
         repetitions: 1,
         interval: GRAD_INTERVAL_EASY,
         easeFactor: state.easeFactor, // EF unchanged on first touch
@@ -210,6 +222,7 @@ export function nextReview(
     return {
       ...state,
       learningStep: 0,
+      stepStartedAt: now.getTime(),
       // repetitions, interval, easeFactor, dueDate, lastReview all unchanged
       firstSeen,
     };
@@ -221,6 +234,7 @@ export function nextReview(
     return {
       ...state,
       learningStep: 0,
+      stepStartedAt: now.getTime(),
       repetitions: 0,
       interval: 1,
       easeFactor: newEF,
@@ -234,12 +248,13 @@ export function nextReview(
   const newEF = updatedEaseFactor(state.easeFactor, grade);
 
   if (grade === 2) {
-    // Hard on a graduated card: SM-2 treats this as a soft fail (grade < 3),
+    // A4 Hard: SM-2 treats this as a soft fail (grade < 3),
     // resetting repetitions and interval. The card does NOT enter relearning —
     // it just reschedules to tomorrow under the standard graduated path.
     return {
       ...state,
       learningStep: null,
+      stepStartedAt: null,
       repetitions: 0,
       interval: 1,
       easeFactor: newEF,
@@ -254,9 +269,11 @@ export function nextReview(
   else if (newRepetitions === 2) newInterval = 6;
   else newInterval = Math.floor(state.interval * newEF);
 
+  // A4 Good/Easy: standard SM-2 graduation path
   return {
     ...state,
     learningStep: null,
+    stepStartedAt: null,
     repetitions: newRepetitions,
     interval: newInterval,
     easeFactor: newEF,
@@ -274,5 +291,6 @@ export function initialReviewState(now: Date = new Date()): ReviewState {
     lastReview: null,
     firstSeen: null,
     learningStep: null,
+    stepStartedAt: null,
   };
 }

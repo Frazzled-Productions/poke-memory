@@ -41,6 +41,7 @@ function isDailyLimitsShaped(value: unknown): boolean {
 // Migrations applied in order:
 //   1. `firstSeen` (introduced before learningStep): backfill from lastReview.
 //   2. `learningStep` (new field): backfill to null (graduated / not in a step).
+//   3. `stepStartedAt` (new field): backfill to null.
 export function migrateReviewState(state: unknown): void {
   if (typeof state !== "object" || state === null) return;
   const s = state as Record<string, unknown>;
@@ -51,6 +52,10 @@ export function migrateReviewState(state: unknown): void {
   // Migration 2: learningStep
   if (s.learningStep === undefined) {
     s.learningStep = null;
+  }
+  // Migration 3: stepStartedAt
+  if (s.stepStartedAt === undefined) {
+    s.stepStartedAt = null;
   }
 }
 
