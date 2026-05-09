@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { clearLocalProgress } from "@/lib/storage/reset";
+import { deleteAllCloudProgress } from "@/lib/sync/cloud";
+import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -91,8 +96,11 @@ const GROUPS: FieldGroup[] = [
 const ALL_FIELDS: FieldConfig[] = GROUPS.flatMap((g) => g.fields);
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { user, supabase } = useAuth();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [saved, setSaved] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -106,6 +114,15 @@ export default function SettingsPage() {
     if (settings === null) return;
     const value = parseInt(raw, 10);
     setSettings({ ...settings, [key]: isNaN(value) ? settings[key] : value });
+  }
+
+  async function handleReset() {
+    if (user && supabase) {
+      const ok = await deleteAllCloudProgress(supabase, user.id);
+      if (!ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
+    }
+    clearLocalProgress();
+    router.replace("/");
   }
 
   function handleSave() {
@@ -133,70 +150,106 @@ export default function SettingsPage() {
         {settings === null ? (
           <LoadingSkeleton />
         ) : (
-          <div className="flex flex-col gap-6">
-            {GROUPS.map((group, groupIdx) => (
-              <section
-                key={group.heading ?? `group-${groupIdx}`}
-                className="flex flex-col gap-4"
-                aria-labelledby={
-                  group.heading ? `group-heading-${groupIdx}` : undefined
-                }
-              >
-                {group.heading !== null && (
-                  <h2
-                    id={`group-heading-${groupIdx}`}
-                    className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                  >
-                    {group.heading}
-                  </h2>
-                )}
-                {group.fields.map(({ key, label, helper, min, max }) => (
-                  <div
-                    key={key}
-                    className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
-                  >
-                    <label
-                      htmlFor={key}
-                      className="block text-sm font-medium text-foreground"
-                    >
-                      {label}
-                    </label>
-                    <input
-                      id={key}
-                      type="number"
-                      min={min}
-                      max={max}
-                      step={1}
-                      value={settings[key]}
-                      onChange={(e) => handleChange(key, e.target.value)}
-                      className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                    />
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      {helper}
-                    </p>
-                  </div>
-                ))}
-              </section>
-            ))}
-
-            <div className="flex items-center gap-4 pt-2">
-              <button
-                type="button"
-                onClick={handleSave}
-                className="min-h-[44px] rounded-lg bg-foreground px-8 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-              >
-                Save
-              </button>
-              {saved && (
-                <p
-                  className="text-sm font-medium text-emerald-600 dark:text-emerald-400"
-                  aria-live="polite"
+          <>
+            <div className="flex flex-col gap-6">
+              {GROUPS.map((group, groupIdx) => (
+                <section
+                  key={group.heading ?? `group-${groupIdx}`}
+                  className="flex flex-col gap-4"
+                  aria-labelledby={
+                    group.heading ? `group-heading-${groupIdx}` : undefined
+                  }
                 >
-                  Saved!
-                </p>
-              )}
+                  {group.heading !== null && (
+                    <h2
+                      id={`group-heading-${groupIdx}`}
+                      className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                    >
+                      {group.heading}
+                    </h2>
+                  )}
+                  {group.fields.map(({ key, label, helper, min, max }) => (
+                    <div
+                      key={key}
+                      className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                    >
+                      <label
+                        htmlFor={key}
+                        className="block text-sm font-medium text-foreground"
+                      >
+                        {label}
+                      </label>
+                      <input
+                        id={key}
+                        type="number"
+                        min={min}
+                        max={max}
+                        step={1}
+                        value={settings[key]}
+                        onChange={(e) => handleChange(key, e.target.value)}
+                        className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                      />
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        {helper}
+                      </p>
+                    </div>
+                  ))}
+                </section>
+              ))}
+
+              <div className="flex items-center gap-4 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="min-h-[44px] rounded-lg bg-foreground px-8 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+                >
+                  Save
+                </button>
+                {saved && (
+                  <p
+                    className="text-sm font-medium text-emerald-600 dark:text-emerald-400"
+                    aria-live="polite"
+                  >
+                    Saved!
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+
+            <section
+              className="mt-10 rounded-xl border border-red-200 p-5 dark:border-red-900"
+              aria-labelledby="danger-zone-heading"
+            >
+              <h2
+                id="danger-zone-heading"
+                className="text-sm font-semibold uppercase tracking-wide text-red-600 dark:text-red-400"
+              >
+                Danger zone
+              </h2>
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Reset all progress</p>
+                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    Permanently deletes your review history
+                    {user ? " and cloud data" : ""}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResetOpen(true)}
+                  className="min-h-[44px] shrink-0 rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-950"
+                >
+                  Reset all progress
+                </button>
+              </div>
+            </section>
+
+            <ResetProgressDialog
+              open={resetOpen}
+              onClose={() => setResetOpen(false)}
+              onConfirm={handleReset}
+            />
+          </>
         )}
       </div>
     </div>

@@ -1,0 +1,97 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}
+
+export function ResetProgressDialog({ open, onClose, onConfirm }: Props) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [value, setValue] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open) {
+      dialog.showModal();
+    } else {
+      dialog.close();
+      setValue("");
+      setError(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    function handleCancel(e: Event) {
+      e.preventDefault();
+      onClose();
+    }
+    dialog.addEventListener("cancel", handleCancel);
+    return () => dialog.removeEventListener("cancel", handleCancel);
+  }, [onClose]);
+
+  async function handleConfirm() {
+    if (value !== "RESET" || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setPending(false);
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="reset-dialog-title"
+      aria-describedby="reset-dialog-desc"
+      className="rounded-xl border border-zinc-200 bg-background p-6 shadow-xl backdrop:bg-black/50 dark:border-zinc-800"
+    >
+      <h2 id="reset-dialog-title" className="text-lg font-semibold text-foreground">Reset all progress?</h2>
+      <p id="reset-dialog-desc" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+        This will permanently erase all your review history and cannot be undone.
+        Type <strong className="text-foreground">RESET</strong> to confirm.
+      </p>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Type RESET to confirm"
+        disabled={pending}
+        className="mt-4 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+      />
+      {error && (
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="mt-4 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={pending}
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:hover:bg-zinc-800 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={value !== "RESET" || pending}
+          className="min-h-[44px] rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {pending ? "Resetting…" : "Reset"}
+        </button>
+      </div>
+    </dialog>
+  );
+}
