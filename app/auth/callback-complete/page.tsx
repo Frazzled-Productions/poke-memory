@@ -82,9 +82,9 @@ export default function CallbackCompletePage() {
       if (!hasLocal && cloudHasData) {
         if (localSession !== null) {
           const merged = mergeCloudIntoLocal(localSession.cards, cloudRows!);
-          saveSession({ cards: merged, limits: DEFAULT_LIMITS });
+          saveSession({ cards: merged, limits: localSession.limits ?? DEFAULT_LIMITS });
         }
-        router.replace("/");
+        if (!cancelled) router.replace("/");
         return;
       }
       setStatus({ kind: "conflict", localCards: localSession!.cards, cloudRows: cloudRows! });

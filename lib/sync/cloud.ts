@@ -62,8 +62,8 @@ export async function pushSession(
 
   let allOk = true;
   const BATCH = 200;
+  const updatedAt = new Date().toISOString();
   for (let i = 0; i < rows.length; i += BATCH) {
-    const updatedAt = new Date().toISOString();
     const batch = rows.slice(i, i + BATCH).map((r) => ({ ...r, user_id: userId, updated_at: updatedAt }));
     try {
       const { error } = await client
