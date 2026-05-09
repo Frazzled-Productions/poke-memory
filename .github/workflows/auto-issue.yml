@@ -120,10 +120,7 @@ jobs:
                if one is found, the corresponding specialist call was missed
                or failed silently — dispatch it and incorporate the answer
                before posting.
-            3. Post the plan as a comment on the issue:
-               `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
-            3b. Before finalizing the comment body, assess the plan's scope.
-               Count the following from the plan content:
+            3. Assess the plan's scope before posting. Count the following:
                - **Files**: distinct files the plan explicitly modifies or creates
                - **Surfaces**: count of categories touched (workflow files / lib/ /
                  components/ / docs + db + API routes — each category = 1 surface)
@@ -140,8 +137,14 @@ jobs:
                c. Plan introduces both new infrastructure AND new logic, with ≥ 3 files
                d. ≥ 6 acceptance criteria
 
-               When the threshold is crossed, append this block to the plan body
-               BEFORE the two standard `/go` closing lines:
+            4. Post the plan as a comment on the issue:
+               `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
+
+               The comment body must end in one of two ways:
+
+               **A) If the scope warning fires (any threshold from step 3 crossed),
+               append this block as the final content** — its own `/go` invitation
+               replaces the standard closing lines:
 
                ---
                **⚠ Scope warning.** This plan touches N file(s) across M surface(s) [brief reason].
@@ -154,10 +157,11 @@ jobs:
                Reply `/split` to file these as sub-issues of this issue. Reply `/go` to proceed with the full scope.
                ---
 
-               When no threshold is crossed, omit the scope warning block entirely.
-            4. The comment must end with these two lines, on their own:
+               **B) If no scope warning fires, end with these two lines on their own:**
                "Reply with `/go` to proceed."
                "To change scope, post a comment describing the changes (or include them in your `/go` comment) — the implement stage treats follow-up comments as authoritative over this plan."
+
+               Pick exactly one ending — never both, never neither.
 
       - name: Surface tool denials
         if: always()
@@ -309,7 +313,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.org-app-token.outputs.token }}
           GH_TOKEN_REPO: ${{ steps.app-token.outputs.token }}
-        run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "In Progress"
+        run: .github/scripts/set-project-status.sh "${{ github.event.issue.number }}" "In Progress"
 
       - name: Post initial status comment
         id: status
@@ -635,10 +639,12 @@ jobs:
             exit 1
           fi
 
-          # Parse branch from the most recent <!-- auto-status --> comment
-          BRANCH=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
-            --jq '[.[] | select(.body | startswith("<!-- auto-status -->"))] | last | .body // ""' \
-            | grep 'Branch:' | sed -E 's/.*Branch: `([^`]+)`.*/\1/' | tail -1 || true)
+          # Parse branch from the most recent <!-- auto-status --> comment.
+          # Use awk so a no-match doesn't kill the pipeline under set -euo pipefail.
+          LAST_STATUS=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-status -->"))] | last | .body // ""')
+          BRANCH=$(printf '%s' "$LAST_STATUS" \
+            | awk -F'`' '/Branch:/ { b = $2 } END { if (b) print b }')
 
           if [ -z "$BRANCH" ]; then
             gh issue comment "$ISSUE" --repo "$REPO" \
@@ -689,7 +695,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.org-app-token.outputs.token }}
           GH_TOKEN_REPO: ${{ steps.app-token.outputs.token }}
-        run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "In Progress"
+        run: .github/scripts/set-project-status.sh "${{ github.event.issue.number }}" "In Progress"
 
       - name: Post initial status comment
         id: status
@@ -994,7 +1000,7 @@ jobs:
 
           # Parse numbered lines from the Suggested split block
           TITLES=$(printf '%s' "$PLAN_BODY" \
-            | awk '/\*\*Suggested split:\*\*/{found=1; next} found && /^[[:space:]]*[0-9]+\./{print; next} found && /^Reply/{exit}' \
+            | awk '/\*\*Suggested split:\*\*/{found=1; next} found && /^[[:space:]]*[0-9]+\./{print; next} found && /^Reply.*\/split/{exit} found && /^---/{exit}' \
             | sed -E 's/^[[:space:]]*[0-9]+\.[[:space:]]*//' \
             | sed -E 's/[[:space:]]+[\-—][[:space:]]+.*//')
 
@@ -1004,11 +1010,23 @@ jobs:
             exit 0
           fi
 
-          # Inherit the parent's priority label (default priority:now)
+          # Inherit the parent's priority label (default priority:now). A grep
+          # no-match would exit 1 under pipefail, so route through awk instead.
           PRIORITY_LABEL=$(gh issue view "$ISSUE" --repo "$REPO" --json labels \
-            --jq '.labels[].name' | grep '^priority:' | head -1 || echo "priority:now")
+            --jq '.labels[].name' \
+            | awk '/^priority:/ { print; exit }')
+          PRIORITY_LABEL="${PRIORITY_LABEL:-priority:now}"
+
+          # Post the idempotency-anchor marker BEFORE any sub-issue creation so a
+          # partial failure mid-loop still leaves a marker that the
+          # already-filed check (above) will catch on a re-run. We PATCH this
+          # comment with the final outcome at the end of the loop.
+          MARKER_ID=$(gh api -X POST "/repos/$REPO/issues/$ISSUE/comments" \
+            -f body="$(printf '<!-- auto-split:%s -->\n## Sub-issues filing in progress\n\nProcessing split request — this comment will update with the result.' "$ISSUE")" \
+            --jq '.id')
 
           CREATED=""
+          FAILED=""
           while IFS= read -r title; do
             [ -z "$title" ] && continue
 
@@ -1019,18 +1037,30 @@ jobs:
 
             gh issue edit "$NEW_ID" --repo "$REPO" --add-label "${PRIORITY_LABEL},auto"
 
-            # Link as native GitHub sub-issue; surface permission failures explicitly
-            if ! gh api -X POST "repos/$REPO/issues/$ISSUE/sub_issues" \
+            # Link as native GitHub sub-issue. Record the outcome and continue
+            # so a single failure doesn't strand earlier-created sub-issues.
+            if gh api -X POST "repos/$REPO/issues/$ISSUE/sub_issues" \
                 -F sub_issue_id="$NEW_ID" 2>/tmp/sub-issue-err.txt; then
+              CREATED="${CREATED}"$'\n'"- #${NEW_ID}: ${title}"
+            else
               ERR=$(head -3 /tmp/sub-issue-err.txt 2>/dev/null || echo "unknown error")
-              gh issue comment "$ISSUE" --repo "$REPO" \
-                --body "$(printf '**Failed to link #%s as a native sub-issue.**\n\nError: %s\n\nThe issue was created but not linked. You may need to add **Sub-issues** write permission to the GitHub App and re-install it, then re-comment `/split`.' "$NEW_ID" "$ERR")"
-              exit 1
+              FAILED="${FAILED}"$'\n'"- #${NEW_ID} (created, link failed): ${title} — \`${ERR}\`"
             fi
-
-            CREATED="${CREATED}"$'\n'"- #${NEW_ID}: ${title}"
           done <<< "$TITLES"
 
-          gh issue comment "$ISSUE" --repo "$REPO" --body "$(printf \
-            '<!-- auto-split:%s -->\n## Sub-issues filed\n\nThe following sub-issues were created and linked to #%s:%s\n\nThis issue stays open as a tracker. GitHub will auto-close it when all sub-issues are closed.' \
-            "$ISSUE" "$ISSUE" "$CREATED")"
+          # PATCH the marker with the final outcome.
+          {
+            printf '<!-- auto-split:%s -->\n## Sub-issues filed\n\n' "$ISSUE"
+            if [ -n "$CREATED" ]; then
+              printf 'Linked as sub-issues of #%s:%s\n' "$ISSUE" "$CREATED"
+            fi
+            if [ -n "$FAILED" ]; then
+              printf '\n**Some sub-issues could not be linked.** They were created but the `sub_issues` API call failed. You may need to grant the GitHub App **Sub-issues** write permission and link them manually:%s\n' "$FAILED"
+            fi
+            printf '\nThis issue stays open as a tracker. GitHub will auto-close it when all sub-issues are closed.\n'
+          } > /tmp/auto-split-final.md
+          gh api -X PATCH "/repos/$REPO/issues/comments/$MARKER_ID" \
+            -F body=@/tmp/auto-split-final.md
+
+          # Surface a non-zero exit so the workflow shows red when any link failed.
+          if [ -n "$FAILED" ]; then exit 1; fi
