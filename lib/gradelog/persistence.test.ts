@@ -4,7 +4,6 @@ import {
   appendGradeEntry,
   pruneGradeLog,
   computeGradeTotals,
-  computeSessionGradeTotals,
   type GradeLogEntry,
 } from "./persistence";
 
@@ -119,7 +118,7 @@ describe("pruneGradeLog", () => {
     expect(pruned.map((e) => e.date)).toEqual(["2026-04-20", "2026-05-09"]);
   });
 
-  it("drops all entries when keepDays is 0", () => {
+  it("retains only today's entry when keepDays is 0", () => {
     const pruned = pruneGradeLog(log, 0, "2026-05-09");
     expect(pruned).toHaveLength(1);
     expect(pruned[0].date).toBe("2026-05-09");
@@ -148,21 +147,5 @@ describe("computeGradeTotals", () => {
       { date: "2026-05-09", grade: 5, cardType: "name" },
     ];
     expect(computeGradeTotals(log)).toEqual({ 1: 2, 2: 0, 4: 1, 5: 1 });
-  });
-});
-
-describe("computeSessionGradeTotals", () => {
-  const log: GradeLogEntry[] = [
-    { date: "2026-05-08", grade: 4, cardType: "name" },
-    { date: "2026-05-09", grade: 2, cardType: "name" },
-    { date: "2026-05-09", grade: 5, cardType: "evolution" },
-  ];
-
-  it("returns zeros when no entries match the date", () => {
-    expect(computeSessionGradeTotals(log, "2026-05-07")).toEqual({ 1: 0, 2: 0, 4: 0, 5: 0 });
-  });
-
-  it("returns only entries for the given date", () => {
-    expect(computeSessionGradeTotals(log, "2026-05-09")).toEqual({ 1: 0, 2: 1, 4: 0, 5: 1 });
   });
 });

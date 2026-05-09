@@ -334,7 +334,7 @@ export default function StatsPage() {
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
-  const [gradeTotals, setGradeTotals] = useState<GradeTotals | null>(null);
+  const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
 
   useEffect(() => {
     const saved = loadSession();
@@ -366,7 +366,7 @@ export default function StatsPage() {
           Stats
         </h1>
 
-        {stats === null || currentStreak === null || gradeTotals === null ? (
+        {stats === null || currentStreak === null ? (
           <LoadingSkeleton />
         ) : (
           <div className="flex flex-col gap-10">
