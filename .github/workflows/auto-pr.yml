@@ -288,13 +288,13 @@ jobs:
 
           DENIAL_COUNT=0
           DENIAL_DETAILS=""
-          JQ_COUNT_ERR=$(mktemp)
-          JQ_DETAILS_ERR=$(mktemp)
           echo "Denial log path: $LOG"
           if [ ! -f "$LOG" ]; then
             echo "WARNING: denial log not found at $LOG — DENIAL_COUNT will be 0"
           else
-            DENIAL_COUNT_RAW=$(jq -r 'select(.type == "result") | (.permission_denials_count // 0)' "$LOG" 2>"$JQ_COUNT_ERR" | tail -1)
+            JQ_COUNT_ERR=$(mktemp)
+            JQ_DETAILS_ERR=$(mktemp)
+            DENIAL_COUNT_RAW=$(jq -r 'select(.type == "result") | (.permission_denials_count // 0)' "$LOG" 2>"$JQ_COUNT_ERR" | tail -1 || true)
             if [ -s "$JQ_COUNT_ERR" ]; then
               echo "WARNING: jq error extracting DENIAL_COUNT:"
               cat "$JQ_COUNT_ERR"
@@ -324,8 +324,8 @@ jobs:
               echo "WARNING: jq error extracting DENIAL_DETAILS:"
               cat "$JQ_DETAILS_ERR"
             fi
+            rm -f "$JQ_COUNT_ERR" "$JQ_DETAILS_ERR"
           fi
-          rm -f "$JQ_COUNT_ERR" "$JQ_DETAILS_ERR"
           DETAILS_EMPTY=$([ -z "$DENIAL_DETAILS" ] && echo yes || echo no)
           echo "Denial summary: count=$DENIAL_COUNT, details_empty=$DETAILS_EMPTY"
 
