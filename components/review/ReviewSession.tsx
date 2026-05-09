@@ -16,6 +16,7 @@ import {
   DEFAULT_LIMITS,
 } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
+import { recordReview } from "@/lib/streak";
 import { loadSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
@@ -445,6 +446,7 @@ export function ReviewSession() {
     );
 
     saveSession({ cards: newCards, limits });
+    recordReview(todayString(new Date()));
     setCards(newCards);
 
     // Update the learning queue based on the new state.
