@@ -127,6 +127,29 @@ describe("isBackupFile", () => {
     expect(isBackupFile(makeValidBackup({ cards: [card as BackupFile["cards"][number]] }))).toBe(false);
   });
 
+  it("rejects an evolution card with missing evolvesInto", () => {
+    const card = { ...makeMinimalCard(1), cardType: "evolution" };
+    expect(isBackupFile(makeValidBackup({ cards: [card as BackupFile["cards"][number]] }))).toBe(false);
+  });
+
+  it("accepts an evolution card with valid evolvesInto shape", () => {
+    const card = {
+      ...makeMinimalCard(1),
+      cardType: "evolution",
+      evolvesInto: [{ name: "ivysaur", spriteUrl: "" }],
+    };
+    expect(isBackupFile(makeValidBackup({ cards: [card as BackupFile["cards"][number]] }))).toBe(true);
+  });
+
+  it("accepts an evolution card with legacy evolvesIntoNames shape", () => {
+    const card = {
+      ...makeMinimalCard(1),
+      cardType: "evolution",
+      evolvesIntoNames: ["ivysaur"],
+    };
+    expect(isBackupFile(makeValidBackup({ cards: [card as unknown as BackupFile["cards"][number]] }))).toBe(true);
+  });
+
   it("rejects when a card state is missing dueDate", () => {
     const card = {
       ...makeMinimalCard(1),
@@ -220,7 +243,7 @@ describe("exportProgress", () => {
   });
 
   it("is a no-op when window is undefined (SSR guard)", () => {
-    vi.unstubAllGlobals();
+    vi.stubGlobal("window", undefined);
     expect(() => exportProgress()).not.toThrow();
     expect(capturedBlob).toBeUndefined();
   });

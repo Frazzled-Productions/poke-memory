@@ -12,7 +12,10 @@ export type BackupFile = {
   settings: UserSettings;
 };
 
-// Shape checks mirror lib/review/persistence.ts — keep in sync if those shapes evolve.
+// Intentionally less strict than isReviewCardShaped in persistence.ts:
+// - name and spriteUrl are omitted — hydrateSession refreshes them from seed on every load.
+// - Only dueDate is validated in state — other ReviewState fields get migration defaults.
+// - evolvesInto IS validated for evolution cards — missing/malformed would crash the review UI.
 function isMinimalCardShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -24,6 +27,29 @@ function isMinimalCardShaped(value: unknown): boolean {
     v.cardType !== "name" &&
     v.cardType !== "evolution"
   ) {
+    return false;
+  }
+  if (v.cardType === "evolution") {
+    // Accept new shape: evolvesInto: { name: string; spriteUrl: string }[]
+    if (
+      Array.isArray(v.evolvesInto) &&
+      v.evolvesInto.every(
+        (e: unknown) =>
+          typeof e === "object" &&
+          e !== null &&
+          typeof (e as Record<string, unknown>).name === "string" &&
+          typeof (e as Record<string, unknown>).spriteUrl === "string",
+      )
+    ) {
+      return true;
+    }
+    // Accept legacy shape: evolvesIntoNames: string[] (backwards compat window)
+    if (
+      Array.isArray(v.evolvesIntoNames) &&
+      v.evolvesIntoNames.every((n: unknown) => typeof n === "string")
+    ) {
+      return true;
+    }
     return false;
   }
   return true;
