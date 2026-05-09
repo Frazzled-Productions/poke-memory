@@ -9,6 +9,8 @@ import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
 import { loadSettings } from "@/lib/settings/persistence";
 import { computeStreak, loadStreakData } from "@/lib/streak";
+import { loadGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
+import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,6 +47,7 @@ function LoadingSkeleton() {
         <SkeletonBlock className="h-20" />
         <SkeletonBlock className="h-20" />
       </div>
+      <SkeletonBlock className="h-32 w-full" />
       <SkeletonBlock className="h-64 w-full" />
       <SkeletonBlock className="h-48 w-full" />
     </div>
@@ -331,6 +334,7 @@ export default function StatsPage() {
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
+  const [gradeTotals, setGradeTotals] = useState<GradeTotals | null>(null);
 
   useEffect(() => {
     const saved = loadSession();
@@ -342,6 +346,7 @@ export default function StatsPage() {
     const settings = loadSettings();
     setMasteryRepetitions(settings.masteryRepetitions);
     setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
+    setGradeTotals(computeGradeTotals(loadGradeLog()));
   }, []);
 
   const stats: StatsResult | null =
@@ -361,7 +366,7 @@ export default function StatsPage() {
           Stats
         </h1>
 
-        {stats === null || currentStreak === null ? (
+        {stats === null || currentStreak === null || gradeTotals === null ? (
           <LoadingSkeleton />
         ) : (
           <div className="flex flex-col gap-10">
@@ -381,6 +386,13 @@ export default function StatsPage() {
                 </p>
               )}
             </section>
+            <GradeBreakdownBar
+              again={gradeTotals[1]}
+              hard={gradeTotals[2]}
+              good={gradeTotals[4]}
+              easy={gradeTotals[5]}
+              label="All-time grade breakdown"
+            />
             <MasteryBar stats={stats} />
             <IntroducedBar stats={stats} />
             <DueForecast stats={stats} />

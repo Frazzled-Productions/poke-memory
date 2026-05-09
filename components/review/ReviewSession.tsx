@@ -24,6 +24,8 @@ import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
+import { appendGradeEntry } from "@/lib/gradelog/persistence";
+import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 
 
 // ---------------------------------------------------------------------------
@@ -221,6 +223,10 @@ export function ReviewSession() {
   // In-memory learning queue: cards currently in a learning or relearning step.
   // Initialized at mount from learningCardIds; updated on every grade.
   const [learningQueue, setLearningQueue] = useState<LearningQueueEntry[]>([]);
+
+  // Live session grade tally — resets on page navigation by design. Labelled
+  // "this session" in the UI to set expectations.
+  const [sessionGrades, setSessionGrades] = useState<Record<Grade, number>>({ 1: 0, 2: 0, 4: 0, 5: 0 });
 
   // Ref for the timeout that fires when the earliest pending learning card is due.
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -461,7 +467,9 @@ export function ReviewSession() {
 
     saveSession({ cards: newCards, limits });
     recordReview(todayString(now));
+    appendGradeEntry({ date: todayString(now), grade, cardType: currentCard.cardType });
     setCards(newCards);
+    setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
 
     // Update the learning queue based on the new state.
     setLearningQueue((prev) => {
@@ -525,6 +533,13 @@ export function ReviewSession() {
       )}
 
       <TodayPill perType={perType} />
+      <GradeBreakdownBar
+        again={sessionGrades[1]}
+        hard={sessionGrades[2]}
+        good={sessionGrades[4]}
+        easy={sessionGrades[5]}
+        label="This session"
+      />
     </div>
   );
 }

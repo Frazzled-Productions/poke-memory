@@ -6,6 +6,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Per-session and all-time grade breakdown** — a "This session" bar appears on the Practice page while you review, showing a live count of Again / Hard / Good / Easy grades (resets on navigation, as labelled). The Stats page now shows an "All-time grade breakdown" bar with cumulative totals drawn from a new `poke-memory:grade-log:v1` localStorage log. Existing sessions have no log entries; counts start accumulating from the first grade after this update. Closes [#5](https://github.com/fraserbrookhouse/poke-memory/issues/5).
+
 - **Component test infrastructure and pre-PR test gate** — `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`, and `jsdom` are now installed. Vitest is configured with two projects: `node` (existing scheduler and session tests, no DOM overhead) and `jsdom` (component tests). A `ReviewSession` reveal-flow test covers the unrevealed → revealed → graded lifecycle and would catch regressions like the one from #47. The pre-PR build gate in `auto-issue.yml` now runs `npm test` as a third step after `typecheck` and `build`. Closes [#48](https://github.com/fraserbrookhouse/poke-memory/issues/48).
 
 - **Dependabot enabled** — weekly automated PRs for npm dependencies (grouped: Next.js, React, Tailwind, Vitest + Testing Library) and GitHub Actions. Closes [#59](https://github.com/fraserbrookhouse/poke-memory/issues/59).
