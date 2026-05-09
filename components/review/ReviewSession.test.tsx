@@ -40,11 +40,13 @@ const { FIXTURE_CARD } = vi.hoisted(() => {
     isLegendary: false,
     isMythical: false,
     cardType: "name",
+    // buildSession calls initialReviewState(now) for each card, so these
+    // values are overwritten and have no effect on test behaviour.
     state: {
       repetitions: 0,
       interval: 0,
       easeFactor: 2.5,
-      dueDate: "2026-05-09",
+      dueDate: "1970-01-01", // arbitrary — ignored by buildSession
       lastReview: null,
       firstSeen: null,
       learningStep: null,
@@ -59,6 +61,8 @@ vi.mock("@/lib/pokemon/seed", () => ({
   SEED_EVOLUTION_CARDS: [],
 }));
 
+// loadSession returns null so buildSession always rebuilds state from scratch —
+// the state fields on FIXTURE_CARD are never read during these tests.
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: () => null,
   saveSession: vi.fn(),
@@ -99,11 +103,10 @@ describe("ReviewSession reveal flow", () => {
   it("shows Reveal button and hides the Pokémon name before reveal", async () => {
     render(<ReviewSession />);
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument(),
-    );
-
-    expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+      expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
+    });
   });
 
   it("shows name and grade buttons after clicking Reveal", async () => {
