@@ -10,7 +10,7 @@ import type { CloudSyncPayload } from "@/lib/sync/types";
 type ConflictPickerProps = {
   localPayload: CloudSyncPayload;
   cloudPayload: CloudSyncPayload;
-  onResolved: (winner: CloudSyncPayload) => void;
+  onResolved: () => void;
 };
 
 function formatDate(isoTimestamp: string): string {
@@ -50,7 +50,7 @@ export function ConflictPicker({
       saveSession(winner.session);
       saveStreakData(winner.streak);
       saveSettings(winner.settings);
-      onResolved(winner);
+      onResolved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {

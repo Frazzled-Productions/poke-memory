@@ -82,11 +82,17 @@ function SyncAccountSection() {
         if (cloudPayload === null) return;
         const localSession = loadSession();
         if (localSession === null) return;
+        const reviewedDates = localSession.cards
+          .map((card) => card.state.lastReview)
+          .filter((d): d is string => d !== null);
+        const localSyncedAt = reviewedDates.length > 0
+          ? new Date(Math.max(...reviewedDates.map((d) => new Date(d).getTime()))).toISOString()
+          : new Date(0).toISOString();
         const localPayload: CloudSyncPayload = {
           session: localSession,
           streak: loadStreakData(),
           settings: loadSettings(),
-          syncedAt: new Date().toISOString(),
+          syncedAt: localSyncedAt,
         };
         setConflict({ localPayload, cloudPayload });
       } catch {
