@@ -217,7 +217,7 @@ export default function PokedexPage() {
 
   const introduced =
     cards !== null
-      ? cards.filter((c) => c.state.lastReview !== null).length
+      ? cards.filter((c) => c.cardType === "name" && c.state.lastReview !== null).length
       : 0;
 
   // Enrich SEED_POKEMON with classification

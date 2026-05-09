@@ -29,7 +29,6 @@ function isReviewCardShaped(value: unknown): boolean {
   return true;
 }
 
-
 function isDailyLimitsShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
