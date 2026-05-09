@@ -364,11 +364,17 @@ export default function StatsPage() {
               <h2 id="streak-heading" className="mb-3 text-base font-semibold text-foreground">
                 Current streak
               </h2>
-              <StatCard
-                label={stats.currentStreak === 0 ? "no active streak" : stats.currentStreak === 1 ? "day in a row" : "days in a row"}
-                value={stats.currentStreak}
-                accent="text-amber-500 dark:text-amber-400"
-              />
+              {stats.currentStreak > 0 ? (
+                <StatCard
+                  label={stats.currentStreak === 1 ? "day in a row" : "days in a row"}
+                  value={stats.currentStreak}
+                  accent="text-amber-500 dark:text-amber-400"
+                />
+              ) : (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  No active streak — review some cards to start one!
+                </p>
+              )}
             </section>
             <MasteryBar stats={stats} />
             <IntroducedBar stats={stats} />
