@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { hasCloudData, pullSession, pushSession } from "@/lib/sync/cloud";
 import { loadSession, saveSession } from "@/lib/review/persistence";
-import { DEFAULT_LIMITS } from "@/lib/review/session";
+import { DEFAULT_LIMITS, buildSession } from "@/lib/review/session";
+import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { CloudRow } from "@/lib/sync/cloud";
 import type { ReviewableCard } from "@/lib/review/session";
 
@@ -40,7 +41,6 @@ export default function CallbackCompletePage() {
   const { user, loading, supabase } = useAuth();
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [pending, setPending] = useState(false);
-  const [pushWarning, setPushWarning] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -80,10 +80,12 @@ export default function CallbackCompletePage() {
         return;
       }
       if (!hasLocal && cloudHasData) {
-        if (localSession !== null) {
-          const merged = mergeCloudIntoLocal(localSession.cards, cloudRows!);
-          saveSession({ cards: merged, limits: localSession.limits ?? DEFAULT_LIMITS });
-        }
+        // When localSession is null (brand-new device), seed a fresh session so
+        // cloud state has a base to merge into; otherwise cloud data is silently lost.
+        const base = localSession !== null ? localSession.cards : buildSession(SEED_POKEMON);
+        const limits = localSession?.limits ?? DEFAULT_LIMITS;
+        const merged = mergeCloudIntoLocal(base, cloudRows!);
+        saveSession({ cards: merged, limits });
         if (!cancelled) router.replace("/");
         return;
       }
@@ -98,7 +100,10 @@ export default function CallbackCompletePage() {
     setPending(true);
     try {
       const ok = await pushSession(supabase, user.id, status.localCards);
-      if (!ok) setPushWarning("Sync failed — your progress is safe locally.");
+      if (!ok) {
+        setStatus({ kind: "push-warning", message: "Sync failed — your progress is safe locally." });
+        return;
+      }
       router.replace("/");
     } finally {
       setPending(false);
@@ -163,9 +168,6 @@ export default function CallbackCompletePage() {
         <p className="mt-2 text-center text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
           You have progress on this device and in the cloud. Which would you like to keep?
         </p>
-        {pushWarning && (
-          <p className="mt-4 text-center text-sm text-amber-600 dark:text-amber-400">{pushWarning}</p>
-        )}
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-zinc-200 bg-background p-6 dark:border-zinc-800">
             <h2 className="text-base font-semibold text-foreground">This device</h2>
