@@ -41,4 +41,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Conventions captured in AGENTS.md** as decisions are locked in: caching, page params, PokéAPI integration, spaced repetition, documentation, privacy.
 - **`auto-retro.yml` workflow** — when an issue closes via a merged PR, posts a single retrospective comment on the closed issue focused on which sub-agents earned their keep on that change. One transferable lesson per change, so the sandbox practice compounds.
 
+- **`/continue` resume** — commenting `/continue` on an issue with a halted auto-run picks up the paused orchestrator on the existing branch, rather than starting a fresh one with `/go`.
+- **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
+
 [Unreleased]: https://github.com/fraserbrookhouse/poke-memory

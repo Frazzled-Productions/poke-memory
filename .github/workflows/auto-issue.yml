@@ -120,11 +120,48 @@ jobs:
                if one is found, the corresponding specialist call was missed
                or failed silently — dispatch it and incorporate the answer
                before posting.
-            3. Post the plan as a comment on the issue:
+            3. Assess the plan's scope before posting. Count the following:
+               - **Files**: distinct files the plan explicitly modifies or creates
+               - **Surfaces**: count of categories touched (workflow files / lib/ /
+                 components/ / docs + db + API routes — each category = 1 surface)
+               - **Infra + logic**: does the plan introduce both new infrastructure
+                 (new workflow job, GitHub secret, npm dependency) AND new application
+                 logic (new lib function, React component, DB schema change)?
+               - **Acceptance criteria**: total numbered acceptance criteria
+
+               Fire a scope warning when ANY of these thresholds is crossed.
+               Use judgment — a trivially small plan that happens to reference 4
+               files should not trigger it; the thresholds are signals, not rules.
+               a. ≥ 4 distinct files in the plan
+               b. ≥ 3 distinct surfaces
+               c. Plan introduces both new infrastructure AND new logic, with ≥ 3 files
+               d. ≥ 6 acceptance criteria
+
+            4. Post the plan as a comment on the issue:
                `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
-            4. The comment must end with these two lines, on their own:
+
+               The comment body must end in one of two ways:
+
+               **A) If the scope warning fires (any threshold from step 3 crossed),
+               append this block as the final content** — its own `/go` invitation
+               replaces the standard closing lines:
+
+               ---
+               **⚠ Scope warning.** This plan touches N file(s) across M surface(s) [brief reason].
+               I estimate this may exceed a single auto-issue budget.
+
+               **Suggested split:**
+               1. <sub-issue A title> — <one-line rationale>
+               2. <sub-issue B title> — <one-line rationale>
+
+               Reply `/split` to file these as sub-issues of this issue. Reply `/go` to proceed with the full scope.
+               ---
+
+               **B) If no scope warning fires, end with these two lines on their own:**
                "Reply with `/go` to proceed."
                "To change scope, post a comment describing the changes (or include them in your `/go` comment) — the implement stage treats follow-up comments as authoritative over this plan."
+
+               Pick exactly one ending — never both, never neither.
 
       - name: Surface tool denials
         if: always()
@@ -276,7 +313,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.org-app-token.outputs.token }}
           GH_TOKEN_REPO: ${{ steps.app-token.outputs.token }}
-        run: .github/scripts/set-project-status.sh ${{ github.event.issue.number }} "In Progress"
+        run: .github/scripts/set-project-status.sh "${{ github.event.issue.number }}" "In Progress"
 
       - name: Post initial status comment
         id: status
@@ -494,11 +531,11 @@ jobs:
               if [ -n "$BRANCH" ] || [ -n "$LAST_COMMIT" ]; then
                 printf '\n'
               fi
-              printf 'Comment `/go` to start over with a fresh branch.'
               if [ -n "$BRANCH" ]; then
-                printf ' To pick up where this left off, check out the branch above and continue manually.'
+                printf 'Comment `/continue` to resume from the branch above. Comment `/go` to start over with a fresh branch.\n'
+              else
+                printf 'Comment `/go` to start over with a fresh branch.\n'
               fi
-              printf '\n'
             fi
             if [ "$DENIAL_COUNT" != "0" ]; then
               printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
@@ -549,3 +586,492 @@ jobs:
           GH_TOKEN="${{ steps.org-app-token.outputs.token }}" \
           GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
             .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
+
+  continue:
+    name: Continue
+    if: |
+      github.event_name == 'issue_comment' &&
+      !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'auto') &&
+      contains(github.event.comment.body, '/continue') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Mint org-scoped App token (for project mutations)
+        id: org-app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          owner: Frazzled-Productions
+
+      - name: Pre-flight checks
+        id: preflight
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # If an open PR already exists, /fix on the PR is the right path
+          OPEN_PR=$(gh pr list --repo "$REPO" --state open --limit 100 \
+            --json number,headRefName \
+            | jq -r --arg prefix "auto/issue-$ISSUE-" \
+                '[.[] | select(.headRefName | startswith($prefix))][0].number // empty')
+          if [ -n "$OPEN_PR" ]; then
+            gh issue comment "$ISSUE" --repo "$REPO" \
+              --body "This issue already has an open PR (#${OPEN_PR}). Use \`/fix\` on the PR instead of \`/continue\` on the issue."
+            echo "::error::Open PR #$OPEN_PR already exists for issue #$ISSUE"
+            exit 1
+          fi
+
+          # Parse branch from the most recent <!-- auto-status --> comment.
+          # Use awk so a no-match doesn't kill the pipeline under set -euo pipefail.
+          LAST_STATUS=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-status -->"))] | last | .body // ""')
+          BRANCH=$(printf '%s' "$LAST_STATUS" \
+            | awk -F'`' '/Branch:/ { b = $2 } END { if (b) print b }')
+
+          if [ -z "$BRANCH" ]; then
+            gh issue comment "$ISSUE" --repo "$REPO" \
+              --body "No prior-run branch found in the status comment. Comment \`/go\` to start fresh."
+            echo "::error::No branch found in status comment for issue #$ISSUE"
+            exit 1
+          fi
+
+          # Verify branch still exists on origin
+          REMOTE_REF=$(git ls-remote \
+            "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
+            "refs/heads/$BRANCH" 2>/dev/null || true)
+          if [ -z "$REMOTE_REF" ]; then
+            gh issue comment "$ISSUE" --repo "$REPO" \
+              --body "Branch \`${BRANCH}\` no longer exists on origin. Comment \`/go\` to start over."
+            echo "::error::Branch $BRANCH not found on origin"
+            exit 1
+          fi
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.preflight.outputs.branch }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git identity
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+${APP_SLUG}[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Record starting SHA
+        id: start
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Move issue to In Progress
+        env:
+          GH_TOKEN: ${{ steps.org-app-token.outputs.token }}
+          GH_TOKEN_REPO: ${{ steps.app-token.outputs.token }}
+        run: .github/scripts/set-project-status.sh "${{ github.event.issue.number }}" "In Progress"
+
+      - name: Post initial status comment
+        id: status
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          ID=$(gh api -X POST \
+            "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            -f body=$'<!-- auto-status -->\n## Working on this\n\n_(Resuming — task list will appear here as work progresses.)_' \
+            --jq '.id')
+          echo "comment_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        env:
+          AUTO_STATUS_COMMENT_ID: ${{ steps.status.outputs.comment_id }}
+          AUTO_STATUS_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 80
+          prompt: |
+            You are resuming issue #${{ github.event.issue.number }} from a prior run.
+
+            Read AGENTS.md (loaded via CLAUDE.md) for the playbook and conventions.
+            Follow it strictly.
+
+            **Live status reporting:** The runtime maintains a live status
+            comment on the issue that mirrors your TodoWrite list — a hook
+            fires on every TodoWrite call and PATCHes the comment with the
+            rendered checklist. Use TodoWrite as your visible progress board:
+            keep a granular task list, update statuses
+            (pending / in_progress / completed) as you go, and the issue
+            timeline tracks along automatically. Do NOT post or PATCH the
+            status comment yourself — the hook owns it. Optional: wrap each
+            phase in `::group::Phase: <name>` / `::endgroup::` on stdout for
+            collapsible Actions-log sections. If you hit a blocker, post a
+            separate comment explaining what's blocked, then stop — don't
+            push half-done work. The post-step takes over the status comment
+            at the end of the run with a verified outcome summary.
+
+            Workflow:
+            1. Load the issue and existing comments:
+               `gh issue view ${{ github.event.issue.number }} --json title,body,comments`
+               Find the most recent `<!-- auto-status -->` comment — its completed/
+               remaining task list shows what the prior run accomplished and what
+               is still left. The plan is the most recent substantive bot plan
+               comment (usually the one that ends with "Reply with `/go` to proceed").
+            2. You are already checked out on branch
+               `${{ steps.preflight.outputs.branch }}`.
+               Do NOT create a new branch. Commit and push to this branch as you
+               complete work.
+            3. Complete the remaining tasks from the prior run, following the
+               implement playbook from AGENTS.md (excluding code-reviewer —
+               it runs after PR creation).
+               - Update README.md and CHANGELOG.md inline if user-facing behavior
+                 changed (per AGENTS.md "Documentation" section).
+            4. Commit. **Do NOT add a Co-Authored-By trailer.** No Claude
+               attribution in commit messages.
+            5. Push the branch.
+            6. **Build gate.** Run
+               `npm run typecheck && npm run build 2>&1 | tee /tmp/build-output.txt`.
+               If exit code is non-zero, read the output, apply a targeted fix,
+               commit, push, and re-run. Allow up to two fix attempts. If the
+               build still fails after the second fix attempt, post a comment
+               on the issue with the last 80 lines of `/tmp/build-output.txt`
+               and stop — do NOT open a PR. The branch stays pushed for
+               manual inspection.
+            7. Open the PR:
+               `gh pr create --title "<title>" --body "<body>" --base main`
+               The body MUST contain `closes #${{ github.event.issue.number }}`
+               so the issue auto-closes on merge. Summarise what changed.
+               Capture the new PR number for the next step.
+            8. Run the `code-reviewer` sub-agent (Agent tool, subagent_type
+               "code-reviewer") against the diff
+               (`git diff origin/main...HEAD`). Then post its findings on the PR
+               via `gh pr comment <pr-number> --body-file <path>`, formatted
+               exactly like this (no other content before the marker):
+
+                   <!-- auto-review:1 -->
+                   ## Auto-review #1
+
+                   <bulleted punch list of findings, or "No significant issues.">
+
+                   Verdict: Looks good to me
+
+                   _Reply with `/fix` to have these findings addressed._
+
+               The first line MUST be the HTML marker `<!-- auto-review:1 -->`
+               exactly. A verdict line starting with `Verdict: ` MUST be
+               present, followed by either `Looks good to me` (no significant
+               issues) or `Needs fixes` (one or more issues that should be
+               addressed). Use those whole-word phrases verbatim — no acronyms.
+               When (and only when) the verdict is `Needs fixes`, append the
+               italicised footer line shown above so the maintainer knows how
+               to trigger a fix run. Omit the footer when the verdict is
+               `Looks good to me`.
+            9. Post a brief comment on the issue linking the PR.
+
+            If you hit a blocker you can't resolve, post a comment on the issue
+            explaining what's blocked and stop — don't push half-done work.
+
+      - name: Verify outcome and surface tool denials
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          START_SHA: ${{ steps.start.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -euo pipefail
+
+          STATUS_ID=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-status -->"))] | last | .id // empty')
+
+          if [ -z "$STATUS_ID" ]; then
+            echo "No live status comment found — orchestrator never posted one. Nothing to update."
+            exit 0
+          fi
+          echo "Live status comment ID: $STATUS_ID"
+
+          CURRENT_BODY=$(gh api "repos/$REPO/issues/comments/$STATUS_ID" --jq '.body')
+
+          PR_NUMBER=$(gh pr list --repo "$REPO" --state all --limit 100 \
+            --json number,headRefName,createdAt \
+            | jq -r --arg prefix "auto/issue-$ISSUE-" '
+                [.[] | select(.headRefName | startswith($prefix))]
+                | sort_by(.createdAt) | last | .number // empty
+              ')
+
+          if [ -n "$PR_NUMBER" ]; then
+            REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+              --jq '[.[] | select(.body | startswith("<!-- auto-review:1 -->"))] | length')
+          else
+            REVIEW_FOUND=0
+          fi
+
+          git fetch origin --quiet 2>/dev/null || true
+          if [ -n "$START_SHA" ] && git rev-parse "$START_SHA" >/dev/null 2>&1; then
+            COMMITS=$(git rev-list --count "$START_SHA..HEAD" 2>/dev/null || echo 0)
+          else
+            COMMITS=0
+          fi
+
+          BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+          case "$BRANCH" in
+            "auto/issue-${ISSUE}-"*) ;;
+            *) BRANCH="" ;;
+          esac
+          LAST_COMMIT=""
+          if [ "$COMMITS" -gt 0 ]; then
+            LAST_COMMIT=$(git log --format='%h %s' -n 1 2>/dev/null || echo "")
+          fi
+
+          DENIAL_COUNT=0
+          DENIAL_DETAILS=""
+          if [ -f "$LOG" ]; then
+            DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+            DENIAL_DETAILS=$(jq -r '
+              def text_of:
+                if type == "string" then .
+                elif type == "array" then map(.text // "" | tostring) | join(" ")
+                else tostring end;
+              select(.type == "user")
+              | .message.content[]?
+              | select(.type == "tool_result")
+              | select((.is_error // false) == true)
+              | (.content | text_of) as $c
+              | select($c | test("permission|denied|not allowed"; "i"))
+              | $c | gsub("\\s+"; " ") | .[0:240]
+            ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+          fi
+
+          HALTED=false
+          if [ -z "$PR_NUMBER" ]; then
+            HALTED=true
+          fi
+
+          {
+            printf '%s\n\n---\n\n## Run finished\n\n' "$CURRENT_BODY"
+            if [ -n "$PR_NUMBER" ] && [ "$REVIEW_FOUND" -gt 0 ]; then
+              printf 'Done — opened PR #%s, posted auto-review #1.\n' "$PR_NUMBER"
+            elif [ -n "$PR_NUMBER" ]; then
+              printf '**Outcome unclear** — opened PR #%s but auto-review #1 was not posted. See [run logs](%s).\n' "$PR_NUMBER" "$RUN_URL"
+            elif [ "$COMMITS" -gt 0 ]; then
+              printf '**Run halted** — pushed %s commit(s) but no PR was opened. See [run logs](%s).\n' "$COMMITS" "$RUN_URL"
+            else
+              printf '**Run halted** — no PR opened, no commits pushed. See [run logs](%s).\n' "$RUN_URL"
+            fi
+            if [ "$HALTED" = true ]; then
+              printf '\n### How to recover\n\n'
+              if [ -n "$BRANCH" ]; then
+                printf 'Branch: `%s`\n' "$BRANCH"
+              fi
+              if [ -n "$LAST_COMMIT" ]; then
+                printf 'Last commit: `%s`\n' "$LAST_COMMIT"
+              fi
+              if [ -n "$BRANCH" ] || [ -n "$LAST_COMMIT" ]; then
+                printf '\n'
+              fi
+              if [ -n "$BRANCH" ]; then
+                printf 'Comment `/continue` to resume from the branch above. Comment `/go` to start over with a fresh branch.\n'
+              else
+                printf 'Comment `/go` to start over with a fresh branch.\n'
+              fi
+            fi
+            if [ "$DENIAL_COUNT" != "0" ]; then
+              printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
+              printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted.\n'
+              if [ -n "$DENIAL_DETAILS" ]; then
+                printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+              else
+                printf '\n_(unable to extract per-call detail; see [run logs](%s))_\n' "$RUN_URL"
+              fi
+              printf '\n</details>\n'
+            fi
+          } > /tmp/status-body.md
+
+          gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -F body=@/tmp/status-body.md
+
+      - name: Move issue to PR / Ready to merge based on review verdict
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          ISSUE="${{ github.event.issue.number }}"
+          STATE=$(gh issue view "$ISSUE" --json state --jq '.state')
+          if [[ "$STATE" != "OPEN" ]]; then
+            echo "Issue #$ISSUE is $STATE — auto-status owns Done; skipping."
+            exit 0
+          fi
+          PR=$(gh pr list --state open --limit 200 --json number,headRefName \
+            --jq "[.[] | select(.headRefName | startswith(\"auto/issue-${ISSUE}-\"))][0].number")
+          if [[ -z "$PR" || "$PR" == "null" ]]; then
+            echo "No open PR found for issue #$ISSUE — leaving status at In Progress."
+            exit 0
+          fi
+          VERDICT=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))]
+                  | sort_by(.created_at) | last | .body // ""' \
+            | grep -E '^Verdict:' | head -1 || true)
+          if [[ "$VERDICT" == *"Looks good to me"* ]]; then
+            STATUS="Ready to merge"
+          else
+            STATUS="PR"
+          fi
+          GH_TOKEN="${{ steps.org-app-token.outputs.token }}" \
+          GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
+            .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
+
+  split:
+    name: Split
+    if: |
+      github.event_name == 'issue_comment' &&
+      !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'auto') &&
+      contains(github.event.comment.body, '/split') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: File sub-issues
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Find last plan comment containing a Suggested split block
+          PLAN_BODY=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq '[.[] | select(.body | test("Suggested split:"))] | last | .body // ""')
+
+          if [ -z "$PLAN_BODY" ]; then
+            gh issue comment "$ISSUE" --repo "$REPO" \
+              --body "No scope warning with a **Suggested split:** block found on this issue. Nothing to split. Comment \`/go\` to proceed with the full scope instead."
+            exit 0
+          fi
+
+          # Idempotency: bail if sub-issues were already filed
+          SPLIT_COUNT=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq "[.[] | select(.body | startswith(\"<!-- auto-split:$ISSUE -->\"))] | length")
+          if [ "$SPLIT_COUNT" -gt 0 ]; then
+            gh issue comment "$ISSUE" --repo "$REPO" \
+              --body "Sub-issues were already filed — see the earlier \`<!-- auto-split:$ISSUE -->\` comment for the list. No action taken."
+            exit 0
+          fi
+
+          # Parse numbered lines from the Suggested split block
+          TITLES=$(printf '%s' "$PLAN_BODY" \
+            | awk '/\*\*Suggested split:\*\*/{found=1; next} found && /^[[:space:]]*[0-9]+\./{print; next} found && /^Reply.*\/split/{exit} found && /^---/{exit}' \
+            | sed -E 's/^[[:space:]]*[0-9]+\.[[:space:]]*//' \
+            | sed -E 's/[[:space:]]+[\-—][[:space:]]+.*//')
+
+          if [ -z "$TITLES" ]; then
+            gh issue comment "$ISSUE" --repo "$REPO" \
+              --body "Could not parse proposed split titles from the scope warning. Expected numbered lines like \`1. Title \u2014 rationale\` under \`**Suggested split:**\`."
+            exit 0
+          fi
+
+          # Inherit the parent's priority label (default priority:now). A grep
+          # no-match would exit 1 under pipefail, so route through awk instead.
+          PRIORITY_LABEL=$(gh issue view "$ISSUE" --repo "$REPO" --json labels \
+            --jq '.labels[].name' \
+            | awk '/^priority:/ { print; exit }')
+          PRIORITY_LABEL="${PRIORITY_LABEL:-priority:now}"
+
+          # Post the idempotency-anchor marker BEFORE any sub-issue creation so a
+          # partial failure mid-loop still leaves a marker that the
+          # already-filed check (above) will catch on a re-run. We PATCH this
+          # comment with the final outcome at the end of the loop.
+          MARKER_ID=$(gh api -X POST "/repos/$REPO/issues/$ISSUE/comments" \
+            -f body="$(printf '<!-- auto-split:%s -->\n## Sub-issues filing in progress\n\nProcessing split request — this comment will update with the result.' "$ISSUE")" \
+            --jq '.id')
+
+          # Each iteration must NOT exit on a sub-step failure — a strand of
+          # successful creations followed by one failure must still PATCH the
+          # marker so re-runs see the partial state and don't duplicate. Every
+          # gh call below is guarded; failures fall into FAILED with detail.
+          CREATED=""
+          FAILED=""
+          while IFS= read -r title; do
+            [ -z "$title" ] && continue
+
+            if ! NEW_ID=$(gh api -X POST "repos/$REPO/issues" \
+                -f title="$title" \
+                -f body="Sub-issue of #${ISSUE}." \
+                --jq '.number' 2>/tmp/split-err.txt); then
+              ERR=$(head -3 /tmp/split-err.txt 2>/dev/null || echo "unknown error")
+              FAILED="${FAILED}"$'\n'"- (create failed) ${title} — \`${ERR}\`"
+              continue
+            fi
+
+            LABEL_NOTE=""
+            if ! gh issue edit "$NEW_ID" --repo "$REPO" \
+                --add-label "${PRIORITY_LABEL},auto" 2>/tmp/split-err.txt; then
+              LABEL_NOTE=" (label apply failed)"
+            fi
+
+            # Link as native GitHub sub-issue.
+            if gh api -X POST "repos/$REPO/issues/$ISSUE/sub_issues" \
+                -F sub_issue_id="$NEW_ID" 2>/tmp/split-err.txt; then
+              CREATED="${CREATED}"$'\n'"- #${NEW_ID}${LABEL_NOTE}: ${title}"
+            else
+              ERR=$(head -3 /tmp/split-err.txt 2>/dev/null || echo "unknown error")
+              FAILED="${FAILED}"$'\n'"- #${NEW_ID} (created, link failed)${LABEL_NOTE}: ${title} — \`${ERR}\`"
+            fi
+          done <<< "$TITLES"
+
+          # PATCH the marker with the final outcome.
+          {
+            printf '<!-- auto-split:%s -->\n## Sub-issues filed\n\n' "$ISSUE"
+            if [ -n "$CREATED" ]; then
+              printf 'Linked as sub-issues of #%s:%s\n' "$ISSUE" "$CREATED"
+            fi
+            if [ -n "$FAILED" ]; then
+              printf '\n**Some sub-issues could not be linked.** They were created but the `sub_issues` API call failed. You may need to grant the GitHub App **Sub-issues** write permission and link them manually:%s\n' "$FAILED"
+            fi
+            printf '\nThis issue stays open as a tracker — close it manually once all sub-issues are done.\n'
+          } > /tmp/auto-split-final.md
+          gh api -X PATCH "/repos/$REPO/issues/comments/$MARKER_ID" \
+            -F body=@/tmp/auto-split-final.md
+
+          # Surface a non-zero exit so the workflow shows red when any link failed.
+          if [ -n "$FAILED" ]; then exit 1; fi
