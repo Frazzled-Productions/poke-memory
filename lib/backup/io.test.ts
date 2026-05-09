@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { isBackupFile, BACKUP_VERSION } from "./schema";
-import { exportProgress, importProgress } from "./io";
+import { exportProgress, validateBackup, applyBackup } from "./io";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import type { BackupFile } from "./schema";
 import type { DailyLimits } from "@/lib/review/session";
@@ -273,6 +273,7 @@ describe("exportProgress", () => {
   });
 
   it("calls URL.revokeObjectURL after creating the download", () => {
+    vi.useFakeTimers();
     const mockRevoke = vi.fn();
     vi.stubGlobal("URL", {
       createObjectURL: (blob: Blob) => {
@@ -282,15 +283,17 @@ describe("exportProgress", () => {
       revokeObjectURL: mockRevoke,
     });
     exportProgress();
+    vi.runAllTimers();
     expect(mockRevoke).toHaveBeenCalledWith("blob:mock");
+    vi.useRealTimers();
   });
 });
 
 // ---------------------------------------------------------------------------
-// importProgress
+// validateBackup + applyBackup
 // ---------------------------------------------------------------------------
 
-describe("importProgress", () => {
+describe("validateBackup + applyBackup", () => {
   beforeEach(() => {
     vi.mocked(saveSession).mockReset();
     vi.mocked(saveSettings).mockReset();
@@ -301,18 +304,23 @@ describe("importProgress", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns { ok: true } and persists sanitised data for a valid file", async () => {
+  it("returns { ok: true } with sanitised data for a valid file", async () => {
     const validId = SEED_POKEMON[0].id;
     const card = {
       ...makeMinimalCard(validId),
       state: { ...makeMinimalCard(validId).state as Record<string, unknown>, stepStartedAt: 12345 },
     };
     const backup = makeValidBackup({ cards: [card as BackupFile["cards"][number]] });
-    const result = await importProgress(makeBackupFile(backup));
-    expect(result).toEqual({ ok: true });
+    const result = await validateBackup(makeBackupFile(backup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    // stepStartedAt must be nulled out on every card
+    expect(result.data.cards[0].state.stepStartedAt).toBeNull();
+    expect(result.data.settings).toEqual(VALID_SETTINGS);
+    // applyBackup commits the validated data
+    applyBackup(result.data);
     expect(vi.mocked(saveSession)).toHaveBeenCalledOnce();
     const savedSession = vi.mocked(saveSession).mock.calls[0][0];
-    // stepStartedAt must be nulled out on every card
     expect(savedSession.cards[0].state.stepStartedAt).toBeNull();
     expect(vi.mocked(saveSettings)).toHaveBeenCalledWith(VALID_SETTINGS);
   });
@@ -325,13 +333,13 @@ describe("importProgress", () => {
       evolvesInto: [{ name: "ivysaur", spriteUrl: "" }],
     };
     const backup = makeValidBackup({ cards: [card as BackupFile["cards"][number]] });
-    const result = await importProgress(makeBackupFile(backup));
-    expect(result).toEqual({ ok: true });
+    const result = await validateBackup(makeBackupFile(backup));
+    expect(result.ok).toBe(true);
   });
 
   it("returns { ok: false } for invalid JSON", async () => {
     const file = new File(["{{not json"], "backup.json", { type: "application/json" });
-    const result = await importProgress(file);
+    const result = await validateBackup(file);
     expect(result.ok).toBe(false);
     expect((result as { ok: false; error: string }).error).toBe(
       "This file isn't a valid poke-memory backup.",
@@ -340,7 +348,7 @@ describe("importProgress", () => {
 
   it("returns { ok: false } with version-specific message for wrong version", async () => {
     const backup = { ...makeValidBackup(), version: 99 };
-    const result = await importProgress(makeBackupFile(backup));
+    const result = await validateBackup(makeBackupFile(backup));
     expect(result.ok).toBe(false);
     expect((result as { ok: false; error: string }).error).toContain("99");
     expect((result as { ok: false; error: string }).error).toContain("isn't supported");
@@ -351,7 +359,7 @@ describe("importProgress", () => {
     const backup = makeValidBackup({
       cards: [makeMinimalCard(unknownId) as BackupFile["cards"][number]],
     });
-    const result = await importProgress(makeBackupFile(backup));
+    const result = await validateBackup(makeBackupFile(backup));
     expect(result.ok).toBe(false);
     expect((result as { ok: false; error: string }).error).toBe(
       "This file isn't a valid poke-memory backup.",
@@ -360,13 +368,13 @@ describe("importProgress", () => {
 
   it("returns { ok: false } for malformed backup shape (missing limits)", async () => {
     const { limits: _l, ...backup } = makeValidBackup();
-    const result = await importProgress(makeBackupFile(backup));
+    const result = await validateBackup(makeBackupFile(backup));
     expect(result.ok).toBe(false);
   });
 
-  it("does not call saveSession or saveSettings on failure", async () => {
+  it("does not call saveSession or saveSettings when validation fails", async () => {
     const file = new File(["{}"], "backup.json", { type: "application/json" });
-    await importProgress(file);
+    await validateBackup(file);
     expect(vi.mocked(saveSession)).not.toHaveBeenCalled();
     expect(vi.mocked(saveSettings)).not.toHaveBeenCalled();
   });
@@ -382,11 +390,11 @@ describe("importProgress", () => {
     };
     const card = { ...makeMinimalCard(validId), state };
     const backup = makeValidBackup({ cards: [card as BackupFile["cards"][number]] });
-    await importProgress(makeBackupFile(backup));
-    const savedCard = vi.mocked(saveSession).mock.calls[0][0].cards[0];
-    expect(savedCard.state.stepStartedAt).toBeNull();
-    expect(savedCard.state.repetitions).toBe(5);
-    expect(savedCard.state.interval).toBe(10);
-    expect(savedCard.state.easeFactor).toBe(2.3);
+    const result = await validateBackup(makeBackupFile(backup));
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.data.cards[0].state.stepStartedAt).toBeNull();
+    expect(result.data.cards[0].state.repetitions).toBe(5);
+    expect(result.data.cards[0].state.interval).toBe(10);
+    expect(result.data.cards[0].state.easeFactor).toBe(2.3);
   });
 });
