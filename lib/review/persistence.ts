@@ -34,10 +34,27 @@ function isReviewCardShaped(value: unknown): boolean {
     return false;
   }
   if (v.cardType === "evolution") {
-    return (
+    // Accept new shape: evolvesInto: { name: string; spriteUrl: string }[]
+    if (
+      Array.isArray(v.evolvesInto) &&
+      v.evolvesInto.every(
+        (e: unknown) =>
+          typeof e === "object" &&
+          e !== null &&
+          typeof (e as Record<string, unknown>).name === "string" &&
+          typeof (e as Record<string, unknown>).spriteUrl === "string",
+      )
+    ) {
+      return true;
+    }
+    // Accept legacy shape: evolvesIntoNames: string[] (backwards compat window)
+    if (
       Array.isArray(v.evolvesIntoNames) &&
       v.evolvesIntoNames.every((n: unknown) => typeof n === "string")
-    );
+    ) {
+      return true;
+    }
+    return false;
   }
   return true;
 }
@@ -119,6 +136,23 @@ export function migrateReviewCard(card: unknown): void {
   const c = card as Record<string, unknown>;
   if (c.cardType === undefined) {
     c.cardType = "name";
+  }
+  // Migrate old evolvesIntoNames: string[] → evolvesInto: { name, spriteUrl }[].
+  // hydrateSession re-populates evolvesInto from seed; [] is a safe placeholder
+  // that prevents component crashes when no seed match exists.
+  if (c.cardType === "evolution") {
+    const hasValidEvolvesInto =
+      Array.isArray(c.evolvesInto) &&
+      c.evolvesInto.every(
+        (e: unknown) =>
+          typeof e === "object" &&
+          e !== null &&
+          typeof (e as Record<string, unknown>).name === "string" &&
+          typeof (e as Record<string, unknown>).spriteUrl === "string",
+      );
+    if (!hasValidEvolvesInto) {
+      c.evolvesInto = [];
+    }
   }
   migrateReviewState(c.state);
 }
