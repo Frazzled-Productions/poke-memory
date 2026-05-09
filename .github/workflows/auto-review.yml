@@ -1,22 +1,24 @@
 name: Auto Review
 
-# Triggered when a PR opens or reopens. Runs the `code-reviewer` sub-agent
-# against the PR diff and posts an `<!-- auto-review:N -->` comment (N
-# computed from existing review markers on the PR) so the existing `/fix`
-# loop in auto-pr.yml works unchanged.
+# Triggered when a PR opens, reopens, or has the `auto-review` label added.
+# Runs the `code-reviewer` sub-agent against the PR diff and posts an
+# `<!-- auto-review:N -->` comment (N computed from existing review markers
+# on the PR) so the existing `/fix` loop in auto-pr.yml works unchanged.
 #
 # Gate: PRs whose head branch starts with `auto/` (bot-opened PRs) OR which
 # carry an `auto-review` label (manually-opened opt-in). Drafts are skipped
 # so a draft opt-in doesn't burn a 30-minute Claude run before the PR is
-# ready for review.
+# ready for review. For `labeled` events only the newly-added `auto-review`
+# label fires a run, so unrelated labels are ignored.
 #
 # Idempotency: the body of the auto-review comment includes a hidden
 # `<!-- auto-review-sha:<head-sha> -->` line on row 2. Re-triggers at the
-# same head SHA (e.g. close + reopen) are skipped.
+# same head SHA (e.g. close + reopen, or removing and re-adding the label)
+# are skipped.
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, labeled]
 
 concurrency:
   group: auto-review-${{ github.event.pull_request.number }}
@@ -27,8 +29,13 @@ jobs:
     name: Review
     if: |
       github.event.pull_request.draft == false &&
-      (startsWith(github.head_ref, 'auto/') ||
-       contains(github.event.pull_request.labels.*.name, 'auto-review'))
+      (
+        (github.event.action != 'labeled' &&
+          (startsWith(github.head_ref, 'auto/') ||
+           contains(github.event.pull_request.labels.*.name, 'auto-review')))
+        ||
+        (github.event.action == 'labeled' && github.event.label.name == 'auto-review')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
