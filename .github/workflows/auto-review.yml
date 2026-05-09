@@ -141,7 +141,7 @@ jobs:
 
                    <!-- auto-review:${{ steps.cycles.outputs.next }} -->
                    <!-- auto-review-sha:${{ github.event.pull_request.head.sha }} -->
-                   ## Auto-review #${{ steps.cycles.outputs.next }}
+                   ## Auto-review ${{ steps.cycles.outputs.next }}
 
                    <bulleted punch list of findings, or "No significant issues.">
 
@@ -160,6 +160,15 @@ jobs:
                when) the verdict is `Needs fixes`, append the italicised footer
                line shown above so the maintainer knows how to trigger a fix
                run. Omit the footer when the verdict is `Looks good to me`.
+
+               When referencing a prior review in your prose (only relevant when
+               this is not the first review): find the comment object in the PR
+               comments JSON whose `.body` starts with the immediately prior
+               review's marker (`<!-- auto-review:COUNT -->` where COUNT = next - 1).
+               Use its `.url` field to write a markdown link — e.g.
+               `[review COUNT](url)` — wherever you would otherwise write bare
+               text like "review #N" or "#N". Do not write any bare `#N` token
+               that GitHub would auto-link to an unrelated issue or PR.
 
       - name: Move issue to PR / Ready to merge based on review verdict
         if: always() && steps.idem.outputs.skip == 'false'

@@ -236,7 +236,7 @@ jobs:
                  formatted exactly like this (no content before the marker):
 
                      <!-- auto-review:${{ steps.cycles.outputs.next }} -->
-                     ## Auto-review #${{ steps.cycles.outputs.next }}
+                     ## Auto-review ${{ steps.cycles.outputs.next }}
 
                      <bulleted punch list, or "No significant issues.">
 
@@ -251,6 +251,13 @@ jobs:
                  verdict is `Needs fixes`, append the italicised footer line
                  shown above so the maintainer knows how to trigger a fix
                  run. Omit the footer when the verdict is `Looks good to me`.
+
+                 When referencing a prior auto-review in your prose: find the
+                 most recent `<!-- auto-review:N -->` comment you loaded in
+                 step 1 and use its `.url` field to write a markdown link —
+                 e.g. `[review N](url)` — wherever you would otherwise write
+                 bare text like "review #N" or "#N". Do not write any bare `#N`
+                 token that GitHub would auto-link to an unrelated issue or PR.
 
             If you hit a blocker, post a PR comment explaining what's blocked
             and stop — don't push half-done work.
