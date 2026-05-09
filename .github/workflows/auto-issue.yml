@@ -151,8 +151,14 @@ jobs:
                I estimate this may exceed a single auto-issue budget.
 
                **Suggested split:**
-               1. <sub-issue A title> — <one-line rationale>
-               2. <sub-issue B title> — <one-line rationale>
+               1. <sub-issue A title>
+                  <one-line rationale>
+               2. <sub-issue B title>
+                  <one-line rationale>
+
+               Each title goes on its own numbered line as plain text — no markdown
+               formatting, no separator characters, no rationale on the same line.
+               The rationale belongs on the indented line directly below.
 
                Reply `/split` to file these as sub-issues of this issue. Reply `/go` to proceed with the full scope.
                ---
@@ -998,15 +1004,23 @@ jobs:
             exit 0
           fi
 
-          # Parse numbered lines from the Suggested split block
+          # Parse numbered title lines from the Suggested split block.
+          # Format: each title is its own numbered line as plain text;
+          # the rationale lives on the indented continuation line below
+          # and is ignored here.
           TITLES=$(printf '%s' "$PLAN_BODY" \
-            | awk '/\*\*Suggested split:\*\*/{found=1; next} found && /^[[:space:]]*[0-9]+\./{print; next} found && /^Reply.*\/split/{exit} found && /^---/{exit}' \
-            | sed -E 's/^[[:space:]]*[0-9]+\.[[:space:]]*//' \
-            | sed -E 's/[[:space:]]+[\-—][[:space:]]+.*//')
+            | awk '
+                /\*\*Suggested split:\*\*/ { found=1; next }
+                found && /^Reply.*\/split/ { exit }
+                found && /^---/ { exit }
+                found && /^[[:space:]]*[0-9]+\./ {
+                  sub(/^[[:space:]]*[0-9]+\.[[:space:]]*/, "")
+                  print
+                }')
 
           if [ -z "$TITLES" ]; then
             gh issue comment "$ISSUE" --repo "$REPO" \
-              --body "Could not parse proposed split titles from the scope warning. Expected numbered lines like \`1. Title \u2014 rationale\` under \`**Suggested split:**\`."
+              --body "Could not parse proposed split titles from the scope warning. Expected numbered lines like \`1. Title\` (rationale on the indented line below) under \`**Suggested split:**\`."
             exit 0
           fi
 
