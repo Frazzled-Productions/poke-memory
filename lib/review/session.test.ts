@@ -6,7 +6,7 @@ import type { SeedPokemon } from '@/lib/pokemon/seed';
 
 const NOW = new Date('2026-05-09T12:00:00Z');
 
-function makeSeedPokemon(id, overrides = {}) {
+function makeSeedPokemon(id: number, overrides: Partial<SeedPokemon> = {}): SeedPokemon {
   return {
     id,
     name: 'pokemon-' + id,
@@ -32,7 +32,7 @@ function makeSeedPokemon(id, overrides = {}) {
   };
 }
 
-function makeCard(seedPokemon, stateOverrides = {}) {
+function makeCard(seedPokemon: SeedPokemon, stateOverrides: Partial<ReturnType<typeof initialReviewState>> = {}): ReviewCard {
   return {
     ...seedPokemon,
     state: { ...initialReviewState(NOW), ...stateOverrides },
