@@ -288,8 +288,21 @@ jobs:
 
           DENIAL_COUNT=0
           DENIAL_DETAILS=""
-          if [ -f "$LOG" ]; then
-            DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          echo "Denial log path: $LOG"
+          if [ ! -f "$LOG" ]; then
+            echo "WARNING: denial log not found at $LOG — DENIAL_COUNT will be 0"
+          else
+            DENIAL_COUNT_RAW=$(jq -r 'select(.type == "result") | (.permission_denials_count // 0)' "$LOG" 2>/tmp/jq-count-err.txt | tail -1)
+            if [ -s /tmp/jq-count-err.txt ]; then
+              echo "WARNING: jq error extracting DENIAL_COUNT:"
+              cat /tmp/jq-count-err.txt
+            fi
+            if [[ "$DENIAL_COUNT_RAW" =~ ^[0-9]+$ ]]; then
+              DENIAL_COUNT="$DENIAL_COUNT_RAW"
+            else
+              echo "WARNING: DENIAL_COUNT non-numeric (raw: '$DENIAL_COUNT_RAW') — defaulting to 0"
+              DENIAL_COUNT=0
+            fi
             DENIAL_DETAILS=$(jq -r '
               def text_of:
                 if type == "string" then .
@@ -302,8 +315,13 @@ jobs:
               | (.content | text_of) as $c
               | select($c | test("permission|denied|not allowed"; "i"))
               | $c | gsub("\\s+"; " ") | .[0:240]
-            ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+            ' "$LOG" 2>/tmp/jq-details-err.txt | sort -u | head -20 || true)
+            if [ -s /tmp/jq-details-err.txt ]; then
+              echo "WARNING: jq error extracting DENIAL_DETAILS:"
+              cat /tmp/jq-details-err.txt
+            fi
           fi
+          echo "Denial summary: count=$DENIAL_COUNT, details_empty=$([ -z \"$DENIAL_DETAILS\" ] && echo yes || echo no)"
 
           {
             printf '<!-- auto-status -->\n'
