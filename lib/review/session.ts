@@ -108,9 +108,10 @@ export function stableShuffleForDay(
  * - learningCardIds: IDs of all cards currently in a learning or relearning
  *   step (learningStep !== null). These are managed entirely by the UI
  *   component's in-memory learning queue — the component pairs each ID with a
- *   wall-clock `dueAt` timestamp. On a fresh page load, all such cards are
- *   restarted at step 0 (component sets dueAt = Date.now() + steps[0]). The
- *   scheduler-side `learningStep` value is preserved across reloads.
+ *   wall-clock `dueAt` timestamp. On remount, the component reconstructs
+ *   `dueAt = stepStartedAt + stepDurationMs` from persisted state so the
+ *   countdown resumes correctly after navigation. The scheduler-side
+ *   `learningStep` and `stepStartedAt` values are preserved across reloads.
  *   Learning cards are excluded from both reviewQueue and newQueue.
  * - reviewQueue: IDs of graduated cards due today or earlier,
  *   EXCLUDING any card whose lastReview === today (already done today)

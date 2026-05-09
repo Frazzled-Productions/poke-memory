@@ -46,6 +46,7 @@ function cardInStep(
     lastReview,
     firstSeen: lastReview === null ? TODAY : "2026-04-26",
     learningStep: step,
+    stepStartedAt: NOW.getTime(),
     ...overrides,
   };
 }
@@ -470,6 +471,12 @@ describe('stepStartedAt tracking', () => {
   it('A1: brand-new Again → enter step 0 sets stepStartedAt', () => {
     const state = newCard();
     const result = nextReview(state, 1, NOW);
+    expect(result.stepStartedAt).toBe(NOW.getTime());
+  });
+
+  it('A1: brand-new Hard → enter step 0 sets stepStartedAt', () => {
+    const state = newCard();
+    const result = nextReview(state, 2, NOW);
     expect(result.stepStartedAt).toBe(NOW.getTime());
   });
 

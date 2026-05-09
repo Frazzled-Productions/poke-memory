@@ -455,7 +455,7 @@ export function ReviewSession() {
         const stepMs = stepDurationMs(nextState.lastReview, nextState.learningStep);
         const newEntry: LearningQueueEntry = {
           cardId: currentCard.id,
-          dueAt: nextState.stepStartedAt !== null ? nextState.stepStartedAt + stepMs : Date.now() + stepMs,
+          dueAt: nextState.stepStartedAt! + stepMs,
         };
 
         // Replace existing entry or add new one.
