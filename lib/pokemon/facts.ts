@@ -108,7 +108,7 @@ export function getPokemonFacts(pokemon: SeedPokemon): PokemonFact[] {
     facts.push({ label: "Status", value: "Mythical" });
   }
 
-  for (const text of pokemon.flavorTexts) {
+  for (const text of (pokemon.flavorTexts ?? [])) {
     facts.push({ label: "Pokédex entry", value: text });
   }
 

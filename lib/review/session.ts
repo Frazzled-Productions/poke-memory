@@ -29,17 +29,26 @@ export function buildSession(seed: readonly SeedPokemon[]): ReviewCard[] {
 // Merge any seed cards not yet in the saved session (e.g. after a seed
 // regeneration that added new species). Existing cards keep their progress;
 // missing seed entries are appended at initialReviewState — due immediately.
+// Also refreshes seed fields on existing persisted cards so stale localStorage
+// snapshots always reflect current seed data (e.g. picks up flavorTexts added
+// after the card was first saved).
 export function hydrateSession(
   saved: readonly ReviewCard[],
   seed: readonly SeedPokemon[],
   now: Date = new Date(),
 ): ReviewCard[] {
+  const seedById = new Map(seed.map((p) => [p.id, p]));
+  const refreshed: ReviewCard[] = saved.map((card) => {
+    const fresh = seedById.get(card.id);
+    if (!fresh) return card;
+    return { ...fresh, state: card.state };
+  });
   const savedIds = new Set(saved.map((card) => card.id));
   const additions = seed
     .filter((pokemon) => !savedIds.has(pokemon.id))
     .map((pokemon) => ({ ...pokemon, state: initialReviewState(now) }));
-  if (additions.length === 0) return [...saved];
-  return [...saved, ...additions];
+  if (additions.length === 0) return refreshed;
+  return [...refreshed, ...additions];
 }
 
 /**
