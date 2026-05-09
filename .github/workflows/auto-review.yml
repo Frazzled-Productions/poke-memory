@@ -113,6 +113,9 @@ jobs:
           # The PR may have been opened by the bot identity (auto-issue.yml)
           # or by a human; allow the bot to trigger this job either way.
           allowed_bots: poke-memory-bot
+          # On `pull_request` events the action defaults to inline-comment
+          # buffering mode and ignores the prompt — disable so our prompt runs.
+          classify_inline_comments: 'false'
           prompt: |
             You are reviewing PR #${{ github.event.pull_request.number }}.
 
