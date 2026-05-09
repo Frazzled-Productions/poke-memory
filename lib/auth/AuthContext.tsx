@@ -23,26 +23,35 @@ function tryCreateClient(): ReturnType<typeof createClient> | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => tryCreateClient());
+  // Defer client creation to useEffect so it runs only in the browser.
+  // createBrowserClient from @supabase/ssr reads cookies during initialisation;
+  // calling it in a useState initialiser triggers Next.js's "Uncached data
+  // accessed outside Suspense" error during SSR with cacheComponents enabled.
+  const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(supabase !== null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!supabase) return;
+    const client = tryCreateClient();
+    setSupabase(client);
+    if (!client) {
+      setLoading(false);
+      return;
+    }
 
-    supabase.auth.getUser().then(({ data }) => {
+    client.auth.getUser().then(({ data }) => {
       setUser(data.user ?? null);
       setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = client.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading, supabase }}>
