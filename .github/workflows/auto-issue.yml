@@ -146,19 +146,23 @@ jobs:
                check whether they would share surface area. Splitting only
                helps if children can be implemented and reviewed independently.
                Treat children as coupled if any of:
-               - Two or more would define or modify the same exported symbol
-                 (function, type, component) — even at different paths
+               - Two or more would define or modify a symbol of the same name
+                 (function, type, component), whether the symbol exists today
+                 or is being introduced fresh — even at different paths
                - Two or more would read or write the same `localStorage` key,
                  database table, or other persistence target
-               - Two or more would touch the same module directory (e.g. both
-                 in `lib/streak/`) such that one's structure constrains the
-                 other's
+               - Two or more would touch the same leaf module directory (e.g.
+                 both in `lib/streak/`)
                - Two or more would edit the same file
 
                If coupling is found, do NOT offer `/split`. The warning still
                fires (the work is still big) but the recommendation is to
                proceed as a single issue — coupled children produce PRs that
-               don't compose at merge time. Use ending A2 in step 4.
+               don't compose at merge time. Use ending A2 in step 4. **When
+               you cannot confidently rule out coupling, default to A2** —
+               the cost of a missed split (one large PR) is much smaller
+               than the cost of a wrongly-offered split (two PRs that don't
+               compose).
 
             4. Post the plan as a comment on the issue:
                `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
