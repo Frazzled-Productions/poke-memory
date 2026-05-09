@@ -169,6 +169,10 @@ jobs:
                `[review COUNT](url)` — wherever you would otherwise write bare
                text like "review #N" or "#N". Do not write any bare `#N` token
                that GitHub would auto-link to an unrelated issue or PR.
+               (Note: this wording differs from auto-pr.yml intentionally —
+               the review agent identifies the prior review by marker because it
+               builds its own context from scratch; the fix agent uses the
+               already-loaded step-1 comments JSON instead.)
 
       - name: Move issue to PR / Ready to merge based on review verdict
         if: always() && steps.idem.outputs.skip == 'false'
