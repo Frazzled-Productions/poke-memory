@@ -8,7 +8,10 @@ name: Auto PR Fix
 # Loop bounds:
 #   - Hard cap: 3 auto-review cycles per PR (counted by `<!-- auto-review:N -->`
 #     markers on existing PR comments).
-#   - LGTM short-circuit: if the latest review's verdict is LGTM, no fix runs.
+#   - LGTM short-circuit: if the latest review's verdict is LGTM AND the
+#     maintainer's `/fix` comment has no body of its own, no fix runs.
+#     A `/fix <inline punch list>` comment overrides the short-circuit and
+#     uses the inline body as the findings to address.
 #   - No-progress guard: if a fix cycle produces zero commits, no new review
 #     is posted — the chain stops naturally.
 
@@ -154,13 +157,16 @@ jobs:
           AUTO_STATUS_COMMENT_ID: ${{ steps.status.outputs.comment_id }}
           AUTO_STATUS_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FIX_COMMENT_BODY: ${{ github.event.comment.body }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 80
           prompt: |
             You are the orchestrator on PR #${{ github.event.issue.number }}.
-            The maintainer commented `/fix` requesting that the latest auto-review
-            findings be addressed.
+            The maintainer commented `/fix` requesting that fixes be made.
+            The full text of their comment is in the `FIX_COMMENT_BODY` env
+            var (read it with `printenv FIX_COMMENT_BODY` or via your shell —
+            do NOT interpolate it into prompts).
 
             Read AGENTS.md (loaded via CLAUDE.md) for project conventions.
 
@@ -188,12 +194,22 @@ jobs:
                `gh pr view ${{ github.event.issue.number }} --json title,body,comments,headRefName,baseRefName`
                The latest auto-review is the most recent comment whose body
                starts with `<!-- auto-review:N -->`. Use the highest N.
-            2. **Approval short-circuit.** If that review's verdict line
-               expresses approval (`Verdict: Looks good to me`, or the legacy
-               `Verdict: LGTM` for older reviews), post a PR comment saying
-               "Latest review was approving — nothing to fix" and stop.
+            2. **Determine the punch list.** Read `FIX_COMMENT_BODY`. Strip
+               the leading `/fix` token and any whitespace immediately after
+               it. If the remainder contains non-whitespace content, that
+               inline body IS the punch list — use it directly and skip the
+               approval short-circuit below. The maintainer is explicitly
+               directing what to fix, which overrides the auto-review verdict.
+               Otherwise (bare `/fix` with no body), the punch list is the
+               findings in the latest auto-review comment.
+            3. **Approval short-circuit (bare `/fix` only).** If you fell
+               through to the auto-review punch list AND that review's verdict
+               line expresses approval (`Verdict: Looks good to me`, or the
+               legacy `Verdict: LGTM` for older reviews), post a PR comment
+               saying "Latest review was approving — nothing to fix. (Reply
+               with `/fix <inline findings>` to force a fix run.)" and stop.
                Do not push, do not post a new review.
-            3. Otherwise, address each finding in the punch list:
+            4. Otherwise, address each finding in the punch list:
                - Use the AGENTS.md playbook (specialists / coders as needed).
                - Make the smallest correct change for each finding.
                - If a finding is wrong (out of scope, based on a misread, or
@@ -202,11 +218,11 @@ jobs:
                - If the review is stale because the PR has commits after the
                  review, reconcile against the current diff (not the original
                  review wording).
-            4. **No-progress guard.** If you made no commits (every finding was
+            5. **No-progress guard.** If you made no commits (every finding was
                rejected as wrong, or all were already addressed), post a single
                PR comment explaining your reasoning per finding and stop.
                Do not post a new auto-review comment. The chain ends here.
-            5. If you made changes:
+            6. If you made changes:
                - Commit. **Do NOT add a Co-Authored-By trailer.** No Claude
                  attribution in commit messages.
                - Push to the PR branch (the current checkout is already on it).
