@@ -70,6 +70,7 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 40
+          show_full_output: true
           # Allow the bot to trigger this job: /split creates sub-issues
           # under the bot identity and labels them `auto`, which is
           # supposed to cascade into a plan run on each child.
