@@ -23,10 +23,9 @@ WATCH_PATHS=(
   package.json
   package-lock.json
   vercel.json
-  vercel.ts
 )
 
-# git diff --quiet exits 0 (no diff), 1 (diff found), or 2+ (error).
+# git diff --quiet exits 0 (no diff), 1 (diff found), or 128 (fatal error).
 # Vercel shallow-clones with --depth=10, so VERCEL_GIT_PREVIOUS_SHA may be
 # outside the window and git diff will error with "bad object". Treat any
 # non-zero exit as "proceed with build" (fail open).
