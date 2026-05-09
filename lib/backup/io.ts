@@ -2,7 +2,8 @@ import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
-import type { ReviewableCard } from "@/lib/review/session";
+import type { ReviewableCard, DailyLimits } from "@/lib/review/session";
+import type { UserSettings } from "@/lib/settings/persistence";
 import { BACKUP_VERSION, isBackupFile } from "./schema";
 
 // Built once at module load — SEED_POKEMON and SEED_EVOLUTION_CARDS are constants.
@@ -10,6 +11,12 @@ const VALID_IDS = new Set<number>([
   ...SEED_POKEMON.map((p) => p.id),
   ...SEED_EVOLUTION_CARDS.map((e) => e.id),
 ]);
+
+export type ValidatedBackup = {
+  cards: ReviewableCard[];
+  limits: DailyLimits;
+  settings: UserSettings;
+};
 
 export function exportProgress(): void {
   if (typeof window === "undefined") return;
@@ -35,12 +42,13 @@ export function exportProgress(): void {
   a.href = url;
   a.download = `poke-memory-backup-${date}.json`;
   a.click();
-  URL.revokeObjectURL(url);
+  // Defer revocation so the download has time to start before the URL is freed.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-export async function importProgress(
+export async function validateBackup(
   file: File,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; data: ValidatedBackup } | { ok: false; error: string }> {
   let parsed: unknown;
   try {
     const text = await file.text();
@@ -74,7 +82,7 @@ export async function importProgress(
   // which refreshes them from the current seed. Calling hydrateSession here
   // would also add all seed cards missing from the backup — not the right
   // behaviour for a restore operation.
-  const sanitisedCards = parsed.cards.map(
+  const cards = parsed.cards.map(
     (card) =>
       ({
         ...card,
@@ -82,8 +90,10 @@ export async function importProgress(
       }) as ReviewableCard,
   );
 
-  saveSession({ cards: sanitisedCards, limits: parsed.limits });
-  saveSettings(parsed.settings);
+  return { ok: true, data: { cards, limits: parsed.limits, settings: parsed.settings } };
+}
 
-  return { ok: true };
+export function applyBackup(data: ValidatedBackup): void {
+  saveSession({ cards: data.cards, limits: data.limits });
+  saveSettings(data.settings);
 }

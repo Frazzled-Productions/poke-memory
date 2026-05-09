@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
-import { exportProgress, importProgress } from "@/lib/backup/io";
+import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { deleteAllCloudProgress } from "@/lib/sync/cloud";
@@ -128,25 +128,22 @@ export default function SettingsPage() {
     router.replace("/");
   }
 
-  function handleExport() {
-    exportProgress();
-  }
-
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    setImportError(null);
     const file = e.target.files?.[0];
-    e.target.value = "";
+    e.target.value = ""; // reset so the same file can be re-selected
     if (!file) return;
 
-    const result = await importProgress(file);
+    const result = await validateBackup(file);
     if (!result.ok) {
       setImportError(result.error);
       return;
     }
-    setImportError(null);
     const confirmed = window.confirm(
       "Replace your current progress with this backup?"
     );
     if (confirmed) {
+      applyBackup(result.data);
       window.location.reload();
     }
   }
@@ -239,7 +236,7 @@ export default function SettingsPage() {
                     </p>
                     <button
                       type="button"
-                      onClick={handleExport}
+                      onClick={exportProgress}
                       className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
                       Export
@@ -258,7 +255,6 @@ export default function SettingsPage() {
                       type="file"
                       accept=".json"
                       className="sr-only"
-                      aria-hidden="true"
                       tabIndex={-1}
                       onChange={handleImport}
                     />
