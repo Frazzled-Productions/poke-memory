@@ -16,6 +16,7 @@ import {
   DEFAULT_LIMITS,
 } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
+import { recordReview } from "@/lib/streak";
 import { loadSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
@@ -439,12 +440,14 @@ export function ReviewSession() {
     if (cards === null) return;
     setGrading(true);
 
-    const nextState = nextReview(currentCard.state, grade, new Date());
+    const now = new Date();
+    const nextState = nextReview(currentCard.state, grade, now);
     const newCards = cards.map((card) =>
       card.id === currentCard.id ? { ...card, state: nextState } : card,
     );
 
     saveSession({ cards: newCards, limits });
+    recordReview(todayString(now));
     setCards(newCards);
 
     // Update the learning queue based on the new state.
