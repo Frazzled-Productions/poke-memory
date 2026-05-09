@@ -2,18 +2,24 @@
 const STORAGE_KEY = "poke-memory:settings:v1";
 
 export type UserSettings = {
-  masteryRepetitions: number;  // cards with this many consecutive correct reviews = mastered
-  maxNewPerDay: number;        // hard daily cap for new cards
-  maxReviewsPerDay: number;    // soft daily cap for review cards
+  masteryRepetitions: number;        // cards with this many consecutive correct reviews = mastered
+  maxNewPerDay: number;              // hard daily cap for new name cards
+  maxReviewsPerDay: number;          // soft daily cap for name reviews
+  maxNewEvolutionPerDay: number;     // hard daily cap for new evolution cards
+  maxReviewsEvolutionPerDay: number; // soft daily cap for evolution reviews
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
   masteryRepetitions: 3,
   maxNewPerDay: 10,
   maxReviewsPerDay: 100,
+  maxNewEvolutionPerDay: 5,
+  maxReviewsEvolutionPerDay: 50,
 };
 
 // Returns DEFAULT_SETTINGS on fresh load, server, or corruption. Never throws.
+// Legacy stored objects without the evolution-* keys are silently upgraded
+// with the defaults — name-card limits keep their saved values.
 export function loadSettings(): UserSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
@@ -35,6 +41,14 @@ export function loadSettings(): UserSettings {
         typeof obj.maxReviewsPerDay === "number"
           ? obj.maxReviewsPerDay
           : DEFAULT_SETTINGS.maxReviewsPerDay,
+      maxNewEvolutionPerDay:
+        typeof obj.maxNewEvolutionPerDay === "number"
+          ? obj.maxNewEvolutionPerDay
+          : DEFAULT_SETTINGS.maxNewEvolutionPerDay,
+      maxReviewsEvolutionPerDay:
+        typeof obj.maxReviewsEvolutionPerDay === "number"
+          ? obj.maxReviewsEvolutionPerDay
+          : DEFAULT_SETTINGS.maxReviewsEvolutionPerDay,
     };
   } catch {
     return DEFAULT_SETTINGS;

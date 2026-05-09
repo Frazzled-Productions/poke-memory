@@ -49,16 +49,28 @@ export type EvolutionCard = {
   evolvesIntoNames: string[];
 };
 
+// Evolution-card IDs live in the [EVOLUTION_ID_OFFSET, EVOLUTION_ID_OFFSET +
+// MAX_NAME_ID] namespace, disjoint from name-card IDs (1..MAX_NAME_ID).
+// The hydrate/save paths key cards by id, so any overlap would silently
+// merge cards of different types. Validated at module load.
+export const EVOLUTION_ID_OFFSET = 1_000_000;
+const MAX_NAME_ID = EVOLUTION_ID_OFFSET - 1;
+
 export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
   const cards: EvolutionCard[] = [];
   for (const pokemon of SEED_POKEMON) {
+    if (pokemon.id <= 0 || pokemon.id > MAX_NAME_ID) {
+      throw new Error(
+        `Pokemon id ${pokemon.id} (${pokemon.name}) falls outside the name-card namespace [1, ${MAX_NAME_ID}]; the evolution-card ID scheme would collide.`,
+      );
+    }
     const directEvolutions = pokemon.evolutionChain.filter(
       (node) => node.evolvesFromId === pokemon.id,
     );
     if (directEvolutions.length === 0) continue;
     cards.push({
       cardType: "evolution",
-      id: 1_000_000 + pokemon.id,
+      id: EVOLUTION_ID_OFFSET + pokemon.id,
       pokemonId: pokemon.id,
       name: pokemon.name,
       spriteUrl: pokemon.spriteUrl,

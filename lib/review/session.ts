@@ -19,14 +19,21 @@ export type ReviewableCard = NameReviewCard | EvolutionReviewCard;
 // Backward-compat alias
 export type ReviewCard = ReviewableCard;
 
-export type DailyLimits = {
+export type PerTypeLimits = {
   maxNewPerDay: number;
   maxReviewsPerDay: number;
 };
 
+export type CardTypeKey = "name" | "evolution";
+
+export type DailyLimits = {
+  name: PerTypeLimits;
+  evolution: PerTypeLimits;
+};
+
 export const DEFAULT_LIMITS: DailyLimits = {
-  maxNewPerDay: 10,
-  maxReviewsPerDay: 100,
+  name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
 };
 
 export function buildSession(
@@ -132,22 +139,30 @@ export function stableShuffleForDay(
   return keyed.map((item) => item.id);
 }
 
+export type PerTypeCounters = {
+  newIntroducedToday: number;
+  reviewsDoneToday: number;
+};
+
 /**
  * Computes all queues and today's counters from the full card set + limits.
  *
- * - learningCardIds: IDs of all cards currently in a learning or relearning
- *   step (learningStep !== null). These are managed by the UI component's
- *   in-memory learning queue — the component reconstructs dueAt from
- *   stepStartedAt + stepDurationMs on remount. Learning cards are excluded
- *   from both reviewQueue and newQueue.
- * - reviewQueue: graduated cards due today or earlier, not already reviewed
- *   today, not in a learning step; capped at maxReviewsPerDay - done today.
- * - newQueue: never-reviewed cards not in a learning step; capped at
- *   maxNewPerDay - introduced today.
- * - newIntroducedToday / reviewsDoneToday: live counters for the UI cap display.
+ * Counters and caps are tracked per cardType — name and evolution cards each
+ * have their own daily new / review budget. The returned `reviewQueue` and
+ * `newQueue` are merged across types (after each type's cap is applied
+ * independently) so the consumer can keep its single-cursor ordering policy.
  *
- * Note: getNextCardId serves review/new ordering only. The component layers
- * learning-queue priority on top.
+ * - learningCardIds: IDs of all cards currently in a learning/relearning step
+ *   (learningStep !== null), regardless of cardType. The UI's in-memory queue
+ *   reconstructs dueAt from stepStartedAt + stepDurationMs.
+ * - reviewQueue: graduated cards due today or earlier, not already reviewed
+ *   today, not in a learning step; each type capped independently at
+ *   limits[type].maxReviewsPerDay - reviewsDoneToday[type].
+ * - newQueue: never-reviewed cards not in a learning step; each type capped
+ *   independently at limits[type].maxNewPerDay - newIntroducedToday[type].
+ * - perType: live per-type counters for the lockout/end-state logic.
+ * - newIntroducedToday / reviewsDoneToday: blended totals for the TodayPill
+ *   display (sum across types).
  *
  * Pure — no I/O.
  */
@@ -161,48 +176,78 @@ export function buildSessionQueues(
   newQueue: number[];
   newIntroducedToday: number;
   reviewsDoneToday: number;
+  perType: Record<CardTypeKey, PerTypeCounters>;
 } {
-  const newIntroducedToday = cards.filter(
-    (c) => c.state.firstSeen === today,
-  ).length;
-
-  const reviewsDoneToday = cards.filter(
-    (c) => c.state.lastReview === today && c.state.firstSeen !== today,
-  ).length;
-
   const learningCardIds = cards
     .filter((c) => c.state.learningStep !== null)
     .map((c) => c.id);
 
-  const reviewCandidateIds = cards
-    .filter(
-      (c) =>
-        c.state.learningStep === null &&
-        c.state.lastReview !== null &&
-        c.state.dueDate <= today &&
-        c.state.lastReview !== today,
-    )
-    .map((c) => c.id);
+  const perType: Record<CardTypeKey, PerTypeCounters> = {
+    name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+    evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+  };
 
-  const reviewSlots = Math.max(0, limits.maxReviewsPerDay - reviewsDoneToday);
-  const reviewQueue = stableShuffleForDay(reviewCandidateIds, today).slice(
-    0,
-    reviewSlots,
-  );
+  const reviewCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [] };
+  const newCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [] };
 
-  const newCandidateIds = cards
-    .filter(
-      (c) => c.state.learningStep === null && c.state.lastReview === null,
-    )
-    .map((c) => c.id);
+  for (const card of cards) {
+    const type = card.cardType;
+    if (card.state.firstSeen === today) {
+      perType[type].newIntroducedToday += 1;
+    }
+    if (card.state.lastReview === today && card.state.firstSeen !== today) {
+      perType[type].reviewsDoneToday += 1;
+    }
+    if (card.state.learningStep !== null) continue;
+    if (
+      card.state.lastReview !== null &&
+      card.state.dueDate <= today &&
+      card.state.lastReview !== today
+    ) {
+      reviewCandidatesByType[type].push(card.id);
+    } else if (card.state.lastReview === null) {
+      newCandidatesByType[type].push(card.id);
+    }
+  }
 
-  const newSlots = Math.max(0, limits.maxNewPerDay - newIntroducedToday);
-  const newQueue = stableShuffleForDay(newCandidateIds, today).slice(
-    0,
-    newSlots,
-  );
+  const reviewQueue: number[] = [];
+  const newQueue: number[] = [];
 
-  return { learningCardIds, reviewQueue, newQueue, newIntroducedToday, reviewsDoneToday };
+  for (const type of ["name", "evolution"] as const) {
+    const reviewSlots = Math.max(
+      0,
+      limits[type].maxReviewsPerDay - perType[type].reviewsDoneToday,
+    );
+    reviewQueue.push(
+      ...stableShuffleForDay(reviewCandidatesByType[type], today).slice(0, reviewSlots),
+    );
+    const newSlots = Math.max(
+      0,
+      limits[type].maxNewPerDay - perType[type].newIntroducedToday,
+    );
+    newQueue.push(
+      ...stableShuffleForDay(newCandidatesByType[type], today).slice(0, newSlots),
+    );
+  }
+
+  // Reshuffle the merged per-type slices so name and evolution interleave
+  // deterministically rather than appearing in two contiguous blocks.
+  const shuffledReviewQueue = stableShuffleForDay(reviewQueue, today);
+  const shuffledNewQueue = stableShuffleForDay(newQueue, today);
+
+  const newIntroducedToday =
+    perType.name.newIntroducedToday + perType.evolution.newIntroducedToday;
+  const reviewsDoneToday =
+    perType.name.reviewsDoneToday + perType.evolution.reviewsDoneToday;
+
+  return {
+    learningCardIds,
+    reviewQueue: shuffledReviewQueue,
+    newQueue: shuffledNewQueue,
+    newIntroducedToday,
+    reviewsDoneToday,
+    perType,
+  };
 }
 
 // Note: the component checks its in-memory learning queue before calling this.

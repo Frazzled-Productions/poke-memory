@@ -1,4 +1,4 @@
-import type { ReviewableCard, DailyLimits } from "@/lib/review/session";
+import type { ReviewableCard, DailyLimits, PerTypeLimits } from "@/lib/review/session";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 
 export type { DailyLimits };
@@ -23,19 +23,72 @@ function isReviewCardShaped(value: unknown): boolean {
   ) {
     return false;
   }
+  // Reject unknown cardType values — undefined is allowed (legacy migration
+  // backfills it to "name") but any explicit value other than "name" or
+  // "evolution" indicates corruption or a forward-incompatible schema.
+  if (
+    v.cardType !== undefined &&
+    v.cardType !== "name" &&
+    v.cardType !== "evolution"
+  ) {
+    return false;
+  }
   if (v.cardType === "evolution") {
-    return Array.isArray(v.evolvesIntoNames);
+    return (
+      Array.isArray(v.evolvesIntoNames) &&
+      v.evolvesIntoNames.every((n: unknown) => typeof n === "string")
+    );
   }
   return true;
 }
 
-function isDailyLimitsShaped(value: unknown): boolean {
+function isPerTypeLimitsShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
     typeof v.maxNewPerDay === "number" &&
     typeof v.maxReviewsPerDay === "number"
   );
+}
+
+function isDailyLimitsShaped(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  // New shape: per-type limits.
+  if (isPerTypeLimitsShaped(v.name) && isPerTypeLimitsShaped(v.evolution)) {
+    return true;
+  }
+  // Legacy flat shape: { maxNewPerDay, maxReviewsPerDay }. Accepted for
+  // migration; loadSession promotes it into the per-type shape on read.
+  return (
+    typeof v.maxNewPerDay === "number" &&
+    typeof v.maxReviewsPerDay === "number"
+  );
+}
+
+function migrateDailyLimits(raw: unknown): DailyLimits {
+  if (typeof raw !== "object" || raw === null) return DEFAULT_LIMITS;
+  const v = raw as Record<string, unknown>;
+  if (isPerTypeLimitsShaped(v.name) && isPerTypeLimitsShaped(v.evolution)) {
+    return {
+      name: v.name as PerTypeLimits,
+      evolution: v.evolution as PerTypeLimits,
+    };
+  }
+  // Legacy flat shape — promote to name limits, evolution gets defaults.
+  if (
+    typeof v.maxNewPerDay === "number" &&
+    typeof v.maxReviewsPerDay === "number"
+  ) {
+    return {
+      name: {
+        maxNewPerDay: v.maxNewPerDay,
+        maxReviewsPerDay: v.maxReviewsPerDay,
+      },
+      evolution: { ...DEFAULT_LIMITS.evolution },
+    };
+  }
+  return DEFAULT_LIMITS;
 }
 
 // Backfills missing state fields from localStorage. No-op on already-present
@@ -58,8 +111,10 @@ export function migrateReviewState(state: unknown): void {
   }
 }
 
-// Backfills cardType on legacy name cards and migrates state fields.
-function migrateReviewCard(card: unknown): void {
+// Backfills cardType on legacy name cards and migrates state fields. Exported
+// so unit tests can exercise the legacy-shape migration without needing a
+// localStorage harness.
+export function migrateReviewCard(card: unknown): void {
   if (typeof card !== "object" || card === null) return;
   const c = card as Record<string, unknown>;
   if (c.cardType === undefined) {
@@ -104,7 +159,7 @@ export function loadSession(): SavedSession | null {
         }
         return {
           cards: obj.cards as ReviewableCard[],
-          limits: obj.limits as DailyLimits,
+          limits: migrateDailyLimits(obj.limits),
         };
       }
     }

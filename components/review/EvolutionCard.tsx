@@ -22,9 +22,13 @@ export function EvolutionCard({ spriteUrl, name, evolvesIntoNames, revealed }: P
         <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
           What does <span className="capitalize">{name}</span> evolve into?
         </p>
-        <div className="min-h-[2.5rem] flex flex-col items-center justify-center" aria-live="polite">
+        <div className="min-h-[2.5rem] flex flex-col items-center justify-center">
           {revealed ? (
-            <div className="flex flex-wrap gap-x-2 gap-y-1 justify-center">
+            <div
+              className="flex flex-wrap gap-x-2 gap-y-1 justify-center"
+              aria-live="polite"
+              aria-atomic="true"
+            >
               {evolvesIntoNames.map((evoName, idx) => (
                 <span key={evoName}>
                   <span className="text-3xl font-semibold tracking-wide capitalize text-foreground">
@@ -39,7 +43,10 @@ export function EvolutionCard({ spriteUrl, name, evolvesIntoNames, revealed }: P
               ))}
             </div>
           ) : (
-            <p className="text-3xl font-semibold tracking-wide text-zinc-300 dark:text-zinc-600 select-none">
+            <p
+              className="text-3xl font-semibold tracking-wide text-zinc-300 dark:text-zinc-600 select-none"
+              aria-hidden="true"
+            >
               ???
             </p>
           )}

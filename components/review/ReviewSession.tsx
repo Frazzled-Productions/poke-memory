@@ -18,7 +18,7 @@ import {
 } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { recordReview } from "@/lib/streak";
-import { loadSettings } from "@/lib/settings/persistence";
+import { loadSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
@@ -41,6 +41,19 @@ function stepDurationMs(lastReview: string | null, stepIndex: number): number {
   return steps[Math.min(stepIndex, steps.length - 1)];
 }
 
+function limitsFromSettings(settings: UserSettings): DailyLimits {
+  return {
+    name: {
+      maxNewPerDay: settings.maxNewPerDay,
+      maxReviewsPerDay: settings.maxReviewsPerDay,
+    },
+    evolution: {
+      maxNewPerDay: settings.maxNewEvolutionPerDay,
+      maxReviewsPerDay: settings.maxReviewsEvolutionPerDay,
+    },
+  };
+}
+
 /**
  * Format milliseconds as "Xm Ys" (e.g. "1m 23s") or just "Xs" when under 1m.
  */
@@ -56,63 +69,64 @@ function formatCountdown(ms: number): string {
 // Sub-components: end states
 // ---------------------------------------------------------------------------
 
-function TodayPill({
-  newIntroducedToday,
-  reviewsDoneToday,
-}: {
-  newIntroducedToday: number;
-  reviewsDoneToday: number;
-}) {
+type PerTypeTodayCounts = {
+  name: { newIntroducedToday: number; reviewsDoneToday: number };
+  evolution: { newIntroducedToday: number; reviewsDoneToday: number };
+};
+
+function TodayPill({ perType }: { perType: PerTypeTodayCounts }) {
   return (
-    <p className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-      Today:{" "}
-      <span className="font-medium text-foreground">{newIntroducedToday} new</span>
-      {" · "}
-      <span className="font-medium text-foreground">{reviewsDoneToday} reviews</span>
-    </p>
+    <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
+      <p>
+        <span className="text-zinc-600 dark:text-zinc-300">Name:</span>{" "}
+        <span className="font-medium text-foreground">
+          {perType.name.newIntroducedToday} new
+        </span>
+        {" · "}
+        <span className="font-medium text-foreground">
+          {perType.name.reviewsDoneToday} reviews
+        </span>
+      </p>
+      <p>
+        <span className="text-zinc-600 dark:text-zinc-300">Evolution:</span>{" "}
+        <span className="font-medium text-foreground">
+          {perType.evolution.newIntroducedToday} new
+        </span>
+        {" · "}
+        <span className="font-medium text-foreground">
+          {perType.evolution.reviewsDoneToday} reviews
+        </span>
+      </p>
+    </div>
   );
 }
 
-function SessionCompleteScreen({
-  newIntroducedToday,
-  reviewsDoneToday,
-}: {
-  newIntroducedToday: number;
-  reviewsDoneToday: number;
-}) {
+function SessionCompleteScreen({ perType }: { perType: PerTypeTodayCounts }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       <p className="text-2xl font-semibold text-foreground">All caught up!</p>
       <p className="text-zinc-500 dark:text-zinc-400">
         No more cards due today. Come back tomorrow to keep going.
       </p>
-      <TodayPill
-        newIntroducedToday={newIntroducedToday}
-        reviewsDoneToday={reviewsDoneToday}
-      />
+      <TodayPill perType={perType} />
     </div>
   );
 }
 
 function ReviewSoftWallScreen({
-  newIntroducedToday,
-  reviewsDoneToday,
+  perType,
   onKeepReviewing,
 }: {
-  newIntroducedToday: number;
-  reviewsDoneToday: number;
+  perType: PerTypeTodayCounts;
   onKeepReviewing: () => void;
 }) {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       <p className="text-2xl font-semibold text-foreground">Daily review limit reached</p>
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-        You have hit your daily review cap. More cards are due — keep going?
+        You have hit a daily review cap. More cards are due — keep going?
       </p>
-      <TodayPill
-        newIntroducedToday={newIntroducedToday}
-        reviewsDoneToday={reviewsDoneToday}
-      />
+      <TodayPill perType={perType} />
       <div className="flex flex-wrap justify-center gap-3">
         <button
           type="button"
@@ -136,36 +150,25 @@ function ReviewSoftWallScreen({
   );
 }
 
-function NewCardsLockedScreen({
-  newIntroducedToday,
-  reviewsDoneToday,
-}: {
-  newIntroducedToday: number;
-  reviewsDoneToday: number;
-}) {
+function NewCardsLockedScreen({ perType }: { perType: PerTypeTodayCounts }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       <p className="text-2xl font-semibold text-foreground">New cards locked for today</p>
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-        You have introduced your daily limit of new Pokémon. Come back tomorrow
-        for more — keeping this limit prevents tomorrow&apos;s review pile from growing too large.
+        You have hit a daily new-card cap. Come back tomorrow for more — keeping
+        this limit prevents tomorrow&apos;s review pile from growing too large.
       </p>
-      <TodayPill
-        newIntroducedToday={newIntroducedToday}
-        reviewsDoneToday={reviewsDoneToday}
-      />
+      <TodayPill perType={perType} />
     </div>
   );
 }
 
 function CountdownScreen({
   dueAt,
-  newIntroducedToday,
-  reviewsDoneToday,
+  perType,
 }: {
   dueAt: number;
-  newIntroducedToday: number;
-  reviewsDoneToday: number;
+  perType: PerTypeTodayCounts;
 }) {
   const [remaining, setRemaining] = useState(() => dueAt - Date.now());
 
@@ -190,10 +193,7 @@ function CountdownScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         Hang tight — a learning card will be ready shortly.
       </p>
-      <TodayPill
-        newIntroducedToday={newIntroducedToday}
-        reviewsDoneToday={reviewsDoneToday}
-      />
+      <TodayPill perType={perType} />
     </div>
   );
 }
@@ -230,8 +230,7 @@ export function ReviewSession() {
     // poke-memory:settings:v1 is the source of truth for limits.
     // saved.limits (from the session) is intentionally ignored — settings
     // take effect on the next page load, which is the definition of "next session".
-    const { maxNewPerDay, maxReviewsPerDay } = loadSettings();
-    const settingsLimits = { maxNewPerDay, maxReviewsPerDay };
+    const settingsLimits = limitsFromSettings(loadSettings());
 
     if (saved !== null) {
       // Merge any seed cards added since the last save.
@@ -323,14 +322,21 @@ export function ReviewSession() {
   // --- Derived state (recomputed every render — cheap, pure) ---
   const today = todayString(new Date());
 
-  // While extendedReview is active, uncap the review limit so all due cards
-  // are visible. Uncapping new cards is not allowed (per srs-expert policy).
+  // While extendedReview is active, uncap both per-type review limits so all
+  // due cards are visible. Uncapping new cards is not allowed (per srs-expert
+  // policy).
   const effectiveLimits: DailyLimits = extendedReview
-    ? { ...limits, maxReviewsPerDay: Number.POSITIVE_INFINITY }
+    ? {
+        name: { ...limits.name, maxReviewsPerDay: Number.POSITIVE_INFINITY },
+        evolution: { ...limits.evolution, maxReviewsPerDay: Number.POSITIVE_INFINITY },
+      }
     : limits;
 
-  const { reviewQueue, newQueue, newIntroducedToday, reviewsDoneToday } =
-    buildSessionQueues(cards, effectiveLimits, today);
+  const { reviewQueue, newQueue, perType } = buildSessionQueues(
+    cards,
+    effectiveLimits,
+    today,
+  );
 
   // --- Learning-queue priority ---
   const now = Date.now();
@@ -353,32 +359,41 @@ export function ReviewSession() {
 
   // --- Determine end state when there is no current card ---
   function resolveEndState(): EndState {
-    // Check whether there are more review candidates beyond today's cap.
-    const hasMoreDueReviews = cards!.some(
-      (c) =>
-        c.state.lastReview !== null &&
-        c.state.dueDate <= today &&
-        c.state.lastReview !== today,
-    );
-
-    if (
-      !extendedReview &&
-      reviewsDoneToday >= limits.maxReviewsPerDay &&
-      hasMoreDueReviews
-    ) {
-      return "REVIEW_SOFT_WALL";
+    // Per-type checks: a wall fires only when *that* type's cap is hit AND
+    // *that* type has more candidates. Mixed-type sessions therefore keep
+    // serving cards from the type that still has budget; the end-state UI
+    // appears only when no type has any work left.
+    function hasMoreDueReviewsOf(type: "name" | "evolution"): boolean {
+      return cards!.some(
+        (c) =>
+          c.cardType === type &&
+          c.state.lastReview !== null &&
+          c.state.dueDate <= today &&
+          c.state.lastReview !== today,
+      );
+    }
+    function hasMoreNewCardsOf(type: "name" | "evolution"): boolean {
+      return cards!.some(
+        (c) =>
+          c.cardType === type &&
+          c.state.lastReview === null &&
+          c.state.learningStep === null,
+      );
     }
 
-    // Only count truly-new cards (never touched). A card already in new-card
-    // learning has lastReview === null but learningStep !== null, and is
-    // tracked by the learning queue, not by the new-cards-locked screen.
-    const hasMoreNewCards = cards!.some(
-      (c) => c.state.lastReview === null && c.state.learningStep === null,
+    const reviewWall = (["name", "evolution"] as const).some(
+      (type) =>
+        perType[type].reviewsDoneToday >= limits[type].maxReviewsPerDay &&
+        hasMoreDueReviewsOf(type),
     );
+    if (!extendedReview && reviewWall) return "REVIEW_SOFT_WALL";
 
-    if (newIntroducedToday >= limits.maxNewPerDay && hasMoreNewCards) {
-      return "NEW_CARDS_LOCKED";
-    }
+    const newWall = (["name", "evolution"] as const).some(
+      (type) =>
+        perType[type].newIntroducedToday >= limits[type].maxNewPerDay &&
+        hasMoreNewCardsOf(type),
+    );
+    if (newWall) return "NEW_CARDS_LOCKED";
 
     return "SESSION_COMPLETE";
   }
@@ -387,13 +402,7 @@ export function ReviewSession() {
     // If there are pending (future-due) learning cards, show the countdown.
     if (learningQueue.length > 0) {
       const earliestDueAt = Math.min(...learningQueue.map((e) => e.dueAt));
-      return (
-        <CountdownScreen
-          dueAt={earliestDueAt}
-          newIntroducedToday={newIntroducedToday}
-          reviewsDoneToday={reviewsDoneToday}
-        />
-      );
+      return <CountdownScreen dueAt={earliestDueAt} perType={perType} />;
     }
 
     const endState = resolveEndState();
@@ -401,28 +410,17 @@ export function ReviewSession() {
     if (endState === "REVIEW_SOFT_WALL") {
       return (
         <ReviewSoftWallScreen
-          newIntroducedToday={newIntroducedToday}
-          reviewsDoneToday={reviewsDoneToday}
+          perType={perType}
           onKeepReviewing={() => setExtendedReview(true)}
         />
       );
     }
 
     if (endState === "NEW_CARDS_LOCKED") {
-      return (
-        <NewCardsLockedScreen
-          newIntroducedToday={newIntroducedToday}
-          reviewsDoneToday={reviewsDoneToday}
-        />
-      );
+      return <NewCardsLockedScreen perType={perType} />;
     }
 
-    return (
-      <SessionCompleteScreen
-        newIntroducedToday={newIntroducedToday}
-        reviewsDoneToday={reviewsDoneToday}
-      />
-    );
+    return <SessionCompleteScreen perType={perType} />;
   }
 
   // --- Handlers ---
@@ -514,10 +512,7 @@ export function ReviewSession() {
         </button>
       )}
 
-      <TodayPill
-        newIntroducedToday={newIntroducedToday}
-        reviewsDoneToday={reviewsDoneToday}
-      />
+      <TodayPill perType={perType} />
     </div>
   );
 }
