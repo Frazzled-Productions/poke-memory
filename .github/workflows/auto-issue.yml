@@ -704,7 +704,7 @@ jobs:
         run: |
           ID=$(gh api -X POST \
             "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
-            -f body=$'<!-- auto-status -->\n## Working on this\n\n_(Resuming \u2014 task list will appear here as work progresses.)_' \
+            -f body=$'<!-- auto-status -->\n## Working on this\n\n_(Resuming — task list will appear here as work progresses.)_' \
             --jq '.id')
           echo "comment_id=$ID" >> "$GITHUB_OUTPUT"
 
@@ -1025,26 +1025,37 @@ jobs:
             -f body="$(printf '<!-- auto-split:%s -->\n## Sub-issues filing in progress\n\nProcessing split request — this comment will update with the result.' "$ISSUE")" \
             --jq '.id')
 
+          # Each iteration must NOT exit on a sub-step failure — a strand of
+          # successful creations followed by one failure must still PATCH the
+          # marker so re-runs see the partial state and don't duplicate. Every
+          # gh call below is guarded; failures fall into FAILED with detail.
           CREATED=""
           FAILED=""
           while IFS= read -r title; do
             [ -z "$title" ] && continue
 
-            NEW_ID=$(gh api -X POST "repos/$REPO/issues" \
-              -f title="$title" \
-              -f body="Sub-issue of #${ISSUE}." \
-              --jq '.number')
+            if ! NEW_ID=$(gh api -X POST "repos/$REPO/issues" \
+                -f title="$title" \
+                -f body="Sub-issue of #${ISSUE}." \
+                --jq '.number' 2>/tmp/split-err.txt); then
+              ERR=$(head -3 /tmp/split-err.txt 2>/dev/null || echo "unknown error")
+              FAILED="${FAILED}"$'\n'"- (create failed) ${title} — \`${ERR}\`"
+              continue
+            fi
 
-            gh issue edit "$NEW_ID" --repo "$REPO" --add-label "${PRIORITY_LABEL},auto"
+            LABEL_NOTE=""
+            if ! gh issue edit "$NEW_ID" --repo "$REPO" \
+                --add-label "${PRIORITY_LABEL},auto" 2>/tmp/split-err.txt; then
+              LABEL_NOTE=" (label apply failed)"
+            fi
 
-            # Link as native GitHub sub-issue. Record the outcome and continue
-            # so a single failure doesn't strand earlier-created sub-issues.
+            # Link as native GitHub sub-issue.
             if gh api -X POST "repos/$REPO/issues/$ISSUE/sub_issues" \
-                -F sub_issue_id="$NEW_ID" 2>/tmp/sub-issue-err.txt; then
-              CREATED="${CREATED}"$'\n'"- #${NEW_ID}: ${title}"
+                -F sub_issue_id="$NEW_ID" 2>/tmp/split-err.txt; then
+              CREATED="${CREATED}"$'\n'"- #${NEW_ID}${LABEL_NOTE}: ${title}"
             else
-              ERR=$(head -3 /tmp/sub-issue-err.txt 2>/dev/null || echo "unknown error")
-              FAILED="${FAILED}"$'\n'"- #${NEW_ID} (created, link failed): ${title} — \`${ERR}\`"
+              ERR=$(head -3 /tmp/split-err.txt 2>/dev/null || echo "unknown error")
+              FAILED="${FAILED}"$'\n'"- #${NEW_ID} (created, link failed)${LABEL_NOTE}: ${title} — \`${ERR}\`"
             fi
           done <<< "$TITLES"
 
@@ -1057,7 +1068,7 @@ jobs:
             if [ -n "$FAILED" ]; then
               printf '\n**Some sub-issues could not be linked.** They were created but the `sub_issues` API call failed. You may need to grant the GitHub App **Sub-issues** write permission and link them manually:%s\n' "$FAILED"
             fi
-            printf '\nThis issue stays open as a tracker. GitHub will auto-close it when all sub-issues are closed.\n'
+            printf '\nThis issue stays open as a tracker — close it manually once all sub-issues are done.\n'
           } > /tmp/auto-split-final.md
           gh api -X PATCH "/repos/$REPO/issues/comments/$MARKER_ID" \
             -F body=@/tmp/auto-split-final.md
