@@ -56,7 +56,8 @@ jobs:
           app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         if: steps.check.outputs.all_covered != 'true'
 
       - name: Classify missing labels with Claude
@@ -73,10 +74,10 @@ jobs:
 
             ## Issue
 
-            Title: ${{ github.event.issue.title }}
+            Fetch the issue data by running this command and reading its output:
+            gh issue view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json title,body
 
-            Body:
-            ${{ github.event.issue.body }}
+            Use the `title` and `body` fields from the JSON output to understand what the issue is about.
 
             ## Already-set dimensions
 
@@ -159,22 +160,25 @@ jobs:
           ALLOWED="priority:now priority:next priority:later bug enhancement area:workflow area:app"
 
           TO_ADD=""
+          PRIORITY_ADDED=false
           for field in priority type area; do
-            value=$(jq -r ".$field // empty" "$LABELS_FILE")
+            # Use head -1 to guard against multi-line jq output on malformed JSON values
+            value=$(jq -r ".$field // empty" "$LABELS_FILE" | head -1)
             [ -z "$value" ] && continue
             [ "$value" = "null" ] && continue
             # Validate against allowlist to prevent 422 from typos
             if echo "$ALLOWED" | tr ' ' '\n' | grep -qx "$value"; then
               TO_ADD="${TO_ADD:+$TO_ADD,}$value"
+              [ "$field" = "priority" ] && PRIORITY_ADDED=true
             else
               echo "::warning::Unrecognised label value '$value' for field '$field' — skipping."
             fi
           done
 
-          # If priority was missing and Claude did not return one, default to priority:later
-          PRIORITY_FROM_CLAUDE=$(jq -r '.priority // empty' "$LABELS_FILE")
-          if [ "$HAS_PRIORITY" = "false" ] && { [ -z "$PRIORITY_FROM_CLAUDE" ] || [ "$PRIORITY_FROM_CLAUDE" = "null" ]; }; then
-            echo "Claude did not assign priority — defaulting to priority:later"
+          # If priority was missing and no valid priority was added (including rejected unrecognised
+          # values), default to priority:later rather than leaving the issue unlabelled.
+          if [ "$HAS_PRIORITY" = "false" ] && [ "$PRIORITY_ADDED" = "false" ]; then
+            echo "Claude did not assign a valid priority — defaulting to priority:later"
             TO_ADD="${TO_ADD:+$TO_ADD,}priority:later"
           fi
 
