@@ -82,20 +82,32 @@ export async function pushSession(
  * Returns null on error so the caller can fall back to local-only mode.
  * learningStep and stepStartedAt are not stored in the cloud; the caller
  * is responsible for reconstructing in-memory state from the seed.
+ *
+ * Paginates in PAGE-sized chunks to avoid the Supabase default max_rows cap
+ * of 1000, which would silently truncate a full ~1482-card corpus.
  */
 export async function pullSession(
   client: SupabaseClient,
   userId: string,
 ): Promise<CloudRow[] | null> {
+  const PAGE = 1000;
+  const allRows: CloudRow[] = [];
+  let offset = 0;
   try {
-    const { data, error } = await client
-      .from("card_reviews")
-      .select(
-        "pokemon_id,repetitions,interval,ease_factor,due_date,last_review,first_seen"
-      )
-      .eq("user_id", userId);
-    if (error || !data) return null;
-    return data as CloudRow[];
+    while (true) {
+      const { data, error } = await client
+        .from("card_reviews")
+        .select(
+          "pokemon_id,repetitions,interval,ease_factor,due_date,last_review,first_seen"
+        )
+        .eq("user_id", userId)
+        .range(offset, offset + PAGE - 1);
+      if (error || !data) return null;
+      allRows.push(...(data as CloudRow[]));
+      if (data.length < PAGE) break;
+      offset += PAGE;
+    }
+    return allRows;
   } catch {
     return null;
   }

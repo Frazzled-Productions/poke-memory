@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS card_reviews (
   pokemon_id  integer     NOT NULL,
   repetitions integer     NOT NULL DEFAULT 0,
   interval    integer     NOT NULL DEFAULT 0,
-  ease_factor numeric(5,4) NOT NULL DEFAULT 2.5,
+  ease_factor numeric(6,4) NOT NULL DEFAULT 2.5,
   due_date    date        NOT NULL,
   last_review date,
   first_seen  date,
