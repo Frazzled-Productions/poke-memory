@@ -109,9 +109,17 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
 - **Both files are updated as part of the same commit that lands the change** — no separate docs-only commit. Orchestrator handles the edit inline; no specialist agent.
 - Internal conventions (this file, `AGENTS.md`) are kept separate from user-facing docs. Don't merge them.
 
+### Stack decisions
+
+- No beta software for auth or other security-critical paths. A library must be stable/GA before it is a candidate.
+- Prefer single vendor — one DPA, one dashboard, one billing relationship is materially simpler than stitching providers together.
+- Plan for plausible future scope (per-card analytics, friends/social) when picking persistence shape, not just the current feature needs.
+
 ### Backlog / process
 
 The backlog lives on GitHub:
+
+**Foundational architectural decisions are planner blockers.** When the planner identifies a decision that would introduce a new vendor, paid service, auth provider, database, or persistence layer, it must surface that decision in the blocker list — not defer it to the implementation run. The implementer never resolves such decisions unilaterally; it waits for maintainer input. **When in doubt, default to blocker.** A false-positive blocker costs one comment round-trip; a false-negative costs a closed PR.
 
 - **Issues**: every idea, bug, or queued change is a GitHub issue, labelled with `priority:now` / `priority:next` / `priority:later`. Issues are user-owned; anyone the user grants access can file new ones. Phone-accessible via the GitHub mobile app.
 - **Project board** ([Poké Memory roadmap](https://github.com/orgs/Frazzled-Productions/projects/1)): kanban view with a `Priority` field (Now / Next / Later) corresponding to the labels. Same source data as Issues, visualised. The project lives under the `Frazzled-Productions` org so a GitHub App can mutate it (Apps cannot write user-owned Projects v2).

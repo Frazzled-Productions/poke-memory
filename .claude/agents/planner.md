@@ -20,6 +20,11 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
    Disambiguation:
    - If a question is expert-answerable but no named specialist fits, use `[USER-DECISION + RESEARCH]` — `researcher` handles the gap.
    - If a question plausibly fits both `[EXPERT-RESEARCH]` and `[USER-DECISION]` (e.g. a technical default with a possible preference override), prefer `[EXPERT-RESEARCH]` — the expert's answer often resolves the apparent preference.
+
+   **Foundational decisions are always blockers.** Any decision that introduces a new vendor, paid service, auth provider, database, or persistence layer is surfaced as a `[USER-DECISION]` or `[USER-DECISION + RESEARCH]` blocker — never filed as a research item the implementer resolves unilaterally. Research may inform the candidate list; the candidate list itself is presented to the maintainer for choice before implementation runs.
+
+   **When in doubt, default to blocker.** A false-positive blocker costs one comment round-trip; a false-negative costs a closed PR.
+
 3. Break work into ordered, atomic steps. Each step has:
    - **What** — one sentence
    - **Where** — file paths
