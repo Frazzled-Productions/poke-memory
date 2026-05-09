@@ -22,6 +22,7 @@ function graduatedCard(overrides: Partial<ReviewState> = {}): ReviewState {
     lastReview: "2026-05-02",
     firstSeen: "2026-04-26",
     learningStep: null,
+    stepStartedAt: null,
     ...overrides,
   };
 }
@@ -453,5 +454,115 @@ describe("firstSeen preservation through graduation", () => {
 
     expect(next.learningStep).toBeNull();
     expect(next.firstSeen).toBe(TODAY); // preserved unchanged
+  });
+});
+
+// ============================================================
+// stepStartedAt: set on step entry, null on graduation
+// ============================================================
+describe('stepStartedAt tracking', () => {
+  it('A1: brand-new Good → enter step 0 sets stepStartedAt to now.getTime()', () => {
+    const state = newCard();
+    const result = nextReview(state, 4, NOW);
+    expect(result.stepStartedAt).toBe(NOW.getTime());
+  });
+
+  it('A1: brand-new Again → enter step 0 sets stepStartedAt', () => {
+    const state = newCard();
+    const result = nextReview(state, 1, NOW);
+    expect(result.stepStartedAt).toBe(NOW.getTime());
+  });
+
+  it('A2: brand-new Easy → graduate immediately → stepStartedAt null', () => {
+    const state = newCard();
+    const result = nextReview(state, 5, NOW);
+    expect(result.stepStartedAt).toBeNull();
+  });
+
+  it('A3: graduated + Again (lapse) → relearning step 0 → stepStartedAt set', () => {
+    const state = graduatedCard();
+    const result = nextReview(state, 1, NOW);
+    expect(result.stepStartedAt).toBe(NOW.getTime());
+  });
+
+  it('A4 Hard: graduated + Hard → stays graduated → stepStartedAt null', () => {
+    const state = graduatedCard();
+    const result = nextReview(state, 2, NOW);
+    expect(result.stepStartedAt).toBeNull();
+  });
+
+  it('A4 Good/Easy: graduated + Good → stays graduated → stepStartedAt null', () => {
+    const state = graduatedCard();
+    const result = nextReview(state, 4, NOW);
+    expect(result.stepStartedAt).toBeNull();
+  });
+
+  it('B1: in-step Again → reset to step 0 → stepStartedAt updated to now', () => {
+    const state = cardInStep(1, null, { stepStartedAt: NOW.getTime() - 30000 });
+    const result = nextReview(state, 1, NOW);
+    expect(result.learningStep).toBe(0);
+    expect(result.stepStartedAt).toBe(NOW.getTime());
+  });
+
+  it('B2: in-step Hard → repeat step → stepStartedAt preserved', () => {
+    const original = NOW.getTime() - 30000;
+    const state = cardInStep(0, null, { stepStartedAt: original });
+    const result = nextReview(state, 2, NOW);
+    expect(result.learningStep).toBe(0);
+    expect(result.stepStartedAt).toBe(original); // unchanged
+  });
+
+  it('B3 advance: in-step Good → advance → stepStartedAt updated to now', () => {
+    const state = cardInStep(0, null, { stepStartedAt: NOW.getTime() - 60000 });
+    const result = nextReview(state, 4, NOW);
+    expect(result.learningStep).toBe(1);
+    expect(result.stepStartedAt).toBe(NOW.getTime());
+  });
+
+  it('B3 graduate: in-step Good at final step → graduate → stepStartedAt null', () => {
+    const state = cardInStep(1, null, { stepStartedAt: NOW.getTime() - 60000 });
+    const result = nextReview(state, 4, NOW);
+    expect(result.learningStep).toBeNull();
+    expect(result.stepStartedAt).toBeNull();
+  });
+
+  it('B4: in-step Easy → graduate → stepStartedAt null', () => {
+    const state = cardInStep(0, null, { stepStartedAt: NOW.getTime() - 30000 });
+    const result = nextReview(state, 5, NOW);
+    expect(result.learningStep).toBeNull();
+    expect(result.stepStartedAt).toBeNull();
+  });
+
+  it('initialReviewState includes stepStartedAt: null', () => {
+    const state = initialReviewState(NOW);
+    expect(state.stepStartedAt).toBeNull();
+  });
+});
+
+// ============================================================
+// Migration 3: stepStartedAt backfill
+// ============================================================
+describe('migration of legacy state (no stepStartedAt field)', () => {
+  it('backfills stepStartedAt: null via migrateReviewState', () => {
+    const legacyState: Record<string, unknown> = {
+      repetitions: 1,
+      interval: 6,
+      easeFactor: 2.5,
+      dueDate: '2026-05-10',
+      lastReview: '2026-05-04',
+      firstSeen: '2026-05-04',
+      learningStep: null,
+      // stepStartedAt absent
+    };
+    migrateReviewState(legacyState);
+    expect(legacyState.stepStartedAt).toBeNull();
+  });
+
+  it('does not overwrite an existing stepStartedAt value', () => {
+    const state: Record<string, unknown> = {
+      stepStartedAt: 1234567890,
+    };
+    migrateReviewState(state);
+    expect(state.stepStartedAt).toBe(1234567890);
   });
 });

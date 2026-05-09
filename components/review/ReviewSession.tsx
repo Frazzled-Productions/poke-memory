@@ -250,21 +250,22 @@ export function ReviewSession() {
     setLimits(sessionLimits);
 
     // Initialize the learning queue from persisted learning-step cards.
-    // On reload, dueAt is freshly computed from step 0 (Option A behavior).
+    // Use stepStartedAt from persisted state so the countdown resumes correctly
+    // after navigation instead of resetting to the full step duration.
     const today = todayString(new Date());
     const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today);
 
     const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
       const card = sessionCards.find((c) => c.id === cardId)!;
-      // Wall-clock dueAt is freshly computed on reload (Option A); but the
-      // persisted learningStep is preserved, so we use it here. This keeps the
-      // in-memory timing consistent with the step the card is actually on —
-      // a card persisted at step 1 waits its step-1 duration, not step 0.
       const stepMs = stepDurationMs(
         card.state.lastReview,
         card.state.learningStep ?? 0,
       );
-      return { cardId, dueAt: Date.now() + stepMs };
+      const stepStartedAt = card.state.stepStartedAt;
+      const dueAt = stepStartedAt !== null
+        ? stepStartedAt + stepMs
+        : Date.now(); // legacy migrated card — no start time recorded, treat as immediately due
+      return { cardId, dueAt };
     });
 
     setLearningQueue(initialLearning);
@@ -454,7 +455,7 @@ export function ReviewSession() {
         const stepMs = stepDurationMs(nextState.lastReview, nextState.learningStep);
         const newEntry: LearningQueueEntry = {
           cardId: currentCard.id,
-          dueAt: Date.now() + stepMs,
+          dueAt: nextState.stepStartedAt !== null ? nextState.stepStartedAt + stepMs : Date.now() + stepMs,
         };
 
         // Replace existing entry or add new one.
