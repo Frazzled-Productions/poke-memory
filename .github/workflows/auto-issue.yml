@@ -68,6 +68,10 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 40
+          # Allow the bot to trigger this job: /split creates sub-issues
+          # under the bot identity and labels them `auto`, which is
+          # supposed to cascade into a plan run on each child.
+          allowed_bots: poke-memory-bot
           prompt: |
             You are the orchestrator for issue #${{ github.event.issue.number }}.
 
@@ -1048,28 +1052,33 @@ jobs:
           while IFS= read -r title; do
             [ -z "$title" ] && continue
 
-            if ! NEW_ID=$(gh api -X POST "repos/$REPO/issues" \
+            # Capture both fields: .number for human-readable refs (#41),
+            # .id for the sub_issues API (which expects the database id,
+            # not the issue number — passing .number gives a 404).
+            if ! CREATE_OUT=$(gh api -X POST "repos/$REPO/issues" \
                 -f title="$title" \
                 -f body="Sub-issue of #${ISSUE}." \
-                --jq '.number' 2>/tmp/split-err.txt); then
+                --jq '"\(.number) \(.id)"' 2>/tmp/split-err.txt); then
               ERR=$(head -3 /tmp/split-err.txt 2>/dev/null || echo "unknown error")
               FAILED="${FAILED}"$'\n'"- (create failed) ${title} — \`${ERR}\`"
               continue
             fi
+            NEW_NUMBER="${CREATE_OUT% *}"
+            NEW_DB_ID="${CREATE_OUT##* }"
 
             LABEL_NOTE=""
-            if ! gh issue edit "$NEW_ID" --repo "$REPO" \
+            if ! gh issue edit "$NEW_NUMBER" --repo "$REPO" \
                 --add-label "${PRIORITY_LABEL},auto" 2>/tmp/split-err.txt; then
               LABEL_NOTE=" (label apply failed)"
             fi
 
             # Link as native GitHub sub-issue.
             if gh api -X POST "repos/$REPO/issues/$ISSUE/sub_issues" \
-                -F sub_issue_id="$NEW_ID" 2>/tmp/split-err.txt; then
-              CREATED="${CREATED}"$'\n'"- #${NEW_ID}${LABEL_NOTE}: ${title}"
+                -F sub_issue_id="$NEW_DB_ID" 2>/tmp/split-err.txt; then
+              CREATED="${CREATED}"$'\n'"- #${NEW_NUMBER}${LABEL_NOTE}: ${title}"
             else
               ERR=$(head -3 /tmp/split-err.txt 2>/dev/null || echo "unknown error")
-              FAILED="${FAILED}"$'\n'"- #${NEW_ID} (created, link failed)${LABEL_NOTE}: ${title} — \`${ERR}\`"
+              FAILED="${FAILED}"$'\n'"- #${NEW_NUMBER} (created, link failed)${LABEL_NOTE}: ${title} — \`${ERR}\`"
             fi
           done <<< "$TITLES"
 
@@ -1080,7 +1089,7 @@ jobs:
               printf 'Linked as sub-issues of #%s:%s\n' "$ISSUE" "$CREATED"
             fi
             if [ -n "$FAILED" ]; then
-              printf '\n**Some sub-issues could not be linked.** They were created but the `sub_issues` API call failed. You may need to grant the GitHub App **Sub-issues** write permission and link them manually:%s\n' "$FAILED"
+              printf '\n**Some sub-issues could not be linked.** They were created but the `sub_issues` API call failed — see the error per row below. Link them manually if needed:%s\n' "$FAILED"
             fi
             printf '\nThis issue stays open as a tracker — close it manually once all sub-issues are done.\n'
           } > /tmp/auto-split-final.md
