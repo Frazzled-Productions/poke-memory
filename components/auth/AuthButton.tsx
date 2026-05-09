@@ -1,10 +1,12 @@
 "use client";
 import Image from "next/image";
+import { useTransition } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { signIn, signOut } from "@/lib/auth/actions";
 
 export function AuthButton() {
   const { user, loading } = useAuth();
+  const [isPending, startTransition] = useTransition();
 
   if (loading) return null;
 
@@ -12,10 +14,11 @@ export function AuthButton() {
     return (
       <button
         type="button"
-        onClick={() => signIn()}
-        className="rounded px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:text-foreground"
+        onClick={() => startTransition(() => signIn())}
+        disabled={isPending}
+        className="rounded px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-foreground"
       >
-        Sign in
+        {isPending ? "Signing in…" : "Sign in"}
       </button>
     );
   }
@@ -39,10 +42,11 @@ export function AuthButton() {
       )}
       <button
         type="button"
-        onClick={() => signOut()}
-        className="rounded px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:text-foreground"
+        onClick={() => startTransition(() => signOut())}
+        disabled={isPending}
+        className="rounded px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-foreground"
       >
-        Sign out
+        {isPending ? "Signing out…" : "Sign out"}
       </button>
     </div>
   );
