@@ -109,6 +109,14 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
 - **Both files are updated as part of the same commit that lands the change** — no separate docs-only commit. Orchestrator handles the edit inline; no specialist agent.
 - Internal conventions (this file, `AGENTS.md`) are kept separate from user-facing docs. Don't merge them.
 
+### Stack decisions
+
+These are screening criteria for new vendors, services, and libraries. Any addition that would introduce a new vendor, paid service, auth provider, database, or persistence layer must be surfaced as a `[USER-DECISION]` or `[USER-DECISION + RESEARCH]` open question in the planner's output — never resolved unilaterally by the implementer. **When in doubt, default to blocker.** A false-positive blocker costs one comment round-trip; a false-negative costs a closed PR.
+
+- No beta software for auth or other security-critical paths. A library must be stable/GA before it is a candidate.
+- Prefer single vendor — one DPA, one dashboard, one billing relationship is materially simpler than stitching providers together.
+- Plan for plausible future scope (per-card analytics, friends/social) when picking persistence shape, not just the current feature needs.
+
 ### Backlog / process
 
 The backlog lives on GitHub:
