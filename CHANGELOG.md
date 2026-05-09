@@ -6,9 +6,9 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
-- **Dependabot enabled** — weekly automated PRs for npm dependencies (grouped: Next.js, React, Tailwind, Vitest) and GitHub Actions. Closes [#59](https://github.com/fraserbrookhouse/poke-memory/issues/59).
-
 - **Component test infrastructure and pre-PR test gate** — `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`, and `jsdom` are now installed. Vitest is configured with two projects: `node` (existing scheduler and session tests, no DOM overhead) and `jsdom` (component tests). A `ReviewSession` reveal-flow test covers the unrevealed → revealed → graded lifecycle and would catch regressions like the one from #47. The pre-PR build gate in `auto-issue.yml` now runs `npm test` as a third step after `typecheck` and `build`. Closes [#48](https://github.com/fraserbrookhouse/poke-memory/issues/48).
+
+- **Dependabot enabled** — weekly automated PRs for npm dependencies (grouped: Next.js, React, Tailwind, Vitest + Testing Library) and GitHub Actions. Closes [#59](https://github.com/fraserbrookhouse/poke-memory/issues/59).
 
 - **Auto-label workflow** — newly-opened GitHub issues now receive `priority`, `type`, and `area` labels automatically via Claude classification (`auto-label.yml`), so issues filed from mobile land on the project board without manual triage.
 

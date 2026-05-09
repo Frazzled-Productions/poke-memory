@@ -4,6 +4,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
     open-pull-requests-limit: 5
     groups:
       next:
@@ -13,9 +14,10 @@ updates:
       tailwind:
         patterns: ["tailwindcss", "@tailwindcss/*"]
       vitest:
-        patterns: ["vitest", "@vitest/*"]
+        patterns: ["vitest", "@vitest/*", "@testing-library/*"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
     open-pull-requests-limit: 5
