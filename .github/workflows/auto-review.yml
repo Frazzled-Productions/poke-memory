@@ -1,13 +1,14 @@
 name: Auto Review
 
 # Triggered when a PR opens or reopens. Runs the `code-reviewer` sub-agent
-# against the PR diff and posts the standard `<!-- auto-review:1 -->` comment
-# so the existing `/fix` loop in auto-pr.yml works unchanged.
+# against the PR diff and posts an `<!-- auto-review:N -->` comment (N
+# computed from existing review markers on the PR) so the existing `/fix`
+# loop in auto-pr.yml works unchanged.
 #
 # Gate: PRs whose head branch starts with `auto/` (bot-opened PRs) OR which
-# carry an `auto-review` label (manually-opened opt-in). This means a human
-# pushing a workflow change manually can still get the review/fix loop just
-# by labelling the PR.
+# carry an `auto-review` label (manually-opened opt-in). Drafts are skipped
+# so a draft opt-in doesn't burn a 30-minute Claude run before the PR is
+# ready for review.
 #
 # Idempotency: the body of the auto-review comment includes a hidden
 # `<!-- auto-review-sha:<head-sha> -->` line on row 2. Re-triggers at the
@@ -25,14 +26,14 @@ jobs:
   review:
     name: Review
     if: |
-      startsWith(github.head_ref, 'auto/') ||
-      contains(github.event.pull_request.labels.*.name, 'auto-review')
+      github.event.pull_request.draft == false &&
+      (startsWith(github.head_ref, 'auto/') ||
+       contains(github.event.pull_request.labels.*.name, 'auto-review'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write
-      id-token: write
     steps:
       - name: Mint App installation token
         id: app-token
@@ -159,7 +160,7 @@ jobs:
           if [[ "$BRANCH" =~ ^auto/issue-([0-9]+)- ]]; then
             ISSUE="${BASH_REMATCH[1]}"
           else
-            ISSUE=$(gh pr view ${{ github.event.pull_request.number }} --json body \
+            ISSUE=$(gh pr view "${{ github.event.pull_request.number }}" --json body \
               --jq '.body' | grep -oiE 'closes #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
           fi
           if [[ -z "$ISSUE" ]]; then

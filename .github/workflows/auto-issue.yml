@@ -573,8 +573,8 @@ jobs:
 
       - name: Move issue to PR
         # Auto-review.yml owns the verdict-based "Ready to merge" upgrade —
-        # this step just records that a PR is open. Without auto-review's
-        # follow-up, the status would stay at "In Progress" forever.
+        # this step just records that a PR is open. Both workflows write the
+        # same status field; concurrent writes are idempotent.
         if: always()
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
