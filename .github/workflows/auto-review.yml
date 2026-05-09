@@ -1,0 +1,190 @@
+name: Auto Review
+
+# Triggered when a PR opens or reopens. Runs the `code-reviewer` sub-agent
+# against the PR diff and posts an `<!-- auto-review:N -->` comment (N
+# computed from existing review markers on the PR) so the existing `/fix`
+# loop in auto-pr.yml works unchanged.
+#
+# Gate: PRs whose head branch starts with `auto/` (bot-opened PRs) OR which
+# carry an `auto-review` label (manually-opened opt-in). Drafts are skipped
+# so a draft opt-in doesn't burn a 30-minute Claude run before the PR is
+# ready for review.
+#
+# Idempotency: the body of the auto-review comment includes a hidden
+# `<!-- auto-review-sha:<head-sha> -->` line on row 2. Re-triggers at the
+# same head SHA (e.g. close + reopen) are skipped.
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+concurrency:
+  group: auto-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    name: Review
+    if: |
+      github.event.pull_request.draft == false &&
+      (startsWith(github.head_ref, 'auto/') ||
+       contains(github.event.pull_request.labels.*.name, 'auto-review'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      # claude-code-action@v1 requires OIDC.
+      id-token: write
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Mint org-scoped App token (for project mutations)
+        id: org-app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          owner: Frazzled-Productions
+
+      - name: Idempotency — skip if already reviewed at this SHA
+        id: idem
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # SHA is a hex commit id — safe to interpolate directly. `gh api
+          # --jq` takes a single expression, not raw jq's `--arg` style.
+          MATCH=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))] | length")
+          if [ "$MATCH" -gt 0 ]; then
+            echo "Already reviewed at SHA $SHA — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.idem.outputs.skip == 'false'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/setup-node@v4
+        if: steps.idem.outputs.skip == 'false'
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.idem.outputs.skip == 'false'
+        run: npm ci
+
+      - name: Count existing auto-review cycles
+        id: cycles
+        if: steps.idem.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          COUNT=$(gh api \
+            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))] | length')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "next=$((COUNT + 1))" >> "$GITHUB_OUTPUT"
+          echo "Found $COUNT existing auto-review comment(s); next would be #$((COUNT + 1))."
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.idem.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 30
+          # The PR may have been opened by the bot identity (auto-issue.yml)
+          # or by a human; allow the bot to trigger this job either way.
+          allowed_bots: poke-memory-bot
+          prompt: |
+            You are reviewing PR #${{ github.event.pull_request.number }}.
+
+            Read AGENTS.md (loaded via CLAUDE.md) for project conventions.
+
+            Workflow:
+            1. Read the PR diff:
+               `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`
+            2. Invoke the `code-reviewer` sub-agent (Agent tool, subagent_type
+               "code-reviewer") against that diff.
+            3. Post the findings on the PR via
+               `gh pr comment ${{ github.event.pull_request.number }} --body-file <path>`,
+               formatted exactly like this (no other content before the marker):
+
+                   <!-- auto-review:${{ steps.cycles.outputs.next }} -->
+                   <!-- auto-review-sha:${{ github.event.pull_request.head.sha }} -->
+                   ## Auto-review #${{ steps.cycles.outputs.next }}
+
+                   <bulleted punch list of findings, or "No significant issues.">
+
+                   Verdict: Looks good to me
+
+                   _Reply with `/fix` to have these findings addressed._
+
+               The first line MUST be the HTML marker
+               `<!-- auto-review:${{ steps.cycles.outputs.next }} -->` exactly.
+               The second line MUST be the SHA marker
+               `<!-- auto-review-sha:${{ github.event.pull_request.head.sha }} -->`
+               so re-triggers at the same head SHA are skipped. A verdict line
+               starting with `Verdict: ` MUST be present, with either
+               `Looks good to me` (no significant issues) or `Needs fixes`. Use
+               those whole-word phrases verbatim — no acronyms. When (and only
+               when) the verdict is `Needs fixes`, append the italicised footer
+               line shown above so the maintainer knows how to trigger a fix
+               run. Omit the footer when the verdict is `Looks good to me`.
+
+      - name: Move issue to PR / Ready to merge based on review verdict
+        if: always() && steps.idem.outputs.skip == 'false'
+        env:
+          # Issue/PR queries use the repo-scoped App token; the script call
+          # below overrides to the org-scoped token because the project lives
+          # in Frazzled-Productions.
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          ISSUE=""
+          if [[ "$BRANCH" =~ ^auto/issue-([0-9]+)- ]]; then
+            ISSUE="${BASH_REMATCH[1]}"
+          else
+            ISSUE=$(gh pr view "${{ github.event.pull_request.number }}" --json body \
+              --jq '.body' | grep -oiE 'closes #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
+          fi
+          if [[ -z "$ISSUE" ]]; then
+            echo "No linked issue — skipping project status update."
+            exit 0
+          fi
+          STATE=$(gh issue view "$ISSUE" --json state --jq '.state')
+          if [[ "$STATE" != "OPEN" ]]; then
+            echo "Issue #$ISSUE is $STATE — auto-status owns Done; skipping."
+            exit 0
+          fi
+          PR="${{ github.event.pull_request.number }}"
+          VERDICT=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))]
+                  | sort_by(.created_at) | last | .body // ""' \
+            | grep -E '^Verdict:' | head -1 || true)
+          if [[ "$VERDICT" == *"Looks good to me"* ]]; then
+            STATUS="Ready to merge"
+          else
+            STATUS="PR"
+          fi
+          GH_TOKEN="${{ steps.org-app-token.outputs.token }}" \
+          GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
+            .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
