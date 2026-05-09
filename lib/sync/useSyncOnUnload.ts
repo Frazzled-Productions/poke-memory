@@ -22,8 +22,10 @@ export function useSyncOnUnload(
   useEffect(() => {
     if (!client || !userId || !cards) return;
 
-    function handleUnload() {
-      if (document.visibilityState !== "hidden") return;
+    function handleUnload(event: Event) {
+      // visibilitychange fires on both hide and show; only push on hide.
+      // pagehide fires before visibilityState transitions, so skip the guard there.
+      if (event.type === "visibilitychange" && document.visibilityState !== "hidden") return;
       if (!client || !userId || !cards) return;
       // Fire-and-forget -- does not block navigation
       void pushSession(client, userId, cards);

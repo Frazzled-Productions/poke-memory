@@ -11,7 +11,8 @@ import type { ReviewableCard } from "@/lib/review/session";
 type Status =
   | { kind: "loading" }
   | { kind: "conflict"; localCards: ReviewableCard[]; cloudRows: CloudRow[] }
-  | { kind: "error" };
+  | { kind: "error" }
+  | { kind: "push-warning"; message: string };
 
 function summarise(cards: ReviewableCard[]) {
   const reviewed = cards.filter((c) => c.state.lastReview !== null);
@@ -40,12 +41,14 @@ export default function CallbackCompletePage() {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [pending, setPending] = useState(false);
   const [pushWarning, setPushWarning] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (loading) return;
     if (!user) { router.replace("/"); return; }
     if (!supabase) { router.replace("/"); return; }
     let cancelled = false;
+    setStatus({ kind: "loading" });
     async function resolve() {
       if (!supabase || !user) return;
       const localSession = loadSession();
@@ -69,14 +72,16 @@ export default function CallbackCompletePage() {
       if (!hasLocal && !cloudHasData) { router.replace("/"); return; }
       if (hasLocal && !cloudHasData) {
         const ok = await pushSession(supabase, user.id, localSession!.cards);
-        if (!ok && !cancelled) setPushWarning("Sync failed — your progress is safe locally.");
-        router.replace("/");
+        if (!ok && !cancelled) {
+          setStatus({ kind: "push-warning", message: "Sync upload failed — your progress is safe locally." });
+          return;
+        }
+        if (!cancelled) router.replace("/");
         return;
       }
       if (!hasLocal && cloudHasData) {
-        const fresh = loadSession();
-        if (fresh !== null) {
-          const merged = mergeCloudIntoLocal(fresh.cards, cloudRows!);
+        if (localSession !== null) {
+          const merged = mergeCloudIntoLocal(localSession.cards, cloudRows!);
           saveSession({ cards: merged, limits: DEFAULT_LIMITS });
         }
         router.replace("/");
@@ -86,14 +91,18 @@ export default function CallbackCompletePage() {
     }
     void resolve();
     return () => { cancelled = true; };
-  }, [loading, user, supabase, router]);
+  }, [loading, user, supabase, router, retryCount]);
 
   async function handleKeepLocal() {
     if (status.kind !== "conflict" || !user || !supabase || pending) return;
     setPending(true);
-    const ok = await pushSession(supabase, user.id, status.localCards);
-    if (!ok) setPushWarning("Sync failed — your progress is safe locally.");
-    router.replace("/");
+    try {
+      const ok = await pushSession(supabase, user.id, status.localCards);
+      if (!ok) setPushWarning("Sync failed — your progress is safe locally.");
+      router.replace("/");
+    } finally {
+      setPending(false);
+    }
   }
 
   function handleKeepCloud() {
@@ -123,8 +132,22 @@ export default function CallbackCompletePage() {
         <div className="flex flex-col items-center gap-4 text-center max-w-sm">
           <p className="text-lg font-semibold text-foreground">Could not reach the cloud</p>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">There was a network error while checking your cloud progress.</p>
-          <button type="button" onClick={() => setStatus({ kind: "loading" })} className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2">
+          <button type="button" onClick={() => setRetryCount((c) => c + 1)} className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2">
             Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status.kind === "push-warning") {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+          <p className="text-lg font-semibold text-foreground">Sync upload failed</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">{status.message}</p>
+          <button type="button" onClick={() => router.replace("/")} className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2">
+            Continue
           </button>
         </div>
       </div>
