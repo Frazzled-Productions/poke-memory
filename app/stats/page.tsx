@@ -9,6 +9,7 @@ import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
 import { loadSettings } from "@/lib/settings/persistence";
+import { computeStreak, loadStreakData } from "@/lib/streak";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,6 +39,7 @@ function LoadingSkeleton() {
       aria-busy="true"
       aria-label="Loading stats"
     >
+      <SkeletonBlock className="h-20 w-full" />
       <SkeletonBlock className="h-28 w-full" />
       <SkeletonBlock className="h-12 w-full" />
       <div className="grid grid-cols-2 gap-4">
@@ -329,6 +331,7 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 export default function StatsPage() {
   const [cards, setCards] = useState<ReviewCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
+  const [currentStreak, setCurrentStreak] = useState<number | null>(null);
 
   useEffect(() => {
     const saved = loadSession();
@@ -339,6 +342,7 @@ export default function StatsPage() {
     }
     const settings = loadSettings();
     setMasteryRepetitions(settings.masteryRepetitions);
+    setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
   }, []);
 
   const stats: StatsResult | null =
@@ -353,10 +357,26 @@ export default function StatsPage() {
           Stats
         </h1>
 
-        {stats === null ? (
+        {stats === null || currentStreak === null ? (
           <LoadingSkeleton />
         ) : (
           <div className="flex flex-col gap-10">
+            <section aria-labelledby="streak-heading">
+              <h2 id="streak-heading" className="mb-3 text-base font-semibold text-foreground">
+                Current streak
+              </h2>
+              {currentStreak > 0 ? (
+                <StatCard
+                  label={currentStreak === 1 ? "day in a row" : "days in a row"}
+                  value={currentStreak}
+                  accent="text-amber-500 dark:text-amber-400"
+                />
+              ) : (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  No active streak — review some cards to start one!
+                </p>
+              )}
+            </section>
             <MasteryBar stats={stats} />
             <IntroducedBar stats={stats} />
             <DueForecast stats={stats} />
