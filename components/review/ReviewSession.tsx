@@ -440,13 +440,14 @@ export function ReviewSession() {
     if (cards === null) return;
     setGrading(true);
 
-    const nextState = nextReview(currentCard.state, grade, new Date());
+    const now = new Date();
+    const nextState = nextReview(currentCard.state, grade, now);
     const newCards = cards.map((card) =>
       card.id === currentCard.id ? { ...card, state: nextState } : card,
     );
 
     saveSession({ cards: newCards, limits });
-    recordReview(todayString(new Date()));
+    recordReview(todayString(now));
     setCards(newCards);
 
     // Update the learning queue based on the new state.

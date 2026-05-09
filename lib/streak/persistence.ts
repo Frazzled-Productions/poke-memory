@@ -1,5 +1,6 @@
-import { STREAK_KEY } from "./types";
 import type { StreakData } from "./types";
+
+const STREAK_KEY = "poke-memory:streak:v1";
 
 export function loadStreakData(): StreakData {
   if (typeof window === "undefined") return [];
