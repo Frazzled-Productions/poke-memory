@@ -93,6 +93,7 @@ export type StatsResult = {
   dueTomorrow: number;                   // dueDate === tomorrow's ISO date
   perGeneration: readonly GenerationStats[];
   struggling: readonly StrugglingCard[]; // bottom-N introduced cards by easeFactor, ascending
+  currentStreak: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,29 @@ function tomorrowString(today: string): string {
   const result = new Date(today);
   result.setDate(result.getDate() + 1);
   return result.toISOString().slice(0, 10);
+}
+
+function yesterdayString(date: string): string {
+  const result = new Date(date);
+  result.setDate(result.getDate() - 1);
+  return result.toISOString().slice(0, 10);
+}
+
+export function computeStreak(reviewedDates: readonly string[], today: string): number {
+  const dateSet = new Set(reviewedDates);
+  let count = 0;
+  let cursor = today;
+  while (true) {
+    if (dateSet.has(cursor)) {
+      count++;
+      cursor = yesterdayString(cursor);
+    } else if (cursor === today) {
+      cursor = yesterdayString(cursor);
+    } else {
+      break;
+    }
+  }
+  return count;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +160,7 @@ export function computeStats(
   today: string,
   strugglingLimit = 10,
   masteryRepetitions = MASTERY_REPETITIONS,
+  reviewedDates: readonly string[] = [],
 ): StatsResult {
   const tomorrow = tomorrowString(today);
 
@@ -232,5 +257,6 @@ export function computeStats(
     dueTomorrow,
     perGeneration,
     struggling,
+    currentStreak: computeStreak(reviewedDates, today),
   };
 }

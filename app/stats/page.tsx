@@ -38,6 +38,7 @@ function LoadingSkeleton() {
       aria-busy="true"
       aria-label="Loading stats"
     >
+      <SkeletonBlock className="h-20 w-full" />
       <SkeletonBlock className="h-28 w-full" />
       <SkeletonBlock className="h-12 w-full" />
       <div className="grid grid-cols-2 gap-4">
@@ -329,6 +330,7 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 export default function StatsPage() {
   const [cards, setCards] = useState<ReviewCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
+  const [reviewedDates, setReviewedDates] = useState<string[] | null>(null);
 
   useEffect(() => {
     const saved = loadSession();
@@ -337,13 +339,14 @@ export default function StatsPage() {
     } else {
       setCards(buildSession(SEED_POKEMON));
     }
+    setReviewedDates(saved?.reviewedDates ?? []);
     const settings = loadSettings();
     setMasteryRepetitions(settings.masteryRepetitions);
   }, []);
 
   const stats: StatsResult | null =
-    cards !== null && masteryRepetitions !== null
-      ? computeStats(cards, todayString(new Date()), 10, masteryRepetitions)
+    cards !== null && masteryRepetitions !== null && reviewedDates !== null
+      ? computeStats(cards, todayString(new Date()), 10, masteryRepetitions, reviewedDates)
       : null;
 
   return (
@@ -357,6 +360,16 @@ export default function StatsPage() {
           <LoadingSkeleton />
         ) : (
           <div className="flex flex-col gap-10">
+            <section aria-labelledby="streak-heading">
+              <h2 id="streak-heading" className="mb-3 text-base font-semibold text-foreground">
+                Current streak
+              </h2>
+              <StatCard
+                label={stats.currentStreak === 1 ? "day in a row" : "days in a row"}
+                value={stats.currentStreak}
+                accent="text-amber-500 dark:text-amber-400"
+              />
+            </section>
             <MasteryBar stats={stats} />
             <IntroducedBar stats={stats} />
             <DueForecast stats={stats} />

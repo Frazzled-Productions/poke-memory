@@ -6,6 +6,7 @@ export type { DailyLimits };
 export type SavedSession = {
   cards: ReviewCard[];
   limits: DailyLimits;
+  reviewedDates?: string[];
 };
 
 const STORAGE_KEY = "poke-memory:review-session:v1";
@@ -98,9 +99,15 @@ export function loadSession(): SavedSession | null {
         for (const card of obj.cards) {
           migrateReviewState((card as Record<string, unknown>).state);
         }
+        const reviewedDates =
+          Array.isArray(obj.reviewedDates) &&
+          (obj.reviewedDates as unknown[]).every((d) => typeof d === "string")
+            ? (obj.reviewedDates as string[])
+            : undefined;
         return {
           cards: obj.cards as ReviewCard[],
           limits: obj.limits as DailyLimits,
+          ...(reviewedDates !== undefined && { reviewedDates }),
         };
       }
     }
