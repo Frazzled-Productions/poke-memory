@@ -23,6 +23,7 @@ export function useSyncOnUnload(
     if (!client || !userId || !cards) return;
 
     function handleUnload() {
+      if (document.visibilityState !== "hidden") return;
       if (!client || !userId || !cards) return;
       // Fire-and-forget -- does not block navigation
       void pushSession(client, userId, cards);

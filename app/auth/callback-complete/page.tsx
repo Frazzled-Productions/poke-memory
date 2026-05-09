@@ -33,23 +33,28 @@ function mergeCloudIntoLocal(local: ReviewableCard[], cloud: CloudRow[]): Review
     return { ...card, state: { ...card.state, repetitions: row.repetitions, interval: row.interval, easeFactor: row.ease_factor, dueDate: row.due_date, lastReview: row.last_review, firstSeen: row.first_seen } };
   });
 }
+
 export default function CallbackCompletePage() {
   const router = useRouter();
   const { user, loading, supabase } = useAuth();
   const [status, setStatus] = useState<Status>({ kind: "loading" });
+  const [pending, setPending] = useState(false);
+  const [pushWarning, setPushWarning] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
     if (!user) { router.replace("/"); return; }
+    if (!supabase) { router.replace("/"); return; }
     let cancelled = false;
     async function resolve() {
+      if (!supabase || !user) return;
       const localSession = loadSession();
       const hasLocal = localSession !== null && localSession.cards.some((c) => c.state.lastReview !== null);
       let cloudRows: CloudRow[] | null = null;
       try {
-        const hasCloud = await hasCloudData(supabase, user!.id);
+        const hasCloud = await hasCloudData(supabase, user.id);
         if (hasCloud) {
-          cloudRows = await pullSession(supabase, user!.id);
+          cloudRows = await pullSession(supabase, user.id);
           if (cloudRows === null) {
             if (!cancelled) setStatus({ kind: "error" });
             return;
@@ -63,7 +68,8 @@ export default function CallbackCompletePage() {
       const cloudHasData = cloudRows !== null && cloudRows.length > 0;
       if (!hasLocal && !cloudHasData) { router.replace("/"); return; }
       if (hasLocal && !cloudHasData) {
-        await pushSession(supabase, user!.id, localSession!.cards);
+        const ok = await pushSession(supabase, user.id, localSession!.cards);
+        if (!ok && !cancelled) setPushWarning("Sync failed — your progress is safe locally.");
         router.replace("/");
         return;
       }
@@ -83,13 +89,15 @@ export default function CallbackCompletePage() {
   }, [loading, user, supabase, router]);
 
   async function handleKeepLocal() {
-    if (status.kind !== "conflict" || !user) return;
-    await pushSession(supabase, user.id, status.localCards);
+    if (status.kind !== "conflict" || !user || !supabase || pending) return;
+    setPending(true);
+    const ok = await pushSession(supabase, user.id, status.localCards);
+    if (!ok) setPushWarning("Sync failed — your progress is safe locally.");
     router.replace("/");
   }
 
   function handleKeepCloud() {
-    if (status.kind !== "conflict") return;
+    if (status.kind !== "conflict" || pending) return;
     const local = loadSession();
     if (local !== null) {
       const merged = mergeCloudIntoLocal(local.cards, status.cloudRows);
@@ -97,6 +105,7 @@ export default function CallbackCompletePage() {
     }
     router.replace("/");
   }
+
   if (status.kind === "loading") {
     return (
       <div className="flex flex-1 items-center justify-center" aria-busy="true" aria-label="Checking sync status">
@@ -131,6 +140,9 @@ export default function CallbackCompletePage() {
         <p className="mt-2 text-center text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
           You have progress on this device and in the cloud. Which would you like to keep?
         </p>
+        {pushWarning && (
+          <p className="mt-4 text-center text-sm text-amber-600 dark:text-amber-400">{pushWarning}</p>
+        )}
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-zinc-200 bg-background p-6 dark:border-zinc-800">
             <h2 className="text-base font-semibold text-foreground">This device</h2>
@@ -140,7 +152,12 @@ export default function CallbackCompletePage() {
             {localSummary.latest && (
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Last reviewed: {localSummary.latest}</p>
             )}
-            <button type="button" onClick={handleKeepLocal} className="mt-4 w-full min-h-[44px] rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2">
+            <button
+              type="button"
+              onClick={handleKeepLocal}
+              disabled={pending}
+              className="mt-4 w-full min-h-[44px] rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50"
+            >
               Keep local
             </button>
           </div>
@@ -152,7 +169,12 @@ export default function CallbackCompletePage() {
             {cloudSummary.latest && (
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Last reviewed: {cloudSummary.latest}</p>
             )}
-            <button type="button" onClick={handleKeepCloud} className="mt-4 w-full min-h-[44px] rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700">
+            <button
+              type="button"
+              onClick={handleKeepCloud}
+              disabled={pending}
+              className="mt-4 w-full min-h-[44px] rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50"
+            >
               Keep cloud
             </button>
           </div>

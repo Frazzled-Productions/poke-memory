@@ -5,6 +5,8 @@
 CREATE TABLE IF NOT EXISTS card_reviews (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  -- Standard Pokémon: pokemon_id = Pokédex number (1–1025)
+  -- Evolution cards:  pokemon_id = EVOLUTION_ID_OFFSET + pokédex_number (≥ 1_000_001)
   pokemon_id  integer     NOT NULL,
   repetitions integer     NOT NULL DEFAULT 0,
   interval    integer     NOT NULL DEFAULT 0,
@@ -30,7 +32,8 @@ CREATE POLICY "card_reviews_update" ON card_reviews
 CREATE POLICY "card_reviews_delete" ON card_reviews
   FOR DELETE USING (auth.uid() = user_id);
 
--- streak_days: one row per calendar day the user completed a review
+-- streak_days: schema scaffolding only — no read/write paths exist yet.
+-- Deferred to the streak-tracking feature.
 CREATE TABLE IF NOT EXISTS streak_days (
   id          uuid  PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid  NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -52,7 +55,8 @@ CREATE POLICY "streak_days_update" ON streak_days
 CREATE POLICY "streak_days_delete" ON streak_days
   FOR DELETE USING (auth.uid() = user_id);
 
--- user_settings: per-user daily limit overrides
+-- user_settings: schema scaffolding only — no read/write paths exist yet.
+-- Deferred to the settings/daily-limit-override feature.
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id             uuid    PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   max_new_per_day     integer NOT NULL DEFAULT 10,

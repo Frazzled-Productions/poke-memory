@@ -4,6 +4,11 @@ import type { ReviewableCard } from "@/lib/review/session";
 // Sync is best-effort: all errors are swallowed so a network hiccup never
 // breaks the local-first review flow.
 
+// pokemon_id encoding:
+//   Standard Pokémon:  pokemon_id = Pokédex number (1–1025)
+//   Evolution cards:   pokemon_id = EVOLUTION_ID_OFFSET + pokédex_number (≥ 1_000_001)
+// The round-trip works because push and pull match on the same value, but any
+// direct SQL query against card_reviews must account for the offset.
 export type CloudRow = {
   pokemon_id: number;
   repetitions: number;
@@ -37,13 +42,14 @@ export async function hasCloudData(
 
 /**
  * Pushes the full local session to the cloud via batched upserts.
+ * Returns true if all batches succeeded, false if any batch failed.
  * learningStep and stepStartedAt are in-memory only and are not persisted.
  */
 export async function pushSession(
   client: SupabaseClient,
   userId: string,
   cards: ReviewableCard[],
-): Promise<void> {
+): Promise<boolean> {
   const rows: CloudRow[] = cards.map((card) => ({
     pokemon_id: card.id,
     repetitions: card.state.repetitions,
@@ -54,17 +60,21 @@ export async function pushSession(
     first_seen: card.state.firstSeen,
   }));
 
+  let allOk = true;
   const BATCH = 200;
   for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH).map((r) => ({ ...r, user_id: userId }));
+    const updatedAt = new Date().toISOString();
+    const batch = rows.slice(i, i + BATCH).map((r) => ({ ...r, user_id: userId, updated_at: updatedAt }));
     try {
-      await client
+      const { error } = await client
         .from("card_reviews")
         .upsert(batch, { onConflict: "user_id,pokemon_id" });
+      if (error) allOk = false;
     } catch {
-      // swallow errors silently -- sync is best-effort
+      allOk = false;
     }
   }
+  return allOk;
 }
 
 /**
