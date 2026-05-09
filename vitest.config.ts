@@ -10,7 +10,7 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: "node",
-          include: ["lib/**/*.test.ts"],
+          include: ["lib/**/*.test.ts", "lib/**/*.test.tsx"],
           environment: "node",
         },
       },

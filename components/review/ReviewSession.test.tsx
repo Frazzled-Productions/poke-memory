@@ -1,4 +1,4 @@
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
@@ -94,9 +94,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-afterEach(() => {
-  cleanup();
-});
 
 describe("ReviewSession reveal flow", () => {
   it("shows Reveal button and hides the Pokémon name before reveal", async () => {
@@ -133,9 +130,10 @@ describe("ReviewSession reveal flow", () => {
     const goodBtn = screen.getByRole("button", { name: /good/i });
     await user.click(goodBtn);
 
-    // After grading: grade buttons gone (session complete with only one card)
+    // After grading the only card the session-complete screen should appear.
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /good/i })).not.toBeInTheDocument(),
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
     );
+    expect(screen.queryByRole("button", { name: /good/i })).not.toBeInTheDocument();
   });
 });

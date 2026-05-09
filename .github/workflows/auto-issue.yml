@@ -525,10 +525,10 @@ jobs:
                attribution in commit messages.
             5. Push the branch.
             6. **Build gate.** Run
-               `npm run typecheck && npm run build && npm test 2>&1 | tee /tmp/build-output.txt`.
+               `(npm run typecheck && npm run build && npm test) 2>&1 | tee /tmp/build-output.txt`.
                If exit code is non-zero, read the output, apply a targeted fix,
                commit, push, and re-run. Allow up to two fix attempts. If the
-               build still fails after the second fix attempt, post a comment
+               gate still fails after the second fix attempt, post a comment
                on the issue with the last 80 lines of `/tmp/build-output.txt`
                and stop — do NOT open a PR. The branch stays pushed for
                manual inspection. (`npm ci` has already run as a workflow
@@ -911,10 +911,10 @@ jobs:
                attribution in commit messages.
             5. Push the branch.
             6. **Build gate.** Run
-               `npm run typecheck && npm run build && npm test 2>&1 | tee /tmp/build-output.txt`.
+               `(npm run typecheck && npm run build && npm test) 2>&1 | tee /tmp/build-output.txt`.
                If exit code is non-zero, read the output, apply a targeted fix,
                commit, push, and re-run. Allow up to two fix attempts. If the
-               build still fails after the second fix attempt, post a comment
+               gate still fails after the second fix attempt, post a comment
                on the issue with the last 80 lines of `/tmp/build-output.txt`
                and stop — do NOT open a PR. The branch stays pushed for
                manual inspection.
