@@ -51,13 +51,13 @@ jobs:
       - name: Mint App installation token
         id: app-token
         if: steps.check.outputs.all_covered != 'true'
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         if: steps.check.outputs.all_covered != 'true'
 
       - name: Classify missing labels with Claude
