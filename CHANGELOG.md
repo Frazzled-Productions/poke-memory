@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Auto-review comment headings and cross-references** — auto-review comments no longer use `#N` tokens in their headings or prose, which GitHub was auto-linking to unrelated issues/PRs. Headings now read `## Auto-review N` (no `#`), and prose references to prior reviews use a markdown link to the prior comment's URL. Closes [#88](https://github.com/fraserbrookhouse/poke-memory/issues/88).
+
 ### Changed
 
 - **PWA `start_url` now includes `?source=pwa`** — the web app manifest's `start_url` is `/?source=pwa` instead of `/`. This lets future analytics tooling distinguish standalone PWA launches from ordinary browser visits without any code change at that time. No runtime behavior changes today. Closes [#8](https://github.com/fraserbrookhouse/poke-memory/issues/8).

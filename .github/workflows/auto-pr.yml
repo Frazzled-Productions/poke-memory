@@ -174,7 +174,7 @@ jobs:
 
             **Cycle context:** there are currently ${{ steps.cycles.outputs.count }}
             auto-review comment(s) on this PR. The new review you'll post after
-            fixing is review #${{ steps.cycles.outputs.next }}. The cap is 3 —
+            fixing is review ${{ steps.cycles.outputs.next }}. The cap is 3 —
             this is allowed because count < 3.
 
             **Live status reporting:** The runtime maintains a live status
@@ -236,7 +236,7 @@ jobs:
                  formatted exactly like this (no content before the marker):
 
                      <!-- auto-review:${{ steps.cycles.outputs.next }} -->
-                     ## Auto-review #${{ steps.cycles.outputs.next }}
+                     ## Auto-review ${{ steps.cycles.outputs.next }}
 
                      <bulleted punch list, or "No significant issues.">
 
@@ -251,6 +251,17 @@ jobs:
                  verdict is `Needs fixes`, append the italicised footer line
                  shown above so the maintainer knows how to trigger a fix
                  run. Omit the footer when the verdict is `Looks good to me`.
+
+                 When referencing a prior auto-review in your prose: find the
+                 most recent `<!-- auto-review:N -->` comment you loaded in
+                 step 1 and use its `.url` field to write a markdown link —
+                 e.g. `[review N](url)` — wherever you would otherwise write
+                 bare text like "review #N" or "#N". Do not write any bare `#N`
+                 token that GitHub would auto-link to an unrelated issue or PR.
+                 (Note: this wording differs from auto-review.yml intentionally —
+                 the fix agent uses the already-loaded step-1 comments JSON to
+                 locate the prior review; the review agent must match by marker
+                 because it builds its own context from scratch.)
 
             If you hit a blocker, post a PR comment explaining what's blocked
             and stop — don't push half-done work.
@@ -333,9 +344,9 @@ jobs:
           {
             printf '<!-- auto-status -->\n'
             if [ "$REVIEW_FOUND" -gt 0 ]; then
-              printf 'Done — pushed %s commit(s), posted auto-review #%s.\n' "$COMMITS" "$NEXT"
+              printf 'Done — pushed %s commit(s), posted auto-review %s.\n' "$COMMITS" "$NEXT"
             elif [ "$COMMITS" -gt 0 ]; then
-              printf '**Outcome unclear** — pushed %s commit(s), but auto-review #%s was not posted on this PR. See [run logs](%s).\n' "$COMMITS" "$NEXT" "$RUN_URL"
+              printf '**Outcome unclear** — pushed %s commit(s), but auto-review %s was not posted on this PR. See [run logs](%s).\n' "$COMMITS" "$NEXT" "$RUN_URL"
             else
               printf 'No commits pushed and no auto-review posted. See [run logs](%s).\n' "$RUN_URL"
             fi
