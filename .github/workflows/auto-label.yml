@@ -57,7 +57,7 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         if: steps.check.outputs.all_covered != 'true'
 
       - name: Classify missing labels with Claude

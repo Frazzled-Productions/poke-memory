@@ -63,7 +63,7 @@ jobs:
             --json headRefName --jq '.headRefName')
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.pr.outputs.branch }}
           fetch-depth: 0
