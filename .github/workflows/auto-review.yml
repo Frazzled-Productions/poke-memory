@@ -113,11 +113,6 @@ jobs:
           # The PR may have been opened by the bot identity (auto-issue.yml)
           # or by a human; allow the bot to trigger this job either way.
           allowed_bots: poke-memory-bot
-          # On `pull_request` events the action defaults to PR-review-mode
-          # (inline MCP comments) and exits without running our prompt.
-          # `track_progress: true` forces tag mode — the same mode used on
-          # `issue_comment` events — so the prompt drives execution.
-          track_progress: 'true'
           prompt: |
             You are reviewing PR #${{ github.event.pull_request.number }}.
 
