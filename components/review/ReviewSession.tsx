@@ -343,19 +343,22 @@ export function ReviewSession() {
     hasPushedRef.current = true;
 
     void (async () => {
-      const streak = loadStreakData();
-      const settings = loadSettings();
-      const saved = loadSession();
-      if (saved === null) return;
-      await saveCloudSync({
-        session: saved,
-        streak,
-        settings,
-        syncedAt: new Date().toISOString(),
-      });
+      try {
+        const streak = loadStreakData();
+        const settings = loadSettings();
+        const saved = loadSession();
+        if (saved === null) return;
+        await saveCloudSync({
+          session: saved,
+          streak,
+          settings,
+          syncedAt: new Date().toISOString(),
+        });
+      } catch {
+        hasPushedRef.current = false;
+      }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, learningQueue, sessionStatus]);
+  }, [cards, extendedReview, learningQueue, limits, sessionStatus]);
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
     return (

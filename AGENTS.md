@@ -141,7 +141,8 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 ### Privacy
 
-- **No personal data leaves the user's browser without explicit consent.** All session state lives in `localStorage`; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
-- This is a hard project constraint. While the app stays fully client-side and processes no personal data, GDPR / UK-GDPR obligations are minimal — we are not a data controller for any user data.
-- When we add a backend, accounts, analytics, or any third-party service that processes personal data, this section gets updated and we do a one-off review pass to identify obligations (privacy notice, consent UI, data-processing agreements). Until then, no per-commit legal review is needed.
+- **Cloud sync is opt-in.** Users without an account see no change — all session state stays in `localStorage` and nothing is transmitted to any server we control.
+- **We are a data controller for signed-in users.** Data stored: review card states, streak dates, and settings — keyed to the user's GitHub account ID in Upstash Redis.
+- **Minimum pre-production obligations**: privacy notice visible to signed-in users, a self-serve deletion mechanism (sign out + contact for data deletion), and a signed Upstash Data Processing Agreement.
+- **No analytics, no error tracking, no telemetry** for unauthenticated users. Signed-in users' sync payloads are stored server-side; no third-party analytics are attached to that data.
 - Sprite URLs are fetched directly by the user's browser from `raw.githubusercontent.com` (PokéAPI's CDN). We don't proxy them, so no information about which Pokémon a user is learning passes through any infrastructure we control.

@@ -39,16 +39,20 @@ export function ConflictPicker({
   onResolved,
 }: ConflictPickerProps) {
   const [loading, setLoading] = useState<"local" | "cloud" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function handlePick(resolution: "local" | "cloud") {
     if (loading !== null) return;
     setLoading(resolution);
+    setError(null);
     try {
       const winner = await resolveConflict(resolution, localPayload);
       saveSession(winner.session);
       saveStreakData(winner.streak);
       saveSettings(winner.settings);
       onResolved(winner);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
       setLoading(null);
     }
@@ -72,6 +76,15 @@ export function ConflictPicker({
           You have review progress saved both locally and in the cloud. Choose
           which data to keep. The other will be discarded.
         </p>
+
+        {error !== null && (
+          <p
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400"
+            role="alert"
+          >
+            {error}
+          </p>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Local option */}

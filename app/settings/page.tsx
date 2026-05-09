@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { loadCloudSync } from "@/lib/sync/actions";
+import { loadSession } from "@/lib/review/persistence";
+import { loadStreakData } from "@/lib/streak/persistence";
+import { ConflictPicker } from "@/components/sync/ConflictPicker";
+import type { CloudSyncPayload } from "@/lib/sync/types";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -42,7 +47,7 @@ const FIELDS: FieldConfig[] = [
   {
     key: "maxNewPerDay",
     label: "New cards per day",
-    helper: "Hard daily cap. Raising this grows tomorrow’s review pile faster.",
+    helper: "Hard daily cap. Raising this grows tomorrow's review pile faster.",
     min: 1,
     max: 50,
   },
@@ -55,8 +60,35 @@ const FIELDS: FieldConfig[] = [
   },
 ];
 
+type ConflictState = {
+  localPayload: CloudSyncPayload;
+  cloudPayload: CloudSyncPayload;
+};
+
 function SyncAccountSection() {
   const { data: session, status } = useSession();
+  const [conflict, setConflict] = useState<ConflictState | null>(null);
+  const prevStatusRef = useRef<string>("loading");
+
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = status;
+    if (prevStatus === status || status !== "authenticated") return;
+
+    void (async () => {
+      const cloudPayload = await loadCloudSync();
+      if (cloudPayload === null) return;
+      const localSession = loadSession();
+      if (localSession === null) return;
+      const localPayload: CloudSyncPayload = {
+        session: localSession,
+        streak: loadStreakData(),
+        settings: loadSettings(),
+        syncedAt: new Date().toISOString(),
+      };
+      setConflict({ localPayload, cloudPayload });
+    })();
+  }, [status]);
 
   if (status === "loading") {
     return (
@@ -92,44 +124,53 @@ function SyncAccountSection() {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-      <p className="text-sm font-medium text-foreground">Sync account</p>
-      <div className="mt-3 flex items-center gap-3">
-        {session.user?.image !== null && session.user?.image !== undefined && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={session.user.image}
-            alt=""
-            width={36}
-            height={36}
-            className="h-9 w-9 rounded-full border border-zinc-200 dark:border-zinc-700"
-          />
-        )}
-        <div className="flex flex-col gap-0.5">
-          <p className="text-sm font-semibold text-foreground">
-            {session.user?.name ?? session.user?.email ?? "GitHub user"}
-          </p>
-          <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"
-              aria-hidden="true"
+    <>
+      {conflict !== null && (
+        <ConflictPicker
+          localPayload={conflict.localPayload}
+          cloudPayload={conflict.cloudPayload}
+          onResolved={() => setConflict(null)}
+        />
+      )}
+      <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+        <p className="text-sm font-medium text-foreground">Sync account</p>
+        <div className="mt-3 flex items-center gap-3">
+          {session.user?.image !== null && session.user?.image !== undefined && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={session.user.image}
+              alt=""
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-full border border-zinc-200 dark:border-zinc-700"
             />
-            Signed in
-          </span>
+          )}
+          <div className="flex flex-col gap-0.5">
+            <p className="text-sm font-semibold text-foreground">
+              {session.user?.name ?? session.user?.email ?? "GitHub user"}
+            </p>
+            <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"
+                aria-hidden="true"
+              />
+              Signed in
+            </span>
+          </div>
         </div>
+        <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+          Your review progress, streak, and settings sync to the cloud and are
+          available on all your devices.
+        </p>
+        <button
+          type="button"
+          onClick={() => void signOut({ callbackUrl: "/settings" })}
+          className="mt-3 min-h-[44px] rounded-lg bg-zinc-100 px-8 py-2 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+        >
+          Sign out
+        </button>
       </div>
-      <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-        Your review progress, streak, and settings sync to the cloud and are
-        available on all your devices.
-      </p>
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="mt-3 min-h-[44px] rounded-lg bg-zinc-100 px-8 py-2 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
-      >
-        Sign out
-      </button>
-    </div>
+    </>
   );
 }
 

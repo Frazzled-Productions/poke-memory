@@ -36,6 +36,10 @@ npm run dev    # http://localhost:3000
 
 The seed step writes `lib/pokemon/generated.json`, which is committed to the repo, so the seed is only required if that file is missing or you want to regenerate it (e.g. after a new Pokémon generation ships).
 
+### Optional: cloud sync env vars
+
+Cloud sync (GitHub OAuth + Upstash Redis) is opt-in. Without these vars the app runs in local-only mode — no env file required. Copy `.env.example` to `.env.local` and fill in the five env vars it lists.
+
 ## Stack
 
 Next.js 16 (App Router, Cache Components), React 19, Tailwind CSS 4, TypeScript 5.
