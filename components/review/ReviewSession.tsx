@@ -236,11 +236,13 @@ export function ReviewSession() {
       const hydrated = hydrateSession(saved.cards, SEED_POKEMON);
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
+        // TODO(#41): populate reviewedDates on grade
         saveSession({ cards: hydrated, limits: sessionLimits });
       }
       sessionCards = hydrated;
     } else {
       const fresh = buildSession(SEED_POKEMON);
+      // TODO(#41): populate reviewedDates on grade
       saveSession({ cards: fresh, limits: settingsLimits });
       sessionCards = fresh;
       sessionLimits = settingsLimits;
@@ -444,6 +446,7 @@ export function ReviewSession() {
       card.id === currentCard.id ? { ...card, state: nextState } : card,
     );
 
+    // TODO(#41): populate reviewedDates on grade
     saveSession({ cards: newCards, limits });
     setCards(newCards);
 

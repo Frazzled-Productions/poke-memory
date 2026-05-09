@@ -330,7 +330,7 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 export default function StatsPage() {
   const [cards, setCards] = useState<ReviewCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
-  const [reviewedDates, setReviewedDates] = useState<string[] | null>(null);
+  const [reviewedDates, setReviewedDates] = useState<string[]>([]);
 
   useEffect(() => {
     const saved = loadSession();
@@ -345,7 +345,7 @@ export default function StatsPage() {
   }, []);
 
   const stats: StatsResult | null =
-    cards !== null && masteryRepetitions !== null && reviewedDates !== null
+    cards !== null && masteryRepetitions !== null
       ? computeStats(cards, todayString(new Date()), 10, masteryRepetitions, reviewedDates)
       : null;
 
@@ -365,7 +365,7 @@ export default function StatsPage() {
                 Current streak
               </h2>
               <StatCard
-                label={stats.currentStreak === 1 ? "day in a row" : "days in a row"}
+                label={stats.currentStreak === 0 ? "no active streak" : stats.currentStreak === 1 ? "day in a row" : "days in a row"}
                 value={stats.currentStreak}
                 accent="text-amber-500 dark:text-amber-400"
               />
