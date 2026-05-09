@@ -500,7 +500,7 @@ export function ReviewSession() {
         <EvolutionCard
           spriteUrl={currentCard.spriteUrl}
           name={currentCard.name}
-          evolvesIntoNames={currentCard.evolvesIntoNames}
+          evolvesInto={currentCard.evolvesInto}
           revealed={revealed}
         />
       ) : (

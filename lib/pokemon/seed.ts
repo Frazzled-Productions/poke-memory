@@ -40,13 +40,15 @@ export type SeedPokemon = {
 
 export const SEED_POKEMON: readonly SeedPokemon[] = seedData as unknown as readonly SeedPokemon[];
 
+export type EvolutionTarget = { name: string; spriteUrl: string };
+
 export type EvolutionCard = {
   cardType: "evolution";
   id: number;
   pokemonId: number;
   name: string;
   spriteUrl: string;
-  evolvesIntoNames: string[];
+  evolvesInto: EvolutionTarget[];
 };
 
 // Evolution-card IDs live in the [EVOLUTION_ID_OFFSET, EVOLUTION_ID_OFFSET +
@@ -58,6 +60,9 @@ const MAX_NAME_ID = EVOLUTION_ID_OFFSET - 1;
 
 export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
   const cards: EvolutionCard[] = [];
+  // Keyed by p.id; looked up by n.speciesId — these are the same foreign key
+  // (species = primary form), so both fields resolve to the same record.
+  const spriteById = new Map(SEED_POKEMON.map((p) => [p.id, p.spriteUrl]));
   for (const pokemon of SEED_POKEMON) {
     if (pokemon.id <= 0 || pokemon.id > MAX_NAME_ID) {
       throw new Error(
@@ -74,7 +79,15 @@ export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
       pokemonId: pokemon.id,
       name: pokemon.name,
       spriteUrl: pokemon.spriteUrl,
-      evolvesIntoNames: directEvolutions.map((n) => n.name),
+      evolvesInto: directEvolutions.map((n) => {
+        const sprite = spriteById.get(n.speciesId);
+        if (sprite === undefined) {
+          throw new Error(
+            `Evolution target speciesId ${n.speciesId} (${n.name}) has no sprite in seed data — seed may be incomplete.`,
+          );
+        }
+        return { name: n.name, spriteUrl: sprite };
+      }),
     });
   }
   return cards;
