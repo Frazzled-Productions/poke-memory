@@ -3,10 +3,11 @@ name: Auto Issue Worker
 # Stage 1 (plan): when an issue is labeled `auto`, the planner sub-agent
 # drafts a plan and posts it as a comment.
 # Stage 2 (implement): when a maintainer replies `/go` on that issue,
-# the orchestrator runs the AGENTS.md playbook, opens a PR, runs the
-# code-reviewer against the diff, and posts the findings as a PR comment.
-# The maintainer reads the review and comments `/fix` on the PR to trigger
-# fix cycles (handled by auto-pr.yml).
+# the orchestrator runs the AGENTS.md playbook and opens a PR. The
+# auto-review.yml workflow then fires on PR open, runs code-reviewer, and
+# posts the `<!-- auto-review:1 -->` comment. The maintainer reads the
+# review and comments `/fix` on the PR to trigger fix cycles (handled by
+# auto-pr.yml).
 
 on:
   issues:
@@ -399,31 +400,10 @@ jobs:
                The body MUST contain `closes #${{ github.event.issue.number }}`
                so the issue auto-closes on merge. Summarise what changed.
                Capture the new PR number for the next step.
-            8. Run the `code-reviewer` sub-agent (Agent tool, subagent_type
-               "code-reviewer") against the diff
-               (`git diff origin/main...HEAD`). Then post its findings on the PR
-               via `gh pr comment <pr-number> --body-file <path>`, formatted
-               exactly like this (no other content before the marker):
-
-                   <!-- auto-review:1 -->
-                   ## Auto-review #1
-
-                   <bulleted punch list of findings, or "No significant issues.">
-
-                   Verdict: Looks good to me
-
-                   _Reply with `/fix` to have these findings addressed._
-
-               The first line MUST be the HTML marker `<!-- auto-review:1 -->`
-               exactly. A verdict line starting with `Verdict: ` MUST be
-               present, followed by either `Looks good to me` (no significant
-               issues) or `Needs fixes` (one or more issues that should be
-               addressed). Use those whole-word phrases verbatim — no acronyms.
-               When (and only when) the verdict is `Needs fixes`, append the
-               italicised footer line shown above so the maintainer knows how
-               to trigger a fix run. Omit the footer when the verdict is
-               `Looks good to me`.
-            9. Post a brief comment on the issue linking the PR.
+            8. Post a brief comment on the issue linking the PR. The
+               `auto-review.yml` workflow will fire on PR open and post the
+               `<!-- auto-review:1 -->` comment asynchronously — do not run
+               code-reviewer here.
 
             If you hit a blocker you can't resolve, post a comment on the issue
             explaining what's blocked and stop — don't push half-done work.
@@ -465,13 +445,6 @@ jobs:
                 [.[] | select(.headRefName | startswith($prefix))]
                 | sort_by(.createdAt) | last | .number // empty
               ')
-
-          if [ -n "$PR_NUMBER" ]; then
-            REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-              --jq '[.[] | select(.body | startswith("<!-- auto-review:1 -->"))] | length')
-          else
-            REVIEW_FOUND=0
-          fi
 
           git fetch origin --quiet 2>/dev/null || true
           if [ -n "$START_SHA" ] && git rev-parse "$START_SHA" >/dev/null 2>&1; then
@@ -560,10 +533,8 @@ jobs:
           {
             # Preserve existing task list / placeholder body verbatim
             printf '%s\n\n---\n\n## Run finished\n\n' "$CURRENT_BODY"
-            if [ -n "$PR_NUMBER" ] && [ "$REVIEW_FOUND" -gt 0 ]; then
-              printf 'Done — opened PR #%s, posted auto-review #1.\n' "$PR_NUMBER"
-            elif [ -n "$PR_NUMBER" ]; then
-              printf '**Outcome unclear** — opened PR #%s but auto-review #1 was not posted. See [run logs](%s).\n' "$PR_NUMBER" "$RUN_URL"
+            if [ -n "$PR_NUMBER" ]; then
+              printf 'Done — opened PR #%s. Auto-review will follow on PR open.\n' "$PR_NUMBER"
             elif [ "$COMMITS" -gt 0 ]; then
               printf '**Run halted** — pushed %s commit(s) but no PR was opened. See [run logs](%s).\n' "$COMMITS" "$RUN_URL"
             else
@@ -600,12 +571,12 @@ jobs:
 
           gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -F body=@/tmp/status-body.md
 
-      - name: Move issue to PR / Ready to merge based on review verdict
+      - name: Move issue to PR
+        # Auto-review.yml owns the verdict-based "Ready to merge" upgrade —
+        # this step just records that a PR is open. Without auto-review's
+        # follow-up, the status would stay at "In Progress" forever.
         if: always()
         env:
-          # Issue/PR queries use the repo-scoped App token; the script call
-          # below overrides to the org-scoped token because the project lives
-          # in Frazzled-Productions.
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
@@ -623,18 +594,9 @@ jobs:
             echo "No open PR found for issue #$ISSUE — leaving status at In Progress."
             exit 0
           fi
-          VERDICT=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
-            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))]
-                  | sort_by(.created_at) | last | .body // ""' \
-            | grep -E '^Verdict:' | head -1 || true)
-          if [[ "$VERDICT" == *"Looks good to me"* ]]; then
-            STATUS="Ready to merge"
-          else
-            STATUS="PR"
-          fi
           GH_TOKEN="${{ steps.org-app-token.outputs.token }}" \
           GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
-            .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
+            .github/scripts/set-project-status.sh "$ISSUE" "PR"
 
   continue:
     name: Continue
@@ -822,31 +784,10 @@ jobs:
                The body MUST contain `closes #${{ github.event.issue.number }}`
                so the issue auto-closes on merge. Summarise what changed.
                Capture the new PR number for the next step.
-            8. Run the `code-reviewer` sub-agent (Agent tool, subagent_type
-               "code-reviewer") against the diff
-               (`git diff origin/main...HEAD`). Then post its findings on the PR
-               via `gh pr comment <pr-number> --body-file <path>`, formatted
-               exactly like this (no other content before the marker):
-
-                   <!-- auto-review:1 -->
-                   ## Auto-review #1
-
-                   <bulleted punch list of findings, or "No significant issues.">
-
-                   Verdict: Looks good to me
-
-                   _Reply with `/fix` to have these findings addressed._
-
-               The first line MUST be the HTML marker `<!-- auto-review:1 -->`
-               exactly. A verdict line starting with `Verdict: ` MUST be
-               present, followed by either `Looks good to me` (no significant
-               issues) or `Needs fixes` (one or more issues that should be
-               addressed). Use those whole-word phrases verbatim — no acronyms.
-               When (and only when) the verdict is `Needs fixes`, append the
-               italicised footer line shown above so the maintainer knows how
-               to trigger a fix run. Omit the footer when the verdict is
-               `Looks good to me`.
-            9. Post a brief comment on the issue linking the PR.
+            8. Post a brief comment on the issue linking the PR. The
+               `auto-review.yml` workflow will fire on PR open and post the
+               `<!-- auto-review:1 -->` comment asynchronously — do not run
+               code-reviewer here.
 
             If you hit a blocker you can't resolve, post a comment on the issue
             explaining what's blocked and stop — don't push half-done work.
@@ -880,13 +821,6 @@ jobs:
                 [.[] | select(.headRefName | startswith($prefix))]
                 | sort_by(.createdAt) | last | .number // empty
               ')
-
-          if [ -n "$PR_NUMBER" ]; then
-            REVIEW_FOUND=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-              --jq '[.[] | select(.body | startswith("<!-- auto-review:1 -->"))] | length')
-          else
-            REVIEW_FOUND=0
-          fi
 
           git fetch origin --quiet 2>/dev/null || true
           if [ -n "$START_SHA" ] && git rev-parse "$START_SHA" >/dev/null 2>&1; then
@@ -931,10 +865,8 @@ jobs:
 
           {
             printf '%s\n\n---\n\n## Run finished\n\n' "$CURRENT_BODY"
-            if [ -n "$PR_NUMBER" ] && [ "$REVIEW_FOUND" -gt 0 ]; then
-              printf 'Done — opened PR #%s, posted auto-review #1.\n' "$PR_NUMBER"
-            elif [ -n "$PR_NUMBER" ]; then
-              printf '**Outcome unclear** — opened PR #%s but auto-review #1 was not posted. See [run logs](%s).\n' "$PR_NUMBER" "$RUN_URL"
+            if [ -n "$PR_NUMBER" ]; then
+              printf 'Done — opened PR #%s. Auto-review will follow on PR open.\n' "$PR_NUMBER"
             elif [ "$COMMITS" -gt 0 ]; then
               printf '**Run halted** — pushed %s commit(s) but no PR was opened. See [run logs](%s).\n' "$COMMITS" "$RUN_URL"
             else
@@ -971,10 +903,12 @@ jobs:
 
           gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -F body=@/tmp/status-body.md
 
-      - name: Move issue to PR / Ready to merge based on review verdict
-        # Skip when pre-flight aborted before checkout — the script lives in
-        # the repo working tree and `gh` calls infer the repo from git
-        # context, both of which fail with "fatal: not a git repository".
+      - name: Move issue to PR
+        # Auto-review.yml owns the verdict-based "Ready to merge" upgrade —
+        # this step just records that a PR is open. Skip when pre-flight
+        # aborted before checkout — the script lives in the repo working
+        # tree and `gh` calls infer the repo from git context, both of which
+        # fail with "fatal: not a git repository".
         if: always() && steps.preflight.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -992,18 +926,9 @@ jobs:
             echo "No open PR found for issue #$ISSUE — leaving status at In Progress."
             exit 0
           fi
-          VERDICT=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
-            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))]
-                  | sort_by(.created_at) | last | .body // ""' \
-            | grep -E '^Verdict:' | head -1 || true)
-          if [[ "$VERDICT" == *"Looks good to me"* ]]; then
-            STATUS="Ready to merge"
-          else
-            STATUS="PR"
-          fi
           GH_TOKEN="${{ steps.org-app-token.outputs.token }}" \
           GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
-            .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
+            .github/scripts/set-project-status.sh "$ISSUE" "PR"
 
   split:
     name: Split
