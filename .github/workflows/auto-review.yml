@@ -59,9 +59,10 @@ jobs:
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          # SHA is a hex commit id — safe to interpolate directly. `gh api
+          # --jq` takes a single expression, not raw jq's `--arg` style.
           MATCH=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq --arg sha "$SHA" \
-              '[.[] | select(.body | contains("<!-- auto-review-sha:" + $sha + " -->"))] | length')
+            --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))] | length")
           if [ "$MATCH" -gt 0 ]; then
             echo "Already reviewed at SHA $SHA — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
