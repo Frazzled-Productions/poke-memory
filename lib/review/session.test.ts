@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { hydrateSession } from '@/lib/review/session';
+import { hydrateSession, buildSession } from '@/lib/review/session';
+import type { EvolutionCard } from '@/lib/pokemon/seed';
 import { initialReviewState } from '@/lib/srs/scheduler';
 import type { NameReviewCard } from '@/lib/review/session';
 import type { SeedPokemon } from '@/lib/pokemon/seed';
@@ -101,5 +102,39 @@ describe('hydrateSession', () => {
     const result = hydrateSession(saved, seed, evoSeed, NOW);
     expect(result).toHaveLength(2);
     expect(result.find((c) => c.id === 1_000_001)).toBeDefined();
+  });
+});
+
+describe('buildSession', () => {
+  const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
+  const evoSeed: EvolutionCard[] = [
+    {
+      cardType: 'evolution',
+      id: 1_000_001,
+      pokemonId: 1,
+      name: 'bulbasaur',
+      spriteUrl: '',
+      evolvesIntoNames: ['ivysaur'],
+      evolvesIntoIds: [2],
+    },
+  ];
+
+  it('assigns cardType "name" to name cards', () => {
+    const result = buildSession(seed, evoSeed, NOW);
+    const nameCards = result.filter((c) => c.cardType === 'name');
+    expect(nameCards).toHaveLength(2);
+    expect(nameCards.map((c) => c.id)).toEqual([1, 2]);
+  });
+
+  it('assigns cardType "evolution" to evolution cards', () => {
+    const result = buildSession(seed, evoSeed, NOW);
+    const evoCards = result.filter((c) => c.cardType === 'evolution');
+    expect(evoCards).toHaveLength(1);
+    expect(evoCards[0].id).toBe(1_000_001);
+  });
+
+  it('produces total count of name + evo cards', () => {
+    const result = buildSession(seed, evoSeed, NOW);
+    expect(result).toHaveLength(3);
   });
 });

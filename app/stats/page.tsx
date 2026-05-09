@@ -346,7 +346,12 @@ export default function StatsPage() {
 
   const stats: StatsResult | null =
     cards !== null && masteryRepetitions !== null
-      ? computeStats(cards, todayString(new Date()), 10, masteryRepetitions)
+      ? computeStats(
+          cards.filter((c) => c.cardType === "name"),
+          todayString(new Date()),
+          10,
+          masteryRepetitions,
+        )
       : null;
 
   return (

@@ -201,9 +201,9 @@ export default function PokedexPage() {
   useEffect(() => {
     const saved = loadSession();
     if (saved !== null) {
-      setCards(hydrateSession(saved.cards, SEED_POKEMON));
+      setCards(hydrateSession(saved.cards, SEED_POKEMON, []));
     } else {
-      setCards(buildSession(SEED_POKEMON));
+      setCards(buildSession(SEED_POKEMON, []));
     }
   }, []);
 

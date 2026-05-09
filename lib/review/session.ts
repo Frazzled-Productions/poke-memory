@@ -46,20 +46,15 @@ export function buildSession(
   return [...nameCards, ...evoCards];
 }
 
+// Merge saved cards with the current seed, refreshing seed fields (e.g. newly
+// added flavorTexts) on existing cards while preserving their SM-2 state.
+// Missing seed entries are appended at initialReviewState — due immediately.
 export function hydrateSession(
   saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
-  evoSeedOrNow?: readonly EvolutionCard[] | Date,
+  evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
 ): ReviewableCard[] {
-  let evoSeed: readonly EvolutionCard[];
-  if (evoSeedOrNow instanceof Date) {
-    now = evoSeedOrNow;
-    evoSeed = SEED_EVOLUTION_CARDS;
-  } else {
-    evoSeed = evoSeedOrNow ?? SEED_EVOLUTION_CARDS;
-  }
-
   const seedById = new Map(seed.map((p) => [p.id, p]));
   const evoSeedById = new Map(evoSeed.map((e) => [e.id, e]));
 
@@ -137,6 +132,25 @@ export function stableShuffleForDay(
   return keyed.map((item) => item.id);
 }
 
+/**
+ * Computes all queues and today's counters from the full card set + limits.
+ *
+ * - learningCardIds: IDs of all cards currently in a learning or relearning
+ *   step (learningStep !== null). These are managed by the UI component's
+ *   in-memory learning queue — the component reconstructs dueAt from
+ *   stepStartedAt + stepDurationMs on remount. Learning cards are excluded
+ *   from both reviewQueue and newQueue.
+ * - reviewQueue: graduated cards due today or earlier, not already reviewed
+ *   today, not in a learning step; capped at maxReviewsPerDay - done today.
+ * - newQueue: never-reviewed cards not in a learning step; capped at
+ *   maxNewPerDay - introduced today.
+ * - newIntroducedToday / reviewsDoneToday: live counters for the UI cap display.
+ *
+ * Note: getNextCardId serves review/new ordering only. The component layers
+ * learning-queue priority on top.
+ *
+ * Pure — no I/O.
+ */
 export function buildSessionQueues(
   cards: readonly ReviewableCard[],
   limits: DailyLimits,
@@ -191,6 +205,9 @@ export function buildSessionQueues(
   return { learningCardIds, reviewQueue, newQueue, newIntroducedToday, reviewsDoneToday };
 }
 
+// Note: the component checks its in-memory learning queue before calling this.
+// This function handles review/new ordering only; learning cards are
+// shown first by the component layer.
 export function getNextCardId(
   reviewQueue: readonly number[],
   newQueue: readonly number[],

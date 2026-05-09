@@ -84,7 +84,7 @@ export type StrugglingCard = {
 };
 
 export type StatsResult = {
-  totalCards: number;                    // SEED_POKEMON.length, typically 1025
+  totalCards: number;                    // name cards only, ~1025
   introduced: number;                    // lastReview !== null
   learning: number;                      // introduced && !mastered
   mastered: number;                      // repetitions >= masteryRepetitions param

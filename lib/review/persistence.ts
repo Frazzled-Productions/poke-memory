@@ -13,15 +13,22 @@ const STORAGE_KEY = "poke-memory:review-session:v1";
 function isReviewCardShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  return (
-    typeof v.id === "number" &&
-    typeof v.name === "string" &&
-    typeof v.spriteUrl === "string" &&
-    typeof v.state === "object" &&
-    v.state !== null &&
-    typeof (v.state as Record<string, unknown>).dueDate === "string"
-  );
+  if (
+    typeof v.id !== "number" ||
+    typeof v.name !== "string" ||
+    typeof v.spriteUrl !== "string" ||
+    typeof v.state !== "object" ||
+    v.state === null ||
+    typeof (v.state as Record<string, unknown>).dueDate !== "string"
+  ) {
+    return false;
+  }
+  if (v.cardType === "evolution") {
+    return Array.isArray(v.evolvesIntoNames);
+  }
+  return true;
 }
+
 
 function isDailyLimitsShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
@@ -32,6 +39,12 @@ function isDailyLimitsShaped(value: unknown): boolean {
   );
 }
 
+// Backfills missing state fields from localStorage. No-op on already-present
+// fields. Migrations applied in order so older sessions pick up every missing
+// field regardless of which version they last saved on:
+//   1. firstSeen  — backfill from lastReview (added before learningStep)
+//   2. learningStep — backfill to null (not in a step)
+//   3. stepStartedAt — backfill to null
 export function migrateReviewState(state: unknown): void {
   if (typeof state !== "object" || state === null) return;
   const s = state as Record<string, unknown>;
