@@ -104,6 +104,18 @@ describe("appendGradeEntry", () => {
       appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" })
     ).not.toThrow();
   });
+
+  it("prunes entries older than 365 days on write", () => {
+    storage.setItem(KEY, JSON.stringify([
+      { date: "2024-05-08", grade: 4, cardType: "name" },
+      { date: "2025-05-09", grade: 2, cardType: "name" },
+    ]));
+    appendGradeEntry({ date: "2026-05-09", grade: 5, cardType: "evolution" });
+    const log = loadGradeLog();
+    expect(log.some((e) => e.date === "2024-05-08")).toBe(false);
+    expect(log.some((e) => e.date === "2025-05-09")).toBe(true);
+    expect(log.some((e) => e.date === "2026-05-09")).toBe(true);
+  });
 });
 
 describe("pruneGradeLog", () => {

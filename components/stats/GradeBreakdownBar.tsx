@@ -40,7 +40,7 @@ export function GradeBreakdownBar({ again, hard, good, easy, label }: Props) {
           <div
             className="flex h-6 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
             role="img"
-            aria-label={`Grade breakdown: ${again} Again, ${hard} Hard, ${good} Good, ${easy} Easy`}
+            aria-label={`${heading}: ${again} Again, ${hard} Hard, ${good} Good, ${easy} Easy`}
           >
             {segments.map(({ key, count, color }) =>
               count > 0 ? (
