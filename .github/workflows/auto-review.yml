@@ -192,3 +192,28 @@ jobs:
           GH_TOKEN="${{ steps.org-app-token.outputs.token }}" \
           GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
             .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
+
+      - name: Fail check when verdict is "Needs fixes"
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          PR="${{ github.event.pull_request.number }}"
+          SHA="${{ github.event.pull_request.head.sha }}"
+          # Scope to the current head SHA so re-runs (close/reopen at the same
+          # SHA, or a later /fix cycle that bumps the SHA) always report the
+          # verdict that was posted against the SHA this run is on.
+          BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
+                  | sort_by(.created_at) | last | .body // \"\"")
+          if [[ -z "$BODY" ]]; then
+            echo "No auto-review comment found for SHA $SHA — nothing to gate on."
+            exit 0
+          fi
+          VERDICT=$(printf '%s\n' "$BODY" | grep -E '^Verdict:' | head -1 || true)
+          echo "Latest verdict at SHA $SHA: ${VERDICT:-<none>}"
+          if [[ "$VERDICT" == *"Needs fixes"* ]]; then
+            echo "::error::Auto-review verdict is 'Needs fixes' — failing the check so the PR shows red until /fix lands."
+            exit 1
+          fi
