@@ -487,10 +487,6 @@ jobs:
             "auto/issue-${ISSUE}-"*) ;;
             *) BRANCH="" ;;
           esac
-          LAST_COMMIT=""
-          if [ "$COMMITS" -gt 0 ]; then
-            LAST_COMMIT=$(git log --format='%h %s' -n 1 2>/dev/null || echo "")
-          fi
 
           DENIAL_COUNT=0
           DENIAL_DETAILS=""
@@ -529,11 +525,27 @@ jobs:
           if [ "$HALTED" = true ] && [ -n "$BRANCH" ]; then
             if ! git diff --quiet HEAD 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard)" ]; then
               git add -A
-              git -c user.name="${APP_SLUG}[bot]" \
-                  -c user.email="${BOT_APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com" \
-                  commit -m "WIP: halted run on #$ISSUE" || true
+              if ! git -c user.name="${APP_SLUG}[bot]" \
+                       -c user.email="${BOT_APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com" \
+                       commit -m "WIP: halted run on #$ISSUE"; then
+                echo "::warning::WIP salvage commit failed — staged changes will not be pushed to origin"
+              fi
             fi
-            git push origin "HEAD:refs/heads/$BRANCH" || true
+            git push origin "HEAD:refs/heads/$BRANCH" || \
+              echo "::warning::Salvage push to origin failed — /continue will fall back to /go"
+          fi
+
+          # Re-count commits and capture the last commit AFTER the salvage push
+          # so the recovery footer references the WIP commit (the most useful
+          # pointer for the maintainer) when one was created. Without this the
+          # footer would point at the pre-WIP commit and the salvage commit
+          # would be invisible.
+          if [ -n "$START_SHA" ] && git rev-parse "$START_SHA" >/dev/null 2>&1; then
+            COMMITS=$(git rev-list --count "$START_SHA..HEAD" 2>/dev/null || echo 0)
+          fi
+          LAST_COMMIT=""
+          if [ "$COMMITS" -gt 0 ]; then
+            LAST_COMMIT=$(git log --format='%h %s' -n 1 2>/dev/null || echo "")
           fi
 
           # Verify the branch is genuinely on origin before advertising
