@@ -10,12 +10,18 @@ async function AuthErrorBanner({
   const { error } = await searchParams;
   if (error !== "auth") return null;
   return (
-    <div className="mb-6 w-full max-w-md rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+    <div
+      role="alert"
+      className="mb-6 w-full max-w-md rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+    >
       Sign-in failed. Please try again.
     </div>
   );
 }
 
+// Home stays synchronous and forwards searchParams to AuthErrorBanner — awaiting
+// searchParams here would pull the suspend point up to the page root and break
+// prerender under cacheComponents.
 export default function Home({
   searchParams,
 }: {
