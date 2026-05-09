@@ -162,6 +162,7 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 80
+          show_full_output: true
           prompt: |
             You are the orchestrator on PR #${{ github.event.issue.number }}.
             The maintainer commented `/fix` requesting that fixes be made.

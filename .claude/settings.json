@@ -55,7 +55,8 @@
       "Bash(true)",
       "Bash(false)",
       "Edit(*)",
-      "Write(*)"
+      "Write(*)",
+      "Task"
     ]
   }
 }
