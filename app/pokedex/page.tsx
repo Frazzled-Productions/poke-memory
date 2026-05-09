@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { buildSession, hydrateSession } from "@/lib/review/session";
-import type { ReviewCard } from "@/lib/review/session";
+import type { ReviewableCard } from "@/lib/review/session";
 import { loadSession } from "@/lib/review/persistence";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
@@ -196,14 +196,14 @@ function LoadingSkeleton() {
 // ---------------------------------------------------------------------------
 
 export default function PokedexPage() {
-  const [cards, setCards] = useState<ReviewCard[] | null>(null);
+  const [cards, setCards] = useState<ReviewableCard[] | null>(null);
 
   useEffect(() => {
     const saved = loadSession();
     if (saved !== null) {
-      setCards(hydrateSession(saved.cards, SEED_POKEMON));
+      setCards(hydrateSession(saved.cards, SEED_POKEMON, []));
     } else {
-      setCards(buildSession(SEED_POKEMON));
+      setCards(buildSession(SEED_POKEMON, []));
     }
   }, []);
 
@@ -217,7 +217,7 @@ export default function PokedexPage() {
 
   const introduced =
     cards !== null
-      ? cards.filter((c) => c.state.lastReview !== null).length
+      ? cards.filter((c) => c.cardType === "name" && c.state.lastReview !== null).length
       : 0;
 
   // Enrich SEED_POKEMON with classification

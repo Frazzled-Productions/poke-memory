@@ -1,74 +1,105 @@
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
-import type { SeedPokemon } from "@/lib/pokemon/seed";
+import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
+import { SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
 export type { Grade };
 
-export type ReviewCard = SeedPokemon & {
+export type NameReviewCard = SeedPokemon & {
+  cardType: "name";
   state: ReviewState;
 };
 
-export type DailyLimits = {
+export type EvolutionReviewCard = EvolutionCard & {
+  state: ReviewState;
+};
+
+export type ReviewableCard = NameReviewCard | EvolutionReviewCard;
+
+// Backward-compat alias
+export type ReviewCard = ReviewableCard;
+
+export type PerTypeLimits = {
   maxNewPerDay: number;
   maxReviewsPerDay: number;
 };
 
-export const DEFAULT_LIMITS: DailyLimits = {
-  maxNewPerDay: 10,
-  maxReviewsPerDay: 100,
+export type CardTypeKey = "name" | "evolution";
+
+export type DailyLimits = {
+  name: PerTypeLimits;
+  evolution: PerTypeLimits;
 };
 
-// Build a fresh session by initialising every seed card to default SM-2 state.
-export function buildSession(seed: readonly SeedPokemon[]): ReviewCard[] {
-  return seed.map((pokemon) => ({
+export const DEFAULT_LIMITS: DailyLimits = {
+  name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+};
+
+export function buildSession(
+  seed: readonly SeedPokemon[],
+  evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
+  now: Date = new Date(),
+): ReviewableCard[] {
+  const nameCards: NameReviewCard[] = seed.map((pokemon) => ({
     ...pokemon,
-    state: initialReviewState(),
+    cardType: "name",
+    state: initialReviewState(now),
   }));
+  const evoCards: EvolutionReviewCard[] = evoSeed.map((evo) => ({
+    ...evo,
+    state: initialReviewState(now),
+  }));
+  return [...nameCards, ...evoCards];
 }
 
-// Merge any seed cards not yet in the saved session (e.g. after a seed
-// regeneration that added new species). Existing cards keep their progress;
-// missing seed entries are appended at initialReviewState — due immediately.
-// Also refreshes seed fields on existing persisted cards so stale localStorage
-// snapshots always reflect current seed data (e.g. picks up flavorTexts added
-// after the card was first saved).
+// Merge saved cards with the current seed, refreshing seed fields (e.g. newly
+// added flavorTexts) on existing cards while preserving their SM-2 state.
+// Missing seed entries are appended at initialReviewState — due immediately.
 export function hydrateSession(
-  saved: readonly ReviewCard[],
+  saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
+  evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-): ReviewCard[] {
+): ReviewableCard[] {
   const seedById = new Map(seed.map((p) => [p.id, p]));
-  const refreshed: ReviewCard[] = saved.map((card) => {
-    const fresh = seedById.get(card.id);
-    if (!fresh) return card;
-    return { ...fresh, state: card.state };
+  const evoSeedById = new Map(evoSeed.map((e) => [e.id, e]));
+
+  const refreshed: ReviewableCard[] = saved.map((card) => {
+    if (card.cardType === "evolution") {
+      const fresh = evoSeedById.get(card.id);
+      if (!fresh) return card;
+      return { ...fresh, state: card.state };
+    } else {
+      const fresh = seedById.get(card.id);
+      if (!fresh) return card;
+      return { ...fresh, cardType: "name", state: card.state };
+    }
   });
-  const savedIds = new Set(saved.map((card) => card.id));
-  const additions = seed
-    .filter((pokemon) => !savedIds.has(pokemon.id))
-    .map((pokemon) => ({ ...pokemon, state: initialReviewState(now) }));
+
+  const savedIds = new Set(saved.map((c) => c.id));
+
+  const nameAdditions: NameReviewCard[] = seed
+    .filter((p) => !savedIds.has(p.id))
+    .map((p) => ({ ...p, cardType: "name", state: initialReviewState(now) }));
+
+  const evoAdditions: EvolutionReviewCard[] = evoSeed
+    .filter((e) => !savedIds.has(e.id))
+    .map((e) => ({ ...e, state: initialReviewState(now) }));
+
+  const additions = [...nameAdditions, ...evoAdditions];
   if (additions.length === 0) return refreshed;
   return [...refreshed, ...additions];
 }
 
-/**
- * Today as YYYY-MM-DD. Pure helper.
- */
 export function todayString(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 
-/**
- * Stable per-day shuffle using a deterministic FNV-1a-inspired hash of
- * (id, today). Same (ids, today) → same output; different today → different
- * ordering. Pure — no Math.random.
- */
 export function stableShuffleForDay(
   ids: readonly number[],
   today: string,
 ): number[] {
-  // Derive a numeric salt from the date string by hashing its characters.
-  // FNV-1a 32-bit: offset_basis=2166136261, prime=16777619
   const FNV_PRIME = 16777619;
   const FNV_OFFSET = 2166136261;
 
@@ -76,7 +107,6 @@ export function stableShuffleForDay(
     let hash = FNV_OFFSET;
     for (let i = 0; i < s.length; i++) {
       hash ^= s.charCodeAt(i);
-      // Keep within 32-bit unsigned range using >>> 0
       hash = Math.imul(hash, FNV_PRIME) >>> 0;
     }
     return hash;
@@ -84,9 +114,7 @@ export function stableShuffleForDay(
 
   const daySalt = fnv1a(today);
 
-  // Assign each id a deterministic sort key derived from (id, daySalt).
   const keyed = ids.map((id) => {
-    // Mix id and daySalt with another FNV-1a round.
     let hash = FNV_OFFSET;
     hash ^= id & 0xff;
     hash = Math.imul(hash, FNV_PRIME) >>> 0;
@@ -111,36 +139,35 @@ export function stableShuffleForDay(
   return keyed.map((item) => item.id);
 }
 
+export type PerTypeCounters = {
+  newIntroducedToday: number;
+  reviewsDoneToday: number;
+};
+
 /**
  * Computes all queues and today's counters from the full card set + limits.
  *
- * - learningCardIds: IDs of all cards currently in a learning or relearning
- *   step (learningStep !== null). These are managed entirely by the UI
- *   component's in-memory learning queue — the component pairs each ID with a
- *   wall-clock `dueAt` timestamp. On remount, the component reconstructs
- *   `dueAt = stepStartedAt + stepDurationMs` from persisted state so the
- *   countdown resumes correctly after navigation. The scheduler-side
- *   `learningStep` and `stepStartedAt` values are preserved across reloads.
- *   Learning cards are excluded from both reviewQueue and newQueue.
- * - reviewQueue: IDs of graduated cards due today or earlier,
- *   EXCLUDING any card whose lastReview === today (already done today)
- *   and EXCLUDING learning-step cards,
- *   capped at max(0, maxReviewsPerDay - reviewsDoneToday),
- *   then stableShuffleForDay'd.
- * - newQueue: IDs of brand-new cards (lastReview === null AND learningStep === null),
- *   capped at max(0, maxNewPerDay - newIntroducedToday),
- *   then stableShuffleForDay'd.
- * - newIntroducedToday: count of cards where firstSeen === today.
- * - reviewsDoneToday: count of cards where lastReview === today AND firstSeen !== today.
+ * Counters and caps are tracked per cardType — name and evolution cards each
+ * have their own daily new / review budget. The returned `reviewQueue` and
+ * `newQueue` are merged across types (after each type's cap is applied
+ * independently) so the consumer can keep its single-cursor ordering policy.
  *
- * Note: getNextCardId serves review/new ordering only. The component layers
- * learning-queue priority on top — learning cards are always shown before
- * review or new cards.
+ * - learningCardIds: IDs of all cards currently in a learning/relearning step
+ *   (learningStep !== null), regardless of cardType. The UI's in-memory queue
+ *   reconstructs dueAt from stepStartedAt + stepDurationMs.
+ * - reviewQueue: graduated cards due today or earlier, not already reviewed
+ *   today, not in a learning step; each type capped independently at
+ *   limits[type].maxReviewsPerDay - reviewsDoneToday[type].
+ * - newQueue: never-reviewed cards not in a learning step; each type capped
+ *   independently at limits[type].maxNewPerDay - newIntroducedToday[type].
+ * - perType: live per-type counters for the lockout/end-state logic.
+ * - newIntroducedToday / reviewsDoneToday: blended totals for the TodayPill
+ *   display (sum across types).
  *
  * Pure — no I/O.
  */
 export function buildSessionQueues(
-  cards: readonly ReviewCard[],
+  cards: readonly ReviewableCard[],
   limits: DailyLimits,
   today: string,
 ): {
@@ -149,72 +176,83 @@ export function buildSessionQueues(
   newQueue: number[];
   newIntroducedToday: number;
   reviewsDoneToday: number;
+  perType: Record<CardTypeKey, PerTypeCounters>;
 } {
-  const newIntroducedToday = cards.filter(
-    (c) => c.state.firstSeen === today,
-  ).length;
-
-  // A card introduced today is counted only as "new" — even if it was lapsed
-  // and re-graded the same day. The `firstSeen !== today` guard deliberately
-  // excludes these from `reviewsDoneToday`; same-day re-views of a brand-new
-  // card are still part of "introducing" it, not a return review.
-  const reviewsDoneToday = cards.filter(
-    (c) => c.state.lastReview === today && c.state.firstSeen !== today,
-  ).length;
-
-  // Learning queue: all cards currently in a learning or relearning step.
-  // These are handled by the component's in-memory queue, not the SRS queues.
   const learningCardIds = cards
     .filter((c) => c.state.learningStep !== null)
     .map((c) => c.id);
 
-  // Review candidates: has been reviewed before (graduated), due today or
-  // earlier, not already reviewed today, and NOT in a learning step.
-  const reviewCandidateIds = cards
-    .filter(
-      (c) =>
-        c.state.learningStep === null &&
-        c.state.lastReview !== null &&
-        c.state.dueDate <= today &&
-        c.state.lastReview !== today,
-    )
-    .map((c) => c.id);
+  const perType: Record<CardTypeKey, PerTypeCounters> = {
+    name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+    evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+  };
 
-  const reviewSlots = Math.max(0, limits.maxReviewsPerDay - reviewsDoneToday);
-  const reviewQueue = stableShuffleForDay(reviewCandidateIds, today).slice(
-    0,
-    reviewSlots,
-  );
+  const reviewCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [] };
+  const newCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [] };
 
-  // New candidates: never reviewed AND not currently in a learning step.
-  // (A card in a learning step has lastReview === null but learningStep !== null —
-  // it belongs in learningCardIds, not the newQueue.)
-  const newCandidateIds = cards
-    .filter(
-      (c) => c.state.learningStep === null && c.state.lastReview === null,
-    )
-    .map((c) => c.id);
+  for (const card of cards) {
+    const type = card.cardType;
+    if (card.state.firstSeen === today) {
+      perType[type].newIntroducedToday += 1;
+    }
+    if (card.state.lastReview === today && card.state.firstSeen !== today) {
+      perType[type].reviewsDoneToday += 1;
+    }
+    if (card.state.learningStep !== null) continue;
+    if (
+      card.state.lastReview !== null &&
+      card.state.dueDate <= today &&
+      card.state.lastReview !== today
+    ) {
+      reviewCandidatesByType[type].push(card.id);
+    } else if (card.state.lastReview === null) {
+      newCandidatesByType[type].push(card.id);
+    }
+  }
 
-  const newSlots = Math.max(0, limits.maxNewPerDay - newIntroducedToday);
-  const newQueue = stableShuffleForDay(newCandidateIds, today).slice(
-    0,
-    newSlots,
-  );
+  const reviewQueue: number[] = [];
+  const newQueue: number[] = [];
 
-  return { learningCardIds, reviewQueue, newQueue, newIntroducedToday, reviewsDoneToday };
+  for (const type of ["name", "evolution"] as const) {
+    const reviewSlots = Math.max(
+      0,
+      limits[type].maxReviewsPerDay - perType[type].reviewsDoneToday,
+    );
+    reviewQueue.push(
+      ...stableShuffleForDay(reviewCandidatesByType[type], today).slice(0, reviewSlots),
+    );
+    const newSlots = Math.max(
+      0,
+      limits[type].maxNewPerDay - perType[type].newIntroducedToday,
+    );
+    newQueue.push(
+      ...stableShuffleForDay(newCandidatesByType[type], today).slice(0, newSlots),
+    );
+  }
+
+  // Reshuffle the merged per-type slices so name and evolution interleave
+  // deterministically rather than appearing in two contiguous blocks.
+  const shuffledReviewQueue = stableShuffleForDay(reviewQueue, today);
+  const shuffledNewQueue = stableShuffleForDay(newQueue, today);
+
+  const newIntroducedToday =
+    perType.name.newIntroducedToday + perType.evolution.newIntroducedToday;
+  const reviewsDoneToday =
+    perType.name.reviewsDoneToday + perType.evolution.reviewsDoneToday;
+
+  return {
+    learningCardIds,
+    reviewQueue: shuffledReviewQueue,
+    newQueue: shuffledNewQueue,
+    newIntroducedToday,
+    reviewsDoneToday,
+    perType,
+  };
 }
 
-/**
- * Get next card to show from the review and new queues.
- * Drains reviewQueue first, then newQueue.
- * Returns null when both queues are empty.
- *
- * Note: the component layers learning-queue priority on top of this — it checks
- * the in-memory learning queue before calling getNextCardId. This function
- * handles only the review/new ordering.
- *
- * Pure.
- */
+// Note: the component checks its in-memory learning queue before calling this.
+// This function handles review/new ordering only; learning cards are
+// shown first by the component layer.
 export function getNextCardId(
   reviewQueue: readonly number[],
   newQueue: readonly number[],

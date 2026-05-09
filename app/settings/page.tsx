@@ -30,29 +30,65 @@ type FieldConfig = {
   max: number;
 };
 
-const FIELDS: FieldConfig[] = [
+type FieldGroup = {
+  heading: string | null; // null = ungrouped (renders without a heading)
+  fields: FieldConfig[];
+};
+
+const GROUPS: FieldGroup[] = [
   {
-    key: "masteryRepetitions",
-    label: "Mastery threshold",
-    helper: "Cards with this many consecutive correct reviews count as mastered.",
-    min: 1,
-    max: 10,
+    heading: null,
+    fields: [
+      {
+        key: "masteryRepetitions",
+        label: "Mastery threshold",
+        helper: "Cards with this many consecutive correct reviews count as mastered.",
+        min: 1,
+        max: 10,
+      },
+    ],
   },
   {
-    key: "maxNewPerDay",
-    label: "New cards per day",
-    helper: "Hard daily cap. Raising this grows tomorrow's review pile faster.",
-    min: 1,
-    max: 50,
+    heading: "Name cards",
+    fields: [
+      {
+        key: "maxNewPerDay",
+        label: "New cards per day",
+        helper: "Hard daily cap. Raising this grows tomorrow's review pile faster.",
+        min: 1,
+        max: 50,
+      },
+      {
+        key: "maxReviewsPerDay",
+        label: "Reviews per day",
+        helper: "Soft cap — you can always override it during a session.",
+        min: 1,
+        max: 500,
+      },
+    ],
   },
   {
-    key: "maxReviewsPerDay",
-    label: "Reviews per day",
-    helper: "Soft cap — you can always override it during a session.",
-    min: 1,
-    max: 500,
+    heading: "Evolution cards",
+    fields: [
+      {
+        key: "maxNewEvolutionPerDay",
+        label: "New cards per day",
+        helper: "Hard daily cap for evolution cards. Tracked separately from name cards.",
+        min: 1,
+        max: 50,
+      },
+      {
+        key: "maxReviewsEvolutionPerDay",
+        label: "Reviews per day",
+        helper: "Soft cap for evolution reviews. Independent of the name-card review cap.",
+        min: 1,
+        max: 500,
+      },
+    ],
   },
 ];
+
+const ALL_FIELDS: FieldConfig[] = GROUPS.flatMap((g) => g.fields);
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -75,7 +111,7 @@ export default function SettingsPage() {
   function handleSave() {
     if (settings === null) return;
     const clamped = Object.fromEntries(
-      FIELDS.map(({ key, min, max }) => [key, Math.max(min, Math.min(max, settings[key]))])
+      ALL_FIELDS.map(({ key, min, max }) => [key, Math.max(min, Math.min(max, settings[key]))])
     ) as UserSettings;
     saveSettings(clamped);
     setSettings(clamped);
@@ -97,32 +133,50 @@ export default function SettingsPage() {
         {settings === null ? (
           <LoadingSkeleton />
         ) : (
-          <div className="flex flex-col gap-4">
-            {FIELDS.map(({ key, label, helper, min, max }) => (
-              <div
-                key={key}
-                className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+          <div className="flex flex-col gap-6">
+            {GROUPS.map((group, groupIdx) => (
+              <section
+                key={group.heading ?? `group-${groupIdx}`}
+                className="flex flex-col gap-4"
+                aria-labelledby={
+                  group.heading ? `group-heading-${groupIdx}` : undefined
+                }
               >
-                <label
-                  htmlFor={key}
-                  className="block text-sm font-medium text-foreground"
-                >
-                  {label}
-                </label>
-                <input
-                  id={key}
-                  type="number"
-                  min={min}
-                  max={max}
-                  step={1}
-                  value={settings[key]}
-                  onChange={(e) => handleChange(key, e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                />
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  {helper}
-                </p>
-              </div>
+                {group.heading !== null && (
+                  <h2
+                    id={`group-heading-${groupIdx}`}
+                    className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                  >
+                    {group.heading}
+                  </h2>
+                )}
+                {group.fields.map(({ key, label, helper, min, max }) => (
+                  <div
+                    key={key}
+                    className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                  >
+                    <label
+                      htmlFor={key}
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      {label}
+                    </label>
+                    <input
+                      id={key}
+                      type="number"
+                      min={min}
+                      max={max}
+                      step={1}
+                      value={settings[key]}
+                      onChange={(e) => handleChange(key, e.target.value)}
+                      className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    />
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      {helper}
+                    </p>
+                  </div>
+                ))}
+              </section>
             ))}
 
             <div className="flex items-center gap-4 pt-2">

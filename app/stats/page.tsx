@@ -2,10 +2,9 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { buildSession, hydrateSession, todayString } from "@/lib/review/session";
-import type { ReviewCard } from "@/lib/review/session";
+import { buildSession, hydrateSession, todayString, type ReviewableCard } from "@/lib/review/session";
 import { loadSession } from "@/lib/review/persistence";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
 import { loadSettings } from "@/lib/settings/persistence";
@@ -329,16 +328,16 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 // ---------------------------------------------------------------------------
 
 export default function StatsPage() {
-  const [cards, setCards] = useState<ReviewCard[] | null>(null);
+  const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
 
   useEffect(() => {
     const saved = loadSession();
     if (saved !== null) {
-      setCards(hydrateSession(saved.cards, SEED_POKEMON));
+      setCards(hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS));
     } else {
-      setCards(buildSession(SEED_POKEMON));
+      setCards(buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS));
     }
     const settings = loadSettings();
     setMasteryRepetitions(settings.masteryRepetitions);
@@ -347,7 +346,12 @@ export default function StatsPage() {
 
   const stats: StatsResult | null =
     cards !== null && masteryRepetitions !== null
-      ? computeStats(cards, todayString(new Date()), 10, masteryRepetitions)
+      ? computeStats(
+          cards.filter((c) => c.cardType === "name"),
+          todayString(new Date()),
+          10,
+          masteryRepetitions,
+        )
       : null;
 
   return (
