@@ -147,6 +147,8 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 **Auto-review on PR open.** `auto-review.yml` triggers on `pull_request: [opened, reopened]` and runs the `code-reviewer` sub-agent against the PR diff, posting the standard `<!-- auto-review:1 -->` comment that `/fix` (in `auto-pr.yml`) keys off. The workflow gates on PRs whose head branch starts with `auto/` OR which carry an `auto-review` label, so manually-opened PRs (e.g. when an App-permissions block prevents the bot from pushing) can still pick up the review/fix loop by adding the label. Idempotency is enforced via a hidden `<!-- auto-review-sha:<head-sha> -->` line on the second row of each review comment — re-triggers at the same head SHA (close + reopen) are skipped. The review workflow also owns the "Ready to merge" project-status upgrade based on verdict; `auto-issue.yml`'s implement/continue jobs only set status to "PR" once the PR opens. A final job step looks up the latest auto-review comment scoped to the current head SHA and exits non-zero when the verdict is `Needs fixes`, so the PR's checks UI shows red until a subsequent `/fix` cycle lands a `Looks good to me` review at a new SHA.
 
+**Auto-labelling.** `auto-label.yml` triggers on `issues: [opened]`; it classifies any missing priority / type / area labels via Claude and applies them within ~1 minute, so issues filed from mobile land on the project board correctly without manual triage.
+
 ### Privacy
 
 - **No personal data leaves the user's browser without explicit consent.** All session state lives in `localStorage`; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
