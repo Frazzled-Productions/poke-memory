@@ -112,7 +112,11 @@ jobs:
           claude_args: --max-turns 30
           # The PR may have been opened by the bot identity (auto-issue.yml)
           # or by a human; allow the bot to trigger this job either way.
-          allowed_bots: poke-memory-bot
+          # `claude` is the App backing claude-code-action@v1 — implement-job
+          # PRs are attributed to that identity even though `gh pr create`
+          # runs with the poke-memory-bot token, so it must be allow-listed
+          # here or the action exits before any review work happens.
+          allowed_bots: poke-memory-bot,claude
           prompt: |
             You are reviewing PR #${{ github.event.pull_request.number }}.
 
