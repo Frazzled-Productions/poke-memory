@@ -141,14 +141,34 @@ jobs:
                c. Plan introduces both new infrastructure AND new logic, with ≥ 3 files
                d. ≥ 6 acceptance criteria
 
+               **Coupling check.** If a scope warning fires, before proposing a
+               split sketch the boundary you would draw between children and
+               check whether they would share surface area. Splitting only
+               helps if children can be implemented and reviewed independently.
+               Treat children as coupled if any of:
+               - Two or more would define or modify the same exported symbol
+                 (function, type, component) — even at different paths
+               - Two or more would read or write the same `localStorage` key,
+                 database table, or other persistence target
+               - Two or more would touch the same module directory (e.g. both
+                 in `lib/streak/`) such that one's structure constrains the
+                 other's
+               - Two or more would edit the same file
+
+               If coupling is found, do NOT offer `/split`. The warning still
+               fires (the work is still big) but the recommendation is to
+               proceed as a single issue — coupled children produce PRs that
+               don't compose at merge time. Use ending A2 in step 4.
+
             4. Post the plan as a comment on the issue:
                `gh issue comment ${{ github.event.issue.number }} --body-file <path>`
 
-               The comment body must end in one of two ways:
+               The comment body must end in one of three ways:
 
-               **A) If the scope warning fires (any threshold from step 3 crossed),
-               append this block as the final content** — its own `/go` invitation
-               replaces the standard closing lines:
+               **A1) If the scope warning fires AND the proposed children are
+               cleanly independent (no coupling per step 3), append this block
+               as the final content** — its own `/go` invitation replaces the
+               standard closing lines:
 
                ---
                **⚠ Scope warning.** This plan touches N file(s) across M surface(s) [brief reason].
@@ -167,11 +187,22 @@ jobs:
                Reply `/split` to file these as sub-issues of this issue. Reply `/go` to proceed with the full scope.
                ---
 
+               **A2) If the scope warning fires BUT the proposed children would
+               be coupled (per step 3), append this block as the final content**
+               — splitting is not offered:
+
+               ---
+               **⚠ Scope warning.** This plan touches N file(s) across M surface(s) [brief reason].
+               I considered splitting but the parts share <name the coupling — e.g. a `computeStreak` function and the `poke-memory:streak:v1` storage key>, so independent PRs would not compose at merge time.
+
+               Reply `/go` to proceed with the full scope. If you see a different breakdown that avoids the shared surface, post it as a comment and I'll plan against it.
+               ---
+
                **B) If no scope warning fires, end with these two lines on their own:**
                "Reply with `/go` to proceed."
                "To change scope, post a comment describing the changes (or include them in your `/go` comment) — the implement stage treats follow-up comments as authoritative over this plan."
 
-               Pick exactly one ending — never both, never neither.
+               Pick exactly one ending — never multiple, never none.
 
       - name: Surface tool denials
         if: always()
