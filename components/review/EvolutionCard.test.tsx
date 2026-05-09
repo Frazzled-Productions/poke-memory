@@ -45,10 +45,9 @@ describe("EvolutionCard", () => {
     expect(answerImg).toBeInTheDocument();
     expect(answerImg).toHaveAttribute("src", "https://example.com/charmeleon.png");
     // Question sprite should no longer be shown
-    expect(screen.queryByRole("img", { hidden: false })).not.toHaveAttribute(
-      "src",
-      QUESTION_SPRITE,
-    );
+    for (const img of screen.queryAllByRole("img")) {
+      expect(img).not.toHaveAttribute("src", QUESTION_SPRITE);
+    }
     expect(screen.queryByText("???")).not.toBeInTheDocument();
   });
 

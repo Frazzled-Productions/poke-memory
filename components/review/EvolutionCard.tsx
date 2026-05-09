@@ -1,9 +1,10 @@
 import Image from "next/image";
+import type { EvolutionTarget } from "@/lib/pokemon/seed";
 
 type Props = {
   spriteUrl: string;
   name: string;
-  evolvesInto: { name: string; spriteUrl: string }[];
+  evolvesInto: EvolutionTarget[];
   revealed: boolean;
 };
 
