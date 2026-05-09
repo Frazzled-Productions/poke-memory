@@ -4,12 +4,6 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
-### Added
-
-- **`WORKFLOW.md`** — a new process-map document covering the sub-agent roster, orchestration playbook, all GitHub Actions workflows (`auto-issue`, `auto-pr`, `auto-review`, `auto-retro`, `auto-status`, `auto-label`, `ci`, `issue-overlap-scan`, `vercel-failure-autofix`), issue lifecycle state machine, build gates, graceful-exit / WIP salvage, scope-warning / `/split` rules, and retrospectives. `AGENTS.md`'s "Backlog / process" section is trimmed to agent-action rules only, with a pointer to the new doc. Closes [#101](https://github.com/fraserbrookhouse/poke-memory/issues/101).
-
-- **Reset all progress** — a "Danger zone" section at the bottom of Settings lets you erase all your review history with a typed-confirmation dialog (you must type `RESET` to proceed). For signed-in users, cloud data in Supabase is deleted too. Closes [#58](https://github.com/fraserbrookhouse/poke-memory/issues/58).
-
 ### Fixed
 
 - **Auto-review comment headings and cross-references** — auto-review comments no longer use `#N` tokens in their headings or prose, which GitHub was auto-linking to unrelated issues/PRs. Headings now read `## Auto-review N` (no `#`), and prose references to prior reviews use a markdown link to the prior comment's URL. Closes [#88](https://github.com/fraserbrookhouse/poke-memory/issues/88).
@@ -19,6 +13,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **PWA `start_url` now includes `?source=pwa`** — the web app manifest's `start_url` is `/?source=pwa` instead of `/`. This lets future analytics tooling distinguish standalone PWA launches from ordinary browser visits without any code change at that time. No runtime behavior changes today. Closes [#8](https://github.com/fraserbrookhouse/poke-memory/issues/8).
 
 ### Added
+
+- **`WORKFLOW.md`** — a new process-map document covering the sub-agent roster, orchestration playbook, all GitHub Actions workflows (`auto-issue`, `auto-pr`, `auto-review`, `auto-retro`, `auto-status`, `auto-label`, `ci`, `issue-overlap-scan`, `vercel-failure-autofix`), issue lifecycle state machine, build gates, graceful-exit / WIP salvage, scope-warning / `/split` rules, and retrospectives. `AGENTS.md`'s "Backlog / process" section is trimmed to agent-action rules only, with a pointer to the new doc. Closes [#101](https://github.com/fraserbrookhouse/poke-memory/issues/101).
+
+- **Backup export and import** — a new "Backup" section on the Settings page lets you download your card progress and settings as a JSON file, and restore from a previously exported backup. Invalid files are rejected with an inline error without touching localStorage; valid imports require explicit confirmation before overwriting current progress. Closes [#57](https://github.com/fraserbrookhouse/poke-memory/issues/57).
+
+- **Reset all progress** — a "Danger zone" section at the bottom of Settings lets you erase all your review history with a typed-confirmation dialog (you must type `RESET` to proceed). For signed-in users, cloud data in Supabase is deleted too. Closes [#58](https://github.com/fraserbrookhouse/poke-memory/issues/58).
 
 - **Per-session and all-time grade breakdown** — a "This session" bar appears on the Practice page while you review, showing a live count of Again / Hard / Good / Easy grades (resets on navigation, as labelled). The Stats page now shows an "All-time grade breakdown" bar with cumulative totals drawn from a new `poke-memory:grade-log:v1` localStorage log. Existing sessions have no log entries; counts start accumulating from the first grade after this update. Closes [#5](https://github.com/fraserbrookhouse/poke-memory/issues/5).
 

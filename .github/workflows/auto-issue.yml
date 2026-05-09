@@ -674,7 +674,7 @@ jobs:
             # Preserve existing task list / placeholder body verbatim
             printf '%s\n\n---\n\n## Run finished\n\n' "$CURRENT_BODY"
             if [ -n "$PR_NUMBER" ]; then
-              printf 'Done — opened PR #%s. Auto-review will follow on PR open.\n' "$PR_NUMBER"
+              printf 'Done — opened PR %s. Auto-review will follow on PR open.\n' "$PR_NUMBER"
             elif [ "$COMMITS" -gt 0 ]; then
               printf '**Run halted** — pushed %s commit(s) but no PR was opened. See [run logs](%s).\n' "$COMMITS" "$RUN_URL"
             else
@@ -1008,7 +1008,7 @@ jobs:
           {
             printf '%s\n\n---\n\n## Run finished\n\n' "$CURRENT_BODY"
             if [ -n "$PR_NUMBER" ]; then
-              printf 'Done — opened PR #%s. Auto-review will follow on PR open.\n' "$PR_NUMBER"
+              printf 'Done — opened PR %s. Auto-review will follow on PR open.\n' "$PR_NUMBER"
             elif [ "$COMMITS" -gt 0 ]; then
               printf '**Run halted** — pushed %s commit(s) but no PR was opened. See [run logs](%s).\n' "$COMMITS" "$RUN_URL"
             else
@@ -1200,7 +1200,7 @@ jobs:
           {
             printf '<!-- auto-split:%s -->\n## Sub-issues filed\n\n' "$ISSUE"
             if [ -n "$CREATED" ]; then
-              printf 'Linked as sub-issues of #%s:%s\n' "$ISSUE" "$CREATED"
+              printf 'Linked as sub-issues of %s:%s\n' "$ISSUE" "$CREATED"
             fi
             if [ -n "$FAILED" ]; then
               printf '\n**Some sub-issues could not be linked.** They were created but the `sub_issues` API call failed — see the error per row below. Link them manually if needed:%s\n' "$FAILED"
