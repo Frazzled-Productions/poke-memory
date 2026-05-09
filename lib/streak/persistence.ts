@@ -19,7 +19,11 @@ export function loadStreakData(): StreakData {
 
 export function saveStreakData(data: StreakData): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STREAK_KEY, JSON.stringify(data));
+  try {
+    localStorage.setItem(STREAK_KEY, JSON.stringify(data));
+  } catch {
+    // QuotaExceededError or similar — streak write is best-effort
+  }
 }
 
 export function recordReview(date: string): void {
