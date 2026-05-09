@@ -437,6 +437,8 @@ jobs:
           START_SHA: ${{ steps.start.outputs.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LOG: /home/runner/work/_temp/claude-execution-output.json
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          BOT_APP_ID: ${{ vars.BOT_APP_ID }}
         run: |
           set -euo pipefail
 
@@ -485,10 +487,6 @@ jobs:
             "auto/issue-${ISSUE}-"*) ;;
             *) BRANCH="" ;;
           esac
-          LAST_COMMIT=""
-          if [ "$COMMITS" -gt 0 ]; then
-            LAST_COMMIT=$(git log --format='%h %s' -n 1 2>/dev/null || echo "")
-          fi
 
           DENIAL_COUNT=0
           DENIAL_DETAILS=""
@@ -518,6 +516,47 @@ jobs:
             HALTED=true
           fi
 
+          # Salvage push: if we halted with uncommitted edits in the working
+          # tree, commit them as WIP and push the branch to origin so /continue
+          # has something to resume from. Without this, a halt mid-implementation
+          # loses all in-progress work and the recovery footer points at a
+          # branch that never made it to origin. Inline -c flags so the commit
+          # works even if the earlier `Configure git identity` step was skipped.
+          if [ "$HALTED" = true ] && [ -n "$BRANCH" ]; then
+            if ! git diff --quiet HEAD 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+              git add -A
+              if ! git -c user.name="${APP_SLUG}[bot]" \
+                       -c user.email="${BOT_APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com" \
+                       commit -m "WIP: halted run on #$ISSUE"; then
+                echo "::warning::WIP salvage commit failed — staged changes will not be pushed to origin"
+              fi
+            fi
+            git push origin "HEAD:refs/heads/$BRANCH" || \
+              echo "::warning::Salvage push to origin failed — /continue will fall back to /go"
+          fi
+
+          # Re-count commits and capture the last commit AFTER the salvage push
+          # so the recovery footer references the WIP commit (the most useful
+          # pointer for the maintainer) when one was created. Without this the
+          # footer would point at the pre-WIP commit and the salvage commit
+          # would be invisible.
+          if [ -n "$START_SHA" ] && git rev-parse "$START_SHA" >/dev/null 2>&1; then
+            COMMITS=$(git rev-list --count "$START_SHA..HEAD" 2>/dev/null || echo 0)
+          fi
+          LAST_COMMIT=""
+          if [ "$COMMITS" -gt 0 ]; then
+            LAST_COMMIT=$(git log --format='%h %s' -n 1 2>/dev/null || echo "")
+          fi
+
+          # Verify the branch is genuinely on origin before advertising
+          # /continue. Stays truthful even if the salvage push above failed
+          # (network, permissions, etc.). Uses ls-remote so we read origin
+          # directly rather than trusting the local refs.
+          BRANCH_ON_ORIGIN=false
+          if [ -n "$BRANCH" ] && git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            BRANCH_ON_ORIGIN=true
+          fi
+
           {
             # Preserve existing task list / placeholder body verbatim
             printf '%s\n\n---\n\n## Run finished\n\n' "$CURRENT_BODY"
@@ -532,16 +571,16 @@ jobs:
             fi
             if [ "$HALTED" = true ]; then
               printf '\n### How to recover\n\n'
-              if [ -n "$BRANCH" ]; then
+              if [ "$BRANCH_ON_ORIGIN" = true ]; then
                 printf 'Branch: `%s`\n' "$BRANCH"
               fi
               if [ -n "$LAST_COMMIT" ]; then
                 printf 'Last commit: `%s`\n' "$LAST_COMMIT"
               fi
-              if [ -n "$BRANCH" ] || [ -n "$LAST_COMMIT" ]; then
+              if [ "$BRANCH_ON_ORIGIN" = true ] || [ -n "$LAST_COMMIT" ]; then
                 printf '\n'
               fi
-              if [ -n "$BRANCH" ]; then
+              if [ "$BRANCH_ON_ORIGIN" = true ]; then
                 printf 'Comment `/continue` to resume from the branch above. Comment `/go` to start over with a fresh branch.\n'
               else
                 printf 'Comment `/go` to start over with a fresh branch.\n'
@@ -757,6 +796,11 @@ jobs:
                `${{ steps.preflight.outputs.branch }}`.
                Do NOT create a new branch. Commit and push to this branch as you
                complete work.
+               Before continuing, run `git log -1 --format=%s` — if the subject
+               starts with `WIP:`, the last commit is an auto-salvage of
+               uncommitted edits from the prior halted run; inspect
+               `git diff HEAD~1` and amend or revert as needed before
+               proceeding.
             3. Complete the remaining tasks from the prior run, following the
                implement playbook from AGENTS.md (excluding code-reviewer —
                it runs after PR creation).
@@ -928,7 +972,10 @@ jobs:
           gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -F body=@/tmp/status-body.md
 
       - name: Move issue to PR / Ready to merge based on review verdict
-        if: always()
+        # Skip when pre-flight aborted before checkout — the script lives in
+        # the repo working tree and `gh` calls infer the repo from git
+        # context, both of which fail with "fatal: not a git repository".
+        if: always() && steps.preflight.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
