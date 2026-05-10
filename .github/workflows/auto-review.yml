@@ -229,14 +229,29 @@ jobs:
           set -euo pipefail
           PR="${{ github.event.pull_request.number }}"
           SHA="${{ github.event.pull_request.head.sha }}"
-          BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
-            --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
-                  | sort_by(.created_at) | last | .body // \"\"")
-          VERDICT=$(printf '%s\n' "$BODY" | grep -E '^Verdict:' | head -1 || true)
           COUNT=${{ steps.cycles.outputs.count }}
-          if [[ "$VERDICT" == *"Needs fixes"* ]] && [[ "$COUNT" -lt 3 ]]; then
-            echo "Verdict is 'Needs fixes' and cycle count ($COUNT) < 3 — posting auto /fix comment."
-            gh pr comment "$PR" --body $'<!-- auto-review-autofix -->\n/fix'
+          NEXT=${{ steps.cycles.outputs.next }}
+          BODY=""
+          for attempt in 1 2 3; do
+            BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+              --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
+                    | sort_by(.created_at) | last | .body // \"\"")
+            [[ -n "$BODY" ]] && break
+            echo "Attempt $attempt: review comment not yet visible, waiting 2s..."
+            sleep 2
+          done
+          VERDICT=$(printf '%s\n' "$BODY" | grep -E '^Verdict:' | head -1 || true)
+          MARKER="<!-- auto-review-autofix:$NEXT -->"
+          if [[ "$VERDICT" == *"Needs fixes"* ]] && [[ "$COUNT" -lt 2 ]]; then
+            EXISTING=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+              --jq "[.[] | select(.body | contains(\"$MARKER\"))] | length")
+            if [[ "$EXISTING" -gt 0 ]]; then
+              echo "Autofix comment for review $NEXT already exists — skipping (idempotent re-run)."
+            else
+              echo "Verdict is 'Needs fixes' and cycle count ($COUNT) < 2 — posting auto /fix comment."
+              printf '%s\n/fix\n' "$MARKER" > /tmp/autofix-body.md
+              gh pr comment "$PR" --body-file /tmp/autofix-body.md
+            fi
           else
             echo "No auto-fix needed (verdict: '${VERDICT:-<none>}', count: $COUNT)."
           fi
@@ -252,9 +267,15 @@ jobs:
           # Scope to the current head SHA so re-runs (close/reopen at the same
           # SHA, or a later /fix cycle that bumps the SHA) always report the
           # verdict that was posted against the SHA this run is on.
-          BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
-            --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
-                  | sort_by(.created_at) | last | .body // \"\"")
+          BODY=""
+          for attempt in 1 2 3; do
+            BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+              --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
+                    | sort_by(.created_at) | last | .body // \"\"")
+            [[ -n "$BODY" ]] && break
+            echo "Attempt $attempt: review comment not yet visible, waiting 2s..."
+            sleep 2
+          done
           if [[ -z "$BODY" ]]; then
             echo "No auto-review comment found for SHA $SHA — nothing to gate on."
             exit 0

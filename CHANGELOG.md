@@ -6,6 +6,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **Auto-fix loop now actually triggers `auto-pr.yml`** — the bot-posted `/fix` comment now passes `auto-pr.yml`'s job gate (previously the gate required `OWNER`/`MEMBER`/`COLLABORATOR` but GitHub App comments carry neither; `poke-memory-bot` is now explicitly allowed through). The auto-fix comment uses a cycle-specific `<!-- auto-review-autofix:N -->` marker so idempotent re-runs skip duplicate posts. The trigger threshold is tightened to `count < 2` (was `< 3`) to avoid posting an autofix that would immediately hit the cycle cap. Both verdict-reading steps in `auto-review.yml` now retry up to three times with a 2 s delay to handle GitHub API eventual consistency. Fix-cycle approval verdicts now include `@fraserbrookhouse` (matching `auto-review.yml`), ensuring the maintainer receives a notification on approval from any review cycle.
+
 - **Auto-review comment headings and cross-references** — auto-review comments no longer use `#N` tokens in their headings or prose, which GitHub was auto-linking to unrelated issues/PRs. Headings now read `## Auto-review N` (no `#`), and prose references to prior reviews use a markdown link to the prior comment's URL. Closes [#88](https://github.com/fraserbrookhouse/poke-memory/issues/88).
 
 ### Changed

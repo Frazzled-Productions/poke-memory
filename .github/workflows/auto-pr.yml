@@ -31,7 +31,9 @@ jobs:
       contains(github.event.comment.body, '/fix') &&
       (github.event.comment.author_association == 'OWNER' ||
        github.event.comment.author_association == 'MEMBER' ||
-       github.event.comment.author_association == 'COLLABORATOR')
+       github.event.comment.author_association == 'COLLABORATOR' ||
+       (github.event.comment.user.type == 'Bot' &&
+        startsWith(github.event.comment.user.login, 'poke-memory-bot')))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -206,7 +208,8 @@ jobs:
                findings in the latest auto-review comment.
             3. **Approval short-circuit (bare `/fix` only).** If you fell
                through to the auto-review punch list AND that review's verdict
-               line expresses approval (`Verdict: Looks good to me`, or the
+               line expresses approval (`Verdict: Looks good to me`,
+               `Verdict: Looks good to me — @fraserbrookhouse`, or the
                legacy `Verdict: LGTM` for older reviews), post a PR comment
                saying "Latest review was approving — nothing to fix. (Reply
                with `/fix <inline findings>` to force a fix run.)" and stop.
@@ -240,17 +243,18 @@ jobs:
 
                      <bulleted punch list, or "No significant issues.">
 
-                     Verdict: Looks good to me
+                     Verdict: Looks good to me — @fraserbrookhouse
 
                      _Reply with `/fix` to have these findings addressed._
 
                  The first line MUST be the marker exactly as shown. A verdict
                  line starting with `Verdict: ` MUST be present, with either
-                 `Looks good to me` or `Needs fixes`. Use those whole-word
-                 phrases verbatim — no acronyms. When (and only when) the
-                 verdict is `Needs fixes`, append the italicised footer line
-                 shown above so the maintainer knows how to trigger a fix
-                 run. Omit the footer when the verdict is `Looks good to me`.
+                 `Looks good to me — @fraserbrookhouse` or `Needs fixes`. Use
+                 those whole-word phrases verbatim — no acronyms. When (and
+                 only when) the verdict is `Needs fixes`, append the italicised
+                 footer line shown above so the maintainer knows how to trigger
+                 a fix run. Omit the footer when the verdict is
+                 `Looks good to me — @fraserbrookhouse`.
 
                  When referencing a prior auto-review in your prose: find the
                  most recent `<!-- auto-review:N -->` comment you loaded in
