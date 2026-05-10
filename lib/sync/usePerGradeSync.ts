@@ -12,9 +12,9 @@ import { pushSingleCard } from "@/lib/sync/cloud";
  * upserted one at a time; successes are drained, failures stay queued for
  * the next grade or the unload safety-net.
  *
- * flushPending() — returns the current unsynced queue without side effects.
- * Pass this to useSyncOnUnload so it can batch only the cards that failed
- * the per-grade path.
+ * flushPending() — returns a snapshot of the current unsynced queue; does not
+ * modify the queue or cancel any pending timer. Pass this to useSyncOnUnload
+ * so it can batch only the cards that failed the per-grade path.
  *
  * Guest-mode guard runs on every enqueueGrade call — safe across sign-in
  * state changes mid-session.
@@ -39,8 +39,11 @@ export function usePerGradeSync(
 
     const toSend = [...pendingQueueRef.current];
     if (toSend.length === 0) return;
+    const sentIds = new Set(toSend.map((c) => c.id));
 
     const failed: ReviewableCard[] = [];
+    // No in-flight guard here — concurrent drains are safe because upserts are
+    // idempotent. A guard would add complexity without correctness benefit.
     await Promise.all(
       toSend.map(async (card) => {
         const ok = await pushSingleCard(c, uid, card);
@@ -48,15 +51,18 @@ export function usePerGradeSync(
       }),
     );
 
-    // Replace the queue with only the cards that failed, preserving any new
-    // entries that arrived while we were awaiting.
-    pendingQueueRef.current = pendingQueueRef.current.filter((card) =>
-      failed.some((f) => f.id === card.id),
+    // Keep a card in the queue if it wasn't part of this drain (a newer grade
+    // arrived during the await window) or if it was sent but failed.
+    pendingQueueRef.current = pendingQueueRef.current.filter(
+      (card) => !sentIds.has(card.id) || failed.some((f) => f.id === card.id),
     );
   }, []);
 
   const enqueueGrade = useCallback(
     (card: ReviewableCard) => {
+      // If the user signs out within the 200 ms debounce window the guard exits
+      // early and this grade is not synced. The unload safety-net also bails
+      // because client/userId are null by then. Accepted best-effort loss.
       if (!clientRef.current || !userIdRef.current) return;
 
       // Replace existing entry for this card or append.
