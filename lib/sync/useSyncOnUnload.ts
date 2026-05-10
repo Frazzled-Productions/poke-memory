@@ -72,6 +72,9 @@ export function useSyncOnUnload(
           lastPushFailed: !ok,
         });
       }).finally(() => {
+        // Runs even if the component unmounted. The localStorage write above is
+        // harmless (global store, not component state); pushingRef reset is a
+        // no-op on a stale ref but prevents double-push if the page survives.
         pushingRef.current = false;
       });
     }

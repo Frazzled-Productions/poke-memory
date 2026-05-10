@@ -55,7 +55,10 @@ export function usePerGradeSync(
     const failedIds = new Set(results.filter((r) => !r.ok).map((r) => r.card.id));
 
     // Keep a card in the queue if it wasn't part of this drain (a newer grade
-    // arrived during the await window) or if it was sent but failed.
+    // arrived during the await window) or if it was sent but failed. If two
+    // concurrent drains both attempted the same card, the queue entry at
+    // filter-time reflects the latest enqueued state — the newest version
+    // survives either way.
     pendingQueueRef.current = pendingQueueRef.current.filter(
       (card) => !sentIds.has(card.id) || failedIds.has(card.id),
     );
