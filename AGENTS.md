@@ -142,7 +142,7 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 **Scope warning + `/split`.** When the planner detects large scope (≥4 files, ≥3 surfaces, infra + logic with ≥3 files, or ≥6 acceptance criteria), it runs a coupling check before offering `/split`. Coupling exists when proposed children share a symbol name, `localStorage` key, DB table, leaf module directory, or file — coupled children produce PRs that don't compose at merge time. If coupling is found, `/split` is not offered; proceed as a single issue. When children are cleanly independent, the planner appends a **Suggested split** block and `/split` is available. Each child inherits the `auto` label and triggers its own plan run.
 
-**Auto-review on PR open.** `auto-review.yml` fires when a PR opens and posts `<!-- auto-review:1 -->`. Do not run `code-reviewer` yourself in the implement stage — it runs automatically after the PR is open. The workflow explicitly refuses to run on fork PRs (`head.repo.fork == false` in the job-level `if:`) — this is a deliberate guard, not a side-effect of GitHub's default secret-isolation policy.
+**Auto-review on PR open.** `auto-review.yml` fires when a PR opens and posts `<!-- auto-review:1 -->`. Do not run `code-reviewer` yourself in the implement stage — it runs automatically after the PR is open. Fork PRs are explicitly excluded (`head.repo.fork == false` in the job-level `if:`) — this is a deliberate guard, not a side-effect of GitHub's default secret-isolation policy.
 
 ### Privacy
 
