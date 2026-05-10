@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { hasCloudData, pullSession, pushSession } from "@/lib/sync/cloud";
+import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS, buildSession } from "@/lib/review/session";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
@@ -72,6 +73,13 @@ export default function CallbackCompletePage() {
       if (!hasLocal && !cloudHasData) { router.replace("/"); return; }
       if (hasLocal && !cloudHasData) {
         const ok = await pushSession(supabase, user.id, localSession!.cards);
+        const prev = loadSyncStatus();
+        saveSyncStatus({
+          ...prev,
+          lastPushAt: ok ? new Date().toISOString() : prev.lastPushAt,
+          lastPushFailed: !ok,
+          lastPushAttemptAt: new Date().toISOString(),
+        });
         if (!ok && !cancelled) {
           setStatus({ kind: "push-warning", message: "Sync upload failed — your progress is safe locally." });
           return;
@@ -100,6 +108,13 @@ export default function CallbackCompletePage() {
     setPending(true);
     try {
       const ok = await pushSession(supabase, user.id, status.localCards);
+      const prev = loadSyncStatus();
+      saveSyncStatus({
+        ...prev,
+        lastPushAt: ok ? new Date().toISOString() : prev.lastPushAt,
+        lastPushFailed: !ok,
+        lastPushAttemptAt: new Date().toISOString(),
+      });
       if (!ok) {
         setStatus({ kind: "push-warning", message: "Sync failed — your progress is safe locally." });
         return;
