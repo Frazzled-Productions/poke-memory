@@ -10,8 +10,8 @@ export type CardClass = "locked" | "learning" | "mastered";
 /** A card is "mastered" once it has this many consecutive successful reviews. */
 export const MASTERY_REPETITIONS = 3;
 
-export function isMastered(state: ReviewState): boolean {
-  return state.repetitions >= 3 && state.interval >= 21;
+export function isMastered(state: ReviewState, masteryReps = MASTERY_REPETITIONS): boolean {
+  return state.repetitions >= masteryReps && state.interval >= 21;
 }
 
 /**
@@ -77,7 +77,7 @@ export type GenerationStats = {
   name: string;
   total: number;       // species in this generation
   introduced: number;  // count where lastReview !== null
-  mastered: number;    // count where repetitions >= masteryRepetitions
+  mastered: number;    // count where repetitions >= masteryRepetitions AND interval >= 21
 };
 
 export type StrugglingCard = {
@@ -92,7 +92,7 @@ export type StatsResult = {
   totalCards: number;                    // name cards only, ~1025
   introduced: number;                    // lastReview !== null
   learning: number;                      // introduced && !mastered
-  mastered: number;                      // repetitions >= masteryRepetitions param
+  mastered: number;                      // repetitions >= masteryRepetitions param AND interval >= 21
   locked: number;                        // lastReview === null (== totalCards - introduced)
   dueToday: number;                      // dueDate <= today AND lastReview !== today
   dueTomorrow: number;                   // dueDate === tomorrow's ISO date
@@ -129,7 +129,7 @@ function tomorrowString(today: string): string {
  * Card filters:
  *   - `introduced` cards = `lastReview !== null`.
  *   - `learning` cards = introduced AND repetitions < MASTERY_REPETITIONS.
- *   - `mastered` cards = repetitions >= MASTERY_REPETITIONS.
+ *   - `mastered` cards = repetitions >= masteryRepetitions AND interval >= 21.
  *   - `dueToday` excludes cards already reviewed today (matches the queue policy).
  *   - `dueTomorrow` is exact-match on tomorrow's ISO date.
  *   - `struggling` is the bottom `strugglingLimit` *introduced* cards sorted
@@ -161,7 +161,7 @@ export function computeStats(
   for (const card of cards) {
     const state = card.state;
     const isIntroduced  = state.lastReview !== null;
-    const isCardMastered = state.repetitions >= masteryRepetitions;
+    const isCardMastered = isMastered(state, masteryRepetitions);
 
     // Mastery / learning / locked tallies.
     if (isIntroduced) {

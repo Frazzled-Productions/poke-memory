@@ -4,8 +4,11 @@ import { loadSession } from "@/lib/review/persistence";
 import { classifyCard } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
 
-export function useCardClass(id: number): CardClass | null {
-  const [cardClass, setCardClass] = useState<CardClass | null>(null);
+/** "pending" = hydration not yet complete; CardClass = resolved. */
+export type CardClassOrPending = CardClass | "pending";
+
+export function useCardClass(id: number): CardClassOrPending {
+  const [cardClass, setCardClass] = useState<CardClassOrPending>("pending");
 
   useEffect(() => {
     const session = loadSession();

@@ -6,6 +6,7 @@ import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { getPokemonFacts } from "@/lib/pokemon/facts";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
+import type { CardClassOrPending } from "@/lib/review/useCardClass";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -33,6 +34,42 @@ const SPRITE_BY_ID: Record<number, string> = Object.fromEntries(
   SEED_POKEMON.map((p) => [p.id, p.spriteUrl])
 );
 
+function EvolutionChainNode({ node }: { node: EvolutionNode }) {
+  const nodeSprite = SPRITE_BY_ID[node.speciesId];
+  const nodeClass: CardClassOrPending = useCardClass(node.speciesId);
+  const nodeLocked = nodeClass === "locked" || nodeClass === "pending";
+  const nodeLearning = nodeClass === "learning";
+
+  return (
+    <Link
+      href={"/pokedex/" + node.speciesId}
+      className="flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+    >
+      {nodeSprite ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={nodeSprite}
+          alt={nodeLocked ? `#${zeroPad(node.speciesId)} (locked)` : node.name}
+          width={40}
+          height={40}
+          className={[
+            "h-10 w-10 object-contain",
+            nodeLocked ? "brightness-0" : nodeLearning ? "grayscale opacity-60" : "",
+          ].join(" ")}
+        />
+      ) : (
+        <div
+          className="h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700"
+          aria-hidden="true"
+        />
+      )}
+      <span className="text-xs text-center text-zinc-600 dark:text-zinc-300 leading-tight max-w-[4rem]">
+        {nodeLocked ? "???" : node.name}
+      </span>
+    </Link>
+  );
+}
+
 function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
   if (chain.length === 0) return [];
   const stages: EvolutionNode[][] = [];
@@ -55,13 +92,24 @@ function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
 export function PokemonDetailDisclosure({ pokemon }: { pokemon: SeedPokemon }) {
   const { id, name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
   const cardClass = useCardClass(id);
-  const isLocked = cardClass === null || cardClass === "locked";
+  const isPending = cardClass === "pending";
+  const isLocked = cardClass === "locked";
   const isMasteredCard = cardClass === "mastered";
   const isLearning = cardClass === "learning";
 
   const facts = getPokemonFacts(pokemon);
   const stages = buildStages(evolutionChain);
   const showEvolution = stages.length > 1;
+
+  if (isPending) {
+    return (
+      <div className="flex flex-col items-center gap-4 animate-pulse">
+        <div className="h-4 w-12 rounded bg-zinc-200 dark:bg-zinc-700" />
+        <div className="h-48 w-48 rounded-lg bg-zinc-200 dark:bg-zinc-700" />
+        <div className="h-8 w-32 rounded bg-zinc-200 dark:bg-zinc-700" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -194,35 +242,9 @@ export function PokemonDetailDisclosure({ pokemon }: { pokemon: SeedPokemon }) {
                   </span>
                 )}
                 <div className="flex flex-col items-center gap-3">
-                  {stage.map((node) => {
-                    const nodeSprite = SPRITE_BY_ID[node.speciesId];
-                    return (
-                      <Link
-                        key={node.speciesId}
-                        href={"/pokedex/" + node.speciesId}
-                        className="flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-                      >
-                        {nodeSprite ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={nodeSprite}
-                            alt={node.name}
-                            width={40}
-                            height={40}
-                            className="h-10 w-10 object-contain"
-                          />
-                        ) : (
-                          <div
-                            className="h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700"
-                            aria-hidden="true"
-                          />
-                        )}
-                        <span className="text-xs text-center text-zinc-600 dark:text-zinc-300 leading-tight max-w-[4rem]">
-                          {node.name}
-                        </span>
-                      </Link>
-                    );
-                  })}
+                  {stage.map((node) => (
+                    <EvolutionChainNode key={node.speciesId} node={node} />
+                  ))}
                 </div>
               </div>
             ))}
