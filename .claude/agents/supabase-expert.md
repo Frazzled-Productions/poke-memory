@@ -27,16 +27,16 @@ Supabase Auth (GitHub OAuth), per-user RLS policies, `@supabase/ssr` client spli
 - Per-user policies bind to `auth.uid()`:
   ```sql
   -- SELECT
-  CREATE POLICY "users_select_own" ON review_state
+  CREATE POLICY "users_select_own" ON card_reviews
     FOR SELECT USING (auth.uid() = user_id);
   -- INSERT
-  CREATE POLICY "users_insert_own" ON review_state
+  CREATE POLICY "users_insert_own" ON card_reviews
     FOR INSERT WITH CHECK (auth.uid() = user_id);
   -- UPDATE
-  CREATE POLICY "users_update_own" ON review_state
-    FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  CREATE POLICY "users_update_own" ON card_reviews
+    FOR UPDATE USING (auth.uid() = user_id);
   -- DELETE
-  CREATE POLICY "users_delete_own" ON review_state
+  CREATE POLICY "users_delete_own" ON card_reviews
     FOR DELETE USING (auth.uid() = user_id);
   ```
 - Prefer four separate named policies (SELECT / INSERT / UPDATE / DELETE) over one permissive `ALL` policy — clearer and easier to audit.
