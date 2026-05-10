@@ -32,6 +32,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Richer Pokémon facts** — height and weight facts now include a familiar-object comparison (e.g. "0.7 m — roughly knee-height on an adult", "6.9 kg — about as heavy as a small bowling ball"). Base happiness and base experience are shown as descriptive tier labels ("Bonds with trainers easily", "Very low XP yield") instead of raw numbers. Catch difficulty no longer shows the raw catch-rate value in parentheses. Closes [#82](https://github.com/fraserbrookhouse/poke-memory/issues/82).
+
 - **Reverse-direction card type** — a new card mode where the Pokémon's name is shown as the prompt and you must identify the sprite on reveal. Each species gets an independent reverse card scheduled separately by SM-2. Disabled by default; enable in Settings under "Reverse cards". Disabling and re-enabling resets reverse-card review history. Closes [#56](https://github.com/fraserbrookhouse/poke-memory/issues/56).
 
 - **Pokédex progressive disclosure** — Pokémon in the Pokédex are now revealed progressively as you learn them. Unlearned Pokémon appear as a solid-black silhouette with only the Pokédex number visible. Pokémon you have started reviewing appear greyscale with their name and type shown. Mastered Pokémon (at least 3 consecutive reviews with a projected interval of 21+ days) show their full-colour sprite, name, types, flavour text, base stats, and evolution chain. The detail page applies the same three-tier gating so navigating directly to `/pokedex/[id]` also respects your progress. Closes [#22](https://github.com/fraserbrookhouse/poke-memory/issues/22).

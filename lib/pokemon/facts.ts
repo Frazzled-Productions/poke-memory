@@ -31,12 +31,57 @@ function titleCase(slug: string): string {
 }
 
 function catchDifficulty(rate: number): string {
-  if (rate <= 15) return `Extremely rare (catch rate ${rate})`;
-  if (rate <= 45) return `Rare (catch rate ${rate})`;
-  if (rate <= 100) return `Uncommon (catch rate ${rate})`;
-  if (rate <= 180) return `Somewhat common (catch rate ${rate})`;
-  if (rate <= 220) return `Common (catch rate ${rate})`;
-  return `Very common (catch rate ${rate})`;
+  if (rate <= 15) return "Extremely rare";
+  if (rate <= 45) return "Rare";
+  if (rate <= 100) return "Uncommon";
+  if (rate <= 180) return "Somewhat common";
+  if (rate <= 220) return "Common";
+  return "Very common";
+}
+
+function heightComparison(dm: number): string {
+  const m = dm / 10;
+  const label =
+    m < 0.3 ? "about the size of a hamster" :
+    m < 0.6 ? "about the size of a large house cat" :
+    m < 1.0 ? "roughly knee-height on an adult" :
+    m < 1.5 ? "roughly the height of a 10-year-old child" :
+    m < 2.0 ? "roughly the height of an average adult" :
+    m < 4.0 ? "taller than a basketball hoop" :
+    m < 8.0 ? "about the height of a double-decker bus" :
+    m < 15.0 ? "taller than a four-storey building" :
+    "taller than a five-storey building";
+  return `${m.toFixed(1)} m — ${label}`;
+}
+
+function weightComparison(hg: number): string {
+  const kg = hg / 10;
+  const label =
+    kg < 1 ? "lighter than a bag of sugar" :
+    kg < 5 ? "about as heavy as a bag of sugar" :
+    kg < 15 ? "about as heavy as a small bowling ball" :
+    kg < 40 ? "about as heavy as a medium dog" :
+    kg < 100 ? "about as heavy as an average adult" :
+    kg < 200 ? "heavier than a grand piano" :
+    kg < 500 ? "about as heavy as a grand piano and a half" :
+    "heavier than a small car";
+  return `${kg.toFixed(1)} kg — ${label}`;
+}
+
+function happinessTier(n: number): string {
+  if (n <= 34) return "Slow to trust";
+  if (n <= 69) return "Warms up gradually";
+  if (n <= 99) return "Bonds with trainers easily";
+  if (n <= 139) return "Particularly friendly";
+  return "Very happy by nature";
+}
+
+function experienceTier(n: number): string {
+  if (n < 70) return "Very low XP yield";
+  if (n < 110) return "Low XP yield";
+  if (n < 160) return "Average XP yield";
+  if (n < 220) return "High XP yield";
+  return "Very high XP yield";
 }
 
 function genderText(rate: number): string {
@@ -53,11 +98,11 @@ export function getPokemonFacts(pokemon: SeedPokemon): PokemonFact[] {
   const facts: PokemonFact[] = [];
 
   if (pokemon.height !== null) {
-    facts.push({ label: "Height", value: `${(pokemon.height / 10).toFixed(1)} m` });
+    facts.push({ label: "Height", value: heightComparison(pokemon.height) });
   }
 
   if (pokemon.weight !== null) {
-    facts.push({ label: "Weight", value: `${(pokemon.weight / 10).toFixed(1)} kg` });
+    facts.push({ label: "Weight", value: weightComparison(pokemon.weight) });
   }
 
   if (pokemon.types.length > 0) {
@@ -77,7 +122,7 @@ export function getPokemonFacts(pokemon: SeedPokemon): PokemonFact[] {
   }
 
   if (pokemon.baseHappiness !== null) {
-    facts.push({ label: "Base happiness", value: String(pokemon.baseHappiness) });
+    facts.push({ label: "Base happiness", value: happinessTier(pokemon.baseHappiness) });
   }
 
   if (pokemon.growthRate) {
@@ -93,7 +138,7 @@ export function getPokemonFacts(pokemon: SeedPokemon): PokemonFact[] {
   }
 
   if (pokemon.baseExperience !== null) {
-    facts.push({ label: "Base exp.", value: String(pokemon.baseExperience) });
+    facts.push({ label: "Base exp.", value: experienceTier(pokemon.baseExperience) });
   }
 
   const statEntries = Object.entries(pokemon.stats) as [string, number][];

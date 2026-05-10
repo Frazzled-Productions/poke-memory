@@ -49,4 +49,40 @@ describe('getPokemonFacts', () => {
     const facts = getPokemonFacts(pokemon);
     expect(facts.every((f) => f.label !== 'Pokédex entry')).toBe(true);
   });
+
+  it('height fact contains " m — " (comparison present)', () => {
+    const facts = getPokemonFacts(basePokemon());
+    const height = facts.find((f) => f.label === 'Height');
+    expect(height?.value).toContain(' m — ');
+  });
+
+  it('weight fact contains " kg — " (comparison present)', () => {
+    const facts = getPokemonFacts(basePokemon());
+    const weight = facts.find((f) => f.label === 'Weight');
+    expect(weight?.value).toContain(' kg — ');
+  });
+
+  it('base happiness fact is tier label, not raw number', () => {
+    const facts = getPokemonFacts(basePokemon());
+    const happiness = facts.find((f) => f.label === 'Base happiness');
+    expect(happiness?.value).toBe('Warms up gradually');
+  });
+
+  it('base exp. fact is tier label, not raw number', () => {
+    const facts = getPokemonFacts(basePokemon());
+    const exp = facts.find((f) => f.label === 'Base exp.');
+    expect(exp?.value).toBe('Very low XP yield');
+  });
+
+  it('catch difficulty does not contain "catch rate"', () => {
+    const facts = getPokemonFacts(basePokemon());
+    const difficulty = facts.find((f) => f.label === 'Catch difficulty');
+    expect(difficulty?.value).not.toContain('catch rate');
+  });
+
+  it('catch difficulty for rate=3 is "Extremely rare" with no parenthetical', () => {
+    const facts = getPokemonFacts(basePokemon({ captureRate: 3 }));
+    const difficulty = facts.find((f) => f.label === 'Catch difficulty');
+    expect(difficulty?.value).toBe('Extremely rare');
+  });
 });
