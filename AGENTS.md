@@ -25,6 +25,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [next16-expert](.claude/agents/next16-expert.md) | Any Next.js 16 API / caching / routing / rendering question. Read-only. |
 | [pokeapi-expert](.claude/agents/pokeapi-expert.md) | Choosing PokéAPI endpoints, schemas, caching. Use BEFORE writing integration code. |
 | [srs-expert](.claude/agents/srs-expert.md) | Designing/implementing the spaced-repetition scheduler. |
+| [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth, Postgres + RLS, schema design for SM-2 state, Next.js 16 App Router client patterns. Use BEFORE writing any Supabase integration code. Read-only. |
 | [workflow-expert](.claude/agents/workflow-expert.md) | Any non-trivial change to `.github/workflows/**` or `.claude/agents/**`. Read-only. |
 | [planner](.claude/agents/planner.md) | Designing an implementation plan before any code is written. |
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist. |
@@ -55,6 +56,7 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 | Server Actions | data-coder (implementation), ui-coder (call sites) |
 | SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
+| Supabase schema / RLS | supabase-expert designs; data-coder implements |
 | `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
 | `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
 | `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
