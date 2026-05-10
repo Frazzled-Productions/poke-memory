@@ -229,8 +229,8 @@ jobs:
           set -euo pipefail
           PR="${{ github.event.pull_request.number }}"
           SHA="${{ github.event.pull_request.head.sha }}"
-          COUNT=${{ steps.cycles.outputs.count }}
-          NEXT=${{ steps.cycles.outputs.next }}
+          COUNT=${{ steps.cycles.outputs.count || '0' }}
+          NEXT=${{ steps.cycles.outputs.next || '1' }}
           BODY=""
           for attempt in 1 2 3; do
             BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \

@@ -198,14 +198,18 @@ jobs:
                `gh pr view ${{ github.event.issue.number }} --json title,body,comments,headRefName,baseRefName`
                The latest auto-review is the most recent comment whose body
                starts with `<!-- auto-review:N -->`. Use the highest N.
-            2. **Determine the punch list.** Read `FIX_COMMENT_BODY`. Strip
-               the leading `/fix` token and any whitespace immediately after
-               it. If the remainder contains non-whitespace content, that
-               inline body IS the punch list — use it directly and skip the
-               approval short-circuit below. The maintainer is explicitly
-               directing what to fix, which overrides the auto-review verdict.
-               Otherwise (bare `/fix` with no body), the punch list is the
-               findings in the latest auto-review comment.
+            2. **Determine the punch list.** Read `FIX_COMMENT_BODY`.
+               First, discard any leading lines that are HTML comment markers
+               (lines whose trimmed content matches `<!-- … -->`; e.g.
+               `<!-- auto-review-autofix:N -->` injected by the bot).
+               Then strip the leading `/fix` token and any whitespace
+               immediately after it. If the remainder contains non-whitespace
+               content, that inline body IS the punch list — use it directly
+               and skip the approval short-circuit below. The maintainer is
+               explicitly directing what to fix, which overrides the
+               auto-review verdict. Otherwise (bare `/fix` with no body),
+               the punch list is the findings in the latest auto-review
+               comment.
             3. **Approval short-circuit (bare `/fix` only).** If you fell
                through to the auto-review punch list AND that review's verdict
                line expresses approval (`Verdict: Looks good to me`,
