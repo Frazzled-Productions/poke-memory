@@ -12,9 +12,9 @@ name: Auto Review
 # — this is a deliberate guard, not a side-effect of GitHub's default
 # secret-isolation policy. The condition uses == false rather than != true:
 # a null fork value yields (null == false) → false, keeping the guard closed;
-# != true would yield (null != true) → true, bypassing it. For `labeled`
-# events only the newly-added
-# `auto-review` label fires a run, so unrelated labels are ignored.
+# != true would yield (null != true) → true, bypassing it.
+# For `labeled` events only the newly-added `auto-review` label fires a run,
+# so unrelated labels are ignored.
 #
 # Idempotency: the body of the auto-review comment includes a hidden
 # `<!-- auto-review-sha:<head-sha> -->` line on row 2. Re-triggers at the
