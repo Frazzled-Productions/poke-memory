@@ -19,11 +19,11 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [pokeapi-expert](.claude/agents/pokeapi-expert.md) | PokéAPI endpoint selection, schemas, caching strategy | Yes |
 | [srs-expert](.claude/agents/srs-expert.md) | Spaced-repetition algorithm design and implementation | No |
 | [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth + RLS + schema design for SM-2 state | Yes |
+| [workflow-expert](.claude/agents/workflow-expert.md) | GitHub Actions / orchestration changes — idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist | Yes |
 | [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling | No |
 | [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations | No |
 | [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change | Yes |
-| [workflow-expert](.claude/agents/workflow-expert.md) | GitHub Actions / orchestration changes — idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
 
 ---
 

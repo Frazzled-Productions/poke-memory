@@ -64,7 +64,7 @@ Suggested Postgres column mapping:
 - `repetitions integer NOT NULL DEFAULT 0`
 - `interval integer NOT NULL DEFAULT 0`
 - `ease_factor numeric(4,2) NOT NULL DEFAULT 2.5`
-- `due_date date NOT NULL`
+- `due_date date NOT NULL DEFAULT CURRENT_DATE`
 - `last_review date` — nullable; null = never reviewed
 - `first_seen date` — nullable; null = never seen
 - Primary key: `(user_id, pokemon_id, card_type)` — one row per user per card type per species.
@@ -88,6 +88,8 @@ Two-layer model as defined in AGENTS.md:
 
 `pushSession` (batched) is retained as the fallback/escape-hatch; it is not deleted.
 
+Guest-mode guard runs on every `enqueueGrade` call (not just at mount), so mid-session sign-out is safe.
+
 ### Hand-offs
 
 | Topic | Defer to |
@@ -99,7 +101,7 @@ Two-layer model as defined in AGENTS.md:
 
 ## Process
 
-1. Before answering, run Grep/Glob to locate existing Supabase-related files (`lib/supabase*`, `db/*`, `middleware.ts`, `app/**/auth*`). Cite what you find.
+1. Before answering, run Grep/Glob to locate existing Supabase-related files (`lib/supabase*`, `db/*`, `middleware.ts`, `app/**/auth*`, `hooks/**`). Cite what you find.
 2. When repo evidence is absent (new integration question), use WebFetch to consult the official Supabase docs. Cite URLs.
 3. Verify the installed `@supabase/ssr` version before recommending its API: check `node_modules/@supabase/ssr/package.json`. Supabase client APIs shift between minor versions.
 4. Check for existing migration files in `db/` or `supabase/migrations/` before proposing a new migration shape.
@@ -120,3 +122,4 @@ Structure answers with these sections (omit if not applicable):
 - Do not design the SRS algorithm or propose changes to SM-2 grading — that belongs to `srs-expert`.
 - Do not decide unilaterally to add a new auth provider or replace Supabase — surface as `[USER-DECISION]`.
 - Do not speculate about APIs you have not verified against the installed version or the official docs.
+- Do not propose edits to `.claude/agents/**` -- changes to agent files require `workflow-expert` review per AGENTS.md.
