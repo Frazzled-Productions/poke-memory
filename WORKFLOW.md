@@ -110,7 +110,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Conflict gate** | Checks for `<!-- overlap-scan:i+j:conflict -->` markers linked to open issues; refuses to proceed if unresolved |
 | **What it does** | Runs the orchestration playbook (plan → research → implement → review), pushes a branch, runs the build gate, opens a PR |
 | **Build gate** | `npm run typecheck && npm run build && npm test` — up to 2 fix attempts before stopping without a PR |
-| **Git credential** | The App installation token is written as a global git credential (`http.https://github.com/.extraheader`) immediately before `claude-code-action` — same mechanism as `auto-pr.yml`. No `if:` guard is needed here: this job has no early-exit path and no `stopped` flag. |
+| **Git credential** | The App installation token is written as a global git credential (`http.https://github.com/.extraheader`) immediately before `claude-code-action`. `actions/checkout` writes the token to the repo-local `.git/config`, but `claude-code-action` subprocesses spawn outside that scope and fall back to the ambient `GITHUB_TOKEN`; the global credential ensures all subprocess trees push as `poke-memory-bot`. No `if:` guard is needed: this job has no early-exit path and no `stopped` flag. |
 | **Post-step** | Runs `if: always()` — salvages uncommitted edits as a `WIP: halted run on #N` commit, verifies the branch on origin before advertising `/continue`, updates the live status comment |
 | **Project status** | Moves to **In Progress** on start; to **PR** when a PR opens |
 
