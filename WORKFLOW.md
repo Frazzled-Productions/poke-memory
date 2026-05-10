@@ -34,7 +34,7 @@ The main agent (Claude in the user's session) orchestrates. Coder agents do not 
 Standard flow for non-trivial work:
 
 1. **Plan** — invoke `planner`. It surfaces unknowns tagged as `[EXPERT-RESEARCH]`, `[USER-DECISION + RESEARCH]`, or `[USER-DECISION]`.
-2. **Research in parallel** — dispatch specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `researcher`) in a single message when their questions are independent. Fold answers into the plan.
+2. **Research in parallel** — dispatch specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `supabase-expert`, `researcher`) in a single message when their questions are independent. Fold answers into the plan.
 3. **Implement** — invoke `ui-coder` and/or `data-coder` with full context (research findings + spec). Run in parallel when their work is independent.
 4. **Review** — invoke `code-reviewer` at the end. Iterate on its punch list.
 

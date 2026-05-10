@@ -17,7 +17,7 @@ Supabase Auth (GitHub OAuth), per-user RLS policies, `@supabase/ssr` client spli
 
 - GitHub OAuth is configured in the Supabase dashboard (Providers → GitHub). Callback URL: `{SUPABASE_URL}/auth/v1/callback`.
 - In Next.js 16 App Router: use `@supabase/ssr`'s `createServerClient` in Server Components, Server Actions, and Route Handlers; use `createBrowserClient` in Client Components. Never use `createClient` from `@supabase/supabase-js` directly in App Router — it does not handle cookie-based session refresh.
-- Session is carried in cookies (managed by `@supabase/ssr`), not `localStorage`. The middleware pattern in `middleware.ts` calls `supabase.auth.getUser()` on every request to refresh the session cookie; without it, sessions silently expire.
+- Session is carried in cookies (managed by `@supabase/ssr`), not `localStorage`. This repo does not use `middleware.ts` — session refresh is handled inside the server client helper (`lib/supabase/server.ts`). If adding middleware becomes necessary, call `supabase.auth.getUser()` on every request to refresh the session cookie.
 - `getUser()` always makes a network call to validate the JWT with Supabase — use it for auth-gated logic. `getSession()` reads from the cookie without validation and is only safe for non-sensitive reads.
 - Sign-in: `signInWithOAuth({ provider: 'github', options: { redirectTo: ... } })`. Sign-out: `signOut()` in a Server Action.
 
@@ -58,16 +58,16 @@ type ReviewState = {
 };
 ```
 
-Suggested Postgres column mapping:
-- `pokemon_id integer NOT NULL` — Pokédex number
-- `card_type text NOT NULL` — e.g. `'name'`, `'evolution'`, `'reverse'`
+Live Postgres column mapping (see `db/migrations/001_initial_sync_schema.sql`):
+- `pokemon_id integer NOT NULL` — Pokédex number for name cards; `EVOLUTION_ID_OFFSET + pokédex_number` for evolution cards. **No `card_type` column** — card types are encoded via the `pokemon_id` offset, not a separate column.
 - `repetitions integer NOT NULL DEFAULT 0`
 - `interval integer NOT NULL DEFAULT 0`
-- `ease_factor numeric(4,2) NOT NULL DEFAULT 2.5`
-- `due_date date NOT NULL DEFAULT CURRENT_DATE`
+- `ease_factor numeric(6,4) NOT NULL DEFAULT 2.5`
+- `due_date date NOT NULL` — no DEFAULT; caller must always supply a value on INSERT
 - `last_review date` — nullable; null = never reviewed
 - `first_seen date` — nullable; null = never seen
-- Primary key: `(user_id, pokemon_id, card_type)` — one row per user per card type per species.
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- Unique constraint: `(user_id, pokemon_id)` — one row per user per encoded card ID.
 
 Dates are stored as `date` (not `timestamp`) to match the `"YYYY-MM-DD"` string convention used throughout the app. No timezone math needed.
 
@@ -101,7 +101,7 @@ Guest-mode guard runs on every `enqueueGrade` call (not just at mount), so mid-s
 
 ## Process
 
-1. Before answering, run Grep/Glob to locate existing Supabase-related files (`lib/supabase*`, `db/*`, `middleware.ts`, `app/**/auth*`, `hooks/**`). Cite what you find.
+1. Before answering, run Grep/Glob to locate existing Supabase-related files (`lib/supabase*`, `db/*`, `app/**/auth*`, `hooks/**`). Cite what you find.
 2. When repo evidence is absent (new integration question), use WebFetch to consult the official Supabase docs. Cite URLs.
 3. Verify the installed `@supabase/ssr` version before recommending its API: check `node_modules/@supabase/ssr/package.json`. Supabase client APIs shift between minor versions.
 4. Check for existing migration files in `db/` or `supabase/migrations/` before proposing a new migration shape.
@@ -122,4 +122,4 @@ Structure answers with these sections (omit if not applicable):
 - Do not design the SRS algorithm or propose changes to SM-2 grading — that belongs to `srs-expert`.
 - Do not decide unilaterally to add a new auth provider or replace Supabase — surface as `[USER-DECISION]`.
 - Do not speculate about APIs you have not verified against the installed version or the official docs.
-- Do not propose edits to `.claude/agents/**` -- changes to agent files require `workflow-expert` review per AGENTS.md.
+- Do not propose edits to `.claude/agents/**` — changes to agent files require `workflow-expert` review per AGENTS.md.

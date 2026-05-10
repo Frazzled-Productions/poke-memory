@@ -38,7 +38,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 The main agent (Claude in the user's session) orchestrates. Coder agents do not call other agents directly — they receive research findings via the prompt. The standard flow for non-trivial work:
 
 1. **Plan** — invoke `planner`. It surfaces unknowns to research first.
-2. **Research in parallel** — invoke specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `researcher`) in a single message when their questions are independent. Pass findings to coders via prompt.
+2. **Research in parallel** — invoke specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `supabase-expert`, `researcher`) in a single message when their questions are independent. Pass findings to coders via prompt.
 3. **Implement** — invoke `ui-coder` and/or `data-coder` with full context (research findings + spec). Run them in parallel when their work is independent.
 4. **Review** — invoke `code-reviewer` at the end. Iterate on its punch list.
 
