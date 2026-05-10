@@ -13,7 +13,7 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 ## Process
 1. Read the relevant existing code first — don't plan in a vacuum.
 2. Identify unknowns. Tag each one for the orchestrator:
-   - `[EXPERT-RESEARCH]` — has an objectively-correct answer a domain specialist can produce. Name the specialist (`next16-expert`, `pokeapi-expert`, or `srs-expert`). Example: "what conflict resolution rule preserves SM-2 scheduling integrity?" → srs-expert.
+   - `[EXPERT-RESEARCH]` — has an objectively-correct answer a domain specialist can produce. Name the specialist (`next16-expert`, `pokeapi-expert`, `srs-expert`, or `supabase-expert`). Example: "what conflict resolution rule preserves SM-2 scheduling integrity?" → srs-expert.
    - `[USER-DECISION + RESEARCH]` — needs maintainer judgment, but a project-specific options brief from `researcher` would meaningfully improve the decision (comparative tradeoffs, current ecosystem state, what fits this codebase). Example: "which backend provider?" → researcher surveys options against this project's constraints.
    - `[USER-DECISION]` — pure preference; no research helps. Use sparingly — most "user calls" benefit from a brief.
 

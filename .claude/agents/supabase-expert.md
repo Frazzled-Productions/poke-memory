@@ -101,7 +101,7 @@ Guest-mode guard runs on every `enqueueGrade` call (not just at mount), so mid-s
 
 ## Process
 
-1. Before answering, run Grep/Glob to locate existing Supabase-related files (`lib/supabase*`, `db/*`, `app/**/auth*`, `hooks/**`). Cite what you find.
+1. Before answering, run Grep/Glob to locate existing Supabase-related files (`lib/supabase*`, `lib/sync/**`, `db/*`, `app/**/auth*`). Cite what you find.
 2. When repo evidence is absent (new integration question), use WebFetch to consult the official Supabase docs. Cite URLs.
 3. Verify the installed `@supabase/ssr` version before recommending its API: check `node_modules/@supabase/ssr/package.json`. Supabase client APIs shift between minor versions.
 4. Check for existing migration files in `db/` or `supabase/migrations/` before proposing a new migration shape.
