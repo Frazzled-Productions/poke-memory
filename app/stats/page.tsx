@@ -75,7 +75,7 @@ function StatCard({
   );
 }
 
-function MasteryBar({ stats }: { stats: StatsResult }) {
+function MasteryBar({ stats, nameCardsEnabled }: { stats: StatsResult; nameCardsEnabled: boolean }) {
   const { totalCards, locked, learning, mastered } = stats;
   // Compute mastered + learning by rounding, then derive locked as the
   // remainder so the three segments always sum to exactly 100% — three
@@ -90,7 +90,7 @@ function MasteryBar({ stats }: { stats: StatsResult }) {
         id="mastery-heading"
         className="mb-4 text-lg font-semibold text-foreground"
       >
-        Mastery distribution
+        Mastery distribution{!nameCardsEnabled && <span className="ml-2 text-sm font-normal text-zinc-400 dark:text-zinc-500">(disabled)</span>}
       </h2>
 
       {/* Stacked bar */}
@@ -336,6 +336,7 @@ export default function StatsPage() {
   const { user } = useAuth();
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
+  const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
   const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
 
@@ -348,6 +349,7 @@ export default function StatsPage() {
       setCards(buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled }));
     }
     setMasteryRepetitions(settings.masteryRepetitions);
+    setNameCardsEnabled(settings.nameCardsEnabled);
     setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
     setGradeTotals(computeGradeTotals(loadGradeLog()));
   }, []);
@@ -401,7 +403,7 @@ export default function StatsPage() {
               easy={gradeTotals[5]}
               label="All-time grade breakdown"
             />
-            <MasteryBar stats={stats} />
+            <MasteryBar stats={stats} nameCardsEnabled={nameCardsEnabled} />
             <IntroducedBar stats={stats} />
             <DueForecast stats={stats} />
             <GenerationBreakdown stats={stats} />

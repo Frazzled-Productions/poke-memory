@@ -88,33 +88,41 @@ type PerTypeTodayCounts = {
 
 function TodayPill({
   perType,
+  nameEnabled,
+  evolutionEnabled,
   reverseEnabled,
 }: {
   perType: PerTypeTodayCounts;
+  nameEnabled: boolean;
+  evolutionEnabled: boolean;
   reverseEnabled: boolean;
 }) {
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
-      <p>
-        <span className="text-zinc-600 dark:text-zinc-300">Name:</span>{" "}
-        <span className="font-medium text-foreground">
-          {perType.name.newIntroducedToday} new
-        </span>
-        {" · "}
-        <span className="font-medium text-foreground">
-          {perType.name.reviewsDoneToday} reviews
-        </span>
-      </p>
-      <p>
-        <span className="text-zinc-600 dark:text-zinc-300">Evolution:</span>{" "}
-        <span className="font-medium text-foreground">
-          {perType.evolution.newIntroducedToday} new
-        </span>
-        {" · "}
-        <span className="font-medium text-foreground">
-          {perType.evolution.reviewsDoneToday} reviews
-        </span>
-      </p>
+      {nameEnabled && (
+        <p>
+          <span className="text-zinc-600 dark:text-zinc-300">Name:</span>{" "}
+          <span className="font-medium text-foreground">
+            {perType.name.newIntroducedToday} new
+          </span>
+          {" · "}
+          <span className="font-medium text-foreground">
+            {perType.name.reviewsDoneToday} reviews
+          </span>
+        </p>
+      )}
+      {evolutionEnabled && (
+        <p>
+          <span className="text-zinc-600 dark:text-zinc-300">Evolution:</span>{" "}
+          <span className="font-medium text-foreground">
+            {perType.evolution.newIntroducedToday} new
+          </span>
+          {" · "}
+          <span className="font-medium text-foreground">
+            {perType.evolution.reviewsDoneToday} reviews
+          </span>
+        </p>
+      )}
       {reverseEnabled && (
         <p>
           <span className="text-zinc-600 dark:text-zinc-300">Reverse:</span>{" "}
@@ -133,9 +141,13 @@ function TodayPill({
 
 function SessionCompleteScreen({
   perType,
+  nameEnabled,
+  evolutionEnabled,
   reverseEnabled,
 }: {
   perType: PerTypeTodayCounts;
+  nameEnabled: boolean;
+  evolutionEnabled: boolean;
   reverseEnabled: boolean;
 }) {
   return (
@@ -144,17 +156,21 @@ function SessionCompleteScreen({
       <p className="text-zinc-500 dark:text-zinc-400">
         No more cards due today. Come back tomorrow to keep going.
       </p>
-      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
     </div>
   );
 }
 
 function ReviewSoftWallScreen({
   perType,
+  nameEnabled,
+  evolutionEnabled,
   reverseEnabled,
   onKeepReviewing,
 }: {
   perType: PerTypeTodayCounts;
+  nameEnabled: boolean;
+  evolutionEnabled: boolean;
   reverseEnabled: boolean;
   onKeepReviewing: () => void;
 }) {
@@ -164,7 +180,7 @@ function ReviewSoftWallScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         You have hit a daily review cap. More cards are due — keep going?
       </p>
-      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
       <div className="flex flex-wrap justify-center gap-3">
         <button
           type="button"
@@ -190,9 +206,13 @@ function ReviewSoftWallScreen({
 
 function NewCardsLockedScreen({
   perType,
+  nameEnabled,
+  evolutionEnabled,
   reverseEnabled,
 }: {
   perType: PerTypeTodayCounts;
+  nameEnabled: boolean;
+  evolutionEnabled: boolean;
   reverseEnabled: boolean;
 }) {
   return (
@@ -202,7 +222,7 @@ function NewCardsLockedScreen({
         You have hit a daily new-card cap. Come back tomorrow for more — keeping
         this limit prevents tomorrow&apos;s review pile from growing too large.
       </p>
-      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
     </div>
   );
 }
@@ -210,10 +230,14 @@ function NewCardsLockedScreen({
 function CountdownScreen({
   dueAt,
   perType,
+  nameEnabled,
+  evolutionEnabled,
   reverseEnabled,
 }: {
   dueAt: number;
   perType: PerTypeTodayCounts;
+  nameEnabled: boolean;
+  evolutionEnabled: boolean;
   reverseEnabled: boolean;
 }) {
   const [remaining, setRemaining] = useState(() => dueAt - Date.now());
@@ -239,7 +263,7 @@ function CountdownScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         Hang tight — a learning card will be ready shortly.
       </p>
-      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
     </div>
   );
 }
@@ -253,6 +277,8 @@ export function ReviewSession() {
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
   const [reverseEnabled, setReverseEnabled] = useState(false);
+  const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
+  const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [revealed, setRevealed] = useState(false);
   const [grading, setGrading] = useState(false);
   // Transient flag: user chose "Keep reviewing" at the soft wall.
@@ -285,6 +311,8 @@ export function ReviewSession() {
     let sessionLimits: DailyLimits;
 
     const enabled = settings.reverseCardsEnabled;
+    const nameEnabled = settings.nameCardsEnabled;
+    const evolutionEnabled = settings.evolutionCardsEnabled;
 
     // poke-memory:settings:v1 is the source of truth for limits.
     // saved.limits (from the session) is intentionally ignored — settings
@@ -298,7 +326,7 @@ export function ReviewSession() {
         SEED_POKEMON,
         SEED_EVOLUTION_CARDS,
         now,
-        { reverseEnabled: enabled },
+        { reverseEnabled: enabled, nameEnabled, evolutionEnabled },
       );
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
@@ -306,7 +334,7 @@ export function ReviewSession() {
       }
       sessionCards = hydrated;
     } else {
-      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, { reverseEnabled: enabled });
+      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, { reverseEnabled: enabled, nameEnabled, evolutionEnabled });
       saveSession({ cards: fresh, limits: settingsLimits });
       sessionCards = fresh;
       sessionLimits = settingsLimits;
@@ -315,6 +343,8 @@ export function ReviewSession() {
     setCards(sessionCards);
     setLimits(sessionLimits);
     setReverseEnabled(enabled);
+    setNameCardsEnabled(nameEnabled);
+    setEvolutionCardsEnabled(evolutionEnabled);
 
     // Initialize the learning queue from persisted learning-step cards.
     // Use stepStartedAt from persisted state so the countdown resumes correctly
@@ -392,6 +422,20 @@ export function ReviewSession() {
         <div className="w-[320px] h-[320px] rounded-xl bg-zinc-200 dark:bg-zinc-800" />
         <div className="h-10 w-40 rounded-md bg-zinc-200 dark:bg-zinc-800" />
         <div className="h-11 w-32 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+      </div>
+    );
+  }
+
+  // --- All card types disabled ---
+  if (!nameCardsEnabled && !evolutionCardsEnabled && !reverseEnabled) {
+    return (
+      <div className="flex flex-col items-center gap-4 text-center">
+        <p className="text-2xl font-semibold text-foreground">No card types enabled</p>
+        <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
+          Enable at least one card type in{" "}
+          <a href="/settings" className="underline text-foreground">Settings</a>{" "}
+          to start reviewing.
+        </p>
       </div>
     );
   }
@@ -489,6 +533,8 @@ export function ReviewSession() {
         <CountdownScreen
           dueAt={earliestDueAt}
           perType={perType}
+          nameEnabled={nameCardsEnabled}
+          evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
         />
       );
@@ -500,6 +546,8 @@ export function ReviewSession() {
       return (
         <ReviewSoftWallScreen
           perType={perType}
+          nameEnabled={nameCardsEnabled}
+          evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
           onKeepReviewing={() => setExtendedReview(true)}
         />
@@ -508,12 +556,12 @@ export function ReviewSession() {
 
     if (endState === "NEW_CARDS_LOCKED") {
       return (
-        <NewCardsLockedScreen perType={perType} reverseEnabled={reverseEnabled} />
+        <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
       );
     }
 
     return (
-      <SessionCompleteScreen perType={perType} reverseEnabled={reverseEnabled} />
+      <SessionCompleteScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
     );
   }
 
@@ -616,7 +664,7 @@ export function ReviewSession() {
         </button>
       )}
 
-      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
       <GradeBreakdownBar
         again={sessionGrades[1]}
         hard={sessionGrades[2]}

@@ -310,6 +310,95 @@ describe('hydrateSession (reverse cards)', () => {
   });
 });
 
+describe('buildSession (name/evolution enabled flags)', () => {
+  const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
+  const evoSeed: EvolutionCard[] = [
+    {
+      cardType: 'evolution',
+      id: 1_000_001,
+      pokemonId: 1,
+      name: 'bulbasaur',
+      spriteUrl: '',
+      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
+    },
+  ];
+
+  it('buildSession with nameEnabled: false → zero name cards', () => {
+    const result = buildSession(seed, evoSeed, NOW, { nameEnabled: false });
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
+    // evo cards still present
+    expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(1);
+  });
+
+  it('buildSession with evolutionEnabled: false → zero evolution cards', () => {
+    const result = buildSession(seed, evoSeed, NOW, { evolutionEnabled: false });
+    expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(0);
+    // name cards still present
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(2);
+  });
+
+  it('buildSession with both disabled → zero cards of both types (reverse unaffected if enabled)', () => {
+    const result = buildSession(seed, evoSeed, NOW, {
+      nameEnabled: false,
+      evolutionEnabled: false,
+      reverseEnabled: true,
+    });
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
+    expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(0);
+    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(2);
+  });
+});
+
+describe('hydrateSession (name/evolution enabled flags)', () => {
+  const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
+  const evoSeed: EvolutionCard[] = [
+    {
+      cardType: 'evolution',
+      id: 1_000_001,
+      pokemonId: 1,
+      name: 'bulbasaur',
+      spriteUrl: '',
+      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
+    },
+  ];
+
+  it('hydrateSession strips saved name cards when nameEnabled: false', () => {
+    const saved: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1)),
+      makeCard(makeSeedPokemon(2)),
+    ];
+    const result = hydrateSession(saved, seed, evoSeed, NOW, { nameEnabled: false });
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
+  });
+
+  it('hydrateSession strips saved evolution cards when evolutionEnabled: false', () => {
+    const savedEvo: EvolutionReviewCard = {
+      cardType: 'evolution',
+      id: 1_000_001,
+      pokemonId: 1,
+      name: 'bulbasaur',
+      spriteUrl: '',
+      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
+      state: initialReviewState(NOW),
+    };
+    const saved: ReviewableCard[] = [makeCard(makeSeedPokemon(1)), savedEvo];
+    const result = hydrateSession(saved, seed, evoSeed, NOW, { evolutionEnabled: false });
+    expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(0);
+  });
+
+  it('hydrateSession does not add new name cards when nameEnabled: false', () => {
+    // saved is empty — no saved name cards, but seed has 2 pokemon
+    const result = hydrateSession([], seed, [], NOW, { nameEnabled: false });
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
+  });
+
+  it('hydrateSession does not add new evolution cards when evolutionEnabled: false', () => {
+    // saved is empty — no saved evo cards, but evoSeed has 1 entry
+    const result = hydrateSession([], seed, evoSeed, NOW, { evolutionEnabled: false });
+    expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(0);
+  });
+});
+
 describe('buildSessionQueues (per-type budgets)', () => {
   const TODAY = '2026-05-09';
   const baseLimits: DailyLimits = {

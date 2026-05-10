@@ -75,6 +75,11 @@ vi.mock("@/lib/settings/persistence", () => ({
     maxReviewsPerDay: 100,
     maxNewEvolutionPerDay: 5,
     maxReviewsEvolutionPerDay: 50,
+    reverseCardsEnabled: false,
+    maxNewReversePerDay: 10,
+    maxReviewsReversePerDay: 100,
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
   }),
 }));
 
