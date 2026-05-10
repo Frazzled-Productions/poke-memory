@@ -94,7 +94,26 @@ const GROUPS: FieldGroup[] = [
   },
 ];
 
-const ALL_FIELDS: FieldConfig[] = GROUPS.flatMap((g) => g.fields);
+// Numeric fields only — used for clamping on save. Boolean fields are handled
+// separately in handleSave via spread.
+const ALL_NUMERIC_FIELDS: FieldConfig[] = GROUPS.flatMap((g) => g.fields);
+
+const REVERSE_NUMERIC_FIELDS: FieldConfig[] = [
+  {
+    key: "maxNewReversePerDay",
+    label: "New cards per day",
+    helper: "Hard daily cap for reverse cards. Tracked separately from name cards.",
+    min: 1,
+    max: 50,
+  },
+  {
+    key: "maxReviewsReversePerDay",
+    label: "Reviews per day",
+    helper: "Soft cap for reverse reviews. Independent of the name-card review cap.",
+    min: 1,
+    max: 500,
+  },
+];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -117,6 +136,11 @@ export default function SettingsPage() {
     if (settings === null) return;
     const value = parseInt(raw, 10);
     setSettings({ ...settings, [key]: isNaN(value) ? settings[key] : value });
+  }
+
+  function handleToggle(key: keyof UserSettings) {
+    if (settings === null) return;
+    setSettings({ ...settings, [key]: !settings[key] });
   }
 
   async function handleReset() {
@@ -150,9 +174,14 @@ export default function SettingsPage() {
 
   function handleSave() {
     if (settings === null) return;
-    const clamped = Object.fromEntries(
-      ALL_FIELDS.map(({ key, min, max }) => [key, Math.max(min, Math.min(max, settings[key]))])
-    ) as UserSettings;
+    const allNumeric = [...ALL_NUMERIC_FIELDS, ...REVERSE_NUMERIC_FIELDS];
+    const numericClamped = Object.fromEntries(
+      allNumeric.map(({ key, min, max }) => [
+        key,
+        Math.max(min, Math.min(max, settings[key] as number)),
+      ])
+    );
+    const clamped = { ...settings, ...numericClamped } as UserSettings;
     saveSettings(clamped);
     setSettings(clamped);
     setSaved(true);
@@ -219,6 +248,75 @@ export default function SettingsPage() {
                   ))}
                 </section>
               ))}
+
+              <section className="flex flex-col gap-4" aria-labelledby="reverse-heading">
+                <h2
+                  id="reverse-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Reverse cards
+                </h2>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Enable reverse cards
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Show the Pokémon&apos;s name as the prompt; identify the sprite on reveal.
+                        Re-enabling after disabling will reset reverse-card progress.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.reverseCardsEnabled}
+                      onClick={() => handleToggle("reverseCardsEnabled")}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        settings.reverseCardsEnabled
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          settings.reverseCardsEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+                {settings.reverseCardsEnabled && (
+                  <>
+                    {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                      <div
+                        key={key}
+                        className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                      >
+                        <label
+                          htmlFor={key}
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {label}
+                        </label>
+                        <input
+                          id={key}
+                          type="number"
+                          min={min}
+                          max={max}
+                          step={1}
+                          value={settings[key] as number}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                        />
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          {helper}
+                        </p>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </section>
 
               <section className="flex flex-col gap-4" aria-labelledby="backup-heading">
                 <h2

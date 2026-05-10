@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
+import { ReverseCard } from "@/components/review/ReverseCard";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import {
@@ -57,6 +58,10 @@ function limitsFromSettings(settings: UserSettings): DailyLimits {
       maxNewPerDay: settings.maxNewEvolutionPerDay,
       maxReviewsPerDay: settings.maxReviewsEvolutionPerDay,
     },
+    reverse: {
+      maxNewPerDay: settings.maxNewReversePerDay,
+      maxReviewsPerDay: settings.maxReviewsReversePerDay,
+    },
   };
 }
 
@@ -78,9 +83,16 @@ function formatCountdown(ms: number): string {
 type PerTypeTodayCounts = {
   name: { newIntroducedToday: number; reviewsDoneToday: number };
   evolution: { newIntroducedToday: number; reviewsDoneToday: number };
+  reverse: { newIntroducedToday: number; reviewsDoneToday: number };
 };
 
-function TodayPill({ perType }: { perType: PerTypeTodayCounts }) {
+function TodayPill({
+  perType,
+  reverseEnabled,
+}: {
+  perType: PerTypeTodayCounts;
+  reverseEnabled: boolean;
+}) {
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
       <p>
@@ -103,27 +115,47 @@ function TodayPill({ perType }: { perType: PerTypeTodayCounts }) {
           {perType.evolution.reviewsDoneToday} reviews
         </span>
       </p>
+      {reverseEnabled && (
+        <p>
+          <span className="text-zinc-600 dark:text-zinc-300">Reverse:</span>{" "}
+          <span className="font-medium text-foreground">
+            {perType.reverse.newIntroducedToday} new
+          </span>
+          {" · "}
+          <span className="font-medium text-foreground">
+            {perType.reverse.reviewsDoneToday} reviews
+          </span>
+        </p>
+      )}
     </div>
   );
 }
 
-function SessionCompleteScreen({ perType }: { perType: PerTypeTodayCounts }) {
+function SessionCompleteScreen({
+  perType,
+  reverseEnabled,
+}: {
+  perType: PerTypeTodayCounts;
+  reverseEnabled: boolean;
+}) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       <p className="text-2xl font-semibold text-foreground">All caught up!</p>
       <p className="text-zinc-500 dark:text-zinc-400">
         No more cards due today. Come back tomorrow to keep going.
       </p>
-      <TodayPill perType={perType} />
+      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
     </div>
   );
 }
 
 function ReviewSoftWallScreen({
   perType,
+  reverseEnabled,
   onKeepReviewing,
 }: {
   perType: PerTypeTodayCounts;
+  reverseEnabled: boolean;
   onKeepReviewing: () => void;
 }) {
   return (
@@ -132,7 +164,7 @@ function ReviewSoftWallScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         You have hit a daily review cap. More cards are due — keep going?
       </p>
-      <TodayPill perType={perType} />
+      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
       <div className="flex flex-wrap justify-center gap-3">
         <button
           type="button"
@@ -156,7 +188,13 @@ function ReviewSoftWallScreen({
   );
 }
 
-function NewCardsLockedScreen({ perType }: { perType: PerTypeTodayCounts }) {
+function NewCardsLockedScreen({
+  perType,
+  reverseEnabled,
+}: {
+  perType: PerTypeTodayCounts;
+  reverseEnabled: boolean;
+}) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       <p className="text-2xl font-semibold text-foreground">New cards locked for today</p>
@@ -164,7 +202,7 @@ function NewCardsLockedScreen({ perType }: { perType: PerTypeTodayCounts }) {
         You have hit a daily new-card cap. Come back tomorrow for more — keeping
         this limit prevents tomorrow&apos;s review pile from growing too large.
       </p>
-      <TodayPill perType={perType} />
+      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
     </div>
   );
 }
@@ -172,9 +210,11 @@ function NewCardsLockedScreen({ perType }: { perType: PerTypeTodayCounts }) {
 function CountdownScreen({
   dueAt,
   perType,
+  reverseEnabled,
 }: {
   dueAt: number;
   perType: PerTypeTodayCounts;
+  reverseEnabled: boolean;
 }) {
   const [remaining, setRemaining] = useState(() => dueAt - Date.now());
 
@@ -199,7 +239,7 @@ function CountdownScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         Hang tight — a learning card will be ready shortly.
       </p>
-      <TodayPill perType={perType} />
+      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
     </div>
   );
 }
@@ -212,6 +252,7 @@ export function ReviewSession() {
   // null = SSR / not-yet-hydrated. Same pattern as before.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
+  const [reverseEnabled, setReverseEnabled] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [grading, setGrading] = useState(false);
   // Transient flag: user chose "Keep reviewing" at the soft wall.
@@ -237,26 +278,35 @@ export function ReviewSession() {
   useSyncOnUnload(supabase, user?.id ?? null, flushPending);
 
   useEffect(() => {
+    const settings = loadSettings();
     const saved = loadSession();
     const now = new Date();
     let sessionCards: ReviewableCard[];
     let sessionLimits: DailyLimits;
 
+    const enabled = settings.reverseCardsEnabled;
+
     // poke-memory:settings:v1 is the source of truth for limits.
     // saved.limits (from the session) is intentionally ignored — settings
     // take effect on the next page load, which is the definition of "next session".
-    const settingsLimits = limitsFromSettings(loadSettings());
+    const settingsLimits = limitsFromSettings(settings);
 
     if (saved !== null) {
       // Merge any seed cards added since the last save.
-      const hydrated = hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, now);
+      const hydrated = hydrateSession(
+        saved.cards,
+        SEED_POKEMON,
+        SEED_EVOLUTION_CARDS,
+        now,
+        { reverseEnabled: enabled },
+      );
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
         saveSession({ cards: hydrated, limits: sessionLimits });
       }
       sessionCards = hydrated;
     } else {
-      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now);
+      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, { reverseEnabled: enabled });
       saveSession({ cards: fresh, limits: settingsLimits });
       sessionCards = fresh;
       sessionLimits = settingsLimits;
@@ -264,6 +314,7 @@ export function ReviewSession() {
 
     setCards(sessionCards);
     setLimits(sessionLimits);
+    setReverseEnabled(enabled);
 
     // Initialize the learning queue from persisted learning-step cards.
     // Use stepStartedAt from persisted state so the countdown resumes correctly
@@ -337,13 +388,14 @@ export function ReviewSession() {
   // --- Derived state (recomputed every render — cheap, pure) ---
   const today = todayString(new Date());
 
-  // While extendedReview is active, uncap both per-type review limits so all
+  // While extendedReview is active, uncap all per-type review limits so all
   // due cards are visible. Uncapping new cards is not allowed (per srs-expert
   // policy).
   const effectiveLimits: DailyLimits = extendedReview
     ? {
         name: { ...limits.name, maxReviewsPerDay: Number.POSITIVE_INFINITY },
         evolution: { ...limits.evolution, maxReviewsPerDay: Number.POSITIVE_INFINITY },
+        reverse: { ...limits.reverse, maxReviewsPerDay: Number.POSITIVE_INFINITY },
       }
     : limits;
 
@@ -378,7 +430,7 @@ export function ReviewSession() {
     // *that* type has more candidates. Mixed-type sessions therefore keep
     // serving cards from the type that still has budget; the end-state UI
     // appears only when no type has any work left.
-    function hasMoreDueReviewsOf(type: "name" | "evolution"): boolean {
+    function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse"): boolean {
       // Mirror the candidate filter in buildSessionQueues — cards in a
       // learning/relearning step are served via the in-memory learning
       // queue, not the review queue, and must not count toward "more due
@@ -392,7 +444,7 @@ export function ReviewSession() {
           c.state.lastReview !== today,
       );
     }
-    function hasMoreNewCardsOf(type: "name" | "evolution"): boolean {
+    function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse"): boolean {
       return cards!.some(
         (c) =>
           c.cardType === type &&
@@ -401,14 +453,14 @@ export function ReviewSession() {
       );
     }
 
-    const reviewWall = (["name", "evolution"] as const).some(
+    const reviewWall = (["name", "evolution", "reverse"] as const).some(
       (type) =>
         perType[type].reviewsDoneToday >= limits[type].maxReviewsPerDay &&
         hasMoreDueReviewsOf(type),
     );
     if (!extendedReview && reviewWall) return "REVIEW_SOFT_WALL";
 
-    const newWall = (["name", "evolution"] as const).some(
+    const newWall = (["name", "evolution", "reverse"] as const).some(
       (type) =>
         perType[type].newIntroducedToday >= limits[type].maxNewPerDay &&
         hasMoreNewCardsOf(type),
@@ -422,7 +474,13 @@ export function ReviewSession() {
     // If there are pending (future-due) learning cards, show the countdown.
     if (learningQueue.length > 0) {
       const earliestDueAt = Math.min(...learningQueue.map((e) => e.dueAt));
-      return <CountdownScreen dueAt={earliestDueAt} perType={perType} />;
+      return (
+        <CountdownScreen
+          dueAt={earliestDueAt}
+          perType={perType}
+          reverseEnabled={reverseEnabled}
+        />
+      );
     }
 
     const endState = resolveEndState();
@@ -431,23 +489,28 @@ export function ReviewSession() {
       return (
         <ReviewSoftWallScreen
           perType={perType}
+          reverseEnabled={reverseEnabled}
           onKeepReviewing={() => setExtendedReview(true)}
         />
       );
     }
 
     if (endState === "NEW_CARDS_LOCKED") {
-      return <NewCardsLockedScreen perType={perType} />;
+      return (
+        <NewCardsLockedScreen perType={perType} reverseEnabled={reverseEnabled} />
+      );
     }
 
-    return <SessionCompleteScreen perType={perType} />;
+    return (
+      <SessionCompleteScreen perType={perType} reverseEnabled={reverseEnabled} />
+    );
   }
 
   // --- Handlers ---
 
   function handleReveal() {
     if (currentCard === null) return;
-    if (currentCard.cardType === "name") {
+    if (currentCard.cardType === "name" || currentCard.cardType === "reverse") {
       const facts = getPokemonFacts(currentCard);
       setCurrentFact(selectFact(facts));
     }
@@ -514,6 +577,13 @@ export function ReviewSession() {
           evolvesInto={currentCard.evolvesInto}
           revealed={revealed}
         />
+      ) : currentCard.cardType === "reverse" ? (
+        <ReverseCard
+          name={currentCard.name}
+          spriteUrl={currentCard.spriteUrl}
+          revealed={revealed}
+          fact={currentFact}
+        />
       ) : (
         <PokemonCard
           spriteUrl={currentCard.spriteUrl}
@@ -535,7 +605,7 @@ export function ReviewSession() {
         </button>
       )}
 
-      <TodayPill perType={perType} />
+      <TodayPill perType={perType} reverseEnabled={reverseEnabled} />
       <GradeBreakdownBar
         again={sessionGrades[1]}
         hard={sessionGrades[2]}

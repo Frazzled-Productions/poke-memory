@@ -25,7 +25,8 @@ function isMinimalCardShaped(value: unknown): boolean {
   if (
     v.cardType !== undefined &&
     v.cardType !== "name" &&
-    v.cardType !== "evolution"
+    v.cardType !== "evolution" &&
+    v.cardType !== "reverse"
   ) {
     return false;
   }
@@ -67,12 +68,15 @@ function isPerTypeLimitsShaped(value: unknown): boolean {
 function isLimitsShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
+  // `reverse` is optional — existing exports don't have it; migrateDailyLimits backfills.
   return isPerTypeLimitsShaped(v.name) && isPerTypeLimitsShaped(v.evolution);
 }
 
 function isSettingsShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
+  // reverseCardsEnabled and maxNew/ReviewsReversePerDay are optional —
+  // loadSettings backfills them on import so existing exports remain valid.
   return (
     typeof v.masteryRepetitions === "number" &&
     typeof v.maxNewPerDay === "number" &&
