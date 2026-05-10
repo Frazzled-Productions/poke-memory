@@ -37,8 +37,18 @@ const SPRITE_BY_ID: Record<number, string> = Object.fromEntries(
 function EvolutionChainNode({ node }: { node: EvolutionNode }) {
   const nodeSprite = SPRITE_BY_ID[node.speciesId];
   const nodeClass: CardClassOrPending = useCardClass(node.speciesId);
-  const nodeLocked = nodeClass === "locked" || nodeClass === "pending";
+  const nodePending = nodeClass === "pending";
+  const nodeLocked = nodeClass === "locked";
   const nodeLearning = nodeClass === "learning";
+
+  if (nodePending) {
+    return (
+      <div className="flex flex-col items-center gap-0.5 rounded-lg p-1.5 animate-pulse">
+        <div className="h-10 w-10 rounded bg-zinc-200 dark:bg-zinc-700" />
+        <div className="h-3 w-10 rounded bg-zinc-200 dark:bg-zinc-700" />
+      </div>
+    );
+  }
 
   return (
     <Link

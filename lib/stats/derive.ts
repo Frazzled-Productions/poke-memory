@@ -10,18 +10,18 @@ export type CardClass = "locked" | "learning" | "mastered";
 /** A card is "mastered" once it has this many consecutive successful reviews. */
 export const MASTERY_REPETITIONS = 3;
 
-export function isMastered(state: ReviewState, masteryReps = MASTERY_REPETITIONS): boolean {
-  return state.repetitions >= masteryReps && state.interval >= 21;
+export function isMastered(state: ReviewState, masteryRepetitions = MASTERY_REPETITIONS): boolean {
+  return state.repetitions >= masteryRepetitions && state.interval >= 21;
 }
 
 /**
  * Locked: card has never been graded (lastReview === null).
  * Learning: graded at least once, but not yet mastered.
- * Mastered: repetitions >= 3 AND interval >= 21.
+ * Mastered: repetitions >= masteryRepetitions AND interval >= 21.
  */
-export function classifyCard(card: ReviewableCard): CardClass {
+export function classifyCard(card: ReviewableCard, masteryRepetitions = MASTERY_REPETITIONS): CardClass {
   if (card.state.lastReview === null) return "locked";
-  if (isMastered(card.state)) return "mastered";
+  if (isMastered(card.state, masteryRepetitions)) return "mastered";
   return "learning";
 }
 
@@ -128,7 +128,7 @@ function tomorrowString(today: string): string {
  *
  * Card filters:
  *   - `introduced` cards = `lastReview !== null`.
- *   - `learning` cards = introduced AND repetitions < MASTERY_REPETITIONS.
+ *   - `learning` cards = introduced AND NOT isMastered (repetitions < masteryRepetitions OR interval < 21).
  *   - `mastered` cards = repetitions >= masteryRepetitions AND interval >= 21.
  *   - `dueToday` excludes cards already reviewed today (matches the queue policy).
  *   - `dueTomorrow` is exact-match on tomorrow's ISO date.
