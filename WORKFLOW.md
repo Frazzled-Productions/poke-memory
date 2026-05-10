@@ -22,6 +22,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling | No |
 | [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations | No |
 | [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change | Yes |
+| [workflow-expert](.claude/agents/workflow-expert.md) | GitHub Actions / orchestration changes — idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
 
 ---
 
