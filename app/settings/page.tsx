@@ -141,7 +141,7 @@ export default function SettingsPage() {
   function handleToggle(key: keyof UserSettings) {
     if (settings === null) return;
     if (key === "reverseCardsEnabled" && settings.reverseCardsEnabled) {
-      if (!window.confirm("Disabling reverse cards will discard all reverse-card progress. This cannot be undone. Continue?")) {
+      if (!window.confirm("Disabling reverse cards will discard all reverse-card progress when saved. This cannot be undone. Continue?")) {
         return;
       }
     }

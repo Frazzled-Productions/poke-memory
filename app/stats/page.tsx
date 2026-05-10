@@ -345,7 +345,7 @@ export default function StatsPage() {
     if (saved !== null) {
       setCards(hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled }));
     } else {
-      setCards(buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS));
+      setCards(buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled }));
     }
     setMasteryRepetitions(settings.masteryRepetitions);
     setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
