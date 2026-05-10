@@ -11,6 +11,8 @@ import { loadSettings } from "@/lib/settings/persistence";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import { loadGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
+import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -331,6 +333,7 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 // ---------------------------------------------------------------------------
 
 export default function StatsPage() {
+  const { user } = useAuth();
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
@@ -362,9 +365,14 @@ export default function StatsPage() {
   return (
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
       <div className="w-full max-w-3xl">
-        <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
           Stats
         </h1>
+        {user !== null && (
+          <div className="mb-8">
+            <SyncStatusLine />
+          </div>
+        )}
 
         {stats === null || currentStreak === null ? (
           <LoadingSkeleton />

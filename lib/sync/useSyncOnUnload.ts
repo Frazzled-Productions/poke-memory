@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushSession } from "@/lib/sync/cloud";
+import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 
 /**
  * Registers visibilitychange and pagehide listeners that push the current
@@ -22,13 +23,19 @@ export function useSyncOnUnload(
   useEffect(() => {
     if (!client || !userId || !cards) return;
 
-    function handleUnload(event: Event) {
+    async function handleUnload(event: Event) {
       // visibilitychange fires on both hide and show; only push on hide.
       // pagehide fires before visibilityState transitions, so skip the guard there.
       if (event.type === "visibilitychange" && document.visibilityState !== "hidden") return;
       if (!client || !userId || !cards) return;
-      // Fire-and-forget -- does not block navigation
-      void pushSession(client, userId, cards);
+      const ok = await pushSession(client, userId, cards);
+      const prev = loadSyncStatus();
+      saveSyncStatus({
+        ...prev,
+        lastPushAt: ok ? new Date().toISOString() : prev.lastPushAt,
+        lastPushFailed: !ok,
+        lastPushAttemptAt: new Date().toISOString(),
+      });
     }
 
     window.addEventListener("visibilitychange", handleUnload);
