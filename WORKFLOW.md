@@ -228,7 +228,7 @@ Two separate gates catch type/build/test errors at different points:
 Runs before opening a PR: `npm run typecheck && npm run build && npm test`
 
 - Orchestrator is allowed up to **2 targeted fix attempts** (commit + push + retry).
-- After the second failure: post a comment on the issue with the last 80 lines of build output and stop. Branch stays pushed for manual inspection.
+- After the second failure: post a comment on the issue with the last 80 lines of build output (including `@fraserbrookhouse` to notify the maintainer) and stop. Branch stays pushed for manual inspection.
 - Goal: surface errors in the same run that produced them, before Vercel or CI finds them.
 
 ### CI gate (`ci.yml`)
@@ -245,7 +245,7 @@ Runs on every `pull_request` event and every push to `main`: the same `typecheck
 When an implement (or continue) run hits its turn cap, times out, or errors mid-flight, the post-step runs with `if: always()` and:
 
 1. **Salvage push** — if uncommitted edits exist in the working tree, stages and commits them as `WIP: halted run on #N`, then pushes to origin. This ensures `/continue` always has a branch to resume from.
-2. **Status update** — PATCHes the live `<!-- auto-status -->` comment with a "Run finished" section showing outcome, branch, last commit, and recovery instructions.
+2. **Status update** — PATCHes the live `<!-- auto-status -->` comment with a "Run finished" section showing outcome, branch, last commit, and recovery instructions. The halt block includes `@fraserbrookhouse` so the maintainer is notified in the issue timeline.
 3. **Recovery footer** — only advertises `/continue` when the branch is confirmed on origin via `git ls-remote`. Falls back to `/go` if the salvage push itself failed.
 
 When resuming via `/continue`, the orchestrator checks `git log -1 --format=%s`. If the subject starts with `WIP:`, it inspects `git diff HEAD~1` and amends or reverts the WIP commit before continuing.

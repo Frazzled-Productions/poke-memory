@@ -541,9 +541,10 @@ jobs:
                commit, push, and re-run. Allow up to two fix attempts. If the
                gate still fails after the second fix attempt, post a comment
                on the issue with the last 80 lines of `/tmp/build-output.txt`
-               and stop — do NOT open a PR. The branch stays pushed for
-               manual inspection. (`npm ci` has already run as a workflow
-               step, so dependencies are in place.)
+               — include `@fraserbrookhouse` in the comment so the maintainer
+               is notified — and stop — do NOT open a PR. The branch stays
+               pushed for manual inspection. (`npm ci` has already run as a
+               workflow step, so dependencies are in place.)
             7. Open the PR:
                `gh pr create --title "<title>" --body "<body>" --base main`
                The body MUST contain `closes #${{ github.event.issue.number }}`
@@ -705,6 +706,7 @@ jobs:
               else
                 printf 'Comment `/go` to start over with a fresh branch.\n'
               fi
+              printf '\n@fraserbrookhouse — this run halted without opening a PR.\n'
             fi
             if [ "$DENIAL_COUNT" != "0" ]; then
               printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
@@ -937,8 +939,9 @@ jobs:
                commit, push, and re-run. Allow up to two fix attempts. If the
                gate still fails after the second fix attempt, post a comment
                on the issue with the last 80 lines of `/tmp/build-output.txt`
-               and stop — do NOT open a PR. The branch stays pushed for
-               manual inspection.
+               — include `@fraserbrookhouse` in the comment so the maintainer
+               is notified — and stop — do NOT open a PR. The branch stays
+               pushed for manual inspection.
             7. Open the PR:
                `gh pr create --title "<title>" --body "<body>" --base main`
                The body MUST contain `closes #${{ github.event.issue.number }}`
@@ -1048,6 +1051,7 @@ jobs:
               else
                 printf 'Comment `/go` to start over with a fresh branch.\n'
               fi
+              printf '\n@fraserbrookhouse — this run halted without opening a PR.\n'
             fi
             if [ "$DENIAL_COUNT" != "0" ]; then
               printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
