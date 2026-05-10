@@ -7,6 +7,8 @@ export type UserSettings = {
   maxReviewsPerDay: number;          // soft daily cap for name reviews
   maxNewEvolutionPerDay: number;     // hard daily cap for new evolution cards
   maxReviewsEvolutionPerDay: number; // soft daily cap for evolution reviews
+  nameCardsEnabled: boolean;         // show sprite as prompt; type/select the name
+  evolutionCardsEnabled: boolean;    // show sprite; identify evolution chain
   reverseCardsEnabled: boolean;      // show name as prompt; reveal sprite
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
@@ -18,6 +20,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxReviewsPerDay: 100,
   maxNewEvolutionPerDay: 5,
   maxReviewsEvolutionPerDay: 50,
+  nameCardsEnabled: true,
+  evolutionCardsEnabled: true,
   reverseCardsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
@@ -55,6 +59,14 @@ export function loadSettings(): UserSettings {
         typeof obj.maxReviewsEvolutionPerDay === "number"
           ? obj.maxReviewsEvolutionPerDay
           : DEFAULT_SETTINGS.maxReviewsEvolutionPerDay,
+      nameCardsEnabled:
+        typeof obj.nameCardsEnabled === "boolean"
+          ? obj.nameCardsEnabled
+          : DEFAULT_SETTINGS.nameCardsEnabled,
+      evolutionCardsEnabled:
+        typeof obj.evolutionCardsEnabled === "boolean"
+          ? obj.evolutionCardsEnabled
+          : DEFAULT_SETTINGS.evolutionCardsEnabled,
       reverseCardsEnabled:
         typeof obj.reverseCardsEnabled === "boolean"
           ? obj.reverseCardsEnabled

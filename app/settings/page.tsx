@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
+import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { deleteAllCloudProgress } from "@/lib/sync/cloud";
@@ -54,49 +55,49 @@ const GROUPS: FieldGroup[] = [
       },
     ],
   },
+];
+
+const NAME_NUMERIC_FIELDS: FieldConfig[] = [
   {
-    heading: "Name cards",
-    fields: [
-      {
-        key: "maxNewPerDay",
-        label: "New cards per day",
-        helper: "Hard daily cap. Raising this grows tomorrow's review pile faster.",
-        min: 1,
-        max: 50,
-      },
-      {
-        key: "maxReviewsPerDay",
-        label: "Reviews per day",
-        helper: "Soft cap — you can always override it during a session.",
-        min: 1,
-        max: 500,
-      },
-    ],
+    key: "maxNewPerDay",
+    label: "New cards per day",
+    helper: "Hard daily cap. Raising this grows tomorrow's review pile faster.",
+    min: 1,
+    max: 50,
   },
   {
-    heading: "Evolution cards",
-    fields: [
-      {
-        key: "maxNewEvolutionPerDay",
-        label: "New cards per day",
-        helper: "Hard daily cap for evolution cards. Tracked separately from name cards.",
-        min: 1,
-        max: 50,
-      },
-      {
-        key: "maxReviewsEvolutionPerDay",
-        label: "Reviews per day",
-        helper: "Soft cap for evolution reviews. Independent of the name-card review cap.",
-        min: 1,
-        max: 500,
-      },
-    ],
+    key: "maxReviewsPerDay",
+    label: "Reviews per day",
+    helper: "Soft cap — you can always override it during a session.",
+    min: 1,
+    max: 500,
+  },
+];
+
+const EVOLUTION_NUMERIC_FIELDS: FieldConfig[] = [
+  {
+    key: "maxNewEvolutionPerDay",
+    label: "New cards per day",
+    helper: "Hard daily cap for evolution cards. Tracked separately from name cards.",
+    min: 1,
+    max: 50,
+  },
+  {
+    key: "maxReviewsEvolutionPerDay",
+    label: "Reviews per day",
+    helper: "Soft cap for evolution reviews. Independent of the name-card review cap.",
+    min: 1,
+    max: 500,
   },
 ];
 
 // Numeric fields only — used for clamping on save. Boolean fields are handled
 // separately in handleSave via spread.
-const ALL_NUMERIC_FIELDS: FieldConfig[] = GROUPS.flatMap((g) => g.fields);
+const ALL_NUMERIC_FIELDS: FieldConfig[] = [
+  ...GROUPS.flatMap((g) => g.fields),
+  ...NAME_NUMERIC_FIELDS,
+  ...EVOLUTION_NUMERIC_FIELDS,
+];
 
 const REVERSE_NUMERIC_FIELDS: FieldConfig[] = [
   {
@@ -122,13 +123,17 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toggleErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSettings(loadSettings());
     return () => {
       if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
+      if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
     };
   }, []);
 
@@ -140,11 +145,43 @@ export default function SettingsPage() {
 
   function handleToggle(key: keyof UserSettings) {
     if (settings === null) return;
+
+    // Interlocking guard: block if toggling off would leave all three types disabled.
+    const toggleKeys = ["nameCardsEnabled", "evolutionCardsEnabled", "reverseCardsEnabled"] as const;
+    if (toggleKeys.includes(key as typeof toggleKeys[number]) && settings[key] === true) {
+      const wouldAllBeOff = toggleKeys.every((k) => (k === key ? false : !settings[k]));
+      if (wouldAllBeOff) {
+        setToggleError("At least one card type must be enabled.");
+        setToggleErrorKey(key);
+        if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
+        toggleErrorTimeoutRef.current = setTimeout(() => {
+          toggleErrorTimeoutRef.current = null;
+          setToggleError(null);
+          setToggleErrorKey(null);
+        }, 3000);
+        return;
+      }
+    }
+
+    // Confirm dialogs before disabling a card type.
+    if (key === "nameCardsEnabled" && settings.nameCardsEnabled) {
+      if (!window.confirm("Disabling name cards will discard all name-card progress when saved. This cannot be undone. Continue?")) {
+        return;
+      }
+    }
+    if (key === "evolutionCardsEnabled" && settings.evolutionCardsEnabled) {
+      if (!window.confirm("Disabling evolution cards will discard all evolution-card progress when saved. This cannot be undone. Continue?")) {
+        return;
+      }
+    }
     if (key === "reverseCardsEnabled" && settings.reverseCardsEnabled) {
       if (!window.confirm("Disabling reverse cards will discard all reverse-card progress when saved. This cannot be undone. Continue?")) {
         return;
       }
     }
+
+    setToggleError(null);
+    setToggleErrorKey(null);
     setSettings({ ...settings, [key]: !settings[key] });
   }
 
@@ -188,6 +225,18 @@ export default function SettingsPage() {
     );
     const clamped = { ...settings, ...numericClamped } as UserSettings;
     saveSettings(clamped);
+    const session = loadSession();
+    if (session !== null) {
+      const filtered = session.cards.filter((card) => {
+        if (card.cardType === "name" && !clamped.nameCardsEnabled) return false;
+        if (card.cardType === "evolution" && !clamped.evolutionCardsEnabled) return false;
+        if (card.cardType === "reverse" && !clamped.reverseCardsEnabled) return false;
+        return true;
+      });
+      if (filtered.length !== session.cards.length) {
+        saveSession({ ...session, cards: filtered });
+      }
+    }
     setSettings(clamped);
     setSaved(true);
     if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
@@ -254,6 +303,156 @@ export default function SettingsPage() {
                 </section>
               ))}
 
+              {/* Name cards section */}
+              <section className="flex flex-col gap-4" aria-labelledby="name-cards-heading">
+                <h2
+                  id="name-cards-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Name cards
+                </h2>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Enable name cards
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Show sprite as prompt; type the name. Re-enabling after disabling will reset name-card progress.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.nameCardsEnabled}
+                      onClick={() => handleToggle("nameCardsEnabled")}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        settings.nameCardsEnabled
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          settings.nameCardsEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+                {toggleError !== null && toggleErrorKey === "nameCardsEnabled" && (
+                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                    {toggleError}
+                  </p>
+                )}
+                <div className={settings.nameCardsEnabled ? undefined : "opacity-50"}>
+                  <div className="flex flex-col gap-4">
+                    {NAME_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                      <div
+                        key={key}
+                        className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                      >
+                        <label
+                          htmlFor={key}
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {label}
+                        </label>
+                        <input
+                          id={key}
+                          type="number"
+                          min={min}
+                          max={max}
+                          step={1}
+                          value={Number(settings[key])}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          disabled={!settings.nameCardsEnabled}
+                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                        />
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          {helper}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              {/* Evolution cards section */}
+              <section className="flex flex-col gap-4" aria-labelledby="evolution-cards-heading">
+                <h2
+                  id="evolution-cards-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Evolution cards
+                </h2>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Enable evolution cards
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Show sprite; identify the evolution chain. Re-enabling after disabling will reset evolution-card progress.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.evolutionCardsEnabled}
+                      onClick={() => handleToggle("evolutionCardsEnabled")}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        settings.evolutionCardsEnabled
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          settings.evolutionCardsEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+                {toggleError !== null && toggleErrorKey === "evolutionCardsEnabled" && (
+                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                    {toggleError}
+                  </p>
+                )}
+                <div className={settings.evolutionCardsEnabled ? undefined : "opacity-50"}>
+                  <div className="flex flex-col gap-4">
+                    {EVOLUTION_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                      <div
+                        key={key}
+                        className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                      >
+                        <label
+                          htmlFor={key}
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {label}
+                        </label>
+                        <input
+                          id={key}
+                          type="number"
+                          min={min}
+                          max={max}
+                          step={1}
+                          value={Number(settings[key])}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          disabled={!settings.evolutionCardsEnabled}
+                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                        />
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          {helper}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
               <section className="flex flex-col gap-4" aria-labelledby="reverse-heading">
                 <h2
                   id="reverse-heading"
@@ -291,6 +490,11 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
+                {toggleError !== null && toggleErrorKey === "reverseCardsEnabled" && (
+                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                    {toggleError}
+                  </p>
+                )}
                 {settings.reverseCardsEnabled && (
                   <>
                     {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (

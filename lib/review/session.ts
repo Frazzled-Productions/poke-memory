@@ -53,17 +53,22 @@ export function buildSession(
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: { reverseEnabled?: boolean } = {},
+  opts: { reverseEnabled?: boolean; nameEnabled?: boolean; evolutionEnabled?: boolean } = {},
 ): ReviewableCard[] {
-  const nameCards: NameReviewCard[] = seed.map((pokemon) => ({
-    ...pokemon,
-    cardType: "name",
-    state: initialReviewState(now),
-  }));
-  const evoCards: EvolutionReviewCard[] = evoSeed.map((evo) => ({
-    ...evo,
-    state: initialReviewState(now),
-  }));
+  const { nameEnabled = true, evolutionEnabled = true } = opts;
+  const nameCards: NameReviewCard[] = nameEnabled
+    ? seed.map((pokemon) => ({
+        ...pokemon,
+        cardType: "name",
+        state: initialReviewState(now),
+      }))
+    : [];
+  const evoCards: EvolutionReviewCard[] = evolutionEnabled
+    ? evoSeed.map((evo) => ({
+        ...evo,
+        state: initialReviewState(now),
+      }))
+    : [];
   const reverseCards: ReverseReviewCard[] = opts.reverseEnabled
     ? seed.map((p) => ({
         ...p,
@@ -86,16 +91,22 @@ export function hydrateSession(
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: { reverseEnabled?: boolean } = {},
+  opts: { reverseEnabled?: boolean; nameEnabled?: boolean; evolutionEnabled?: boolean } = {},
 ): ReviewableCard[] {
-  const { reverseEnabled = false } = opts;
+  const { reverseEnabled = false, nameEnabled = true, evolutionEnabled = true } = opts;
   const seedById = new Map(seed.map((p) => [p.id, p]));
   const evoSeedById = new Map(evoSeed.map((e) => [e.id, e]));
 
-  // When disabled, drop saved reverse cards so re-enabling starts fresh.
-  const filteredSaved = reverseEnabled
+  // When disabled, drop saved cards of that type so re-enabling starts fresh.
+  let filteredSaved = reverseEnabled
     ? saved
     : saved.filter((c) => c.cardType !== "reverse");
+  if (!nameEnabled) {
+    filteredSaved = filteredSaved.filter((c) => c.cardType !== "name");
+  }
+  if (!evolutionEnabled) {
+    filteredSaved = filteredSaved.filter((c) => c.cardType !== "evolution");
+  }
 
   const refreshed: ReviewableCard[] = filteredSaved.map((card) => {
     if (card.cardType === "evolution") {
@@ -121,13 +132,17 @@ export function hydrateSession(
 
   const savedIds = new Set(filteredSaved.map((c) => c.id));
 
-  const nameAdditions: NameReviewCard[] = seed
-    .filter((p) => !savedIds.has(p.id))
-    .map((p) => ({ ...p, cardType: "name", state: initialReviewState(now) }));
+  const nameAdditions: NameReviewCard[] = nameEnabled
+    ? seed
+        .filter((p) => !savedIds.has(p.id))
+        .map((p) => ({ ...p, cardType: "name", state: initialReviewState(now) }))
+    : [];
 
-  const evoAdditions: EvolutionReviewCard[] = evoSeed
-    .filter((e) => !savedIds.has(e.id))
-    .map((e) => ({ ...e, state: initialReviewState(now) }));
+  const evoAdditions: EvolutionReviewCard[] = evolutionEnabled
+    ? evoSeed
+        .filter((e) => !savedIds.has(e.id))
+        .map((e) => ({ ...e, state: initialReviewState(now) }))
+    : [];
 
   const reverseAdditions: ReverseReviewCard[] = reverseEnabled
     ? seed

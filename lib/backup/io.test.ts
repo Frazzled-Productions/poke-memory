@@ -22,6 +22,8 @@ vi.mock("@/lib/settings/persistence", () => ({
     reverseCardsEnabled: false,
     maxNewReversePerDay: 10,
     maxReviewsReversePerDay: 100,
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
   },
 }));
 
@@ -47,6 +49,8 @@ const VALID_SETTINGS: UserSettings = {
   reverseCardsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
+  nameCardsEnabled: true,
+  evolutionCardsEnabled: true,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {
