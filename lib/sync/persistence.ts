@@ -4,14 +4,12 @@ export type SyncStatus = {
   lastPushAt: string | null;
   lastPushFailed: boolean;
   lastPushAttemptAt: string | null;
-  lastPullAt: string | null;
 };
 
 const ZERO: SyncStatus = {
   lastPushAt: null,
   lastPushFailed: false,
   lastPushAttemptAt: null,
-  lastPullAt: null,
 };
 
 export function loadSyncStatus(): SyncStatus {
@@ -26,7 +24,6 @@ export function loadSyncStatus(): SyncStatus {
       lastPushAt: typeof obj.lastPushAt === "string" ? obj.lastPushAt : null,
       lastPushFailed: typeof obj.lastPushFailed === "boolean" ? obj.lastPushFailed : false,
       lastPushAttemptAt: typeof obj.lastPushAttemptAt === "string" ? obj.lastPushAttemptAt : null,
-      lastPullAt: typeof obj.lastPullAt === "string" ? obj.lastPullAt : null,
     };
   } catch {
     return ZERO;

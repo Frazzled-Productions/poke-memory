@@ -23,18 +23,37 @@ export function useSyncOnUnload(
   useEffect(() => {
     if (!client || !userId || !cards) return;
 
-    async function handleUnload(event: Event) {
+    let pushing = false;
+
+    function handleUnload(event: Event) {
       // visibilitychange fires on both hide and show; only push on hide.
       // pagehide fires before visibilityState transitions, so skip the guard there.
       if (event.type === "visibilitychange" && document.visibilityState !== "hidden") return;
       if (!client || !userId || !cards) return;
-      const ok = await pushSession(client, userId, cards);
+      // Guard against concurrent calls from two rapid hide events.
+      if (pushing) return;
+      pushing = true;
+
+      // Write attempt timestamp synchronously before any async work — browsers do
+      // not guarantee async continuations run during pagehide/discard. Pessimistically
+      // mark as failed; overwrite to success/false if the promise resolves in time.
+      const now = new Date().toISOString();
       const prev = loadSyncStatus();
       saveSyncStatus({
         ...prev,
-        lastPushAt: ok ? new Date().toISOString() : prev.lastPushAt,
-        lastPushFailed: !ok,
-        lastPushAttemptAt: new Date().toISOString(),
+        lastPushAttemptAt: now,
+        lastPushFailed: true,
+      });
+
+      void pushSession(client, userId, cards).then((ok) => {
+        const current = loadSyncStatus();
+        saveSyncStatus({
+          ...current,
+          lastPushAt: ok ? new Date().toISOString() : current.lastPushAt,
+          lastPushFailed: !ok,
+        });
+      }).finally(() => {
+        pushing = false;
       });
     }
 
