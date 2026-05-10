@@ -150,7 +150,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | | |
 |---|---|
 | **Trigger** | `pull_request: [opened, reopened, labeled]` |
-| **Gate** | PRs whose head branch starts with `auto/` OR which carry an `auto-review` label. Drafts are skipped. For `labeled` events, only the `auto-review` label fires a run. |
+| **Gate** | PRs whose head branch starts with `auto/` OR which carry an `auto-review` label. Drafts are skipped. Fork PRs are explicitly excluded (`head.repo.fork == false`). For `labeled` events, only the `auto-review` label fires a run. |
 | **Idempotency** | Each review comment includes `<!-- auto-review-sha:<head-sha> -->` on row 2; re-triggers at the same SHA are skipped. |
 | **What it does** | Runs `code-reviewer` sub-agent; posts `<!-- auto-review:N -->` comment; upgrades project status to **Ready to merge** if verdict is `Looks good to me` |
 | **Check gate** | Final job step exits non-zero when the latest verdict scoped to the current head SHA is `Needs fixes` — PR checks show red until a `/fix` cycle lands an approval at a new SHA |
