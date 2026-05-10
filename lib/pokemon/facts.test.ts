@@ -93,8 +93,8 @@ describe('getPokemonFacts', () => {
     expect(h?.value).toContain('hamster');
   });
 
-  it('height = 1.0 m exactly (dm=10) → knee-height comparison', () => {
-    const facts = getPokemonFacts(basePokemon({ height: 10 }));
+  it('height 0.9 m (dm=9) → knee-height comparison (boundary: m < 1.0)', () => {
+    const facts = getPokemonFacts(basePokemon({ height: 9 }));
     const h = facts.find((f) => f.label === 'Height');
     expect(h?.value).toContain('knee-height');
   });
@@ -112,10 +112,16 @@ describe('getPokemonFacts', () => {
     expect(w?.value).toContain('two adult humans');
   });
 
-  it('weight at 200 kg exactly (hg=2000) → horse comparison', () => {
+  it('weight at 200 kg exactly (hg=2000) → grizzly bear comparison', () => {
     const facts = getPokemonFacts(basePokemon({ weight: 2000 }));
     const w = facts.find((f) => f.label === 'Weight');
-    expect(w?.value).toContain('horse');
+    expect(w?.value).toContain('grizzly bear');
+  });
+
+  it('weight at 350 kg (hg=3500) → large horse comparison', () => {
+    const facts = getPokemonFacts(basePokemon({ weight: 3500 }));
+    const w = facts.find((f) => f.label === 'Weight');
+    expect(w?.value).toContain('large horse');
   });
 
   it('weight at 4.9 kg (hg=49) → laptop comparison', () => {

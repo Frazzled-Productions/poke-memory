@@ -47,6 +47,7 @@ function heightComparison(dm: number): string {
     m < 1.0 ? "roughly knee-height on an adult" :
     m < 1.5 ? "roughly the height of a 10-year-old child" :
     m < 2.0 ? "roughly the height of an average adult" :
+    m < 3.0 ? "taller than a standard doorframe" :
     m < 4.0 ? "taller than a basketball hoop" :
     m < 8.0 ? "about the height of a double-decker bus" :
     m < 15.0 ? "taller than a four-storey building" :
@@ -64,7 +65,8 @@ function weightComparison(hg: number): string {
     kg < 40 ? "about as heavy as a medium dog" :
     kg < 100 ? "about as heavy as an average adult" :
     kg < 200 ? "about as heavy as two adult humans" :
-    kg < 500 ? "about as heavy as a horse" :
+    kg < 350 ? "about as heavy as a large grizzly bear" :
+    kg < 500 ? "about as heavy as a large horse" :
     "heavier than a small car";
   return `${kg.toFixed(1)} kg — ${label}`;
 }
