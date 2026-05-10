@@ -26,8 +26,13 @@ export function useSyncOnUnload(
 ): void {
   // useRef so the in-flight guard survives effect re-runs.
   const pushingRef = useRef(false);
-  // Keep a stable ref to getUnsynced so the effect doesn't re-register
-  // listeners on every render (the function identity changes each render).
+  // Use refs for all values read inside handleUnload so the handler always sees
+  // the latest values even if sign-out races with a visibilitychange/pagehide
+  // event before the effect cleanup can remove the listeners.
+  const clientRef = useRef(client);
+  const userIdRef = useRef(userId);
+  clientRef.current = client;
+  userIdRef.current = userId;
   const getUnsyncedRef = useRef(getUnsynced);
   getUnsyncedRef.current = getUnsynced;
 
@@ -37,7 +42,11 @@ export function useSyncOnUnload(
     function handleUnload(event: Event) {
       // visibilitychange fires on both hide and show; only push on hide.
       if (event.type === "visibilitychange" && document.visibilityState !== "hidden") return;
-      if (!client || !userId) return;
+      // Read from refs so a sign-out that races with unload uses the current
+      // (null) values rather than stale closed-over props.
+      const c = clientRef.current;
+      const uid = userIdRef.current;
+      if (!c || !uid) return;
       if (pushingRef.current) return;
 
       const unsynced = getUnsyncedRef.current();
@@ -55,7 +64,7 @@ export function useSyncOnUnload(
         lastPushFailed: true,
       });
 
-      void pushSession(client, userId, unsynced).then((ok) => {
+      void pushSession(c, uid, unsynced).then((ok) => {
         const current = loadSyncStatus();
         saveSyncStatus({
           ...current,

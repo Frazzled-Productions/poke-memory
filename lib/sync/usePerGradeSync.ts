@@ -41,23 +41,23 @@ export function usePerGradeSync(
     if (toSend.length === 0) return;
     const sentIds = new Set(toSend.map((card) => card.id));
 
-    const failed: ReviewableCard[] = [];
     // No in-flight guard here — concurrent drains produce idempotent upserts,
     // so the only shared-state risk is the pendingQueueRef filter below writing
     // on stale read. That outcome is benign: each drain removes its own sentIds
     // independently, so no grade is permanently lost. A guard would add
     // complexity without a meaningful correctness benefit.
-    await Promise.all(
+    const results = await Promise.all(
       toSend.map(async (card) => {
         const ok = await pushSingleCard(c, uid, card);
-        if (!ok) failed.push(card);
+        return { card, ok };
       }),
     );
+    const failedIds = new Set(results.filter((r) => !r.ok).map((r) => r.card.id));
 
     // Keep a card in the queue if it wasn't part of this drain (a newer grade
     // arrived during the await window) or if it was sent but failed.
     pendingQueueRef.current = pendingQueueRef.current.filter(
-      (card) => !sentIds.has(card.id) || failed.some((f) => f.id === card.id),
+      (card) => !sentIds.has(card.id) || failedIds.has(card.id),
     );
   }, []);
 
