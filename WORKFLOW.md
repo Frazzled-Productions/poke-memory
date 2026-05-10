@@ -111,7 +111,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Conflict gate** | Checks for `<!-- overlap-scan:i+j:conflict -->` markers linked to open issues; refuses to proceed if unresolved |
 | **What it does** | Runs the orchestration playbook (plan → research → implement → review), pushes a branch, runs the build gate, opens a PR |
 | **Build gate** | `npm run typecheck && npm run build && npm test` — up to 2 fix attempts before stopping without a PR |
-| **Git credential** | The App installation token is written as a global git credential (`http.https://github.com/.extraheader`) immediately before `claude-code-action`. `actions/checkout` writes the token to the repo-local `.git/config`, but `claude-code-action` subprocesses spawn outside that scope and fall back to the ambient `GITHUB_TOKEN`; the global credential ensures all subprocess trees push as `poke-memory-bot`. No `if:` guard is needed: this job has no early-exit path and no `stopped` flag. |
+| **Git credential** | `claude-code-action` URL-embeds the App installation token (passed via `github_token:`) into the origin remote, so subprocess pushes authenticate as `poke-memory-bot` and CI fires on the resulting `synchronize` events. Do NOT add a `git config --global http.https://github.com/.extraheader` step in front of the action — that layers a Bearer header on top of the URL-embedded Basic auth, GitHub rejects the dual-auth request, and the action's internal `git fetch origin main --depth=1` fails before Claude is invoked. |
 | **Post-step** | Runs `if: always()` — salvages uncommitted edits as a `WIP: halted run on #N` commit, verifies the branch on origin before advertising `/continue`, updates the live status comment |
 | **Project status** | Moves to **In Progress** on start; to **PR** when a PR opens |
 
@@ -122,7 +122,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Trigger** | Maintainer comments `/continue` on an open `auto`-labelled issue |
 | **Pre-flight** | Guards against existing open PR; parses branch name from the last `<!-- auto-status -->` comment; verifies branch exists on origin |
 | **What it does** | Checks out the saved branch and resumes implementation from where it left off; follows the same workflow as implement |
-| **Git credential** | Same global-credential mechanism as the implement job — App token written to `http.https://github.com/.extraheader` before `claude-code-action`. No `if:` guard; no early-exit path in this job. |
+| **Git credential** | Same as the implement job — `claude-code-action`'s URL-embedded App token handles subprocess pushes. No global git credential step. |
 | **WIP handling** | If the last commit subject starts with `WIP:`, the resumed orchestrator inspects `git diff HEAD~1` and amends or reverts before continuing |
 
 #### Split job
