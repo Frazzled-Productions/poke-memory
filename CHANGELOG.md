@@ -12,6 +12,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **`/go` and `/continue` now invoke Claude on issues again** — the same broken "Wire App token into git credential for push" step that was previously removed from `auto-pr.yml` was still present in both `auto-issue.yml` jobs (implement and continue). It caused `claude-code-action`'s internal `git fetch origin main --depth=1` to fail with dual-auth (URL-embedded Basic + global Bearer header), so `/go` runs halted ~30s in without ever invoking Claude. The Wire step has been removed from both jobs. CI continues to fire on subprocess pushes via the action's URL-embedding mechanism, matching the auto-pr.yml fix.
+
 - **`/fix` command now invokes Claude on PRs again** — `auto-pr.yml`'s "Wire App token into git credential for push" step (added in the CI-firing fix below) wrote a global `http.https://github.com/.extraheader` with `Authorization: Bearer ${APP_TOKEN}`. `claude-code-action` already embeds the App token in the remote URL itself, so the global Bearer header was layered on top of URL-embedded Basic auth — GitHub rejected the dual-auth request, and `claude-code-action`'s internal `git fetch origin main --depth=1` failed before Claude was ever invoked. The Wire step has been removed from `auto-pr.yml`. CI still fires on `/fix`-cycle commits because the App token now reaches subprocess pushes via the action's own URL-embedding mechanism, not via a global credential.
 
 - **Reverse-card backup import now works** — backups containing reviewed reverse cards would always fail re-import with "This file isn't a valid poke-memory backup." because reverse-card IDs (2 000 001+) were not included in the allowed-ID set. They are now.
