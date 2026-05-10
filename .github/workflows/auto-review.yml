@@ -151,7 +151,7 @@ jobs:
 
                    <bulleted punch list of findings, or "No significant issues.">
 
-                   Verdict: Looks good to me
+                   Verdict: Looks good to me — @fraserbrookhouse
 
                    _Reply with `/fix` to have these findings addressed._
 
@@ -161,11 +161,12 @@ jobs:
                `<!-- auto-review-sha:${{ github.event.pull_request.head.sha }} -->`
                so re-triggers at the same head SHA are skipped. A verdict line
                starting with `Verdict: ` MUST be present, with either
-               `Looks good to me` (no significant issues) or `Needs fixes`. Use
-               those whole-word phrases verbatim — no acronyms. When (and only
-               when) the verdict is `Needs fixes`, append the italicised footer
-               line shown above so the maintainer knows how to trigger a fix
-               run. Omit the footer when the verdict is `Looks good to me`.
+               `Looks good to me — @fraserbrookhouse` (no significant issues) or
+               `Needs fixes`. Use those whole-word phrases verbatim — no acronyms.
+               When (and only when) the verdict is `Needs fixes`, append the
+               italicised footer line shown above so the maintainer knows how to
+               trigger a fix run. Omit the footer when the verdict is
+               `Looks good to me — @fraserbrookhouse`.
 
                When referencing a prior review in your prose (only relevant when
                this is not the first review): find the comment object in the PR
@@ -220,6 +221,42 @@ jobs:
           GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
             .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
 
+      - name: Post auto-fix comment on Needs fixes
+        if: always() && steps.idem.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          PR="${{ github.event.pull_request.number }}"
+          SHA="${{ github.event.pull_request.head.sha }}"
+          COUNT=${{ steps.cycles.outputs.count || '0' }}
+          NEXT=${{ steps.cycles.outputs.next || '1' }}
+          BODY=""
+          for attempt in 1 2 3; do
+            BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+              --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
+                    | sort_by(.created_at) | last | .body // \"\"")
+            [[ -n "$BODY" ]] && break
+            echo "Attempt $attempt: review comment not yet visible, waiting 2s..."
+            sleep 2
+          done
+          [[ -n "$BODY" ]] || echo "WARNING: review comment not found after 3 retries — autofix will be skipped."
+          VERDICT=$(printf '%s\n' "$BODY" | grep -E '^Verdict:' | head -1 || true)
+          MARKER="<!-- auto-review-autofix:$NEXT -->"
+          if [[ "$VERDICT" == *"Needs fixes"* ]] && [[ "$COUNT" -lt 2 ]]; then
+            EXISTING=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+              --jq "[.[] | select(.body | contains(\"$MARKER\"))] | length")
+            if [[ "$EXISTING" -gt 0 ]]; then
+              echo "Autofix comment for review $NEXT already exists — skipping (idempotent re-run)."
+            else
+              echo "Verdict is 'Needs fixes' and cycle count ($COUNT) < 2 — posting auto /fix comment."
+              printf '%s\n/fix\n' "$MARKER" > /tmp/autofix-body.md
+              gh pr comment "$PR" --body-file /tmp/autofix-body.md
+            fi
+          else
+            echo "No auto-fix needed (verdict: '${VERDICT:-<none>}', count: $COUNT)."
+          fi
+
       - name: Fail check when verdict is "Needs fixes"
         if: always()
         env:
@@ -231,9 +268,15 @@ jobs:
           # Scope to the current head SHA so re-runs (close/reopen at the same
           # SHA, or a later /fix cycle that bumps the SHA) always report the
           # verdict that was posted against the SHA this run is on.
-          BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
-            --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
-                  | sort_by(.created_at) | last | .body // \"\"")
+          BODY=""
+          for attempt in 1 2 3; do
+            BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+              --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
+                    | sort_by(.created_at) | last | .body // \"\"")
+            [[ -n "$BODY" ]] && break
+            echo "Attempt $attempt: review comment not yet visible, waiting 2s..."
+            sleep 2
+          done
           if [[ -z "$BODY" ]]; then
             echo "No auto-review comment found for SHA $SHA — nothing to gate on."
             exit 0
