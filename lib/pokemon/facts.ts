@@ -50,7 +50,7 @@ function heightComparison(dm: number): string {
     m < 4.0 ? "taller than a basketball hoop" :
     m < 8.0 ? "about the height of a double-decker bus" :
     m < 15.0 ? "taller than a four-storey building" :
-    "taller than a five-storey building";
+    "taller than a six-storey building";
   return `${m.toFixed(1)} m — ${label}`;
 }
 
@@ -58,18 +58,19 @@ function weightComparison(hg: number): string {
   const kg = hg / 10;
   const label =
     kg < 1 ? "lighter than a bag of sugar" :
-    kg < 5 ? "about as heavy as a bag of sugar" :
-    kg < 15 ? "about as heavy as a small bowling ball" :
+    kg < 5 ? "about as heavy as a laptop" :
+    kg < 8 ? "about as heavy as a small bowling ball" :
+    kg < 15 ? "about as heavy as a large bag of dog food" :
     kg < 40 ? "about as heavy as a medium dog" :
     kg < 100 ? "about as heavy as an average adult" :
-    kg < 200 ? "heavier than a grand piano" :
-    kg < 500 ? "about as heavy as a grand piano and a half" :
+    kg < 200 ? "about as heavy as two adult humans" :
+    kg < 500 ? "about as heavy as a horse" :
     "heavier than a small car";
   return `${kg.toFixed(1)} kg — ${label}`;
 }
 
 function happinessTier(n: number): string {
-  if (n <= 34) return "Slow to trust";
+  if (n < 35) return "Slow to trust";
   if (n <= 69) return "Warms up gradually";
   if (n <= 99) return "Bonds with trainers easily";
   if (n <= 139) return "Particularly friendly";

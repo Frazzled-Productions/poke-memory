@@ -85,4 +85,80 @@ describe('getPokemonFacts', () => {
     const difficulty = facts.find((f) => f.label === 'Catch difficulty');
     expect(difficulty?.value).toBe('Extremely rare');
   });
+
+  // Height boundary values
+  it('height < 0.3 m (dm=2) → hamster comparison', () => {
+    const facts = getPokemonFacts(basePokemon({ height: 2 }));
+    const h = facts.find((f) => f.label === 'Height');
+    expect(h?.value).toContain('hamster');
+  });
+
+  it('height = 1.0 m exactly (dm=10) → knee-height comparison', () => {
+    const facts = getPokemonFacts(basePokemon({ height: 10 }));
+    const h = facts.find((f) => f.label === 'Height');
+    expect(h?.value).toContain('knee-height');
+  });
+
+  it('height >= 15 m (dm=200) → six-storey comparison', () => {
+    const facts = getPokemonFacts(basePokemon({ height: 200 }));
+    const h = facts.find((f) => f.label === 'Height');
+    expect(h?.value).toContain('six-storey');
+  });
+
+  // Weight boundary values
+  it('weight at 100 kg exactly (hg=1000) → two adult humans comparison', () => {
+    const facts = getPokemonFacts(basePokemon({ weight: 1000 }));
+    const w = facts.find((f) => f.label === 'Weight');
+    expect(w?.value).toContain('two adult humans');
+  });
+
+  it('weight at 200 kg exactly (hg=2000) → horse comparison', () => {
+    const facts = getPokemonFacts(basePokemon({ weight: 2000 }));
+    const w = facts.find((f) => f.label === 'Weight');
+    expect(w?.value).toContain('horse');
+  });
+
+  it('weight at 4.9 kg (hg=49) → laptop comparison', () => {
+    const facts = getPokemonFacts(basePokemon({ weight: 49 }));
+    const w = facts.find((f) => f.label === 'Weight');
+    expect(w?.value).toContain('laptop');
+  });
+
+  it('weight at 14.9 kg (hg=149) → dog food comparison', () => {
+    const facts = getPokemonFacts(basePokemon({ weight: 149 }));
+    const w = facts.find((f) => f.label === 'Weight');
+    expect(w?.value).toContain('dog food');
+  });
+
+  // Happiness boundary values
+  it('happiness=0 → "Slow to trust"', () => {
+    const facts = getPokemonFacts(basePokemon({ baseHappiness: 0 }));
+    const h = facts.find((f) => f.label === 'Base happiness');
+    expect(h?.value).toBe('Slow to trust');
+  });
+
+  it('happiness=35 → "Warms up gradually" (first value above Slow to trust boundary)', () => {
+    const facts = getPokemonFacts(basePokemon({ baseHappiness: 35 }));
+    const h = facts.find((f) => f.label === 'Base happiness');
+    expect(h?.value).toBe('Warms up gradually');
+  });
+
+  // Experience boundary values
+  it('experience=69 → "Very low XP yield"', () => {
+    const facts = getPokemonFacts(basePokemon({ baseExperience: 69 }));
+    const e = facts.find((f) => f.label === 'Base exp.');
+    expect(e?.value).toBe('Very low XP yield');
+  });
+
+  it('experience=70 → "Low XP yield" (first value above very-low boundary)', () => {
+    const facts = getPokemonFacts(basePokemon({ baseExperience: 70 }));
+    const e = facts.find((f) => f.label === 'Base exp.');
+    expect(e?.value).toBe('Low XP yield');
+  });
+
+  it('experience=220 → "Very high XP yield"', () => {
+    const facts = getPokemonFacts(basePokemon({ baseExperience: 220 }));
+    const e = facts.find((f) => f.label === 'Base exp.');
+    expect(e?.value).toBe('Very high XP yield');
+  });
 });
