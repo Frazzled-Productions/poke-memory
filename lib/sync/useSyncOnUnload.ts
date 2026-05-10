@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushSession } from "@/lib/sync/cloud";
@@ -20,10 +20,11 @@ export function useSyncOnUnload(
   userId: string | null,
   cards: ReviewableCard[] | null,
 ): void {
+  // useRef so the in-flight guard survives effect re-runs caused by cards updates.
+  const pushingRef = useRef(false);
+
   useEffect(() => {
     if (!client || !userId || !cards) return;
-
-    let pushing = false;
 
     function handleUnload(event: Event) {
       // visibilitychange fires on both hide and show; only push on hide.
@@ -31,8 +32,8 @@ export function useSyncOnUnload(
       if (event.type === "visibilitychange" && document.visibilityState !== "hidden") return;
       if (!client || !userId || !cards) return;
       // Guard against concurrent calls from two rapid hide events.
-      if (pushing) return;
-      pushing = true;
+      if (pushingRef.current) return;
+      pushingRef.current = true;
 
       // Write attempt timestamp synchronously before any async work — browsers do
       // not guarantee async continuations run during pagehide/discard. Pessimistically
@@ -53,7 +54,7 @@ export function useSyncOnUnload(
           lastPushFailed: !ok,
         });
       }).finally(() => {
-        pushing = false;
+        pushingRef.current = false;
       });
     }
 
