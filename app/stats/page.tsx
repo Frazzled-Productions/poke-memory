@@ -340,13 +340,13 @@ export default function StatsPage() {
   const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
 
   useEffect(() => {
+    const settings = loadSettings();
     const saved = loadSession();
     if (saved !== null) {
-      setCards(hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS));
+      setCards(hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled }));
     } else {
       setCards(buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS));
     }
-    const settings = loadSettings();
     setMasteryRepetitions(settings.masteryRepetitions);
     setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
     setGradeTotals(computeGradeTotals(loadGradeLog()));

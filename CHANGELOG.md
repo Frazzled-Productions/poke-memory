@@ -6,6 +6,16 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **Reverse-card backup import now works** — backups containing reviewed reverse cards would always fail re-import with "This file isn't a valid poke-memory backup." because reverse-card IDs (2 000 001+) were not included in the allowed-ID set. They are now.
+
+- **Stats page no longer silently drops reverse cards** — the Stats page was calling `hydrateSession` before reading settings, so reverse cards were always filtered out regardless of the user's preference. Settings are now read first and forwarded to `hydrateSession`.
+
+- **Disabling reverse cards now asks for confirmation** — toggling "Reverse cards" off in Settings previously discarded all reverse-card SM-2 history silently on the next page load. A browser confirmation dialog now warns that the action is irreversible before the toggle is saved.
+
+- **Practice session reloads when settings change in another tab** — the `reverseEnabled` flag and daily limits were read once at mount and never refreshed. A `storage` event listener now triggers a page reload when the settings key changes in another tab, keeping both tabs consistent.
+
+- **Screen readers no longer hear the answer before guessing on reverse cards** — `aria-live="polite"` was on the container that includes the Pokémon's name (the prompt the user is meant to guess). It has been moved to the fact sub-block that only appears after reveal, so only the post-reveal content is announced automatically.
+
 - **CI now runs on `/fix`-cycle commits** — `actions/checkout` writes the App installation token to the repo-local `.git/config`, but `claude-code-action` spawns git subprocesses outside that scope, causing them to fall back to the ambient `GITHUB_TOKEN`. GitHub suppresses `pull_request: synchronize` events from `GITHUB_TOKEN`-backed pushes, so `ci.yml` never fired on `/fix`-cycle commits, leaving PRs with no `test` check on the new head SHA. Setting the App token as a global git credential (`http.https://github.com/.extraheader`) before the action step covers all subprocess trees and ensures pushes authenticate as `poke-memory-bot`. Applies to `auto-pr.yml` (fix cycles) and both `auto-issue.yml` jobs (implement and continue). Closes [#121](https://github.com/fraserbrookhouse/poke-memory/issues/121).
 
 - **Auto-fix loop reaches Claude** — follow-up to the entry below: `auto-pr.yml` now passes `allowed_bots: poke-memory-bot` to `claude-code-action`, so bot-posted `/fix` comments from `auto-review.yml`'s autofix step actually invoke Claude. The previous fix opened the workflow's job-level `if:` gate to bot users, but the action has a separate internal allowlist that defaults to ignoring bots — without it, the job ran, posted its initial status comment, and exited reporting "No commits pushed and no auto-review posted."

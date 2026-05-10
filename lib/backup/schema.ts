@@ -68,7 +68,7 @@ function isPerTypeLimitsShaped(value: unknown): boolean {
 function isLimitsShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  // `reverse` is optional — existing exports don't have it; migrateDailyLimits backfills.
+  // `reverse` is optional — existing exports don't have it; loadSession in lib/review/persistence.ts backfills.
   return isPerTypeLimitsShaped(v.name) && isPerTypeLimitsShaped(v.evolution);
 }
 

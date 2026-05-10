@@ -29,23 +29,22 @@ export function ReverseCard({ name, spriteUrl, revealed, fact }: Props) {
           <span className="text-6xl select-none" aria-hidden="true">?</span>
         </div>
       )}
-      <div
-        className="min-h-[2.5rem] flex flex-col items-center justify-center"
-        aria-live="polite"
-      >
+      <div className="min-h-[2.5rem] flex flex-col items-center justify-center">
         <p className="text-3xl font-semibold tracking-wide capitalize text-foreground">
           {name}
         </p>
-        {revealed && fact && (
-          <div className="mt-2 text-center">
-            <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-              {fact.label}
-            </span>
-            <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-300 max-w-xs">
-              {fact.value}
-            </p>
-          </div>
-        )}
+        <div aria-live="polite" aria-atomic="true">
+          {revealed && fact && (
+            <div className="mt-2 text-center">
+              <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                {fact.label}
+              </span>
+              <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-300 max-w-xs">
+                {fact.value}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

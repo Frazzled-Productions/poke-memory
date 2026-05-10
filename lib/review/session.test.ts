@@ -288,6 +288,13 @@ describe('hydrateSession (reverse cards)', () => {
     expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
   });
 
+  it('strips reverse cards when toggle is turned off (build-then-disable path)', () => {
+    const built = buildSession(seed, [], NOW, { reverseEnabled: true });
+    const result = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
+    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(seed.length);
+  });
+
   it('preserves review state on existing reverse cards when re-enabled', () => {
     const revCard: ReverseReviewCard = {
       ...makeSeedPokemon(1),

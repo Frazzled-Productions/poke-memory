@@ -338,6 +338,17 @@ export function ReviewSession() {
     setLearningQueue(initialLearning);
   }, []);
 
+  // Reload when settings change in another tab so reverseEnabled and limits stay current.
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key === "poke-memory:settings:v1") {
+        window.location.reload();
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   // Schedule a timeout to re-render when the earliest pending learning card is due.
   // Re-runs whenever learningQueue changes.
   useEffect(() => {
