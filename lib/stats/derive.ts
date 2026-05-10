@@ -1,4 +1,5 @@
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
+import type { ReviewState } from "@/lib/srs/scheduler";
 
 // ---------------------------------------------------------------------------
 // Mastery classification
@@ -6,17 +7,23 @@ import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 
 export type CardClass = "locked" | "learning" | "mastered";
 
-/** A card is "mastered" once it has this many consecutive successful reviews. */
+/** Minimum consecutive successful reviews for mastery — mastery also requires interval >= MASTERY_INTERVAL_DAYS. */
 export const MASTERY_REPETITIONS = 3;
+/** A card is "mastered" once its projected review interval reaches this many days. */
+export const MASTERY_INTERVAL_DAYS = 21;
+
+export function isMastered(state: ReviewState, masteryRepetitions = MASTERY_REPETITIONS): boolean {
+  return state.repetitions >= masteryRepetitions && state.interval >= MASTERY_INTERVAL_DAYS;
+}
 
 /**
  * Locked: card has never been graded (lastReview === null).
- * Learning: graded at least once, but repetitions < MASTERY_REPETITIONS.
- * Mastered: repetitions >= MASTERY_REPETITIONS.
+ * Learning: graded at least once, but not yet mastered.
+ * Mastered: repetitions >= masteryRepetitions AND interval >= 21.
  */
 export function classifyCard(card: ReviewableCard, masteryRepetitions = MASTERY_REPETITIONS): CardClass {
   if (card.state.lastReview === null) return "locked";
-  if (card.state.repetitions >= masteryRepetitions) return "mastered";
+  if (isMastered(card.state, masteryRepetitions)) return "mastered";
   return "learning";
 }
 
@@ -72,7 +79,7 @@ export type GenerationStats = {
   name: string;
   total: number;       // species in this generation
   introduced: number;  // count where lastReview !== null
-  mastered: number;    // count where repetitions >= masteryRepetitions
+  mastered: number;    // count where repetitions >= masteryRepetitions AND interval >= MASTERY_INTERVAL_DAYS
 };
 
 export type StrugglingCard = {
@@ -87,7 +94,7 @@ export type StatsResult = {
   totalCards: number;                    // name cards only, ~1025
   introduced: number;                    // lastReview !== null
   learning: number;                      // introduced && !mastered
-  mastered: number;                      // repetitions >= masteryRepetitions param
+  mastered: number;                      // repetitions >= masteryRepetitions param AND interval >= MASTERY_INTERVAL_DAYS
   locked: number;                        // lastReview === null (== totalCards - introduced)
   dueToday: number;                      // dueDate <= today AND lastReview !== today
   dueTomorrow: number;                   // dueDate === tomorrow's ISO date
@@ -123,8 +130,8 @@ function tomorrowString(today: string): string {
  *
  * Card filters:
  *   - `introduced` cards = `lastReview !== null`.
- *   - `learning` cards = introduced AND repetitions < MASTERY_REPETITIONS.
- *   - `mastered` cards = repetitions >= MASTERY_REPETITIONS.
+ *   - `learning` cards = introduced AND NOT isMastered (repetitions < masteryRepetitions OR interval < 21).
+ *   - `mastered` cards = repetitions >= masteryRepetitions AND interval >= 21.
  *   - `dueToday` excludes cards already reviewed today (matches the queue policy).
  *   - `dueTomorrow` is exact-match on tomorrow's ISO date.
  *   - `struggling` is the bottom `strugglingLimit` *introduced* cards sorted
@@ -155,13 +162,13 @@ export function computeStats(
 
   for (const card of cards) {
     const state = card.state;
-    const isIntroduced = state.lastReview !== null;
-    const isMastered   = state.repetitions >= masteryRepetitions;
+    const isIntroduced  = state.lastReview !== null;
+    const isCardMastered = isMastered(state, masteryRepetitions);
 
     // Mastery / learning / locked tallies.
     if (isIntroduced) {
       introduced++;
-      if (isMastered) {
+      if (isCardMastered) {
         mastered++;
       } else {
         learning++;
@@ -189,8 +196,8 @@ export function computeStats(
     if (gen >= 1 && gen <= 9) {
       const idx = gen - 1;
       genTotal[idx]++;
-      if (isIntroduced) genIntroduced[idx]++;
-      if (isMastered)   genMastered[idx]++;
+      if (isIntroduced)   genIntroduced[idx]++;
+      if (isCardMastered) genMastered[idx]++;
     }
   }
 

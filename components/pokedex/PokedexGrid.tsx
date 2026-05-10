@@ -83,7 +83,7 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
             loading="lazy"
             className={[
               "h-16 w-16 object-contain",
-              isLocked ? "brightness-[0.3] grayscale" : "",
+              isLocked ? "brightness-0" : isLearning ? "grayscale opacity-60" : "",
             ].join(" ")}
           />
 
