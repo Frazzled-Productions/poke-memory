@@ -39,11 +39,14 @@ export function usePerGradeSync(
 
     const toSend = [...pendingQueueRef.current];
     if (toSend.length === 0) return;
-    const sentIds = new Set(toSend.map((c) => c.id));
+    const sentIds = new Set(toSend.map((card) => card.id));
 
     const failed: ReviewableCard[] = [];
-    // No in-flight guard here — concurrent drains are safe because upserts are
-    // idempotent. A guard would add complexity without correctness benefit.
+    // No in-flight guard here — concurrent drains produce idempotent upserts,
+    // so the only shared-state risk is the pendingQueueRef filter below writing
+    // on stale read. That outcome is benign: each drain removes its own sentIds
+    // independently, so no grade is permanently lost. A guard would add
+    // complexity without a meaningful correctness benefit.
     await Promise.all(
       toSend.map(async (card) => {
         const ok = await pushSingleCard(c, uid, card);
