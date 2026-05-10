@@ -106,6 +106,18 @@ describe('getPokemonFacts', () => {
   });
 
   // Weight boundary values
+  it('weight at 5 kg (hg=50) → bowling ball comparison (bucket lower bound)', () => {
+    const facts = getPokemonFacts(basePokemon({ weight: 50 }));
+    const w = facts.find((f) => f.label === 'Weight');
+    expect(w?.value).toContain('bowling ball');
+  });
+
+  it('weight at 7 kg (hg=70) → bowling ball comparison (mid-bucket)', () => {
+    const facts = getPokemonFacts(basePokemon({ weight: 70 }));
+    const w = facts.find((f) => f.label === 'Weight');
+    expect(w?.value).toContain('bowling ball');
+  });
+
   it('weight at 100 kg exactly (hg=1000) → two adult humans comparison', () => {
     const facts = getPokemonFacts(basePokemon({ weight: 1000 }));
     const w = facts.find((f) => f.label === 'Weight');

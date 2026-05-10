@@ -47,7 +47,7 @@ function heightComparison(dm: number): string {
     m < 1.0 ? "roughly knee-height on an adult" :
     m < 1.5 ? "roughly the height of a 10-year-old child" :
     m < 2.0 ? "roughly the height of an average adult" :
-    m < 3.0 ? "taller than a standard doorframe" :
+    m < 3.1 ? "taller than a standard doorframe" :
     m < 4.0 ? "taller than a basketball hoop" :
     m < 8.0 ? "about the height of a double-decker bus" :
     m < 15.0 ? "taller than a four-storey building" :
@@ -60,7 +60,7 @@ function weightComparison(hg: number): string {
   const label =
     kg < 1 ? "lighter than a bag of sugar" :
     kg < 5 ? "about as heavy as a laptop" :
-    kg < 8 ? "about as heavy as a small bowling ball" :
+    kg < 7.5 ? "about as heavy as a small bowling ball" :
     kg < 15 ? "about as heavy as a large bag of dog food" :
     kg < 40 ? "about as heavy as a medium dog" :
     kg < 100 ? "about as heavy as an average adult" :
