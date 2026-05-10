@@ -7,7 +7,7 @@ import type { ReviewState } from "@/lib/srs/scheduler";
 
 export type CardClass = "locked" | "learning" | "mastered";
 
-/** A card is "mastered" once it has this many consecutive successful reviews. */
+/** Minimum consecutive successful reviews for mastery — mastery also requires interval >= MASTERY_INTERVAL_DAYS. */
 export const MASTERY_REPETITIONS = 3;
 /** A card is "mastered" once its projected review interval reaches this many days. */
 export const MASTERY_INTERVAL_DAYS = 21;

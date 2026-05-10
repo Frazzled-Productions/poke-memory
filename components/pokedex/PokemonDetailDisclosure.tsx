@@ -53,6 +53,7 @@ function EvolutionChainNode({ node }: { node: EvolutionNode }) {
   return (
     <Link
       href={"/pokedex/" + node.speciesId}
+      aria-label={nodeLocked ? `Pokémon #${zeroPad(node.speciesId)} (locked)` : node.name}
       className="flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
     >
       {nodeSprite ? (
