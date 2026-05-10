@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
+import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { deleteAllCloudProgress } from "@/lib/sync/cloud";
@@ -123,6 +124,7 @@ export default function SettingsPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
+  const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,10 +152,12 @@ export default function SettingsPage() {
       const wouldAllBeOff = toggleKeys.every((k) => (k === key ? false : !settings[k]));
       if (wouldAllBeOff) {
         setToggleError("At least one card type must be enabled.");
+        setToggleErrorKey(key);
         if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
         toggleErrorTimeoutRef.current = setTimeout(() => {
           toggleErrorTimeoutRef.current = null;
           setToggleError(null);
+          setToggleErrorKey(null);
         }, 3000);
         return;
       }
@@ -177,6 +181,7 @@ export default function SettingsPage() {
     }
 
     setToggleError(null);
+    setToggleErrorKey(null);
     setSettings({ ...settings, [key]: !settings[key] });
   }
 
@@ -220,6 +225,18 @@ export default function SettingsPage() {
     );
     const clamped = { ...settings, ...numericClamped } as UserSettings;
     saveSettings(clamped);
+    const session = loadSession();
+    if (session !== null) {
+      const filtered = session.cards.filter((card) => {
+        if (card.cardType === "name" && !clamped.nameCardsEnabled) return false;
+        if (card.cardType === "evolution" && !clamped.evolutionCardsEnabled) return false;
+        if (card.cardType === "reverse" && !clamped.reverseCardsEnabled) return false;
+        return true;
+      });
+      if (filtered.length !== session.cards.length) {
+        saveSession({ ...session, cards: filtered });
+      }
+    }
     setSettings(clamped);
     setSaved(true);
     if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
@@ -241,7 +258,6 @@ export default function SettingsPage() {
         ) : (
           <>
             <div className="flex flex-col gap-6">
-              {/* Ungrouped fields (mastery threshold) */}
               {GROUPS.map((group, groupIdx) => (
                 <section
                   key={group.heading ?? `group-${groupIdx}`}
@@ -324,7 +340,12 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
-                <div className={settings.nameCardsEnabled ? undefined : "opacity-50 pointer-events-none"}>
+                {toggleError !== null && toggleErrorKey === "nameCardsEnabled" && (
+                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                    {toggleError}
+                  </p>
+                )}
+                <div className={settings.nameCardsEnabled ? undefined : "opacity-50"}>
                   <div className="flex flex-col gap-4">
                     {NAME_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
                       <div
@@ -345,6 +366,7 @@ export default function SettingsPage() {
                           step={1}
                           value={Number(settings[key])}
                           onChange={(e) => handleChange(key, e.target.value)}
+                          disabled={!settings.nameCardsEnabled}
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -393,7 +415,12 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
-                <div className={settings.evolutionCardsEnabled ? undefined : "opacity-50 pointer-events-none"}>
+                {toggleError !== null && toggleErrorKey === "evolutionCardsEnabled" && (
+                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                    {toggleError}
+                  </p>
+                )}
+                <div className={settings.evolutionCardsEnabled ? undefined : "opacity-50"}>
                   <div className="flex flex-col gap-4">
                     {EVOLUTION_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
                       <div
@@ -414,6 +441,7 @@ export default function SettingsPage() {
                           step={1}
                           value={Number(settings[key])}
                           onChange={(e) => handleChange(key, e.target.value)}
+                          disabled={!settings.evolutionCardsEnabled}
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -424,13 +452,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </section>
-
-              {/* Toggle error alert */}
-              {toggleError !== null && (
-                <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
-                  {toggleError}
-                </p>
-              )}
 
               <section className="flex flex-col gap-4" aria-labelledby="reverse-heading">
                 <h2
@@ -469,6 +490,11 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
+                {toggleError !== null && toggleErrorKey === "reverseCardsEnabled" && (
+                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                    {toggleError}
+                  </p>
+                )}
                 {settings.reverseCardsEnabled && (
                   <>
                     {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (

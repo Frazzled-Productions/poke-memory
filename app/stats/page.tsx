@@ -344,9 +344,9 @@ export default function StatsPage() {
     const settings = loadSettings();
     const saved = loadSession();
     if (saved !== null) {
-      setCards(hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled }));
+      setCards(hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled }));
     } else {
-      setCards(buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled }));
+      setCards(buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled }));
     }
     setMasteryRepetitions(settings.masteryRepetitions);
     setNameCardsEnabled(settings.nameCardsEnabled);

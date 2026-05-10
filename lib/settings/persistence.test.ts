@@ -36,13 +36,6 @@ describe('loadSettings migration', () => {
     expect(settings).toEqual(DEFAULT_SETTINGS);
   });
 
-  it('returns DEFAULT_SETTINGS when stored value is null (key absent)', () => {
-    // key is absent — getItem returns null
-    const settings = loadSettings();
-    expect(settings.nameCardsEnabled).toBe(DEFAULT_SETTINGS.nameCardsEnabled);
-    expect(settings.evolutionCardsEnabled).toBe(DEFAULT_SETTINGS.evolutionCardsEnabled);
-  });
-
   it('stored object missing nameCardsEnabled defaults to true', () => {
     const partial = {
       masteryRepetitions: 3,
