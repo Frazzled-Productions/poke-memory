@@ -189,10 +189,11 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 | | |
 |---|---|
-| **Trigger** | `issues: [opened]` |
-| **What it does** | Classifies any missing label dimensions (priority / type / area) via Claude and applies them — purely additive, never removes existing labels |
-| **Fallback** | If Claude doesn't produce a valid priority label, defaults to `priority:later` |
-| **Effect** | Issues filed from mobile land on the project board correctly without manual triage |
+| **Trigger** | `issues: [opened]`; `pull_request: [opened]` |
+| **What it does** | **Issues**: classifies all three dimensions (priority / type / area) via Claude and applies any that are missing. **PRs**: classifies type and area only — priority labels belong to the linked issue, not the PR. Purely additive, never removes existing labels. |
+| **Fork guard** | Fork PRs are excluded from PR labelling (consistent with `auto-review.yml`) |
+| **Fallback** | If Claude doesn't produce a valid priority label for an issue, defaults to `priority:later`. No priority fallback for PRs. |
+| **Effect** | Issues filed from mobile land on the project board correctly without manual triage; PRs are filterable by area/type without manual labelling |
 
 ---
 
