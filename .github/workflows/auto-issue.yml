@@ -475,6 +475,15 @@ jobs:
             --jq '.id')
           echo "comment_id=$ID" >> "$GITHUB_OUTPUT"
 
+      # No if: guard — this job has no early-exit (stopped) path; the step always runs.
+      - name: Wire App token into git credential for push
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config --global \
+            http.https://github.com/.extraheader \
+            "Authorization: Bearer ${APP_TOKEN}"
+
       - uses: anthropics/claude-code-action@v1
         env:
           AUTO_STATUS_COMMENT_ID: ${{ steps.status.outputs.comment_id }}
@@ -858,6 +867,15 @@ jobs:
             -f body=$'<!-- auto-status -->\n## Working on this\n\n_(Resuming — task list will appear here as work progresses.)_' \
             --jq '.id')
           echo "comment_id=$ID" >> "$GITHUB_OUTPUT"
+
+      # No if: guard — this job has no early-exit (stopped) path; the step always runs.
+      - name: Wire App token into git credential for push
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config --global \
+            http.https://github.com/.extraheader \
+            "Authorization: Bearer ${APP_TOKEN}"
 
       - uses: anthropics/claude-code-action@v1
         env:
