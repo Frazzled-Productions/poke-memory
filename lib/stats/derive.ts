@@ -1,4 +1,5 @@
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
+import type { ReviewState } from "@/lib/srs/scheduler";
 
 // ---------------------------------------------------------------------------
 // Mastery classification
@@ -9,14 +10,18 @@ export type CardClass = "locked" | "learning" | "mastered";
 /** A card is "mastered" once it has this many consecutive successful reviews. */
 export const MASTERY_REPETITIONS = 3;
 
+export function isMastered(state: ReviewState): boolean {
+  return state.repetitions >= 3 && state.interval >= 21;
+}
+
 /**
  * Locked: card has never been graded (lastReview === null).
- * Learning: graded at least once, but repetitions < MASTERY_REPETITIONS.
- * Mastered: repetitions >= MASTERY_REPETITIONS.
+ * Learning: graded at least once, but not yet mastered.
+ * Mastered: repetitions >= 3 AND interval >= 21.
  */
-export function classifyCard(card: ReviewableCard, masteryRepetitions = MASTERY_REPETITIONS): CardClass {
+export function classifyCard(card: ReviewableCard): CardClass {
   if (card.state.lastReview === null) return "locked";
-  if (card.state.repetitions >= masteryRepetitions) return "mastered";
+  if (isMastered(card.state)) return "mastered";
   return "learning";
 }
 
@@ -155,13 +160,13 @@ export function computeStats(
 
   for (const card of cards) {
     const state = card.state;
-    const isIntroduced = state.lastReview !== null;
-    const isMastered   = state.repetitions >= masteryRepetitions;
+    const isIntroduced  = state.lastReview !== null;
+    const isCardMastered = state.repetitions >= masteryRepetitions;
 
     // Mastery / learning / locked tallies.
     if (isIntroduced) {
       introduced++;
-      if (isMastered) {
+      if (isCardMastered) {
         mastered++;
       } else {
         learning++;
@@ -189,8 +194,8 @@ export function computeStats(
     if (gen >= 1 && gen <= 9) {
       const idx = gen - 1;
       genTotal[idx]++;
-      if (isIntroduced) genIntroduced[idx]++;
-      if (isMastered)   genMastered[idx]++;
+      if (isIntroduced)   genIntroduced[idx]++;
+      if (isCardMastered) genMastered[idx]++;
     }
   }
 
