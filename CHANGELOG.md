@@ -6,6 +6,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **`/fix` command now invokes Claude on PRs again** — `auto-pr.yml`'s "Wire App token into git credential for push" step (added in the CI-firing fix below) wrote a global `http.https://github.com/.extraheader` with `Authorization: Bearer ${APP_TOKEN}`. `claude-code-action` already embeds the App token in the remote URL itself, so the global Bearer header was layered on top of URL-embedded Basic auth — GitHub rejected the dual-auth request, and `claude-code-action`'s internal `git fetch origin main --depth=1` failed before Claude was ever invoked. The Wire step has been removed from `auto-pr.yml`. CI still fires on `/fix`-cycle commits because the App token now reaches subprocess pushes via the action's own URL-embedding mechanism, not via a global credential.
+
 - **Reverse-card backup import now works** — backups containing reviewed reverse cards would always fail re-import with "This file isn't a valid poke-memory backup." because reverse-card IDs (2 000 001+) were not included in the allowed-ID set. They are now.
 
 - **Stats page no longer silently drops reverse cards** — the Stats page was calling `hydrateSession` before reading settings, so reverse cards were always filtered out regardless of the user's preference. Settings are now read first and forwarded to `hydrateSession`.
