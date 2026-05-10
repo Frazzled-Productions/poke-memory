@@ -165,6 +165,14 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 80
           show_full_output: true
+          # `auto-review.yml` posts `<!-- auto-review-autofix:N -->\n/fix\n` as
+          # `poke-memory-bot[bot]` when the verdict is `Needs fixes`. Without
+          # this allowlist, claude-code-action defaults to ignoring bot
+          # triggers and exits before invoking Claude — the job appears to run
+          # but `auto-status` ends up reporting "No commits pushed and no
+          # auto-review posted." The job-level `if:` already permits the bot
+          # user; this is the action's separate internal gate.
+          allowed_bots: poke-memory-bot
           prompt: |
             You are the orchestrator on PR #${{ github.event.issue.number }}.
             The maintainer commented `/fix` requesting that fixes be made.
