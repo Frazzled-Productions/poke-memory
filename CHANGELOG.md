@@ -83,6 +83,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Project conventions (internal)
 
+- **`workflow-expert` sub-agent** — a new read-only sub-agent for reviewing `.github/workflows/**` and `.claude/agents/**` changes. Knows idempotency markers (`<!-- auto-plan -->`, `<!-- auto-review:N -->`, `<!-- auto-status -->`, etc.), WIP salvage flow, `/fix` cycle cap, fork-PR guard, and project-board transitions. Invoke before any non-trivial workflow change, analogous to `next16-expert` for Next.js changes. Closes #138.
 - **8 custom Claude Code sub-agents** covering planning, research, coding, and review. Roster and orchestration playbook in [AGENTS.md](./AGENTS.md).
 - **Conventions captured in AGENTS.md** as decisions are locked in: caching, page params, PokéAPI integration, spaced repetition, documentation, privacy.
 - **`auto-retro.yml` workflow** — when an issue closes via a merged PR, posts a single retrospective comment on the closed issue focused on which sub-agents earned their keep on that change. One transferable lesson per change, so the sandbox practice compounds.
