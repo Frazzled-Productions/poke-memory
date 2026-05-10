@@ -9,9 +9,11 @@ export type CardClass = "locked" | "learning" | "mastered";
 
 /** A card is "mastered" once it has this many consecutive successful reviews. */
 export const MASTERY_REPETITIONS = 3;
+/** A card is "mastered" once its projected review interval reaches this many days. */
+export const MASTERY_INTERVAL_DAYS = 21;
 
 export function isMastered(state: ReviewState, masteryRepetitions = MASTERY_REPETITIONS): boolean {
-  return state.repetitions >= masteryRepetitions && state.interval >= 21;
+  return state.repetitions >= masteryRepetitions && state.interval >= MASTERY_INTERVAL_DAYS;
 }
 
 /**
@@ -77,7 +79,7 @@ export type GenerationStats = {
   name: string;
   total: number;       // species in this generation
   introduced: number;  // count where lastReview !== null
-  mastered: number;    // count where repetitions >= masteryRepetitions AND interval >= 21
+  mastered: number;    // count where repetitions >= masteryRepetitions AND interval >= MASTERY_INTERVAL_DAYS
 };
 
 export type StrugglingCard = {
@@ -92,7 +94,7 @@ export type StatsResult = {
   totalCards: number;                    // name cards only, ~1025
   introduced: number;                    // lastReview !== null
   learning: number;                      // introduced && !mastered
-  mastered: number;                      // repetitions >= masteryRepetitions param AND interval >= 21
+  mastered: number;                      // repetitions >= masteryRepetitions param AND interval >= MASTERY_INTERVAL_DAYS
   locked: number;                        // lastReview === null (== totalCards - introduced)
   dueToday: number;                      // dueDate <= today AND lastReview !== today
   dueTomorrow: number;                   // dueDate === tomorrow's ISO date

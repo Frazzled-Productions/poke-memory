@@ -7,6 +7,7 @@ import { loadSession } from "@/lib/review/persistence";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { classifyCard } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
+import { loadSettings } from "@/lib/settings/persistence";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
 import { LoadingSkeleton } from "@/components/pokedex/PokedexGrid";
 import PokedexFiltered from "@/components/pokedex/PokedexFiltered";
@@ -25,8 +26,9 @@ export default function PokedexPage() {
 
   const cardClassById = new Map<number, CardClass>();
   if (cards !== null) {
+    const { masteryRepetitions } = loadSettings();
     for (const card of cards) {
-      cardClassById.set(card.id, classifyCard(card));
+      cardClassById.set(card.id, classifyCard(card, masteryRepetitions));
     }
   }
 
