@@ -33,7 +33,7 @@ jobs:
        github.event.comment.author_association == 'MEMBER' ||
        github.event.comment.author_association == 'COLLABORATOR' ||
        (github.event.comment.user.type == 'Bot' &&
-        startsWith(github.event.comment.user.login, 'poke-memory-bot')))
+        github.event.comment.user.login == 'poke-memory-bot[bot]'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
