@@ -541,8 +541,8 @@ jobs:
                commit, push, and re-run. Allow up to two fix attempts. If the
                gate still fails after the second fix attempt, post a comment
                on the issue with the last 80 lines of `/tmp/build-output.txt`
-               — include `@fraserbrookhouse` in the comment so the maintainer
-               is notified — and stop — do NOT open a PR. The branch stays
+               (include `@fraserbrookhouse` in the comment so the maintainer
+               is notified) and stop — do NOT open a PR. The branch stays
                pushed for manual inspection. (`npm ci` has already run as a
                workflow step, so dependencies are in place.)
             7. Open the PR:
@@ -939,8 +939,8 @@ jobs:
                commit, push, and re-run. Allow up to two fix attempts. If the
                gate still fails after the second fix attempt, post a comment
                on the issue with the last 80 lines of `/tmp/build-output.txt`
-               — include `@fraserbrookhouse` in the comment so the maintainer
-               is notified — and stop — do NOT open a PR. The branch stays
+               (include `@fraserbrookhouse` in the comment so the maintainer
+               is notified) and stop — do NOT open a PR. The branch stays
                pushed for manual inspection.
             7. Open the PR:
                `gh pr create --title "<title>" --body "<body>" --base main`
