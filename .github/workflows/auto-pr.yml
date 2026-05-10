@@ -153,6 +153,8 @@ jobs:
             --jq '.id')
           echo "comment_id=$ID" >> "$GITHUB_OUTPUT"
 
+      # The if: guard matches the pattern of the surrounding steps. auto-issue.yml's
+      # Wire steps carry no guard because those jobs have no early-exit (stopped) path.
       - name: Wire App token into git credential for push
         if: env.stopped != 'true'
         env:

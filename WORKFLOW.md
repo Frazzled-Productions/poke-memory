@@ -110,6 +110,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Conflict gate** | Checks for `<!-- overlap-scan:i+j:conflict -->` markers linked to open issues; refuses to proceed if unresolved |
 | **What it does** | Runs the orchestration playbook (plan → research → implement → review), pushes a branch, runs the build gate, opens a PR |
 | **Build gate** | `npm run typecheck && npm run build && npm test` — up to 2 fix attempts before stopping without a PR |
+| **Git credential** | The App installation token is written as a global git credential (`http.https://github.com/.extraheader`) immediately before `claude-code-action` — same mechanism as `auto-pr.yml`. No `if:` guard is needed here: this job has no early-exit path and no `stopped` flag. |
 | **Post-step** | Runs `if: always()` — salvages uncommitted edits as a `WIP: halted run on #N` commit, verifies the branch on origin before advertising `/continue`, updates the live status comment |
 | **Project status** | Moves to **In Progress** on start; to **PR** when a PR opens |
 
@@ -120,6 +121,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Trigger** | Maintainer comments `/continue` on an open `auto`-labelled issue |
 | **Pre-flight** | Guards against existing open PR; parses branch name from the last `<!-- auto-status -->` comment; verifies branch exists on origin |
 | **What it does** | Checks out the saved branch and resumes implementation from where it left off; follows the same workflow as implement |
+| **Git credential** | Same global-credential mechanism as the implement job — App token written to `http.https://github.com/.extraheader` before `claude-code-action`. No `if:` guard; no early-exit path in this job. |
 | **WIP handling** | If the last commit subject starts with `WIP:`, the resumed orchestrator inspects `git diff HEAD~1` and amends or reverts before continuing |
 
 #### Split job
@@ -142,6 +144,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **LGTM short-circuit** | Bare `/fix` on an already-approved PR does nothing — the orchestrator posts a note and stops. `/fix <inline findings>` overrides and forces a fix run using the inline body as the punch list. |
 | **No-progress guard** | If a fix cycle produces zero commits, no new review is posted and the chain ends. |
 | **What it does** | Reads the latest `<!-- auto-review:N -->` comment (or the inline `/fix` body), addresses findings, commits, pushes, runs `code-reviewer`, posts `<!-- auto-review:N+1 -->` |
+| **Git credential** | The App installation token is written as a global git credential (`http.https://github.com/.extraheader`) immediately before `claude-code-action`. `actions/checkout` writes the token to the repo-local `.git/config`, but `claude-code-action` spawns subprocesses outside that scope which fall back to the ambient `GITHUB_TOKEN`; the global credential ensures all subprocess trees push as `poke-memory-bot`. The step is guarded `if: env.stopped != 'true'` (earlier stop steps set that flag). |
 | **Project status** | Moves to **In Progress** during the fix; to **PR** or **Ready to merge** after based on the new review verdict |
 
 ---
