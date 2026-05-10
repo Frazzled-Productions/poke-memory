@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { getPokemonFacts } from '@/lib/pokemon/facts';
 import type { SeedPokemon } from '@/lib/pokemon/seed';
 
-function basePokemon(overrides = {}) {
+function basePokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
   return {
     id: 1,
     name: 'bulbasaur',
