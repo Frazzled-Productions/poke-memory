@@ -10,6 +10,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Changed
 
+- **Auto-review now self-triggers `/fix`** — when `auto-review.yml` posts a `Needs fixes` verdict, it automatically posts a `/fix` comment on the PR (gated at the existing 3-cycle cap), so the fix loop starts without manual intervention. LGTM verdict comments now @-mention `@fraserbrookhouse` so the maintainer receives a GitHub notification when a PR is approved. Closes [#137](https://github.com/fraserbrookhouse/poke-memory/issues/137).
+
 - **PWA `start_url` now includes `?source=pwa`** — the web app manifest's `start_url` is `/?source=pwa` instead of `/`. This lets future analytics tooling distinguish standalone PWA launches from ordinary browser visits without any code change at that time. No runtime behavior changes today. Closes [#8](https://github.com/fraserbrookhouse/poke-memory/issues/8).
 
 ### Added

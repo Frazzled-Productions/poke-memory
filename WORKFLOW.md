@@ -137,7 +137,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 | | |
 |---|---|
-| **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) comments `/fix` on a PR |
+| **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) or `auto-review.yml` posts `/fix` on a PR |
 | **Cycle cap** | 3 auto-review cycles per PR (counted by `<!-- auto-review:N -->` markers). After 3, the workflow posts a stop comment and exits. |
 | **LGTM short-circuit** | Bare `/fix` on an already-approved PR does nothing — the orchestrator posts a note and stops. `/fix <inline findings>` overrides and forces a fix run using the inline body as the punch list. |
 | **No-progress guard** | If a fix cycle produces zero commits, no new review is posted and the chain ends. |
@@ -153,7 +153,9 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Trigger** | `pull_request: [opened, reopened, labeled]` |
 | **Gate** | PRs whose head branch starts with `auto/` OR which carry an `auto-review` label. Drafts are skipped. Fork PRs are explicitly excluded (`head.repo.fork == false`). For `labeled` events, only the `auto-review` label fires a run. |
 | **Idempotency** | Each review comment includes `<!-- auto-review-sha:<head-sha> -->` on row 2; re-triggers at the same SHA are skipped. |
-| **What it does** | Runs `code-reviewer` sub-agent; posts `<!-- auto-review:N -->` comment; upgrades project status to **Ready to merge** if verdict is `Looks good to me` |
+| **Auto-fix trigger** | When verdict is `Needs fixes` and the cycle count is below 3, automatically posts a `<!-- auto-review-autofix -->` `/fix` comment on the PR — which triggers `auto-pr.yml` without manual intervention. The existing cycle cap (3) and no-progress guard still hold; the auto-trigger respects both. |
+| **LGTM mention** | When verdict is `Looks good to me`, the comment body includes `@fraserbrookhouse` so the maintainer receives a GitHub notification. |
+| **What it does** | Runs `code-reviewer` sub-agent; posts `<!-- auto-review:N -->` comment; upgrades project status to **Ready to merge** if verdict is `Looks good to me`; auto-posts `/fix` if verdict is `Needs fixes` |
 | **Check gate** | Final job step exits non-zero when the latest verdict scoped to the current head SHA is `Needs fixes` — PR checks show red until a `/fix` cycle lands an approval at a new SHA |
 
 ---

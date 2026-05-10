@@ -151,7 +151,7 @@ jobs:
 
                    <bulleted punch list of findings, or "No significant issues.">
 
-                   Verdict: Looks good to me
+                   Verdict: Looks good to me — @fraserbrookhouse
 
                    _Reply with `/fix` to have these findings addressed._
 
@@ -161,11 +161,12 @@ jobs:
                `<!-- auto-review-sha:${{ github.event.pull_request.head.sha }} -->`
                so re-triggers at the same head SHA are skipped. A verdict line
                starting with `Verdict: ` MUST be present, with either
-               `Looks good to me` (no significant issues) or `Needs fixes`. Use
-               those whole-word phrases verbatim — no acronyms. When (and only
-               when) the verdict is `Needs fixes`, append the italicised footer
-               line shown above so the maintainer knows how to trigger a fix
-               run. Omit the footer when the verdict is `Looks good to me`.
+               `Looks good to me — @fraserbrookhouse` (no significant issues) or
+               `Needs fixes`. Use those whole-word phrases verbatim — no acronyms.
+               When (and only when) the verdict is `Needs fixes`, append the
+               italicised footer line shown above so the maintainer knows how to
+               trigger a fix run. Omit the footer when the verdict is
+               `Looks good to me — @fraserbrookhouse`.
 
                When referencing a prior review in your prose (only relevant when
                this is not the first review): find the comment object in the PR
@@ -219,6 +220,26 @@ jobs:
           GH_TOKEN="${{ steps.org-app-token.outputs.token }}" \
           GH_TOKEN_REPO="${{ steps.app-token.outputs.token }}" \
             .github/scripts/set-project-status.sh "$ISSUE" "$STATUS"
+
+      - name: Post auto-fix comment on Needs fixes
+        if: always() && steps.idem.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          PR="${{ github.event.pull_request.number }}"
+          SHA="${{ github.event.pull_request.head.sha }}"
+          BODY=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
+                  | sort_by(.created_at) | last | .body // \"\"")
+          VERDICT=$(printf '%s\n' "$BODY" | grep -E '^Verdict:' | head -1 || true)
+          COUNT=${{ steps.cycles.outputs.count }}
+          if [[ "$VERDICT" == *"Needs fixes"* ]] && [[ "$COUNT" -lt 3 ]]; then
+            echo "Verdict is 'Needs fixes' and cycle count ($COUNT) < 3 — posting auto /fix comment."
+            gh pr comment "$PR" --body $'<!-- auto-review-autofix -->\n/fix'
+          else
+            echo "No auto-fix needed (verdict: '${VERDICT:-<none>}', count: $COUNT)."
+          fi
 
       - name: Fail check when verdict is "Needs fixes"
         if: always()
