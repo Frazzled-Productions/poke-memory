@@ -68,6 +68,18 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
 - Use `revalidatePath('/path')` only when invalidating path-level data, not specific tags.
 - Tag the underlying cached fetches with `cacheTag(...)` inside `'use cache'` functions — without that, there is nothing for `updateTag` to invalidate.
 
+### Sync (authenticated users)
+
+Two-layer model for pushing review state to Supabase:
+
+1. **Per-grade debounced upsert (primary path)** — `usePerGradeSync(client, userId)` returns `{ enqueueGrade, flushPending }`. Call `enqueueGrade(card)` fire-and-forget immediately after each grade. A 200 ms debounce coalesces rapid re-grades; when it fires, one upsert per pending card is sent via `pushSingleCard`. Failed cards stay in the queue for the next grade cycle or the unload safety-net.
+
+2. **Unload safety-net (secondary path)** — `useSyncOnUnload(client, userId, flushPending)` registers `visibilitychange` / `pagehide` listeners. On unload it calls `flushPending()` (from `usePerGradeSync`) to get the still-unsynced cards; if non-empty, it falls back to the batched `pushSession` for just those cards. When the per-grade path is working normally, `flushPending()` returns `[]` and the unload push is skipped entirely.
+
+- **`pushSession` is not deleted** — it remains the batched fallback and the escape hatch for "force resync" scenarios.
+- **Volume**: 100 reviews/day → at most 100 single-row upserts (often fewer after debounce coalescing). Well within Supabase free-tier limits.
+- Guest-mode guard runs on every `enqueueGrade` call, not just at mount, so mid-session sign-out is safe.
+
 ### Page params
 
 - `params` and `searchParams` are `Promise` — always `await` them. Synchronous access from earlier Next.js versions is fully removed.
