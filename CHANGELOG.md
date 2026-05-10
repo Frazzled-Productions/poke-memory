@@ -14,6 +14,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Per-grade cloud sync for signed-in users** — review grades are now pushed to Supabase immediately after each grade (debounced 200 ms to coalesce rapid re-grades after Reveal), instead of only on page unload. A single-row upsert fires per card, so a typical 100-review session generates ≤ 100 network calls rather than one 1482-row batch. The unload-time push is retained as a safety net covering any grades that failed the per-grade path. Closes [#94](https://github.com/fraserbrookhouse/poke-memory/issues/94).
+
 - **Last-synced timestamp on Stats page** — signed-in users see a small "Last synced: HH:MM" line below the Stats page heading, updated after every successful push to the cloud. Shows "Sync failed at HH:MM — Push returned an error — will retry next session." when the most recent push failed, and "Not synced yet." before any push has occurred. Timestamp is stored in `poke-memory:sync-status:v1` in localStorage. Closes [#97](https://github.com/fraserbrookhouse/poke-memory/issues/97).
 
 - **Pokédex search and filters** — a sticky filter bar at the top of the Pokédex page lets you find Pokémon by name (debounced search input with a clear button), filter by type using 18 multi-select type chips (OR logic), and jump to a single generation with mutually exclusive generation pills (Gen I–IX plus All). Filters are reflected in URL search params (`?q=`, `?type=`, `?gen=`) so they survive page refresh and are shareable. An empty-state message appears when no Pokémon match, with a "Clear filters" link. Closes [#54](https://github.com/fraserbrookhouse/poke-memory/issues/54).

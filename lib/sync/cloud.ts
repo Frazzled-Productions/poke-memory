@@ -78,6 +78,36 @@ export async function pushSession(
 }
 
 /**
+ * Upserts a single card into card_reviews. Best-effort — returns false on any
+ * error without throwing.
+ */
+export async function pushSingleCard(
+  client: SupabaseClient,
+  userId: string,
+  card: ReviewableCard,
+): Promise<boolean> {
+  try {
+    const { error } = await client.from("card_reviews").upsert(
+      {
+        user_id: userId,
+        pokemon_id: card.id,
+        repetitions: card.state.repetitions,
+        interval: card.state.interval,
+        ease_factor: card.state.easeFactor,
+        due_date: card.state.dueDate,
+        last_review: card.state.lastReview,
+        first_seen: card.state.firstSeen,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,pokemon_id" },
+    );
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Deletes all card_review rows for the user from the cloud.
  * Returns true on success, false on any error.
  */

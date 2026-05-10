@@ -23,6 +23,7 @@ import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { appendGradeEntry } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
@@ -230,9 +231,10 @@ export function ReviewSession() {
 
   // Ref for the timeout that fires when the earliest pending learning card is due.
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Sync on page unload when user is signed in.
+  // Sync: per-grade debounced upserts (primary path) + unload safety-net.
   const { user, supabase } = useAuth();
-  useSyncOnUnload(supabase, user?.id ?? null, cards);
+  const { enqueueGrade, flushPending } = usePerGradeSync(supabase, user?.id ?? null);
+  useSyncOnUnload(supabase, user?.id ?? null, flushPending);
 
   useEffect(() => {
     const saved = loadSession();
@@ -468,6 +470,7 @@ export function ReviewSession() {
     saveSession({ cards: newCards, limits });
     recordReview(todayString(now));
     appendGradeEntry({ date: todayString(now), grade, cardType: currentCard.cardType });
+    enqueueGrade({ ...currentCard, state: nextState });
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
 
