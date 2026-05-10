@@ -24,12 +24,13 @@ function isReviewCardShaped(value: unknown): boolean {
     return false;
   }
   // Reject unknown cardType values — undefined is allowed (legacy migration
-  // backfills it to "name") but any explicit value other than "name" or
-  // "evolution" indicates corruption or a forward-incompatible schema.
+  // backfills it to "name") but any explicit value other than "name",
+  // "evolution", or "reverse" indicates corruption or a forward-incompatible schema.
   if (
     v.cardType !== undefined &&
     v.cardType !== "name" &&
-    v.cardType !== "evolution"
+    v.cardType !== "evolution" &&
+    v.cardType !== "reverse"
   ) {
     return false;
   }
@@ -71,7 +72,7 @@ function isPerTypeLimitsShaped(value: unknown): boolean {
 function isDailyLimitsShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  // New shape: per-type limits.
+  // Current shape: per-type limits. `reverse` is optional for existing sessions.
   if (isPerTypeLimitsShaped(v.name) && isPerTypeLimitsShaped(v.evolution)) {
     return true;
   }
@@ -90,9 +91,13 @@ function migrateDailyLimits(raw: unknown): DailyLimits {
     return {
       name: v.name as PerTypeLimits,
       evolution: v.evolution as PerTypeLimits,
+      // `reverse` is optional in persisted sessions; backfill with default.
+      reverse: isPerTypeLimitsShaped(v.reverse)
+        ? (v.reverse as PerTypeLimits)
+        : { ...DEFAULT_LIMITS.reverse },
     };
   }
-  // Legacy flat shape — promote to name limits, evolution gets defaults.
+  // Legacy flat shape — promote to name limits, evolution + reverse get defaults.
   if (
     typeof v.maxNewPerDay === "number" &&
     typeof v.maxReviewsPerDay === "number"
@@ -103,6 +108,7 @@ function migrateDailyLimits(raw: unknown): DailyLimits {
         maxReviewsPerDay: v.maxReviewsPerDay,
       },
       evolution: { ...DEFAULT_LIMITS.evolution },
+      reverse: { ...DEFAULT_LIMITS.reverse },
     };
   }
   return DEFAULT_LIMITS;

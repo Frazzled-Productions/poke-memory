@@ -3,7 +3,7 @@ import type { Grade } from "@/lib/srs/scheduler";
 export type GradeLogEntry = {
   date: string;
   grade: Grade;
-  cardType: "name" | "evolution";
+  cardType: "name" | "evolution" | "reverse";
 };
 
 export type GradeLog = GradeLogEntry[];
@@ -24,7 +24,7 @@ function isEntryShape(v: unknown): v is GradeLogEntry {
   return (
     typeof e.date === "string" &&
     isGrade(e.grade) &&
-    (e.cardType === "name" || e.cardType === "evolution")
+    (e.cardType === "name" || e.cardType === "evolution" || e.cardType === "reverse")
   );
 }
 

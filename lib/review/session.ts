@@ -1,7 +1,7 @@
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
-import { SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 
 export type { Grade };
 
@@ -14,7 +14,18 @@ export type EvolutionReviewCard = EvolutionCard & {
   state: ReviewState;
 };
 
-export type ReviewableCard = NameReviewCard | EvolutionReviewCard;
+// Reverse card: name shown as prompt, sprite revealed on grade.
+// id = REVERSE_ID_OFFSET + pokemon.id to keep namespaces disjoint.
+// Spreads all SeedPokemon fields so facts (height, type, etc.) are available
+// after reveal without a secondary lookup.
+export type ReverseReviewCard = Omit<SeedPokemon, "id"> & {
+  cardType: "reverse";
+  id: number;        // REVERSE_ID_OFFSET + pokemonId
+  pokemonId: number; // original species ID (same as SeedPokemon.id)
+  state: ReviewState;
+};
+
+export type ReviewableCard = NameReviewCard | EvolutionReviewCard | ReverseReviewCard;
 
 // Backward-compat alias
 export type ReviewCard = ReviewableCard;
@@ -24,22 +35,25 @@ export type PerTypeLimits = {
   maxReviewsPerDay: number;
 };
 
-export type CardTypeKey = "name" | "evolution";
+export type CardTypeKey = "name" | "evolution" | "reverse";
 
 export type DailyLimits = {
   name: PerTypeLimits;
   evolution: PerTypeLimits;
+  reverse: PerTypeLimits;
 };
 
 export const DEFAULT_LIMITS: DailyLimits = {
   name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
   evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+  reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
 export function buildSession(
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
+  opts: { reverseEnabled?: boolean } = {},
 ): ReviewableCard[] {
   const nameCards: NameReviewCard[] = seed.map((pokemon) => ({
     ...pokemon,
@@ -50,26 +64,54 @@ export function buildSession(
     ...evo,
     state: initialReviewState(now),
   }));
-  return [...nameCards, ...evoCards];
+  const reverseCards: ReverseReviewCard[] = opts.reverseEnabled
+    ? seed.map((p) => ({
+        ...p,
+        id: REVERSE_ID_OFFSET + p.id,
+        pokemonId: p.id,
+        cardType: "reverse" as const,
+        state: initialReviewState(now),
+      }))
+    : [];
+  return [...nameCards, ...evoCards, ...reverseCards];
 }
 
 // Merge saved cards with the current seed, refreshing seed fields (e.g. newly
 // added flavorTexts) on existing cards while preserving their SM-2 state.
 // Missing seed entries are appended at initialReviewState — due immediately.
+// When reverseEnabled is false, any persisted reverse cards are filtered out;
+// re-enabling reverse cards starts fresh (no saved state carried over).
 export function hydrateSession(
   saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
+  opts: { reverseEnabled?: boolean } = {},
 ): ReviewableCard[] {
+  const { reverseEnabled = false } = opts;
   const seedById = new Map(seed.map((p) => [p.id, p]));
   const evoSeedById = new Map(evoSeed.map((e) => [e.id, e]));
 
-  const refreshed: ReviewableCard[] = saved.map((card) => {
+  // When disabled, drop saved reverse cards so re-enabling starts fresh.
+  const filteredSaved = reverseEnabled
+    ? saved
+    : saved.filter((c) => c.cardType !== "reverse");
+
+  const refreshed: ReviewableCard[] = filteredSaved.map((card) => {
     if (card.cardType === "evolution") {
       const fresh = evoSeedById.get(card.id);
       if (!fresh) return card;
       return { ...fresh, state: card.state };
+    } else if (card.cardType === "reverse") {
+      const fresh = seedById.get(card.pokemonId);
+      if (!fresh) return card;
+      return {
+        ...fresh,
+        id: card.id,
+        pokemonId: fresh.id,
+        cardType: "reverse" as const,
+        state: card.state,
+      };
     } else {
       const fresh = seedById.get(card.id);
       if (!fresh) return card;
@@ -77,7 +119,7 @@ export function hydrateSession(
     }
   });
 
-  const savedIds = new Set(saved.map((c) => c.id));
+  const savedIds = new Set(filteredSaved.map((c) => c.id));
 
   const nameAdditions: NameReviewCard[] = seed
     .filter((p) => !savedIds.has(p.id))
@@ -87,7 +129,19 @@ export function hydrateSession(
     .filter((e) => !savedIds.has(e.id))
     .map((e) => ({ ...e, state: initialReviewState(now) }));
 
-  const additions = [...nameAdditions, ...evoAdditions];
+  const reverseAdditions: ReverseReviewCard[] = reverseEnabled
+    ? seed
+        .filter((p) => !savedIds.has(REVERSE_ID_OFFSET + p.id))
+        .map((p) => ({
+          ...p,
+          id: REVERSE_ID_OFFSET + p.id,
+          pokemonId: p.id,
+          cardType: "reverse" as const,
+          state: initialReviewState(now),
+        }))
+    : [];
+
+  const additions = [...nameAdditions, ...evoAdditions, ...reverseAdditions];
   if (additions.length === 0) return refreshed;
   return [...refreshed, ...additions];
 }
@@ -147,10 +201,11 @@ export type PerTypeCounters = {
 /**
  * Computes all queues and today's counters from the full card set + limits.
  *
- * Counters and caps are tracked per cardType — name and evolution cards each
- * have their own daily new / review budget. The returned `reviewQueue` and
- * `newQueue` are merged across types (after each type's cap is applied
- * independently) so the consumer can keep its single-cursor ordering policy.
+ * Counters and caps are tracked per cardType — name, evolution, and reverse
+ * cards each have their own daily new / review budget. The returned
+ * `reviewQueue` and `newQueue` are merged across types (after each type's cap
+ * is applied independently) so the consumer can keep its single-cursor
+ * ordering policy.
  *
  * - learningCardIds: IDs of all cards currently in a learning/relearning step
  *   (learningStep !== null), regardless of cardType. The UI's in-memory queue
@@ -185,10 +240,11 @@ export function buildSessionQueues(
   const perType: Record<CardTypeKey, PerTypeCounters> = {
     name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
     evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+    reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
   };
 
-  const reviewCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [] };
-  const newCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [] };
+  const reviewCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [] };
+  const newCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [] };
 
   for (const card of cards) {
     const type = card.cardType;
@@ -213,7 +269,7 @@ export function buildSessionQueues(
   const reviewQueue: number[] = [];
   const newQueue: number[] = [];
 
-  for (const type of ["name", "evolution"] as const) {
+  for (const type of ["name", "evolution", "reverse"] as const) {
     const reviewSlots = Math.max(
       0,
       limits[type].maxReviewsPerDay - perType[type].reviewsDoneToday,
@@ -230,15 +286,19 @@ export function buildSessionQueues(
     );
   }
 
-  // Reshuffle the merged per-type slices so name and evolution interleave
-  // deterministically rather than appearing in two contiguous blocks.
+  // Reshuffle the merged per-type slices so name, evolution, and reverse
+  // interleave deterministically rather than appearing in contiguous blocks.
   const shuffledReviewQueue = stableShuffleForDay(reviewQueue, today);
   const shuffledNewQueue = stableShuffleForDay(newQueue, today);
 
   const newIntroducedToday =
-    perType.name.newIntroducedToday + perType.evolution.newIntroducedToday;
+    perType.name.newIntroducedToday +
+    perType.evolution.newIntroducedToday +
+    perType.reverse.newIntroducedToday;
   const reviewsDoneToday =
-    perType.name.reviewsDoneToday + perType.evolution.reviewsDoneToday;
+    perType.name.reviewsDoneToday +
+    perType.evolution.reviewsDoneToday +
+    perType.reverse.reviewsDoneToday;
 
   return {
     learningCardIds,

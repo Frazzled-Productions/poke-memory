@@ -140,4 +140,17 @@ describe("computeStats mastery boundary", () => {
     expect(computeStats(cards, TODAY, 10, 3).mastered).toBe(1);
     expect(computeStats(cards, TODAY, 10, 4).mastered).toBe(0);
   });
+
+  it("totalCards reflects only name cards passed in — reverse cards filtered upstream do not inflate count", () => {
+    // computeStats receives cards.filter(c => c.cardType === "name") from the
+    // stats page, so reverse cards never reach it. This test documents that
+    // expectation: passing only name cards keeps totalCards at the name-card count.
+    const nameCards = [
+      card(1, { lastReview: TODAY, repetitions: MASTERY_REPETITIONS, interval: MASTERY_INTERVAL_DAYS }),
+      card(2),
+    ];
+    const result = computeStats(nameCards, TODAY);
+    expect(result.totalCards).toBe(2);
+    expect(result.mastered).toBe(1);
+  });
 });

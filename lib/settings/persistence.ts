@@ -7,6 +7,9 @@ export type UserSettings = {
   maxReviewsPerDay: number;          // soft daily cap for name reviews
   maxNewEvolutionPerDay: number;     // hard daily cap for new evolution cards
   maxReviewsEvolutionPerDay: number; // soft daily cap for evolution reviews
+  reverseCardsEnabled: boolean;      // show name as prompt; reveal sprite
+  maxNewReversePerDay: number;       // hard daily cap for new reverse cards
+  maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -15,6 +18,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxReviewsPerDay: 100,
   maxNewEvolutionPerDay: 5,
   maxReviewsEvolutionPerDay: 50,
+  reverseCardsEnabled: false,
+  maxNewReversePerDay: 10,
+  maxReviewsReversePerDay: 100,
 };
 
 // Returns DEFAULT_SETTINGS on fresh load, server, or corruption. Never throws.
@@ -49,6 +55,18 @@ export function loadSettings(): UserSettings {
         typeof obj.maxReviewsEvolutionPerDay === "number"
           ? obj.maxReviewsEvolutionPerDay
           : DEFAULT_SETTINGS.maxReviewsEvolutionPerDay,
+      reverseCardsEnabled:
+        typeof obj.reverseCardsEnabled === "boolean"
+          ? obj.reverseCardsEnabled
+          : DEFAULT_SETTINGS.reverseCardsEnabled,
+      maxNewReversePerDay:
+        typeof obj.maxNewReversePerDay === "number"
+          ? obj.maxNewReversePerDay
+          : DEFAULT_SETTINGS.maxNewReversePerDay,
+      maxReviewsReversePerDay:
+        typeof obj.maxReviewsReversePerDay === "number"
+          ? obj.maxReviewsReversePerDay
+          : DEFAULT_SETTINGS.maxReviewsReversePerDay,
     };
   } catch {
     return DEFAULT_SETTINGS;

@@ -1,6 +1,6 @@
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import type { ReviewableCard, DailyLimits } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
@@ -10,6 +10,7 @@ import { BACKUP_VERSION, isBackupFile } from "./schema";
 const VALID_IDS = new Set<number>([
   ...SEED_POKEMON.map((p) => p.id),
   ...SEED_EVOLUTION_CARDS.map((e) => e.id),
+  ...SEED_POKEMON.map((p) => REVERSE_ID_OFFSET + p.id),
 ]);
 
 export type ValidatedBackup = {

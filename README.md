@@ -2,7 +2,12 @@
 
 Anki-style spaced-repetition flashcards for learning the names of all 1025 Pokémon.
 
-You see a sprite, mentally answer, hit **Reveal**, and grade yourself with one of four buttons — Again / Hard / Good / Easy. The SM-2 scheduler decides when to show the card again: easy ones drift further out, struggling ones come back tomorrow.
+Two card directions, each scheduled independently by SM-2:
+
+- **Forward** (default on) — sprite shown as prompt, name revealed on flip.
+- **Reverse** (default off, enable in Settings) — name shown as prompt, sprite revealed on flip.
+
+Hit **Reveal**, grade yourself Again / Hard / Good / Easy, and the scheduler decides when each card comes back — easy cards drift out, struggling ones return sooner.
 
 ## Live demo
 
@@ -16,7 +21,7 @@ Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the 
 
 ## What's in it
 
-- All 1025 canonical Pokémon (gen 1 through gen 9, no alternate forms).
+- All 1025 canonical Pokémon (gen 1 through gen 9, no alternate forms). Two card directions per species: **forward** (sprite → name) and **reverse** (name → sprite), each scheduled independently. Reverse cards are off by default; enable them in Settings.
 - **Daily streak counter** — review at least one card to keep your streak alive; missing today is forgiven if you reviewed yesterday. Visible as a badge on the Practice page and a card on the Stats page.
 - **Four pages**: **Practice** (the daily review loop with a live Again/Hard/Good/Easy tally for the current session), **Stats** (all-time grade breakdown, mastery distribution, due forecast, per-generation progress, struggling-card list, current streak), **Pokédex** — a 1025-cell grid with progressive disclosure: unlearned Pokémon appear as silhouettes, reviewed Pokémon greyscale, and mastered ones in full colour. Tap any cell to open a detail page that reveals the same tiers — types and flavour text unlock when you start learning, base stats, facts, and the evolution chain unlock once mastered. And **Settings** — configure mastery threshold, new-card cap, and review cap.
 - **Pokémon facts on card flip** — when you reveal a card, a randomly-selected fact appears below the name (height, weight, type, genus, generation, catch difficulty, gender ratio, habitat, growth rate, and more). A new random fact is picked each flip.

@@ -6,9 +6,11 @@ import {
   type DailyLimits,
   type EvolutionReviewCard,
   type NameReviewCard,
+  type ReverseReviewCard,
   type ReviewableCard,
 } from '@/lib/review/session';
 import type { EvolutionCard, SeedPokemon } from '@/lib/pokemon/seed';
+import { REVERSE_ID_OFFSET } from '@/lib/pokemon/seed';
 import { initialReviewState } from '@/lib/srs/scheduler';
 import { migrateReviewCard } from '@/lib/review/persistence';
 
@@ -239,11 +241,81 @@ describe('migrateReviewCard', () => {
   });
 });
 
+describe('buildSession (reverse cards)', () => {
+  const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
+
+  it('excludes reverse cards when reverseEnabled is false (default)', () => {
+    const result = buildSession(seed, [], NOW);
+    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
+  });
+
+  it('includes reverse cards when reverseEnabled is true', () => {
+    const result = buildSession(seed, [], NOW, { reverseEnabled: true });
+    const reverseCards = result.filter((c) => c.cardType === 'reverse');
+    expect(reverseCards).toHaveLength(2);
+    expect(reverseCards.map((c) => c.id)).toEqual(
+      expect.arrayContaining([REVERSE_ID_OFFSET + 1, REVERSE_ID_OFFSET + 2]),
+    );
+  });
+
+  it('reverse card id = REVERSE_ID_OFFSET + pokemon.id', () => {
+    const result = buildSession(seed, [], NOW, { reverseEnabled: true });
+    const rev = result.find((c) => c.cardType === 'reverse' && (c as ReverseReviewCard).pokemonId === 1);
+    expect(rev?.id).toBe(REVERSE_ID_OFFSET + 1);
+  });
+});
+
+describe('hydrateSession (reverse cards)', () => {
+  const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
+
+  it('appends reverse cards when enabled and not in saved session', () => {
+    const saved = [makeCard(makeSeedPokemon(1))];
+    const result = hydrateSession(saved, seed, [], NOW, { reverseEnabled: true });
+    const reverseCards = result.filter((c) => c.cardType === 'reverse');
+    expect(reverseCards).toHaveLength(2);
+  });
+
+  it('strips saved reverse cards when reverseEnabled is false', () => {
+    const revCard: ReverseReviewCard = {
+      ...makeSeedPokemon(1),
+      id: REVERSE_ID_OFFSET + 1,
+      pokemonId: 1,
+      cardType: 'reverse',
+      state: initialReviewState(NOW),
+    };
+    const saved = [makeCard(makeSeedPokemon(1)), revCard];
+    const result = hydrateSession(saved, seed, [], NOW, { reverseEnabled: false });
+    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
+  });
+
+  it('strips reverse cards when toggle is turned off (build-then-disable path)', () => {
+    const built = buildSession(seed, [], NOW, { reverseEnabled: true });
+    const result = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
+    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(seed.length);
+  });
+
+  it('preserves review state on existing reverse cards when re-enabled', () => {
+    const revCard: ReverseReviewCard = {
+      ...makeSeedPokemon(1),
+      id: REVERSE_ID_OFFSET + 1,
+      pokemonId: 1,
+      cardType: 'reverse',
+      state: { ...initialReviewState(NOW), repetitions: 4, interval: 30 },
+    };
+    const result = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: true });
+    const found = result.find((c) => c.id === REVERSE_ID_OFFSET + 1);
+    expect(found?.state.repetitions).toBe(4);
+    expect(found?.state.interval).toBe(30);
+  });
+});
+
 describe('buildSessionQueues (per-type budgets)', () => {
   const TODAY = '2026-05-09';
   const baseLimits: DailyLimits = {
     name: { maxNewPerDay: 2, maxReviewsPerDay: 5 },
     evolution: { maxNewPerDay: 1, maxReviewsPerDay: 3 },
+    reverse: { maxNewPerDay: 2, maxReviewsPerDay: 5 },
   };
 
   function nameCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): NameReviewCard {
@@ -261,6 +333,15 @@ describe('buildSessionQueues (per-type budgets)', () => {
       name: 'name-' + id,
       spriteUrl: '',
       evolvesInto: [{ name: 'evo-of-' + id, spriteUrl: '' }],
+      state: { ...initialReviewState(NOW), ...partialState },
+    };
+  }
+  function reverseCard(pokemonId: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): ReverseReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId),
+      id: REVERSE_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'reverse',
       state: { ...initialReviewState(NOW), ...partialState },
     };
   }
@@ -326,5 +407,27 @@ describe('buildSessionQueues (per-type budgets)', () => {
     const newCards = queues.newQueue.map((id) => cards.find((c) => c.id === id)!);
     expect(newCards.filter((c) => c.cardType === 'name')).toHaveLength(1);
     expect(newCards.filter((c) => c.cardType === 'evolution')).toHaveLength(1); // capped at 1
+  });
+
+  it('caps reverse cards independently from name and evolution', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3),     // 3 fresh name (cap=2)
+      reverseCard(1), reverseCard(2), reverseCard(3), // 3 fresh reverse (cap=2)
+    ];
+    const queues = buildSessionQueues(cards, baseLimits, TODAY);
+    const newCards = queues.newQueue.map((id) => cards.find((c) => c.id === id)!);
+    expect(newCards.filter((c) => c.cardType === 'name')).toHaveLength(2);
+    expect(newCards.filter((c) => c.cardType === 'reverse')).toHaveLength(2);
+  });
+
+  it('tracks reverse card review counters independently', () => {
+    const cards: ReviewableCard[] = [
+      reverseCard(1, { firstSeen: '2026-05-01', lastReview: TODAY, repetitions: 2 }),
+      reverseCard(2, { firstSeen: '2026-05-01', lastReview: TODAY, repetitions: 2 }),
+    ];
+    const queues = buildSessionQueues(cards, baseLimits, TODAY);
+    expect(queues.perType.reverse.reviewsDoneToday).toBe(2);
+    expect(queues.perType.name.reviewsDoneToday).toBe(0);
+    expect(queues.reviewsDoneToday).toBe(2);
   });
 });

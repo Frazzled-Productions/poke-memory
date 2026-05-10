@@ -19,6 +19,9 @@ vi.mock("@/lib/settings/persistence", () => ({
     maxReviewsPerDay: 100,
     maxNewEvolutionPerDay: 5,
     maxReviewsEvolutionPerDay: 50,
+    reverseCardsEnabled: false,
+    maxNewReversePerDay: 10,
+    maxReviewsReversePerDay: 100,
   },
 }));
 
@@ -32,6 +35,7 @@ import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 const VALID_LIMITS: DailyLimits = {
   name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
   evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+  reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
 const VALID_SETTINGS: UserSettings = {
@@ -40,6 +44,9 @@ const VALID_SETTINGS: UserSettings = {
   maxReviewsPerDay: 100,
   maxNewEvolutionPerDay: 5,
   maxReviewsEvolutionPerDay: 50,
+  reverseCardsEnabled: false,
+  maxNewReversePerDay: 10,
+  maxReviewsReversePerDay: 100,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {
