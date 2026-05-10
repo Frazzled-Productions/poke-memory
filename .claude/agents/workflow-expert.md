@@ -1,7 +1,7 @@
 ---
 name: workflow-expert
 description: Use before any non-trivial change to .github/workflows/** or .claude/agents/**. Knows idempotency markers, WIP salvage flow, cycle caps, fork-PR guard, and project-board transitions. Read-only.
-tools: Read, Grep, Glob, Bash, WebFetch
+tools: Read, Grep, Glob, WebFetch
 model: sonnet
 ---
 
@@ -25,8 +25,8 @@ Every automation that posts a comment guards against duplicate runs using an HTM
 | Marker | Comment | Checked by |
 |---|---|---|
 | `<!-- auto-plan -->` | Posted by the plan job in `auto-issue.yml` | Plan job's salvage step checks for its presence before re-posting |
-| `<!-- auto-review:N -->` | Posted by `auto-review.yml` and `auto-pr.yml`; N is the cycle index | `auto-pr.yml` counts existing markers to compute next N; cap is 3 |
-| `<!-- auto-review-sha:<head-sha> -->` | Line 2 of every auto-review comment | `auto-review.yml` skips re-triggers at the same SHA |
+| `<!-- auto-review:N -->` | Posted by `auto-review.yml` and `auto-pr.yml`; N is the cycle index | Both workflows count existing `<!-- auto-review:` markers to compute next N; only `auto-pr.yml` enforces the cap (3 cycles max) |
+| `<!-- auto-review-sha:<head-sha> -->` | Line 2 of `auto-review.yml` comments only (not present in `auto-pr.yml` fix comments) | `auto-review.yml` skips re-triggers at the same SHA |
 | `<!-- auto-retro -->` | Posted by `auto-retro.yml` | `auto-retro.yml` skips issues that already have this comment |
 | `<!-- auto-split:N -->` | N is the issue number; posted before the create loop | `auto-issue.yml` split job bails when this marker exists |
 | `<!-- auto-status -->` | Live status comment; only one exists per issue/PR | Identified by startswith check; PATCHed in-place rather than re-posted |
@@ -39,7 +39,7 @@ Post-steps in `auto-issue.yml` (implement and continue jobs) and `auto-pr.yml` (
 
 Salvage sequence:
 1. If uncommitted edits exist in the working tree, stage and commit them as `WIP: halted run on $N`, then push to origin.
-2. PATCH the live `<!-- auto-status -->` comment with outcome, branch, last commit, and recovery instructions.
+2. PATCH the live `<!-- auto-status -->` comment with outcome, branch, last commit, and recovery instructions (see *GitHub Actions gotchas → `gh` CLI in steps* below).
 3. Only advertise `/continue` when the branch is confirmed on origin via `git ls-remote`. Fall back to `/go` if the salvage push failed.
 
 On resume via `/continue`: the orchestrator checks `git log -1 --format=%s`. If the subject starts with `WIP:`, it inspects `git diff HEAD~1` and amends or reverts before continuing.

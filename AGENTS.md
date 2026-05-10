@@ -56,6 +56,8 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 | SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
 | `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
+| `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
+| `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
 
 ## Conventions
 

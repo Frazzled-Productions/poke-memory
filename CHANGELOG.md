@@ -14,8 +14,6 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
-- **`workflow-expert` sub-agent** — a new read-only sub-agent for reviewing `.github/workflows/**` and `.claude/agents/**` changes. Knows idempotency markers (`<!-- auto-plan -->`, `<!-- auto-review:N -->`, `<!-- auto-status -->`, etc.), WIP salvage flow, `/fix` cycle cap, fork-PR guard, and project-board transitions. Invoke before any non-trivial workflow change, analogous to `next16-expert` for Next.js changes. Closes #138.
-
 - **Pokédex progressive disclosure** — Pokémon in the Pokédex are now revealed progressively as you learn them. Unlearned Pokémon appear as a solid-black silhouette with only the Pokédex number visible. Pokémon you have started reviewing appear greyscale with their name and type shown. Mastered Pokémon (at least 3 consecutive reviews with a projected interval of 21+ days) show their full-colour sprite, name, types, flavour text, base stats, and evolution chain. The detail page applies the same three-tier gating so navigating directly to `/pokedex/[id]` also respects your progress. Closes [#22](https://github.com/fraserbrookhouse/poke-memory/issues/22).
 - **Per-grade cloud sync for signed-in users** — review grades are now pushed to Supabase immediately after each grade (debounced 200 ms to coalesce rapid re-grades after Reveal), instead of only on page unload. A single-row upsert fires per card, so a typical 100-review session generates ≤ 100 network calls rather than one 1482-row batch. The unload-time push is retained as a safety net covering any grades that failed the per-grade path. Closes [#94](https://github.com/fraserbrookhouse/poke-memory/issues/94).
 
@@ -85,6 +83,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Project conventions (internal)
 
+- **`workflow-expert` sub-agent** — a new read-only sub-agent for reviewing `.github/workflows/**` and `.claude/agents/**` changes. Knows idempotency markers (`<!-- auto-plan -->`, `<!-- auto-review:N -->`, `<!-- auto-status -->`, etc.), WIP salvage flow, `/fix` cycle cap, fork-PR guard, and project-board transitions. Invoke before any non-trivial workflow change, analogous to `next16-expert` for Next.js changes. Closes #138.
 - **8 custom Claude Code sub-agents** covering planning, research, coding, and review. Roster and orchestration playbook in [AGENTS.md](./AGENTS.md).
 - **Conventions captured in AGENTS.md** as decisions are locked in: caching, page params, PokéAPI integration, spaced repetition, documentation, privacy.
 - **`auto-retro.yml` workflow** — when an issue closes via a merged PR, posts a single retrospective comment on the closed issue focused on which sub-agents earned their keep on that change. One transferable lesson per change, so the sandbox practice compounds.
