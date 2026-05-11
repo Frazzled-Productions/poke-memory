@@ -66,6 +66,7 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | `/continue` | On an issue | Resumes a halted implement run from the saved branch |
 | `/split` | On an issue | Files sub-issues from the planner's **Suggested split** block |
 | `/fix` | On a PR | Runs a fix cycle in `auto-pr.yml` (up to 3 cycles per PR) |
+| `/resolve` | On a PR | Merges `origin/main`, resolves conflicts via Claude, runs build gate, pushes (`auto-resolve.yml`) |
 
 ### Backlog ownership
 
@@ -147,6 +148,21 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **What it does** | Reads the latest `<!-- auto-review:N -->` comment (or the inline `/fix` body), addresses findings, commits, pushes, runs `code-reviewer`, posts `<!-- auto-review:N+1 -->` |
 | **Git credential** | `actions/checkout` writes the App token to the repo-local `.git/config`. `claude-code-action`'s `git-config.ts` then unsets that local extraheader and embeds the App token directly in the remote URL (`https://x-access-token:${TOKEN}@github.com/...`), so subprocess fetches and pushes authenticate as `poke-memory-bot`. No global git credential is set: doing so injects a second `Authorization` header (Bearer) on top of the URL-embedded Basic auth, which GitHub rejects, and the action's `git fetch origin main --depth=1` step fails before Claude is invoked. |
 | **Project status** | Moves to **In Progress** during the fix; to **PR** or **Ready to merge** after based on the new review verdict |
+
+---
+
+### `auto-resolve.yml` — Auto Resolve
+
+| | |
+|---|---|
+| **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) or `poke-memory-bot` posts `/resolve` on an open PR |
+| **Fork guard** | Fork PRs are excluded — `isCrossRepository` is fetched via `gh pr view` and the job bails early if true |
+| **Pre-flight** | Retries `mergeableState` up to 3× (10 s sleep) while `UNKNOWN`; exits with a comment if already `MERGEABLE` / `CLEAN` |
+| **Fast-path** | If `git merge origin/main --no-edit` succeeds cleanly, pushes the merge commit and posts `<!-- auto-resolve:N -->` directly — no Claude invocation |
+| **Conflict path** | Claude resolves each conflicted file; reads both sides + recent main history per file; bails if any file is under `lib/srs/`, `db/migrations/`, or is `next.config.ts`, or if more than 5 files conflict |
+| **Build gate** | `npm run typecheck && npm run build && npm test` — two attempts. On second failure, posts last 80 lines of output and stops without pushing |
+| **Idempotency** | `<!-- auto-resolve:N -->` marker (N = count of existing resolve comments + 1) is posted in the summary; concurrent `/resolve` comments queue via `cancel-in-progress: false` and the second run finds a clean PR |
+| **What it does** | Merges `origin/main` into the PR branch, resolves conflicts, runs the build gate, pushes, and posts an `<!-- auto-resolve:N -->` summary listing each conflicted file and how it was resolved |
 
 ---
 
