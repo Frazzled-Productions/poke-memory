@@ -6,7 +6,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
-- **Superuser mode** — a maintainer-only escape hatch that bypasses all mastery gates for UI purposes. Activate via `localStorage.setItem('poke-memory:superuser', 'true')` in DevTools, or by typing `super` anywhere on the page when not focused in a text field (the same sequence toggles it off). In superuser mode: all Pokémon tiles in Settings are interactive, the Pokédex grid shows every cell as mastered, and Pokédex detail pages reveal full stats and evolution chains regardless of progress. The flag persists in `localStorage` until explicitly cleared. No effect on review state, SRS scheduling, or stats. Closes #170.
+- **Superuser mode** — a maintainer-only escape hatch that bypasses all mastery gates for UI purposes. Activate via `localStorage.setItem('poke-memory:superuser', 'true')` in DevTools, or by typing `super` anywhere on the page when not focused in a text field (the same sequence toggles it off). On mobile, tap the "poke-memory" nav title 7 times within 2 seconds to toggle (works on iOS Safari and Android Chrome without DevTools). In superuser mode: all Pokémon tiles in Settings are interactive, the Pokédex grid shows every cell as mastered, and Pokédex detail pages reveal full stats and evolution chains regardless of progress. The flag persists in `localStorage` until explicitly cleared. No effect on review state, SRS scheduling, or stats. Closes #170, #177.
 
 ### Fixed
 
