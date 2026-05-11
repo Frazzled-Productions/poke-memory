@@ -17,6 +17,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Settings: app version displayed** — a new "About" section on the Settings page shows the current app version (e.g. `v0.1.0`). The version is read from `package.json` at build time via `NEXT_PUBLIC_APP_VERSION` and updates automatically on each deploy. Closes #201.
+
 - **Sync: auto-pull on tab focus** — when you return to a signed-in tab that has been in the background for ≥ 30 seconds, the app silently pulls your latest cloud progress and merges it into your local session. Stats and Pokédex pages re-render immediately without a manual sync or page reload. The practice session (`/`) is excluded to avoid interrupting an active review. Closes #95.
 
 ### Fixed
