@@ -119,7 +119,7 @@ function migrateDailyLimits(raw: unknown): DailyLimits {
 // field regardless of which version they last saved on:
 //   1. firstSeen  — backfill from lastReview (added before learningStep)
 //   2. learningStep — backfill to null (not in a step)
-//   3. stepStartedAt — backfill to null
+//   3. stepStartedAt — concrete timestamp for in-learning cards, null for graduated cards
 export function migrateReviewState(state: unknown): void {
   if (typeof state !== "object" || state === null) return;
   const s = state as Record<string, unknown>;
@@ -130,7 +130,9 @@ export function migrateReviewState(state: unknown): void {
     s.learningStep = null;
   }
   if (s.stepStartedAt === undefined) {
-    s.stepStartedAt = null;
+    // Cards in a learning step get a concrete start time so the mount-time queue
+    // builder can compute a real countdown; graduated cards keep null.
+    s.stepStartedAt = s.learningStep !== null ? Date.now() : null;
   }
 }
 

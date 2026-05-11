@@ -14,6 +14,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **Practice: graded card no longer reappears after mobile tab reload** — on mobile (especially Safari iOS), backgrounding the browser tab causes the OS to evict the page and trigger a full reload on return. If a card was mid-learning-step when the tab was evicted and the persisted state was missing `stepStartedAt` (a migration gap from an earlier schema), the queue builder treated the card as immediately due on every reload, re-showing it before the step timer had elapsed. The fix gives such cards a fresh step window on reload (60 s for new cards, 10 min for lapsed cards) so the correct countdown is shown instead. The persistence migration now also writes a concrete `stepStartedAt` timestamp for any in-learning card missing the field, preventing the same race on subsequent loads. Closes #186.
+
 - **Sync: mobile reviews now survive page hide** — the session-end sync push previously used the Supabase JS client's plain `fetch`, which browsers terminate on page discard/OS suspend. The unload path now uses `navigator.sendBeacon` pointing to a new `/api/sync` Route Handler, which browsers guarantee to deliver even when a tab is being closed or the OS suspends the app. Reviewed cards on mobile now reliably appear on desktop after locking the screen. Closes #93.
 
 - **Sync status shows accurate card count instead of generic failure** — when a tab closes before the debounce on the per-grade sync path fires, the unload safety-net now reports exactly how many cards failed (e.g. "1 card may be out of sync" or "3 cards may be out of sync") rather than the generic "Sync failed" banner. The generic banner is retained for full-session manual sync failures. Successful manual sync clears the straggler count. Closes #134.
@@ -31,6 +33,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Reverse cards no longer crash the practice page** — enabling reverse cards with a large Pokédex (~1025 species) could push the serialised session to ~4.5 MB, triggering a `QuotaExceededError` on `localStorage.setItem`. The error propagated out of React's mount effect and Next.js rendered "this page could not load". The fix strips `flavorTexts` and `evolutionChain` from reverse cards before writing to localStorage (these fields are re-injected from the seed on every mount) and wraps the write in a try/catch so a quota error is logged and swallowed rather than crashing the page. Closes #171.
 
 ### Added
+
+- **Weekly app codebase digest** — a new `auto-app-suggest.yml` workflow runs every Wednesday at 09:00 UTC and scans recently-changed app source files (`app/**`, `components/**`, `lib/**`, `db/**`) for tech debt, missing tests, dead code, and accessibility gaps. It files at most one digest issue per ISO week with up to five curated items, each backed by file paths and a concrete evidence snippet. Nothing is filed when nothing crosses the signal threshold. Closes #145.
 
 - **Friendly error screen** — render-phase errors in any page now show a "Something went wrong" card with a "Try again" button instead of Next.js's raw crash screen. Closes #172.
 

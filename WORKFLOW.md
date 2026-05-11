@@ -223,6 +223,21 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
+### `auto-app-suggest.yml` — Weekly App Digest
+
+| | |
+|---|---|
+| **Trigger** | Weekly cron Wednesday 09:00 UTC + `workflow_dispatch` |
+| **Idempotency key** | ISO week string in issue title (`Weekly app review — YYYY-Www`). Checks all states (open + closed). |
+| **Inputs** | Files changed in `app/**`, `components/**`, `lib/**`, `db/**` in the last 30 days |
+| **Signal constraints** | A — Recency filter (only recently-changed files); B — Recurrence filter (only patterns spanning ≥2 files) |
+| **Output** | One digest issue per ISO week, ≤5 curated items, each with file paths and a concrete evidence snippet |
+| **No-op** | Skips silently when nothing crosses the recurrence threshold or when a digest issue already exists for the week |
+| **Scope** | Only proposes changes within `app/**`, `components/**`, `lib/**`, or `db/**` — never workflow files or individual issue filings |
+| **Label** | Digest issue is labelled `area:app`; label is created if absent |
+
+---
+
 ### `vercel-failure-autofix.yml` — Vercel Auto-fix
 
 | | |
