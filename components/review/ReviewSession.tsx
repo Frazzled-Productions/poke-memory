@@ -19,6 +19,8 @@ import {
   DEFAULT_LIMITS,
 } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
+import { useStorageQuota } from "@/lib/review/useStorageQuota";
+import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 import { recordReview } from "@/lib/streak";
 import { loadSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
@@ -297,6 +299,8 @@ export function ReviewSession() {
   // "this session" in the UI to set expectations.
   const [sessionGrades, setSessionGrades] = useState<Record<Grade, number>>({ 1: 0, 2: 0, 4: 0, 5: 0 });
 
+  const { quotaExceeded, dismiss, notifySaveResult } = useStorageQuota();
+
   // Ref for the timeout that fires when the earliest pending learning card is due.
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
@@ -331,12 +335,12 @@ export function ReviewSession() {
       );
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
-        try { saveSession({ cards: hydrated, limits: sessionLimits }); } catch { /* quota — non-fatal */ }
+        notifySaveResult(saveSession({ cards: hydrated, limits: sessionLimits }));
       }
       sessionCards = hydrated;
     } else {
       const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, { reverseEnabled: enabled, nameEnabled, evolutionEnabled });
-      try { saveSession({ cards: fresh, limits: settingsLimits }); } catch { /* quota — non-fatal */ }
+      notifySaveResult(saveSession({ cards: fresh, limits: settingsLimits }));
       sessionCards = fresh;
       sessionLimits = settingsLimits;
     }
@@ -355,7 +359,7 @@ export function ReviewSession() {
       return c;
     });
     if (stampedAny) {
-      try { saveSession({ cards: sessionCards, limits: sessionLimits }); } catch { /* quota — non-fatal */ }
+      notifySaveResult(saveSession({ cards: sessionCards, limits: sessionLimits }));
     }
 
     setCards(sessionCards);
@@ -381,7 +385,7 @@ export function ReviewSession() {
     });
 
     setLearningQueue(initialLearning);
-  }, []);
+  }, [notifySaveResult]);
 
   // Reload when settings change in another tab so reverseEnabled and limits stay current.
   useEffect(() => {
@@ -615,7 +619,7 @@ export function ReviewSession() {
       card.id === currentCard.id ? { ...card, state: nextState } : card,
     );
 
-    saveSession({ cards: newCards, limits });
+    notifySaveResult(saveSession({ cards: newCards, limits }));
     recordReview(todayString(now));
     appendGradeEntry({ date: todayString(now), grade, cardType: currentCard.cardType });
     enqueueGrade({ ...currentCard, state: nextState });
@@ -670,6 +674,7 @@ export function ReviewSession() {
     );
     return (
       <div className="flex flex-col items-center gap-8">
+        {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
         <SpritePicker
           key={currentCard.id}
           targetPokemon={reverseTarget}
@@ -691,6 +696,7 @@ export function ReviewSession() {
 
   return (
     <div className="flex flex-col items-center gap-8">
+      {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
       {currentCard.cardType === "evolution" ? (
         <EvolutionCard
           spriteUrl={currentCard.spriteUrl}

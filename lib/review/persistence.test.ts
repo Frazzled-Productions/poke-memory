@@ -77,6 +77,28 @@ describe("saveSession (quota handling)", () => {
       saveSession({ cards: [makeReverseCard()], limits: defaultLimits })
     ).not.toThrow();
   });
+
+  it("returns { ok: false, reason: 'quota' } on QuotaExceededError", () => {
+    const storage = makeMockStorage();
+    const throwingSetItem = vi.fn(() => {
+      throw new DOMException("QuotaExceededError", "QuotaExceededError");
+    });
+    vi.stubGlobal("window", { localStorage: { ...storage, setItem: throwingSetItem } });
+    vi.stubGlobal("localStorage", { ...storage, setItem: throwingSetItem });
+
+    const result = saveSession({ cards: [makeReverseCard()], limits: defaultLimits });
+    expect(result.ok).toBe(false);
+    expect((result as { ok: false; reason: string }).reason).toBe("quota");
+  });
+
+  it("returns { ok: true } on successful save", () => {
+    const storage = makeMockStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("localStorage", storage);
+
+    const result = saveSession({ cards: [makeReverseCard()], limits: defaultLimits });
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("saveSession (reverse card stripping)", () => {
