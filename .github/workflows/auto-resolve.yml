@@ -1,0 +1,343 @@
+name: Auto Resolve
+
+# Triggered when a maintainer or poke-memory-bot comments `/resolve` on a PR.
+# Merges origin/main into the PR branch, resolves conflicts via Claude,
+# runs the build gate, and pushes. Posts a <!-- auto-resolve:N --> summary.
+#
+# Fast-path: if the merge is already clean (stale mergeable_state), pushes directly.
+# Conflict path: hands conflict files to Claude for resolution.
+#
+# Bail conditions (conflict path):
+#   - Any conflicted file under lib/srs/, db/migrations/, or next.config.ts
+#   - More than 5 conflicted files
+#   - Build gate fails after 2 attempts
+#
+# Fork guard: fork PRs are excluded (mirrors auto-review.yml).
+# Idempotency: <!-- auto-resolve:N --> markers count existing resolve runs.
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: auto-resolve-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve
+    if: |
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, '/resolve') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR' ||
+       (github.event.comment.user.type == 'Bot' &&
+        github.event.comment.user.login == 'poke-memory-bot[bot]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Pre-flight — fork guard, PR state, and mergeable state
+        id: preflight
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          PR=${{ github.event.issue.number }}
+          REPO=${{ github.repository }}
+
+          # Fork guard
+          IS_FORK=$(gh pr view "$PR" --repo "$REPO" \
+            --json isCrossRepository --jq '.isCrossRepository')
+          if [[ "$IS_FORK" == "true" ]]; then
+            gh pr comment "$PR" --body $'⚠️ \`/resolve\` is not available on fork PRs.'
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # PR state guard
+          STATE=$(gh pr view "$PR" --repo "$REPO" --json state --jq '.state')
+          if [[ "$STATE" != "OPEN" ]]; then
+            echo "PR is $STATE — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Resolve head branch
+          BRANCH=$(gh pr view "$PR" --repo "$REPO" --json headRefName --jq '.headRefName')
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          # Check mergeable state — retry up to 3x while UNKNOWN
+          MERGEABLE="UNKNOWN"
+          for i in 1 2 3; do
+            MERGEABLE=$(gh pr view "$PR" --repo "$REPO" \
+              --json mergeableState --jq '.mergeableState')
+            echo "mergeableState attempt $i: $MERGEABLE"
+            [[ "$MERGEABLE" != "UNKNOWN" ]] && break
+            [[ $i -lt 3 ]] && { echo "State is UNKNOWN, waiting 10 s..."; sleep 10; }
+          done
+
+          if [[ "$MERGEABLE" == "UNKNOWN" ]]; then
+            gh pr comment "$PR" --body $'⚠️ Could not determine merge state after 3 retries — attempting merge anyway.'
+          fi
+
+          if [[ "$MERGEABLE" == "CLEAN" ]]; then
+            gh pr comment "$PR" --body $'PR is already up to date with `main` — nothing to resolve.'
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        if: steps.preflight.outputs.skip == 'false'
+        with:
+          ref: ${{ steps.preflight.outputs.branch }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git identity
+        if: steps.preflight.outputs.skip == 'false'
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+${APP_SLUG}[bot]@users.noreply.github.com"
+
+      - name: Count existing auto-resolve markers
+        id: markers
+        if: steps.preflight.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          COUNT=$(gh api \
+            "repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-resolve:"))] | length')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "next=$((COUNT + 1))" >> "$GITHUB_OUTPUT"
+          echo "Found $COUNT existing auto-resolve comment(s); next would be #$((COUNT + 1))."
+
+      - name: Attempt fast-path merge
+        id: merge
+        if: steps.preflight.outputs.skip == 'false'
+        run: |
+          git fetch origin main --quiet
+          if git merge origin/main --no-edit 2>&1; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort 2>/dev/null || true
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v6
+        if: steps.preflight.outputs.skip == 'false'
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.preflight.outputs.skip == 'false'
+        run: npm ci
+
+      - name: Fast-path — build gate
+        if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'true'
+        run: |
+          set -euo pipefail
+          npm run typecheck && npm run build && npm test
+
+      - name: Fast-path — push and summarize
+        if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          git push
+          N=${{ steps.markers.outputs.next }}
+          PR=${{ github.event.issue.number }}
+          printf '<!-- auto-resolve:%s -->\n## Auto-resolve %s\n\nMerged `origin/main` cleanly (no conflicts). Build gate passed. Merge commit pushed.\n' \
+            "$N" "$N" > /tmp/resolve-body.md
+          gh pr comment "$PR" --body-file /tmp/resolve-body.md
+
+      - name: Post status comment (conflict path)
+        id: status
+        if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          ID=$(gh api -X POST \
+            "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            -f body=$'<!-- auto-status -->\n## Resolving merge conflicts\n\n_(Starting up — task list will appear here as work progresses.)_' \
+            --jq '.id')
+          echo "comment_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'false'
+        env:
+          AUTO_STATUS_COMMENT_ID: ${{ steps.status.outputs.comment_id }}
+          AUTO_STATUS_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 80
+          show_full_output: true
+          allowed_bots: poke-memory-bot
+          prompt: |
+            You are resolving merge conflicts on PR #${{ github.event.issue.number }}.
+
+            Read AGENTS.md (loaded via CLAUDE.md) for project conventions.
+
+            **Live status reporting:** The runtime maintains a live status
+            comment on the PR that mirrors your TodoWrite list — a hook fires
+            on every TodoWrite call and PATCHes the comment with the rendered
+            checklist. Use TodoWrite as your visible progress board: keep a
+            granular task list, update statuses
+            (pending / in_progress / completed) as you go, and the PR
+            timeline tracks along automatically. Do NOT post or PATCH the
+            status comment yourself — the hook owns it. If you hit a blocker,
+            post a separate comment explaining what's blocked, then stop —
+            don't push half-done work.
+
+            **Context:** The shell fast-path confirmed this PR has merge
+            conflicts with `origin/main`. The working tree is clean (the
+            failed merge was aborted). Dependencies are pre-installed
+            (`npm ci` has already run). You are handling the conflict-resolution
+            path.
+
+            **Workflow:**
+
+            1. Run `git fetch origin main --quiet && git merge origin/main --no-edit`.
+
+            2. Enumerate conflicted files: `git diff --name-only --diff-filter=U`.
+
+            3. **Bail unconditionally** (regardless of count) if any conflicted
+               file path starts with `lib/srs/` or `db/migrations/`, or if the
+               file is exactly `next.config.ts`. Also bail if more than 5 files
+               are conflicted.
+               To bail: run `git merge --abort`, post a PR comment listing
+               each conflicted file and the specific bail reason (protected path
+               or count > 5), then stop — do NOT push.
+
+            4. For each remaining conflicted file, resolve it:
+               - Read the current working-tree file (contains `<<<<<<< HEAD` markers).
+               - Read the incoming side: `git show MERGE_HEAD:<path>`.
+               - Understand what changed on main: `git log origin/main --oneline -10 -- <path>`.
+               - Write the fully merged file — no conflict markers left.
+               - Stage it: `git add <path>`.
+               - If the correct resolution is genuinely ambiguous and you cannot
+                 determine intent, bail on this file (abort the whole merge,
+                 post a comment listing the ambiguous file and why, stop).
+
+            5. Complete the merge commit:
+               `git commit --no-edit`
+               (If that fails because the commit message template is missing,
+               use: `git commit -m "Merge origin/main"`)
+
+            6. **Build gate** (two attempts):
+               `(npm run typecheck && npm run build && npm test) 2>&1 | tee /tmp/build-output.txt`
+               If it fails on the first attempt, read the last 80 lines of
+               `/tmp/build-output.txt`, apply a targeted fix (edit files, re-stage,
+               amend or create a new commit), and retry once.
+               After the second failure: post a PR comment with the last 80
+               lines of `/tmp/build-output.txt` and stop — do NOT push.
+
+            7. Push: `git push`.
+
+            8. Post a PR comment via
+               `gh pr comment ${{ github.event.issue.number }} --body-file <path>`
+               formatted exactly as follows (save to a file, then pass `--body-file`):
+
+                   <!-- auto-resolve:${{ steps.markers.outputs.next }} -->
+                   ## Auto-resolve ${{ steps.markers.outputs.next }}
+
+                   **Conflicts resolved:**
+                   - `<file>`: <one sentence describing how the conflict was resolved>
+
+                   Build gate passed. Merge commit pushed.
+
+               The first line MUST be the marker
+               `<!-- auto-resolve:${{ steps.markers.outputs.next }} -->` exactly.
+               List every conflicted file with a brief resolution note.
+               Do NOT add a `Co-Authored-By:` trailer to any commit.
+
+      - name: Verify outcome
+        if: always() && steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          NEXT: ${{ steps.markers.outputs.next }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -euo pipefail
+
+          STATUS_ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- auto-status -->"))] | last | .id // empty')
+
+          if [ -z "$STATUS_ID" ]; then
+            echo "No live status comment found — nothing to update."
+            exit 0
+          fi
+          echo "Live status comment ID: $STATUS_ID"
+
+          RESOLVE_FOUND=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            | jq -r --arg n "$NEXT" \
+              '[.[] | select(.body | startswith("<!-- auto-resolve:" + $n + " -->"))] | length')
+
+          DENIAL_COUNT=0
+          DENIAL_DETAILS=""
+          if [ -f "$LOG" ]; then
+            JQ_ERR=$(mktemp)
+            DENIAL_COUNT_RAW=$(jq -r 'select(.type == "result") | (.permission_denials_count // 0)' \
+              "$LOG" 2>"$JQ_ERR" | tail -1 || true)
+            if [[ "$DENIAL_COUNT_RAW" =~ ^[0-9]+$ ]]; then
+              DENIAL_COUNT="$DENIAL_COUNT_RAW"
+            fi
+            DENIAL_DETAILS=$(jq -r '
+              def text_of:
+                if type == "string" then .
+                elif type == "array" then map(.text // "" | tostring) | join(" ")
+                else tostring end;
+              select(.type == "user")
+              | .message.content[]?
+              | select(.type == "tool_result")
+              | select((.is_error // false) == true)
+              | (.content | text_of) as $c
+              | select($c | test("permission|denied|not allowed"; "i"))
+              | $c | gsub("\\s+"; " ") | .[0:240]
+            ' "$LOG" 2>>"$JQ_ERR" | sort -u | head -20 || true)
+            rm -f "$JQ_ERR"
+          fi
+
+          {
+            printf '<!-- auto-status -->\n'
+            if [ "$RESOLVE_FOUND" -gt 0 ]; then
+              printf 'Done — conflicts resolved and pushed (auto-resolve %s).\n' "$NEXT"
+            else
+              printf 'Stopped without pushing. See [run logs](%s).\n' "$RUN_URL"
+            fi
+            if [ "$DENIAL_COUNT" != "0" ]; then
+              printf '\n<details><summary>%s tool denial(s) during this run</summary>\n\n' "$DENIAL_COUNT"
+              printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any should be permitted.\n'
+              if [ -n "$DENIAL_DETAILS" ]; then
+                printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+              else
+                printf '\n_(see [run logs](%s) for details)_\n' "$RUN_URL"
+              fi
+              printf '\n</details>\n'
+            fi
+          } > /tmp/status-body.md
+
+          gh api -X PATCH "repos/$REPO/issues/comments/$STATUS_ID" -F body=@/tmp/status-body.md
