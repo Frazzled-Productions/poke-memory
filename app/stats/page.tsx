@@ -15,6 +15,7 @@ import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useManualSync } from "@/lib/sync/useManualSync";
+import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -337,6 +338,7 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 export default function StatsPage() {
   const { user, supabase } = useAuth();
   const { syncState, errorMessage, syncNow } = useManualSync(supabase, user?.id ?? null);
+  const storageVersion = useSessionStorageKey();
   const [syncRefreshKey, setSyncRefreshKey] = useState(0);
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
@@ -362,7 +364,7 @@ export default function StatsPage() {
     setNameCardsEnabled(settings.nameCardsEnabled);
     setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
     setGradeTotals(computeGradeTotals(loadGradeLog()));
-  }, [syncRefreshKey]);
+  }, [syncRefreshKey, storageVersion]);
 
   const stats: StatsResult | null =
     cards !== null && masteryRepetitions !== null
