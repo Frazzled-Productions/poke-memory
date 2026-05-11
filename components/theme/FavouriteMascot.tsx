@@ -11,7 +11,7 @@ export function FavouriteMascot() {
   return (
     <Image
       src={favourite.spriteUrl}
-      alt={favourite.name}
+      alt=""
       width={32}
       height={32}
       className="h-8 w-8 object-contain"

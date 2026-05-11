@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { loadFavourite } from "@/lib/theme/persistence";
 import { applyTheme } from "@/lib/theme/apply";
 import type { StoredFavourite } from "@/lib/theme/persistence";
@@ -26,9 +26,7 @@ export function FavouriteThemeProvider({
 }) {
   const [favourite, setFavourite] = useState<StoredFavourite | null>(null);
 
-  const updateFavourite = useCallback((f: StoredFavourite | null) => {
-    setFavourite(f);
-  }, []);
+  const updateFavourite = setFavourite;
 
   useEffect(() => {
     const stored = loadFavourite();

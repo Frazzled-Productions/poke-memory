@@ -2,7 +2,7 @@ import { CURATED_POKEMON } from "./curated-pokemon";
 import type { CuratedPokemon, ThemeColors } from "./curated-pokemon";
 
 const STORAGE_KEY = "poke-memory:favourite:v1";
-const HEX_COLOR = /^#[0-9a-fA-F]{3,8}$/;
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 export type StoredFavourite = {
   id: number;
