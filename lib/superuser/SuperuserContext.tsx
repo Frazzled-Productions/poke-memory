@@ -7,6 +7,11 @@ import { isSuperuser, enableSuperuser, disableSuperuser, STORAGE_KEY } from "./p
 const CHORD_SEQUENCE = ["s", "u", "p", "e", "r"];
 const CHORD_TIMEOUT_MS = 2000;
 
+// Mobile: tap the nav title (data-superuser-tap="true") 7 times within 2 s to toggle.
+// Mirrors the Android "build number" pattern — undiscoverable without knowing the target.
+const TAP_COUNT = 7;
+const TAP_TIMEOUT_MS = 2000;
+
 type SuperuserContextValue = { superuser: boolean };
 
 const SuperuserContext = createContext<SuperuserContextValue>({ superuser: false });
@@ -77,12 +82,46 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    let tapCount = 0;
+    let tapTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    function handleTouchEnd(e: TouchEvent) {
+      const target = e.target as Element | null;
+      if (!target?.closest("[data-superuser-tap]")) return;
+
+      if (tapTimeoutId === null) {
+        tapTimeoutId = setTimeout(() => {
+          tapCount = 0;
+          tapTimeoutId = null;
+        }, TAP_TIMEOUT_MS);
+      }
+
+      tapCount += 1;
+      if (tapCount >= TAP_COUNT) {
+        clearTimeout(tapTimeoutId);
+        tapCount = 0;
+        tapTimeoutId = null;
+        if (superuserRef.current) {
+          disableSuperuser();
+          setSuperuser(false);
+          superuserRef.current = false;
+        } else {
+          enableSuperuser();
+          setSuperuser(true);
+          superuserRef.current = true;
+        }
+      }
+    }
+
     window.addEventListener("storage", handleStorage);
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("touchend", handleTouchEnd);
     return () => {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("touchend", handleTouchEnd);
       if (timeoutId !== null) clearTimeout(timeoutId);
+      if (tapTimeoutId !== null) clearTimeout(tapTimeoutId);
     };
   }, []);
 
