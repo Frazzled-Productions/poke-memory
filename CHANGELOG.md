@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sync: storage-full condition no longer silently loses a day's progress** — three interacting bugs caused a full review session to vanish when localStorage ran out of space: (1) name-card payloads were serialized with large seed-only arrays (`flavorTexts`, `evolutionChain`) inflating the session to ~2.5 MB on mobile browsers; (2) `pullAndMerge` ignored `saveSession` failures and dispatched a stale `StorageEvent`; (3) the manual sync button reported "all synced" even when the local write failed. The fix strips the large arrays from all card types before serialization (they are re-injected from the seed on every mount), propagates write failures out of `pullAndMerge`, and surfaces a storage-full error message on the manual sync button instead of a false success. Closes #208.
+
 ## [0.1.0] — 2026-05-11
 
 ### Fixed
