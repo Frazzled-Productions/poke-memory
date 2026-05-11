@@ -47,13 +47,21 @@ export async function pullAndMerge(
 
     // Use the most-recently-updated cloud row's timestamp as lastPullAt so a
     // drifting device clock cannot produce false "cloud is newer" signals on
-    // the next pull. When no rows exist or none have updated_at, retain the
-    // previous lastPullAt rather than substituting a local clock value.
+    // the next pull.
+    // - If any row has updated_at, advance to the max.
+    // - If rows arrived but none have updated_at (legacy schema), fall back to
+    //   Date.now() so the "first pull" branch in mergeCloudIntoLocalSilent does
+    //   not re-fire on every subsequent pull (which would unconditionally take
+    //   cloud and overwrite any locally-made progress).
+    // - If no rows at all, retain the previous lastPullAt.
     let serverTs: string | null = syncStatus.lastPullAt;
     for (const r of cloudRows) {
       if (r.updated_at && (serverTs === null || r.updated_at > serverTs)) {
         serverTs = r.updated_at;
       }
+    }
+    if (serverTs === null && cloudRows.length > 0) {
+      serverTs = new Date().toISOString();
     }
 
     saveSyncStatus({ ...syncStatus, lastPullAt: serverTs });
