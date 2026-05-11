@@ -1,6 +1,6 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard } from "@/lib/review/session";
 
@@ -40,11 +40,13 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     isLegendary: false,
     isMythical: false,
     cardType: "name",
+    // buildSession calls initialReviewState(now) for each card, so these
+    // values are overwritten and have no effect on test behaviour.
     state: {
       repetitions: 0,
       interval: 0,
       easeFactor: 2.5,
-      dueDate: "1970-01-01",
+      dueDate: "1970-01-01", // arbitrary — ignored by buildSession
       lastReview: null,
       firstSeen: null,
       learningStep: null,
@@ -56,29 +58,24 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     return { ...card, id, name, spriteUrl: `https://example.com/${name.toLowerCase()}.png` };
   }
 
-  const cards4 = [
-    card,
-    makeExtra(2, "Ivysaur"),
-    makeExtra(3, "Venusaur"),
-    makeExtra(4, "Charmander"),
-  ];
+  const defaultSettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 5,
+    maxReviewsEvolutionPerDay: 50,
+    reverseCardsEnabled: false,
+    maxNewReversePerDay: 10,
+    maxReviewsReversePerDay: 100,
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
+  };
 
   return {
     FIXTURE_CARD: card,
-    FIXTURE_CARDS_4: cards4,
+    FIXTURE_CARDS_4: [card, makeExtra(2, "Ivysaur"), makeExtra(3, "Venusaur"), makeExtra(4, "Charmander")],
     mockSeedPokemon: vi.fn(() => [card]),
-    mockLoadSettings: vi.fn(() => ({
-      masteryRepetitions: 3,
-      maxNewPerDay: 10,
-      maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
-      maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: true,
-    })),
+    mockLoadSettings: vi.fn(() => defaultSettings),
   };
 });
 
@@ -91,7 +88,8 @@ vi.mock("@/lib/pokemon/seed", () => ({
   REVERSE_ID_OFFSET: 2_000_000,
 }));
 
-// loadSession returns null so buildSession always rebuilds state from scratch.
+// loadSession returns null so buildSession always rebuilds state from scratch —
+// the state fields on FIXTURE_CARD are never read during these tests.
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: () => null,
   saveSession: vi.fn(),
@@ -119,7 +117,6 @@ vi.mock("@/lib/sync/useSyncOnUnload", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Restore defaults before each test so suites don't bleed into each other.
   mockSeedPokemon.mockReturnValue([FIXTURE_CARD]);
   mockLoadSettings.mockReturnValue({
     masteryRepetitions: 3,
@@ -196,112 +193,85 @@ describe("ReviewSession reverse card flow", () => {
   };
 
   beforeEach(() => {
-    vi.useFakeTimers();
     mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
     mockLoadSettings.mockReturnValue(reverseSettings);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  /** Extract the current card's target name from the SpritePicker group aria-label. */
+  function getTargetName(): string {
+    const group = screen.getByRole("group");
+    const label = group.getAttribute("aria-label") ?? "";
+    const match = label.match(/Which Pokémon is (.+)\?/);
+    return match?.[1] ?? "";
+  }
 
   it("shows the Pokémon name as a prompt and sprite tiles but no Reveal button", async () => {
     render(<ReviewSession />);
 
+    // 4 sprite tile buttons are rendered — no Reveal button.
     await waitFor(() => {
-      // No Reveal button — reverse cards use the SpritePicker flow
       expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
-      // 4 sprite tile buttons (one per candidate)
-      const tileButtons = screen.getAllByRole("button");
-      expect(tileButtons.length).toBe(4);
+      expect(screen.getAllByRole("button")).toHaveLength(4);
     });
+
+    // The name prompt is shown (from SpritePicker's group aria-label).
+    const targetName = getTargetName();
+    expect(["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"]).toContain(targetName);
   });
 
-  it("correct tile tap grades Good and advances", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
+  it("correct tile tap grades Good and advances to the next card", async () => {
+    const user = userEvent.setup();
     render(<ReviewSession />);
 
-    // Wait for the session to hydrate — a name prompt and 4 tiles appear.
-    const tileButtons = await screen.findAllByRole("button");
-    expect(tileButtons).toHaveLength(4);
+    await waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(4));
 
-    // The SpritePicker renders the target name as a text node. Find which
-    // tile's aria-label matches that name — that tile is the correct answer.
-    const nameLabels = tileButtons.map((btn) => btn.getAttribute("aria-label"));
-    // The heading is a <p> with the target name; find the displayed name text.
-    const allText = tileButtons.map((btn) => btn.getAttribute("aria-label")).filter(Boolean);
-    // All 4 pokemon names are in the pool; pick the one that matches the current card heading.
-    const pokemonNames = ["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"];
-    const displayedName = pokemonNames.find((n) =>
-      screen.queryByText(n),
-    );
-    expect(displayedName).toBeTruthy();
-
-    const correctTile = screen.getByRole("button", { name: displayedName! });
+    const targetName = getTargetName();
+    const correctTile = screen.getByRole("button", { name: targetName });
     await user.click(correctTile);
 
-    // Advance past CORRECT_FEEDBACK_MS so onGrade(true) fires → handleGrade(4)
-    act(() => {
-      vi.advanceTimersByTime(700);
-    });
-
-    // After grading the first card Good, it enters a learning step and the
-    // next new card is served. No Reveal button — still SpritePicker.
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
-      // Still showing 4 tile buttons for the next card
-      expect(screen.getAllByRole("button")).toHaveLength(4);
-      // The name prompt has changed (or CountdownScreen if all cards graded)
-    });
-
-    // Tiles must be re-enabled (new card, no answer yet)
-    const newTiles = screen.getAllByRole("button");
-    newTiles.forEach((tile) => {
-      expect(tile).not.toBeDisabled();
-    });
+    // After CORRECT_FEEDBACK_MS (600ms) the next card loads: tiles re-enabled.
+    // Use 3 000ms waitFor timeout to allow the real timer to fire.
+    await waitFor(
+      () => {
+        const tiles = screen.getAllByRole("button");
+        expect(tiles).toHaveLength(4);
+        tiles.forEach((tile) => expect(tile).not.toBeDisabled());
+      },
+      { timeout: 3000 },
+    );
   });
 
-  it("incorrect tile tap shows brief feedback then grades Again and advances", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
+  it("incorrect tile tap shows feedback then grades Again and advances", async () => {
+    const user = userEvent.setup();
     render(<ReviewSession />);
 
-    const tileButtons = await screen.findAllByRole("button");
-    expect(tileButtons).toHaveLength(4);
+    await waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(4));
 
-    const pokemonNames = ["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"];
-    const displayedName = pokemonNames.find((n) => screen.queryByText(n));
-    expect(displayedName).toBeTruthy();
+    const targetName = getTargetName();
+    const tiles = screen.getAllByRole("button");
 
-    // Click a tile that is NOT the correct answer
-    const incorrectTile = tileButtons.find(
-      (btn) => btn.getAttribute("aria-label") !== displayedName,
-    );
-    expect(incorrectTile).toBeDefined();
-    await user.click(incorrectTile!);
+    // Click a tile that is NOT the correct answer.
+    const incorrectTile = tiles.find(
+      (tile) => tile.getAttribute("aria-label") !== targetName,
+    )!;
+    await user.click(incorrectTile);
 
-    // Tiles must be disabled during feedback
-    const disabledTiles = screen.getAllByRole("button");
-    disabledTiles.forEach((tile) => {
-      expect(tile).toBeDisabled();
-    });
-
-    // Feedback text mentioning the correct answer is shown
-    expect(
-      screen.getByText(new RegExp(`correct answer was ${displayedName}`, "i")),
-    ).toBeInTheDocument();
-
-    // Advance past INCORRECT_FEEDBACK_MS so onGrade(false) fires → handleGrade(1)
-    act(() => {
-      vi.advanceTimersByTime(1300);
-    });
-
-    // After the feedback delay the next card is served; tiles re-enabled
+    // Tiles are disabled immediately and the correct-answer label appears.
     await waitFor(() => {
-      const nextTiles = screen.getAllByRole("button");
-      expect(nextTiles).toHaveLength(4);
-      nextTiles.forEach((tile) => {
-        expect(tile).not.toBeDisabled();
-      });
+      screen.getAllByRole("button").forEach((tile) => expect(tile).toBeDisabled());
+      expect(
+        screen.getByText(new RegExp(`correct answer was ${targetName}`, "i")),
+      ).toBeInTheDocument();
     });
+
+    // After INCORRECT_FEEDBACK_MS (1 200ms) the next card loads: tiles re-enabled.
+    await waitFor(
+      () => {
+        const nextTiles = screen.getAllByRole("button");
+        expect(nextTiles).toHaveLength(4);
+        nextTiles.forEach((tile) => expect(tile).not.toBeDisabled());
+      },
+      { timeout: 3000 },
+    );
   });
 });

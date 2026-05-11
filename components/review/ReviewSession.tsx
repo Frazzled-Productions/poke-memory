@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
@@ -638,25 +638,20 @@ export function ReviewSession() {
     setGrading(false);
   }
 
-  // Distractors for the current reverse card — stable per card id.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const reverseDistractors = useMemo(
-    () =>
-      currentCard.cardType === "reverse"
-        ? pickDistractors(currentCard.pokemonId, SEED_POKEMON, 3, String(currentCard.id))
-        : [],
-    // Re-pick only when the card changes, not on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentCard.id],
-  );
-
   // --- Active review UI ---
 
   // Reverse cards use the SpritePicker (multiple-choice); no reveal step.
   if (currentCard.cardType === "reverse") {
+    const reverseDistractors = pickDistractors(
+      currentCard.pokemonId,
+      SEED_POKEMON,
+      3,
+      String(currentCard.id),
+    );
     return (
       <div className="flex flex-col items-center gap-8">
         <SpritePicker
+          key={currentCard.id}
           targetPokemon={currentCard}
           distractors={reverseDistractors}
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}
