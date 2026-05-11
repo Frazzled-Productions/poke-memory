@@ -157,8 +157,8 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 |---|---|
 | **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) or `poke-memory-bot` posts `/resolve` on an open PR |
 | **Fork guard** | Fork PRs are excluded — `isCrossRepository` is fetched via `gh pr view` and the job bails early if true |
-| **Pre-flight** | Retries `mergeableState` up to 3× (10 s sleep) while `UNKNOWN`; exits with a comment if already `MERGEABLE` / `CLEAN` |
-| **Fast-path** | If `git merge origin/main --no-edit` succeeds cleanly, pushes the merge commit and posts `<!-- auto-resolve:N -->` directly — no Claude invocation |
+| **Pre-flight** | Retries `mergeableState` up to 3× while `UNKNOWN` (posts a warning comment if still `UNKNOWN` after 3 retries); exits with a comment if already `CLEAN` |
+| **Fast-path** | If `git merge origin/main --no-edit` succeeds cleanly, runs the build gate (`typecheck` / `build` / `test`), then pushes and posts `<!-- auto-resolve:N -->` — no Claude invocation |
 | **Conflict path** | Claude resolves each conflicted file; reads both sides + recent main history per file; bails if any file is under `lib/srs/`, `db/migrations/`, or is `next.config.ts`, or if more than 5 files conflict |
 | **Build gate** | `npm run typecheck && npm run build && npm test` — two attempts. On second failure, posts last 80 lines of output and stops without pushing |
 | **Idempotency** | `<!-- auto-resolve:N -->` marker (N = count of existing resolve comments + 1) is posted in the summary; concurrent `/resolve` comments queue via `cancel-in-progress: false` and the second run finds a clean PR |

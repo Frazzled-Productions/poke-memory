@@ -84,11 +84,14 @@ jobs:
               --json mergeableState --jq '.mergeableState')
             echo "mergeableState attempt $i: $MERGEABLE"
             [[ "$MERGEABLE" != "UNKNOWN" ]] && break
-            echo "State is UNKNOWN, waiting 10 s..."
-            sleep 10
+            [[ $i -lt 3 ]] && { echo "State is UNKNOWN, waiting 10 s..."; sleep 10; }
           done
 
-          if [[ "$MERGEABLE" == "MERGEABLE" || "$MERGEABLE" == "CLEAN" ]]; then
+          if [[ "$MERGEABLE" == "UNKNOWN" ]]; then
+            gh pr comment "$PR" --body $'⚠️ Could not determine merge state after 3 retries — attempting merge anyway.'
+          fi
+
+          if [[ "$MERGEABLE" == "CLEAN" ]]; then
             gh pr comment "$PR" --body $'PR is already up to date with `main` — nothing to resolve.'
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -137,6 +140,22 @@ jobs:
             echo "clean=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - uses: actions/setup-node@v6
+        if: steps.preflight.outputs.skip == 'false'
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.preflight.outputs.skip == 'false'
+        run: npm ci
+
+      - name: Fast-path — build gate
+        if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'true'
+        run: |
+          set -euo pipefail
+          npm run typecheck && npm run build && npm test
+
       - name: Fast-path — push and summarize
         if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'true'
         env:
@@ -146,19 +165,9 @@ jobs:
           git push
           N=${{ steps.markers.outputs.next }}
           PR=${{ github.event.issue.number }}
-          printf '<!-- auto-resolve:%s -->\n## Auto-resolve %s\n\nMerged `origin/main` cleanly (no conflicts). Merge commit pushed.\n' \
+          printf '<!-- auto-resolve:%s -->\n## Auto-resolve %s\n\nMerged `origin/main` cleanly (no conflicts). Build gate passed. Merge commit pushed.\n' \
             "$N" "$N" > /tmp/resolve-body.md
           gh pr comment "$PR" --body-file /tmp/resolve-body.md
-
-      - uses: actions/setup-node@v6
-        if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'false'
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'false'
-        run: npm ci
 
       - name: Post status comment (conflict path)
         id: status
