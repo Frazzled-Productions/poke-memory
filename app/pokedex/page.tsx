@@ -9,12 +9,14 @@ import { classifyCard } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
+import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { LoadingSkeleton } from "@/components/pokedex/PokedexGrid";
 import PokedexFiltered from "@/components/pokedex/PokedexFiltered";
 
 export default function PokedexPage() {
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
+  const storageVersion = useSessionStorageKey();
 
   useEffect(() => {
     const { masteryRepetitions: mr } = loadSettings();
@@ -25,7 +27,7 @@ export default function PokedexPage() {
     } else {
       setCards(buildSession(SEED_POKEMON, []));
     }
-  }, []);
+  }, [storageVersion]);
 
   const cardClassById = new Map<number, CardClass>();
   if (cards !== null && masteryRepetitions !== null) {

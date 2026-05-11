@@ -6,6 +6,8 @@ export type SyncStatus = {
   lastPushAttemptAt: string | null;
   /** Number of cards that failed the unload safety-net push. null = full-session failure or legacy record. */
   failedCardCount: number | null;
+  /** ISO timestamp of the last successful background pull from cloud. Stored from server updated_at to avoid clock-skew. */
+  lastPullAt: string | null;
 };
 
 const ZERO: SyncStatus = {
@@ -13,6 +15,7 @@ const ZERO: SyncStatus = {
   lastPushFailed: false,
   lastPushAttemptAt: null,
   failedCardCount: null,
+  lastPullAt: null,
 };
 
 export function loadSyncStatus(): SyncStatus {
@@ -28,6 +31,7 @@ export function loadSyncStatus(): SyncStatus {
       lastPushFailed: typeof obj.lastPushFailed === "boolean" ? obj.lastPushFailed : false,
       lastPushAttemptAt: typeof obj.lastPushAttemptAt === "string" ? obj.lastPushAttemptAt : null,
       failedCardCount: Number.isInteger(obj.failedCardCount) && (obj.failedCardCount as number) >= 0 ? obj.failedCardCount as number : null,
+      lastPullAt: typeof obj.lastPullAt === "string" ? obj.lastPullAt : null,
     };
   } catch {
     return ZERO;

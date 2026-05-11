@@ -86,6 +86,26 @@ Two-layer model for pushing review state to Supabase:
 - **Volume**: 100 reviews/day → at most 100 single-row upserts (often fewer after debounce coalescing). Well within Supabase free-tier limits.
 - Guest-mode guard runs on every `enqueueGrade` call, not just at mount, so mid-session sign-out is safe.
 
+### Sync: background pull on visibility
+
+When a signed-in tab regains focus after being hidden ≥ 30 seconds, `useVisibilityPull` (mounted via `SyncOnVisible` in the root layout) silently calls `pullAndMerge`, which pulls all cloud rows and merges them into `localStorage`.
+
+**Blocked routes**: `["/"]` — the practice session is excluded to avoid interrupting an active review. The block is route-level; the session-complete screen (still at `/`) is also excluded, which is the accepted tradeoff for keeping the implementation simple.
+
+**`lastPullAt` and clock-skew mitigation**: `SyncStatus.lastPullAt` stores the ISO timestamp from the most-recently-updated cloud row in the pull response (server-side `updated_at`), not `Date.now()`. This prevents a device with a drifting local clock from producing false "cloud is newer" signals on subsequent pulls.
+
+**Per-card conflict rule** (implemented in `mergeCloudIntoLocalSilent` in `lib/sync/cloud.ts`):
+1. `lastPullAt` is `null` (first pull on this device) → cloud wins unconditionally.
+2. `card.state.lastReview !== null && lastReview >= lastPullAt.slice(0, 10)` → this device graded since the last pull (same calendar day or later) → **keep local**.
+3. `cloudRow.updated_at > lastPullAt` → cloud has newer state → **take cloud**.
+4. Otherwise (cloud row unchanged since last pull) → **keep local**.
+
+The `>=` date comparison is conservative: any review on the same calendar day as the pull counts as "graded since pull," preventing incorrect reverts when sub-day ordering cannot be determined from `YYYY-MM-DD` strings.
+
+**Synthetic `StorageEvent` invariant**: `pullAndMerge` dispatches a synthetic `StorageEvent` for `"poke-memory:review-session:v1"` after writing to `localStorage`. Any other code that writes this key must also dispatch this event so same-tab subscribers (`useSessionStorageKey` in Stats and Pokédex pages) are notified. Cross-tab listeners receive the native event automatically.
+
+**Reactive re-render**: `useSessionStorageKey` (`lib/review/useSessionStorageKey.ts`) returns an incrementing counter on each matching storage event. Stats and Pokédex pages include this counter in their session-loading `useEffect` dependency arrays so they re-render after a background pull without a page reload.
+
 ### Page params
 
 - `params` and `searchParams` are `Promise` — always `await` them. Synchronous access from earlier Next.js versions is fully removed.

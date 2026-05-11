@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
 import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
@@ -56,6 +58,9 @@ export default function RootLayout({
           <SuperuserProvider>
             <FavouriteThemeProvider>
               <Nav />
+              <Suspense fallback={null}>
+                <SyncOnVisible />
+              </Suspense>
               <div className="flex flex-1 flex-col">{children}</div>
             </FavouriteThemeProvider>
           </SuperuserProvider>

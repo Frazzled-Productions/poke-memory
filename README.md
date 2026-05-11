@@ -38,6 +38,7 @@ Sign in with GitHub (the **Sign in** button in the nav) to sync your review hist
 - **Guest mode** -- no account needed; everything stays in your browser.
 - **Sign in** -- ties your session to a GitHub account via Supabase Auth; data stored in Postgres.
 - **Conflict picker** -- if you have local progress *and* cloud progress when you sign in, you will be asked which to keep.
+- **Auto-pull on focus** -- returning to a tab that's been in the background for ≥ 30 seconds silently pulls the latest cloud state and updates Stats and Pokédex without a page reload.
 - Signing out leaves your local localStorage intact; you can continue as a guest without losing anything.
 
 > **Note:** Supabase project URL and anon key must be configured (see `.env.local.example`). GitHub OAuth redirect URIs must be added in the Supabase dashboard.

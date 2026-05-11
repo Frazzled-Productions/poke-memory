@@ -28,6 +28,8 @@ export type CloudRow = {
   due_date: string;
   last_review: string | null;
   first_seen: string | null;
+  /** Present on pull responses. Absent on locally-constructed push rows (added in the upsert batch). */
+  updated_at?: string;
 };
 
 /**
@@ -182,7 +184,7 @@ export async function pullSession(
       const { data, error } = await client
         .from("card_reviews")
         .select(
-          "pokemon_id,repetitions,interval,ease_factor,due_date,last_review,first_seen"
+          "pokemon_id,repetitions,interval,ease_factor,due_date,last_review,first_seen,updated_at"
         )
         .eq("user_id", userId)
         .range(offset, offset + PAGE - 1);
@@ -208,6 +210,88 @@ export function buildBeaconPayload(cards: ReviewableCard[]): Blob {
 }
 
 /**
+ * Applies a single cloud row's SM-2 fields onto a local card, preserving
+ * in-memory-only fields (learningStep, stepStartedAt). Normalizes invariant
+ * violations (firstSeen set but lastReview null) the same way mergeCloudIntoLocal does.
+ */
+function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
+  if (row.first_seen !== null && row.last_review === null) {
+    console.warn(
+      `[sync] normalizing card ${card.id}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
+    );
+    return {
+      ...card,
+      state: {
+        ...card.state,
+        repetitions: 0,
+        interval: 0,
+        easeFactor: 2.5,
+        dueDate: row.due_date,
+        lastReview: null,
+        firstSeen: null,
+      },
+    };
+  }
+  return {
+    ...card,
+    state: {
+      ...card.state,
+      repetitions: row.repetitions,
+      interval: row.interval,
+      easeFactor: row.ease_factor,
+      dueDate: row.due_date,
+      lastReview: row.last_review,
+      firstSeen: row.first_seen,
+    },
+  };
+}
+
+/**
+ * Silent background-pull merge. Per-card conflict rule:
+ *   - lastPullAt is null (first pull): cloud wins unconditionally.
+ *   - card.state.lastReview >= lastPullAt.slice(0,10): this device graded
+ *     since the last pull → keep local.
+ *   - cloud row's updated_at > lastPullAt: cloud has newer state → take cloud.
+ *   - otherwise: cloud row unchanged since last pull → keep local.
+ *
+ * The >= date comparison is conservative: a review on the same calendar day as
+ * the pull counts as "graded since pull," preventing incorrect reverts in
+ * same-day scenarios.
+ */
+export function mergeCloudIntoLocalSilent(
+  local: ReviewableCard[],
+  cloud: CloudRow[],
+  lastPullAt: string | null,
+): ReviewableCard[] {
+  const byId = new Map(cloud.map((r) => [r.pokemon_id, r]));
+  return local.map((card) => {
+    const row = byId.get(card.id);
+    if (!row) return card;
+
+    if (lastPullAt === null) {
+      return applyCloudRow(card, row);
+    }
+
+    const pullDate = lastPullAt.slice(0, 10);
+    const localLastReview = card.state.lastReview;
+
+    // Local has a review on the same calendar day as the pull or later — keep local.
+    if (localLastReview !== null && localLastReview >= pullDate) {
+      return card;
+    }
+
+    // Cloud row updated after the last pull — take cloud.
+    // When updated_at is absent (legacy row), conservatively treat as newer.
+    if (!row.updated_at || row.updated_at > lastPullAt) {
+      return applyCloudRow(card, row);
+    }
+
+    // Cloud row unchanged since last pull — keep local.
+    return card;
+  });
+}
+
+/**
  * Merges cloud rows into a local card array. For each card, if a matching
  * cloud row exists (keyed by pokemon_id / card.id), its SM-2 state fields
  * overwrite the local state. Cards without a cloud counterpart are returned
@@ -226,39 +310,6 @@ export function mergeCloudIntoLocal(
   return local.map((card) => {
     const row = byId.get(card.id);
     if (!row) return card;
-
-    // Normalize a bad cloud row: clear firstSeen and reset SM-2 fields so the
-    // card re-enters the new-card queue cleanly without carrying stale
-    // repetitions/interval/easeFactor from the invariant-violating cloud row.
-    if (row.first_seen !== null && row.last_review === null) {
-      console.warn(
-        `[sync] normalizing card ${card.id}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
-      );
-      return {
-        ...card,
-        state: {
-          ...card.state,
-          repetitions: 0,
-          interval: 0,
-          easeFactor: 2.5,
-          dueDate: row.due_date,
-          lastReview: null,
-          firstSeen: null,
-        },
-      };
-    }
-
-    return {
-      ...card,
-      state: {
-        ...card.state,
-        repetitions: row.repetitions,
-        interval: row.interval,
-        easeFactor: row.ease_factor,
-        dueDate: row.due_date,
-        lastReview: row.last_review,
-        firstSeen: row.first_seen,
-      },
-    };
+    return applyCloudRow(card, row);
   });
 }

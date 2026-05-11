@@ -53,7 +53,8 @@ function makeCard(
 function makeCloudRow(
   pokemonId: number,
   firstSeen: string | null,
-  lastReview: string | null
+  lastReview: string | null,
+  updatedAt = "2026-05-11T12:00:00.000Z"
 ): CloudRow {
   return {
     pokemon_id: pokemonId,
@@ -63,6 +64,7 @@ function makeCloudRow(
     due_date: "2026-05-11",
     last_review: lastReview,
     first_seen: firstSeen,
+    updated_at: updatedAt,
   };
 }
 
