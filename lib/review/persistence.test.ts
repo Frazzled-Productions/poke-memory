@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { loadSession, saveSession } from "./persistence";
+import { loadSession, saveSession, SESSION_STORAGE_KEY } from "./persistence";
 import type { ReverseReviewCard, DailyLimits } from "./session";
 import { DEFAULT_LIMITS } from "./session";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 
-const KEY = "poke-memory:review-session:v1";
+const KEY = SESSION_STORAGE_KEY;
 
 const NOW = new Date("2026-05-11T12:00:00Z");
 

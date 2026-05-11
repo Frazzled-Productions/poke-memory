@@ -54,9 +54,9 @@ export function useVisibilityPull(
       const gapMs = Date.now() - hiddenAt;
       if (gapMs < HIDDEN_THRESHOLD_MS) return;
 
-      hiddenAtRef.current = null;
-
       if (isPullingRef.current) return;
+
+      hiddenAtRef.current = null;
       isPullingRef.current = true;
       void pullAndMerge(cl, uid).finally(() => {
         isPullingRef.current = false;
