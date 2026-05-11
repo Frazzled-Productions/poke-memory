@@ -36,6 +36,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 - **`supabase-expert` sub-agent** — a new read-only sub-agent covering Supabase Auth (GitHub OAuth, `@supabase/ssr` for Next.js 16 App Router), Postgres + RLS policy authoring, SM-2 schema design, the locked sync model, and privacy constraints. Invoke before writing any Supabase integration code, analogous to `next16-expert` for Next.js questions. Closes #143.
 
+- **Weekly app codebase digest** — a new `auto-app-suggest.yml` workflow runs every Wednesday at 09:00 UTC and scans recently-changed app source files (`app/**`, `components/**`, `lib/**`, `db/**`) for tech debt, missing tests, dead code, and accessibility gaps. It files at most one digest issue per ISO week with up to five curated items, each backed by file paths and a concrete evidence snippet. Nothing is filed when nothing crosses the signal threshold. Closes #145.
+
 - **Card-type enable/disable toggles in Settings** — Name cards and Evolution cards each have a toggle on the Settings page. Disabling a type excludes it from the review queue (both new and review), de-emphasises its daily-cap inputs, and resets its SM-2 progress when re-enabled. At least one card type must remain enabled at all times. The Stats page shows a "(disabled)" annotation on the Mastery distribution section when name cards are off. Existing sessions without the new fields default to both types enabled.
 
 ### Fixed
