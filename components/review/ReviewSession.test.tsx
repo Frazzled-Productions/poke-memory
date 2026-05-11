@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard } from "@/lib/review/session";
-import { loadSession } from "@/lib/review/persistence";
+import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 
 // ---------------------------------------------------------------------------
@@ -101,27 +101,8 @@ vi.mock("@/lib/sync/useSyncOnUnload", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Default: no persisted session — loadSession can be overridden per-test.
-  vi.mocked(loadSession).mockReturnValue(null);
 });
 
-
-// Card persisted in the migration-gap shape: learningStep is set but
-// stepStartedAt was backfilled to null (old schema). This is the shape
-// that caused a reload after grading to re-show the already-graded card.
-const MIGRATION_CARD: NameReviewCard = {
-  ...FIXTURE_CARD,
-  state: {
-    repetitions: 0,
-    interval: 0,
-    easeFactor: 2.5,
-    dueDate: "2026-05-11",
-    lastReview: null,
-    firstSeen: "2026-05-11",
-    learningStep: 0,     // in learning step
-    stepStartedAt: null, // migration gap — no start time recorded
-  },
-};
 
 describe("ReviewSession reveal flow", () => {
   it("shows Reveal button and hides the Pokémon name before reveal", async () => {
@@ -169,6 +150,23 @@ describe("ReviewSession reveal flow", () => {
 });
 
 describe("Regression: migration-shape learning card (stepStartedAt: null)", () => {
+  // Card persisted in the migration-gap shape: learningStep is set but
+  // stepStartedAt was backfilled to null (old schema). This is the shape
+  // that caused a reload after grading to re-show the already-graded card.
+  const MIGRATION_CARD: NameReviewCard = {
+    ...FIXTURE_CARD,
+    state: {
+      repetitions: 0,
+      interval: 0,
+      easeFactor: 2.5,
+      dueDate: "2026-05-11",
+      lastReview: null,
+      firstSeen: "2026-05-11",
+      learningStep: 0,     // in learning step
+      stepStartedAt: null, // migration gap — no start time recorded
+    },
+  };
+
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -192,5 +190,34 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
       expect(screen.getByText(/next card in/i)).toBeInTheDocument(),
     );
     expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+  });
+
+  it("persists stamped stepStartedAt so subsequent reloads use the same countdown anchor", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-11T12:00:00Z"));
+
+    vi.mocked(loadSession).mockReturnValueOnce({
+      cards: [MIGRATION_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+
+    render(<ReviewSession />);
+
+    // saveSession must be called with a concrete (numeric) stepStartedAt so
+    // that a subsequent reload reads the fixed anchor instead of stamping a
+    // fresh Date.now() and drifting the countdown window.
+    await waitFor(() => {
+      expect(vi.mocked(saveSession)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: expect.arrayContaining([
+            expect.objectContaining({
+              state: expect.objectContaining({
+                stepStartedAt: expect.any(Number),
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
   });
 });
