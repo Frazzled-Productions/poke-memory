@@ -4,7 +4,11 @@ import { loadSyncStatus } from "@/lib/sync/persistence";
 
 type SyncState = { text: string; errorDetail: string | null };
 
-export function SyncStatusLine() {
+type Props = {
+  refreshKey?: number;
+};
+
+export function SyncStatusLine({ refreshKey }: Props) {
   const [state, setState] = useState<SyncState | null>(null);
 
   useEffect(() => {
@@ -23,7 +27,7 @@ export function SyncStatusLine() {
     } else {
       setState({ text: "Not synced yet.", errorDetail: null });
     }
-  }, []);
+  }, [refreshKey]);
 
   if (state === null) return null;
 
