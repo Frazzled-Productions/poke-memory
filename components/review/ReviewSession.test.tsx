@@ -94,7 +94,7 @@ vi.mock("@/lib/pokemon/seed", () => ({
 // mockReturnValueOnce; default returns null so buildSession rebuilds state.
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: vi.fn().mockReturnValue(null),
-  saveSession: vi.fn(),
+  saveSession: vi.fn().mockReturnValue({ ok: true }),
 }));
 
 vi.mock("@/lib/settings/persistence", () => ({
