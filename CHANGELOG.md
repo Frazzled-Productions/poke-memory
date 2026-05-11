@@ -6,6 +6,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Friendly error screen** — render-phase errors in any page now show a "Something went wrong" card with a "Try again" button instead of Next.js's raw crash screen. Closes #172.
+
 - **Favourite Pokémon colour theme** — once you master a Pokémon from a curated list of 11 (Charizard, Pikachu, Gengar, Eevee, Snorlax, Mewtwo, Umbreon, Gardevoir, Garchomp, Lucario, and Drampa), you can elect it as your favourite on the Settings page. Electing a favourite re-skins the entire app with that Pokémon's colour palette. The theme is applied instantly with no flash on page reload. Your favourite's sprite also appears beside the logo in the navbar. Removing the favourite or resetting progress reverts to the default palette. The theme syncs across tabs via the `storage` event. Closes #164.
 
 - **Manual sync button on Stats page** — signed-in users now see a "Sync now" button alongside the last-synced timestamp. Clicking pushes local progress to the cloud and pulls the latest cloud state, then merges it into localStorage. The button shows a spinner while syncing, turns green on success (auto-resets after 3 seconds), and surfaces errors in red so users can retry. Disabled while a sync is in flight to prevent double-clicks. Closes #98.
