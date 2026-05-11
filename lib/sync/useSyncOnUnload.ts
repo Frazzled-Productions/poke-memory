@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
-import { pushSession } from "@/lib/sync/cloud";
+import { buildBeaconPayload } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 
 /**
@@ -16,8 +16,8 @@ import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
  *
  * Pass null for client or userId to disable sync (e.g. guest mode).
  *
- * Fire-and-forget: does not block navigation. Errors are swallowed by
- * pushSession which is best-effort.
+ * Fire-and-forget: does not block navigation. Uses navigator.sendBeacon so the
+ * request survives page hide and tab discard on mobile browsers.
  */
 export function useSyncOnUnload(
   client: SupabaseClient | null,
@@ -29,9 +29,7 @@ export function useSyncOnUnload(
   // Use refs for all values read inside handleUnload so the handler always sees
   // the latest values even if sign-out races with a visibilitychange/pagehide
   // event before the effect cleanup can remove the listeners.
-  const clientRef = useRef(client);
   const userIdRef = useRef(userId);
-  clientRef.current = client;
   userIdRef.current = userId;
   const getUnsyncedRef = useRef(getUnsynced);
   getUnsyncedRef.current = getUnsynced;
@@ -42,11 +40,10 @@ export function useSyncOnUnload(
     function handleUnload(event: Event) {
       // visibilitychange fires on both hide and show; only push on hide.
       if (event.type === "visibilitychange" && document.visibilityState !== "hidden") return;
-      // Read from refs so a sign-out that races with unload uses the current
-      // (null) values rather than stale closed-over props.
-      const c = clientRef.current;
+      // Read from ref so a sign-out that races with unload uses the current
+      // (null) value rather than the stale closed-over prop.
       const uid = userIdRef.current;
-      if (!c || !uid) return;
+      if (!uid) return;
       if (pushingRef.current) return;
 
       const unsynced = getUnsyncedRef.current();
@@ -54,33 +51,25 @@ export function useSyncOnUnload(
 
       pushingRef.current = true;
 
-      // Write attempt timestamp synchronously before any async work — browsers
-      // do not guarantee async continuations run during pagehide/discard.
       const now = new Date().toISOString();
       const prev = loadSyncStatus();
+      const queued = navigator.sendBeacon("/api/sync", buildBeaconPayload(unsynced));
+      // Set lastPushAt when the beacon is accepted so the UI shows a timestamp
+      // rather than "Not synced yet." for users who only sync via the unload
+      // path. Reflects browser acceptance, not server confirmation (which is
+      // unobservable from sendBeacon).
       saveSyncStatus({
         ...prev,
         lastPushAttemptAt: now,
-        lastPushFailed: true,
-        // Upper bound: pushSession doesn't report partial batch successes, so we
-        // may overstate the residual if any batch succeeded before a later one failed.
-        failedCardCount: unsynced.length,
+        lastPushFailed: !queued,
+        // sendBeacon's return value reports browser acceptance, not server
+        // success. When the browser rejects the queue, every card stays
+        // unsynced; when it accepts, we optimistically clear the residual
+        // count since we cannot observe the server response.
+        failedCardCount: queued ? 0 : unsynced.length,
+        ...(queued && { lastPushAt: now }),
       });
-
-      void pushSession(c, uid, unsynced).then((ok) => {
-        const current = loadSyncStatus();
-        saveSyncStatus({
-          ...current,
-          lastPushAt: ok ? new Date().toISOString() : current.lastPushAt,
-          lastPushFailed: !ok,
-          failedCardCount: ok ? 0 : unsynced.length,
-        });
-      }).finally(() => {
-        // Runs even if the component unmounted. The localStorage write above is
-        // harmless (global store, not component state); pushingRef reset is a
-        // no-op on a stale ref but prevents double-push if the page survives.
-        pushingRef.current = false;
-      });
+      pushingRef.current = false;
     }
 
     window.addEventListener("visibilitychange", handleUnload);

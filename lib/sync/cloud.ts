@@ -51,6 +51,18 @@ export async function hasCloudData(
   }
 }
 
+function toCloudRow(card: ReviewableCard): CloudRow {
+  return {
+    pokemon_id: card.id,
+    repetitions: card.state.repetitions,
+    interval: card.state.interval,
+    ease_factor: card.state.easeFactor,
+    due_date: card.state.dueDate,
+    last_review: card.state.lastReview,
+    first_seen: card.state.firstSeen,
+  };
+}
+
 /**
  * Pushes the full local session to the cloud via batched upserts.
  * Returns true if all batches succeeded, false if any batch failed.
@@ -74,15 +86,7 @@ export async function pushSession(
     return false;
   });
 
-  const rows: CloudRow[] = safeCards.map((card) => ({
-    pokemon_id: card.id,
-    repetitions: card.state.repetitions,
-    interval: card.state.interval,
-    ease_factor: card.state.easeFactor,
-    due_date: card.state.dueDate,
-    last_review: card.state.lastReview,
-    first_seen: card.state.firstSeen,
-  }));
+  const rows: CloudRow[] = safeCards.map(toCloudRow);
 
   let allOk = true;
   const BATCH = 200;
@@ -191,6 +195,16 @@ export async function pullSession(
   } catch {
     return null;
   }
+}
+
+/**
+ * Serialises cards to a Blob suitable for navigator.sendBeacon('/api/sync', blob).
+ * Content-Type is set to application/json via the Blob constructor — sendBeacon
+ * does not accept a headers option, so this is the only way to set it.
+ */
+export function buildBeaconPayload(cards: ReviewableCard[]): Blob {
+  const safeRows = cards.filter(isSyncSafe).map(toCloudRow);
+  return new Blob([JSON.stringify({ cards: safeRows })], { type: "application/json" });
 }
 
 /**
