@@ -70,6 +70,7 @@ export default function CallbackCompletePage() {
           lastPushAt: ok ? new Date().toISOString() : prev.lastPushAt,
           lastPushFailed: !ok,
           lastPushAttemptAt: new Date().toISOString(),
+          failedCardCount: ok ? 0 : null,
         });
         if (!ok && !cancelled) {
           setStatus({ kind: "push-warning", message: "Sync upload failed — your progress is safe locally." });
@@ -105,6 +106,7 @@ export default function CallbackCompletePage() {
         lastPushAt: ok ? new Date().toISOString() : prev.lastPushAt,
         lastPushFailed: !ok,
         lastPushAttemptAt: new Date().toISOString(),
+        failedCardCount: ok ? 0 : null,
       });
       if (!ok) {
         setStatus({ kind: "push-warning", message: "Sync failed — your progress is safe locally." });

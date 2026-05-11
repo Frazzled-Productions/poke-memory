@@ -62,6 +62,9 @@ export function useSyncOnUnload(
         ...prev,
         lastPushAttemptAt: now,
         lastPushFailed: true,
+        // Upper bound: pushSession doesn't report partial batch successes, so we
+        // may overstate the residual if any batch succeeded before a later one failed.
+        failedCardCount: unsynced.length,
       });
 
       void pushSession(c, uid, unsynced).then((ok) => {
@@ -70,6 +73,7 @@ export function useSyncOnUnload(
           ...current,
           lastPushAt: ok ? new Date().toISOString() : current.lastPushAt,
           lastPushFailed: !ok,
+          failedCardCount: ok ? 0 : unsynced.length,
         });
       }).finally(() => {
         // Runs even if the component unmounted. The localStorage write above is
