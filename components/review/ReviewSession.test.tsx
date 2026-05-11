@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
@@ -19,7 +19,7 @@ vi.mock("next/image", () => ({
 
 // vi.mock factories are hoisted — define seed data via vi.hoisted so the
 // factory closure can reference it before the module-level const is initialised.
-const { FIXTURE_CARD } = vi.hoisted(() => {
+const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.hoisted(() => {
   const card: NameReviewCard = {
     id: 1,
     name: "Bulbasaur",
@@ -55,21 +55,12 @@ const { FIXTURE_CARD } = vi.hoisted(() => {
       stepStartedAt: null,
     },
   };
-  return { FIXTURE_CARD: card };
-});
 
-vi.mock("@/lib/pokemon/seed", () => ({
-  SEED_POKEMON: [FIXTURE_CARD],
-  SEED_EVOLUTION_CARDS: [],
-}));
+  function makeExtra(id: number, name: string): typeof card {
+    return { ...card, id, name, spriteUrl: `https://example.com/${name.toLowerCase()}.png` };
+  }
 
-vi.mock("@/lib/review/persistence", () => ({
-  loadSession: vi.fn().mockReturnValue(null),
-  saveSession: vi.fn(),
-}));
-
-vi.mock("@/lib/settings/persistence", () => ({
-  loadSettings: () => ({
+  const defaultSettings = {
     masteryRepetitions: 3,
     maxNewPerDay: 10,
     maxReviewsPerDay: 100,
@@ -80,7 +71,34 @@ vi.mock("@/lib/settings/persistence", () => ({
     maxReviewsReversePerDay: 100,
     nameCardsEnabled: true,
     evolutionCardsEnabled: true,
-  }),
+  };
+
+  return {
+    FIXTURE_CARD: card,
+    FIXTURE_CARDS_4: [card, makeExtra(2, "Ivysaur"), makeExtra(3, "Venusaur"), makeExtra(4, "Charmander")],
+    mockSeedPokemon: vi.fn(() => [card]),
+    mockLoadSettings: vi.fn(() => defaultSettings),
+  };
+});
+
+vi.mock("@/lib/pokemon/seed", () => ({
+  get SEED_POKEMON() {
+    return mockSeedPokemon();
+  },
+  SEED_EVOLUTION_CARDS: [],
+  EVOLUTION_ID_OFFSET: 1_000_000,
+  REVERSE_ID_OFFSET: 2_000_000,
+}));
+
+// loadSession is a vi.fn() so individual tests can override it with
+// mockReturnValueOnce; default returns null so buildSession rebuilds state.
+vi.mock("@/lib/review/persistence", () => ({
+  loadSession: vi.fn().mockReturnValue(null),
+  saveSession: vi.fn(),
+}));
+
+vi.mock("@/lib/settings/persistence", () => ({
+  loadSettings: () => mockLoadSettings(),
 }));
 
 vi.mock("@/lib/streak", () => ({
@@ -101,6 +119,20 @@ vi.mock("@/lib/sync/useSyncOnUnload", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockSeedPokemon.mockReturnValue([FIXTURE_CARD]);
+  mockLoadSettings.mockReturnValue({
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 5,
+    maxReviewsEvolutionPerDay: 50,
+    reverseCardsEnabled: false,
+    maxNewReversePerDay: 10,
+    maxReviewsReversePerDay: 100,
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
+  });
+  vi.mocked(loadSession).mockReturnValue(null);
 });
 
 
@@ -146,6 +178,105 @@ describe("ReviewSession reveal flow", () => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
     );
     expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("ReviewSession reverse card flow", () => {
+  const reverseSettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 5,
+    maxReviewsEvolutionPerDay: 50,
+    reverseCardsEnabled: true,
+    maxNewReversePerDay: 10,
+    maxReviewsReversePerDay: 100,
+    nameCardsEnabled: false,
+    evolutionCardsEnabled: false,
+  };
+
+  beforeEach(() => {
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue(reverseSettings);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Extract the current card's target name from the SpritePicker group aria-label. */
+  function getTargetName(): string {
+    const group = screen.getByRole("group");
+    const label = group.getAttribute("aria-label") ?? "";
+    const match = label.match(/Which Pokémon is (.+)\?/);
+    return match?.[1] ?? "";
+  }
+
+  it("shows the Pokémon name as a prompt and sprite tiles but no Reveal button", async () => {
+    render(<ReviewSession />);
+
+    // 4 sprite tile buttons are rendered — no Reveal button.
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("button")).toHaveLength(4);
+    });
+
+    // The name prompt is shown (from SpritePicker's group aria-label).
+    const targetName = getTargetName();
+    expect(["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"]).toContain(targetName);
+  });
+
+  it("correct tile tap grades Good and advances to the next card", async () => {
+    render(<ReviewSession />);
+    // Wait for initial render with real timers (waitFor uses setTimeout internally).
+    await waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(4));
+
+    const targetName = getTargetName();
+    const correctTile = screen.getByRole("button", { name: targetName });
+
+    // Switch to fake timers only for the controlled advance.
+    vi.useFakeTimers();
+    act(() => { fireEvent.click(correctTile); });
+    // Advance past CORRECT_FEEDBACK_MS (600ms) and flush state updates.
+    await act(async () => { vi.advanceTimersByTime(700); });
+    vi.useRealTimers();
+
+    const tiles = screen.getAllByRole("button");
+    expect(tiles).toHaveLength(4);
+    tiles.forEach((tile) => expect(tile).not.toBeDisabled());
+  });
+
+  it("incorrect tile tap shows feedback then grades Again and advances", async () => {
+    render(<ReviewSession />);
+    await waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(4));
+
+    const targetName = getTargetName();
+    const knownWrongNames = ["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"].filter(
+      (n) => n !== targetName,
+    );
+    const tiles = screen.getAllByRole("button");
+
+    // Click a tile that is NOT the correct answer.
+    const incorrectTile = tiles.find((tile) =>
+      knownWrongNames.includes(tile.getAttribute("aria-label") ?? ""),
+    )!;
+
+    vi.useFakeTimers();
+    act(() => { fireEvent.click(incorrectTile); });
+
+    // Tiles are disabled immediately and the correct-answer label appears.
+    screen.getAllByRole("button").forEach((tile) => expect(tile).toBeDisabled());
+    expect(
+      screen.getByText(new RegExp(`correct answer was ${targetName}`, "i")),
+    ).toBeInTheDocument();
+
+    // Advance past INCORRECT_FEEDBACK_MS (1 200ms) and flush state updates.
+    await act(async () => { vi.advanceTimersByTime(1300); });
+    vi.useRealTimers();
+
+    const nextTiles = screen.getAllByRole("button");
+    expect(nextTiles).toHaveLength(4);
+    nextTiles.forEach((tile) => expect(tile).not.toBeDisabled());
   });
 });
 

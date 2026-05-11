@@ -2,6 +2,7 @@ import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
 import { SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+import { FNV_PRIME, FNV_OFFSET, fnv1a } from "@/lib/utils/fnv1a";
 
 export type { Grade };
 
@@ -169,18 +170,6 @@ export function stableShuffleForDay(
   ids: readonly number[],
   today: string,
 ): number[] {
-  const FNV_PRIME = 16777619;
-  const FNV_OFFSET = 2166136261;
-
-  function fnv1a(s: string): number {
-    let hash = FNV_OFFSET;
-    for (let i = 0; i < s.length; i++) {
-      hash ^= s.charCodeAt(i);
-      hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    }
-    return hash;
-  }
-
   const daySalt = fnv1a(today);
 
   const keyed = ids.map((id) => {

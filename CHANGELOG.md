@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Changed
+
+- **Reverse cards now use a multiple-choice sprite picker** — instead of showing a name with a hidden sprite and asking you to self-grade, reverse cards now present the Pokémon's name at the top and four sprite tiles below. Tap the correct sprite to grade `Good`; tapping the wrong one grades `Again` and briefly highlights the correct tile before advancing. No reveal step, no manual grading buttons. Closes #185.
+
 ### Added
 
 - **Sync: auto-pull on tab focus** — when you return to a signed-in tab that has been in the background for ≥ 30 seconds, the app silently pulls your latest cloud progress and merges it into your local session. Stats and Pokédex pages re-render immediately without a manual sync or page reload. The practice session (`/`) is excluded to avoid interrupting an active review. Closes #95.

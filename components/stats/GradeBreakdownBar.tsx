@@ -4,6 +4,7 @@ type Props = {
   good: number;
   easy: number;
   label?: string;
+  hideZeroSegments?: boolean;
 };
 
 type Segment = {
@@ -13,7 +14,7 @@ type Segment = {
   color: string;
 };
 
-export function GradeBreakdownBar({ again, hard, good, easy, label }: Props) {
+export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegments = false }: Props) {
   const heading = label ?? "Grade breakdown";
   const total = again + hard + good + easy;
 
@@ -23,6 +24,13 @@ export function GradeBreakdownBar({ again, hard, good, easy, label }: Props) {
     { key: "good",  label: "Good",  count: good,  color: "bg-blue-500" },
     { key: "easy",  label: "Easy",  count: easy,  color: "bg-emerald-500" },
   ];
+
+  const visibleSegments = hideZeroSegments ? segments.filter((s) => s.count > 0) : segments;
+  const legendColClass =
+    visibleSegments.length === 1 ? "grid-cols-1" :
+    visibleSegments.length === 2 ? "grid-cols-2" :
+    visibleSegments.length === 3 ? "grid-cols-3" :
+    "grid-cols-4";
 
   return (
     <section aria-label={heading}>
@@ -54,8 +62,8 @@ export function GradeBreakdownBar({ again, hard, good, easy, label }: Props) {
           </div>
 
           {/* Legend chips */}
-          <div className="mt-4 grid grid-cols-4 gap-3">
-            {segments.map(({ key, label: segLabel, count, color }) => (
+          <div className={`mt-4 grid ${legendColClass} gap-3`}>
+            {visibleSegments.map(({ key, label: segLabel, count, color }) => (
               <div
                 key={key}
                 className="rounded-xl border border-zinc-200 bg-background px-3 py-3 dark:border-zinc-800"

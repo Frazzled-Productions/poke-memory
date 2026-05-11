@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
-import { ReverseCard } from "@/components/review/ReverseCard";
+import { SpritePicker } from "@/components/review/SpritePicker";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { pickDistractors } from "@/lib/pokemon/distractors";
 import {
   buildSession,
   buildSessionQueues,
@@ -583,7 +584,7 @@ export function ReviewSession() {
 
   function handleReveal() {
     if (currentCard === null) return;
-    if (currentCard.cardType === "name" || currentCard.cardType === "reverse") {
+    if (currentCard.cardType === "name") {
       const facts = getPokemonFacts(currentCard);
       setCurrentFact(selectFact(facts));
     } else if (currentCard.cardType === "evolution" && currentCard.evolvesInto.length === 1) {
@@ -652,6 +653,42 @@ export function ReviewSession() {
   }
 
   // --- Active review UI ---
+
+  // Reverse cards use the SpritePicker (multiple-choice); no reveal step.
+  if (currentCard.cardType === "reverse") {
+    // pokemonId is set from SEED_POKEMON at session-build time, so this find
+    // only fails if the seed changes under a persisted session (e.g. after a
+    // seed data update). Guard against a hard crash by rendering nothing in
+    // that case; the user can reload to rebuild their session.
+    const reverseTarget = SEED_POKEMON.find((p) => p.id === currentCard.pokemonId);
+    if (!reverseTarget) return null;
+    const reverseDistractors = pickDistractors(
+      currentCard.pokemonId,
+      SEED_POKEMON,
+      3,
+      String(currentCard.id),
+    );
+    return (
+      <div className="flex flex-col items-center gap-8">
+        <SpritePicker
+          key={currentCard.id}
+          targetPokemon={reverseTarget}
+          distractors={reverseDistractors}
+          onGrade={(correct) => handleGrade(correct ? 4 : 1)}
+        />
+        <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+        <GradeBreakdownBar
+          again={sessionGrades[1]}
+          hard={sessionGrades[2]}
+          good={sessionGrades[4]}
+          easy={sessionGrades[5]}
+          label="This session"
+          hideZeroSegments
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center gap-8">
       {currentCard.cardType === "evolution" ? (
@@ -659,13 +696,6 @@ export function ReviewSession() {
           spriteUrl={currentCard.spriteUrl}
           name={currentCard.name}
           evolvesInto={currentCard.evolvesInto}
-          revealed={revealed}
-          fact={currentFact}
-        />
-      ) : currentCard.cardType === "reverse" ? (
-        <ReverseCard
-          name={currentCard.name}
-          spriteUrl={currentCard.spriteUrl}
           revealed={revealed}
           fact={currentFact}
         />
