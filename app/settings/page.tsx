@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
@@ -10,6 +11,12 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { deleteAllCloudProgress } from "@/lib/sync/cloud";
 import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
+import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
+import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
+import { loadFavourite, saveFavourite } from "@/lib/theme/persistence";
+import { applyTheme } from "@/lib/theme/apply";
+import { isMastered } from "@/lib/stats/derive";
+import { SEED_POKEMON } from "@/lib/pokemon/seed";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -26,6 +33,109 @@ function LoadingSkeleton() {
       <SkeletonBlock className="h-20 w-full" />
       <SkeletonBlock className="h-20 w-full" />
     </div>
+  );
+}
+
+function FavouritePicker({
+  settings,
+  favouriteId,
+  onSelect,
+}: {
+  settings: UserSettings;
+  favouriteId: number | null;
+  onSelect: (entry: CuratedPokemon | null) => void;
+}) {
+  const session = loadSession();
+  const cardStateById = new Map(
+    (session?.cards ?? []).map((c) => [c.id, c.state]),
+  );
+
+  return (
+    <section className="flex flex-col gap-4" aria-labelledby="favourite-heading">
+      <h2
+        id="favourite-heading"
+        className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+      >
+        Favourite Pokémon
+      </h2>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        Master a Pokémon to unlock its colour theme. Electing a favourite re-skins the whole app.
+      </p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {CURATED_POKEMON.map((entry) => {
+          const seed = SEED_POKEMON.find((p) => p.id === entry.id);
+          const state = cardStateById.get(entry.id);
+          const mastered =
+            state !== undefined &&
+            isMastered(state, settings.masteryRepetitions);
+          const selected = favouriteId === entry.id;
+
+          return (
+            <div
+              key={entry.id}
+              className={`relative rounded-xl border px-4 py-3 flex flex-col items-center gap-2 transition-colors ${
+                mastered
+                  ? "border-zinc-200 bg-background dark:border-zinc-800"
+                  : "border-zinc-100 bg-zinc-50 opacity-60 dark:border-zinc-900 dark:bg-zinc-900"
+              }`}
+            >
+              <div
+                className="h-2 w-full rounded-full mb-1"
+                style={{ backgroundColor: entry.colors.primary }}
+                aria-hidden="true"
+              />
+              {seed?.spriteUrl ? (
+                <Image
+                  src={seed.spriteUrl}
+                  alt={entry.name}
+                  width={64}
+                  height={64}
+                  className="h-16 w-16 object-contain"
+                  unoptimized
+                />
+              ) : (
+                <div className="h-16 w-16" />
+              )}
+              <p className="text-sm font-medium text-foreground text-center">
+                {entry.name}
+              </p>
+              {mastered ? (
+                selected ? (
+                  <div className="flex flex-col items-center gap-1 w-full">
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      Selected ✓
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(null)}
+                      className="w-full min-h-[36px] rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-400"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onSelect(entry)}
+                    className="w-full min-h-[36px] rounded-lg bg-foreground px-3 py-1 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+                  >
+                    Set as favourite
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full min-h-[36px] rounded-lg border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-400 cursor-not-allowed dark:border-zinc-800 dark:text-zinc-600"
+                >
+                  Not yet mastered
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -125,12 +235,14 @@ export default function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
+  const [favouriteId, setFavouriteId] = useState<number | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSettings(loadSettings());
+    setFavouriteId(loadFavourite()?.id ?? null);
     return () => {
       if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
       if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
@@ -191,6 +303,8 @@ export default function SettingsPage() {
       if (!ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     }
     clearLocalProgress();
+    applyTheme(null);
+    setFavouriteId(null);
     router.replace("/");
   }
 
@@ -526,6 +640,16 @@ export default function SettingsPage() {
                   </>
                 )}
               </section>
+
+              <FavouritePicker
+                settings={settings}
+                favouriteId={favouriteId}
+                onSelect={(entry) => {
+                  saveFavourite(entry);
+                  applyTheme(entry?.colors ?? null);
+                  setFavouriteId(entry?.id ?? null);
+                }}
+              />
 
               <section className="flex flex-col gap-4" aria-labelledby="backup-heading">
                 <h2

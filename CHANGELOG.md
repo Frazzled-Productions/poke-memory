@@ -6,6 +6,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Favourite Pokémon colour theme** — once you master a Pokémon from a curated list of 11 (Charizard, Pikachu, Gengar, Eevee, Snorlax, Mewtwo, Umbreon, Gardevoir, Garchomp, Lucario, and Drampa), you can elect it as your favourite on the Settings page. Electing a favourite re-skins the entire app with that Pokémon's colour palette. The theme is applied instantly with no flash on page reload. Your favourite's sprite also appears beside the logo in the navbar. Removing the favourite or resetting progress reverts to the default palette. The theme syncs across tabs via the `storage` event. Closes #164.
+
 - **Manual sync button on Stats page** — signed-in users now see a "Sync now" button alongside the last-synced timestamp. Clicking pushes local progress to the cloud and pulls the latest cloud state, then merges it into localStorage. The button shows a spinner while syncing, turns green on success (auto-resets after 3 seconds), and surfaces errors in red so users can retry. Disabled while a sync is in flight to prevent double-clicks. Closes #98.
 
 - **`supabase-expert` sub-agent** — a new read-only sub-agent covering Supabase Auth (GitHub OAuth, `@supabase/ssr` for Next.js 16 App Router), Postgres + RLS policy authoring, SM-2 schema design, the locked sync model, and privacy constraints. Invoke before writing any Supabase integration code, analogous to `next16-expert` for Next.js questions. Closes #143.

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { NavLinks, NavLinksFallback } from "./NavLinks";
+import { FavouriteMascot } from "./theme/FavouriteMascot";
 
 export function Nav() {
   return (
@@ -11,8 +12,9 @@ export function Nav() {
       >
         <Link
           href="/"
-          className="text-sm font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
+          className="flex items-center gap-2 text-sm font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
         >
+          <FavouriteMascot />
           poke-memory
         </Link>
 
