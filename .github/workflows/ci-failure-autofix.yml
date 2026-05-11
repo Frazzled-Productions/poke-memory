@@ -25,7 +25,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      id-token: write
     steps:
       - name: Mint App installation token
         id: app-token
@@ -66,7 +65,7 @@ jobs:
           # auto-review.yml's SHA-based marker pattern for exact deduplication.
           MARKER="<!-- ci-autofix:$RUN_ID -->"
           FOUND=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | length')
+            | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | length')
           if [ "$FOUND" -gt 0 ]; then
             echo "ci-autofix comment for run $RUN_ID already exists — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
