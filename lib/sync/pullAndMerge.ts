@@ -48,10 +48,14 @@ export async function pullAndMerge(
 
     // Use the most-recently-updated cloud row's timestamp as lastPullAt so a
     // drifting device clock cannot produce false "cloud is newer" signals on
-    // the next pull. Falls back to the current ISO time only when no rows exist.
-    const serverTs =
+    // the next pull. Falls back to the current ISO time only when no rows exist
+    // or none have an updated_at.
+    const serverTs: string =
       cloudRows.length > 0
-        ? cloudRows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), cloudRows[0].updated_at)
+        ? cloudRows.reduce<string>((max, r) => {
+            if (!r.updated_at) return max;
+            return r.updated_at > max ? r.updated_at : max;
+          }, cloudRows[0].updated_at ?? new Date().toISOString())
         : new Date().toISOString();
 
     saveSyncStatus({ ...syncStatus, lastPullAt: serverTs });

@@ -28,7 +28,8 @@ export type CloudRow = {
   due_date: string;
   last_review: string | null;
   first_seen: string | null;
-  updated_at: string;
+  /** Present on pull responses. Absent on locally-constructed push rows (added in the upsert batch). */
+  updated_at?: string;
 };
 
 /**
@@ -280,7 +281,8 @@ export function mergeCloudIntoLocalSilent(
     }
 
     // Cloud row updated after the last pull — take cloud.
-    if (row.updated_at > lastPullAt) {
+    // When updated_at is absent (legacy row), conservatively treat as newer.
+    if (!row.updated_at || row.updated_at > lastPullAt) {
       return applyCloudRow(card, row);
     }
 
