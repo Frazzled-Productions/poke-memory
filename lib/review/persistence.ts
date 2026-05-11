@@ -8,7 +8,7 @@ export type SavedSession = {
   limits: DailyLimits;
 };
 
-const STORAGE_KEY = "poke-memory:review-session:v1";
+export const STORAGE_KEY = "poke-memory:review-session:v1";
 
 function isReviewCardShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
@@ -216,7 +216,7 @@ export function loadSession(): SavedSession | null {
 function serializeCard(card: ReviewableCard): unknown {
   if (card.cardType !== "reverse") return card;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { flavorTexts: _ft, evolutionChain: _ec, ...rest } = card as ReverseReviewCard & Record<string, unknown>;
+  const { flavorTexts: _ft, evolutionChain: _ec, ...rest } = card as ReverseReviewCard;
   return rest;
 }
 

@@ -419,7 +419,7 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
       types: ['grass'],
       stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
       flavorText: 'A strange seed.',
-      flavorTexts: undefined,
+      // flavorTexts is absent (key-absent, matching the real on-disk shape after serializeCard strips it)
       evolutionChain: [],
       height: 7,
       weight: 69,

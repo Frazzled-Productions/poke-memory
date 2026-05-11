@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { loadSession, saveSession } from "./persistence";
-import type { ReverseReviewCard, DailyLimits } from "./session";
+import { loadSession, saveSession, STORAGE_KEY } from "./persistence";
+import type { ReverseReviewCard, NameReviewCard, DailyLimits } from "./session";
 import { DEFAULT_LIMITS } from "./session";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
-
-const KEY = "poke-memory:review-session:v1";
 
 const NOW = new Date("2026-05-11T12:00:00Z");
 
@@ -59,6 +57,33 @@ function makeReverseCard(): ReverseReviewCard {
   };
 }
 
+function makeNameCard(): NameReviewCard {
+  return {
+    id: 1,
+    cardType: "name",
+    name: "bulbasaur",
+    spriteUrl: "https://example.com/1.png",
+    types: ["grass"],
+    stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
+    flavorText: "A strange seed was planted on its back at birth.",
+    flavorTexts: ["A strange seed."],
+    evolutionChain: [],
+    height: 7,
+    weight: 69,
+    baseExperience: 64,
+    genus: "Seed Pokémon",
+    generation: "generation-i",
+    captureRate: 45,
+    baseHappiness: 50,
+    growthRate: "medium-slow",
+    habitat: "grassland",
+    genderRate: 1,
+    isLegendary: false,
+    isMythical: false,
+    state: initialReviewState(NOW),
+  };
+}
+
 describe("saveSession (quota handling)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -68,7 +93,7 @@ describe("saveSession (quota handling)", () => {
   it("does not throw when localStorage.setItem throws QuotaExceededError", () => {
     const storage = makeMockStorage();
     const throwingSetItem = vi.fn(() => {
-      throw new DOMException("QuotaExceededError", "QuotaExceededError");
+      throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
     });
     vi.stubGlobal("window", { localStorage: { ...storage, setItem: throwingSetItem } });
     vi.stubGlobal("localStorage", { ...storage, setItem: throwingSetItem });
@@ -96,7 +121,7 @@ describe("saveSession (reverse card stripping)", () => {
     const card = makeReverseCard();
     saveSession({ cards: [card], limits: defaultLimits });
 
-    const raw = storage._store[KEY];
+    const raw = storage._store[STORAGE_KEY];
     expect(raw).toBeDefined();
     const parsed = JSON.parse(raw) as { cards: unknown[] };
     expect(parsed.cards).toHaveLength(1);
@@ -104,6 +129,33 @@ describe("saveSession (reverse card stripping)", () => {
     expect(stored.flavorTexts).toBeUndefined();
     expect(stored.evolutionChain).toBeUndefined();
     expect(stored.cardType).toBe("reverse");
+    expect(stored.name).toBe("bulbasaur");
+  });
+});
+
+describe("saveSession (non-reverse card passthrough)", () => {
+  let storage: ReturnType<typeof makeMockStorage>;
+
+  beforeEach(() => {
+    storage = makeMockStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("localStorage", storage);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("writes name cards to storage without modification", () => {
+    const card = makeNameCard();
+    saveSession({ cards: [card], limits: defaultLimits });
+
+    const raw = storage._store[STORAGE_KEY];
+    expect(raw).toBeDefined();
+    const parsed = JSON.parse(raw) as { cards: unknown[] };
+    expect(parsed.cards).toHaveLength(1);
+    const stored = parsed.cards[0] as Record<string, unknown>;
+    expect(stored.cardType).toBe("name");
     expect(stored.name).toBe("bulbasaur");
   });
 });
@@ -131,7 +183,7 @@ describe("loadSession (round-trip slimmed reverse card)", () => {
       spriteUrl: "https://example.com/1.png",
       state,
     };
-    storage._store[KEY] = JSON.stringify({ cards: [slimCard], limits: defaultLimits });
+    storage._store[STORAGE_KEY] = JSON.stringify({ cards: [slimCard], limits: defaultLimits });
 
     const result = loadSession();
     expect(result).not.toBeNull();
