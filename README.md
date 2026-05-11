@@ -1,5 +1,7 @@
 # poke-memory
 
+[![Release](https://img.shields.io/github/v/release/fraserbrookhouse/poke-memory)](https://github.com/fraserbrookhouse/poke-memory/releases)
+
 Anki-style spaced-repetition flashcards for learning the names of all 1025 Pokémon.
 
 Two card directions, each scheduled independently by SM-2:
@@ -63,4 +65,4 @@ This repo doubles as a sandbox for practicing Claude Code sub-agent workflows. T
 
 ## Status
 
-Hobby project, work-in-progress. See [CHANGELOG.md](./CHANGELOG.md) for what's been built so far.
+Hobby project, work-in-progress. See [CHANGELOG.md](./CHANGELOG.md) for what's been built so far and [Releases](https://github.com/fraserbrookhouse/poke-memory/releases) for tagged versions.

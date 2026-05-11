@@ -157,6 +157,14 @@ A React hook can live in `lib/` (e.g. `lib/review/useStorageQuota.ts`), but if i
 - **All three files are updated as part of the same commit that lands the change** — no separate docs-only commit. Orchestrator handles the edit inline; no specialist agent.
 - Internal conventions (this file, `AGENTS.md`) are kept separate from user-facing docs. Don't merge them.
 
+### Versioning
+
+- **Standard**: SemVer 2.0.0.
+- **Pre-v1 semantics**: `0.MINOR.0` for any release containing `### Added`, `### Changed`, `### Removed`, or `### Deprecated` entries; `0.MINOR.PATCH` for releases containing only `### Fixed` and/or `### Security` entries.
+- **Cadence**: weekly automated cut — see `auto-release.yml` and `WORKFLOW.md` (implemented by #200).
+- **Version source**: `package.json` is the single source of truth. The release workflow bumps it automatically — never edit the version field by hand.
+- **`[Unreleased]` promotion**: when a release is cut, `## [Unreleased]` becomes `## [X.Y.Z] — YYYY-MM-DD`, a fresh empty `## [Unreleased]` is prepended, and a reference link is appended at the bottom of `CHANGELOG.md`.
+
 ### Stack decisions
 
 These are screening criteria for new vendors, services, and libraries. Any addition that would introduce a new vendor, paid service, auth provider, database, or persistence layer must be surfaced as a `[USER-DECISION]` or `[USER-DECISION + RESEARCH]` open question in the planner's output — never resolved unilaterally by the implementer. **When in doubt, default to blocker.** A false-positive blocker costs one comment round-trip; a false-negative costs a closed PR.
