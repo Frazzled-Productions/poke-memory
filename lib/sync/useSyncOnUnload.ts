@@ -62,6 +62,8 @@ export function useSyncOnUnload(
         ...prev,
         lastPushAttemptAt: now,
         lastPushFailed: true,
+        // Upper bound: pushSession doesn't report partial batch successes, so we
+        // may overstate the residual if any batch succeeded before a later one failed.
         failedCardCount: unsynced.length,
       });
 

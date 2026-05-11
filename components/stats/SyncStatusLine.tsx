@@ -20,14 +20,15 @@ export function SyncStatusLine({ refreshKey }: Props) {
       const timeStr = status.lastPushAttemptAt ? ` at ${fmt(status.lastPushAttemptAt)}` : "";
       const { failedCardCount } = status;
       if (failedCardCount === 0) {
-        // Unload push succeeded before the .then() could clear lastPushFailed.
+        // Either the unload push succeeded before .then() cleared lastPushFailed,
+        // or a manual sync succeeded and wrote failedCardCount: 0.
         setState({ text: `Last synced: ${status.lastPushAt ? fmt(status.lastPushAt) : "recently"}`, errorDetail: null });
       } else if (failedCardCount === 1) {
         setState({
           text: `1 card may be out of sync${timeStr}`,
           errorDetail: "Will retry next time you sync.",
         });
-      } else if (failedCardCount !== null && failedCardCount > 1) {
+      } else if (typeof failedCardCount === "number" && failedCardCount > 1) {
         setState({
           text: `${failedCardCount} cards may be out of sync${timeStr}`,
           errorDetail: "Will retry next time you sync.",

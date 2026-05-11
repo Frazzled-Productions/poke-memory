@@ -27,7 +27,7 @@ export function loadSyncStatus(): SyncStatus {
       lastPushAt: typeof obj.lastPushAt === "string" ? obj.lastPushAt : null,
       lastPushFailed: typeof obj.lastPushFailed === "boolean" ? obj.lastPushFailed : false,
       lastPushAttemptAt: typeof obj.lastPushAttemptAt === "string" ? obj.lastPushAttemptAt : null,
-      failedCardCount: typeof obj.failedCardCount === "number" ? obj.failedCardCount : null,
+      failedCardCount: Number.isInteger(obj.failedCardCount) && (obj.failedCardCount as number) >= 0 ? obj.failedCardCount as number : null,
     };
   } catch {
     return ZERO;
