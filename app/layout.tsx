@@ -63,9 +63,7 @@ export default function RootLayout({
                 <SyncOnVisible />
               </Suspense>
               <div className="flex flex-1 flex-col">{children}</div>
-              <Suspense fallback={null}>
-                <Footer />
-              </Suspense>
+              <Footer />
             </FavouriteThemeProvider>
           </SuperuserProvider>
         </AuthProvider>
