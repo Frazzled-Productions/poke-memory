@@ -78,6 +78,10 @@ export async function validateBackup(
   }
 
   // Null out stepStartedAt to prevent stale countdown timers after import.
+  // ReviewSession's mount-time stamp loop will re-stamp any in-learning card
+  // with null stepStartedAt as Date.now(), giving it a fresh step window —
+  // this is intentional: imported cards start a clean step rather than
+  // inheriting a possibly-hours-old anchor from the backup.
   // Static seed fields (name, spriteUrl, evolvesInto) are intentionally kept
   // from the backup: every consumer calls hydrateSession after loadSession,
   // which refreshes them from the current seed. Calling hydrateSession here

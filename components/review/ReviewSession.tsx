@@ -340,6 +340,23 @@ export function ReviewSession() {
       sessionLimits = settingsLimits;
     }
 
+    // Stamp a concrete stepStartedAt for any in-learning card still missing one.
+    // Sessions saved before this field was tracked have stepStartedAt: null for
+    // learning cards. Persisting the stamp here ensures subsequent reloads compute
+    // the countdown from the same fixed anchor instead of a fresh window each time.
+    const stampNow = Date.now();
+    let stampedAny = false;
+    sessionCards = sessionCards.map((c) => {
+      if (c.state.learningStep !== null && c.state.stepStartedAt === null) {
+        stampedAny = true;
+        return { ...c, state: { ...c.state, stepStartedAt: stampNow } };
+      }
+      return c;
+    });
+    if (stampedAny) {
+      try { saveSession({ cards: sessionCards, limits: sessionLimits }); } catch { /* quota — non-fatal */ }
+    }
+
     setCards(sessionCards);
     setLimits(sessionLimits);
     setReverseEnabled(enabled);
@@ -358,11 +375,8 @@ export function ReviewSession() {
         card.state.lastReview,
         card.state.learningStep ?? 0,
       );
-      const stepStartedAt = card.state.stepStartedAt;
-      const dueAt = stepStartedAt !== null
-        ? stepStartedAt + stepMs
-        : Date.now(); // legacy migrated card — no start time recorded, treat as immediately due
-      return { cardId, dueAt };
+      const stepStartedAt = card.state.stepStartedAt ?? Date.now();
+      return { cardId, dueAt: stepStartedAt + stepMs };
     });
 
     setLearningQueue(initialLearning);
