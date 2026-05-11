@@ -1,9 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { isSuperuser, enableSuperuser, disableSuperuser } from "./persistence";
-
-const STORAGE_KEY = "poke-memory:superuser";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { isSuperuser, enableSuperuser, disableSuperuser, STORAGE_KEY } from "./persistence";
 
 // Typing "super" anywhere (when not focused on an input) toggles the mode.
 const CHORD_SEQUENCE = ["s", "u", "p", "e", "r"];
@@ -19,13 +17,18 @@ export function useSuperuser(): SuperuserContextValue {
 
 export function SuperuserProvider({ children }: { children: React.ReactNode }) {
   const [superuser, setSuperuser] = useState(false);
+  const superuserRef = useRef(false);
 
   useEffect(() => {
-    setSuperuser(isSuperuser());
+    const initial = isSuperuser();
+    setSuperuser(initial);
+    superuserRef.current = initial;
 
     function handleStorage(e: StorageEvent) {
       if (e.key !== STORAGE_KEY) return;
-      setSuperuser(isSuperuser());
+      const next = isSuperuser();
+      setSuperuser(next);
+      superuserRef.current = next;
     }
 
     let pending: string[] = [];
@@ -43,16 +46,18 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
 
       if (e.key === CHORD_SEQUENCE[pending.length]) {
         if (timeoutId !== null) clearTimeout(timeoutId);
-        pending = [...pending, e.key];
+        pending.push(e.key);
 
         if (pending.length === CHORD_SEQUENCE.length) {
           pending = [];
-          if (isSuperuser()) {
+          if (superuserRef.current) {
             disableSuperuser();
             setSuperuser(false);
+            superuserRef.current = false;
           } else {
             enableSuperuser();
             setSuperuser(true);
+            superuserRef.current = true;
           }
         } else {
           timeoutId = setTimeout(() => {
@@ -64,7 +69,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
         pending = [];
         // Restart sequence if this key matches the first char
         if (e.key === CHORD_SEQUENCE[0]) {
-          pending = [e.key];
+          pending.push(e.key);
           timeoutId = setTimeout(() => {
             pending = [];
           }, CHORD_TIMEOUT_MS);
