@@ -207,7 +207,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
     // that a subsequent reload reads the fixed anchor instead of stamping a
     // fresh Date.now() and drifting the countdown window.
     await waitFor(() => {
-      expect(vi.mocked(saveSession)).toHaveBeenCalledWith(
+      expect(vi.mocked(saveSession)).toHaveBeenLastCalledWith(
         expect.objectContaining({
           cards: expect.arrayContaining([
             expect.objectContaining({

@@ -550,7 +550,7 @@ describe('stepStartedAt tracking', () => {
 // Migration 3: stepStartedAt backfill
 // ============================================================
 describe('migration of legacy state (no stepStartedAt field)', () => {
-  it('backfills stepStartedAt: null via migrateReviewState', () => {
+  it('sets stepStartedAt to null for graduated cards (learningStep: null, stepStartedAt absent)', () => {
     const legacyState: Record<string, unknown> = {
       repetitions: 1,
       interval: 6,
@@ -563,6 +563,25 @@ describe('migration of legacy state (no stepStartedAt field)', () => {
     };
     migrateReviewState(legacyState);
     expect(legacyState.stepStartedAt).toBeNull();
+  });
+
+  it('sets stepStartedAt to a concrete timestamp for in-learning cards (learningStep: non-null, stepStartedAt absent)', () => {
+    const before = Date.now();
+    const legacyState: Record<string, unknown> = {
+      repetitions: 0,
+      interval: 0,
+      easeFactor: 2.5,
+      dueDate: '2026-05-10',
+      lastReview: null,
+      firstSeen: null,
+      learningStep: 0,
+      // stepStartedAt absent
+    };
+    migrateReviewState(legacyState);
+    const after = Date.now();
+    expect(typeof legacyState.stepStartedAt).toBe('number');
+    expect(legacyState.stepStartedAt as number).toBeGreaterThanOrEqual(before);
+    expect(legacyState.stepStartedAt as number).toBeLessThanOrEqual(after);
   });
 
   it('does not overwrite an existing stepStartedAt value', () => {
