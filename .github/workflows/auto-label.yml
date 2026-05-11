@@ -78,6 +78,11 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 5
+          # Issues opened by the bot (e.g. `/split` sub-issues from
+          # auto-issue.yml) must still be classified — without this allowlist
+          # the action exits before producing /tmp/labels.json and the job
+          # fails. Mirrors the same guard in auto-issue.yml and auto-pr.yml.
+          allowed_bots: poke-memory-bot
           prompt: |
             Classify a GitHub issue and write a JSON label assignment to /tmp/labels.json.
 
@@ -249,6 +254,12 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 5
+          # PRs opened by the bot (auto-pr.yml runs as poke-memory-bot) must
+          # still be classified — without this allowlist the action exits
+          # before producing /tmp/labels.json and the job fails with
+          # "Workflow initiated by non-human actor". Mirrors the same guard
+          # in auto-pr.yml and auto-review.yml.
+          allowed_bots: poke-memory-bot
           prompt: |
             Classify a GitHub pull request and write a JSON label assignment to /tmp/labels.json.
 
