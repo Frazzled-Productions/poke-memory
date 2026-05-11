@@ -4,6 +4,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Evolution cards: reveal sprite now matches question size** — the evolution sprite shown after tapping Reveal was rendered at 96 px while the question-side pre-evolution sprite was 320 px. Single-evolution cards now show the revealed evolution at 320 px, matching the question side. Branching evolutions (e.g. Eevee) continue to render at 96 px per sprite so the row fits the card area.
+
+- **Evolution cards now show a fact on reveal** — tapping Reveal on an evolution card now displays a fact about the revealed evolution (type, height, Pokédex entry, etc.), matching the behaviour of name and reverse cards. For branching evolutions (multiple targets revealed simultaneously) no fact is shown, since a single fact cannot represent multiple Pokémon at once. Closes #163.
+
 ### Added
 
 - **Superuser mode** — a maintainer-only escape hatch that bypasses all mastery gates for UI purposes. Activate via `localStorage.setItem('poke-memory:superuser', 'true')` in DevTools, or by typing `super` anywhere on the page when not focused in a text field (the same sequence toggles it off). On mobile, tap the "poke-memory" nav title 7 times within 2 seconds to toggle (works on iOS Safari and Android Chrome without DevTools). In superuser mode: all Pokémon tiles in Settings are interactive, the Pokédex grid shows every cell as mastered, and Pokédex detail pages reveal full stats and evolution chains regardless of progress. The flag persists in `localStorage` until explicitly cleared. No effect on review state, SRS scheduling, or stats. Closes #170, #177.

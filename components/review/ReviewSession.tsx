@@ -572,6 +572,17 @@ export function ReviewSession() {
     if (currentCard.cardType === "name" || currentCard.cardType === "reverse") {
       const facts = getPokemonFacts(currentCard);
       setCurrentFact(selectFact(facts));
+    } else if (currentCard.cardType === "evolution" && currentCard.evolvesInto.length === 1) {
+      const evoName = currentCard.evolvesInto[0].name;
+      const evoPokemon = SEED_POKEMON.find((p) => p.name === evoName);
+      if (evoPokemon) {
+        setCurrentFact(selectFact(getPokemonFacts(evoPokemon)));
+      } else {
+        console.warn(`[handleReveal] seed data missing for evolution target: ${evoName}`);
+        setCurrentFact(null);
+      }
+    } else {
+      setCurrentFact(null);
     }
     setRevealed(true);
   }
@@ -635,6 +646,7 @@ export function ReviewSession() {
           name={currentCard.name}
           evolvesInto={currentCard.evolvesInto}
           revealed={revealed}
+          fact={currentFact}
         />
       ) : currentCard.cardType === "reverse" ? (
         <ReverseCard

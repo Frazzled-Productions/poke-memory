@@ -1,37 +1,52 @@
 import Image from "next/image";
 import type { EvolutionTarget } from "@/lib/pokemon/seed";
+import type { PokemonFact } from "@/lib/pokemon/facts";
 
 type Props = {
   spriteUrl: string;
   name: string;
   evolvesInto: EvolutionTarget[];
   revealed: boolean;
+  fact?: PokemonFact | null;
 };
 
-export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed }: Props) {
+export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: Props) {
+  const isBranching = evolvesInto.length > 1;
+  const spriteSize = isBranching ? 96 : 320;
+
   return (
     <div className="flex flex-col items-center gap-4">
       {revealed ? (
-        <div
-          className="flex flex-wrap gap-4 justify-center"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          {evolvesInto.map((evo) => (
-            <div key={evo.name} className="flex flex-col items-center gap-1">
-              <Image
-                src={evo.spriteUrl}
-                alt={evo.name}
-                width={96}
-                height={96}
-                className="object-contain"
-              />
-              <span className="text-lg font-semibold tracking-wide capitalize text-foreground">
-                {evo.name}
+        <>
+          <div
+            className="flex flex-wrap gap-4 justify-center"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {evolvesInto.map((evo) => (
+              <div key={evo.name} className="flex flex-col items-center gap-1">
+                <Image
+                  src={evo.spriteUrl}
+                  alt={evo.name}
+                  width={spriteSize}
+                  height={spriteSize}
+                  className="object-contain"
+                />
+                <span className="text-lg font-semibold tracking-wide capitalize text-foreground">
+                  {evo.name}
+                </span>
+              </div>
+            ))}
+          </div>
+          {!isBranching && fact && (
+            <div className="w-full mt-2 text-center">
+              <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                {fact.label}
               </span>
+              <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-300 max-w-xs mx-auto">{fact.value}</p>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       ) : (
         <Image
           src={spriteUrl}
