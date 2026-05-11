@@ -222,13 +222,24 @@ function serializeCard(card: ReviewableCard): unknown {
   return rest;
 }
 
-export function saveSession(session: SavedSession): void {
-  if (typeof window === "undefined") return;
+export type SaveResult = { ok: true } | { ok: false; reason: "quota" | "unknown" };
+
+export function saveSession(session: SavedSession): SaveResult {
+  if (typeof window === "undefined") return { ok: true };
 
   const payload = { cards: session.cards.map(serializeCard), limits: session.limits };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    return { ok: true };
   } catch (err) {
+    if (
+      err instanceof DOMException &&
+      (err.name === "QuotaExceededError" || err.code === 22)
+    ) {
+      console.warn("[poke-memory] saveSession: localStorage quota exceeded", err);
+      return { ok: false, reason: "quota" };
+    }
     console.warn("[poke-memory] saveSession: localStorage write failed", err);
+    return { ok: false, reason: "unknown" };
   }
 }
