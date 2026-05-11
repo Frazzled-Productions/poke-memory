@@ -35,8 +35,6 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v6
-
       - name: Mint App installation token
         id: app-token
         uses: actions/create-github-app-token@v3
@@ -46,7 +44,10 @@ jobs:
 
       - name: Compute ISO week key
         id: week
-        run: echo "key=$(date -u +"%G-W%V")" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "key=$(date -u +"%G-W%V")" >> "$GITHUB_OUTPUT"
+          echo "today=$(date -u +"%Y-%m-%d")" >> "$GITHUB_OUTPUT"
+          echo "since=$(date -u -d '30 days ago' +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
 
       - name: Idempotency check — skip if digest already exists this week
         id: idempotency
@@ -57,9 +58,8 @@ jobs:
           set -euo pipefail
           TITLE="Weekly workflow review — ${WEEK_KEY}"
           COUNT=$(gh issue list \
-            --search "\"${TITLE}\" in:title" \
             --state all \
-            --limit 5 \
+            --limit 50 \
             --json number,title \
             --jq "[.[] | select(.title == \"${TITLE}\")] | length")
           if [ "$COUNT" -gt 0 ]; then
@@ -89,6 +89,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           WEEK_KEY: ${{ steps.week.outputs.key }}
+          SINCE: ${{ steps.week.outputs.since }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -96,7 +97,7 @@ jobs:
           prompt: |
             You are generating a weekly workflow improvement digest for this repository.
 
-            Today is $(date -u +"%Y-%m-%d"). The current ISO week is **${{ steps.week.outputs.key }}**.
+            Today is ${{ steps.week.outputs.today }}. The current ISO week is **${{ steps.week.outputs.key }}**.
 
             ## Your task
 
@@ -118,8 +119,8 @@ jobs:
             rate limits:
 
             ### 1. Retro comments (last 30 days)
+            The `$SINCE` environment variable is pre-set to the ISO timestamp 30 days ago.
             ```
-            SINCE=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ")
             gh issue list --state closed --limit 50 --json number,closedAt \
               --jq ".[] | select(.closedAt >= \"$SINCE\") | .number"
             ```
@@ -132,8 +133,8 @@ jobs:
 
             ### 2. PR review comments on `auto/*` PRs (last 30 days)
             ```
-            gh pr list --state merged --limit 30 --search "head:auto/" --json number,title,mergedAt \
-              --jq ".[] | select(.mergedAt != null)"
+            gh pr list --state merged --limit 50 --search "head:auto/" --json number,title,mergedAt \
+              --jq ".[] | select(.mergedAt != null and .mergedAt >= \"$SINCE\")"
             ```
             For each PR number, fetch:
             ```
@@ -145,7 +146,6 @@ jobs:
 
             ### 3. WIP-salvage commits (last 30 days)
             ```
-            SINCE=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ")
             gh api "repos/${{ github.repository }}/commits?since=${SINCE}&per_page=100" \
               --jq '.[] | select(.commit.message | startswith("WIP:")) | {sha: .sha[0:7], message: .commit.message}'
             ```
@@ -207,21 +207,13 @@ jobs:
             ### 2. ...
             ```
 
-            Then create the issue:
+            Then create the issue and capture the number from the URL it prints:
             ```
-            gh issue create \
+            ISSUE_URL=$(gh issue create \
               --title "Weekly workflow review — ${{ steps.week.outputs.key }}" \
               --body-file /tmp/digest-body.md \
-              --label "area:workflow"
-            ```
-
-            Store the issue number in `/tmp/digest-issue-number.txt` (just the
-            number, no other text):
-            ```
-            gh issue list \
-              --search "\"Weekly workflow review — ${{ steps.week.outputs.key }}\" in:title" \
-              --state open --limit 1 --json number --jq '.[0].number' \
-              > /tmp/digest-issue-number.txt
+              --label "area:workflow")
+            echo "$ISSUE_URL" | grep -oE '[0-9]+$' > /tmp/digest-issue-number.txt
             ```
 
       - name: Surface tool denials
@@ -232,6 +224,8 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LOG: /home/runner/work/_temp/claude-execution-output.json
         run: |
+          # set -u only (not -e): the || echo 0 / || true guards below intentionally
+          # mask expected non-zero exits; -e would abort on them prematurely.
           set -u
           if [ ! -f "$LOG" ]; then exit 0; fi
 
