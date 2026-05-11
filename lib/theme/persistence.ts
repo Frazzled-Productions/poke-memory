@@ -1,10 +1,14 @@
+import { CURATED_POKEMON } from "./curated-pokemon";
 import type { CuratedPokemon, ThemeColors } from "./curated-pokemon";
 
 const STORAGE_KEY = "poke-memory:favourite:v1";
+const HEX_COLOR = /^#[0-9a-fA-F]{3,8}$/;
 
 export type StoredFavourite = {
   id: number;
+  name: string;
   colors: ThemeColors;
+  spriteUrl: string | null;
 };
 
 export function loadFavourite(): StoredFavourite | null {
@@ -16,6 +20,8 @@ export function loadFavourite(): StoredFavourite | null {
     if (typeof parsed !== "object" || parsed === null) return null;
     const obj = parsed as Record<string, unknown>;
     if (typeof obj.id !== "number") return null;
+    const curated = CURATED_POKEMON.find((p) => p.id === obj.id);
+    if (!curated) return null;
     if (typeof obj.colors !== "object" || obj.colors === null) return null;
     const c = obj.colors as Record<string, unknown>;
     if (
@@ -26,21 +32,34 @@ export function loadFavourite(): StoredFavourite | null {
     ) {
       return null;
     }
+    if (
+      !HEX_COLOR.test(c.primary) ||
+      !HEX_COLOR.test(c.secondary) ||
+      !HEX_COLOR.test(c.accent) ||
+      !HEX_COLOR.test(c.fgOnPrimary)
+    ) {
+      return null;
+    }
     return {
       id: obj.id,
+      name: curated.name,
       colors: {
         primary: c.primary,
         secondary: c.secondary,
         accent: c.accent,
         fgOnPrimary: c.fgOnPrimary,
       },
+      spriteUrl: typeof obj.spriteUrl === "string" ? obj.spriteUrl : null,
     };
   } catch {
     return null;
   }
 }
 
-export function saveFavourite(entry: CuratedPokemon | null): void {
+export function saveFavourite(
+  entry: CuratedPokemon | null,
+  spriteUrl: string | null = null,
+): void {
   if (typeof window === "undefined") return;
   try {
     if (entry === null) {
@@ -48,7 +67,12 @@ export function saveFavourite(entry: CuratedPokemon | null): void {
     } else {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ id: entry.id, colors: entry.colors }),
+        JSON.stringify({
+          id: entry.id,
+          name: entry.name,
+          colors: entry.colors,
+          spriteUrl,
+        }),
       );
     }
   } catch {

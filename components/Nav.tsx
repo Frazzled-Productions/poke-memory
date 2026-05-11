@@ -14,7 +14,9 @@ export function Nav() {
           href="/"
           className="flex items-center gap-2 text-sm font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
         >
-          <FavouriteMascot />
+          <span aria-hidden="true">
+            <FavouriteMascot />
+          </span>
           poke-memory
         </Link>
 

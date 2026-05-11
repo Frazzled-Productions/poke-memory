@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
@@ -43,12 +43,12 @@ function FavouritePicker({
 }: {
   settings: UserSettings;
   favouriteId: number | null;
-  onSelect: (entry: CuratedPokemon | null) => void;
+  onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
 }) {
-  const session = loadSession();
-  const cardStateById = new Map(
-    (session?.cards ?? []).map((c) => [c.id, c.state]),
-  );
+  const cardStateById = useMemo(() => {
+    const session = loadSession();
+    return new Map((session?.cards ?? []).map((c) => [c.id, c.state]));
+  }, []);
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="favourite-heading">
@@ -107,7 +107,7 @@ function FavouritePicker({
                     </span>
                     <button
                       type="button"
-                      onClick={() => onSelect(null)}
+                      onClick={() => onSelect(null, null)}
                       className="w-full min-h-[36px] rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-400"
                     >
                       Remove
@@ -116,7 +116,7 @@ function FavouritePicker({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => onSelect(entry)}
+                    onClick={() => onSelect(entry, seed?.spriteUrl ?? null)}
                     className="w-full min-h-[36px] rounded-lg bg-foreground px-3 py-1 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
                   >
                     Set as favourite
@@ -302,6 +302,7 @@ export default function SettingsPage() {
       const ok = await deleteAllCloudProgress(supabase, user.id);
       if (!ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     }
+    saveFavourite(null);
     clearLocalProgress();
     applyTheme(null);
     setFavouriteId(null);
@@ -644,8 +645,8 @@ export default function SettingsPage() {
               <FavouritePicker
                 settings={settings}
                 favouriteId={favouriteId}
-                onSelect={(entry) => {
-                  saveFavourite(entry);
+                onSelect={(entry, spriteUrl) => {
+                  saveFavourite(entry, spriteUrl);
                   applyTheme(entry?.colors ?? null);
                   setFavouriteId(entry?.id ?? null);
                 }}

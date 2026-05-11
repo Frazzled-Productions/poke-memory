@@ -46,7 +46,7 @@ export default function RootLayout({
         {/* Inline script applies saved theme before first paint to avoid flash of default palette */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('poke-memory:favourite:v1');if(t){var d=JSON.parse(t),r=document.documentElement;r.style.setProperty('--theme-primary',d.colors.primary);r.style.setProperty('--theme-secondary',d.colors.secondary);r.style.setProperty('--theme-accent',d.colors.accent);r.style.setProperty('--theme-fg-on-primary',d.colors.fgOnPrimary);}}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('poke-memory:favourite:v1');if(t){var d=JSON.parse(t),c=d&&d.colors,r=document.documentElement;if(c&&c.primary)r.style.setProperty('--theme-primary',c.primary);if(c&&c.secondary)r.style.setProperty('--theme-secondary',c.secondary);if(c&&c.accent)r.style.setProperty('--theme-accent',c.accent);if(c&&c.fgOnPrimary)r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);}}catch(e){}`,
           }}
         />
       </head>
