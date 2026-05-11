@@ -265,6 +265,18 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
+### `ci-failure-autofix.yml` — CI Auto-fix
+
+| | |
+|---|---|
+| **Trigger** | `workflow_run` on `CI` workflow `completed` with `conclusion == 'failure'`, branches matching `auto/issue-*` |
+| **What it does** | Finds the failed `test` job, fetches the last 80 lines of its log, and posts a `/fix` comment on the PR — which triggers `auto-pr.yml`'s fix cycle |
+| **Idempotency** | Skips if a `<!-- ci-autofix:$RUN_ID -->` comment already exists on the PR — exact match by run ID, so re-delivery of the same `workflow_run` event is a no-op |
+| **Cycle-cap interaction** | `auto-pr.yml`'s 3-cycle cap does not prevent this workflow from posting a `/fix` on the next CI failure. On a capped PR, `auto-pr.yml` will silently drop the comment; no further fix cycles run, but stale `/fix` comments may accumulate. |
+| **Coupling** | Job selector matches by name `"test"` (the API-returned display name). After any `ci.yml` change, verify the name with `gh api repos/{owner}/{repo}/actions/runs/{id}/jobs --jq '.jobs[].name'` and update the `jq` selector in the `Fetch failing job log` step if needed. |
+
+---
+
 ## Build gates
 
 Two separate gates catch type/build/test errors at different points:
