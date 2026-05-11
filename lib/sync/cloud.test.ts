@@ -149,7 +149,6 @@ describe("pushSingleCard", () => {
     const unsafeCard = makeCard(7, "2026-05-10", null);
 
     const result = await pushSingleCard(client, "user-1", unsafeCard);
-
     expect(result).toBe(false);
     expect(client._upsertSpy).not.toHaveBeenCalled();
   });
@@ -178,7 +177,7 @@ describe("mergeCloudIntoLocal", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("normalizes a bad cloud row by clearing firstSeen (Option B)", () => {
+  it("normalizes a bad cloud row by clearing firstSeen and resetting SM-2 fields", () => {
     const localCard = makeCard(5, null, null);
     const badRow = makeCloudRow(5, "2026-05-10", null);
 
@@ -186,6 +185,9 @@ describe("mergeCloudIntoLocal", () => {
 
     expect(merged.state.firstSeen).toBeNull();
     expect(merged.state.lastReview).toBeNull();
+    expect(merged.state.repetitions).toBe(0);
+    expect(merged.state.interval).toBe(0);
+    expect(merged.state.easeFactor).toBe(2.5);
   });
 
   it("warns when normalizing a bad cloud row", () => {
@@ -205,6 +207,9 @@ describe("mergeCloudIntoLocal", () => {
 
     expect(merged.state.firstSeen).toBe("2026-05-09");
     expect(merged.state.lastReview).toBe("2026-05-10");
+    expect(merged.state.repetitions).toBe(1);
+    expect(merged.state.interval).toBe(1);
+    expect(merged.state.easeFactor).toBe(2.5);
   });
 
   it("returns card unchanged when no matching cloud row", () => {

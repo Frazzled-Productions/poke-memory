@@ -58,6 +58,8 @@ export async function hasCloudData(
  * Cards that violate the firstSeen/lastReview invariant are silently skipped
  * rather than written — in-step cards (firstSeen set, lastReview null) should
  * not be persisted to the cloud until they graduate.
+ * Note: returns true when every card is filtered out (no batches attempted =
+ * no failures). The caller should not interpret true as "something was written".
  */
 export async function pushSession(
   client: SupabaseClient,
@@ -211,15 +213,26 @@ export function mergeCloudIntoLocal(
     const row = byId.get(card.id);
     if (!row) return card;
 
-    // Normalize a bad cloud row: clear firstSeen so the card re-enters the
-    // new-card queue rather than being stuck as "introduced, never reviewed".
-    const firstSeen =
-      row.first_seen !== null && row.last_review === null
-        ? (console.warn(
-            `[sync] normalizing card ${card.id}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
-          ),
-          null)
-        : row.first_seen;
+    // Normalize a bad cloud row: clear firstSeen and reset SM-2 fields so the
+    // card re-enters the new-card queue cleanly without carrying stale
+    // repetitions/interval/easeFactor from the invariant-violating cloud row.
+    if (row.first_seen !== null && row.last_review === null) {
+      console.warn(
+        `[sync] normalizing card ${card.id}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
+      );
+      return {
+        ...card,
+        state: {
+          ...card.state,
+          repetitions: 0,
+          interval: 0,
+          easeFactor: 2.5,
+          dueDate: row.due_date,
+          lastReview: null,
+          firstSeen: null,
+        },
+      };
+    }
 
     return {
       ...card,
@@ -230,7 +243,7 @@ export function mergeCloudIntoLocal(
         easeFactor: row.ease_factor,
         dueDate: row.due_date,
         lastReview: row.last_review,
-        firstSeen,
+        firstSeen: row.first_seen,
       },
     };
   });
