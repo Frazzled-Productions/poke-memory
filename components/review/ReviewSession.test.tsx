@@ -449,8 +449,9 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
 
     render(<ReviewSession />);
 
-    // Review card is served first (learning card not yet due).
-    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    // render() wraps in act, so useEffects (session load) are flushed synchronously.
+    // Use a sync query — findByRole/waitFor poll via setTimeout, which is faked here.
+    const revealBtn = screen.getByRole("button", { name: /reveal/i });
 
     // Click Reveal on the review card.
     act(() => { fireEvent.click(revealBtn); });
