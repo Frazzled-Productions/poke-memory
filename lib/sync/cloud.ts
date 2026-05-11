@@ -4,6 +4,17 @@ import type { ReviewableCard } from "@/lib/review/session";
 // Sync is best-effort: all errors are swallowed so a network hiccup never
 // breaks the local-first review flow.
 
+/**
+ * Returns true when a card's SM-2 state is safe to write to the cloud.
+ * A card is unsafe when firstSeen is set but lastReview is null — this means
+ * the card entered learning steps but has not yet graduated. Writing this state
+ * would produce a row with first_seen != null and last_review = null, violating
+ * the invariant that every seen card has a review date.
+ */
+export function isSyncSafe(card: ReviewableCard): boolean {
+  return !(card.state.firstSeen !== null && card.state.lastReview === null);
+}
+
 // pokemon_id encoding:
 //   Standard Pokémon:  pokemon_id = Pokédex number (1–1025)
 //   Evolution cards:   pokemon_id = EVOLUTION_ID_OFFSET + pokédex_number (≥ 1_000_001)
@@ -44,13 +55,24 @@ export async function hasCloudData(
  * Pushes the full local session to the cloud via batched upserts.
  * Returns true if all batches succeeded, false if any batch failed.
  * learningStep and stepStartedAt are in-memory only and are not persisted.
+ * Cards that violate the firstSeen/lastReview invariant are silently skipped
+ * rather than written — in-step cards (firstSeen set, lastReview null) should
+ * not be persisted to the cloud until they graduate.
  */
 export async function pushSession(
   client: SupabaseClient,
   userId: string,
   cards: ReviewableCard[],
 ): Promise<boolean> {
-  const rows: CloudRow[] = cards.map((card) => ({
+  const safeCards = cards.filter((card) => {
+    if (isSyncSafe(card)) return true;
+    console.warn(
+      `[sync] skipping card ${card.id}: firstSeen set but lastReview null (in-step, not graduated)`
+    );
+    return false;
+  });
+
+  const rows: CloudRow[] = safeCards.map((card) => ({
     pokemon_id: card.id,
     repetitions: card.state.repetitions,
     interval: card.state.interval,
@@ -79,13 +101,20 @@ export async function pushSession(
 
 /**
  * Upserts a single card into card_reviews. Best-effort — returns false on any
- * error without throwing.
+ * error without throwing. Returns false without a network call when the card
+ * violates the firstSeen/lastReview invariant (in-step, not yet graduated).
  */
 export async function pushSingleCard(
   client: SupabaseClient,
   userId: string,
   card: ReviewableCard,
 ): Promise<boolean> {
+  if (!isSyncSafe(card)) {
+    console.warn(
+      `[sync] skipping card ${card.id}: firstSeen set but lastReview null (in-step, not graduated)`
+    );
+    return false;
+  }
   try {
     const { error } = await client.from("card_reviews").upsert(
       {
@@ -168,6 +197,10 @@ export async function pullSession(
  * overwrite the local state. Cards without a cloud counterpart are returned
  * unchanged. The merge is non-destructive: in-memory-only fields
  * (learningStep, stepStartedAt) are preserved from the local card.
+ *
+ * Cloud rows that violate the firstSeen/lastReview invariant are normalized on
+ * read: firstSeen is cleared so the card re-enters the new-card queue rather
+ * than appearing as "introduced but never reviewed" in stats.
  */
 export function mergeCloudIntoLocal(
   local: ReviewableCard[],
@@ -177,6 +210,17 @@ export function mergeCloudIntoLocal(
   return local.map((card) => {
     const row = byId.get(card.id);
     if (!row) return card;
+
+    // Normalize a bad cloud row: clear firstSeen so the card re-enters the
+    // new-card queue rather than being stuck as "introduced, never reviewed".
+    const firstSeen =
+      row.first_seen !== null && row.last_review === null
+        ? (console.warn(
+            `[sync] normalizing card ${card.id}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
+          ),
+          null)
+        : row.first_seen;
+
     return {
       ...card,
       state: {
@@ -186,7 +230,7 @@ export function mergeCloudIntoLocal(
         easeFactor: row.ease_factor,
         dueDate: row.due_date,
         lastReview: row.last_review,
-        firstSeen: row.first_seen,
+        firstSeen,
       },
     };
   });
