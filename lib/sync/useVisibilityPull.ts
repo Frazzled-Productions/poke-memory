@@ -24,6 +24,7 @@ export function useVisibilityPull(
   pathname: string,
 ): void {
   const hiddenAtRef = useRef<number | null>(null);
+  const isPullingRef = useRef(false);
   const clientRef = useRef(client);
   const userIdRef = useRef(userId);
   const pathnameRef = useRef(pathname);
@@ -55,7 +56,11 @@ export function useVisibilityPull(
 
       hiddenAtRef.current = null;
 
-      void pullAndMerge(cl, uid);
+      if (isPullingRef.current) return;
+      isPullingRef.current = true;
+      void pullAndMerge(cl, uid).finally(() => {
+        isPullingRef.current = false;
+      });
     }
 
     document.addEventListener("visibilitychange", handleVisibilityChange);

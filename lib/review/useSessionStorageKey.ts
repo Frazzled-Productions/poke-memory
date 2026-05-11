@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const SESSION_STORAGE_KEY = "poke-memory:review-session:v1";
+import { SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 
 /**
  * Returns an incrementing counter that bumps whenever the session localStorage

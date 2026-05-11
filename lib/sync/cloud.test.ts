@@ -4,6 +4,7 @@ import {
   pushSession,
   pushSingleCard,
   mergeCloudIntoLocal,
+  mergeCloudIntoLocalSilent,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { CloudRow } from "./cloud";
@@ -232,5 +233,102 @@ describe("mergeCloudIntoLocal", () => {
 
     expect(merged[0].state.firstSeen).toBe("2026-05-09");
     expect(merged[1].state.firstSeen).toBeNull();
+  });
+});
+
+// ─── mergeCloudIntoLocalSilent ────────────────────────────────────────────────
+
+describe("mergeCloudIntoLocalSilent", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  it("branch 1: lastPullAt null — cloud wins unconditionally (first pull)", () => {
+    const local = makeCard(1, null, null);
+    const row = makeCloudRow(1, "2026-05-09", "2026-05-10");
+
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], null);
+
+    expect(merged.state.firstSeen).toBe("2026-05-09");
+    expect(merged.state.lastReview).toBe("2026-05-10");
+  });
+
+  it("branch 1: lastPullAt null — cloud wins even for a card with local lastReview", () => {
+    const local = makeCard(2, "2026-04-01", "2026-04-01");
+    const row = makeCloudRow(2, "2026-05-09", "2026-05-10");
+
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], null);
+
+    expect(merged.state.lastReview).toBe("2026-05-10");
+  });
+
+  it("branch 2: local lastReview === pullDate — keep local (same calendar day)", () => {
+    const pullAt = "2026-05-10T12:00:00.000Z";
+    const local = makeCard(3, "2026-05-01", "2026-05-10"); // reviewed on pull day
+    const row = makeCloudRow(3, "2026-05-09", "2026-05-09", "2026-05-10T14:00:00.000Z");
+
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], pullAt);
+
+    expect(merged).toBe(local); // identity — no copy made
+  });
+
+  it("branch 2: local lastReview after pullDate — keep local", () => {
+    const pullAt = "2026-05-09T12:00:00.000Z";
+    const local = makeCard(4, "2026-05-10", "2026-05-10"); // reviewed after pull
+    const row = makeCloudRow(4, "2026-05-08", "2026-05-08", "2026-05-09T10:00:00.000Z");
+
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], pullAt);
+
+    expect(merged).toBe(local);
+  });
+
+  it("branch 3: cloud row updated_at > lastPullAt — take cloud", () => {
+    const pullAt = "2026-05-09T12:00:00.000Z";
+    const local = makeCard(5, null, null); // never reviewed locally
+    const row = makeCloudRow(5, "2026-05-10", "2026-05-10", "2026-05-10T08:00:00.000Z"); // cloud newer
+
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], pullAt);
+
+    expect(merged.state.lastReview).toBe("2026-05-10");
+    expect(merged.state.firstSeen).toBe("2026-05-10");
+  });
+
+  it("branch 3 (updated_at absent): keep local — cannot confirm cloud is newer", () => {
+    const pullAt = "2026-05-09T12:00:00.000Z";
+    const local = makeCard(6, "2026-05-01", "2026-05-01");
+    // Legacy row with no updated_at
+    const row: import("./cloud").CloudRow = {
+      pokemon_id: 6,
+      repetitions: 5,
+      interval: 10,
+      ease_factor: 2.8,
+      due_date: "2026-05-20",
+      last_review: "2026-05-08",
+      first_seen: "2026-05-01",
+      updated_at: undefined,
+    };
+
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], pullAt);
+
+    expect(merged).toBe(local); // kept local
+  });
+
+  it("branch 4: cloud row updated_at <= lastPullAt — keep local (unchanged cloud)", () => {
+    const pullAt = "2026-05-10T12:00:00.000Z";
+    const local = makeCard(7, "2026-05-01", "2026-05-01");
+    const row = makeCloudRow(7, "2026-05-09", "2026-05-09", "2026-05-10T10:00:00.000Z"); // same day, earlier
+
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], pullAt);
+
+    expect(merged).toBe(local);
+  });
+
+  it("returns card unchanged when no matching cloud row", () => {
+    const pullAt = "2026-05-09T12:00:00.000Z";
+    const local = makeCard(99, "2026-05-01", "2026-05-01");
+
+    const [merged] = mergeCloudIntoLocalSilent([local], [], pullAt);
+
+    expect(merged).toBe(local);
   });
 });

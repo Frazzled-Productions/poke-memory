@@ -8,7 +8,7 @@ export type SavedSession = {
   limits: DailyLimits;
 };
 
-const STORAGE_KEY = "poke-memory:review-session:v1";
+export const SESSION_STORAGE_KEY = "poke-memory:review-session:v1";
 
 function isReviewCardShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
@@ -166,7 +166,7 @@ export function migrateReviewCard(card: unknown): void {
 export function loadSession(): SavedSession | null {
   if (typeof window === "undefined") return null;
 
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
   if (raw === null) return null;
 
   try {
@@ -225,7 +225,7 @@ export function saveSession(session: SavedSession): void {
 
   const payload = { cards: session.cards.map(serializeCard), limits: session.limits };
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {
     console.warn("[poke-memory] saveSession: localStorage write failed", err);
   }

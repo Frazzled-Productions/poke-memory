@@ -252,6 +252,7 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
  *   - card.state.lastReview >= lastPullAt.slice(0,10): this device graded
  *     since the last pull → keep local.
  *   - cloud row's updated_at > lastPullAt: cloud has newer state → take cloud.
+ *   - cloud row lacks updated_at (legacy row): cannot confirm newer → keep local.
  *   - otherwise: cloud row unchanged since last pull → keep local.
  *
  * The >= date comparison is conservative: a review on the same calendar day as
@@ -281,8 +282,9 @@ export function mergeCloudIntoLocalSilent(
     }
 
     // Cloud row updated after the last pull — take cloud.
-    // When updated_at is absent (legacy row), conservatively treat as newer.
-    if (!row.updated_at || row.updated_at > lastPullAt) {
+    // When updated_at is absent (legacy row), keep local: we cannot confirm
+    // the cloud row is newer, so we preserve known-good local progress.
+    if (row.updated_at && row.updated_at > lastPullAt) {
       return applyCloudRow(card, row);
     }
 
