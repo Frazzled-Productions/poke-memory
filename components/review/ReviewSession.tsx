@@ -303,6 +303,9 @@ export function ReviewSession() {
 
   // Ref for the timeout that fires when the earliest pending learning card is due.
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Locks the card the user clicked Reveal on so a learning-queue re-render
+  // can't swap it out before the user submits a grade.
+  const revealedCardId = useRef<number | null>(null);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
   const { user, supabase } = useAuth();
   const { enqueueGrade, flushPending } = usePerGradeSync(supabase, user?.id ?? null);
@@ -501,6 +504,16 @@ export function ReviewSession() {
   const currentCard =
     currentCardId !== null ? cards.find((c) => c.id === currentCardId) ?? null : null;
 
+  // If the user has clicked Reveal, lock that card for the duration of the
+  // grading window. A learning-queue setTimeout may fire mid-session and flip
+  // currentCardId to the now-due learning card; without this lock the grade
+  // buttons would show for the wrong card.
+  const lockedCard =
+    revealed && revealedCardId.current !== null
+      ? (cards.find((c) => c.id === revealedCardId.current) ?? null)
+      : null;
+  const effectiveCard = lockedCard ?? currentCard;
+
   // --- Determine end state when there is no current card ---
   function resolveEndState(): EndState {
     // Per-type checks: a wall fires only when *that* type's cap is hit AND
@@ -547,7 +560,7 @@ export function ReviewSession() {
     return "SESSION_COMPLETE";
   }
 
-  if (currentCard === null) {
+  if (effectiveCard === null) {
     // If there are pending (future-due) learning cards, show the countdown.
     if (learningQueue.length > 0) {
       const earliestDueAt = Math.min(...learningQueue.map((e) => e.dueAt));
@@ -607,25 +620,26 @@ export function ReviewSession() {
       setCurrentFact(null);
     }
     setRevealed(true);
+    revealedCardId.current = currentCard.id;
   }
 
   function handleGrade(grade: Grade) {
-    if (currentCard === null || grading) return;
+    if (effectiveCard === null || grading) return;
     // Re-narrow cards inside the closure — TS doesn't carry the outer
     // null-check through a function that captures a useState variable.
     if (cards === null) return;
     setGrading(true);
 
     const now = new Date();
-    const nextState = nextReview(currentCard.state, grade, now);
+    const nextState = nextReview(effectiveCard.state, grade, now);
     const newCards = cards.map((card) =>
-      card.id === currentCard.id ? { ...card, state: nextState } : card,
+      card.id === effectiveCard.id ? { ...card, state: nextState } : card,
     );
 
     notifySaveResult(saveSession({ cards: newCards, limits }));
     recordReview(todayString(now));
-    appendGradeEntry({ date: todayString(now), grade, cardType: currentCard.cardType });
-    enqueueGrade({ ...currentCard, state: nextState });
+    appendGradeEntry({ date: todayString(now), grade, cardType: effectiveCard.cardType });
+    enqueueGrade({ ...effectiveCard, state: nextState });
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
 
@@ -636,50 +650,51 @@ export function ReviewSession() {
         // Distinction: new-card learning has lastReview === null after grading.
         const stepMs = stepDurationMs(nextState.lastReview, nextState.learningStep);
         const newEntry: LearningQueueEntry = {
-          cardId: currentCard.id,
+          cardId: effectiveCard.id,
           dueAt: nextState.stepStartedAt! + stepMs,
         };
 
         // Replace existing entry or add new one.
-        const exists = prev.some((e) => e.cardId === currentCard.id);
+        const exists = prev.some((e) => e.cardId === effectiveCard.id);
         if (exists) {
           return prev.map((e) =>
-            e.cardId === currentCard.id ? newEntry : e,
+            e.cardId === effectiveCard.id ? newEntry : e,
           );
         }
         return [...prev, newEntry];
       } else {
         // Card has graduated or is in a non-learning state — remove from queue.
-        return prev.filter((e) => e.cardId !== currentCard.id);
+        return prev.filter((e) => e.cardId !== effectiveCard.id);
       }
     });
 
     setCurrentFact(null);
     setRevealed(false);
+    revealedCardId.current = null;
     setGrading(false);
   }
 
   // --- Active review UI ---
 
   // Reverse cards use the SpritePicker (multiple-choice); no reveal step.
-  if (currentCard.cardType === "reverse") {
+  if (effectiveCard.cardType === "reverse") {
     // pokemonId is set from SEED_POKEMON at session-build time, so this find
     // only fails if the seed changes under a persisted session (e.g. after a
     // seed data update). Guard against a hard crash by rendering nothing in
     // that case; the user can reload to rebuild their session.
-    const reverseTarget = SEED_POKEMON.find((p) => p.id === currentCard.pokemonId);
+    const reverseTarget = SEED_POKEMON.find((p) => p.id === effectiveCard.pokemonId);
     if (!reverseTarget) return null;
     const reverseDistractors = pickDistractors(
-      currentCard.pokemonId,
+      effectiveCard.pokemonId,
       SEED_POKEMON,
       3,
-      String(currentCard.id),
+      String(effectiveCard.id),
     );
     return (
       <div className="flex flex-col items-center gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
         <SpritePicker
-          key={currentCard.id}
+          key={effectiveCard.id}
           targetPokemon={reverseTarget}
           distractors={reverseDistractors}
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}
@@ -700,18 +715,18 @@ export function ReviewSession() {
   return (
     <div className="flex flex-col items-center gap-8">
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-      {currentCard.cardType === "evolution" ? (
+      {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard
-          spriteUrl={currentCard.spriteUrl}
-          name={currentCard.name}
-          evolvesInto={currentCard.evolvesInto}
+          spriteUrl={effectiveCard.spriteUrl}
+          name={effectiveCard.name}
+          evolvesInto={effectiveCard.evolvesInto}
           revealed={revealed}
           fact={currentFact}
         />
       ) : (
         <PokemonCard
-          spriteUrl={currentCard.spriteUrl}
-          name={currentCard.name}
+          spriteUrl={effectiveCard.spriteUrl}
+          name={effectiveCard.name}
           revealed={revealed}
           fact={currentFact}
         />

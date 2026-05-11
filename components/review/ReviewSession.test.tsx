@@ -5,6 +5,7 @@ import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
+import { LEARNING_STEPS_MS } from "@/lib/srs/constants";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -350,5 +351,143 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
         }),
       );
     });
+  });
+});
+
+describe("Baseline: due review card reveal → grade cycle", () => {
+  it("reveals a due review card and transitions to session-complete after grading", async () => {
+    const reviewCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      state: {
+        repetitions: 3,
+        interval: 5,
+        easeFactor: 2.5,
+        dueDate: "1970-01-01", // always due regardless of test run date
+        lastReview: "1970-01-01",
+        firstSeen: "1970-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([reviewCard]);
+    vi.mocked(loadSession).mockReturnValueOnce({ cards: [reviewCard], limits: DEFAULT_LIMITS });
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    // Un-revealed state: Reveal button visible, name hidden.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+      expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
+    });
+
+    // After reveal: name visible, grade buttons shown.
+    await user.click(screen.getByRole("button", { name: /reveal/i }));
+    expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
+    for (const label of ["Again", "Hard", "Good", "Easy"]) {
+      expect(screen.getByRole("button", { name: new RegExp(label, "i") })).toBeInTheDocument();
+    }
+
+    // After grading Easy: session-complete screen.
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+    await waitFor(() => expect(screen.getByText(/all caught up/i)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("Regression: learning-queue preemption during grading window (#196)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps the revealed review card locked when a learning card becomes due mid-session", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-11T12:00:00Z"));
+    const now = Date.now();
+
+    // Review card (already reviewed, due today) — the card the user reveals.
+    const reviewCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      name: "Bulbasaur",
+      state: {
+        repetitions: 3,
+        interval: 5,
+        easeFactor: 2.5,
+        dueDate: "2026-05-11",
+        lastReview: "2026-05-06",
+        firstSeen: "2026-05-01",
+        learningStep: null,
+        stepStartedAt: null,
+      },
+    };
+
+    // Learning card in its first step, due 100 ms from now.
+    const learningCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 2,
+      name: "Ivysaur",
+      spriteUrl: "https://example.com/ivysaur.png",
+      state: {
+        repetitions: 0,
+        interval: 0,
+        easeFactor: 2.5,
+        dueDate: "2026-05-11",
+        lastReview: null,
+        firstSeen: "2026-05-11",
+        learningStep: 0,
+        stepStartedAt: now - (LEARNING_STEPS_MS[0] - 100), // dueAt = now + 100 ms
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([reviewCard, learningCard]);
+    vi.mocked(loadSession).mockReturnValueOnce({
+      cards: [reviewCard, learningCard],
+      limits: DEFAULT_LIMITS,
+    });
+
+    render(<ReviewSession />);
+
+    // Review card is served first (learning card not yet due).
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+
+    // Click Reveal on the review card.
+    act(() => { fireEvent.click(revealBtn); });
+
+    // Advance past the learning card's dueAt to trigger the countdown setTimeout.
+    await act(async () => { vi.advanceTimersByTime(200); });
+
+    // The grade buttons must still be visible — the locked card has not been replaced.
+    expect(screen.getByRole("button", { name: /easy/i })).toBeInTheDocument();
+
+    // The review card's name must still be displayed, not the learning card's.
+    expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
+    expect(screen.queryByText("Ivysaur")).not.toBeInTheDocument();
+
+    // Grade the locked review card.
+    act(() => { fireEvent.click(screen.getByRole("button", { name: /easy/i })); });
+    vi.useRealTimers();
+
+    // saveSession must record the review card (id 1) as graded, not the learning card.
+    await waitFor(() => {
+      expect(vi.mocked(saveSession)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: expect.arrayContaining([
+            expect.objectContaining({
+              id: 1,
+              state: expect.objectContaining({ lastReview: "2026-05-11" }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    // The learning card (id 2) must remain in its learning step — it was not graded.
+    const lastCallArg = vi.mocked(saveSession).mock.lastCall?.[0] as
+      | { cards: { id: number; state: { learningStep: number | null } }[] }
+      | undefined;
+    const savedLearningCard = lastCallArg?.cards.find((c) => c.id === 2);
+    expect(savedLearningCard?.state.learningStep).toBe(0);
   });
 });

@@ -6,6 +6,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **Practice: grade buttons stay on the revealed card when a learning card becomes due** — clicking Reveal then having a background learning-card timer fire could silently switch the displayed card before you submitted a grade. The grade buttons now remain locked to the card you revealed until you press a grade button. Closes #196.
 - **Practice: storage full warning banner** — when localStorage runs out of space, the practice view now shows a dismissible amber banner reading "Progress saving is disabled — storage is full." The banner clears automatically once saving succeeds again (e.g. after freeing space) and can also be manually dismissed. Previously this was a silent failure with only a console warning. Closes #175.
 
 ### Changed
