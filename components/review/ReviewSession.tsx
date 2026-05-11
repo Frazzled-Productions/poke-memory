@@ -642,7 +642,12 @@ export function ReviewSession() {
 
   // Reverse cards use the SpritePicker (multiple-choice); no reveal step.
   if (currentCard.cardType === "reverse") {
-    const reverseTarget = SEED_POKEMON.find((p) => p.id === currentCard.pokemonId)!;
+    // pokemonId is set from SEED_POKEMON at session-build time, so this find
+    // only fails if the seed changes under a persisted session (e.g. after a
+    // seed data update). Guard against a hard crash by rendering nothing in
+    // that case; the user can reload to rebuild their session.
+    const reverseTarget = SEED_POKEMON.find((p) => p.id === currentCard.pokemonId);
+    if (!reverseTarget) return null;
     const reverseDistractors = pickDistractors(
       currentCard.pokemonId,
       SEED_POKEMON,

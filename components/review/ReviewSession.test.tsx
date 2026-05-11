@@ -1,6 +1,6 @@
 import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard } from "@/lib/review/session";
 
@@ -195,6 +195,10 @@ describe("ReviewSession reverse card flow", () => {
   beforeEach(() => {
     mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
     mockLoadSettings.mockReturnValue(reverseSettings);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   /** Extract the current card's target name from the SpritePicker group aria-label. */

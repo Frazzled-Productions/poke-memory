@@ -25,6 +25,13 @@ export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegm
     { key: "easy",  label: "Easy",  count: easy,  color: "bg-emerald-500" },
   ];
 
+  const visibleSegments = hideZeroSegments ? segments.filter((s) => s.count > 0) : segments;
+  const legendColClass =
+    visibleSegments.length === 1 ? "grid-cols-1" :
+    visibleSegments.length === 2 ? "grid-cols-2" :
+    visibleSegments.length === 3 ? "grid-cols-3" :
+    "grid-cols-4";
+
   return (
     <section aria-label={heading}>
       <h2
@@ -55,25 +62,23 @@ export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegm
           </div>
 
           {/* Legend chips */}
-          <div className="mt-4 grid grid-cols-4 gap-3">
-            {segments.map(({ key, label: segLabel, count, color }) =>
-              hideZeroSegments && count === 0 ? null : (
-                <div
-                  key={key}
-                  className="rounded-xl border border-zinc-200 bg-background px-3 py-3 dark:border-zinc-800"
-                >
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
-                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      {segLabel}
-                    </span>
-                  </div>
-                  <p className="text-xl font-bold tabular-nums text-foreground">
-                    {count.toLocaleString()}
-                  </p>
+          <div className={`mt-4 grid ${legendColClass} gap-3`}>
+            {visibleSegments.map(({ key, label: segLabel, count, color }) => (
+              <div
+                key={key}
+                className="rounded-xl border border-zinc-200 bg-background px-3 py-3 dark:border-zinc-800"
+              >
+                <div className="mb-1 flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    {segLabel}
+                  </span>
                 </div>
-              )
-            )}
+                <p className="text-xl font-bold tabular-nums text-foreground">
+                  {count.toLocaleString()}
+                </p>
+              </div>
+            ))}
           </div>
         </>
       )}
