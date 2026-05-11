@@ -62,6 +62,7 @@ export function useSyncOnUnload(
         ...prev,
         lastPushAttemptAt: now,
         lastPushFailed: true,
+        failedCardCount: unsynced.length,
       });
 
       void pushSession(c, uid, unsynced).then((ok) => {
@@ -70,6 +71,7 @@ export function useSyncOnUnload(
           ...current,
           lastPushAt: ok ? new Date().toISOString() : current.lastPushAt,
           lastPushFailed: !ok,
+          failedCardCount: ok ? 0 : unsynced.length,
         });
       }).finally(() => {
         // Runs even if the component unmounted. The localStorage write above is
