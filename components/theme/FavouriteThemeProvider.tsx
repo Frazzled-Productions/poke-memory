@@ -1,13 +1,21 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { loadFavourite } from "@/lib/theme/persistence";
 import { applyTheme } from "@/lib/theme/apply";
 import type { StoredFavourite } from "@/lib/theme/persistence";
 
-const FavouriteContext = createContext<StoredFavourite | null>(null);
+type FavouriteContextValue = {
+  favourite: StoredFavourite | null;
+  updateFavourite: (f: StoredFavourite | null) => void;
+};
 
-export function useFavourite(): StoredFavourite | null {
+const FavouriteContext = createContext<FavouriteContextValue>({
+  favourite: null,
+  updateFavourite: () => {},
+});
+
+export function useFavourite(): FavouriteContextValue {
   return useContext(FavouriteContext);
 }
 
@@ -17,6 +25,10 @@ export function FavouriteThemeProvider({
   children: React.ReactNode;
 }) {
   const [favourite, setFavourite] = useState<StoredFavourite | null>(null);
+
+  const updateFavourite = useCallback((f: StoredFavourite | null) => {
+    setFavourite(f);
+  }, []);
 
   useEffect(() => {
     const stored = loadFavourite();
@@ -35,7 +47,7 @@ export function FavouriteThemeProvider({
   }, []);
 
   return (
-    <FavouriteContext.Provider value={favourite}>
+    <FavouriteContext.Provider value={{ favourite, updateFavourite }}>
       {children}
     </FavouriteContext.Provider>
   );

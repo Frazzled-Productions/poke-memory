@@ -15,6 +15,7 @@ import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
 import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
 import { loadFavourite, saveFavourite } from "@/lib/theme/persistence";
 import { applyTheme } from "@/lib/theme/apply";
+import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
 import { isMastered } from "@/lib/stats/derive";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 
@@ -229,6 +230,7 @@ const REVERSE_NUMERIC_FIELDS: FieldConfig[] = [
 export default function SettingsPage() {
   const router = useRouter();
   const { user, supabase } = useAuth();
+  const { updateFavourite } = useFavourite();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -306,6 +308,7 @@ export default function SettingsPage() {
     clearLocalProgress();
     applyTheme(null);
     setFavouriteId(null);
+    updateFavourite(null);
     router.replace("/");
   }
 
@@ -649,6 +652,11 @@ export default function SettingsPage() {
                   saveFavourite(entry, spriteUrl);
                   applyTheme(entry?.colors ?? null);
                   setFavouriteId(entry?.id ?? null);
+                  updateFavourite(
+                    entry
+                      ? { id: entry.id, name: entry.name, colors: entry.colors, spriteUrl: spriteUrl ?? null }
+                      : null
+                  );
                 }}
               />
 

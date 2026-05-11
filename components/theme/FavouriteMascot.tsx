@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useFavourite } from "./FavouriteThemeProvider";
 
 export function FavouriteMascot() {
-  const favourite = useFavourite();
+  const { favourite } = useFavourite();
 
   if (favourite === null || favourite.spriteUrl === null) return null;
 
