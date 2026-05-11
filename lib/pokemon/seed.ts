@@ -22,7 +22,7 @@ export type SeedPokemon = {
   types: string[];
   stats: PokemonStats;
   flavorText: string;
-  flavorTexts: string[] | undefined;
+  flavorTexts?: string[];
   evolutionChain: EvolutionNode[];
   height: number | null;
   weight: number | null;

@@ -157,6 +157,8 @@ describe("saveSession (non-reverse card passthrough)", () => {
     const stored = parsed.cards[0] as Record<string, unknown>;
     expect(stored.cardType).toBe("name");
     expect(stored.name).toBe("bulbasaur");
+    expect(stored.flavorTexts).toEqual(["A strange seed."]);
+    expect(stored.evolutionChain).toEqual([]);
   });
 });
 
