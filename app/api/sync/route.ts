@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { CloudRow } from "@/lib/sync/cloud";
 
@@ -14,7 +15,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  // Cast to untyped SupabaseClient — Database is a stub type (unknown) in this
+  // repo, which causes the typed upsert to expect never[]. The untyped client
+  // matches the pattern used throughout lib/sync/cloud.ts.
+  const supabase = (await createClient()) as unknown as SupabaseClient;
   const {
     data: { user },
     error: authError,
