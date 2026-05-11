@@ -30,7 +30,7 @@ export function SyncNowButton({ syncState, errorMessage, onSync }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1" aria-live="polite">
       <button
         type="button"
         onClick={onSync}

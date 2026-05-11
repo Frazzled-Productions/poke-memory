@@ -127,11 +127,13 @@ export function useManualSync(
       });
 
       // Step f: surface success.
-      isSyncingRef.current = false;
       setSyncState("success");
 
-      // Step g: auto-reset to idle after 3 seconds.
+      // Step g: auto-reset to idle after 3 seconds. isSyncingRef is reset
+      // here (not at step f) so programmatic syncNow calls during the success
+      // window are still blocked until the button re-enables itself.
       resetTimerRef.current = setTimeout(() => {
+        isSyncingRef.current = false;
         if (!cancelledRef.current) {
           setSyncState("idle");
         }
