@@ -6,6 +6,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **Sync: mobile reviews now survive page hide** — the session-end sync push previously used the Supabase JS client's plain `fetch`, which browsers terminate on page discard/OS suspend. The unload path now uses `navigator.sendBeacon` pointing to a new `/api/sync` Route Handler, which browsers guarantee to deliver even when a tab is being closed or the OS suspends the app. Reviewed cards on mobile now reliably appear on desktop after locking the screen. Closes #93.
+
 - **Evolution cards: reveal sprite now matches question size** — the evolution sprite shown after tapping Reveal was rendered at 96 px while the question-side pre-evolution sprite was 320 px. Single-evolution cards now show the revealed evolution at 320 px, matching the question side. Branching evolutions (e.g. Eevee) continue to render at 96 px per sprite so the row fits the card area.
 
 - **Evolution cards now show a fact on reveal** — tapping Reveal on an evolution card now displays a fact about the revealed evolution (type, height, Pokédex entry, etc.), matching the behaviour of name and reverse cards. For branching evolutions (multiple targets revealed simultaneously) no fact is shown, since a single fact cannot represent multiple Pokémon at once. Closes #163.

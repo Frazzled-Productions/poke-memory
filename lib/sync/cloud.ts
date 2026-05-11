@@ -163,6 +163,24 @@ export async function pullSession(
 }
 
 /**
+ * Serialises cards to a Blob suitable for navigator.sendBeacon('/api/sync', blob).
+ * Content-Type is set to application/json via the Blob constructor — sendBeacon
+ * does not accept a headers option, so this is the only way to set it.
+ */
+export function buildBeaconPayload(cards: ReviewableCard[]): Blob {
+  const rows: CloudRow[] = cards.map((card) => ({
+    pokemon_id: card.id,
+    repetitions: card.state.repetitions,
+    interval: card.state.interval,
+    ease_factor: card.state.easeFactor,
+    due_date: card.state.dueDate,
+    last_review: card.state.lastReview,
+    first_seen: card.state.firstSeen,
+  }));
+  return new Blob([JSON.stringify({ cards: rows })], { type: "application/json" });
+}
+
+/**
  * Merges cloud rows into a local card array. For each card, if a matching
  * cloud row exists (keyed by pokemon_id / card.id), its SM-2 state fields
  * overwrite the local state. Cards without a cloud counterpart are returned

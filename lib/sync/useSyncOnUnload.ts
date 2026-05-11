@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
-import { pushSession } from "@/lib/sync/cloud";
+import { buildBeaconPayload } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 
 /**
@@ -16,8 +16,8 @@ import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
  *
  * Pass null for client or userId to disable sync (e.g. guest mode).
  *
- * Fire-and-forget: does not block navigation. Errors are swallowed by
- * pushSession which is best-effort.
+ * Fire-and-forget: does not block navigation. Uses navigator.sendBeacon so the
+ * request survives page hide and tab discard on mobile browsers.
  */
 export function useSyncOnUnload(
   client: SupabaseClient | null,
@@ -54,29 +54,20 @@ export function useSyncOnUnload(
 
       pushingRef.current = true;
 
-      // Write attempt timestamp synchronously before any async work — browsers
-      // do not guarantee async continuations run during pagehide/discard.
       const now = new Date().toISOString();
       const prev = loadSyncStatus();
-      saveSyncStatus({
-        ...prev,
-        lastPushAttemptAt: now,
-        lastPushFailed: true,
-      });
+      saveSyncStatus({ ...prev, lastPushAttemptAt: now, lastPushFailed: true });
 
-      void pushSession(c, uid, unsynced).then((ok) => {
-        const current = loadSyncStatus();
-        saveSyncStatus({
-          ...current,
-          lastPushAt: ok ? new Date().toISOString() : current.lastPushAt,
-          lastPushFailed: !ok,
-        });
-      }).finally(() => {
-        // Runs even if the component unmounted. The localStorage write above is
-        // harmless (global store, not component state); pushingRef reset is a
-        // no-op on a stale ref but prevents double-push if the page survives.
-        pushingRef.current = false;
-      });
+      // sendBeacon delivers the request even when the page is being discarded.
+      // It returns true if the browser accepted the request for queuing (not
+      // necessarily that the server received it). lastPushFailed reflects the
+      // browser's acceptance — best-effort, same as before.
+      let queued = false;
+      if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+        queued = navigator.sendBeacon("/api/sync", buildBeaconPayload(unsynced));
+      }
+      saveSyncStatus({ ...loadSyncStatus(), lastPushFailed: !queued });
+      pushingRef.current = false;
     }
 
     window.addEventListener("visibilitychange", handleUnload);
