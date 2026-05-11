@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { pullAndMerge } from "./pullAndMerge";
+import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
+import { saveSession, loadSession } from "@/lib/review/persistence";
 
-// Mock modules used by pullAndMerge so the test doesn't need real Supabase
-// or a seeded localStorage.
 vi.mock("@/lib/sync/cloud", () => ({
   pullSession: vi.fn(),
-  mergeCloudIntoLocalSilent: vi.fn((_local: unknown, _cloud: unknown) => []),
+  mergeCloudIntoLocalSilent: vi.fn(() => []),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({
@@ -32,15 +32,10 @@ vi.mock("@/lib/pokemon/seed", () => ({
   SEED_EVOLUTION_CARDS: [],
 }));
 
-async function getCloudMock() {
-  const m = await import("@/lib/sync/cloud");
-  return m as unknown as { pullSession: ReturnType<typeof vi.fn>; mergeCloudIntoLocalSilent: ReturnType<typeof vi.fn> };
-}
-
-async function getSaveMock() {
-  const m = await import("@/lib/review/persistence");
-  return m as unknown as { loadSession: ReturnType<typeof vi.fn>; saveSession: ReturnType<typeof vi.fn> };
-}
+const mockPullSession = vi.mocked(pullSession);
+const mockMerge = vi.mocked(mergeCloudIntoLocalSilent);
+const mockSaveSession = vi.mocked(saveSession);
+const mockLoadSession = vi.mocked(loadSession);
 
 const fakeClient = {} as Parameters<typeof pullAndMerge>[0];
 const fakeUserId = "user-123";
@@ -50,12 +45,26 @@ describe("pullAndMerge", () => {
 
   beforeEach(() => {
     dispatchedEvents = [];
+    // StorageEvent is a browser API unavailable in the node test environment.
+    // Stub it so pullAndMerge can construct and dispatch events without throwing.
+    vi.stubGlobal(
+      "StorageEvent",
+      class {
+        key: string | null;
+        constructor(_type: string, init: { key?: string | null } = {}) {
+          this.key = init.key ?? null;
+        }
+      },
+    );
     vi.stubGlobal("window", {
       dispatchEvent: (e: Event) => { dispatchedEvents.push(e as StorageEvent); },
-      localStorage: {
-        getItem: () => null,
-      },
+      localStorage: { getItem: () => null },
     });
+    // Reset to success defaults before each test.
+    mockPullSession.mockResolvedValue([]);
+    mockMerge.mockReturnValue([]);
+    mockSaveSession.mockReturnValue({ ok: true });
+    mockLoadSession.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -70,18 +79,12 @@ describe("pullAndMerge", () => {
   });
 
   it('returns "error" when pullSession returns null', async () => {
-    const { pullSession } = await getCloudMock();
-    pullSession.mockResolvedValue(null);
-
+    mockPullSession.mockResolvedValue(null);
     expect(await pullAndMerge(fakeClient, fakeUserId)).toBe("error");
   });
 
   it('returns "error" and fires no StorageEvent when saveSession returns { ok: false }', async () => {
-    const { pullSession } = await getCloudMock();
-    const { saveSession } = await getSaveMock();
-
-    pullSession.mockResolvedValue([]);
-    saveSession.mockReturnValue({ ok: false, reason: "quota" });
+    mockSaveSession.mockReturnValue({ ok: false, reason: "quota" });
 
     const result = await pullAndMerge(fakeClient, fakeUserId);
 
@@ -90,12 +93,7 @@ describe("pullAndMerge", () => {
   });
 
   it('returns "ok" and dispatches StorageEvent when save succeeds', async () => {
-    const { pullSession } = await getCloudMock();
-    const { saveSession } = await getSaveMock();
-
-    pullSession.mockResolvedValue([]);
-    saveSession.mockReturnValue({ ok: true });
-
+    // mockSaveSession already returns { ok: true } from beforeEach.
     const result = await pullAndMerge(fakeClient, fakeUserId);
 
     expect(result).toBe("ok");
