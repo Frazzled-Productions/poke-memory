@@ -40,6 +40,18 @@ export async function hasCloudData(
   }
 }
 
+function toCloudRow(card: ReviewableCard): CloudRow {
+  return {
+    pokemon_id: card.id,
+    repetitions: card.state.repetitions,
+    interval: card.state.interval,
+    ease_factor: card.state.easeFactor,
+    due_date: card.state.dueDate,
+    last_review: card.state.lastReview,
+    first_seen: card.state.firstSeen,
+  };
+}
+
 /**
  * Pushes the full local session to the cloud via batched upserts.
  * Returns true if all batches succeeded, false if any batch failed.
@@ -50,15 +62,7 @@ export async function pushSession(
   userId: string,
   cards: ReviewableCard[],
 ): Promise<boolean> {
-  const rows: CloudRow[] = cards.map((card) => ({
-    pokemon_id: card.id,
-    repetitions: card.state.repetitions,
-    interval: card.state.interval,
-    ease_factor: card.state.easeFactor,
-    due_date: card.state.dueDate,
-    last_review: card.state.lastReview,
-    first_seen: card.state.firstSeen,
-  }));
+  const rows: CloudRow[] = cards.map(toCloudRow);
 
   let allOk = true;
   const BATCH = 200;
@@ -168,16 +172,7 @@ export async function pullSession(
  * does not accept a headers option, so this is the only way to set it.
  */
 export function buildBeaconPayload(cards: ReviewableCard[]): Blob {
-  const rows: CloudRow[] = cards.map((card) => ({
-    pokemon_id: card.id,
-    repetitions: card.state.repetitions,
-    interval: card.state.interval,
-    ease_factor: card.state.easeFactor,
-    due_date: card.state.dueDate,
-    last_review: card.state.lastReview,
-    first_seen: card.state.firstSeen,
-  }));
-  return new Blob([JSON.stringify({ cards: rows })], { type: "application/json" });
+  return new Blob([JSON.stringify({ cards: cards.map(toCloudRow) })], { type: "application/json" });
 }
 
 /**

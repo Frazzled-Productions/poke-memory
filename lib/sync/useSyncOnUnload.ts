@@ -29,9 +29,7 @@ export function useSyncOnUnload(
   // Use refs for all values read inside handleUnload so the handler always sees
   // the latest values even if sign-out races with a visibilitychange/pagehide
   // event before the effect cleanup can remove the listeners.
-  const clientRef = useRef(client);
   const userIdRef = useRef(userId);
-  clientRef.current = client;
   userIdRef.current = userId;
   const getUnsyncedRef = useRef(getUnsynced);
   getUnsyncedRef.current = getUnsynced;
@@ -42,11 +40,10 @@ export function useSyncOnUnload(
     function handleUnload(event: Event) {
       // visibilitychange fires on both hide and show; only push on hide.
       if (event.type === "visibilitychange" && document.visibilityState !== "hidden") return;
-      // Read from refs so a sign-out that races with unload uses the current
-      // (null) values rather than stale closed-over props.
-      const c = clientRef.current;
+      // Read from ref so a sign-out that races with unload uses the current
+      // (null) value rather than the stale closed-over prop.
       const uid = userIdRef.current;
-      if (!c || !uid) return;
+      if (!uid) return;
       if (pushingRef.current) return;
 
       const unsynced = getUnsyncedRef.current();
@@ -56,17 +53,17 @@ export function useSyncOnUnload(
 
       const now = new Date().toISOString();
       const prev = loadSyncStatus();
-      saveSyncStatus({ ...prev, lastPushAttemptAt: now, lastPushFailed: true });
-
-      // sendBeacon delivers the request even when the page is being discarded.
-      // It returns true if the browser accepted the request for queuing (not
-      // necessarily that the server received it). lastPushFailed reflects the
-      // browser's acceptance — best-effort, same as before.
-      let queued = false;
-      if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-        queued = navigator.sendBeacon("/api/sync", buildBeaconPayload(unsynced));
-      }
-      saveSyncStatus({ ...loadSyncStatus(), lastPushFailed: !queued });
+      const queued = navigator.sendBeacon("/api/sync", buildBeaconPayload(unsynced));
+      // Set lastPushAt when the beacon is accepted so the UI shows a timestamp
+      // rather than "Not synced yet." for users who only sync via the unload
+      // path. Reflects browser acceptance, not server confirmation (which is
+      // unobservable from sendBeacon).
+      saveSyncStatus({
+        ...prev,
+        lastPushAttemptAt: now,
+        lastPushFailed: !queued,
+        ...(queued && { lastPushAt: now }),
+      });
       pushingRef.current = false;
     }
 
