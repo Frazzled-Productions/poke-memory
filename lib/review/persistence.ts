@@ -1,4 +1,4 @@
-import type { ReviewableCard, DailyLimits, PerTypeLimits } from "@/lib/review/session";
+import type { ReviewableCard, ReverseReviewCard, DailyLimits, PerTypeLimits } from "@/lib/review/session";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 
 export type { DailyLimits };
@@ -210,8 +210,23 @@ export function loadSession(): SavedSession | null {
   }
 }
 
+// Strips large seed-derived arrays from reverse cards before serialization.
+// hydrateSession re-injects them from the seed on every mount, so persisting
+// them wastes quota (~4.5 MB → ~2.9 MB with ~1025 reverse cards).
+function serializeCard(card: ReviewableCard): unknown {
+  if (card.cardType !== "reverse") return card;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { flavorTexts: _ft, evolutionChain: _ec, ...rest } = card as ReverseReviewCard & Record<string, unknown>;
+  return rest;
+}
+
 export function saveSession(session: SavedSession): void {
   if (typeof window === "undefined") return;
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  const payload = { cards: session.cards.map(serializeCard), limits: session.limits };
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.warn("[poke-memory] saveSession: localStorage write failed", err);
+  }
 }
