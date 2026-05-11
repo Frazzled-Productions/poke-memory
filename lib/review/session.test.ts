@@ -399,6 +399,56 @@ describe('hydrateSession (name/evolution enabled flags)', () => {
   });
 });
 
+describe('hydrateSession (reverse card from slimmed stored shape)', () => {
+  it('re-injects flavorTexts and evolutionChain from seed when loading a slimmed reverse card', () => {
+    const fullSeed = makeSeedPokemon(1, {
+      flavorTexts: ['A strange seed.', 'It bears the seed.'],
+      evolutionChain: [
+        { speciesId: 1, name: 'bulbasaur', evolvesFromId: null },
+        { speciesId: 2, name: 'ivysaur', evolvesFromId: 1 },
+      ],
+    });
+
+    // Simulate loading a slimmed card from localStorage — no flavorTexts or evolutionChain
+    const slimCard: ReverseReviewCard = {
+      id: REVERSE_ID_OFFSET + 1,
+      pokemonId: 1,
+      cardType: 'reverse',
+      name: 'bulbasaur',
+      spriteUrl: '',
+      types: ['grass'],
+      stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
+      flavorText: 'A strange seed.',
+      flavorTexts: undefined,
+      evolutionChain: [],
+      height: 7,
+      weight: 69,
+      baseExperience: 64,
+      genus: 'Seed',
+      generation: 'generation-i',
+      captureRate: 45,
+      baseHappiness: 50,
+      growthRate: 'medium-slow',
+      habitat: null,
+      genderRate: 1,
+      isLegendary: false,
+      isMythical: false,
+      state: { ...initialReviewState(NOW), repetitions: 3, interval: 7 },
+    };
+
+    const result = hydrateSession([slimCard], [fullSeed], [], NOW, { reverseEnabled: true });
+
+    expect(result).toHaveLength(1);
+    const card = result[0];
+    if (card.cardType !== 'reverse') throw new Error('Expected reverse card');
+    expect(card.flavorTexts).toEqual(['A strange seed.', 'It bears the seed.']);
+    expect(card.evolutionChain).toHaveLength(2);
+    // SM-2 state preserved
+    expect(card.state.repetitions).toBe(3);
+    expect(card.state.interval).toBe(7);
+  });
+});
+
 describe('buildSessionQueues (per-type budgets)', () => {
   const TODAY = '2026-05-09';
   const baseLimits: DailyLimits = {

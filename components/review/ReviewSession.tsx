@@ -330,12 +330,12 @@ export function ReviewSession() {
       );
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
-        saveSession({ cards: hydrated, limits: sessionLimits });
+        try { saveSession({ cards: hydrated, limits: sessionLimits }); } catch { /* quota — non-fatal */ }
       }
       sessionCards = hydrated;
     } else {
       const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, { reverseEnabled: enabled, nameEnabled, evolutionEnabled });
-      saveSession({ cards: fresh, limits: settingsLimits });
+      try { saveSession({ cards: fresh, limits: settingsLimits }); } catch { /* quota — non-fatal */ }
       sessionCards = fresh;
       sessionLimits = settingsLimits;
     }

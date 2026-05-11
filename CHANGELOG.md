@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Reverse cards no longer crash the practice page** — enabling reverse cards with a large Pokédex (~1025 species) could push the serialised session to ~4.5 MB, triggering a `QuotaExceededError` on `localStorage.setItem`. The error propagated out of React's mount effect and Next.js rendered "this page could not load". The fix strips `flavorTexts` and `evolutionChain` from reverse cards before writing to localStorage (these fields are re-injected from the seed on every mount) and wraps the write in a try/catch so a quota error is logged and swallowed rather than crashing the page. Closes #171.
+
 ### Added
 
 - **Favourite Pokémon colour theme** — once you master a Pokémon from a curated list of 11 (Charizard, Pikachu, Gengar, Eevee, Snorlax, Mewtwo, Umbreon, Gardevoir, Garchomp, Lucario, and Drampa), you can elect it as your favourite on the Settings page. Electing a favourite re-skins the entire app with that Pokémon's colour palette. The theme is applied instantly with no flash on page reload. Your favourite's sprite also appears beside the logo in the navbar. Removing the favourite or resetting progress reverts to the default palette. The theme syncs across tabs via the `storage` event. Closes #164.
