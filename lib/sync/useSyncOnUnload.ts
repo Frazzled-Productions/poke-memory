@@ -62,6 +62,11 @@ export function useSyncOnUnload(
         ...prev,
         lastPushAttemptAt: now,
         lastPushFailed: !queued,
+        // sendBeacon's return value reports browser acceptance, not server
+        // success. When the browser rejects the queue, every card stays
+        // unsynced; when it accepts, we optimistically clear the residual
+        // count since we cannot observe the server response.
+        failedCardCount: queued ? 0 : unsynced.length,
         ...(queued && { lastPushAt: now }),
       });
       pushingRef.current = false;

@@ -78,6 +78,7 @@ export function useManualSync(
             ...prev,
             lastPushFailed: true,
             lastPushAttemptAt: new Date().toISOString(),
+            failedCardCount: null,
           });
           isSyncingRef.current = false;
           setSyncState("error");
@@ -95,6 +96,7 @@ export function useManualSync(
           ...prev,
           lastPushFailed: true,
           lastPushAttemptAt: new Date().toISOString(),
+          failedCardCount: null,
         });
         isSyncingRef.current = false;
         setSyncState("error");
@@ -124,6 +126,7 @@ export function useManualSync(
         lastPushAt: now,
         lastPushFailed: false,
         lastPushAttemptAt: now,
+        failedCardCount: 0,
       });
 
       // Step f: surface success.
