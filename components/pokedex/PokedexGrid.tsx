@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { GEN_RANGES, generationOf } from "@/lib/stats/derive";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -17,7 +18,9 @@ function zeroPad(id: number): string {
 // ---------------------------------------------------------------------------
 
 function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
-  const { id, name, spriteUrl, cardClass } = pokemon;
+  const { superuser } = useSuperuser();
+  const { id, name, spriteUrl, cardClass: rawCardClass } = pokemon;
+  const cardClass = superuser ? "mastered" : rawCardClass;
 
   const isLocked = cardClass === "locked";
   const isMastered = cardClass === "mastered";

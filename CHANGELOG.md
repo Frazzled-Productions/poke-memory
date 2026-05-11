@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- **Superuser mode** — a maintainer-only escape hatch that bypasses all mastery gates for UI purposes. Activate via `localStorage.setItem('poke-memory:superuser', 'true')` in DevTools, or by typing `super` anywhere on the page when not focused in a text field (the same sequence toggles it off). In superuser mode: all Pokémon tiles in Settings are interactive, the Pokédex grid shows every cell as mastered, and Pokédex detail pages reveal full stats and evolution chains regardless of progress. The flag persists in `localStorage` until explicitly cleared. No effect on review state, SRS scheduling, or stats. Closes #170.
+
 ### Fixed
 
 - **Reverse cards no longer crash the practice page** — enabling reverse cards with a large Pokédex (~1025 species) could push the serialised session to ~4.5 MB, triggering a `QuotaExceededError` on `localStorage.setItem`. The error propagated out of React's mount effect and Next.js rendered "this page could not load". The fix strips `flavorTexts` and `evolutionChain` from reverse cards before writing to localStorage (these fields are re-injected from the seed on every mount) and wraps the write in a try/catch so a quota error is logged and swallowed rather than crashing the page. Closes #171.
