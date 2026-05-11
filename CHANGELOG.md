@@ -6,6 +6,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **Sync status shows accurate card count instead of generic failure** — when a tab closes before the debounce on the per-grade sync path fires, the unload safety-net now reports exactly how many cards failed (e.g. "1 card may be out of sync" or "3 cards may be out of sync") rather than the generic "Sync failed" banner. The generic banner is retained for full-session manual sync failures. Successful manual sync clears the straggler count. Closes #134.
+
 - **Evolution cards: reveal sprite now matches question size** — the evolution sprite shown after tapping Reveal was rendered at 96 px while the question-side pre-evolution sprite was 320 px. Single-evolution cards now show the revealed evolution at 320 px, matching the question side. Branching evolutions (e.g. Eevee) continue to render at 96 px per sprite so the row fits the card area.
 
 - **Evolution cards now show a fact on reveal** — tapping Reveal on an evolution card now displays a fact about the revealed evolution (type, height, Pokédex entry, etc.), matching the behaviour of name and reverse cards. For branching evolutions (multiple targets revealed simultaneously) no fact is shown, since a single fact cannot represent multiple Pokémon at once. Closes #163.
