@@ -265,6 +265,17 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
+### `ci-failure-autofix.yml` — CI Auto-fix
+
+| | |
+|---|---|
+| **Trigger** | `workflow_run` on `CI` workflow `completed` with `conclusion == 'failure'`, branches matching `auto/issue-*` |
+| **What it does** | Finds the failed `test` job, fetches the last 80 lines of its log, and posts a `/fix` comment on the PR — which triggers `auto-pr.yml`'s fix cycle |
+| **Idempotency** | Skips if a `<!-- ci-autofix -->` comment was posted on the same PR in the last 10 minutes |
+| **Coupling** | Job selector matches by name `"test"` — if `ci.yml` ever adds a `name:` key to that job, update the `jq` selector in the `Fetch failing job log` step |
+
+---
+
 ## Build gates
 
 Two separate gates catch type/build/test errors at different points:
