@@ -4,6 +4,7 @@ type Props = {
   good: number;
   easy: number;
   label?: string;
+  hideZeroSegments?: boolean;
 };
 
 type Segment = {
@@ -13,7 +14,7 @@ type Segment = {
   color: string;
 };
 
-export function GradeBreakdownBar({ again, hard, good, easy, label }: Props) {
+export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegments = false }: Props) {
   const heading = label ?? "Grade breakdown";
   const total = again + hard + good + easy;
 
@@ -55,22 +56,24 @@ export function GradeBreakdownBar({ again, hard, good, easy, label }: Props) {
 
           {/* Legend chips */}
           <div className="mt-4 grid grid-cols-4 gap-3">
-            {segments.map(({ key, label: segLabel, count, color }) => (
-              <div
-                key={key}
-                className="rounded-xl border border-zinc-200 bg-background px-3 py-3 dark:border-zinc-800"
-              >
-                <div className="mb-1 flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    {segLabel}
-                  </span>
+            {segments.map(({ key, label: segLabel, count, color }) =>
+              hideZeroSegments && count === 0 ? null : (
+                <div
+                  key={key}
+                  className="rounded-xl border border-zinc-200 bg-background px-3 py-3 dark:border-zinc-800"
+                >
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
+                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      {segLabel}
+                    </span>
+                  </div>
+                  <p className="text-xl font-bold tabular-nums text-foreground">
+                    {count.toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-xl font-bold tabular-nums text-foreground">
-                  {count.toLocaleString()}
-                </p>
-              </div>
-            ))}
+              )
+            )}
           </div>
         </>
       )}

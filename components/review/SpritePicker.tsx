@@ -3,23 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
+import { FNV_PRIME, fnv1a } from "@/lib/utils/fnv1a";
 
 // How long to show correctness feedback before advancing (ms).
 // Correct tap: brief highlight. Incorrect tap: time to see the right answer.
 const CORRECT_FEEDBACK_MS = 600;
 const INCORRECT_FEEDBACK_MS = 1200;
-
-const FNV_PRIME = 16777619;
-const FNV_OFFSET = 2166136261;
-
-function fnv1a(s: string): number {
-  let hash = FNV_OFFSET;
-  for (let i = 0; i < s.length; i++) {
-    hash ^= s.charCodeAt(i);
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-  }
-  return hash;
-}
 
 type Tile = SeedPokemon & { isCorrect: boolean };
 
@@ -120,7 +109,15 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
             key={tile.id}
             type="button"
             disabled={answered}
-            aria-label={tile.name}
+            aria-label={
+              !answered
+                ? tile.name
+                : tile.isCorrect
+                  ? `${tile.name} (correct)`
+                  : tile.id === selectedId
+                    ? `${tile.name} (incorrect)`
+                    : tile.name
+            }
             onClick={() => handleTap(tile)}
             className={tileClassName(tile)}
           >

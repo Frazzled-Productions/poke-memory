@@ -642,6 +642,7 @@ export function ReviewSession() {
 
   // Reverse cards use the SpritePicker (multiple-choice); no reveal step.
   if (currentCard.cardType === "reverse") {
+    const reverseTarget = SEED_POKEMON.find((p) => p.id === currentCard.pokemonId)!;
     const reverseDistractors = pickDistractors(
       currentCard.pokemonId,
       SEED_POKEMON,
@@ -652,7 +653,7 @@ export function ReviewSession() {
       <div className="flex flex-col items-center gap-8">
         <SpritePicker
           key={currentCard.id}
-          targetPokemon={currentCard}
+          targetPokemon={reverseTarget}
           distractors={reverseDistractors}
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}
         />
@@ -663,6 +664,7 @@ export function ReviewSession() {
           good={sessionGrades[4]}
           easy={sessionGrades[5]}
           label="This session"
+          hideZeroSegments
         />
       </div>
     );

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
@@ -220,58 +220,55 @@ describe("ReviewSession reverse card flow", () => {
   });
 
   it("correct tile tap grades Good and advances to the next card", async () => {
-    const user = userEvent.setup();
     render(<ReviewSession />);
-
+    // Wait for initial render with real timers (waitFor uses setTimeout internally).
     await waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(4));
 
     const targetName = getTargetName();
     const correctTile = screen.getByRole("button", { name: targetName });
-    await user.click(correctTile);
 
-    // After CORRECT_FEEDBACK_MS (600ms) the next card loads: tiles re-enabled.
-    // Use 3 000ms waitFor timeout to allow the real timer to fire.
-    await waitFor(
-      () => {
-        const tiles = screen.getAllByRole("button");
-        expect(tiles).toHaveLength(4);
-        tiles.forEach((tile) => expect(tile).not.toBeDisabled());
-      },
-      { timeout: 3000 },
-    );
+    // Switch to fake timers only for the controlled advance.
+    vi.useFakeTimers();
+    act(() => { fireEvent.click(correctTile); });
+    // Advance past CORRECT_FEEDBACK_MS (600ms) and flush state updates.
+    await act(async () => { vi.advanceTimersByTime(700); });
+    vi.useRealTimers();
+
+    const tiles = screen.getAllByRole("button");
+    expect(tiles).toHaveLength(4);
+    tiles.forEach((tile) => expect(tile).not.toBeDisabled());
   });
 
   it("incorrect tile tap shows feedback then grades Again and advances", async () => {
-    const user = userEvent.setup();
     render(<ReviewSession />);
-
     await waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(4));
 
     const targetName = getTargetName();
+    const knownWrongNames = ["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"].filter(
+      (n) => n !== targetName,
+    );
     const tiles = screen.getAllByRole("button");
 
     // Click a tile that is NOT the correct answer.
-    const incorrectTile = tiles.find(
-      (tile) => tile.getAttribute("aria-label") !== targetName,
+    const incorrectTile = tiles.find((tile) =>
+      knownWrongNames.includes(tile.getAttribute("aria-label") ?? ""),
     )!;
-    await user.click(incorrectTile);
+
+    vi.useFakeTimers();
+    act(() => { fireEvent.click(incorrectTile); });
 
     // Tiles are disabled immediately and the correct-answer label appears.
-    await waitFor(() => {
-      screen.getAllByRole("button").forEach((tile) => expect(tile).toBeDisabled());
-      expect(
-        screen.getByText(new RegExp(`correct answer was ${targetName}`, "i")),
-      ).toBeInTheDocument();
-    });
+    screen.getAllByRole("button").forEach((tile) => expect(tile).toBeDisabled());
+    expect(
+      screen.getByText(new RegExp(`correct answer was ${targetName}`, "i")),
+    ).toBeInTheDocument();
 
-    // After INCORRECT_FEEDBACK_MS (1 200ms) the next card loads: tiles re-enabled.
-    await waitFor(
-      () => {
-        const nextTiles = screen.getAllByRole("button");
-        expect(nextTiles).toHaveLength(4);
-        nextTiles.forEach((tile) => expect(tile).not.toBeDisabled());
-      },
-      { timeout: 3000 },
-    );
+    // Advance past INCORRECT_FEEDBACK_MS (1 200ms) and flush state updates.
+    await act(async () => { vi.advanceTimersByTime(1300); });
+    vi.useRealTimers();
+
+    const nextTiles = screen.getAllByRole("button");
+    expect(nextTiles).toHaveLength(4);
+    nextTiles.forEach((tile) => expect(tile).not.toBeDisabled());
   });
 });
