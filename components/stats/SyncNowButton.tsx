@@ -35,7 +35,6 @@ export function SyncNowButton({ syncState, errorMessage, onSync }: Props) {
         type="button"
         onClick={onSync}
         disabled={isDisabled}
-        aria-disabled={isDisabled}
         aria-busy={syncState === "syncing"}
         className={`${baseClasses} ${stateClasses[syncState]}`}
       >
@@ -47,6 +46,9 @@ export function SyncNowButton({ syncState, errorMessage, onSync }: Props) {
         )}
         {labels[syncState]}
       </button>
+      {syncState === "success" && (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">Resets in a moment…</p>
+      )}
       {syncState === "error" && errorMessage !== null && (
         <p className="text-xs text-red-500 dark:text-red-400">{errorMessage}</p>
       )}

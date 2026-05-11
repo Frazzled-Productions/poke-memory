@@ -362,7 +362,7 @@ export default function StatsPage() {
     setNameCardsEnabled(settings.nameCardsEnabled);
     setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
     setGradeTotals(computeGradeTotals(loadGradeLog()));
-  }, []);
+  }, [syncRefreshKey]);
 
   const stats: StatsResult | null =
     cards !== null && masteryRepetitions !== null

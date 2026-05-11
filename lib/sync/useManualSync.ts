@@ -28,6 +28,11 @@ export function useManualSync(
   // Track the auto-reset timeout so it can be cleared on unmount.
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Synchronous in-progress flag — closes the race window where two calls in
+  // the same tick both pass the syncState === "syncing" closure check before
+  // the state batch re-renders.
+  const isSyncingRef = useRef(false);
+
   useEffect(() => {
     cancelledRef.current = false;
     return () => {
@@ -40,9 +45,10 @@ export function useManualSync(
   }, []);
 
   const syncNow = useCallback(() => {
-    if (client === null || userId === null || syncState === "syncing") {
+    if (client === null || userId === null || isSyncingRef.current) {
       return;
     }
+    isSyncingRef.current = true;
 
     // Supersede any pending auto-reset from a previous run.
     if (resetTimerRef.current !== null) {
@@ -73,6 +79,7 @@ export function useManualSync(
             lastPushFailed: true,
             lastPushAttemptAt: new Date().toISOString(),
           });
+          isSyncingRef.current = false;
           setSyncState("error");
           setErrorMessage("Sync failed — check your connection and try again.");
           return;
@@ -83,6 +90,13 @@ export function useManualSync(
       const cloudRows = await pullSession(client, userId);
       if (cancelledRef.current) return;
       if (cloudRows === null) {
+        const prev = loadSyncStatus();
+        saveSyncStatus({
+          ...prev,
+          lastPushFailed: true,
+          lastPushAttemptAt: new Date().toISOString(),
+        });
+        isSyncingRef.current = false;
         setSyncState("error");
         setErrorMessage("Could not fetch cloud data — check your connection.");
         return;
@@ -113,6 +127,7 @@ export function useManualSync(
       });
 
       // Step f: surface success.
+      isSyncingRef.current = false;
       setSyncState("success");
 
       // Step g: auto-reset to idle after 3 seconds.
@@ -124,13 +139,15 @@ export function useManualSync(
       }, 3000);
     }
 
-    void run().catch(() => {
+    void run().catch((err) => {
+      console.error(err);
+      isSyncingRef.current = false;
       if (!cancelledRef.current) {
         setSyncState("error");
         setErrorMessage("Sync failed — check your connection and try again.");
       }
     });
-  }, [client, userId, syncState]);
+  }, [client, userId]);
 
   return { syncState, errorMessage, syncNow };
 }
