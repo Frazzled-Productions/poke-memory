@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { Footer } from "@/components/Footer";
 import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
@@ -62,6 +63,7 @@ export default function RootLayout({
                 <SyncOnVisible />
               </Suspense>
               <div className="flex flex-1 flex-col">{children}</div>
+              <Footer />
             </FavouriteThemeProvider>
           </SuperuserProvider>
         </AuthProvider>

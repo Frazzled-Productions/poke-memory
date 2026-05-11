@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- **Copyright footer** — a "© [year] Frazzled Productions" notice now appears at the bottom of every page.
+
 ## [0.1.0] — 2026-05-11
 
 ### Fixed
