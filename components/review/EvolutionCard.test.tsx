@@ -13,6 +13,11 @@ const QUESTION_SPRITE = "https://example.com/charmander.png";
 const EVOLVES_INTO = [
   { name: "charmeleon", spriteUrl: "https://example.com/charmeleon.png" },
 ];
+const EEVEE_EVOLUTIONS = [
+  { name: "vaporeon", spriteUrl: "https://example.com/vaporeon.png" },
+  { name: "jolteon", spriteUrl: "https://example.com/jolteon.png" },
+  { name: "flareon", spriteUrl: "https://example.com/flareon.png" },
+];
 
 describe("EvolutionCard", () => {
   it("shows questioned Pokémon sprite and ??? before reveal", () => {
@@ -67,22 +72,16 @@ describe("EvolutionCard", () => {
   });
 
   it("renders branching-evolution sprites at 96px after reveal", () => {
-    const eeveeEvolutions = [
-      { name: "vaporeon", spriteUrl: "https://example.com/vaporeon.png" },
-      { name: "jolteon", spriteUrl: "https://example.com/jolteon.png" },
-      { name: "flareon", spriteUrl: "https://example.com/flareon.png" },
-    ];
-
     render(
       <EvolutionCard
         spriteUrl={QUESTION_SPRITE}
         name="eevee"
-        evolvesInto={eeveeEvolutions}
+        evolvesInto={EEVEE_EVOLUTIONS}
         revealed={true}
       />,
     );
 
-    for (const evo of eeveeEvolutions) {
+    for (const evo of EEVEE_EVOLUTIONS) {
       const img = screen.getByAltText(evo.name);
       expect(img).toHaveAttribute("width", "96");
       expect(img).toHaveAttribute("height", "96");
@@ -116,30 +115,41 @@ describe("EvolutionCard", () => {
       />,
     );
 
-    // No unexpected fact content rendered
     expect(screen.queryByText("Type")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fire")).not.toBeInTheDocument();
   });
 
-  it("renders all answer sprites for branching evolutions", () => {
-    const eeveeEvolutions = [
-      { name: "vaporeon", spriteUrl: "https://example.com/vaporeon.png" },
-      { name: "jolteon", spriteUrl: "https://example.com/jolteon.png" },
-      { name: "flareon", spriteUrl: "https://example.com/flareon.png" },
-    ];
+  it("does not show fact for branching evolutions even when fact prop is provided", () => {
+    const fact = { label: "Height", value: "0.3 m" };
 
     render(
       <EvolutionCard
         spriteUrl={QUESTION_SPRITE}
         name="eevee"
-        evolvesInto={eeveeEvolutions}
+        evolvesInto={EEVEE_EVOLUTIONS}
+        revealed={true}
+        fact={fact}
+      />,
+    );
+
+    expect(screen.queryByText("Height")).not.toBeInTheDocument();
+    expect(screen.queryByText("0.3 m")).not.toBeInTheDocument();
+  });
+
+  it("renders all answer sprites for branching evolutions", () => {
+    render(
+      <EvolutionCard
+        spriteUrl={QUESTION_SPRITE}
+        name="eevee"
+        evolvesInto={EEVEE_EVOLUTIONS}
         revealed={true}
       />,
     );
 
-    for (const evo of eeveeEvolutions) {
+    for (const evo of EEVEE_EVOLUTIONS) {
       expect(screen.getByAltText(evo.name)).toBeInTheDocument();
     }
     // All three answer sprites are shown
-    expect(screen.getAllByRole("img")).toHaveLength(eeveeEvolutions.length);
+    expect(screen.getAllByRole("img")).toHaveLength(EEVEE_EVOLUTIONS.length);
   });
 });

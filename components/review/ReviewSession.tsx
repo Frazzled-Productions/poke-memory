@@ -577,7 +577,12 @@ export function ReviewSession() {
       const evoPokemon = SEED_POKEMON.find((p) => p.name === evoName);
       if (evoPokemon) {
         setCurrentFact(selectFact(getPokemonFacts(evoPokemon)));
+      } else {
+        console.warn(`[handleReveal] seed data missing for evolution target: ${evoName}`);
+        setCurrentFact(null);
       }
+    } else {
+      setCurrentFact(null);
     }
     setRevealed(true);
   }
