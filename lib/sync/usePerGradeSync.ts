@@ -2,7 +2,7 @@
 import { useCallback, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
-import { pushSingleCard } from "@/lib/sync/cloud";
+import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
 
 /**
  * Debounced per-grade sync hook. Returns { enqueueGrade, flushPending }.
@@ -70,6 +70,11 @@ export function usePerGradeSync(
       // early and this grade is not synced. The unload safety-net also bails
       // because client/userId are null by then. Accepted best-effort loss.
       if (!clientRef.current || !userIdRef.current) return;
+
+      // Skip in-step cards entirely — they are not safe to write to the cloud
+      // until they graduate (lastReview set). Enqueuing them would cause
+      // pushSingleCard to return false and keep them in the retry queue forever.
+      if (!isSyncSafe(card)) return;
 
       // Replace existing entry for this card or append.
       const queue = pendingQueueRef.current;
