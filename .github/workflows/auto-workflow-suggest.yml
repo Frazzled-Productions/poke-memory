@@ -47,7 +47,11 @@ jobs:
         run: |
           echo "key=$(date -u +"%G-W%V")" >> "$GITHUB_OUTPUT"
           echo "today=$(date -u +"%Y-%m-%d")" >> "$GITHUB_OUTPUT"
-          echo "since=$(date -u -d '30 days ago' +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
+          SINCE_VAL=$(date -u -d '30 days ago' +"%Y-%m-%dT%H:%M:%SZ")
+          if [ -z "$SINCE_VAL" ]; then
+            echo "ERROR: could not compute since date" >&2; exit 1
+          fi
+          echo "since=$SINCE_VAL" >> "$GITHUB_OUTPUT"
 
       - name: Idempotency check — skip if digest already exists this week
         id: idempotency
@@ -59,7 +63,7 @@ jobs:
           TITLE="Weekly workflow review — ${WEEK_KEY}"
           COUNT=$(gh issue list \
             --state all \
-            --limit 50 \
+            --limit 100 \
             --json number,title \
             --jq "[.[] | select(.title == \"${TITLE}\")] | length")
           if [ "$COUNT" -gt 0 ]; then
