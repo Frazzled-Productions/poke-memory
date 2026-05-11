@@ -1,8 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard } from "@/lib/review/session";
+import { loadSession } from "@/lib/review/persistence";
+import { DEFAULT_LIMITS } from "@/lib/review/session";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -61,10 +63,8 @@ vi.mock("@/lib/pokemon/seed", () => ({
   SEED_EVOLUTION_CARDS: [],
 }));
 
-// loadSession returns null so buildSession always rebuilds state from scratch —
-// the state fields on FIXTURE_CARD are never read during these tests.
 vi.mock("@/lib/review/persistence", () => ({
-  loadSession: () => null,
+  loadSession: vi.fn().mockReturnValue(null),
   saveSession: vi.fn(),
 }));
 
@@ -101,8 +101,27 @@ vi.mock("@/lib/sync/useSyncOnUnload", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: no persisted session — loadSession can be overridden per-test.
+  vi.mocked(loadSession).mockReturnValue(null);
 });
 
+
+// Card persisted in the migration-gap shape: learningStep is set but
+// stepStartedAt was backfilled to null (old schema). This is the shape
+// that caused a reload after grading to re-show the already-graded card.
+const MIGRATION_CARD: NameReviewCard = {
+  ...FIXTURE_CARD,
+  state: {
+    repetitions: 0,
+    interval: 0,
+    easeFactor: 2.5,
+    dueDate: "2026-05-11",
+    lastReview: null,
+    firstSeen: "2026-05-11",
+    learningStep: 0,     // in learning step
+    stepStartedAt: null, // migration gap — no start time recorded
+  },
+};
 
 describe("ReviewSession reveal flow", () => {
   it("shows Reveal button and hides the Pokémon name before reveal", async () => {
@@ -146,5 +165,32 @@ describe("ReviewSession reveal flow", () => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
     );
     expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("Regression: migration-shape learning card (stepStartedAt: null)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows countdown screen instead of Reveal UI after reload when stepStartedAt is null", async () => {
+    // Pin Date.now() only (not setTimeout/setInterval) so waitFor still works.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-11T12:00:00Z"));
+
+    vi.mocked(loadSession).mockReturnValueOnce({
+      cards: [MIGRATION_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+
+    render(<ReviewSession />);
+
+    // With the fix, the card's dueAt is Date.now() + stepMs (60 s in the
+    // future), so it is not yet due. The component must show the countdown
+    // screen, not the card's Reveal UI.
+    await waitFor(() =>
+      expect(screen.getByText(/next card in/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
   });
 });

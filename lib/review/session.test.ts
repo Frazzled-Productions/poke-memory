@@ -176,6 +176,42 @@ describe('hydrateSession (evolution refresh)', () => {
   });
 });
 
+describe('migrateReviewState (stepStartedAt backfill for learning-step cards)', () => {
+  it('sets stepStartedAt to a number when learningStep is non-null and stepStartedAt is absent', () => {
+    const state: Record<string, unknown> = {
+      repetitions: 0,
+      interval: 0,
+      easeFactor: 2.5,
+      dueDate: '2026-05-11',
+      lastReview: null,
+      firstSeen: '2026-05-11',
+      learningStep: 0,
+      // stepStartedAt intentionally absent — simulates old persisted schema
+    };
+    const before = Date.now();
+    migrateReviewCard({ id: 1, name: 'bulbasaur', spriteUrl: '', state });
+    const after = Date.now();
+    expect(typeof state.stepStartedAt).toBe('number');
+    expect(state.stepStartedAt as number).toBeGreaterThanOrEqual(before);
+    expect(state.stepStartedAt as number).toBeLessThanOrEqual(after);
+  });
+
+  it('keeps stepStartedAt as null when learningStep is null and stepStartedAt is absent', () => {
+    const state: Record<string, unknown> = {
+      repetitions: 3,
+      interval: 7,
+      easeFactor: 2.5,
+      dueDate: '2026-05-18',
+      lastReview: '2026-05-11',
+      firstSeen: '2026-05-01',
+      learningStep: null,
+      // stepStartedAt intentionally absent — graduated card, should stay null
+    };
+    migrateReviewCard({ id: 1, name: 'bulbasaur', spriteUrl: '', state });
+    expect(state.stepStartedAt).toBeNull();
+  });
+});
+
 describe('migrateReviewCard', () => {
   it('backfills cardType "name" on legacy cards missing the field', () => {
     const legacy: Record<string, unknown> = {

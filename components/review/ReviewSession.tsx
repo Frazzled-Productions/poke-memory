@@ -361,7 +361,7 @@ export function ReviewSession() {
       const stepStartedAt = card.state.stepStartedAt;
       const dueAt = stepStartedAt !== null
         ? stepStartedAt + stepMs
-        : Date.now(); // legacy migrated card — no start time recorded, treat as immediately due
+        : Date.now() + stepMs; // migration gap: no start time → give a fresh step window so reload never reshows the card
       return { cardId, dueAt };
     });
 

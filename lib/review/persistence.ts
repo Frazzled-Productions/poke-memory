@@ -130,7 +130,9 @@ export function migrateReviewState(state: unknown): void {
     s.learningStep = null;
   }
   if (s.stepStartedAt === undefined) {
-    s.stepStartedAt = null;
+    // Cards in a learning step get a concrete start time so the mount-time queue
+    // builder can compute a real countdown; graduated cards keep null.
+    s.stepStartedAt = s.learningStep !== null ? Date.now() : null;
   }
 }
 
