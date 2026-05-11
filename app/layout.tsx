@@ -4,6 +4,7 @@ import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
+import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,10 +53,12 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          <FavouriteThemeProvider>
-            <Nav />
-            <div className="flex flex-1 flex-col">{children}</div>
-          </FavouriteThemeProvider>
+          <SuperuserProvider>
+            <FavouriteThemeProvider>
+              <Nav />
+              <div className="flex flex-1 flex-col">{children}</div>
+            </FavouriteThemeProvider>
+          </SuperuserProvider>
         </AuthProvider>
       </body>
     </html>

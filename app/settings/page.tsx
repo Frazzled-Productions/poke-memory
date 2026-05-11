@@ -18,6 +18,7 @@ import { applyTheme } from "@/lib/theme/apply";
 import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
 import { isMastered } from "@/lib/stats/derive";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -46,6 +47,7 @@ function FavouritePicker({
   favouriteId: number | null;
   onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
 }) {
+  const { superuser } = useSuperuser();
   const cardStateById = useMemo(() => {
     const session = loadSession();
     return new Map((session?.cards ?? []).map((c) => [c.id, c.state]));
@@ -67,8 +69,8 @@ function FavouritePicker({
           const seed = SEED_POKEMON.find((p) => p.id === entry.id);
           const state = cardStateById.get(entry.id);
           const mastered =
-            state !== undefined &&
-            isMastered(state, settings.masteryRepetitions);
+            superuser ||
+            (state !== undefined && isMastered(state, settings.masteryRepetitions));
           const selected = favouriteId === entry.id;
 
           return (

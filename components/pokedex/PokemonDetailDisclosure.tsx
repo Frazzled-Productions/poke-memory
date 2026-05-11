@@ -7,6 +7,7 @@ import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { getPokemonFacts } from "@/lib/pokemon/facts";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import type { CardClassOrPending } from "@/lib/review/useCardClass";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -35,8 +36,10 @@ const SPRITE_BY_ID: Record<number, string> = Object.fromEntries(
 );
 
 function EvolutionChainNode({ node }: { node: EvolutionNode }) {
+  const { superuser } = useSuperuser();
   const nodeSprite = SPRITE_BY_ID[node.speciesId];
-  const nodeClass: CardClassOrPending = useCardClass(node.speciesId);
+  const rawNodeClass: CardClassOrPending = useCardClass(node.speciesId);
+  const nodeClass: CardClassOrPending = superuser && rawNodeClass !== "pending" ? "mastered" : rawNodeClass;
   const nodePending = nodeClass === "pending";
   const nodeLocked = nodeClass === "locked";
   const nodeLearning = nodeClass === "learning";
@@ -101,8 +104,10 @@ function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
 }
 
 export function PokemonDetailDisclosure({ pokemon }: { pokemon: SeedPokemon }) {
+  const { superuser } = useSuperuser();
   const { id, name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
-  const cardClass = useCardClass(id);
+  const rawCardClass = useCardClass(id);
+  const cardClass = superuser && rawCardClass !== "pending" ? "mastered" : rawCardClass;
   const isPending = cardClass === "pending";
   const isLocked = cardClass === "locked";
   const isMasteredCard = cardClass === "mastered";
