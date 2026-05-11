@@ -37,6 +37,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Mint App installation token
         id: app-token
@@ -49,6 +51,10 @@ jobs:
         id: week
         run: echo "key=$(date -u +"%G-W%V")" >> "$GITHUB_OUTPUT"
 
+      - name: Compute today date
+        id: date
+        run: echo "date=$(date -u +"%Y-%m-%d")" >> "$GITHUB_OUTPUT"
+
       - name: Idempotency check — skip if digest already exists this week
         id: idempotency
         env:
@@ -60,7 +66,7 @@ jobs:
           COUNT=$(gh issue list \
             --search "\"${TITLE}\" in:title" \
             --state all \
-            --limit 5 \
+            --limit 100 \
             --json number,title \
             --jq "[.[] | select(.title == \"${TITLE}\")] | length")
           if [ "$COUNT" -gt 0 ]; then
@@ -97,7 +103,7 @@ jobs:
           prompt: |
             You are generating a weekly app codebase improvement digest for this repository.
 
-            Today is $(date -u +"%Y-%m-%d"). The current ISO week is **${{ steps.week.outputs.key }}**.
+            Today is ${{ steps.date.outputs.date }}. The current ISO week is **${{ steps.week.outputs.key }}**.
 
             ## Your task
 
@@ -165,7 +171,10 @@ jobs:
             cat package.json
             ```
             Do not run `npm outdated` — just note packages where you know a newer
-            major is available based on your training data.
+            major is available based on your training data. Because this relies on
+            training-data knowledge of package versions (which may be stale or
+            incorrect), items in this category MUST be recommended as
+            `priority:later` only — never `priority:now` or `priority:next`.
 
             ## Step 3 — Synthesis rules
 
@@ -227,7 +236,7 @@ jobs:
             ```
             gh issue list \
               --search "\"Weekly app review — ${{ steps.week.outputs.key }}\" in:title" \
-              --state open --limit 1 --json number --jq '.[0].number' \
+              --state all --limit 1 --json number --jq '.[0].number' \
               > /tmp/digest-issue-number.txt
             ```
 
