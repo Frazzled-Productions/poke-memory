@@ -28,6 +28,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Added
 
+- **Weekly app codebase digest** — a new `auto-app-suggest.yml` workflow runs every Wednesday at 09:00 UTC and scans recently-changed app source files (`app/**`, `components/**`, `lib/**`, `db/**`) for tech debt, missing tests, dead code, and accessibility gaps. It files at most one digest issue per ISO week with up to five curated items, each backed by file paths and a concrete evidence snippet. Nothing is filed when nothing crosses the signal threshold. Closes #145.
+
 - **Friendly error screen** — render-phase errors in any page now show a "Something went wrong" card with a "Try again" button instead of Next.js's raw crash screen. Closes #172.
 
 - **Favourite Pokémon colour theme** — once you master a Pokémon from a curated list of 11 (Charizard, Pikachu, Gengar, Eevee, Snorlax, Mewtwo, Umbreon, Gardevoir, Garchomp, Lucario, and Drampa), you can elect it as your favourite on the Settings page. Electing a favourite re-skins the entire app with that Pokémon's colour palette. The theme is applied instantly with no flash on page reload. Your favourite's sprite also appears beside the logo in the navbar. Removing the favourite or resetting progress reverts to the default palette. The theme syncs across tabs via the `storage` event. Closes #164.
