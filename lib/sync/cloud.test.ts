@@ -30,6 +30,13 @@ function makeCard(
     baseExperience: 64,
     genus: "Test Pokémon",
     generation: "generation-i",
+    captureRate: null,
+    baseHappiness: null,
+    growthRate: null,
+    habitat: null,
+    genderRate: null,
+    isLegendary: false,
+    isMythical: false,
     state: {
       repetitions: 0,
       interval: 1,
