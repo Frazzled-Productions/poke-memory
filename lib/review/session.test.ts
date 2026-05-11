@@ -436,7 +436,7 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
       state: { ...initialReviewState(NOW), repetitions: 3, interval: 7 },
     };
 
-    const result = hydrateSession([slimCard], [fullSeed], [], NOW, { reverseEnabled: true });
+    const result = hydrateSession([slimCard], [fullSeed], [], NOW, { reverseEnabled: true, nameEnabled: false, evolutionEnabled: false });
 
     expect(result).toHaveLength(1);
     const card = result[0];
