@@ -15,7 +15,7 @@ export function useStorageQuota(): UseStorageQuotaReturn {
   const notifySaveResult = useCallback((result: SaveResult) => {
     if (result.ok) {
       setQuotaExceeded(false);
-    } else if (result.reason === "quota") {
+    } else {
       setQuotaExceeded(true);
     }
   }, []);

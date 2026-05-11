@@ -222,7 +222,7 @@ function serializeCard(card: ReviewableCard): unknown {
   return rest;
 }
 
-export type SaveResult = { ok: true } | { ok: false; reason: "quota" };
+export type SaveResult = { ok: true } | { ok: false; reason: "quota" | "unknown" };
 
 export function saveSession(session: SavedSession): SaveResult {
   if (typeof window === "undefined") return { ok: true };
@@ -240,6 +240,6 @@ export function saveSession(session: SavedSession): SaveResult {
       return { ok: false, reason: "quota" };
     }
     console.warn("[poke-memory] saveSession: localStorage write failed", err);
-    return { ok: true };
+    return { ok: false, reason: "unknown" };
   }
 }

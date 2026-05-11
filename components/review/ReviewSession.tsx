@@ -385,6 +385,9 @@ export function ReviewSession() {
     });
 
     setLearningQueue(initialLearning);
+  // notifySaveResult is stable (useCallback with no deps). The dep is listed to
+  // satisfy the linter, but this effect is intentionally one-shot (mount only).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notifySaveResult]);
 
   // Reload when settings change in another tab so reverseEnabled and limits stay current.

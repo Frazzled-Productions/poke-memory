@@ -16,6 +16,14 @@ describe("useStorageQuota", () => {
     expect(result.current.quotaExceeded).toBe(true);
   });
 
+  it("sets quotaExceeded to true on unknown save failure", () => {
+    const { result } = renderHook(() => useStorageQuota());
+    act(() => {
+      result.current.notifySaveResult({ ok: false, reason: "unknown" });
+    });
+    expect(result.current.quotaExceeded).toBe(true);
+  });
+
   it("clears quotaExceeded when save succeeds after a quota failure", () => {
     const { result } = renderHook(() => useStorageQuota());
     act(() => {
@@ -38,5 +46,20 @@ describe("useStorageQuota", () => {
       result.current.dismiss();
     });
     expect(result.current.quotaExceeded).toBe(false);
+  });
+
+  it("re-shows banner after dismiss when next save also fails with quota error", () => {
+    const { result } = renderHook(() => useStorageQuota());
+    act(() => {
+      result.current.notifySaveResult({ ok: false, reason: "quota" });
+    });
+    act(() => {
+      result.current.dismiss();
+    });
+    expect(result.current.quotaExceeded).toBe(false);
+    act(() => {
+      result.current.notifySaveResult({ ok: false, reason: "quota" });
+    });
+    expect(result.current.quotaExceeded).toBe(true);
   });
 });
