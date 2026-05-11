@@ -147,7 +147,7 @@ When starting a new change, the orchestrator runs `gh issue list --label "priori
 
 When a change closes an issue, reference it in the commit message (`closes #N`) so it auto-closes on push.
 
-**Retrospectives.** When an issue closes via a merged PR, `auto-retro.yml` posts a `<!-- auto-retro -->` comment. The retro is *process reflection* — it does not recommend code changes. Aggregating retros into convention is left manual for now; if a pattern recurs across several retros, promote it into this file by hand.
+**Retrospectives.** When an issue closes via a merged PR, `auto-retro.yml` posts a `<!-- auto-retro -->` comment. The retro is *process reflection* — it does not recommend code changes. Retro comments are one of four input channels consumed weekly by `auto-workflow-suggest.yml` — that workflow is where cross-retro aggregation happens, producing a single digest issue per ISO week. Promoting digest patterns to convention (adding them to this file) remains the human's responsibility.
 
 **Branch protection on `main`.** A repository ruleset (`main-protection`, ID `16176438`) enforces: required status check `test` (the job from `ci.yml`), no force pushes, linear history. Manage via `gh api /repos/fraserbrookhouse/poke-memory/rulesets/16176438`; toggle `enforcement` between `active` / `evaluate` / `disabled` to stage changes.
 
