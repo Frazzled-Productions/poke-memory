@@ -209,6 +209,20 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
+### `auto-workflow-suggest.yml` — Weekly Workflow Digest
+
+| | |
+|---|---|
+| **Trigger** | Weekly cron Monday 09:00 UTC + `workflow_dispatch` |
+| **Idempotency key** | ISO week string in issue title (`Weekly workflow review — YYYY-Www`). Checks all states (open + closed). |
+| **Inputs** | Retro comments (last 30d), PR review comments on `auto/*` PRs (last 30d), WIP-salvage commits (last 30d), agent invocation patterns in merged PR bodies |
+| **Output** | One digest issue per ISO week, ≤5 curated items, each with evidence links and a priority label recommendation |
+| **No-op** | Skips silently when nothing crosses the relevance threshold or when a digest issue already exists for the week |
+| **Scope** | Only proposes changes to `.github/workflows/**`, `.claude/agents/**`, `WORKFLOW.md`, or `AGENTS.md` — never app code or individual issue filings |
+| **Label** | Digest issue is labelled `area:workflow`; label is created if absent |
+
+---
+
 ### `vercel-failure-autofix.yml` — Vercel Auto-fix
 
 | | |

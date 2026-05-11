@@ -1,0 +1,279 @@
+name: Auto Workflow Suggest
+
+# Weekly cron that scans process-signal channels from the last 30 days and
+# creates a single digest issue per ISO week with ≤5 curated improvement
+# proposals targeting workflow files, agent definitions, and process docs.
+#
+# Signals consumed:
+#   - Retro comments (last 30d) on closed issues
+#   - PR review comments on `auto/*` PRs (last 30d)
+#   - WIP-salvage commits (last 30d)
+#   - Agent invocation patterns in merged PR descriptions
+#
+# Idempotency: skips silently when a digest issue for the current ISO week
+# already exists (open or closed), or when nothing crosses the relevance
+# threshold.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'   # Monday 09:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: auto-workflow-suggest
+  cancel-in-progress: false
+
+jobs:
+  suggest:
+    name: Weekly Workflow Digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Compute ISO week key
+        id: week
+        run: echo "key=$(date -u +"%G-W%V")" >> "$GITHUB_OUTPUT"
+
+      - name: Idempotency check — skip if digest already exists this week
+        id: idempotency
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          WEEK_KEY: ${{ steps.week.outputs.key }}
+        run: |
+          set -euo pipefail
+          TITLE="Weekly workflow review — ${WEEK_KEY}"
+          COUNT=$(gh issue list \
+            --search "\"${TITLE}\" in:title" \
+            --state all \
+            --limit 5 \
+            --json number,title \
+            --jq "[.[] | select(.title == \"${TITLE}\")] | length")
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Digest issue for ${WEEK_KEY} already exists — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure area:workflow label exists
+        if: steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          EXISTS=$(gh label list --json name --jq '[.[].name] | index("area:workflow") != null')
+          if [ "$EXISTS" = "false" ]; then
+            gh label create "area:workflow" --color "0075ca" --description "Workflow and automation improvements"
+            echo "Created area:workflow label."
+          else
+            echo "area:workflow label already exists."
+          fi
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.idempotency.outputs.skip != 'true'
+        id: claude
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          WEEK_KEY: ${{ steps.week.outputs.key }}
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 30
+          prompt: |
+            You are generating a weekly workflow improvement digest for this repository.
+
+            Today is $(date -u +"%Y-%m-%d"). The current ISO week is **${{ steps.week.outputs.key }}**.
+
+            ## Your task
+
+            1. Gather process signals from the last 30 days (see below).
+            2. Synthesise ≤5 curated improvement proposals targeting only:
+               - `.github/workflows/**`
+               - `.claude/agents/**`
+               - `WORKFLOW.md`
+               - `AGENTS.md`
+            3. If nothing crosses a relevance threshold (e.g. no recurring
+               friction, no failed build patterns, no WIP salvages), skip
+               silently — do NOT create a digest issue.
+            4. If you have ≥1 item worth raising, create exactly one digest
+               issue for this week (title: `Weekly workflow review — ${{ steps.week.outputs.key }}`).
+
+            ## Signals to gather
+
+            Work through these sequentially (not in parallel) to stay within
+            rate limits:
+
+            ### 1. Retro comments (last 30 days)
+            ```
+            SINCE=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ")
+            gh issue list --state closed --limit 50 --json number,closedAt \
+              --jq ".[] | select(.closedAt >= \"$SINCE\") | .number"
+            ```
+            For each issue number, fetch:
+            ```
+            gh issue view <N> --json comments \
+              --jq '.comments[] | select(.body | startswith("<!-- auto-retro -->")) | .body'
+            ```
+            Summarise the lessons in aggregate — do NOT quote verbatim.
+
+            ### 2. PR review comments on `auto/*` PRs (last 30 days)
+            ```
+            gh pr list --state merged --limit 30 --search "head:auto/" --json number,title,mergedAt \
+              --jq ".[] | select(.mergedAt != null)"
+            ```
+            For each PR number, fetch:
+            ```
+            gh pr view <N> --json comments,reviews \
+              --jq '.comments[].body, .reviews[].body'
+            ```
+            Focus on `<!-- auto-review:N -->` comments — they are the
+            structured review output. Summarise findings; do not quote verbatim.
+
+            ### 3. WIP-salvage commits (last 30 days)
+            ```
+            SINCE=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ")
+            gh api "repos/${{ github.repository }}/commits?since=${SINCE}&per_page=100" \
+              --jq '.[] | select(.commit.message | startswith("WIP:")) | {sha: .sha[0:7], message: .commit.message}'
+            ```
+            Note how many WIP salvages occurred and what they were on.
+
+            ### 4. Agent invocation patterns in merged PR descriptions
+            Reuse the 30 merged `auto/*` PRs from step 2. Extract from each
+            PR body: mentions of `subagent_type:`, agent names from the roster
+            (planner, next16-expert, pokeapi-expert, etc.), and any notes about
+            agent overhead or skipped agents. Look for patterns (agents
+            frequently skipped, agents that ran but added no value, etc.).
+
+            ## Synthesis rules
+
+            - Propose only changes to the four target areas listed above.
+            - Maximum 5 items. Choose the highest-signal ones.
+            - Each item MUST include:
+              - A one-line proposal (imperative: "Add X", "Remove Y", "Rename Z")
+              - Evidence: 1–3 links to the retro comments, PR review comments,
+                or commit SHAs that support the proposal (use GitHub URLs)
+              - Recommended priority: `priority:now`, `priority:next`, or
+                `priority:later` (use the repo label vocabulary)
+            - If a proposal is about an agent definition change, name the
+              specific agent file in `.claude/agents/`.
+            - Do NOT auto-file individual sub-issues. The digest is for human
+              triage — the maintainer files items they want as separate issues.
+            - Do NOT recommend code changes to the app itself — only process
+              and workflow improvements.
+
+            ## No-op rule
+
+            If after gathering all signals you have nothing worth proposing
+            (no recurring friction, no build failures, no WIP salvages, no
+            patterns of agent overhead), write a short note to stdout explaining
+            what you found and exit cleanly — **do not create a digest issue**.
+            A quiet week is fine; a noisy backlog is not.
+
+            ## Issue creation
+
+            If you have ≥1 item, write the digest body to `/tmp/digest-body.md`
+            in this format:
+
+            ```markdown
+            <!-- auto-workflow-suggest -->
+            ## Weekly workflow review — WEEK_KEY
+
+            Signals scanned: retro comments, PR review comments on `auto/*` PRs,
+            WIP-salvage commits, agent invocation patterns — last 30 days.
+
+            ---
+
+            ### 1. <one-line proposal>
+
+            **Evidence:** <link(s)>
+            **Priority:** `priority:next`
+
+            ---
+
+            ### 2. ...
+            ```
+
+            Then create the issue:
+            ```
+            gh issue create \
+              --title "Weekly workflow review — ${{ steps.week.outputs.key }}" \
+              --body-file /tmp/digest-body.md \
+              --label "area:workflow"
+            ```
+
+            Store the issue number in `/tmp/digest-issue-number.txt` (just the
+            number, no other text):
+            ```
+            gh issue list \
+              --search "\"Weekly workflow review — ${{ steps.week.outputs.key }}\" in:title" \
+              --state open --limit 1 --json number --jq '.[0].number' \
+              > /tmp/digest-issue-number.txt
+            ```
+
+      - name: Surface tool denials
+        if: always() && steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -u
+          if [ ! -f "$LOG" ]; then exit 0; fi
+
+          DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          if [ "$DENIAL_COUNT" = "0" ] || [ -z "$DENIAL_COUNT" ]; then
+            echo "No tool denials."
+            exit 0
+          fi
+
+          # Try to get the digest issue number if one was created
+          ISSUE_NUM=""
+          if [ -f "/tmp/digest-issue-number.txt" ]; then
+            ISSUE_NUM=$(cat /tmp/digest-issue-number.txt | tr -d '[:space:]')
+          fi
+
+          DENIAL_DETAILS=$(jq -r '
+            def text_of:
+              if type == "string" then .
+              elif type == "array" then map(.text // "" | tostring) | join(" ")
+              else tostring end;
+            select(.type == "user")
+            | .message.content[]?
+            | select(.type == "tool_result")
+            | select((.is_error // false) == true)
+            | (.content | text_of) as $c
+            | select($c | test("permission|denied|not allowed"; "i"))
+            | $c | gsub("\\s+"; " ") | .[0:240]
+          ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+
+          {
+            printf '<!-- auto-denials:workflow-suggest -->\n'
+            printf '## %s tool denial(s) during weekly workflow digest run\n\n' "$DENIAL_COUNT"
+            printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
+            if [ -n "$DENIAL_DETAILS" ]; then
+              printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+            fi
+          } > /tmp/denials.md
+
+          # Post on the digest issue if one was created; otherwise post on the repo
+          if [ -n "$ISSUE_NUM" ] && [ "$ISSUE_NUM" != "null" ]; then
+            gh issue comment "$ISSUE_NUM" --repo "$REPO" --body-file /tmp/denials.md
+          else
+            echo "No digest issue to comment on — denial details logged to stdout only."
+            cat /tmp/denials.md
+          fi
