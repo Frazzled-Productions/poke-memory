@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { hasCloudData, pullSession, pushSession } from "@/lib/sync/cloud";
+import { hasCloudData, mergeCloudIntoLocal, pullSession, pushSession } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS, buildSession } from "@/lib/review/session";
@@ -26,15 +26,6 @@ function summariseCloud(rows: CloudRow[]) {
   const reviewed = rows.filter((r) => r.last_review !== null);
   const latest = reviewed.map((r) => r.last_review as string).sort().at(-1) ?? null;
   return { count: reviewed.length, latest };
-}
-
-function mergeCloudIntoLocal(local: ReviewableCard[], cloud: CloudRow[]): ReviewableCard[] {
-  const byId = new Map(cloud.map((r) => [r.pokemon_id, r]));
-  return local.map((card) => {
-    const row = byId.get(card.id);
-    if (!row) return card;
-    return { ...card, state: { ...card.state, repetitions: row.repetitions, interval: row.interval, easeFactor: row.ease_factor, dueDate: row.due_date, lastReview: row.last_review, firstSeen: row.first_seen } };
-  });
 }
 
 export default function CallbackCompletePage() {

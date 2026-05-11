@@ -161,3 +161,33 @@ export async function pullSession(
     return null;
   }
 }
+
+/**
+ * Merges cloud rows into a local card array. For each card, if a matching
+ * cloud row exists (keyed by pokemon_id / card.id), its SM-2 state fields
+ * overwrite the local state. Cards without a cloud counterpart are returned
+ * unchanged. The merge is non-destructive: in-memory-only fields
+ * (learningStep, stepStartedAt) are preserved from the local card.
+ */
+export function mergeCloudIntoLocal(
+  local: ReviewableCard[],
+  cloud: CloudRow[],
+): ReviewableCard[] {
+  const byId = new Map(cloud.map((r) => [r.pokemon_id, r]));
+  return local.map((card) => {
+    const row = byId.get(card.id);
+    if (!row) return card;
+    return {
+      ...card,
+      state: {
+        ...card.state,
+        repetitions: row.repetitions,
+        interval: row.interval,
+        easeFactor: row.ease_factor,
+        dueDate: row.due_date,
+        lastReview: row.last_review,
+        firstSeen: row.first_seen,
+      },
+    };
+  });
+}

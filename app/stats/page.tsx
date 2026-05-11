@@ -12,7 +12,9 @@ import { computeStreak, loadStreakData } from "@/lib/streak";
 import { loadGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
+import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useManualSync } from "@/lib/sync/useManualSync";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -333,12 +335,20 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 // ---------------------------------------------------------------------------
 
 export default function StatsPage() {
-  const { user } = useAuth();
+  const { user, supabase } = useAuth();
+  const { syncState, errorMessage, syncNow } = useManualSync(supabase, user?.id ?? null);
+  const [syncRefreshKey, setSyncRefreshKey] = useState(0);
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
   const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
+
+  useEffect(() => {
+    if (syncState === "success") {
+      setSyncRefreshKey((k) => k + 1);
+    }
+  }, [syncState]);
 
   useEffect(() => {
     const settings = loadSettings();
@@ -371,8 +381,13 @@ export default function StatsPage() {
           Stats
         </h1>
         {user !== null && (
-          <div className="mb-8">
-            <SyncStatusLine />
+          <div className="mb-8 flex items-center justify-between gap-4">
+            <SyncStatusLine refreshKey={syncRefreshKey} />
+            <SyncNowButton
+              syncState={syncState}
+              errorMessage={errorMessage}
+              onSync={syncNow}
+            />
           </div>
         )}
 
