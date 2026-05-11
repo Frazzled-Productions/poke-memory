@@ -669,11 +669,15 @@ export default function SettingsPage() {
                 >
                   About
                 </h2>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <p className="text-sm font-medium text-foreground">Version</p>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    v{process.env.NEXT_PUBLIC_APP_VERSION}
-                  </p>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Version</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      {process.env.NEXT_PUBLIC_APP_VERSION
+                        ? `v${process.env.NEXT_PUBLIC_APP_VERSION}`
+                        : "dev"}
+                    </p>
+                  </div>
                 </div>
               </section>
 
