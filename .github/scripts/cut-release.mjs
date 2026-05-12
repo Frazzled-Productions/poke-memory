@@ -44,7 +44,7 @@ function fail(msg) {
 
 let fragmentFiles = [];
 if (fs.existsSync(FRAGMENTS_DIR)) {
-  fragmentFiles = fs.readdirSync(FRAGMENTS_DIR).filter((f) => /\.md$/i.test(f));
+  fragmentFiles = fs.readdirSync(FRAGMENTS_DIR).filter((f) => /\.md$/i.test(f)).sort();
 }
 
 if (fragmentFiles.length === 0) {
@@ -93,8 +93,8 @@ for (const filename of fragmentFiles) {
 
 const nonEmptyKinds = Object.keys(bulletsByKind);
 
-if (!hasMinorBump && nonEmptyKinds.length === 0) {
-  // Only minor-bump fragments with no bullets — treat as no content.
+if (nonEmptyKinds.length === 0) {
+  // No content bullets in any fragment — treat as no content.
   console.log('No changelog fragments with content — nothing to release.');
   setOutput('skip', 'true');
   process.exit(0);
