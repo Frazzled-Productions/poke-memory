@@ -48,12 +48,25 @@ vi.mock("@/lib/settings/persistence", () => ({
   hasStoredSettings: vi.fn(() => false),
 }));
 
+vi.mock("@/lib/sync/gradeLog", () => ({
+  pullGradeLog: vi.fn(),
+  pushGradeLog: vi.fn(),
+  mergeGradeLog: (a: unknown[], b: unknown[]) => [...a, ...b],
+}));
+
+vi.mock("@/lib/gradelog/persistence", () => ({
+  loadGradeLog: vi.fn(() => []),
+  saveGradeLog: vi.fn(),
+}));
+
 import { pullSession, pushSession } from "@/lib/sync/cloud";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { pullStreak, pushStreak } from "@/lib/sync/streak";
 import { pullSettings, pushSettings } from "@/lib/sync/settings";
 import { loadStreakData, saveStreakData } from "@/lib/streak/persistence";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { pullGradeLog, pushGradeLog } from "@/lib/sync/gradeLog";
+import { loadGradeLog } from "@/lib/gradelog/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
@@ -113,6 +126,9 @@ describe("useManualSync", () => {
     vi.mocked(loadStreakData).mockReturnValue([]);
     vi.mocked(hasStoredSettings).mockReturnValue(false);
     vi.mocked(loadSettings).mockReturnValue({} as ReturnType<typeof loadSettings>);
+    vi.mocked(pullGradeLog).mockResolvedValue([]);
+    vi.mocked(pushGradeLog).mockResolvedValue(true);
+    vi.mocked(loadGradeLog).mockReturnValue([]);
   });
 
   // Regression test for #293: a previous version pushed BEFORE pulling, so a

@@ -6,6 +6,8 @@ import { mergeCloudIntoLocal, pullSession, pushSession } from "@/lib/sync/cloud"
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { mergeStreak, pullStreak, pushStreak } from "@/lib/sync/streak";
 import { pullSettings, pushSettings } from "@/lib/sync/settings";
+import { mergeGradeLog, pullGradeLog, pushGradeLog } from "@/lib/sync/gradeLog";
+import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 import { loadStreakData, saveStreakData, STREAK_UPDATED_EVENT } from "@/lib/streak/persistence";
@@ -192,7 +194,28 @@ export function useManualSync(
       }
       if (cancelledRef.current) return;
 
-      // Step g: record successful sync metadata.
+      // Step g: grade-log sync. Union-merge by `occurredAt`; auxiliary
+      // analytics data — failures warn and continue.
+      const cloudGradeLog = await pullGradeLog(client, userId);
+      if (cancelledRef.current) return;
+      if (cloudGradeLog !== null) {
+        const localGradeLog = loadGradeLog();
+        const merged = mergeGradeLog(localGradeLog, cloudGradeLog);
+        if (merged.length !== localGradeLog.length) {
+          saveGradeLog(merged);
+        }
+        if (merged.length > 0) {
+          const gradeLogOk = await pushGradeLog(client, userId, merged);
+          if (!gradeLogOk) {
+            console.warn("[sync] grade log push failed; continuing");
+          }
+        }
+      } else {
+        console.warn("[sync] grade log pull failed; continuing");
+      }
+      if (cancelledRef.current) return;
+
+      // Step h: record successful sync metadata.
       const now = new Date().toISOString();
       const prev = loadSyncStatus();
       saveSyncStatus({
