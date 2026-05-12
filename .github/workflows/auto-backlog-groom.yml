@@ -1,0 +1,304 @@
+name: Auto Backlog Groom
+
+# Weekly cron that reads all open issues across priority:now / priority:next /
+# priority:later and creates a single digest issue per ISO week proposing
+# priority re-ranking moves (promote / demote / leapfrog / flag-stale).
+#
+# Signal quality rule: every proposal must cite a specific, named signal
+# (linked blocking issue, retro comment URL, exact staleness duration).
+# Vague reasoning ("seems important") is rejected by the prompt. If nothing
+# crosses the bar, the digest is skipped entirely for the week.
+#
+# Idempotency: skips silently when a digest issue for the current ISO week
+# already exists (open or closed), or when nothing crosses the signal bar.
+
+on:
+  schedule:
+    - cron: '0 9 * * 5'   # Friday 09:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: auto-backlog-groom
+  cancel-in-progress: false
+
+jobs:
+  suggest:
+    name: Weekly Backlog Digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      id-token: write
+
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Compute ISO week key
+        id: week
+        run: echo "key=$(date -u +"%G-W%V")" >> "$GITHUB_OUTPUT"
+
+      - name: Compute today's date
+        id: date
+        run: echo "date=$(date -u +"%Y-%m-%d")" >> "$GITHUB_OUTPUT"
+
+      - name: Idempotency check — skip if digest already exists this week
+        id: idempotency
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          WEEK_KEY: ${{ steps.week.outputs.key }}
+        run: |
+          set -euo pipefail
+          TITLE="Weekly backlog grooming — ${WEEK_KEY}"
+          COUNT=$(gh issue list \
+            --search "\"${TITLE}\" in:title" \
+            --state all \
+            --limit 5 \
+            --json number,title \
+            --jq "[.[] | select(.title == \"${TITLE}\")] | length")
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Digest issue for ${WEEK_KEY} already exists — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure area:backlog label exists
+        if: steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          EXISTS=$(gh label list --json name --jq '[.[].name] | index("area:backlog") != null')
+          if [ "$EXISTS" = "false" ]; then
+            gh label create "area:backlog" --color "d93f0b" --description "Backlog grooming and priority management" || true
+            echo "Created area:backlog label."
+          else
+            echo "area:backlog label already exists."
+          fi
+
+      - name: Compute retro lookback date (60 days ago)
+        id: since
+        if: steps.idempotency.outputs.skip != 'true'
+        run: echo "since=$(date -u -d "60 days ago" +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.idempotency.outputs.skip != 'true'
+        id: claude
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          WEEK_KEY: ${{ steps.week.outputs.key }}
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 30
+          prompt: |
+            You are generating a weekly backlog grooming digest for this repository.
+
+            Today is ${{ steps.date.outputs.date }}. The current ISO week is **${{ steps.week.outputs.key }}**.
+
+            ## Your task
+
+            1. Gather issue data for all three priority tiers (see below).
+            2. Identify items that cross the signal bar for a priority move.
+            3. Produce ≤5 curated proposals (promote / demote / leapfrog / flag-stale),
+               each citing a specific named signal.
+            4. If nothing crosses the signal bar, skip silently — do NOT create a
+               digest issue.
+            5. If you have ≥1 item worth raising, create exactly one digest issue
+               (title: `Weekly backlog grooming — ${{ steps.week.outputs.key }}`).
+
+            **You never edit labels or move issues yourself — proposals only.**
+
+            ## Step 1 — Gather issue data (run sequentially to stay within rate limits)
+
+            ```bash
+            gh issue list --label "priority:now"   --state open --limit 100 \
+              --json number,title,createdAt,updatedAt,labels,body
+            gh issue list --label "priority:next"  --state open --limit 100 \
+              --json number,title,createdAt,updatedAt,labels,body
+            gh issue list --label "priority:later" --state open --limit 100 \
+              --json number,title,createdAt,updatedAt,labels,body
+            ```
+
+            Compute staleness from `updatedAt` for each issue (days since last update).
+            Staleness thresholds:
+            - `priority:now`: ≥ 28 days (4 weeks)
+            - `priority:next`: ≥ 56 days (8 weeks)
+            - `priority:later`: ≥ 112 days (16 weeks)
+
+            ## Step 2 — Fetch comment threads selectively
+
+            Only fetch comments for issues that are:
+            - Staleness candidates (updatedAt exceeds their tier's threshold), OR
+            - Contain `#` cross-references in their body (potential blocking relationships), OR
+            - Have "overlap-scan" in their body (overlap-scan conflict markers)
+
+            Do NOT fetch comments for every issue — keep API calls bounded.
+
+            For each candidate issue:
+            ```bash
+            gh issue view <N> --json comments,body \
+              --jq '{body: .body, comments: [.comments[].body]}'
+            ```
+
+            Also fetch recent retro comments to surface recurring friction signals:
+            ```bash
+            gh issue list --state closed --limit 50 --json number,closedAt \
+              --jq '.[] | select(.closedAt >= "${{ steps.since.outputs.since }}") | .number'
+            ```
+            For each closed issue number, fetch:
+            ```bash
+            gh issue view <N> --json comments \
+              --jq '.comments[] | select(.body | startswith("<!-- auto-retro -->")) | .body'
+            ```
+
+            ## Step 3 — Evaluate signal sources per move type
+
+            Apply the following signal rules. A proposal is valid only if at least one
+            named signal is met — no vague reasoning.
+
+            ### Promote (`priority:later` → `priority:next` or `priority:next` → `priority:now`)
+            Signal required (any one):
+            - Issue body or a comment explicitly names an open `priority:now` issue as
+              blocked by or dependent on this issue (cite the `#N` blocking issue)
+            - A `<!-- auto-retro -->` comment on a recently-closed issue (last 60 days)
+              names this issue's `#N` as recurring friction (cite the retro URL)
+
+            ### Demote (`priority:now` → `priority:next` or `priority:next` → `priority:later`)
+            Signal required (any one):
+            - `priority:now` issue has been open ≥ 28 days with zero non-bot comments
+              after the creation comment (no `/go`, no discussion) — cite exact staleness
+              in days
+            - Issue's concern is demonstrably solved by a merged PR — cite the PR number
+
+            ### Leapfrog (`priority:later` → `priority:now`)
+            Signal required (any one, high bar):
+            - A `<!-- overlap-scan:…:conflict -->` marker in the issue body names this
+              issue as blocking a `priority:now` issue — cite the marker text
+            - Two or more separate `<!-- auto-retro -->` comments from distinct retros
+              reference this issue's `#N` — cite both retro URLs
+
+            ### Flag stale (no move recommendation, visibility only)
+            Signal required:
+            - Staleness threshold exceeded for the issue's tier AND no other move
+              signal present (cite exact updatedAt date and staleness in days)
+
+            ## Step 4 — Apply the high-bar rule
+
+            For each candidate proposal:
+            - If the signal is a specific issue number, retro URL, overlap-scan marker
+              text, or exact staleness duration in days → **keep** the proposal
+            - If the reasoning is vague ("this seems important", "might be worth
+              promoting", "could be relevant") → **reject** the proposal silently
+
+            If every candidate is rejected, exit cleanly with a note to stdout —
+            do not create a digest issue.
+
+            ## Step 5 — Rank and cap at ≤5 proposals
+
+            When forced to choose among valid proposals, rank by:
+            leapfrog > promote > demote > flag-stale
+
+            ## No-op rule
+
+            If after all evaluation you have zero valid proposals, write a short note
+            to stdout (how many issues per tier, how many crossed staleness thresholds,
+            why nothing met the signal bar) and exit cleanly — **do not create a
+            digest issue**. A quiet week is fine; a noisy backlog is not.
+
+            ## Issue creation
+
+            If you have ≥1 valid proposal, write the digest body to `/tmp/digest-body.md`
+            in this exact format:
+
+            ```markdown
+            <!-- auto-backlog-groom -->
+            ## Weekly backlog grooming — WEEK_KEY
+
+            Signals scanned: all open issues across `priority:now`, `priority:next`,
+            `priority:later`. Staleness thresholds: now=4w, next=8w, later=16w.
+
+            ---
+
+            ### 1. [MOVE_TYPE] #NNN — Issue title
+
+            **Signal:** <specific named signal — issue number / retro URL / overlap marker / exact staleness>
+            **Proposed move:** `priority:X` → `priority:Y`
+            **Reason:** <one sentence, no vague language>
+
+            ---
+
+            ### 2. ...
+            ```
+
+            Valid MOVE_TYPE values: `PROMOTE`, `DEMOTE`, `LEAPFROG`, `FLAG STALE`.
+
+            Then create the issue and store the issue number in
+            `/tmp/digest-issue-number.txt` (just the number, no other text):
+            ```bash
+            gh issue create \
+              --title "Weekly backlog grooming — ${{ steps.week.outputs.key }}" \
+              --body-file /tmp/digest-body.md \
+              --label "area:backlog" | grep -oE '[0-9]+$' > /tmp/digest-issue-number.txt
+            ```
+
+      - name: Surface tool denials
+        if: always() && steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -u
+          if [ ! -f "$LOG" ]; then exit 0; fi
+
+          DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          if [ "$DENIAL_COUNT" = "0" ] || [ -z "$DENIAL_COUNT" ]; then
+            echo "No tool denials."
+            exit 0
+          fi
+
+          # Try to get the digest issue number if one was created
+          ISSUE_NUM=""
+          if [ -f "/tmp/digest-issue-number.txt" ]; then
+            ISSUE_NUM=$(cat /tmp/digest-issue-number.txt | tr -d '[:space:]')
+          fi
+
+          DENIAL_DETAILS=$(jq -r '
+            def text_of:
+              if type == "string" then .
+              elif type == "array" then map(.text // "" | tostring) | join(" ")
+              else tostring end;
+            select(.type == "user")
+            | .message.content[]?
+            | select(.type == "tool_result")
+            | select((.is_error // false) == true)
+            | (.content | text_of) as $c
+            | select($c | test("permission|denied|not allowed"; "i"))
+            | $c | gsub("\\s+"; " ") | .[0:240]
+          ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+
+          {
+            printf '<!-- auto-denials:backlog-groom -->\n'
+            printf '## %s tool denial(s) during weekly backlog grooming run\n\n' "$DENIAL_COUNT"
+            printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
+            if [ -n "$DENIAL_DETAILS" ]; then
+              printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+            fi
+          } > /tmp/denials.md
+
+          # Post on the digest issue if one was created; otherwise log to stdout
+          if [ -n "$ISSUE_NUM" ] && [ "$ISSUE_NUM" != "null" ]; then
+            gh issue comment "$ISSUE_NUM" --repo "$REPO" --body-file /tmp/denials.md
+          else
+            echo "No digest issue to comment on — denial details logged to stdout only."
+            cat /tmp/denials.md
+          fi
