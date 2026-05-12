@@ -55,10 +55,12 @@ export type EvolutionCard = {
 // Evolution-card IDs live in the [EVOLUTION_ID_OFFSET, EVOLUTION_ID_OFFSET +
 // MAX_NAME_ID] namespace, disjoint from name-card IDs (1..MAX_NAME_ID).
 // Reverse-card IDs live in [REVERSE_ID_OFFSET, REVERSE_ID_OFFSET + MAX_NAME_ID].
+// Cry-card IDs live in [CRY_ID_OFFSET, CRY_ID_OFFSET + MAX_NAME_ID].
 // The hydrate/save paths key cards by id, so any overlap would silently
 // merge cards of different types. Validated at module load.
 export const EVOLUTION_ID_OFFSET = 1_000_000;
 export const REVERSE_ID_OFFSET = 2_000_000;
+export const CRY_ID_OFFSET = 3_000_000;
 const MAX_NAME_ID = EVOLUTION_ID_OFFSET - 1;
 
 export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {

@@ -10,9 +10,14 @@ export async function pushGradeLog(
   userId: string,
   entries: GradeLogEntry[],
 ): Promise<boolean> {
-  if (entries.length === 0) return true;
+  // Drop cry-card entries until the cry follow-up migration is applied
+  // (extends grade_log.card_type CHECK to include 'cry'). Local data is
+  // preserved either way — this just prevents a sync attempt that the
+  // current CHECK constraint would reject with errcode 23514.
+  const supported = entries.filter((e) => e.cardType !== "cry");
+  if (supported.length === 0) return true;
   try {
-    const rows = entries.map((e) => ({
+    const rows = supported.map((e) => ({
       user_id: userId,
       occurred_at: e.occurredAt,
       entry_date: e.date,

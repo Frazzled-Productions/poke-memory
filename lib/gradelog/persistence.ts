@@ -3,7 +3,7 @@ import type { Grade } from "@/lib/srs/scheduler";
 export type GradeLogEntry = {
   date: string;
   grade: Grade;
-  cardType: "name" | "evolution" | "reverse";
+  cardType: "name" | "evolution" | "reverse" | "cry";
   /**
    * Epoch ms when the entry was recorded. Required since #308 — gives every
    * entry a stable unique key for cross-device sync deduplication. Legacy
@@ -44,7 +44,10 @@ function isStoredEntryShape(v: unknown): v is Omit<GradeLogEntry, "occurredAt"> 
   return (
     typeof e.date === "string" &&
     isGrade(e.grade) &&
-    (e.cardType === "name" || e.cardType === "evolution" || e.cardType === "reverse") &&
+    (e.cardType === "name" ||
+      e.cardType === "evolution" ||
+      e.cardType === "reverse" ||
+      e.cardType === "cry") &&
     (e.occurredAt === undefined || typeof e.occurredAt === "number")
   );
 }

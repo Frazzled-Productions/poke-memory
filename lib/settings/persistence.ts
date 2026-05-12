@@ -25,6 +25,9 @@ export type UserSettings = {
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
   playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
+  cryCardsEnabled: boolean;          // enable third-direction cards: audio prompt → name
+  maxNewCryPerDay: number;
+  maxReviewsCryPerDay: number;
   favouriteTheme: StoredFavouriteTheme | null; // chosen mastery accent Pokémon
   /**
    * FSRS desired-retention target. Range 0.80..0.97; default 0.90 matches
@@ -46,6 +49,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
+  cryCardsEnabled: false,
+  maxNewCryPerDay: 10,
+  maxReviewsCryPerDay: 100,
   favouriteTheme: null,
   retentionTarget: 0.9,
 };
@@ -117,6 +123,18 @@ export function loadSettings(): UserSettings {
         typeof obj.playCryOnReveal === "boolean"
           ? obj.playCryOnReveal
           : DEFAULT_SETTINGS.playCryOnReveal,
+      cryCardsEnabled:
+        typeof obj.cryCardsEnabled === "boolean"
+          ? obj.cryCardsEnabled
+          : DEFAULT_SETTINGS.cryCardsEnabled,
+      maxNewCryPerDay:
+        typeof obj.maxNewCryPerDay === "number"
+          ? obj.maxNewCryPerDay
+          : DEFAULT_SETTINGS.maxNewCryPerDay,
+      maxReviewsCryPerDay:
+        typeof obj.maxReviewsCryPerDay === "number"
+          ? obj.maxReviewsCryPerDay
+          : DEFAULT_SETTINGS.maxReviewsCryPerDay,
       // Shallow validation only — lib/theme/persistence.ts does the deep
       // validation (HEX_COLOR, known Pokémon id) on read.
       favouriteTheme:

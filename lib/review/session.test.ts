@@ -489,6 +489,7 @@ describe('buildSessionQueues (per-type budgets)', () => {
     name: { maxNewPerDay: 2, maxReviewsPerDay: 5 },
     evolution: { maxNewPerDay: 1, maxReviewsPerDay: 3 },
     reverse: { maxNewPerDay: 2, maxReviewsPerDay: 5 },
+    cry: { maxNewPerDay: 2, maxReviewsPerDay: 5 },
   };
 
   function nameCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): NameReviewCard {

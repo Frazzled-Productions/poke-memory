@@ -91,13 +91,16 @@ function migrateDailyLimits(raw: unknown): DailyLimits {
     return {
       name: v.name as PerTypeLimits,
       evolution: v.evolution as PerTypeLimits,
-      // `reverse` is optional in persisted sessions; backfill with default.
+      // `reverse` and `cry` are optional in persisted sessions; backfill with defaults.
       reverse: isPerTypeLimitsShaped(v.reverse)
         ? (v.reverse as PerTypeLimits)
         : { ...DEFAULT_LIMITS.reverse },
+      cry: isPerTypeLimitsShaped(v.cry)
+        ? (v.cry as PerTypeLimits)
+        : { ...DEFAULT_LIMITS.cry },
     };
   }
-  // Legacy flat shape — promote to name limits, evolution + reverse get defaults.
+  // Legacy flat shape — promote to name limits, the rest get defaults.
   if (
     typeof v.maxNewPerDay === "number" &&
     typeof v.maxReviewsPerDay === "number"
@@ -109,6 +112,7 @@ function migrateDailyLimits(raw: unknown): DailyLimits {
       },
       evolution: { ...DEFAULT_LIMITS.evolution },
       reverse: { ...DEFAULT_LIMITS.reverse },
+      cry: { ...DEFAULT_LIMITS.cry },
     };
   }
   return DEFAULT_LIMITS;

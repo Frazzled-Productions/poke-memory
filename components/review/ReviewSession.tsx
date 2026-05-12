@@ -108,6 +108,10 @@ function limitsFromSettings(settings: UserSettings): DailyLimits {
       maxNewPerDay: settings.maxNewReversePerDay,
       maxReviewsPerDay: settings.maxReviewsReversePerDay,
     },
+    cry: {
+      maxNewPerDay: settings.maxNewCryPerDay,
+      maxReviewsPerDay: settings.maxReviewsCryPerDay,
+    },
   };
 }
 
@@ -422,6 +426,7 @@ export function ReviewSession() {
     const enabled = settings.reverseCardsEnabled;
     const nameEnabled = settings.nameCardsEnabled;
     const evolutionEnabled = settings.evolutionCardsEnabled;
+    const cryEnabled = settings.cryCardsEnabled;
 
     // poke-memory:settings:v1 is the source of truth for limits.
     // saved.limits (from the session) is intentionally ignored — settings
@@ -435,7 +440,7 @@ export function ReviewSession() {
         SEED_POKEMON,
         SEED_EVOLUTION_CARDS,
         now,
-        { reverseEnabled: enabled, nameEnabled, evolutionEnabled },
+        { reverseEnabled: enabled, nameEnabled, evolutionEnabled, cryEnabled },
       );
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
@@ -443,7 +448,7 @@ export function ReviewSession() {
       }
       sessionCards = hydrated;
     } else {
-      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, { reverseEnabled: enabled, nameEnabled, evolutionEnabled });
+      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, { reverseEnabled: enabled, nameEnabled, evolutionEnabled, cryEnabled });
       notifySaveResult(saveSession({ cards: fresh, limits: settingsLimits }));
       sessionCards = fresh;
       sessionLimits = settingsLimits;
@@ -538,6 +543,36 @@ export function ReviewSession() {
     };
   }, [learningQueue]);
 
+  // Auto-play the cry when a cry card first becomes the current card.
+  // Drives the "audio as prompt" loop without requiring a tap. Skipped
+  // on already-revealed cards (the cry plays separately via handleReveal).
+  useEffect(() => {
+    // Resolve the would-be current card by re-running the queue logic in
+    // the effect; doing it here (above the early returns) keeps the hook
+    // unconditional. If anything is null or the card isn't a cry, exit.
+    if (cards === null) return;
+    if (revealed) return;
+    if (!cards.length) return;
+    // Mirror the priority used downstream: locked > learning > review > new.
+    let cardId: number | null = revealedCardId.current;
+    if (cardId === null) {
+      // Re-evaluate cheaply: just look for an in-step or due card.
+      const found = cards.find(
+        (c) =>
+          c.cardType === "cry" &&
+          (c.state.learningStep !== null ||
+            (c.state.lastReview !== null && c.state.dueDate <= todayString(new Date()) && c.state.lastReview !== todayString(new Date())) ||
+            c.state.lastReview === null),
+      );
+      cardId = found?.id ?? null;
+    }
+    if (cardId === null) return;
+    const card = cards.find((c) => c.id === cardId);
+    if (!card || card.cardType !== "cry") return;
+    playCry(card.cryUrl ?? null);
+    // Re-fire only when the underlying card id changes (next cry card up).
+  }, [cards, revealed]);
+
   // Cmd/Ctrl+Z triggers undo while an undo snapshot is live. Listener is
   // attached unconditionally so the hook order stays stable across early
   // returns; the body short-circuits when there is nothing to undo.
@@ -613,6 +648,7 @@ export function ReviewSession() {
         name: { ...limits.name, maxReviewsPerDay: Number.POSITIVE_INFINITY },
         evolution: { ...limits.evolution, maxReviewsPerDay: Number.POSITIVE_INFINITY },
         reverse: { ...limits.reverse, maxReviewsPerDay: Number.POSITIVE_INFINITY },
+        cry: { ...limits.cry, maxReviewsPerDay: Number.POSITIVE_INFINITY },
       }
     : limits;
 
@@ -952,6 +988,77 @@ export function ReviewSession() {
   }
 
   // --- Active review UI ---
+
+  // Cry cards: cry plays as the prompt; sprite + name + grade buttons
+  // appear after the user taps Reveal (or the visually-merged Play tile).
+  if (effectiveCard.cardType === "cry") {
+    return (
+      <div className="flex flex-col items-center gap-8">
+        {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+        <div className="flex w-full max-w-xl flex-col gap-2">
+          <ScopeControl scope={scope} onChange={handleScopeChange} />
+        </div>
+        {revealed ? (
+          <PokemonCard
+            spriteUrl={effectiveCard.spriteUrl}
+            name={effectiveCard.name}
+            revealed
+            fact={currentFact}
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-4">
+            <button
+              type="button"
+              onClick={() => playCry(effectiveCard.cryUrl ?? null)}
+              className="flex h-40 w-40 items-center justify-center rounded-full border-2 border-zinc-300 bg-zinc-50 text-5xl transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:border-zinc-700 dark:bg-zinc-900"
+              aria-label="Play cry"
+            >
+              🔊
+            </button>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Cry — name this Pokémon
+            </p>
+          </div>
+        )}
+
+        {revealed ? (
+          <GradeButtons
+            onGrade={handleGrade}
+            disabled={grading}
+            previews={gradePreviewsOrNull ?? undefined}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={handleReveal}
+            className="min-h-[44px] rounded-lg bg-foreground px-8 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+          >
+            Reveal
+          </button>
+        )}
+
+        <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
+        {undoSnapshot !== null && (
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="min-h-[36px] rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            aria-label="Undo last grade"
+          >
+            Undo last grade (⌘Z)
+          </button>
+        )}
+        <GradeBreakdownBar
+          again={sessionGrades[1]}
+          hard={sessionGrades[2]}
+          good={sessionGrades[4]}
+          easy={sessionGrades[5]}
+          label="This session"
+          hideZeroSegments
+        />
+      </div>
+    );
+  }
 
   // Reverse cards use the SpritePicker (multiple-choice); no reveal step.
   if (effectiveCard.cardType === "reverse") {

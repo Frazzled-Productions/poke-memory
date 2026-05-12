@@ -29,6 +29,9 @@ const SAMPLE: UserSettings = {
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
+  cryCardsEnabled: false,
+  maxNewCryPerDay: 10,
+  maxReviewsCryPerDay: 100,
   favouriteTheme: null,
   retentionTarget: 0.9,
 };
