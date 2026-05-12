@@ -46,6 +46,12 @@ import {
   type PracticeScope,
 } from "@/lib/review/scope";
 import { ScopeControl } from "@/components/review/ScopeControl";
+import {
+  loadAudioMode,
+  saveAudioMode,
+  acquireWakeLock,
+  releaseWakeLock,
+} from "@/lib/review/audioMode";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
@@ -345,15 +351,50 @@ export function ReviewSession() {
   const [newCardsThisSession, setNewCardsThisSession] = useState(0);
   const [masteredThisSession, setMasteredThisSession] = useState(0);
   const [scope, setScope] = useState<PracticeScope>({ gens: [], types: [], presets: [] });
+  const [audioMode, setAudioMode] = useState(false);
 
-  // Load persisted scope on mount.
+  // Load persisted scope + audio-mode flag on mount.
   useEffect(() => {
     setScope(loadScope());
+    setAudioMode(loadAudioMode());
   }, []);
+
+  // Acquire / release the screen wake lock while audio mode is on. The
+  // sentinel is held in a ref so the cleanup can always release the
+  // most recently acquired lock, even across re-renders.
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  useEffect(() => {
+    if (!audioMode) {
+      releaseWakeLock(wakeLockRef.current);
+      wakeLockRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    acquireWakeLock().then((s) => {
+      if (cancelled) {
+        releaseWakeLock(s);
+        return;
+      }
+      wakeLockRef.current = s;
+    });
+    return () => {
+      cancelled = true;
+      releaseWakeLock(wakeLockRef.current);
+      wakeLockRef.current = null;
+    };
+  }, [audioMode]);
 
   function handleScopeChange(next: PracticeScope) {
     setScope(next);
     saveScope(next);
+  }
+
+  function handleAudioModeToggle() {
+    setAudioMode((prev) => {
+      const next = !prev;
+      saveAudioMode(next);
+      return next;
+    });
   }
   // Single-step undo: snapshot of pre-grade state. Captured in handleGrade
   // and consumed by handleUndo. Cleared when the next grade fires.
@@ -792,7 +833,10 @@ export function ReviewSession() {
     }
     setRevealed(true);
     revealedCardId.current = currentCard.id;
-    if (loadSettings().playCryOnReveal) {
+    // Audio mode always plays the cry on reveal so the user has audio
+    // feedback regardless of the Settings toggle. Outside audio mode the
+    // existing `playCryOnReveal` preference controls playback.
+    if (audioMode || loadSettings().playCryOnReveal) {
       if (currentCard.cardType === "name") {
         playCry(currentCard.cryUrl ?? null);
       } else if (currentCard.cardType === "evolution") {
@@ -926,7 +970,31 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-        <ScopeControl scope={scope} onChange={handleScopeChange} />
+        <div className="flex w-full max-w-xl flex-col gap-2">
+          <ScopeControl scope={scope} onChange={handleScopeChange} />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={audioMode}
+            onClick={handleAudioModeToggle}
+            className={
+              "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm transition-colors " +
+              (audioMode
+                ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                : "border-zinc-200 bg-background text-zinc-600 dark:border-zinc-800 dark:text-zinc-300")
+            }
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Audio mode
+              </span>
+              <span className="text-xs">
+                {audioMode ? "On — screen stays awake, cry plays on reveal." : "Off"}
+              </span>
+            </span>
+            <span aria-hidden="true">{audioMode ? "🔊" : "🔈"}</span>
+          </button>
+        </div>
         <SpritePicker
           key={effectiveCard.id}
           targetPokemon={reverseTarget}
