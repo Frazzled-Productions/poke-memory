@@ -47,6 +47,7 @@ function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard 
     genderRate: 0,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
     cardType: "name",
     state: state(overrides),
   };

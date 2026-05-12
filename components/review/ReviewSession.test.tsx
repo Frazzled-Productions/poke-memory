@@ -42,6 +42,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     genderRate: 1,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
     cardType: "name",
     // buildSession calls initialReviewState(now) for each card, so these
     // values are overwritten and have no effect on test behaviour.

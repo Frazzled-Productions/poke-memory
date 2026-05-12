@@ -39,6 +39,7 @@ function makeSeedPokemon(id: number, overrides: Partial<SeedPokemon> = {}): Seed
     genderRate: 0,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
     ...overrides,
   };
 }
@@ -470,6 +471,7 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
       genderRate: 1,
       isLegendary: false,
       isMythical: false,
+      cryUrl: null,
       state: { ...initialReviewState(NOW), repetitions: 3, interval: 7 },
     };
 

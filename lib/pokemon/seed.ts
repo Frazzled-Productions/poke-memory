@@ -36,6 +36,7 @@ export type SeedPokemon = {
   genderRate: number | null;
   isLegendary: boolean;
   isMythical: boolean;
+  cryUrl: string | null;
 };
 
 export const SEED_POKEMON: readonly SeedPokemon[] = seedData as unknown as readonly SeedPokemon[];

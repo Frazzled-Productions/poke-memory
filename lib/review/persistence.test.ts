@@ -54,6 +54,7 @@ function makeNameCard(): NameReviewCard {
     genderRate: 1,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
     state: initialReviewState(NOW),
   };
 }
@@ -85,6 +86,7 @@ function makeReverseCard(): ReverseReviewCard {
     genderRate: 1,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
     state: initialReviewState(NOW),
   };
 }
