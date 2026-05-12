@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { buildSession, hydrateSession, todayString, type ReviewableCard } from "@/lib/review/session";
 import { loadSession } from "@/lib/review/persistence";
@@ -228,61 +229,48 @@ function GenerationBreakdown({ stats }: { stats: StatsResult }) {
         By generation
       </h2>
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
-              <th
-                scope="col"
-                className="py-2 pl-4 pr-2 text-left font-medium text-zinc-500 dark:text-zinc-400"
+        <div className="grid grid-cols-[1fr_auto] items-center border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+          <span>Generation</span>
+          <span className="text-right">Mastered / Total</span>
+        </div>
+        <ul role="list" className="text-sm">
+          {stats.perGeneration.map((gen, idx) => {
+            const masteredPct = pct(gen.mastered, gen.total);
+            const isLast = idx === stats.perGeneration.length - 1;
+            return (
+              <li
+                key={gen.gen}
+                className={
+                  isLast
+                    ? ""
+                    : "border-b border-zinc-100 dark:border-zinc-800/60"
+                }
               >
-                Generation
-              </th>
-              <th
-                scope="col"
-                className="py-2 pr-4 text-right font-medium text-zinc-500 dark:text-zinc-400"
-              >
-                Mastered / Total
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {stats.perGeneration.map((gen, idx) => {
-              const masteredPct = pct(gen.mastered, gen.total);
-              const isLast = idx === stats.perGeneration.length - 1;
-              return (
-                <tr
-                  key={gen.gen}
-                  className={
-                    isLast
-                      ? ""
-                      : "border-b border-zinc-100 dark:border-zinc-800/60"
-                  }
+                <Link
+                  href={`/pokedex?gen=${gen.gen}`}
+                  aria-label={`View ${gen.name} in Pokédex`}
+                  className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:hover:bg-zinc-900 dark:focus:bg-zinc-900"
                 >
-                  <td className="py-2.5 pl-4 pr-2 text-foreground">
-                    {gen.name}
-                  </td>
-                  <td className="py-2.5 pr-4">
-                    <div className="flex items-center justify-end gap-3">
-                      {/* inline bar */}
-                      <div
-                        className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
-                        aria-hidden="true"
-                      >
-                        <div
-                          className="h-full bg-emerald-500"
-                          style={{ width: `${masteredPct}%` }}
-                        />
-                      </div>
-                      <span className="tabular-nums text-zinc-500 dark:text-zinc-400 min-w-[64px] text-right">
-                        {gen.mastered} / {gen.total}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  <span className="text-foreground">{gen.name}</span>
+                  <span className="flex items-center justify-end gap-3">
+                    <span
+                      className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+                      aria-hidden="true"
+                    >
+                      <span
+                        className="block h-full bg-emerald-500"
+                        style={{ width: `${masteredPct}%` }}
+                      />
+                    </span>
+                    <span className="min-w-[64px] text-right tabular-nums text-zinc-500 dark:text-zinc-400">
+                      {gen.mastered} / {gen.total}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );
