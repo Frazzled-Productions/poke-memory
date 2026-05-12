@@ -3,6 +3,7 @@ import {
   hydrateSession,
   buildSession,
   buildSessionQueues,
+  buildQueueCounters,
   type DailyLimits,
   type EvolutionReviewCard,
   type NameReviewCard,
@@ -606,5 +607,81 @@ describe('buildSessionQueues (per-type budgets)', () => {
     expect(queues.perType.reverse.reviewsDoneToday).toBe(2);
     expect(queues.perType.name.reviewsDoneToday).toBe(0);
     expect(queues.reviewsDoneToday).toBe(2);
+  });
+});
+
+describe('buildQueueCounters', () => {
+  const TODAY = '2026-05-09';
+
+  it('returns correct triple for 2 new + 1 learning + 1 review', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1)), // new: lastReview null, learningStep null
+      makeCard(makeSeedPokemon(2)), // new: lastReview null, learningStep null
+      makeCard(makeSeedPokemon(3), { learningStep: 0 }), // learning
+      makeCard(makeSeedPokemon(4), {
+        lastReview: '2026-05-01',
+        dueDate: '2026-05-09',
+        learningStep: null,
+        repetitions: 2,
+        interval: 8,
+      }), // review: due today, not reviewed today
+    ];
+    const result = buildQueueCounters(cards, TODAY);
+    expect(result.newCount).toBe(2);
+    expect(result.learningCount).toBe(1);
+    expect(result.reviewCount).toBe(1);
+  });
+
+  it('learning cards are excluded from newCount and reviewCount', () => {
+    const cards: ReviewableCard[] = [
+      // learningStep set, lastReview null → learning, NOT new
+      makeCard(makeSeedPokemon(1), { learningStep: 0, lastReview: null }),
+      // learningStep set, lastReview in the past, dueDate in the past → learning, NOT review
+      makeCard(makeSeedPokemon(2), {
+        learningStep: 0,
+        lastReview: '2026-05-01',
+        dueDate: '2026-05-09',
+        repetitions: 1,
+        interval: 8,
+      }),
+    ];
+    const result = buildQueueCounters(cards, TODAY);
+    expect(result.learningCount).toBe(2);
+    expect(result.newCount).toBe(0);
+    expect(result.reviewCount).toBe(0);
+  });
+
+  it('cards reviewed today are excluded from reviewCount', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: TODAY,
+        learningStep: null,
+        repetitions: 2,
+        interval: 1,
+        firstSeen: '2026-05-01',
+      }),
+    ];
+    const result = buildQueueCounters(cards, TODAY);
+    expect(result.reviewCount).toBe(0);
+    expect(result.newCount).toBe(0);
+    expect(result.learningCount).toBe(0);
+  });
+
+  it('future-due graduated card is not in any queue', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: '2026-05-01',
+        dueDate: '2026-05-20',
+        learningStep: null,
+        repetitions: 3,
+        interval: 19,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    const result = buildQueueCounters(cards, TODAY);
+    expect(result.newCount).toBe(0);
+    expect(result.learningCount).toBe(0);
+    expect(result.reviewCount).toBe(0);
   });
 });
