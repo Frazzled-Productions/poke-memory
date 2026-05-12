@@ -93,14 +93,25 @@ export type StrugglingCard = {
   repetitions: number;
 };
 
+export type DueForecastDay = {
+  date: string;     // YYYY-MM-DD
+  count: number;    // cards whose dueDate falls on this day
+};
+
 export type StatsResult = {
   totalCards: number;                    // name cards only, ~1025
   introduced: number;                    // lastReview !== null
   learning: number;                      // introduced && !mastered
   mastered: number;                      // repetitions >= masteryRepetitions param AND interval >= MASTERY_INTERVAL_DAYS
   locked: number;                        // lastReview === null (== totalCards - introduced)
-  dueToday: number;                      // dueDate <= today AND lastReview !== today
-  dueTomorrow: number;                   // dueDate === tomorrow's ISO date
+  /**
+   * 14-entry array, today first then 13 future days. Day 0 ("today") is the
+   * same population as the queue: introduced cards whose dueDate is <= today
+   * and that haven't been reviewed today yet — i.e. cards that will appear
+   * for review right now. Days 1..13 are exact dueDate matches on that
+   * future date, so the forecast surfaces clustering ahead.
+   */
+  dueForecast: readonly DueForecastDay[];
   perGeneration: readonly GenerationStats[];
   struggling: readonly StrugglingCard[]; // bottom-N introduced cards by easeFactor, ascending
 };
@@ -117,10 +128,26 @@ export type StatsResult = {
  * avoid divergent results in negative-UTC offset timezones.
  */
 function tomorrowString(today: string): string {
-  const result = new Date(today);
-  result.setDate(result.getDate() + 1);
+  return addDaysToIsoDate(today, 1);
+}
+
+/**
+ * Add `days` to an ISO `YYYY-MM-DD` string. Same convention as
+ * `tomorrowString`: parse via local-time, increment via `setDate`,
+ * format via UTC `toISOString` — matches the scheduler so forecasts
+ * align with queue date math.
+ */
+function addDaysToIsoDate(date: string, days: number): string {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
   return result.toISOString().slice(0, 10);
 }
+
+/**
+ * Number of forward-looking days to surface in the due forecast,
+ * including today. Currently 14 (today + 13 future days).
+ */
+export const DUE_FORECAST_DAYS = 14;
 
 // ---------------------------------------------------------------------------
 // computeStats
@@ -147,7 +174,15 @@ export function computeStats(
   strugglingLimit = 10,
   masteryRepetitions = MASTERY_REPETITIONS,
 ): StatsResult {
-  const tomorrow = tomorrowString(today);
+  // Pre-compute the 14 forecast date strings so the inner loop can do a
+  // single Map lookup per card instead of a 14-way comparison chain.
+  const forecastDates: string[] = [];
+  for (let i = 0; i < DUE_FORECAST_DAYS; i++) {
+    forecastDates.push(i === 0 ? today : addDaysToIsoDate(today, i));
+  }
+  const forecastIndex = new Map<string, number>();
+  forecastDates.forEach((d, i) => forecastIndex.set(d, i));
+  const forecastCounts = new Array<number>(DUE_FORECAST_DAYS).fill(0);
 
   // Per-generation accumulators keyed by gen index (0-based into GEN_RANGES).
   const genTotal      = new Array<number>(GEN_RANGES.length).fill(0);
@@ -157,8 +192,6 @@ export function computeStats(
   let introduced = 0;
   let learning   = 0;
   let mastered   = 0;
-  let dueToday   = 0;
-  let dueTomorrow = 0;
 
   // Cards eligible for "struggling" — introduced cards only.
   const introducedCards: NameReviewCard[] = [];
@@ -179,19 +212,19 @@ export function computeStats(
       introducedCards.push(card);
     }
 
-    // Due-date tallies. Match the queue policy in `buildSessionQueues`:
-    // a card is "due today" only if it has been reviewed before — locked
-    // (never-reviewed) cards go into the new queue, not the review queue,
-    // so they shouldn't inflate this count on a fresh load.
-    if (
-      state.lastReview !== null &&
-      state.dueDate <= today &&
-      state.lastReview !== today
-    ) {
-      dueToday++;
-    }
-    if (state.dueDate === tomorrow) {
-      dueTomorrow++;
+    // Due-forecast tallies. Every day requires `lastReview !== null` so
+    // that never-reviewed cards (which carry a default dueDate of today and
+    // flow through the new-card queue, not the review queue) don't inflate
+    // the chart. Day 0 ("today") additionally excludes anything already
+    // reviewed today — matches the queue policy in `buildSessionQueues`.
+    if (state.lastReview !== null) {
+      if (state.dueDate <= today && state.lastReview !== today) {
+        forecastCounts[0]++;
+      }
+      const futureIdx = forecastIndex.get(state.dueDate);
+      if (futureIdx !== undefined && futureIdx > 0) {
+        forecastCounts[futureIdx]++;
+      }
     }
 
     // Per-generation tallies.
@@ -239,14 +272,18 @@ export function computeStats(
       };
     });
 
+  const dueForecast: DueForecastDay[] = forecastDates.map((date, i) => ({
+    date,
+    count: forecastCounts[i],
+  }));
+
   return {
     totalCards: cards.length,
     introduced,
     learning,
     mastered,
     locked: cards.length - introduced,
-    dueToday,
-    dueTomorrow,
+    dueForecast,
     perGeneration,
     struggling,
   };

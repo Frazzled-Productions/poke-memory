@@ -159,3 +159,58 @@ describe("computeStats mastery boundary", () => {
     expect(result.mastered).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// dueForecast
+// ---------------------------------------------------------------------------
+
+describe("computeStats.dueForecast", () => {
+  it("emits 14 entries starting today", () => {
+    const result = computeStats([card(1)], TODAY);
+    expect(result.dueForecast).toHaveLength(14);
+    expect(result.dueForecast[0].date).toBe(TODAY);
+    expect(result.dueForecast[1].date).toBe("2026-05-11");
+    expect(result.dueForecast[13].date).toBe("2026-05-23");
+  });
+
+  it("counts introduced cards due today (dueDate <= today, lastReview !== today)", () => {
+    const cards = [
+      // due today, not reviewed today → counts
+      card(1, { lastReview: "2026-05-08", dueDate: TODAY }),
+      // overdue, not reviewed today → still counts (dueDate <= today)
+      card(2, { lastReview: "2026-05-05", dueDate: "2026-05-09" }),
+      // reviewed today → excluded
+      card(3, { lastReview: TODAY, dueDate: TODAY }),
+      // never reviewed → excluded (those go in new queue)
+      card(4, { lastReview: null, dueDate: TODAY }),
+    ];
+    const result = computeStats(cards, TODAY);
+    expect(result.dueForecast[0].count).toBe(2);
+  });
+
+  it("counts cards on future days by exact dueDate match", () => {
+    const cards = [
+      card(1, { lastReview: TODAY, dueDate: "2026-05-11" }),
+      card(2, { lastReview: TODAY, dueDate: "2026-05-11" }),
+      card(3, { lastReview: TODAY, dueDate: "2026-05-14" }),
+      // outside window — ignored
+      card(4, { lastReview: TODAY, dueDate: "2026-05-24" }),
+    ];
+    const result = computeStats(cards, TODAY);
+    expect(result.dueForecast[1].count).toBe(2); // 2026-05-11
+    expect(result.dueForecast[4].count).toBe(1); // 2026-05-14
+    expect(result.dueForecast[2].count).toBe(0);
+    // Day 14 outside window
+    const totalInWindow = result.dueForecast.reduce((s, d) => s + d.count, 0);
+    expect(totalInWindow).toBe(3);
+  });
+
+  it("never-reviewed cards (lastReview null) are excluded from every forecast day", () => {
+    const cards = [
+      card(1, { lastReview: null, dueDate: TODAY }),
+      card(2, { lastReview: null, dueDate: "2026-05-11" }),
+    ];
+    const result = computeStats(cards, TODAY);
+    expect(result.dueForecast.every((d) => d.count === 0)).toBe(true);
+  });
+});
