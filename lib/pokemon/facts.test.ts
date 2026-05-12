@@ -24,6 +24,7 @@ function basePokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
     genderRate: 1,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
     ...overrides,
   };
 }

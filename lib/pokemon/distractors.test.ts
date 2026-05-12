@@ -24,6 +24,7 @@ function makePokemon(id: number): SeedPokemon {
     genderRate: 1,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
   };
 }
 

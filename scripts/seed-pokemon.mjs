@@ -158,6 +158,64 @@ async function downloadSprite(url, destPath) {
   }
 }
 
+/**
+ * Download a cry from `url` to `destPath`.
+ * Skips download if the file already exists (idempotent).
+ * Returns { ok, skipped }.
+ */
+async function downloadCry(url, destPath) {
+  if (existsSync(destPath)) return { ok: true, skipped: true };
+
+  let attempt = 0;
+  while (true) {
+    let res;
+    try {
+      res = await fetch(url);
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        const delay = BACKOFF_MS[attempt];
+        process.stderr.write(
+          `[seed] WARN: network error downloading cry (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms: ${err.message}\n`
+        );
+        await sleep(delay);
+        attempt++;
+        continue;
+      }
+      return { ok: false, skipped: false, reason: err.message };
+    }
+
+    if (res.status === 429) {
+      process.stderr.write(`[seed] WARN: rate-limited downloading cry, skipping\n`);
+      return { ok: false, skipped: false, reason: "rate-limited" };
+    }
+
+    if (res.status >= 500) {
+      if (attempt < MAX_RETRIES) {
+        const delay = BACKOFF_MS[attempt];
+        process.stderr.write(
+          `[seed] WARN: HTTP ${res.status} downloading cry (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms\n`
+        );
+        await sleep(delay);
+        attempt++;
+        continue;
+      }
+      return { ok: false, skipped: false, reason: `HTTP ${res.status}` };
+    }
+
+    if (!res.ok) {
+      return { ok: false, skipped: false, reason: `HTTP ${res.status}` };
+    }
+
+    try {
+      const buffer = Buffer.from(await res.arrayBuffer());
+      await writeFile(destPath, buffer);
+      return { ok: true, skipped: false };
+    } catch (err) {
+      return { ok: false, skipped: false, reason: err.message };
+    }
+  }
+}
+
 function extractFlavorTexts(flavorTextEntries) {
   const en = (flavorTextEntries ?? []).filter(e => e.language?.name === "en");
   if (en.length === 0) return [];
@@ -261,6 +319,8 @@ async function processSpecies(id) {
     return null;
   }
 
+  const remoteCryUrl = pokemonData.cries?.latest ?? null;
+
   const types = (pokemonData.types ?? []).map(t => t.type.name);
 
   const statsMap = {};
@@ -281,7 +341,7 @@ async function processSpecies(id) {
   const baseExperience = pokemonData.base_experience ?? null;
 
   return {
-    id, name, remoteSpriteUrl,
+    id, name, remoteSpriteUrl, remoteCryUrl,
     height, weight, baseExperience,
     types, stats, flavorText, flavorTexts,
     genus, generation, captureRate, baseHappiness,
@@ -459,13 +519,56 @@ async function main() {
   );
 
   // ------------------------------------------------------------------
+  // Step 3.6: Download cries to public/cries/
+  // ------------------------------------------------------------------
+  const criesDir = resolve(__dirname, "../public/cries");
+  await mkdir(criesDir, { recursive: true });
+
+  let criesDownloaded = 0;
+  let criesSkipped = 0;
+  let criesFailed = 0;
+  const failedCryIds = new Set();
+
+  for (let i = 0; i < partialRecords.length; i += CONCURRENCY) {
+    const batch = partialRecords.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (record) => {
+      if (!record.remoteCryUrl) return;
+      const destPath = resolve(criesDir, `${record.id}.ogg`);
+      const result = await downloadCry(record.remoteCryUrl, destPath);
+      if (!result.ok) {
+        process.stderr.write(
+          `[seed] WARN: cry download failed for ${record.id} (${record.name}): ${result.reason}\n`
+        );
+        criesFailed++;
+        failedCryIds.add(record.id);
+      } else if (result.skipped) {
+        criesSkipped++;
+      } else {
+        criesDownloaded++;
+      }
+    }));
+    if ((i + CONCURRENCY) % (CONCURRENCY * 5) === 0) {
+      process.stderr.write(
+        `[seed] [cries] ${Math.min(i + CONCURRENCY, partialRecords.length)}/${partialRecords.length} processed\n`
+      );
+    }
+  }
+
+  process.stderr.write(
+    `[seed] Cries: ${criesDownloaded} downloaded, ${criesSkipped} already existed, ${criesFailed} failed\n`
+  );
+
+  // ------------------------------------------------------------------
   // Step 4: Merge chains, sort, and write output
   // ------------------------------------------------------------------
-  const records = partialRecords.map(({ evolutionChainUrl: _url, remoteSpriteUrl, ...rest }) => ({
+  const records = partialRecords.map(({ evolutionChainUrl: _url, remoteSpriteUrl, remoteCryUrl, ...rest }) => ({
     ...rest,
     spriteUrl: failedSpriteIds.has(rest.id)
       ? remoteSpriteUrl
       : `/sprites/pokemon/${rest.id}.png`,
+    cryUrl: remoteCryUrl === null || remoteCryUrl === undefined || failedCryIds.has(rest.id)
+      ? null
+      : `/cries/${rest.id}.ogg`,
     evolutionChain: _url ? (chainDataMap.get(_url) ?? []) : [],
   }));
 
