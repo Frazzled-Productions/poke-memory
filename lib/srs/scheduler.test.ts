@@ -310,7 +310,12 @@ describe("Full scenario: graduated → lapse → relearning Good → graduate", 
     state = nextReview(state, 1, NOW); // lapse → relearning step 0
     expect(state.learningStep).toBe(0);
     expect(state.fsrsState).toBe("relearning");
-    state = nextReview(state, 4, NOW); // good → graduate (single relearning step)
+    // Walk the relearning ladder until graduation — the ladder length
+    // depends on FSRS's post-lapse difficulty (medium = 1 step, hard = 2).
+    // Cap at 5 to fail fast if the loop never terminates.
+    for (let i = 0; i < 5 && state.learningStep !== null; i++) {
+      state = nextReview(state, 4, NOW);
+    }
     expect(state.learningStep).toBeNull();
     expect(state.fsrsState).toBe("review");
     expect(state.scheduledDays).toBe(GRAD_INTERVAL_GOOD);

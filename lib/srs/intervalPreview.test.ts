@@ -130,8 +130,11 @@ describe("previewIntervals", () => {
       stepStartedAt: null,
     });
 
-    it("Grade 1 (Again) → <10m (lapse → relearning step 0)", () => {
-      expect(previewIntervals(state, NOW)[1]).toBe("<10m");
+    it("Grade 1 (Again) → in-step minute preview (lapse → relearning step 0)", () => {
+      // Step duration depends on post-lapse FSRS difficulty (medium band:
+      // 10m; hard band: 5m). Assert structural shape — the test's intent
+      // is that lapse goes back into a learning step, not a graduated day.
+      expect(previewIntervals(state, NOW)[1]).toMatch(/^<\d+m$/);
     });
 
     // FSRS-driven graduated grades: exact intervals are FSRS-parameter

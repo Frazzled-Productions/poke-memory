@@ -1,5 +1,5 @@
 import { nextReview, ReviewState, Grade, type NextReviewOptions } from "@/lib/srs/scheduler";
-import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
+import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 
 const GRADES: Grade[] = [1, 2, 4, 5];
 
@@ -29,7 +29,9 @@ export function previewIntervals(
     if (next.learningStep !== null) {
       // Card stays in / enters a learning or relearning step.
       const steps =
-        next.lastReview === null ? LEARNING_STEPS_MS : RELEARNING_STEPS_MS;
+        next.lastReview === null
+          ? learningStepsFor(next.difficulty)
+          : relearningStepsFor(next.difficulty);
       const stepMs = steps[Math.min(next.learningStep, steps.length - 1)];
       // Fallback handles migrated sessions where stepStartedAt was never stamped;
       // ReviewSession stamps it at mount, so null only occurs for pre-migration data.

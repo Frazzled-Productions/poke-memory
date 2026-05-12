@@ -40,8 +40,8 @@ import {
 } from "ts-fsrs";
 
 import {
-  LEARNING_STEPS_MS,
-  RELEARNING_STEPS_MS,
+  learningStepsFor,
+  relearningStepsFor,
   GRAD_INTERVAL_GOOD,
   GRAD_INTERVAL_EASY,
 } from "@/lib/srs/constants";
@@ -202,10 +202,11 @@ export function nextReview(
   // Case B: card is currently in a learning or relearning step
   // --------------------------------------------------------------------------
   if (state.learningStep !== null) {
-    const numSteps =
+    const steps =
       state.lastReview === null
-        ? LEARNING_STEPS_MS.length
-        : RELEARNING_STEPS_MS.length;
+        ? learningStepsFor(state.difficulty)
+        : relearningStepsFor(state.difficulty);
+    const numSteps = steps.length;
 
     if (grade === 1) {
       // B1: Again → reset to step 0
