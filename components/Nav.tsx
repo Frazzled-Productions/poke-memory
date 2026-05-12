@@ -5,14 +5,14 @@ import { FavouriteMascot } from "./theme/FavouriteMascot";
 
 export function Nav() {
   return (
-    <header className="border-b border-zinc-200 bg-background dark:border-zinc-800">
+    <header className="border-b border-theme-secondary bg-theme-primary">
       <nav
         className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3"
         aria-label="Main navigation"
       >
         <Link
           href="/"
-          className="flex items-center gap-2 text-sm font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
+          className="flex items-center gap-2 text-sm font-bold tracking-tight text-theme-fg-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
           data-superuser-tap="true"
         >
           <span aria-hidden="true">
