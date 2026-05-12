@@ -4,6 +4,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+<!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
+
 ## [0.5.2] — 2026-05-12
 
 ### Changed
