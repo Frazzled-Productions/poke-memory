@@ -3,10 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --theme-primary: #DC0A2D;
-  --theme-secondary: #f4a0a0;
-  --theme-accent: #FFD700;
-  --theme-fg-on-primary: #ffffff;
+  --theme-primary: var(--background);
+  --theme-secondary: var(--background);
+  --theme-accent: var(--foreground);
+  --theme-fg-on-primary: var(--foreground);
 }
 
 @theme inline {

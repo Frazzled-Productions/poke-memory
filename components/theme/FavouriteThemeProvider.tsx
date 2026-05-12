@@ -26,7 +26,10 @@ export function FavouriteThemeProvider({
 }) {
   const [favourite, setFavourite] = useState<StoredFavourite | null>(null);
 
-  const updateFavourite = setFavourite;
+  const updateFavourite = (f: StoredFavourite | null) => {
+    setFavourite(f);
+    applyTheme(f?.colors ?? null);
+  };
 
   useEffect(() => {
     const stored = loadFavourite();
