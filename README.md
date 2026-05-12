@@ -2,22 +2,40 @@
 
 [![Release](https://img.shields.io/github/v/release/fraserbrookhouse/poke-memory)](https://github.com/fraserbrookhouse/poke-memory/releases)
 
-Anki-style spaced-repetition flashcards for learning the names of all 1025 Pokémon.
+<p align="center">
+  <img src="public/sprites/pokemon/25.png" width="110" alt="Pikachu" />
+  <img src="public/sprites/pokemon/133.png" width="110" alt="Eevee" />
+  <img src="public/sprites/pokemon/6.png" width="110" alt="Charizard" />
+  <img src="public/sprites/pokemon/150.png" width="110" alt="Mewtwo" />
+  <img src="public/sprites/pokemon/448.png" width="110" alt="Lucario" />
+</p>
 
-Two card directions, each scheduled independently by SM-2:
+### Can you actually name all 1025 Pokémon?
 
-- **Forward** (default on) — sprite shown as prompt, name revealed on flip.
-- **Reverse** (default off, enable in Settings) — name shown as prompt, sprite revealed on flip.
+**poke-memory** is a spaced-repetition app that gives you a fighting chance. Each species becomes a flashcard. You grade yourself on each one. An Anki-style scheduler decides when the card comes back — easy ones drift out to weeks and months, the ones you fluff come back tomorrow.
 
-Hit **Reveal**, grade yourself Again / Hard / Good / Easy, and the scheduler decides when each card comes back — easy cards drift out, struggling ones return sooner.
+**[poke-memory-alpha.vercel.app](https://poke-memory-alpha.vercel.app)** — try it now, no sign-in needed.
 
-## Live demo
+## How a review works
 
-**[poke-memory-alpha.vercel.app](https://poke-memory-alpha.vercel.app)**
+Each species gives you up to two cards, scheduled independently:
 
-Hosted on Vercel; auto-deploys on every push to `main`. Your progress lives in the browser's `localStorage`, so it's per-device and starts fresh on a different machine.
+- **Forward** (default on) — sprite shown, name revealed on flip.
+- **Reverse** (default off, enable in Settings) — name shown, sprite revealed on flip.
 
-### Install on iPhone
+Hit **Reveal**, then **Again / Hard / Good / Easy**. New cards step through a short learning queue (1m → 10m) before graduating to the day-scale schedule. After that, every passing grade stretches the interval; a fail drops the card back into a 10-minute relearning step. A typical trajectory:
+
+| When you grade it | Grade | Next due |
+|---|---|---|
+| First time seeing it | Good | 1 minute |
+| 1 minute later | Good | 10 minutes |
+| 10 minutes later | Good | tomorrow *(graduates)* |
+| Day 2 | Good | 6 days |
+| Day 8 | Good | ~15 days |
+| Day 23 | Easy | ~6 weeks |
+| Day 65 | Again | 10 minutes *(lapse → relearn)* |
+
+## Install on iPhone
 
 Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the icon opens the app in standalone mode — no Safari chrome — with a Pokédex-themed icon. It looks and feels like a native app, but everything still runs in the browser.
 
