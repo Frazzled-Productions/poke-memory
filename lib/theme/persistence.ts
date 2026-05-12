@@ -43,10 +43,19 @@ export function loadFavourite(): StoredFavourite | null {
     const rawSpriteUrl = typeof obj.spriteUrl === "string" ? obj.spriteUrl : null;
     // Migrate legacy remote sprite URLs stored before sprites were self-hosted.
     // raw.githubusercontent.com is no longer in next.config.ts remotePatterns.
-    const spriteUrl =
-      rawSpriteUrl !== null && rawSpriteUrl.startsWith("https://raw.githubusercontent.com")
-        ? `/sprites/pokemon/${obj.id}.png`
-        : rawSpriteUrl;
+    const needsMigration =
+      rawSpriteUrl !== null && rawSpriteUrl.startsWith("https://raw.githubusercontent.com");
+    const spriteUrl = needsMigration ? `/sprites/pokemon/${obj.id}.png` : rawSpriteUrl;
+    if (needsMigration) {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ id: obj.id, name: curated.name, colors: c, spriteUrl }),
+        );
+      } catch {
+        // private browsing or storage full — best-effort migration
+      }
+    }
     return {
       id: obj.id,
       name: curated.name,

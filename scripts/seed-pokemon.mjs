@@ -447,7 +447,7 @@ async function main() {
         spritesDownloaded++;
       }
     }));
-    if (i > 0 && i % (CONCURRENCY * 5) === 0) {
+    if ((i + CONCURRENCY) % (CONCURRENCY * 5) === 0) {
       process.stderr.write(
         `[seed] [sprites] ${Math.min(i + CONCURRENCY, partialRecords.length)}/${partialRecords.length} processed\n`
       );

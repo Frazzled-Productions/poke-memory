@@ -7,6 +7,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 ### Changed
 
 - **Sprites are now self-hosted** — all 1025 Pokémon sprites are served as static assets from the same Vercel deployment (`/sprites/pokemon/{id}.png`) instead of being fetched from `raw.githubusercontent.com` at runtime. No sprite requests leave our infrastructure.
+
 ## [0.5.1] — 2026-05-12
 
 ### Changed
