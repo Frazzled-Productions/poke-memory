@@ -139,6 +139,17 @@ function buildSeedSession() {
   return JSON.stringify({ cards, limits });
 }
 
+// CSS injected on every captured page: hide Next.js dev-mode UI (route
+// announcer, dev-tools indicator) so it never appears in screenshots.
+const HIDE_DEV_UI_CSS = `
+  nextjs-portal,
+  [data-nextjs-toast],
+  [data-nextjs-dialog-overlay],
+  #__next-build-watcher,
+  #__next-route-announcer__,
+  next-route-announcer { display: none !important; }
+`;
+
 async function withPage(browser, contextOptions, fn) {
   const ctx = await browser.newContext({
     ...contextOptions,
@@ -160,6 +171,10 @@ async function withPage(browser, contextOptions, fn) {
   }
 }
 
+async function hideDevUi(page) {
+  await page.addStyleTag({ content: HIDE_DEV_UI_CSS }).catch(() => {});
+}
+
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
 
@@ -169,8 +184,14 @@ async function main() {
     // ── Practice screenshots (iPhone 14 viewport) ──────────────────────────
     await withPage(browser, { ...devices["iPhone 14"] }, async (page) => {
       await page.goto(BASE_URL, { waitUntil: "networkidle" });
-      // Wait for sprite — confirms localStorage session was read and card rendered
-      await page.waitForSelector('img[src*="/sprites/pokemon/"]', { timeout: 15_000 });
+      // Wait for sprite — confirms localStorage session was read and card rendered.
+      // next/image rewrites src to /_next/image?url=%2Fsprites%2Fpokemon%2F…, so
+      // match the encoded path (and decoded fallback) instead of the raw URL.
+      await page.waitForSelector(
+        'img[src*="sprites%2Fpokemon"], img[src*="/sprites/pokemon/"]',
+        { timeout: 30_000 },
+      );
+      await hideDevUi(page);
       await page.waitForTimeout(400);
       await page.screenshot({ path: join(OUT_DIR, "practice-front.png"), fullPage: false });
       console.log("  practice-front.png");
@@ -180,15 +201,24 @@ async function main() {
         await revealBtn.click();
         await page.waitForTimeout(400);
       }
-      await page.screenshot({ path: join(OUT_DIR, "practice-flipped.png"), fullPage: false });
+      // The reveal expands the card with grade buttons below the sprite, which
+      // overflow the iPhone 14 viewport. Capture the full page so the grade
+      // buttons (Again / Hard / Good / Easy) are included in the screenshot.
+      await page.screenshot({ path: join(OUT_DIR, "practice-flipped.png"), fullPage: true });
       console.log("  practice-flipped.png");
     });
 
     // ── Pokédex grid (desktop viewport, 1280×900) ──────────────────────────
     await withPage(browser, { viewport: { width: 1280, height: 900 } }, async (page) => {
       await page.goto(`${BASE_URL}/pokedex`, { waitUntil: "networkidle" });
-      // Wait for at least one sprite — confirms localStorage was read and grid rendered
-      await page.waitForSelector('img[src*="/sprites/pokemon/"]', { timeout: 15_000 });
+      // Wait for at least one sprite — confirms localStorage was read and grid rendered.
+      // next/image rewrites src to /_next/image?url=%2Fsprites%2Fpokemon%2F…, so
+      // match the encoded path (and decoded fallback) instead of the raw URL.
+      await page.waitForSelector(
+        'img[src*="sprites%2Fpokemon"], img[src*="/sprites/pokemon/"]',
+        { timeout: 30_000 },
+      );
+      await hideDevUi(page);
       await page.waitForTimeout(400);
       await page.screenshot({ path: join(OUT_DIR, "pokedex-grid.png"), fullPage: false });
       console.log("  pokedex-grid.png");
@@ -199,8 +229,12 @@ async function main() {
       await page.goto(`${BASE_URL}/stats`, { waitUntil: "networkidle" });
       // Wait for mastery heading — confirms localStorage was read and stats computed
       await page.waitForSelector("h2#mastery-heading", { timeout: 15_000 });
+      await hideDevUi(page);
       await page.waitForTimeout(400);
-      await page.screenshot({ path: join(OUT_DIR, "stats.png"), fullPage: false });
+      // Stats content (streak + grade breakdown + mastery distribution + progress
+      // bar) is taller than an iPhone 14 viewport. Capture the full page so the
+      // mastery cards and "X / 1,025 introduced" row are both visible.
+      await page.screenshot({ path: join(OUT_DIR, "stats.png"), fullPage: true });
       console.log("  stats.png");
     });
   } finally {
