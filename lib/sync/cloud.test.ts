@@ -63,9 +63,13 @@ function makeCloudRow(
 ): CloudRow {
   return {
     pokemon_id: pokemonId,
-    repetitions: 1,
-    interval: 1,
-    ease_factor: 2.5,
+    stability: 1,
+    difficulty: 1,
+    elapsed_days: 0,
+    scheduled_days: 1,
+    reps: 1,
+    lapses: 0,
+    fsrs_state: "review",
     due_date: "2026-05-11",
     last_review: lastReview,
     first_seen: firstSeen,
