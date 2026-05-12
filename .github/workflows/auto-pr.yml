@@ -115,6 +115,21 @@ jobs:
         if: env.stopped != 'true'
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Check CI status at HEAD
+        id: ci-status
+        if: env.stopped != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          STATE=$(gh pr view "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --json statusCheckRollup \
+            --jq '[.statusCheckRollup[] | select(.name == "test")] | first | .state // "UNKNOWN"')
+          echo "CI state at HEAD: $STATE"
+          if [[ "$STATE" == "FAILURE" || "$STATE" == "ERROR" ]]; then
+            echo "CI_FAILING_AT_HEAD=true" >> "$GITHUB_ENV"
+          fi
+
       - name: Resolve linked issue number
         id: linked
         if: env.stopped != 'true'
@@ -201,6 +216,15 @@ jobs:
             push half-done work. The post-step takes over the status comment
             at the end of the run with a verified outcome summary.
 
+            **CI pre-flight (run first, before anything else):**
+            Run `printenv CI_FAILING_AT_HEAD`. If the output is `true`, skip
+            steps 2–3 entirely (do not evaluate the auto-review verdict, do not
+            run the LGTM short-circuit). Treat this run as if a non-empty inline
+            punch list was provided. The CI error excerpt in `FIX_COMMENT_BODY`
+            is the definitive punch list — proceed directly to step 4.
+            This override is deterministic and takes priority over any LGTM
+            verdict that may already be on the PR.
+
             Workflow:
             1. Load the PR and its comments:
                `gh pr view ${{ github.event.issue.number }} --json title,body,comments,headRefName,baseRefName`
@@ -243,6 +267,38 @@ jobs:
                - Commit. **Do NOT add a Co-Authored-By trailer.** No Claude
                  attribution in commit messages.
                - Push to the PR branch (the current checkout is already on it).
+               - **Wait for CI on the pushed SHA before posting any review.**
+                 After `git push`, capture the pushed SHA and poll the `test`
+                 check run until it completes (or 10 minutes elapse):
+                 ```bash
+                 PUSHED_SHA=$(git rev-parse HEAD)
+                 REPO="${GITHUB_REPOSITORY}"
+                 DEADLINE=$(( $(date +%s) + 600 ))
+                 while true; do
+                   CHECK=$(gh api "repos/${REPO}/commits/${PUSHED_SHA}/check-runs" \
+                     --jq '[.check_runs[] | select(.name == "test")] | first | {status: (.status // "not_found"), conclusion: (.conclusion // "")}')
+                   STATUS=$(jq -r '.status' <<< "$CHECK")
+                   CONCLUSION=$(jq -r '.conclusion' <<< "$CHECK")
+                   if [[ "$STATUS" == "completed" ]]; then break; fi
+                   if [[ $(date +%s) -gt $DEADLINE ]]; then
+                     gh pr comment ${{ github.event.issue.number }} \
+                       --body "CI check timed out after 10 minutes on ${PUSHED_SHA:0:7}. Not posting an auto-review until CI has a definitive result — push a new commit or check manually."
+                     exit 0
+                   fi
+                   sleep 30
+                 done
+                 if [[ "$CONCLUSION" != "success" ]]; then
+                   gh pr comment ${{ github.event.issue.number }} \
+                     --body "CI failed on ${PUSHED_SHA:0:7} (conclusion: ${CONCLUSION}). Not posting an LGTM auto-review on a red commit — \`ci-failure-autofix.yml\` will post a new \`/fix\` with the log excerpt."
+                   exit 0
+                 fi
+                 ```
+                 Use `GH_TOKEN` (the App token, already in env) for all `gh api`
+                 calls. A `not_found` status (check run not yet queued right after
+                 push) is treated the same as `in_progress` — sleep 30s and retry.
+                 The check run name `"test"` matches the job ID in `ci.yml`.
+                 Only proceed to `code-reviewer` and `auto-review:N` when CI
+                 passed (`conclusion == "success"`).
                - Run the `code-reviewer` sub-agent (Agent tool, subagent_type
                  "code-reviewer") against the new diff
                  (`git diff origin/${{ github.event.repository.default_branch }}...HEAD`).
