@@ -85,7 +85,7 @@ Sign in with GitHub (the **Sign in** button in the nav) to sync your review hist
 
 ## Privacy
 
-- **Guest mode**: your card and session data stays in your browser — nothing is transmitted to any server we control. Sprites are self-hosted on the same Vercel deployment. Anonymous, aggregate telemetry (page views, device type, country, Core Web Vitals) is collected by Vercel Analytics and Speed Insights; it does not include card progress, review history, or any personally identifying information.
+- **Guest mode**: your card and session data stays in your browser — nothing is transmitted to any server we control. Sprites are self-hosted on the same Vercel deployment. Anonymous, aggregate telemetry (URL path, referrer, country, device type, Core Web Vitals) is collected by Vercel Analytics and Speed Insights; it does not include card progress, review history, or any personally identifying information.
 - **Signed in**: your per-card SM-2 state (repetitions, interval, ease factor, due date, last review, first seen) is stored in Supabase Postgres, accessible only to you via Row-Level Security. Signing out leaves local progress intact.
 
 ## Run locally
