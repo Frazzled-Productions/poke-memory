@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Changed
+
+- Pre-v1 release bump default changed from minor (on Added/Changed/Removed/Deprecated) to patch. Minor bump is now opt-in via `> bump: minor` in `[Unreleased]`.
+
 ## [0.5.0] — 2026-05-12
 
 ### Added
