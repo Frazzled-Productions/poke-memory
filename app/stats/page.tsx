@@ -20,6 +20,7 @@ import { RecordsCard } from "@/components/stats/RecordsCard";
 import { computeRecords, type Records } from "@/lib/stats/records";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
+import { TrainerCard } from "@/components/stats/TrainerCard";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -467,6 +468,15 @@ export default function StatsPage() {
           <LoadingSkeleton />
         ) : (
           <div className="flex flex-col gap-10">
+            <TrainerCard
+              handle={
+                ((user?.user_metadata?.user_name as string | undefined) ??
+                  (user?.user_metadata?.preferred_username as string | undefined) ??
+                  null)
+              }
+              totalMastered={stats.mastered}
+              perGeneration={stats.perGeneration}
+            />
             <section aria-labelledby="streak-heading">
               <h2 id="streak-heading" className="mb-3 text-base font-semibold text-foreground">
                 Current streak
