@@ -28,7 +28,7 @@ const STORAGE_KEY = "poke-memory:review-session:v1";
 
 // Mastery: repetitions >= 3 AND interval >= 21 (matches lib/stats/derive.ts)
 const MASTERY_REPETITIONS = 3;
-const MASTERY_INTERVAL = 21;
+const MASTERY_INTERVAL_DAYS = 21;
 
 function pastDate(daysAgo) {
   const d = new Date();
@@ -80,7 +80,7 @@ function buildSeedSession() {
       cryUrl: null,
       state: {
         repetitions: MASTERY_REPETITIONS + 2,
-        interval: MASTERY_INTERVAL + 9,
+        interval: MASTERY_INTERVAL_DAYS + 9,
         easeFactor: 2.5,
         dueDate: futureDate(15),
         lastReview: pastDate(15),
