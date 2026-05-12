@@ -27,10 +27,11 @@
 
 ## How a review works
 
-Each species gives you up to two cards, scheduled independently:
+Each species gives you up to three cards, scheduled independently:
 
 - **Forward** (default on) — sprite shown, name revealed on flip.
 - **Reverse** (default off, enable in Settings) — name shown, sprite revealed on flip.
+- **Cry → name** (default off, enable in Settings) — cry plays as the prompt, sprite + name revealed on flip. Species without a cry are skipped automatically.
 
 Hit **Reveal**, then **Again / Hard / Good / Easy**. New cards step through a short learning queue (1m → 10m) before graduating to the day-scale schedule. After that, every passing grade stretches the interval; a fail drops the card back into a 10-minute relearning step. A typical trajectory:
 
@@ -51,20 +52,20 @@ Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the 
 ## Features
 
 ### Practice
-The daily review loop. Live **Again / Hard / Good / Easy** tally for the current session, with a streak badge that ticks up each day you review.
+The daily review loop. Live **Again / Hard / Good / Easy** tally for the current session, with a streak badge that ticks up each day you review. Misclick on a grade? Hit **Undo** (or ⌘/Ctrl+Z) to roll the most recent grade back. Optional **Scope** control narrows the session to specific generations, types, or preset groups (Starters, Legendaries). **Audio mode** keeps the screen awake and plays the cry on every reveal. When the day is done, a **Share today** button generates a Wordle-style summary you can paste anywhere.
 
 ### Stats
-All-time grade breakdown, mastery distribution, due forecast, per-generation progress, struggling-card list, and current streak.
+A trainer-card hero strip (level + generation badges), current streak, a four-cell **Records** card (longest streak, best review day, avg days to mastery, most-mastered week), a 30-day **accuracy sparkline** with a 7-day rolling headline, all-time grade breakdown, mastery distribution, a 14-day **due-forecast bar chart**, mastered-by-type and per-generation breakdowns (each gen row deep-links into the Pokédex), a GitHub-style **365-day review heatmap**, and a struggling-card list.
 
 ### Pokédex
 1025-cell grid with progressive disclosure — unlearned Pokémon appear as silhouettes, reviewed Pokémon greyscale, mastered ones in full colour. Tap any cell to open a detail page that reveals more as you progress: types and flavour text unlock when you start learning; base stats, facts, and the evolution chain unlock once mastered.
 
 ### Settings
-Mastery threshold, new-card cap, review cap, and the reverse-card toggle.
+Mastery threshold, new/review caps per direction, reverse-card and cry-card toggles, and an **FSRS recall-target slider** (80% – 97%) that trades off review frequency against retention.
 
 ### Under the hood
 
-- **FSRS scheduling** — the same algorithm Anki ships by default since 23.10, via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Anki-style learning steps (1m / 10m for new cards, 10m for relearning) wrap FSRS so brand-new cards behave familiarly.
+- **FSRS scheduling** — the same algorithm Anki ships by default since 23.10, via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Anki-style learning steps wrap FSRS so brand-new cards behave familiarly; the ladders adapt to FSRS difficulty (easy cards graduate in 1m, medium cards keep the 1m/10m default, hard cards get 1m/5m/15m).
 - **Daily streak** — review at least one card to keep it alive; missing today is forgiven if you reviewed yesterday.
 - **Daily limits** — 10 new cards and 100 reviews per day by default, adjustable in Settings. Keeps the load sustainable.
 - **Random Pokémon fact on each flip** — height, weight, type, genus, generation, catch difficulty, gender ratio, habitat, growth rate, and more. A new fact each flip.

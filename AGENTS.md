@@ -115,6 +115,8 @@ Cards are the primary contract. Streak (`streak_days`) and settings (`user_setti
 
 - `user_settings.settings` (jsonb) is the source of truth for per-user settings. The schema is `(user_id, settings, updated_at)` after migration 005 dropped the original flat columns from migration 001.
 - `card_reviews` is on FSRS columns (`stability`, `difficulty`, `elapsed_days`, `scheduled_days`, `reps`, `lapses`, `fsrs_state`) after migration 004. The regression trigger on lifecycle timestamps from migration 002 was unaffected by the swap.
+- `card_reviews.pokemon_id` is just an integer with no CHECK constraint, so the namespaced ID ranges (name, evolution, reverse, cry) round-trip through the same table without schema work.
+- `grade_log.card_type` currently CHECK-constrains `IN ('name','evolution','reverse')`. The cry-name direction (#255) is shipped but `pushGradeLog` drops `cry` entries until a follow-up migration extends the CHECK to include `'cry'`. Cry card_reviews state syncs fully; only the per-grade analytics rows are local-only for now.
 
 **Catastrophic recovery**
 
@@ -227,8 +229,9 @@ The `>=` date comparison is conservative: any review on the same calendar day as
 
 ### Spaced repetition
 
-- **Algorithm**: FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default FSRS parameters (no per-user weight optimisation yet — that's a follow-up).
-- **Anki-style learning steps layer**: kept on top of FSRS. FSRS schedules graduated cards only; new cards go through fixed wall-clock learning steps (`LEARNING_STEPS_MS = [1m, 10m]`) and lapsed cards through relearning steps (`RELEARNING_STEPS_MS = [10m]`). The in-step layer is what `learningStep` / `stepStartedAt` track.
+- **Algorithm**: FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default parameters per FSRS, with a user-controlled `request_retention` knob (Settings → Recall target, 0.80–0.97, default 0.90). Per-user weight optimisation is a separate follow-up (#268).
+- **Anki-style learning steps layer**: kept on top of FSRS. FSRS schedules graduated cards only; new and lapsed cards go through wall-clock learning steps via `learningStepsFor(difficulty)` / `relearningStepsFor(difficulty)` (`lib/srs/constants.ts`). The bands are: easy (FSRS difficulty ≤ 4) `[1m]`; medium (5–7) `[1m, 10m]` for learning and `[10m]` for relearning — the historic default, preserved as `LEARNING_STEPS_MS` / `RELEARNING_STEPS_MS`; hard (≥ 8) `[1m, 5m, 15m]` for learning and `[5m, 15m]` for relearning. The in-step layer is what `learningStep` / `stepStartedAt` track.
+- **Scheduler call options**: `nextReview(state, grade, now, options?)` accepts `{ retentionTarget }` and is the single chokepoint that reads it. `previewIntervals` accepts the same options shape. FSRS instances are cached per retention value so a session that holds one target doesn't reinstantiate per grade.
 - **Grading UX**: 4 buttons — `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). The 1/2/4/5 internal convention maps to FSRS's `Rating` enum (1/2/3/4) at the boundary in `lib/srs/scheduler.ts`.
 - **Per-card review state**:
   ```ts
@@ -254,6 +257,13 @@ The `>=` date comparison is conservative: any review on the same calendar day as
 - **Queue policy**: two queues — review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today` (stable for the day, rotates daily).
 - **Daily limits**: 10 new cards/day (hard wall — exceeding inflates tomorrow's review queue), 100 reviews/day (soft wall with "Keep reviewing" override). Counters: `newIntroducedToday = firstSeen === today`; `reviewsDoneToday = lastReview === today && firstSeen !== today`.
 - **Persisted session shape**: `{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` runs `migrateReviewState` on every card — including the SM-2 → FSRS conversion for any legacy persisted state — so the migration is idempotent and runs once per device automatically.
+- **Card directions**: three directions, each its own FSRS stream:
+  - `name` (forward): sprite prompt → name. IDs `1..MAX_NAME_ID`.
+  - `reverse`: name prompt → sprite tile picker. IDs `REVERSE_ID_OFFSET + speciesId` (≥ 2_000_001).
+  - `cry`: cry plays as prompt → sprite + name reveal. IDs `CRY_ID_OFFSET + speciesId` (≥ 3_000_001). Only generated for species with a non-null `cryUrl`.
+  - Evolution cards (`EVOLUTION_ID_OFFSET + speciesId`, ≥ 1_000_001) are a fourth stream layered on top of the species; they are not a direction of the same card.
+- **Practice scope** (`lib/review/scope.ts`): a runtime filter over the cards array before `buildSessionQueues` sees it. Persists in `localStorage` (`poke-memory:practice-scope:v1`). Out-of-scope cards' `dueDate` keeps advancing — the scope only affects which cards surface in a session.
+- **Undo** (single-step, session-only): `ReviewSession` captures a pre-grade snapshot of `cards`, session tally, sequence, learning queue, and the `occurredAt` of the just-appended grade-log entry. `handleUndo` (or ⌘/Ctrl+Z) restores them and pops the grade-log entry via `removeGradeEntry(occurredAt)`. Cloud sync rollback is best-effort: the per-grade debounce may already have fired, in which case the cloud retains the post-grade state.
 - **Mastery**: `reps >= masteryRepetitions && scheduledDays >= 21`. The legacy `easeFactor` / `repetitions` field names survive on `StrugglingCard` (in `lib/stats/derive.ts`) — they are derived from FSRS state at the stats boundary so existing UI consumers stay stable.
 
 ### Testing
