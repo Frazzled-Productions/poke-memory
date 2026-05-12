@@ -5,7 +5,7 @@ import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard } from "@/lib/review/session";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
-import { LEARNING_STEPS_MS } from "@/lib/srs/constants";
+import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -490,5 +490,142 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
       | undefined;
     const savedLearningCard = lastCallArg?.cards.find((c) => c.id === 2);
     expect(savedLearningCard?.state.learningStep).toBe(0);
+  });
+});
+
+describe("Learn-ahead: 20-minute boundary", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("pulls a learning card forward when due in 19 min (within learn-ahead window)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-12T12:00:00Z"));
+    const T = Date.now();
+
+    // Relearning card: dueAt = T + 19 min.
+    // stepMs = RELEARNING_STEPS_MS[0] = 600_000 (10 min)
+    // stepStartedAt = T + 19*60_000 - 600_000 = T + 9*60_000
+    const learningCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      state: {
+        repetitions: 0,
+        interval: 1,
+        easeFactor: 2.5,
+        dueDate: "2026-05-12",
+        lastReview: "2026-05-12",    // relearning (not new-card learning)
+        firstSeen: "2026-05-01",
+        learningStep: 0,
+        stepStartedAt: T + 9 * 60_000, // dueAt = T + 9*60_000 + 600_000 = T + 19*60_000
+      },
+    };
+
+    vi.mocked(loadSession).mockReturnValueOnce({
+      cards: [learningCard],
+      limits: DEFAULT_LIMITS,
+    });
+
+    render(<ReviewSession />);
+
+    // The card should be pulled forward and presented for review — Reveal button visible,
+    // no countdown screen.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/next card in/i)).not.toBeInTheDocument();
+  });
+
+  it("shows countdown when learning card is due in 21 min (beyond learn-ahead window)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-12T12:00:00Z"));
+    const T = Date.now();
+
+    // Relearning card: dueAt = T + 21 min.
+    // stepStartedAt = T + 21*60_000 - 600_000 = T + 11*60_000
+    const learningCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      state: {
+        repetitions: 0,
+        interval: 1,
+        easeFactor: 2.5,
+        dueDate: "2026-05-12",
+        lastReview: "2026-05-12",
+        firstSeen: "2026-05-01",
+        learningStep: 0,
+        stepStartedAt: T + 11 * 60_000, // dueAt = T + 11*60_000 + 600_000 = T + 21*60_000
+      },
+    };
+
+    vi.mocked(loadSession).mockReturnValueOnce({
+      cards: [learningCard],
+      limits: DEFAULT_LIMITS,
+    });
+
+    render(<ReviewSession />);
+
+    // Too far in the future — should show countdown, not the card.
+    await waitFor(() =>
+      expect(screen.getByText(/next card in/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("QueueCounterRow: live queue counters", () => {
+  it("renders New/Learning/Review labels during an active session", async () => {
+    // 1 new card (fresh) + 1 learning card (already-due, pulled forward by learn-ahead)
+    const newCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      name: "Bulbasaur",
+      state: {
+        repetitions: 0,
+        interval: 0,
+        easeFactor: 2.5,
+        dueDate: "2026-05-12",
+        lastReview: null,
+        firstSeen: null,
+        learningStep: null,
+        stepStartedAt: null,
+      },
+    };
+
+    const learningCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 2,
+      name: "Ivysaur",
+      spriteUrl: "https://example.com/ivysaur.png",
+      state: {
+        repetitions: 0,
+        interval: 0,
+        easeFactor: 2.5,
+        dueDate: "2026-05-12",
+        lastReview: null,
+        firstSeen: "2026-05-12",
+        learningStep: 0,
+        stepStartedAt: Date.now() - LEARNING_STEPS_MS[0], // already due
+      },
+    };
+
+    // Seed only needs the cards that are in the session (id 1 and 2 are not
+    // both in the default mock; override to include both).
+    mockSeedPokemon.mockReturnValue([newCard, learningCard]);
+    vi.mocked(loadSession).mockReturnValueOnce({
+      cards: [newCard, learningCard],
+      limits: DEFAULT_LIMITS,
+    });
+
+    render(<ReviewSession />);
+
+    // Wait for session to load and render the queue counter row.
+    await waitFor(() =>
+      expect(screen.getByRole("status", { name: /queue counts/i })).toBeInTheDocument(),
+    );
+    const counterRow = screen.getByRole("status", { name: /queue counts/i });
+    expect(counterRow).toHaveTextContent("New");
+    expect(counterRow).toHaveTextContent("Learning");
+    expect(counterRow).toHaveTextContent("Review");
   });
 });
