@@ -37,7 +37,12 @@ export function FavouriteThemeProvider({
     applyTheme(stored?.colors ?? null);
 
     function handleStorage(e: StorageEvent) {
-      if (e.key !== "poke-memory:favourite:v1") return;
+      // The favourite theme lives inside the settings blob (#307). Watch
+      // both keys so a legacy write (during the one-time migration window)
+      // still triggers a refresh.
+      if (e.key !== "poke-memory:settings:v1" && e.key !== "poke-memory:favourite:v1") {
+        return;
+      }
       const updated = loadFavourite();
       setFavourite(updated);
       applyTheme(updated?.colors ?? null);
