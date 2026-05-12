@@ -100,26 +100,26 @@ jobs:
 
             echo "PR #$NUMBER: posting monitor alert comment..."
             gh pr comment "$NUMBER" --repo "$REPO" --body "$(cat <<EOF
-$DEDUP_MARKER
-**CI was never dispatched on this PR.**
+          $DEDUP_MARKER
+          **CI was never dispatched on this PR.**
 
-The \`test\` check has no record at \`${SHA:0:7}\` — this typically means GitHub's \`push\`/\`pull_request\` event dispatch was throttled when this PR was opened.
+          The \`test\` check has no record at \`${SHA:0:7}\` — this typically means GitHub's \`push\`/\`pull_request\` event dispatch was throttled when this PR was opened.
 
-**Recovery steps once the throttle clears:**
-1. Confirm \`push\` events are flowing again:
-   \`\`\`
-   gh api "repos/$REPO/actions/runs?event=push&per_page=1" --jq '.workflow_runs[0].created_at'
-   \`\`\`
-2. Push an empty commit to re-trigger CI on this PR:
-   \`\`\`
-   git fetch origin
-   git checkout \$(gh pr view \$NUMBER --repo \$REPO --json headRefName --jq .headRefName)
-   git commit --allow-empty -m "chore: re-trigger CI after dispatch throttle"
-   git push
-   \`\`\`
+          **Recovery steps once the throttle clears:**
+          1. Confirm \`push\` events are flowing again:
+             \`\`\`
+             gh api "repos/$REPO/actions/runs?event=push&per_page=1" --jq '.workflow_runs[0].created_at'
+             \`\`\`
+          2. Push an empty commit to re-trigger CI on this PR:
+             \`\`\`
+             git fetch origin
+             git checkout \$(gh pr view \$NUMBER --repo \$REPO --json headRefName --jq .headRefName)
+             git commit --allow-empty -m "chore: re-trigger CI after dispatch throttle"
+             git push
+             \`\`\`
 
-See the \`pr-check-monitor\` workflow and WORKFLOW.md for full context.
-EOF
+          See the \`pr-check-monitor\` workflow and WORKFLOW.md for full context.
+          EOF
 )"
             echo "PR #$NUMBER: alert comment posted"
           done < <(echo "$PRS" | jq -c '.[]')
