@@ -112,6 +112,7 @@ describe('loadSettings migration', () => {
       reverseCardsEnabled: true,
       maxNewReversePerDay: 15,
       maxReviewsReversePerDay: 50,
+      playCryOnReveal: true,
     };
     saveSettings(custom);
     const loaded = loadSettings();
