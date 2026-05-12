@@ -23,12 +23,13 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
    **Foundational decisions are always blockers.** Any decision that introduces a new vendor, paid service, auth provider, database, or persistence layer is surfaced as a `[USER-DECISION]` or `[USER-DECISION + RESEARCH]` blocker — never resolved unilaterally by the implementer. Research may inform the candidate list.
 
    **When in doubt, default to blocker.** A false-positive blocker costs one comment round-trip; a false-negative costs a closed PR.
-3. Break work into ordered, atomic steps. Each step has:
+3. If the change adds or modifies a user-facing page or flow, include a step for `playwright` to add or update E2E smoke tests. This step runs after implementation, before review.
+4. Break work into ordered, atomic steps. Each step has:
    - **What** — one sentence
    - **Where** — file paths
    - **Done when** — acceptance criterion
-4. Mark steps that can run in parallel with ⚡ and group them.
-5. Surface risks: places likely to break, edge cases worth handling, dependencies on external systems.
+5. Mark steps that can run in parallel with ⚡ and group them.
+6. Surface risks: places likely to break, edge cases worth handling, dependencies on external systems.
 
 ## Output format
 1. **Goal** — one sentence.

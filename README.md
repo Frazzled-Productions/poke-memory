@@ -55,6 +55,15 @@ npm run dev    # http://localhost:3000
 
 The seed step writes `lib/pokemon/generated.json`, which is committed to the repo, so the seed is only required if that file is missing or you want to regenerate it (e.g. after a new Pokémon generation ships).
 
+### E2E tests
+
+```bash
+npx playwright install          # one-time browser install
+npm run test:e2e                # runs against http://localhost:3000
+```
+
+E2E smoke tests run automatically against Vercel preview deployments in CI.
+
 ## Stack
 
 Next.js 16 (App Router, Cache Components), React 19, Tailwind CSS 4, TypeScript 5.
