@@ -48,6 +48,8 @@
       "Bash(jq *)",
       "Bash(diff *)",
       "Bash(wc *)",
+      "Bash(printenv *)",
+      "Bash(sleep *)",
       "Bash(echo)",
       "Bash(echo *)",
       "Bash(pwd)",
