@@ -5,7 +5,7 @@ import { FavouriteMascot } from "./theme/FavouriteMascot";
 
 export function Nav() {
   return (
-    <header className="border-b border-zinc-200 bg-theme-primary dark:border-zinc-800">
+    <header className="border-b border-theme-secondary bg-theme-primary">
       <nav
         className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3"
         aria-label="Main navigation"

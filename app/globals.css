@@ -4,7 +4,7 @@
   --background: #ffffff;
   --foreground: #171717;
   --theme-primary: var(--background);
-  --theme-secondary: var(--background);
+  --theme-secondary: #e4e4e7;
   --theme-accent: var(--foreground);
   --theme-fg-on-primary: var(--foreground);
 }
@@ -24,6 +24,7 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --theme-secondary: #27272a;
   }
 }
 

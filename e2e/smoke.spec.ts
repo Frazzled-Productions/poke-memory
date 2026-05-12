@@ -93,6 +93,10 @@ test.describe("Pokédex page", () => {
 });
 
 test.describe("Settings page", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
+  });
+
   test("loads with key sections", async ({ page }) => {
     await page.goto("/settings");
     await expect(
@@ -168,11 +172,14 @@ test.describe("Settings page", () => {
     // Select Charizard as the app theme
     await page.getByRole("button", { name: "Set as theme" }).click();
 
-    // Nav header background should have changed to Charizard's primary colour
-    const bgAfter = await navHeader.evaluate(
-      (el) => window.getComputedStyle(el).backgroundColor,
-    );
-    expect(bgAfter).not.toBe(bgBefore);
+    // Nav header background should have changed to Charizard's primary colour.
+    // Poll until React re-renders and applyTheme writes the new CSS variable.
+    await expect(async () => {
+      const bgAfter = await navHeader.evaluate(
+        (el) => window.getComputedStyle(el).backgroundColor,
+      );
+      expect(bgAfter).not.toBe(bgBefore);
+    }).toPass({ timeout: 5000 });
 
     // "Selected ✓" indicator and Remove button should appear
     await expect(page.getByText("Selected ✓")).toBeVisible();

@@ -47,6 +47,8 @@ function FavouritePicker({
   onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
 }) {
   const { superuser } = useSuperuser();
+  // Empty deps: session is loaded once at mount. Nothing on this page writes
+  // to the session, so a snapshot is safe and avoids re-reading on every render.
   const cardStateById = useMemo(() => {
     const session = loadSession();
     return new Map((session?.cards ?? []).map((c) => [c.id, c.state]));

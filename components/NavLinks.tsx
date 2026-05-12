@@ -29,7 +29,7 @@ export function NavLinks() {
                 className={[
                   LINK_BASE,
                   isActive
-                    ? "bg-foreground text-background"
+                    ? "bg-theme-fg-on-primary text-theme-primary"
                     : "text-theme-fg-on-primary opacity-75 hover:opacity-100",
                 ].join(" ")}
               >
