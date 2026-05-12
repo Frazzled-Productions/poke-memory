@@ -4,6 +4,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-12
+
 ### Changed
 
 - **Auto-labelling removed** — `auto-label.yml` (which classified issues and PRs via Claude) has been deleted. Labels on new issues and PRs are applied manually or by the workflow that creates them (e.g. the weekly digest workflows already apply all three label dimensions at creation). This reduces steady-state workflow dispatch volume. Closes #225.
@@ -204,7 +206,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.4.0
 [0.3.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.3.0
 [0.2.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.2.0
 [0.1.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.1.0
