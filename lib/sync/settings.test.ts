@@ -30,6 +30,7 @@ const SAMPLE: UserSettings = {
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
   favouriteTheme: null,
+  retentionTarget: 0.9,
 };
 
 describe("pushSettings", () => {

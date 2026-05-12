@@ -54,6 +54,7 @@ const VALID_SETTINGS: UserSettings = {
   evolutionCardsEnabled: true,
   playCryOnReveal: false,
   favouriteTheme: null,
+  retentionTarget: 0.9,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

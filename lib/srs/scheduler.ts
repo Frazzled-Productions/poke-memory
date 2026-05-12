@@ -67,7 +67,25 @@ export type ReviewState = {
 
 export type Grade = 1 | 2 | 4 | 5;
 
-const scheduler = createFsrs();
+const DEFAULT_RETENTION = 0.9;
+const defaultScheduler = createFsrs();
+
+// Small cache so a session that only uses one retention setting doesn't
+// instantiate a new FSRS object per grade. Keyed on the retention value
+// rounded to 2 decimals (matches the settings slider granularity).
+const schedulerCache = new Map<string, ReturnType<typeof createFsrs>>();
+
+function getScheduler(retention: number | undefined): ReturnType<typeof createFsrs> {
+  if (retention === undefined || retention === DEFAULT_RETENTION) {
+    return defaultScheduler;
+  }
+  const key = retention.toFixed(2);
+  const cached = schedulerCache.get(key);
+  if (cached !== undefined) return cached;
+  const fresh = createFsrs({ request_retention: retention });
+  schedulerCache.set(key, fresh);
+  return fresh;
+}
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -163,12 +181,22 @@ function fromFsrsCard(card: FsrsCard): FsrsResult {
  * FSRS is never called for B1, B2, or A1 — those touches stay inside the
  * in-step / brand-new layer and don't affect stability/difficulty.
  */
+export type NextReviewOptions = {
+  /**
+   * FSRS request_retention override (e.g. 0.85). Falls back to the
+   * library default (0.9) when omitted or set to the default value.
+   */
+  retentionTarget?: number;
+};
+
 export function nextReview(
   state: ReviewState,
   grade: Grade,
   now: Date,
+  options: NextReviewOptions = {},
 ): ReviewState {
   const today = isoDate(now);
+  const scheduler = getScheduler(options.retentionTarget);
 
   // --------------------------------------------------------------------------
   // Case B: card is currently in a learning or relearning step

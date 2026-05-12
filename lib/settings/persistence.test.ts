@@ -114,6 +114,7 @@ describe('loadSettings migration', () => {
       maxReviewsReversePerDay: 50,
       playCryOnReveal: true,
       favouriteTheme: null,
+      retentionTarget: 0.95,
     };
     saveSettings(custom);
     const loaded = loadSettings();

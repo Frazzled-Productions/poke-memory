@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import {
+  loadSettings,
+  saveSettings,
+  RETENTION_TARGET_MIN,
+  RETENTION_TARGET_MAX,
+} from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
 import { loadSession, saveSession } from "@/lib/review/persistence";
@@ -410,6 +415,46 @@ export default function SettingsPage() {
                   ))}
                 </section>
               ))}
+
+              {/* Scheduler section — FSRS knobs */}
+              <section className="flex flex-col gap-4" aria-labelledby="scheduler-heading">
+                <h2
+                  id="scheduler-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Scheduler
+                </h2>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <label
+                    htmlFor="retentionTarget"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    Recall target ({Math.round(settings.retentionTarget * 100)}%)
+                  </label>
+                  <input
+                    id="retentionTarget"
+                    type="range"
+                    min={Math.round(RETENTION_TARGET_MIN * 100)}
+                    max={Math.round(RETENTION_TARGET_MAX * 100)}
+                    step={1}
+                    value={Math.round(settings.retentionTarget * 100)}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        retentionTarget: Number(e.target.value) / 100,
+                      })
+                    }
+                    className="mt-3 w-full"
+                    aria-describedby="retentionTarget-helper"
+                  />
+                  <p
+                    id="retentionTarget-helper"
+                    className="mt-2 text-xs text-zinc-500 dark:text-zinc-400"
+                  >
+                    Lower means fewer reviews but you&apos;ll forget more cards. Higher means more reviews but better retention. Default 90%.
+                  </p>
+                </div>
+              </section>
 
               {/* Name cards section */}
               <section className="flex flex-col gap-4" aria-labelledby="name-cards-heading">
