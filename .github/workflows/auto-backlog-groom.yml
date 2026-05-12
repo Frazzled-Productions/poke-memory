@@ -33,8 +33,6 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v6
-
       - name: Mint App installation token
         id: app-token
         uses: actions/create-github-app-token@v3
@@ -45,6 +43,10 @@ jobs:
       - name: Compute ISO week key
         id: week
         run: echo "key=$(date -u +"%G-W%V")" >> "$GITHUB_OUTPUT"
+
+      - name: Compute today's date
+        id: date
+        run: echo "date=$(date -u +"%Y-%m-%d")" >> "$GITHUB_OUTPUT"
 
       - name: Idempotency check — skip if digest already exists this week
         id: idempotency
@@ -57,7 +59,7 @@ jobs:
           COUNT=$(gh issue list \
             --search "\"${TITLE}\" in:title" \
             --state all \
-            --limit 100 \
+            --limit 5 \
             --json number,title \
             --jq "[.[] | select(.title == \"${TITLE}\")] | length")
           if [ "$COUNT" -gt 0 ]; then
@@ -81,6 +83,10 @@ jobs:
             echo "area:backlog label already exists."
           fi
 
+      - name: Compute retro lookback date (60 days ago)
+        id: since
+        run: echo "since=$(date -u -d "60 days ago" +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
+
       - uses: anthropics/claude-code-action@v1
         if: steps.idempotency.outputs.skip != 'true'
         id: claude
@@ -94,7 +100,7 @@ jobs:
           prompt: |
             You are generating a weekly backlog grooming digest for this repository.
 
-            Today is $(date -u +"%Y-%m-%d"). The current ISO week is **${{ steps.week.outputs.key }}**.
+            Today is ${{ steps.date.outputs.date }}. The current ISO week is **${{ steps.week.outputs.key }}**.
 
             ## Your task
 
@@ -143,9 +149,8 @@ jobs:
 
             Also fetch recent retro comments to surface recurring friction signals:
             ```bash
-            SINCE=$(date -u -d "60 days ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-60d +"%Y-%m-%dT%H:%M:%SZ")
             gh issue list --state closed --limit 50 --json number,closedAt \
-              --jq ".[] | select(.closedAt >= \"$SINCE\") | .number"
+              --jq '.[] | select(.closedAt >= "${{ steps.since.outputs.since }}") | .number'
             ```
             For each closed issue number, fetch:
             ```bash
@@ -234,21 +239,13 @@ jobs:
 
             Valid MOVE_TYPE values: `PROMOTE`, `DEMOTE`, `LEAPFROG`, `FLAG STALE`.
 
-            Then create the issue:
+            Then create the issue and store the issue number in
+            `/tmp/digest-issue-number.txt` (just the number, no other text):
             ```bash
             gh issue create \
               --title "Weekly backlog grooming — ${{ steps.week.outputs.key }}" \
               --body-file /tmp/digest-body.md \
-              --label "area:backlog"
-            ```
-
-            Store the issue number in `/tmp/digest-issue-number.txt` (just the number,
-            no other text):
-            ```bash
-            gh issue list \
-              --search "\"Weekly backlog grooming — ${{ steps.week.outputs.key }}\" in:title" \
-              --state all --limit 1 --json number --jq '.[0].number' \
-              > /tmp/digest-issue-number.txt
+              --label "area:backlog" | grep -oE '[0-9]+$' > /tmp/digest-issue-number.txt
             ```
 
       - name: Surface tool denials
