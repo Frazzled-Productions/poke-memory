@@ -16,6 +16,15 @@
 
 **[poke-memory-alpha.vercel.app](https://poke-memory-alpha.vercel.app)** — try it now, no sign-in needed.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/practice-front.png" width="240" alt="Practice — card front" />
+  <img src="docs/screenshots/practice-flipped.png" width="240" alt="Practice — card flipped" />
+  <img src="docs/screenshots/pokedex-grid.png" width="240" alt="Pokédex grid" />
+  <img src="docs/screenshots/stats.png" width="240" alt="Stats" />
+</p>
+
 ## How a review works
 
 Each species gives you up to two cards, scheduled independently:

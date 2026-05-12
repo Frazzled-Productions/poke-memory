@@ -1,0 +1,253 @@
+/**
+ * Capture README screenshots via Playwright.
+ *
+ * Usage:
+ *   npx playwright install --with-deps chromium   # first time only
+ *   BASE_URL=http://localhost:3000 node scripts/capture-screenshots.mjs
+ *
+ * Outputs four PNGs into docs/screenshots/:
+ *   practice-front.png   – card front (sprite + "What Pokémon is this?")
+ *   practice-flipped.png – card flipped (name revealed + grade buttons)
+ *   pokedex-grid.png     – Pokédex grid showing all three disclosure tiers
+ *   stats.png            – Stats page (grade breakdown + mastery + streak)
+ *
+ * The script seeds synthetic mid-progress data into localStorage so the grid
+ * shows all three tiers (silhouette / greyscale / full colour) at once.
+ */
+
+import { chromium, devices } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
+const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "docs", "screenshots");
+
+// Storage key must match lib/review/persistence.ts
+const STORAGE_KEY = "poke-memory:review-session:v1";
+
+// Mastery: repetitions >= 3 AND interval >= 21 (matches lib/stats/derive.ts)
+const MASTERY_REPETITIONS = 3;
+const MASTERY_INTERVAL = 21;
+
+const TODAY = new Date().toISOString().slice(0, 10);
+
+function pastDate(daysAgo) {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toISOString().slice(0, 10);
+}
+
+function futureDate(daysAhead) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Build a synthetic session with three tiers:
+ *   - ids 1–15:  mastered    (full colour in Pokédex)
+ *   - ids 16–50: learning    (greyscale in Pokédex)
+ *   - ids 51–1025: unseen   (silhouette in Pokédex)
+ *
+ * Only the seen cards need to be in the session; unseen ids are absent.
+ */
+function buildSeedSession() {
+  const cards = [];
+
+  // Mastered cards (ids 1–15): repetitions=5, interval=30, due in future
+  for (let id = 1; id <= 15; id++) {
+    cards.push({
+      id,
+      cardType: "name",
+      name: `pokemon-${id}`,
+      spriteUrl: `/sprites/pokemon/${id}.png`,
+      types: ["normal"],
+      stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },
+      flavorText: "",
+      flavorTexts: [],
+      evolutionChain: [],
+      height: 10,
+      weight: 100,
+      baseExperience: 100,
+      genus: null,
+      generation: "generation-i",
+      captureRate: 45,
+      baseHappiness: 70,
+      growthRate: "medium",
+      habitat: null,
+      genderRate: 4,
+      isLegendary: false,
+      isMythical: false,
+      cryUrl: null,
+      state: {
+        repetitions: 5,
+        interval: 30,
+        easeFactor: 2.5,
+        dueDate: futureDate(15),
+        lastReview: pastDate(15),
+        firstSeen: pastDate(60),
+      },
+    });
+  }
+
+  // Learning cards (ids 16–50): reviewed but not mastered (greyscale)
+  for (let id = 16; id <= 50; id++) {
+    const reps = 1 + ((id - 16) % 2); // 1 or 2 reps — below mastery threshold
+    cards.push({
+      id,
+      cardType: "name",
+      name: `pokemon-${id}`,
+      spriteUrl: `/sprites/pokemon/${id}.png`,
+      types: ["normal"],
+      stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },
+      flavorText: "",
+      flavorTexts: [],
+      evolutionChain: [],
+      height: 10,
+      weight: 100,
+      baseExperience: 100,
+      genus: null,
+      generation: "generation-i",
+      captureRate: 45,
+      baseHappiness: 70,
+      growthRate: "medium",
+      habitat: null,
+      genderRate: 4,
+      isLegendary: false,
+      isMythical: false,
+      cryUrl: null,
+      state: {
+        repetitions: reps,
+        interval: reps === 1 ? 1 : 6,
+        easeFactor: 2.5,
+        dueDate: futureDate(reps),
+        lastReview: pastDate(1),
+        firstSeen: pastDate(10),
+      },
+    });
+  }
+
+  const limits = {
+    name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+    reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  return JSON.stringify({ cards, limits });
+}
+
+async function main() {
+  await mkdir(OUT_DIR, { recursive: true });
+
+  const browser = await chromium.launch();
+
+  try {
+    // ── Practice screenshots (iPhone 14 viewport) ──────────────────────────
+    {
+      const ctx = await browser.newContext({
+        ...devices["iPhone 14"],
+        storageState: {
+          cookies: [],
+          origins: [
+            {
+              origin: BASE_URL,
+              localStorage: [{ name: STORAGE_KEY, value: buildSeedSession() }],
+            },
+          ],
+        },
+      });
+      const page = await ctx.newPage();
+
+      await page.goto(BASE_URL, { waitUntil: "networkidle" });
+
+      // Wait for the card front to render (Reveal button or sprite visible)
+      await page.waitForSelector("button, img[alt]", { timeout: 15_000 });
+      // Extra settle time for animations
+      await page.waitForTimeout(800);
+      await page.screenshot({
+        path: join(OUT_DIR, "practice-front.png"),
+        fullPage: false,
+      });
+      console.log("  practice-front.png");
+
+      // Flip the card
+      const revealBtn = page.getByRole("button", { name: /reveal/i });
+      if (await revealBtn.isVisible()) {
+        await revealBtn.click();
+        await page.waitForTimeout(600);
+      }
+      await page.screenshot({
+        path: join(OUT_DIR, "practice-flipped.png"),
+        fullPage: false,
+      });
+      console.log("  practice-flipped.png");
+
+      await ctx.close();
+    }
+
+    // ── Pokédex grid (desktop viewport, 1280×900) ──────────────────────────
+    {
+      const ctx = await browser.newContext({
+        viewport: { width: 1280, height: 900 },
+        storageState: {
+          cookies: [],
+          origins: [
+            {
+              origin: BASE_URL,
+              localStorage: [{ name: STORAGE_KEY, value: buildSeedSession() }],
+            },
+          ],
+        },
+      });
+      const page = await ctx.newPage();
+
+      await page.goto(`${BASE_URL}/pokedex`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await page.screenshot({
+        path: join(OUT_DIR, "pokedex-grid.png"),
+        fullPage: false,
+      });
+      console.log("  pokedex-grid.png");
+
+      await ctx.close();
+    }
+
+    // ── Stats page (iPhone 14 viewport) ───────────────────────────────────
+    {
+      const ctx = await browser.newContext({
+        ...devices["iPhone 14"],
+        storageState: {
+          cookies: [],
+          origins: [
+            {
+              origin: BASE_URL,
+              localStorage: [{ name: STORAGE_KEY, value: buildSeedSession() }],
+            },
+          ],
+        },
+      });
+      const page = await ctx.newPage();
+
+      await page.goto(`${BASE_URL}/stats`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await page.screenshot({
+        path: join(OUT_DIR, "stats.png"),
+        fullPage: false,
+      });
+      console.log("  stats.png");
+
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  console.log(`\nScreenshots saved to ${OUT_DIR}`);
+  console.log("Review the images, then commit them to the branch.");
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
