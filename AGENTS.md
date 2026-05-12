@@ -238,9 +238,10 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 Two paths exist -- guest and authenticated. The constraints differ.
 
-**Guest path (unchanged)**
-- No personal data leaves the user browser. All session state lives in localStorage; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
+**Guest path**
+- All card/session data stays in the browser. Review state lives in localStorage; it is never transmitted to a server we control.
 - Sprites are self-hosted as static files under `public/sprites/pokemon/` and served from the same Vercel deployment as the app. No sprite requests leave our infrastructure.
+- **Aggregate telemetry**: Vercel Analytics and Speed Insights collect anonymous, aggregate page-view metrics (URL path, referrer, country, device type) and Core Web Vitals. This data goes to Vercel's infrastructure — it does not include card progress, review history, or any personally identifying information. Both components are rendered unconditionally in the root layout.
 
 **Authenticated path (Supabase sync)**
 - When a user signs in with GitHub, their per-card review history (SM-2 state: repetitions, interval, ease factor, due date, last review, first seen) is stored in Supabase Postgres.
