@@ -13,7 +13,7 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 ## Process
 1. Read the relevant existing code first — don't plan in a vacuum.
 2. Identify unknowns. Tag each one for the orchestrator:
-   - `[EXPERT-RESEARCH]` — has an objectively-correct answer a domain specialist can produce. Name the specialist (`next16-expert`, `pokeapi-expert`, or `srs-expert`). Example: "what conflict resolution rule preserves SM-2 scheduling integrity?" → srs-expert.
+   - `[EXPERT-RESEARCH]` — has an objectively-correct answer a domain specialist can produce. Name the specialist (`next16-expert`, `pokeapi-expert`, `srs-expert`, or `supabase-expert`). Example: "what conflict resolution rule preserves FSRS scheduling integrity?" → srs-expert. Example: "should this feature use a new table or extend `user_settings.settings`?" → supabase-expert.
    - `[USER-DECISION + RESEARCH]` — needs maintainer judgment, but a project-specific options brief from `researcher` would meaningfully improve the decision (comparative tradeoffs, current ecosystem state, what fits this codebase). Example: "which backend provider?" → researcher surveys options against this project's constraints.
    - `[USER-DECISION]` — pure preference; no research helps. Use sparingly — most "user calls" benefit from a brief.
 
@@ -24,12 +24,13 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 
    **When in doubt, default to blocker.** A false-positive blocker costs one comment round-trip; a false-negative costs a closed PR.
 3. If the change adds or modifies a user-facing page or flow, include a step for `playwright` to add or update E2E smoke tests. This step runs after implementation, before review.
-4. Break work into ordered, atomic steps. Each step has:
+4. If the change adds or modifies persisted user data — a new table, a new column on `card_reviews`, a new field in `user_settings.settings`, or a new sync flow — route the schema design through `supabase-expert` BEFORE the `data-coder` implementation step. The runbook in AGENTS.md (`### Adding a feature that needs to persist data`) is the canonical reference; the plan should point the implementer at it rather than restate it.
+5. Break work into ordered, atomic steps. Each step has:
    - **What** — one sentence
    - **Where** — file paths
    - **Done when** — acceptance criterion
-5. Mark steps that can run in parallel with ⚡ and group them.
-6. Surface risks: places likely to break, edge cases worth handling, dependencies on external systems.
+6. Mark steps that can run in parallel with ⚡ and group them.
+7. Surface risks: places likely to break, edge cases worth handling, dependencies on external systems.
 
 ## Output format
 

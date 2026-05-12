@@ -18,7 +18,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [next16-expert](.claude/agents/next16-expert.md) | Next.js 16 API, caching, routing, rendering questions | Yes |
 | [pokeapi-expert](.claude/agents/pokeapi-expert.md) | PokéAPI endpoint selection, schemas, caching strategy | Yes |
 | [srs-expert](.claude/agents/srs-expert.md) | Spaced-repetition algorithm design and implementation | No |
-| [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth + RLS + schema design for SM-2 state | Yes |
+| [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth + RLS + schema design for persisted user data (currently FSRS scheduling state on `card_reviews`, plus `streak_days`, `user_settings`, `grade_log`) | Yes |
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist | Yes |
 | [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling | No |
 | [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations | No |
@@ -91,6 +91,20 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | **What it does** | `npm ci && npm run typecheck && npm run build && npm test` |
 | **Required check** | The `test` job is the required status check for `main` (not the workflow name `CI`). Branch protection enforces strict-up-to-date; the bot app bypasses for auto-merges. |
 | **Concurrency** | Cancels concurrent runs on the same ref — only the latest push on a branch completes. |
+
+---
+
+### `migration-check.yml` — Migration drift check
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` touching `db/migrations/**`, `scripts/check-migrations.mjs`, or the workflow file itself; push to `main` |
+| **Job** | `check` |
+| **What it does** | Runs `scripts/check-migrations.mjs`, which lists files in `db/migrations/` (excluding the bootstrap `001_initial_sync_schema.sql`), calls the Supabase Management API to list applied migrations, and exits non-zero if any committed file is not in the applied list |
+| **Required secrets** | `SUPABASE_ACCESS_TOKEN` (Supabase PAT with read access), `SUPABASE_PROJECT_REF` (dashboard slug, e.g. `nvxvvtvnthsgdxgksmju`). Both must be set as repo secrets before the workflow can run; without them the script exits 2 with a clear error. |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard — same pattern as `auto-review.yml`). No secrets exposed. |
+| **Required check** | No — informational. Failure flags the gap; the recovery action is to run `mcp__supabase__apply_migration` against the named file. |
+| **Concurrency** | Cancels concurrent runs on the same ref. |
 
 ---
 
