@@ -102,7 +102,7 @@ test.describe("Settings page", () => {
     // Wait for settings to load (skeleton disappears)
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    for (const heading of ["Name cards", "About", "Backup", "Danger zone"]) {
+    for (const heading of ["Audio", "Name cards", "About", "Backup", "Danger zone"]) {
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();
     }
 
