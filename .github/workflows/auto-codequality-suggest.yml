@@ -1,0 +1,295 @@
+name: Auto Code-Quality Suggest
+
+# Weekly cron that scans app-layer source files changed in the last 30 days
+# and creates a single digest issue per ISO week with ≤5 curated improvement
+# proposals targeting tech debt, missing tests, dead code, and accessibility
+# gaps in the app codebase.
+#
+# Signal-quality constraints (A + B):
+#   A — Recency filter: only analyses files changed in the last 30 days
+#       (keeps signal fresh; avoids surfacing ancient stable code)
+#   B — Recurrence filter: only flags patterns that appear across ≥2 files
+#       (suppresses one-off nits; surfaces systemic issues)
+#
+# Idempotency: skips silently when a digest issue for the current ISO week
+# already exists (open or closed), or when nothing crosses the relevance
+# threshold.
+
+on:
+  schedule:
+    - cron: '0 9 * * 3'   # Wednesday 09:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: auto-codequality-suggest
+  cancel-in-progress: false
+
+jobs:
+  suggest:
+    name: Weekly Code-Quality Digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Compute ISO week key
+        id: week
+        run: echo "key=$(date -u +"%G-W%V")" >> "$GITHUB_OUTPUT"
+
+      - name: Compute today date
+        id: date
+        run: echo "date=$(date -u +"%Y-%m-%d")" >> "$GITHUB_OUTPUT"
+
+      - name: Idempotency check — skip if digest already exists this week
+        id: idempotency
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          WEEK_KEY: ${{ steps.week.outputs.key }}
+        run: |
+          set -euo pipefail
+          TITLE="Weekly code-quality review — ${WEEK_KEY}"
+          COUNT=$(gh issue list \
+            --search "\"${TITLE}\" in:title" \
+            --state all \
+            --limit 100 \
+            --json number,title \
+            --jq "[.[] | select(.title == \"${TITLE}\")] | length")
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Digest issue for ${WEEK_KEY} already exists — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure area:app label exists
+        if: steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          EXISTS=$(gh label list --json name --jq '[.[].name] | index("area:app") != null')
+          if [ "$EXISTS" = "false" ]; then
+            gh label create "area:app" --color "e4e669" --description "App codebase improvements"
+            echo "Created area:app label."
+          else
+            echo "area:app label already exists."
+          fi
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.idempotency.outputs.skip != 'true'
+        id: claude
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          WEEK_KEY: ${{ steps.week.outputs.key }}
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 30
+          prompt: |
+            You are generating a weekly app codebase improvement digest for this repository.
+
+            Today is ${{ steps.date.outputs.date }}. The current ISO week is **${{ steps.week.outputs.key }}**.
+
+            ## Your task
+
+            1. Build the recency list — files in `app/**`, `components/**`, `lib/**`, or
+               `db/**` changed in the last 30 days (constraint A).
+            2. Scan those files for patterns that recur across ≥2 files (constraint B).
+            3. Synthesise ≤5 curated improvement proposals covering tech debt, missing
+               tests, dead code, and accessibility gaps. Each item MUST recur across
+               ≥2 recently-changed files — one-off nits are silently dropped.
+            4. If nothing crosses the threshold, skip silently — do NOT create a digest issue.
+            5. If you have ≥1 item, create exactly one digest issue for this week
+               (title: `Weekly code-quality review — ${{ steps.week.outputs.key }}`).
+
+            ## Step 1 — Build the recency list
+
+            ```bash
+            git log --since="30 days ago" --name-only --format="" \
+              -- 'app/**' 'components/**' 'lib/**' 'db/**' \
+              | sort -u | grep -v '^$'
+            ```
+
+            This is your working set. Only analyse files on this list.
+            If the list is empty, exit cleanly with a note — no digest issue.
+
+            ## Step 2 — Scan for recurring patterns (constraint B)
+
+            Work through these signal categories sequentially. For each candidate,
+            record which files it appears in. Only keep a candidate if it appears
+            in ≥2 files from the recency list.
+
+            ### 2a. Missing co-located tests
+            Cross-reference each `lib/**` file on the recency list against:
+            ```bash
+            find . -path './lib/**' \( -name '*.test.ts' -o -name '*.test.tsx' \)
+            ```
+            Flag lib modules with no co-located test file — but only if ≥2 such
+            modules appear on the recency list.
+
+            ### 2b. Repeated inline patterns worth extracting
+            Read each file on the recency list. Look for:
+            - Identical or near-identical code blocks copy-pasted across ≥2 files
+              (e.g. the same `useEffect` shape, the same fetch pattern, the same
+              Tailwind class combination that should be a component)
+            - Inline constants that appear in ≥2 files and should be a shared export
+
+            ### 2c. Dead or unreachable exports
+            For each exported function/type in the recency list, check whether
+            it is imported anywhere in the repo:
+            ```bash
+            grep -r "<symbol>" --include="*.ts" --include="*.tsx" . | grep -v "export"
+            ```
+            Flag symbols that appear to have zero import sites — but only if ≥2
+            such symbols are found across ≥2 files.
+
+            ### 2d. Accessibility gaps
+            Read JSX in the recency list. Flag patterns that recur across ≥2 files:
+            - Interactive elements missing `aria-label` or `aria-labelledby`
+            - Images missing `alt` attributes
+            - Form inputs not associated with a `<label>`
+
+            ### 2e. Dependency upgrade opportunities
+            Check `package.json` for dependencies also used in ≥2 recently-changed
+            files that have a major version bump available. Use:
+            ```bash
+            cat package.json
+            ```
+            Do not run `npm outdated` — just note packages where you know a newer
+            major is available based on your training data. Because this relies on
+            training-data knowledge of package versions (which may be stale or
+            incorrect), items in this category MUST be recommended as
+            `priority:later` only — never `priority:now` or `priority:next`.
+
+            ## Step 3 — Synthesis rules
+
+            - Maximum 5 items. Choose the highest-signal ones.
+            - Each item MUST include:
+              - A one-line proposal (imperative: "Extract X", "Add test for Y", "Remove dead export Z")
+              - **File paths**: list every file from the recency list where the pattern was found
+              - **Evidence**: a concrete code snippet or description (≤3 lines) showing the pattern
+              - **Recommended priority**: `priority:now`, `priority:next`, or `priority:later`
+            - Do NOT auto-file individual sub-issues. The digest is for human triage.
+            - Do NOT recommend workflow, agent, or process changes — only app code improvements.
+            - Do NOT recommend changes to files outside `app/**`, `components/**`,
+              `lib/**`, or `db/**`.
+
+            ## No-op rule
+
+            If after the scan you have no candidates that meet the recurrence threshold
+            (≥2 recently-changed files), write a short note to stdout explaining what
+            you found (recency list size, categories checked, why nothing crossed the
+            threshold) and exit cleanly — **do not create a digest issue**.
+            A quiet week is fine.
+
+            ## Issue creation
+
+            If you have ≥1 item, write the digest body to `/tmp/digest-body.md`
+            in this format:
+
+            ```markdown
+            <!-- auto-codequality-suggest -->
+            ## Weekly code-quality review — WEEK_KEY
+
+            Signals scanned: files changed in `app/**`, `components/**`, `lib/**`,
+            `db/**` in the last 30 days. Only patterns recurring across ≥2 files
+            are included.
+
+            ---
+
+            ### 1. <one-line proposal>
+
+            **Files:** `path/to/a.ts`, `path/to/b.ts`
+            **Evidence:** <concrete snippet or description>
+            **Priority:** `priority:next`
+
+            ---
+
+            ### 2. ...
+            ```
+
+            Then create the issue:
+            ```
+            gh issue create \
+              --title "Weekly code-quality review — ${{ steps.week.outputs.key }}" \
+              --body-file /tmp/digest-body.md \
+              --label "area:app"
+            ```
+
+            Store the issue number in `/tmp/digest-issue-number.txt` (just the
+            number, no other text):
+            ```
+            gh issue list \
+              --search "\"Weekly code-quality review — ${{ steps.week.outputs.key }}\" in:title" \
+              --state all --limit 1 --json number --jq '.[0].number' \
+              > /tmp/digest-issue-number.txt
+            ```
+
+      - name: Surface tool denials
+        if: always() && steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -u
+          if [ ! -f "$LOG" ]; then exit 0; fi
+
+          DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          if [ "$DENIAL_COUNT" = "0" ] || [ -z "$DENIAL_COUNT" ]; then
+            echo "No tool denials."
+            exit 0
+          fi
+
+          # Try to get the digest issue number if one was created
+          ISSUE_NUM=""
+          if [ -f "/tmp/digest-issue-number.txt" ]; then
+            ISSUE_NUM=$(cat /tmp/digest-issue-number.txt | tr -d '[:space:]')
+          fi
+
+          DENIAL_DETAILS=$(jq -r '
+            def text_of:
+              if type == "string" then .
+              elif type == "array" then map(.text // "" | tostring) | join(" ")
+              else tostring end;
+            select(.type == "user")
+            | .message.content[]?
+            | select(.type == "tool_result")
+            | select((.is_error // false) == true)
+            | (.content | text_of) as $c
+            | select($c | test("permission|denied|not allowed"; "i"))
+            | $c | gsub("\\s+"; " ") | .[0:240]
+          ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+
+          {
+            printf '<!-- auto-denials:codequality-suggest -->\n'
+            printf '## %s tool denial(s) during weekly code-quality digest run\n\n' "$DENIAL_COUNT"
+            printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
+            if [ -n "$DENIAL_DETAILS" ]; then
+              printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+            fi
+          } > /tmp/denials.md
+
+          # Post on the digest issue if one was created; otherwise log to stdout
+          if [ -n "$ISSUE_NUM" ] && [ "$ISSUE_NUM" != "null" ]; then
+            gh issue comment "$ISSUE_NUM" --repo "$REPO" --body-file /tmp/denials.md
+          else
+            echo "No digest issue to comment on — denial details logged to stdout only."
+            cat /tmp/denials.md
+          fi
