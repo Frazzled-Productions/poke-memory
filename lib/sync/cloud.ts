@@ -53,12 +53,67 @@ export async function hasCloudData(
   }
 }
 
+// FSRS state ↔ SM-2-shaped CloudRow adapter. The cloud schema is still on
+// SM-2 columns until issue #264 lands; until then we encode FSRS-shape state
+// onto the SM-2 columns lossily on push and reverse the conversion on pull.
+//
+// Outbound (push) mapping:
+//   repetitions ← reps
+//   interval    ← scheduledDays
+//   ease_factor ← 2.5 - (difficulty - 1) * 1.2 / 9   (FSRS difficulty 1..10 → SM-2 ease 2.5..1.3)
+// Inbound (pull) mapping mirrors the localStorage migration in
+// `migrateReviewState`: a graduated SM-2 row maps to stability=interval,
+// difficulty inverted from ease_factor, fsrsState='review'.
+function fsrsStateToSm2Fields(state: ReviewableCard["state"]): {
+  repetitions: number;
+  interval: number;
+  ease_factor: number;
+} {
+  const ease = 2.5 - ((state.difficulty - 1) * 1.2) / 9;
+  return {
+    repetitions: state.reps,
+    interval: state.scheduledDays,
+    ease_factor: Math.min(2.5, Math.max(1.3, ease)),
+  };
+}
+
+function sm2FieldsToFsrsState(
+  row: Pick<CloudRow, "repetitions" | "interval" | "ease_factor" | "last_review">,
+): Pick<
+  ReviewableCard["state"],
+  "stability" | "difficulty" | "elapsedDays" | "scheduledDays" | "reps" | "lapses" | "fsrsState"
+> {
+  const isGraduated = row.repetitions > 0 || row.last_review !== null;
+  if (!isGraduated) {
+    return {
+      stability: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      scheduledDays: 0,
+      reps: 0,
+      lapses: 0,
+      fsrsState: "new",
+    };
+  }
+  const raw = 10 - (9 * (row.ease_factor - 1.3)) / 1.2;
+  return {
+    stability: Math.max(1, row.interval),
+    difficulty: Math.min(10, Math.max(1, raw)),
+    elapsedDays: 0,
+    scheduledDays: row.interval,
+    reps: row.repetitions,
+    lapses: 0,
+    fsrsState: "review",
+  };
+}
+
 function toCloudRow(card: ReviewableCard): CloudRow {
+  const sm2 = fsrsStateToSm2Fields(card.state);
   return {
     pokemon_id: card.id,
-    repetitions: card.state.repetitions,
-    interval: card.state.interval,
-    ease_factor: card.state.easeFactor,
+    repetitions: sm2.repetitions,
+    interval: sm2.interval,
+    ease_factor: sm2.ease_factor,
     due_date: card.state.dueDate,
     last_review: card.state.lastReview,
     first_seen: card.state.firstSeen,
@@ -124,13 +179,14 @@ export async function pushSingleCard(
     return false;
   }
   try {
+    const sm2 = fsrsStateToSm2Fields(card.state);
     const { error } = await client.from("card_reviews").upsert(
       {
         user_id: userId,
         pokemon_id: card.id,
-        repetitions: card.state.repetitions,
-        interval: card.state.interval,
-        ease_factor: card.state.easeFactor,
+        repetitions: sm2.repetitions,
+        interval: sm2.interval,
+        ease_factor: sm2.ease_factor,
         due_date: card.state.dueDate,
         last_review: card.state.lastReview,
         first_seen: card.state.firstSeen,
@@ -223,22 +279,25 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
       ...card,
       state: {
         ...card.state,
-        repetitions: 0,
-        interval: 0,
-        easeFactor: 2.5,
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "new",
         dueDate: row.due_date,
         lastReview: null,
         firstSeen: null,
       },
     };
   }
+  const fsrs = sm2FieldsToFsrsState(row);
   return {
     ...card,
     state: {
       ...card.state,
-      repetitions: row.repetitions,
-      interval: row.interval,
-      easeFactor: row.ease_factor,
+      ...fsrs,
       dueDate: row.due_date,
       lastReview: row.last_review,
       firstSeen: row.first_seen,

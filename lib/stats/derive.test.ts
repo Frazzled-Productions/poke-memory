@@ -13,9 +13,13 @@ const TODAY = "2026-05-10";
 
 function state(overrides: Partial<ReviewState> = {}): ReviewState {
   return {
-    repetitions: 0,
-    interval: 0,
-    easeFactor: 2.5,
+    stability: 0,
+    difficulty: 0,
+    elapsedDays: 0,
+    scheduledDays: 0,
+    reps: 0,
+    lapses: 0,
+    fsrsState: "new",
     dueDate: TODAY,
     lastReview: null,
     firstSeen: null,
@@ -63,29 +67,29 @@ describe("isMastered", () => {
   });
 
   it("returns false when reps met but interval below threshold", () => {
-    expect(isMastered(state({ repetitions: MASTERY_REPETITIONS, interval: MASTERY_INTERVAL_DAYS - 1 }))).toBe(false);
+    expect(isMastered(state({ reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS - 1 }))).toBe(false);
   });
 
   it("returns false when interval met but reps below threshold", () => {
-    expect(isMastered(state({ repetitions: MASTERY_REPETITIONS - 1, interval: MASTERY_INTERVAL_DAYS }))).toBe(false);
+    expect(isMastered(state({ reps:MASTERY_REPETITIONS - 1, scheduledDays: MASTERY_INTERVAL_DAYS }))).toBe(false);
   });
 
   it("returns true when both reps and interval meet thresholds exactly", () => {
-    expect(isMastered(state({ repetitions: MASTERY_REPETITIONS, interval: MASTERY_INTERVAL_DAYS }))).toBe(true);
+    expect(isMastered(state({ reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }))).toBe(true);
   });
 
   it("returns true when both exceed thresholds", () => {
-    expect(isMastered(state({ repetitions: 5, interval: 60 }))).toBe(true);
+    expect(isMastered(state({ reps:5, scheduledDays: 60 }))).toBe(true);
   });
 
   it("respects a custom masteryRepetitions parameter", () => {
-    const s = state({ repetitions: 5, interval: MASTERY_INTERVAL_DAYS });
+    const s = state({ reps:5, scheduledDays: MASTERY_INTERVAL_DAYS });
     expect(isMastered(s, 5)).toBe(true);
     expect(isMastered(s, 6)).toBe(false);
   });
 
   it("cards with high reps but interval < 21 are NOT mastered (regressions from old single-threshold gate)", () => {
-    expect(isMastered(state({ repetitions: 10, interval: 20 }))).toBe(false);
+    expect(isMastered(state({ reps:10, scheduledDays: 20 }))).toBe(false);
   });
 });
 
@@ -99,19 +103,19 @@ describe("classifyCard", () => {
   });
 
   it("classifies card reviewed once but below mastery as learning", () => {
-    expect(classifyCard(card(1, { lastReview: TODAY, repetitions: 1, interval: 1 }))).toBe("learning");
+    expect(classifyCard(card(1, { lastReview: TODAY, reps:1, scheduledDays: 1 }))).toBe("learning");
   });
 
   it("classifies card with high reps but low interval as learning", () => {
-    expect(classifyCard(card(1, { lastReview: TODAY, repetitions: MASTERY_REPETITIONS, interval: MASTERY_INTERVAL_DAYS - 1 }))).toBe("learning");
+    expect(classifyCard(card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS - 1 }))).toBe("learning");
   });
 
   it("classifies card meeting both thresholds as mastered", () => {
-    expect(classifyCard(card(1, { lastReview: TODAY, repetitions: MASTERY_REPETITIONS, interval: MASTERY_INTERVAL_DAYS }))).toBe("mastered");
+    expect(classifyCard(card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }))).toBe("mastered");
   });
 
   it("respects custom masteryRepetitions", () => {
-    const c = card(1, { lastReview: TODAY, repetitions: 3, interval: MASTERY_INTERVAL_DAYS });
+    const c = card(1, { lastReview: TODAY, reps:3, scheduledDays: MASTERY_INTERVAL_DAYS });
     expect(classifyCard(c, 3)).toBe("mastered");
     expect(classifyCard(c, 4)).toBe("learning");
   });
@@ -123,21 +127,21 @@ describe("classifyCard", () => {
 
 describe("computeStats mastery boundary", () => {
   it("does not count card with reps >= threshold but interval < 21 as mastered", () => {
-    const cards = [card(1, { lastReview: TODAY, repetitions: MASTERY_REPETITIONS, interval: MASTERY_INTERVAL_DAYS - 1 })];
+    const cards = [card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS - 1 })];
     const result = computeStats(cards, TODAY);
     expect(result.mastered).toBe(0);
     expect(result.learning).toBe(1);
   });
 
   it("counts card meeting both thresholds as mastered", () => {
-    const cards = [card(1, { lastReview: TODAY, repetitions: MASTERY_REPETITIONS, interval: MASTERY_INTERVAL_DAYS })];
+    const cards = [card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS })];
     const result = computeStats(cards, TODAY);
     expect(result.mastered).toBe(1);
     expect(result.learning).toBe(0);
   });
 
   it("respects caller-supplied masteryRepetitions parameter", () => {
-    const cards = [card(1, { lastReview: TODAY, repetitions: 3, interval: MASTERY_INTERVAL_DAYS })];
+    const cards = [card(1, { lastReview: TODAY, reps:3, scheduledDays: MASTERY_INTERVAL_DAYS })];
     expect(computeStats(cards, TODAY, 10, 3).mastered).toBe(1);
     expect(computeStats(cards, TODAY, 10, 4).mastered).toBe(0);
   });
@@ -147,7 +151,7 @@ describe("computeStats mastery boundary", () => {
     // stats page, so reverse cards never reach it. This test documents that
     // expectation: passing only name cards keeps totalCards at the name-card count.
     const nameCards = [
-      card(1, { lastReview: TODAY, repetitions: MASTERY_REPETITIONS, interval: MASTERY_INTERVAL_DAYS }),
+      card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }),
       card(2),
     ];
     const result = computeStats(nameCards, TODAY);
