@@ -31,7 +31,12 @@ import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { appendGradeEntry } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
+import { QueueCounterRow } from "@/components/review/QueueCounterRow";
+import { previewIntervals } from "@/lib/srs/intervalPreview";
 
+
+// Pull learning cards forward when due within this window (Anki default: 20 min).
+const LEARN_AHEAD_MS = 20 * 60_000;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -479,19 +484,19 @@ export function ReviewSession() {
       }
     : limits;
 
-  const { reviewQueue, newQueue, perType } = buildSessionQueues(
+  const { reviewQueue, newQueue, perType, learningCardIds } = buildSessionQueues(
     cards,
     effectiveLimits,
     today,
   );
 
-  // --- Learning-queue priority ---
+  // --- Learning-queue priority (with learn-ahead) ---
   const now = Date.now();
   const dueLearning = learningQueue
     .filter((e) => e.dueAt <= now)
     .sort((a, b) => a.dueAt - b.dueAt);
 
-  const currentLearningEntry = dueLearning.length > 0 ? dueLearning[0] : null;
+  let currentLearningEntry = dueLearning.length > 0 ? dueLearning[0] : null;
 
   // Resolve the current card: learning first, then review/new.
   let currentCardId: number | null;
@@ -499,6 +504,20 @@ export function ReviewSession() {
     currentCardId = currentLearningEntry.cardId;
   } else {
     currentCardId = getNextCardId(reviewQueue, newQueue);
+
+    // Learn-ahead: only when there are no other cards to show. Pull the
+    // earliest learning card forward if it's within LEARN_AHEAD_MS.
+    // This avoids the "wait N minutes" screen when the queue is otherwise
+    // empty (matches Anki's default 20-minute learn-ahead behavior).
+    if (currentCardId === null) {
+      const ahead = learningQueue
+        .filter((e) => e.dueAt > now && e.dueAt <= now + LEARN_AHEAD_MS)
+        .sort((a, b) => a.dueAt - b.dueAt);
+      if (ahead.length > 0) {
+        currentLearningEntry = ahead[0];
+        currentCardId = ahead[0].cardId;
+      }
+    }
   }
 
   const currentCard =
@@ -513,6 +532,16 @@ export function ReviewSession() {
       ? (cards.find((c) => c.id === revealedCardId.current) ?? null)
       : null;
   const effectiveCard = lockedCard ?? currentCard;
+
+  // Per-button interval previews — computed for every render (O(1) per grade, cheap).
+  const gradePreviewsOrNull =
+    effectiveCard !== null ? previewIntervals(effectiveCard.state, new Date()) : null;
+
+  // Queue counters: sourced from buildSessionQueues so newCount and reviewCount
+  // reflect the daily-capped queue sizes, matching what actually gets served.
+  const newCount = newQueue.length;
+  const learningCount = learningCardIds.length;
+  const reviewCount = reviewQueue.length;
 
   // --- Determine end state when there is no current card ---
   function resolveEndState(): EndState {
@@ -561,18 +590,30 @@ export function ReviewSession() {
   }
 
   if (effectiveCard === null) {
-    // If there are pending (future-due) learning cards, show the countdown.
+    // If there are pending (future-due) learning cards beyond the learn-ahead
+    // window, show the countdown. Cards within LEARN_AHEAD_MS are already
+    // served via currentLearningEntry above and won't reach this branch.
     if (learningQueue.length > 0) {
-      const earliestDueAt = Math.min(...learningQueue.map((e) => e.dueAt));
-      return (
-        <CountdownScreen
-          dueAt={earliestDueAt}
-          perType={perType}
-          nameEnabled={nameCardsEnabled}
-          evolutionEnabled={evolutionCardsEnabled}
-          reverseEnabled={reverseEnabled}
-        />
-      );
+      const futureLearning = learningQueue.filter((e) => e.dueAt > now);
+      if (futureLearning.length > 0) {
+        const earliestDueAt = Math.min(...futureLearning.map((e) => e.dueAt));
+        return (
+          <div className="flex flex-col items-center gap-6">
+            <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
+            <CountdownScreen
+              dueAt={earliestDueAt}
+              perType={perType}
+              nameEnabled={nameCardsEnabled}
+              evolutionEnabled={evolutionCardsEnabled}
+              reverseEnabled={reverseEnabled}
+            />
+          </div>
+        );
+      }
+      // futureLearning is empty: all entries are overdue. Overdue entries
+      // populate dueLearning → currentLearningEntry → a non-null effectiveCard,
+      // so reaching this branch with effectiveCard === null is unreachable.
+      // Fall through to resolveEndState() safely.
     }
 
     const endState = resolveEndState();
@@ -699,6 +740,7 @@ export function ReviewSession() {
           distractors={reverseDistractors}
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}
         />
+        <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
         <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
         <GradeBreakdownBar
           again={sessionGrades[1]}
@@ -733,7 +775,11 @@ export function ReviewSession() {
       )}
 
       {revealed ? (
-        <GradeButtons onGrade={handleGrade} disabled={grading} />
+        <GradeButtons
+          onGrade={handleGrade}
+          disabled={grading}
+          previews={gradePreviewsOrNull ?? undefined}
+        />
       ) : (
         <button
           type="button"
@@ -744,6 +790,7 @@ export function ReviewSession() {
         </button>
       )}
 
+      <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
       <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
       <GradeBreakdownBar
         again={sessionGrades[1]}

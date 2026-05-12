@@ -325,3 +325,34 @@ export function getNextCardId(
   if (newQueue.length > 0) return newQueue[0];
   return null;
 }
+
+/**
+ * Counts cards by Anki-style queue category.
+ *
+ * - newCount: never-reviewed cards not in a learning step
+ * - learningCount: all cards currently in a learning/relearning step (both pending and due)
+ * - reviewCount: graduated cards due today or earlier, not already reviewed today
+ *
+ * Pure — no I/O.
+ */
+export function buildQueueCounters(
+  cards: readonly ReviewableCard[],
+  today: string,
+): { newCount: number; learningCount: number; reviewCount: number } {
+  let newCount = 0;
+  let learningCount = 0;
+  let reviewCount = 0;
+
+  for (const card of cards) {
+    const s = card.state;
+    if (s.learningStep !== null) {
+      learningCount += 1;
+    } else if (s.lastReview === null) {
+      newCount += 1;
+    } else if (s.dueDate <= today && s.lastReview !== today) {
+      reviewCount += 1;
+    }
+  }
+
+  return { newCount, learningCount, reviewCount };
+}
