@@ -4,6 +4,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-12
+
 ### Added
 
 - **Copyright footer** — a "© [year] Frazzled Productions" notice now appears at the bottom of every page.
@@ -15,6 +17,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 ### Fixed
 
 - **CI: `label-pr` job in `auto-label.yml` no longer fails on every fresh PR** — the job was missing an `actions/checkout` step before the Claude action, causing `git fetch` to exit with code 128. Mirrors the checkout step already present in the sibling `label` job. Closes #215.
+- **CI: `auto-backlog-groom.yml` no longer crashes on first `gh` call** — the workflow was missing an `actions/checkout@v6` step, causing `gh` to fail with `fatal: not a git repository` before any issue data could be fetched. Closes #216.
 - **Sync: storage-full condition no longer silently loses a day's progress** — three interacting bugs caused a full review session to vanish when localStorage ran out of space: (1) name-card payloads were serialized with large seed-only arrays (`flavorTexts`, `evolutionChain`) inflating the session to ~2.5 MB on mobile browsers; (2) `pullAndMerge` ignored `saveSession` failures and dispatched a stale `StorageEvent`; (3) the manual sync button reported "all synced" even when the local write failed. The fix strips the large arrays from all card types before serialization (they are re-injected from the seed on every mount), propagates write failures out of `pullAndMerge`, and surfaces a storage-full error message on the manual sync button instead of a false success. Closes #208.
 
 ## [0.1.0] — 2026-05-11
@@ -182,5 +185,6 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.2.0
 [0.1.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.1.0
