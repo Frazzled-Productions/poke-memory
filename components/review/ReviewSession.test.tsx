@@ -278,7 +278,9 @@ describe("ReviewSession reverse card flow", () => {
     await act(async () => { vi.advanceTimersByTime(700); });
     vi.useRealTimers();
 
-    const tiles = screen.getAllByRole("button");
+    const tiles = screen
+      .getAllByRole("button")
+      .filter((b) => !/undo/i.test(b.getAttribute("aria-label") ?? ""));
     expect(tiles).toHaveLength(4);
     tiles.forEach((tile) => expect(tile).not.toBeDisabled());
   });
@@ -302,7 +304,10 @@ describe("ReviewSession reverse card flow", () => {
     act(() => { fireEvent.click(incorrectTile); });
 
     // Tiles are disabled immediately and the correct-answer label appears.
-    screen.getAllByRole("button").forEach((tile) => expect(tile).toBeDisabled());
+    screen
+      .getAllByRole("button")
+      .filter((b) => !/undo/i.test(b.getAttribute("aria-label") ?? ""))
+      .forEach((tile) => expect(tile).toBeDisabled());
     expect(
       screen.getByText(new RegExp(`correct answer was ${targetName}`, "i")),
     ).toBeInTheDocument();
@@ -311,7 +316,9 @@ describe("ReviewSession reverse card flow", () => {
     await act(async () => { vi.advanceTimersByTime(1300); });
     vi.useRealTimers();
 
-    const nextTiles = screen.getAllByRole("button");
+    const nextTiles = screen
+      .getAllByRole("button")
+      .filter((b) => !/undo/i.test(b.getAttribute("aria-label") ?? ""));
     expect(nextTiles).toHaveLength(4);
     nextTiles.forEach((tile) => expect(tile).not.toBeDisabled());
   });

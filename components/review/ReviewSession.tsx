@@ -30,7 +30,7 @@ import { playCry } from "@/lib/audio/cry";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
-import { appendGradeEntry } from "@/lib/gradelog/persistence";
+import { appendGradeEntry, removeGradeEntry } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 import { previewIntervals } from "@/lib/srs/intervalPreview";
@@ -46,6 +46,16 @@ const LEARN_AHEAD_MS = 20 * 60_000;
 type EndState = "SESSION_COMPLETE" | "REVIEW_SOFT_WALL" | "NEW_CARDS_LOCKED";
 
 type LearningQueueEntry = { cardId: number; dueAt: number };
+
+type UndoSnapshot = {
+  cards: ReviewableCard[];
+  sessionGrades: Record<Grade, number>;
+  learningQueue: LearningQueueEntry[];
+  cardId: number;
+  // `occurredAt` of the grade-log entry written by this grade — used to
+  // pop the entry back out on undo. `null` if appendGradeEntry failed.
+  gradeLogOccurredAt: number | null;
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -310,6 +320,9 @@ export function ReviewSession() {
   // Live session grade tally — resets on page navigation by design. Labelled
   // "this session" in the UI to set expectations.
   const [sessionGrades, setSessionGrades] = useState<Record<Grade, number>>({ 1: 0, 2: 0, 4: 0, 5: 0 });
+  // Single-step undo: snapshot of pre-grade state. Captured in handleGrade
+  // and consumed by handleUndo. Cleared when the next grade fires.
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
 
   const { quotaExceeded, dismiss, notifySaveResult } = useStorageQuota();
 
@@ -448,6 +461,38 @@ export function ReviewSession() {
       }
     };
   }, [learningQueue]);
+
+  // Cmd/Ctrl+Z triggers undo while an undo snapshot is live. Listener is
+  // attached unconditionally so the hook order stays stable across early
+  // returns; the body short-circuits when there is nothing to undo.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (undoSnapshot === null || grading) return;
+      if (
+        (e.key === "z" || e.key === "Z") &&
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey
+      ) {
+        e.preventDefault();
+        // Inline so the effect can be declared above all the function
+        // definitions later in the component.
+        setCards(undoSnapshot.cards);
+        setSessionGrades(undoSnapshot.sessionGrades);
+        setLearningQueue(undoSnapshot.learningQueue);
+        notifySaveResult(saveSession({ cards: undoSnapshot.cards, limits }));
+        if (undoSnapshot.gradeLogOccurredAt !== null) {
+          removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
+        }
+        revealedCardId.current = undoSnapshot.cardId;
+        setRevealed(true);
+        setUndoSnapshot(null);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // notifySaveResult and limits are stable inside the same render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [undoSnapshot, grading, limits]);
 
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
@@ -612,6 +657,16 @@ export function ReviewSession() {
         return (
           <div className="flex flex-col items-center gap-6">
             <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
+        {undoSnapshot !== null && (
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="min-h-[36px] rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            aria-label="Undo last grade"
+          >
+            Undo last grade (⌘Z)
+          </button>
+        )}
             <CountdownScreen
               dueAt={earliestDueAt}
               perType={perType}
@@ -692,6 +747,16 @@ export function ReviewSession() {
     if (cards === null) return;
     setGrading(true);
 
+    // Snapshot the pre-grade state for single-step undo. The previous
+    // snapshot (if any) is replaced — undo is one-deep, not a stack.
+    const snapshot: UndoSnapshot = {
+      cards,
+      sessionGrades,
+      learningQueue,
+      cardId: effectiveCard.id,
+      gradeLogOccurredAt: null,
+    };
+
     const now = new Date();
     const nextState = nextReview(effectiveCard.state, grade, now, {
       retentionTarget: loadSettings().retentionTarget,
@@ -702,7 +767,9 @@ export function ReviewSession() {
 
     notifySaveResult(saveSession({ cards: newCards, limits }));
     recordReview(todayString(now));
-    appendGradeEntry({ date: todayString(now), grade, cardType: effectiveCard.cardType });
+    const appended = appendGradeEntry({ date: todayString(now), grade, cardType: effectiveCard.cardType });
+    snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
+    setUndoSnapshot(snapshot);
     enqueueGrade({ ...effectiveCard, state: nextState });
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
@@ -742,6 +809,23 @@ export function ReviewSession() {
     setGrading(false);
   }
 
+  function handleUndo() {
+    if (undoSnapshot === null || grading) return;
+    // Revert local state to the pre-grade snapshot.
+    setCards(undoSnapshot.cards);
+    setSessionGrades(undoSnapshot.sessionGrades);
+    setLearningQueue(undoSnapshot.learningQueue);
+    notifySaveResult(saveSession({ cards: undoSnapshot.cards, limits }));
+    if (undoSnapshot.gradeLogOccurredAt !== null) {
+      removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
+    }
+    // Make the undone card the current revealed card so the user lands
+    // back on the prompt they just graded.
+    revealedCardId.current = undoSnapshot.cardId;
+    setRevealed(true);
+    setUndoSnapshot(null);
+  }
+
   // --- Active review UI ---
 
   // Reverse cards use the SpritePicker (multiple-choice); no reveal step.
@@ -768,6 +852,16 @@ export function ReviewSession() {
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}
         />
         <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
+        {undoSnapshot !== null && (
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="min-h-[36px] rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            aria-label="Undo last grade"
+          >
+            Undo last grade (⌘Z)
+          </button>
+        )}
         <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
         <GradeBreakdownBar
           again={sessionGrades[1]}
