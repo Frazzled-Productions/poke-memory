@@ -1,0 +1,33 @@
+name: Migration drift check
+
+on:
+  pull_request:
+    paths:
+      - "db/migrations/**"
+      - "scripts/check-migrations.mjs"
+      - ".github/workflows/migration-check.yml"
+  push:
+    branches: [main]
+
+concurrency:
+  group: migration-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    # Fork PRs don't see secrets — skip rather than fail. Same guard as auto-review.yml.
+    if: github.event.pull_request.head.repo.fork == false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Check that db/migrations/* is applied to the live project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: node scripts/check-migrations.mjs
