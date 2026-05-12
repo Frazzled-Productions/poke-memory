@@ -32,23 +32,21 @@ jobs:
           set -euo pipefail
 
           NOW=$(date -u +%s)
-          THRESHOLD=$(( AGE_MINUTES * 60 ))
+          THRESHOLD=$(( $AGE_MINUTES * 60 ))
 
           echo "Fetching open non-draft PRs..."
           PRS=$(gh pr list \
             --repo "$REPO" \
             --state open \
-            --json number,headRefOid,isDraft,createdAt,headRepositoryOwner,headRepository \
+            --json number,headRefOid,isDraft,createdAt,headRepository \
             --limit 100)
 
-          OWNER=$(echo "$REPO" | cut -d/ -f1)
-
-          echo "$PRS" | jq -c '.[]' | while IFS= read -r pr; do
+          while IFS= read -r pr; do
             NUMBER=$(echo "$pr" | jq -r '.number')
             SHA=$(echo "$pr" | jq -r '.headRefOid')
             IS_DRAFT=$(echo "$pr" | jq -r '.isDraft')
             CREATED_AT=$(echo "$pr" | jq -r '.createdAt')
-            HEAD_OWNER=$(echo "$pr" | jq -r '.headRepositoryOwner.login')
+            IS_FORK=$(echo "$pr" | jq -r '.headRepository.isFork')
 
             # Skip drafts
             if [ "$IS_DRAFT" = "true" ]; then
@@ -56,14 +54,18 @@ jobs:
               continue
             fi
 
-            # Skip fork PRs (head repo owner differs from the repo owner)
-            if [ "$HEAD_OWNER" != "$OWNER" ]; then
-              echo "PR #$NUMBER: fork PR (head owner: $HEAD_OWNER), skipping"
+            # Skip fork PRs
+            if [ "$IS_FORK" = "true" ]; then
+              echo "PR #$NUMBER: fork PR, skipping"
               continue
             fi
 
             # Skip PRs younger than the threshold
             PR_TIME=$(date -u -d "$CREATED_AT" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo 0)
+            if [ "$PR_TIME" -eq 0 ]; then
+              echo "PR #$NUMBER: malformed timestamp '$CREATED_AT', skipping"
+              continue
+            fi
             AGE=$(( NOW - PR_TIME ))
             if [ "$AGE" -lt "$THRESHOLD" ]; then
               echo "PR #$NUMBER: only ${AGE}s old (threshold ${THRESHOLD}s), skipping"
@@ -88,8 +90,8 @@ jobs:
             DEDUP_MARKER="<!-- pr-check-monitor:$SHA -->"
             EXISTING=$(gh pr view "$NUMBER" --repo "$REPO" \
               --json comments \
-              --jq ".comments[] | select(.body | contains(\"$DEDUP_MARKER\")) | .body" \
-              2>/dev/null | head -1 || echo "")
+              2>/dev/null | jq -r --arg marker "$DEDUP_MARKER" \
+              '.comments[] | select(.body | contains($marker)) | .body' | head -1 || echo "")
 
             if [ -n "$EXISTING" ]; then
               echo "PR #$NUMBER: dedup marker already exists for SHA ${SHA:0:7}, skipping"
@@ -111,7 +113,7 @@ The \`test\` check has no record at \`${SHA:0:7}\` — this typically means GitH
 2. Push an empty commit to re-trigger CI on this PR:
    \`\`\`
    git fetch origin
-   git checkout $(gh pr view $NUMBER --repo $REPO --json headRefName --jq .headRefName)
+   git checkout \$(gh pr view \$NUMBER --repo \$REPO --json headRefName --jq .headRefName)
    git commit --allow-empty -m "chore: re-trigger CI after dispatch throttle"
    git push
    \`\`\`
@@ -120,4 +122,4 @@ See the \`pr-check-monitor\` workflow and WORKFLOW.md for full context.
 EOF
 )"
             echo "PR #$NUMBER: alert comment posted"
-          done
+          done < <(echo "$PRS" | jq -c '.[]')

@@ -212,7 +212,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Dedup** | The SHA-scoped HTML marker prevents duplicate alerts on the same HEAD commit. Re-running on a healthy PR (CI dispatched) produces no comment. |
 | **Why schedule?** | `schedule`-triggered workflows operate on GitHub's internal cron queue, independently of webhook dispatch — they continue firing even when `push`/`pull_request` event dispatch is throttled. |
 | **Permissions** | `contents: read`, `pull-requests: write`. `GITHUB_TOKEN` only — no Claude, no App token. |
-| **Recovery time** | A stuck PR receives an alert within ≤30 minutes of the 20-minute threshold passing (15-minute cron interval + up to 15 minutes of GitHub cron jitter). |
+| **Recovery time** | A stuck PR typically receives an alert within 30 minutes of the 20-minute threshold passing (15-minute cron interval plus GitHub cron jitter, which can exceed 15 minutes under load). |
 
 ---
 
