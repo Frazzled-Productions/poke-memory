@@ -124,10 +124,9 @@ jobs:
           STATE=$(gh pr view "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
             --json statusCheckRollup \
-            --jq '[.statusCheckRollup[] | select(.context == "test")] | first | .state // "UNKNOWN"')
-          echo "ci_state=$STATE" >> "$GITHUB_OUTPUT"
+            --jq '[.statusCheckRollup[] | select(.name == "test")] | first | .state // "UNKNOWN"')
           echo "CI state at HEAD: $STATE"
-          if [[ "$STATE" == "FAILURE" ]]; then
+          if [[ "$STATE" == "FAILURE" || "$STATE" == "ERROR" ]]; then
             echo "CI_FAILING_AT_HEAD=true" >> "$GITHUB_ENV"
           fi
 
@@ -276,21 +275,21 @@ jobs:
                  REPO="${GITHUB_REPOSITORY}"
                  DEADLINE=$(( $(date +%s) + 600 ))
                  while true; do
-                   STATUS=$(gh api "repos/${REPO}/commits/${PUSHED_SHA}/check-runs" \
-                     --jq '[.check_runs[] | select(.name == "test")] | first | .status // "not_found"')
-                   CONCLUSION=$(gh api "repos/${REPO}/commits/${PUSHED_SHA}/check-runs" \
-                     --jq '[.check_runs[] | select(.name == "test")] | first | .conclusion // ""')
+                   CHECK=$(gh api "repos/${REPO}/commits/${PUSHED_SHA}/check-runs" \
+                     --jq '[.check_runs[] | select(.name == "test")] | first | {status: (.status // "not_found"), conclusion: (.conclusion // "")}')
+                   STATUS=$(jq -r '.status' <<< "$CHECK")
+                   CONCLUSION=$(jq -r '.conclusion' <<< "$CHECK")
                    if [[ "$STATUS" == "completed" ]]; then break; fi
                    if [[ $(date +%s) -gt $DEADLINE ]]; then
                      gh pr comment ${{ github.event.issue.number }} \
-                       --body "CI check timed out after 10 minutes on $(git rev-parse --short HEAD). Not posting an auto-review until CI has a definitive result — push a new commit or check manually."
+                       --body "CI check timed out after 10 minutes on ${PUSHED_SHA:0:7}. Not posting an auto-review until CI has a definitive result — push a new commit or check manually."
                      exit 0
                    fi
                    sleep 30
                  done
                  if [[ "$CONCLUSION" != "success" ]]; then
                    gh pr comment ${{ github.event.issue.number }} \
-                     --body "CI failed on $(git rev-parse --short HEAD) (conclusion: ${CONCLUSION}). Not posting an LGTM auto-review on a red commit — \`ci-failure-autofix.yml\` will post a new \`/fix\` with the log excerpt."
+                     --body "CI failed on ${PUSHED_SHA:0:7} (conclusion: ${CONCLUSION}). Not posting an LGTM auto-review on a red commit — \`ci-failure-autofix.yml\` will post a new \`/fix\` with the log excerpt."
                    exit 0
                  fi
                  ```
