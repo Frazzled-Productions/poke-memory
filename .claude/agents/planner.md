@@ -32,6 +32,16 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 6. Surface risks: places likely to break, edge cases worth handling, dependencies on external systems.
 
 ## Output format
+
+**First line of your response** must be the plan metadata HTML comment:
+```
+<!-- plan-meta: base=<SHA> files=<comma-separated-list> -->
+```
+- `base` = run `git rev-parse origin/main` (Bash tool) and use the result.
+- `files` = comma-separated list (no spaces, no trailing comma) of every file the plan explicitly modifies or creates — the same set you count for the scope warning. When the plan touches no code files (pure-docs change), emit `files=` (empty value).
+
+This line is consumed by the implement job's staleness gate. It must be the literal first line, before the Goal heading.
+
 1. **Goal** — one sentence.
 2. **Open questions** — list, each prefixed with its tag. Always name the specialist for `[EXPERT-RESEARCH]`; always note `researcher` for `[USER-DECISION + RESEARCH]`; omit the agent for `[USER-DECISION]`. The orchestrator uses the tag to decide whether to dispatch a specialist, dispatch the researcher, or pass the question through to the maintainer as-is.
 3. **Plan** — numbered steps. Use ⚡ for parallelizable groups.
