@@ -20,6 +20,14 @@ export type GradeTotals = Record<Grade, number>;
 
 const STORAGE_KEY = "poke-memory:grade-log:v1";
 
+/**
+ * Fires on every successful `appendGradeEntry`. The detail is the stamped
+ * `GradeLogEntry` that was just persisted. Consumed by
+ * `components/sync/AutoSyncOnChange.tsx` (#319) to push the entry to
+ * Supabase without waiting for the next manual Sync.
+ */
+export const GRADE_LOG_APPENDED_EVENT = "poke-memory:grade-log-appended";
+
 const EMPTY_TOTALS: GradeTotals = { 1: 0, 2: 0, 4: 0, 5: 0 };
 
 function isGrade(v: unknown): v is Grade {
@@ -90,6 +98,9 @@ export function appendGradeEntry(entry: Omit<GradeLogEntry, "occurredAt">): void
     const pruned = pruneGradeLog(loadGradeLog(), 365, entry.date);
     pruned.push(stamped);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+    window.dispatchEvent(
+      new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: stamped }),
+    );
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
       console.warn("poke-memory: grade log write failed — localStorage quota exceeded");
