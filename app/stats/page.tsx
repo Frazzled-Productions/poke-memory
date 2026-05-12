@@ -18,6 +18,8 @@ import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
 import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
 import { RecordsCard } from "@/components/stats/RecordsCard";
 import { computeRecords, type Records } from "@/lib/stats/records";
+import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
+import { computeReviewHeatmap } from "@/lib/stats/heatmap";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -490,6 +492,9 @@ export default function StatsPage() {
               label="All-time grade breakdown"
             />
             <AccuracySparkline points={accuracyPoints} rolling7d={rolling7d} />
+            <ReviewHeatmap
+              columns={computeReviewHeatmap(gradeLog, todayString(new Date()))}
+            />
             <MasteryBar stats={stats} nameCardsEnabled={nameCardsEnabled} />
             <IntroducedBar stats={stats} />
             <DueForecast stats={stats} />
