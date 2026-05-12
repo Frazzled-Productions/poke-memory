@@ -119,6 +119,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Trigger** | Issue labeled `auto` |
 | **What it does** | Invokes the `planner` sub-agent; posts `<!-- auto-plan -->` comment; moves issue to **Planned** on the project board |
 | **Scope check** | Planner assesses scope (≥4 files, ≥3 surfaces, infra+logic, ≥6 acceptance criteria) and runs a coupling check before offering `/split` |
+| **Overlap annotation** | If the issue has `<!-- overlap-scan:i+j:<kind> -->` markers, the orchestrator extracts the verbatim reason from each marker's comment body and passes the list to the planner, which appends a `**Related issues:**` section to the plan (one `- #<num> (<kind>): <reason>` line per linked issue) — informational only |
 | **Salvage** | Post-step runs with `if: always()` — if the orchestrator halts before posting the plan, it salvages `/tmp/plan-body.md` to the issue |
 
 #### Implement job
