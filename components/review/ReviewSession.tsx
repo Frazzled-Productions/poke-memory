@@ -24,7 +24,7 @@ import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 import { recordReview } from "@/lib/streak";
 import { loadSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
-import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
+import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -51,9 +51,15 @@ type LearningQueueEntry = { cardId: number; dueAt: number };
 // Helpers
 // ---------------------------------------------------------------------------
 
-function stepDurationMs(lastReview: string | null, stepIndex: number): number {
+function stepDurationMs(
+  lastReview: string | null,
+  stepIndex: number,
+  difficulty: number,
+): number {
   const steps =
-    lastReview === null ? LEARNING_STEPS_MS : RELEARNING_STEPS_MS;
+    lastReview === null
+      ? learningStepsFor(difficulty)
+      : relearningStepsFor(difficulty);
   return steps[Math.min(stepIndex, steps.length - 1)];
 }
 
@@ -388,6 +394,7 @@ export function ReviewSession() {
       const stepMs = stepDurationMs(
         card.state.lastReview,
         card.state.learningStep ?? 0,
+        card.state.difficulty,
       );
       const stepStartedAt = card.state.stepStartedAt ?? Date.now();
       return { cardId, dueAt: stepStartedAt + stepMs };
@@ -705,7 +712,11 @@ export function ReviewSession() {
       if (nextState.learningStep !== null) {
         // Card is in (or remains in) a learning/relearning step.
         // Distinction: new-card learning has lastReview === null after grading.
-        const stepMs = stepDurationMs(nextState.lastReview, nextState.learningStep);
+        const stepMs = stepDurationMs(
+          nextState.lastReview,
+          nextState.learningStep,
+          nextState.difficulty,
+        );
         const newEntry: LearningQueueEntry = {
           cardId: effectiveCard.id,
           dueAt: nextState.stepStartedAt! + stepMs,
