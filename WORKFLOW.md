@@ -241,18 +241,32 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
-### `auto-app-suggest.yml` — Weekly App Digest
+### `auto-codequality-suggest.yml` — Weekly Code-Quality Digest
 
 | | |
 |---|---|
 | **Trigger** | Weekly cron Wednesday 09:00 UTC + `workflow_dispatch` |
-| **Idempotency key** | ISO week string in issue title (`Weekly app review — YYYY-Www`). Checks all states (open + closed). |
+| **Idempotency key** | ISO week string in issue title (`Weekly code-quality review — YYYY-Www`). Checks all states (open + closed). |
 | **Inputs** | Files changed in `app/**`, `components/**`, `lib/**`, `db/**` in the last 30 days |
 | **Signal constraints** | A — Recency filter (only recently-changed files); B — Recurrence filter (only patterns spanning ≥2 files) |
 | **Output** | One digest issue per ISO week, ≤5 curated items, each with file paths and a concrete evidence snippet |
 | **No-op** | Skips silently when nothing crosses the recurrence threshold or when a digest issue already exists for the week |
-| **Scope** | Only proposes changes within `app/**`, `components/**`, `lib/**`, or `db/**` — never workflow files or individual issue filings |
+| **Scope** | Tech debt, missing tests, dead code, and accessibility gaps within `app/**`, `components/**`, `lib/**`, or `db/**` — never workflow files, feature ideas, or individual issue filings |
 | **Label** | Digest issue is labelled `area:app`; label is created if absent |
+
+---
+
+### `auto-app-suggest.yml` — Weekly Feature Ideas Digest
+
+| | |
+|---|---|
+| **Trigger** | Weekly cron Thursday 09:00 UTC + `workflow_dispatch` |
+| **Idempotency key** | ISO week string in issue title (`Weekly feature ideas — YYYY-Www`). Checks all states (open + closed). |
+| **Inputs** | Open enhancement issues (clusters/gaps); user-facing pages under `app/**/page.tsx` and `components/**`; README "Features" section vs. codebase; last 3 CHANGELOG releases; latest `auto-workflow-suggest` digest (UX themes) |
+| **Output** | One digest issue per ISO week, ≤5 proposals, each with surface, why-it-matters, priority, and a `- [ ] File this as an issue <!-- proposal:N -->` checkbox |
+| **No-op** | Skips silently when nothing crosses the bar or when a digest issue already exists for the week |
+| **Scope** | User-facing behaviour changes only — explicitly forbids refactors, test additions, dead-code removal, dependency bumps, accessibility gaps, and CI/workflow changes |
+| **Labels** | Digest issue is labelled `area:app`, `enhancement`, `priority:later`; labels are created if absent |
 
 ---
 
