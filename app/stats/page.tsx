@@ -27,6 +27,20 @@ function pct(numerator: number, denominator: number): number {
   return Math.round((numerator / denominator) * 100);
 }
 
+/**
+ * Format a YYYY-MM-DD date for the due-forecast tooltip / aria-label.
+ * Uses the user's locale (e.g. "Tue, May 12") so the value reads
+ * naturally next to the bar.
+ */
+function formatForecastDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -203,6 +217,10 @@ function IntroducedBar({ stats }: { stats: StatsResult }) {
 }
 
 function DueForecast({ stats }: { stats: StatsResult }) {
+  const forecast = stats.dueForecast;
+  const max = forecast.reduce((m, d) => (d.count > m ? d.count : m), 0);
+  const total = forecast.reduce((s, d) => s + d.count, 0);
+
   return (
     <section aria-labelledby="due-heading">
       <h2
@@ -211,9 +229,51 @@ function DueForecast({ stats }: { stats: StatsResult }) {
       >
         Due forecast
       </h2>
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard label="Due today" value={stats.dueToday} accent="text-rose-600 dark:text-rose-400" />
-        <StatCard label="Due tomorrow" value={stats.dueTomorrow} />
+      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+        <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+          {total.toLocaleString()} card{total === 1 ? "" : "s"} over the next 14
+          days
+        </p>
+        <div
+          className="grid h-24 grid-cols-[repeat(14,minmax(0,1fr))] items-end gap-1"
+          role="img"
+          aria-label={`14-day due forecast: ${forecast
+            .map((d) => `${formatForecastDate(d.date)} ${d.count}`)
+            .join(", ")}`}
+        >
+          {forecast.map((day, idx) => {
+            const heightPct = max === 0 ? 0 : (day.count / max) * 100;
+            const isToday = idx === 0;
+            return (
+              <div
+                key={day.date}
+                className="group relative flex h-full flex-col justify-end"
+                title={`${formatForecastDate(day.date)} · ${day.count} card${day.count === 1 ? "" : "s"}`}
+              >
+                <div
+                  className={
+                    isToday
+                      ? "rounded-sm bg-rose-500"
+                      : "rounded-sm bg-emerald-500/60 group-hover:bg-emerald-500"
+                  }
+                  style={{
+                    height: heightPct === 0 ? "2px" : `${Math.max(heightPct, 6)}%`,
+                  }}
+                  aria-hidden="true"
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-2 grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1 text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
+          {forecast.map((day, idx) => (
+            <span key={day.date} className="text-center">
+              {idx === 0
+                ? "Today"
+                : new Date(day.date).getDate()}
+            </span>
+          ))}
+        </div>
       </div>
     </section>
   );
