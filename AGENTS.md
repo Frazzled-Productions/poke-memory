@@ -25,7 +25,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [next16-expert](.claude/agents/next16-expert.md) | Any Next.js 16 API / caching / routing / rendering question. Read-only. |
 | [pokeapi-expert](.claude/agents/pokeapi-expert.md) | Choosing PokéAPI endpoints, schemas, caching. Use BEFORE writing integration code. |
 | [srs-expert](.claude/agents/srs-expert.md) | Designing/implementing the spaced-repetition scheduler. |
-| [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth, Postgres + RLS, schema design for SM-2 state, Next.js 16 App Router client patterns. Use BEFORE writing any Supabase integration code. Read-only. |
+| [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth, Postgres + RLS, schema design for FSRS state, Next.js 16 App Router client patterns. Use BEFORE writing any Supabase integration code. Read-only. |
 | [workflow-expert](.claude/agents/workflow-expert.md) | Any non-trivial change to `.github/workflows/**` or `.claude/agents/**`. Read-only. |
 | [planner](.claude/agents/planner.md) | Designing an implementation plan before any code is written. |
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist. |
@@ -173,23 +173,34 @@ The `>=` date comparison is conservative: any review on the same calendar day as
 
 ### Spaced repetition
 
-- **Algorithm**: SM-2.
-- **Grading UX**: 4 buttons mapping to SM-2 grades — `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). Anki-equivalent collapse.
+- **Algorithm**: FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default FSRS parameters (no per-user weight optimisation yet — that's a follow-up).
+- **Anki-style learning steps layer**: kept on top of FSRS. FSRS schedules graduated cards only; new cards go through fixed wall-clock learning steps (`LEARNING_STEPS_MS = [1m, 10m]`) and lapsed cards through relearning steps (`RELEARNING_STEPS_MS = [10m]`). The in-step layer is what `learningStep` / `stepStartedAt` track.
+- **Grading UX**: 4 buttons — `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). The 1/2/4/5 internal convention maps to FSRS's `Rating` enum (1/2/3/4) at the boundary in `lib/srs/scheduler.ts`.
 - **Per-card review state**:
   ```ts
   type ReviewState = {
-    repetitions: number;       // consecutive successful reviews
-    interval: number;          // days until next review
-    easeFactor: number;        // multiplier, min 1.3, default 2.5
-    dueDate: string;           // ISO 8601 date "YYYY-MM-DD"
-    lastReview: string | null; // null sentinel = never reviewed
-    firstSeen: string | null;  // ISO date of first-ever grade; set once, never overwritten
+    // FSRS core (graduated-path math)
+    stability: number;
+    difficulty: number;
+    elapsedDays: number;
+    scheduledDays: number;
+    reps: number;
+    lapses: number;
+    fsrsState: 'new' | 'learning' | 'review' | 'relearning';
+    // Lifecycle timestamps (unchanged across the SM-2 → FSRS swap)
+    dueDate: string;           // ISO 8601 "YYYY-MM-DD"
+    lastReview: string | null;
+    firstSeen: string | null;  // ISO date of first-ever grade. Set once; never overwritten.
+    // Anki layer (in-memory wall-clock countdown)
+    learningStep: number | null;
+    stepStartedAt: number | null;
   };
   ```
 - Dates as `"YYYY-MM-DD"` strings (string-comparable, no timezone math). The `nextReview` scheduler is a pure function and lives in `lib/srs/`.
 - **Queue policy**: two queues — review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today` (stable for the day, rotates daily).
 - **Daily limits**: 10 new cards/day (hard wall — exceeding inflates tomorrow's review queue), 100 reviews/day (soft wall with "Keep reviewing" override). Counters: `newIntroducedToday = firstSeen === today`; `reviewsDoneToday = lastReview === today && firstSeen !== today`.
-- **Persisted session shape**: `{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` silently migrates the legacy bare-`ReviewCard[]` shape and backfills `firstSeen` from `lastReview` on existing cards.
+- **Persisted session shape**: `{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` runs `migrateReviewState` on every card — including the SM-2 → FSRS conversion for any legacy persisted state — so the migration is idempotent and runs once per device automatically.
+- **Mastery**: `reps >= masteryRepetitions && scheduledDays >= 21`. The legacy `easeFactor` / `repetitions` field names survive on `StrugglingCard` (in `lib/stats/derive.ts`) — they are derived from FSRS state at the stats boundary so existing UI consumers stay stable.
 
 ### Testing
 
@@ -288,7 +299,7 @@ Two paths exist -- guest and authenticated. The constraints differ.
 - **Aggregate telemetry**: Vercel Analytics and Speed Insights collect anonymous, aggregate page-view metrics (URL path, referrer, country, device type) and Core Web Vitals. This data goes to Vercel's infrastructure — it does not include card progress, review history, or any personally identifying information. Both components are rendered unconditionally in the root layout.
 
 **Authenticated path (Supabase sync)**
-- When a user signs in with GitHub, their per-card review history (SM-2 state: repetitions, interval, ease factor, due date, last review, first seen) is stored in Supabase Postgres.
+- When a user signs in with GitHub, their per-card review history (FSRS state: stability, difficulty, scheduledDays, reps, lapses, fsrsState, due date, last review, first seen) is stored in Supabase Postgres.
 - We **are a data controller** for authenticated users. GDPR / UK-GDPR obligations apply: we need a privacy notice, a lawful basis for processing (legitimate interest / contract performance), and a data-processing agreement with Supabase (covered by Supabase standard DPA).
 - A user-facing privacy notice is required before this feature is made generally available. Filing it as a follow-up issue is the right next step -- it is out of scope for the initial sync implementation.
 - Supabase is the sub-processor for authenticated user data. Row-Level Security ensures each user can only read/write their own rows. (Vercel Analytics is a second sub-processor for aggregate telemetry across all users — see the guest-path note above.)

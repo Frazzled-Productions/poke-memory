@@ -63,11 +63,11 @@ describe('hydrateSession', () => {
   });
 
   it('preserves review state on existing cards', () => {
-    const saved = [makeCard(makeSeedPokemon(1), { repetitions: 5, interval: 10 })];
+    const saved = [makeCard(makeSeedPokemon(1), { reps:5, scheduledDays:10 })];
     const seed = [makeSeedPokemon(1)];
     const result = hydrateSession(saved, seed, [], NOW);
-    expect(result[0].state.repetitions).toBe(5);
-    expect(result[0].state.interval).toBe(10);
+    expect(result[0].state.reps).toBe(5);
+    expect(result[0].state.scheduledDays).toBe(10);
   });
 
   it('refreshes seed fields (including flavorTexts) on existing persisted cards', () => {
@@ -78,7 +78,7 @@ describe('hydrateSession', () => {
     const card = result[0];
     if (card.cardType !== 'name') throw new Error('Expected name card');
     expect(card.flavorTexts).toEqual(['New flavor text.']);
-    expect(card.state.repetitions).toBe(saved[0].state.repetitions);
+    expect(card.state.reps).toBe(saved[0].state.reps);
   });
 
   it('keeps cards whose id is not in the seed unchanged', () => {
@@ -157,7 +157,7 @@ describe('hydrateSession (evolution refresh)', () => {
       name: 'bulbasaur',
       spriteUrl: 'old-url',
       evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
-      state: { ...initialReviewState(NOW), repetitions: 7, interval: 30 },
+      state: { ...initialReviewState(NOW), reps:7, scheduledDays:30 },
     };
     const freshEvo: EvolutionCard = {
       cardType: 'evolution',
@@ -173,17 +173,16 @@ describe('hydrateSession (evolution refresh)', () => {
     if (card.cardType !== 'evolution') throw new Error('Expected evolution card');
     expect(card.evolvesInto.map((e) => e.name)).toEqual(['ivysaur', 'venusaur']);
     expect(card.spriteUrl).toBe('new-url');
-    expect(card.state.repetitions).toBe(7);
-    expect(card.state.interval).toBe(30);
+    expect(card.state.reps).toBe(7);
+    expect(card.state.scheduledDays).toBe(30);
   });
 });
 
 describe('migrateReviewState (stepStartedAt backfill for learning-step cards)', () => {
   it('sets stepStartedAt to a number when learningStep is non-null and stepStartedAt is absent', () => {
     const state: Record<string, unknown> = {
-      repetitions: 0,
-      interval: 0,
-      easeFactor: 2.5,
+      reps:0,
+      scheduledDays:0,
       dueDate: '2026-05-11',
       lastReview: null,
       firstSeen: '2026-05-11',
@@ -200,9 +199,8 @@ describe('migrateReviewState (stepStartedAt backfill for learning-step cards)', 
 
   it('keeps stepStartedAt as null when learningStep is null and stepStartedAt is absent', () => {
     const state: Record<string, unknown> = {
-      repetitions: 3,
-      interval: 7,
-      easeFactor: 2.5,
+      reps:3,
+      scheduledDays:7,
       dueDate: '2026-05-18',
       lastReview: '2026-05-11',
       firstSeen: '2026-05-01',
@@ -221,10 +219,9 @@ describe('migrateReviewCard', () => {
       name: 'bulbasaur',
       spriteUrl: '',
       state: {
-        repetitions: 0,
-        interval: 0,
-        easeFactor: 2.5,
-        dueDate: '2026-05-09',
+        reps:0,
+        scheduledDays:0,
+          dueDate: '2026-05-09',
         lastReview: null,
         firstSeen: null,
         learningStep: null,
@@ -243,10 +240,9 @@ describe('migrateReviewCard', () => {
       spriteUrl: '',
       evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
       state: {
-        repetitions: 0,
-        interval: 0,
-        easeFactor: 2.5,
-        dueDate: '2026-05-09',
+        reps:0,
+        scheduledDays:0,
+          dueDate: '2026-05-09',
         lastReview: null,
         firstSeen: null,
         learningStep: null,
@@ -263,10 +259,9 @@ describe('migrateReviewCard', () => {
       name: 'bulbasaur',
       spriteUrl: '',
       state: {
-        repetitions: 1,
-        interval: 1,
-        easeFactor: 2.5,
-        dueDate: '2026-05-10',
+        reps:1,
+        scheduledDays:1,
+          dueDate: '2026-05-10',
         lastReview: '2026-05-08',
         // firstSeen, learningStep, stepStartedAt all absent
       },
@@ -339,12 +334,12 @@ describe('hydrateSession (reverse cards)', () => {
       id: REVERSE_ID_OFFSET + 1,
       pokemonId: 1,
       cardType: 'reverse',
-      state: { ...initialReviewState(NOW), repetitions: 4, interval: 30 },
+      state: { ...initialReviewState(NOW), reps:4, scheduledDays:30 },
     };
     const result = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: true });
     const found = result.find((c) => c.id === REVERSE_ID_OFFSET + 1);
-    expect(found?.state.repetitions).toBe(4);
-    expect(found?.state.interval).toBe(30);
+    expect(found?.state.reps).toBe(4);
+    expect(found?.state.scheduledDays).toBe(30);
   });
 });
 
@@ -472,7 +467,7 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
       isLegendary: false,
       isMythical: false,
       cryUrl: null,
-      state: { ...initialReviewState(NOW), repetitions: 3, interval: 7 },
+      state: { ...initialReviewState(NOW), reps:3, scheduledDays:7 },
     };
 
     const result = hydrateSession([slimCard], [fullSeed], [], NOW, { reverseEnabled: true, nameEnabled: false, evolutionEnabled: false });
@@ -483,8 +478,8 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
     expect(card.flavorTexts).toEqual(['A strange seed.', 'It bears the seed.']);
     expect(card.evolutionChain).toHaveLength(2);
     // SM-2 state preserved
-    expect(card.state.repetitions).toBe(3);
-    expect(card.state.interval).toBe(7);
+    expect(card.state.reps).toBe(3);
+    expect(card.state.scheduledDays).toBe(7);
   });
 });
 
@@ -541,8 +536,8 @@ describe('buildSessionQueues (per-type budgets)', () => {
   it('counts already-introduced new cards per cardType', () => {
     const cards: ReviewableCard[] = [
       // Today: name has 2 introduced (at cap), evo has 0 (under cap)
-      nameCard(1, { firstSeen: TODAY, lastReview: TODAY, repetitions: 1 }),
-      nameCard(2, { firstSeen: TODAY, lastReview: TODAY, repetitions: 1 }),
+      nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps:1 }),
+      nameCard(2, { firstSeen: TODAY, lastReview: TODAY, reps:1 }),
       // Fresh candidates of each type
       nameCard(3),
       nameCard(4),
@@ -562,11 +557,11 @@ describe('buildSessionQueues (per-type budgets)', () => {
   it('counts reviews per cardType independently', () => {
     const cards: ReviewableCard[] = [
       // 3 name reviews done today
-      nameCard(1, { firstSeen: '2026-05-01', lastReview: TODAY, repetitions: 2 }),
-      nameCard(2, { firstSeen: '2026-05-01', lastReview: TODAY, repetitions: 2 }),
-      nameCard(3, { firstSeen: '2026-05-01', lastReview: TODAY, repetitions: 2 }),
+      nameCard(1, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
+      nameCard(2, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
+      nameCard(3, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
       // 1 evo review done today
-      evoCard(1_000_001, { firstSeen: '2026-05-01', lastReview: TODAY, repetitions: 2 }),
+      evoCard(1_000_001, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
     ];
     const queues = buildSessionQueues(cards, baseLimits, TODAY);
     expect(queues.perType.name.reviewsDoneToday).toBe(3);
@@ -600,8 +595,8 @@ describe('buildSessionQueues (per-type budgets)', () => {
 
   it('tracks reverse card review counters independently', () => {
     const cards: ReviewableCard[] = [
-      reverseCard(1, { firstSeen: '2026-05-01', lastReview: TODAY, repetitions: 2 }),
-      reverseCard(2, { firstSeen: '2026-05-01', lastReview: TODAY, repetitions: 2 }),
+      reverseCard(1, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
+      reverseCard(2, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
     ];
     const queues = buildSessionQueues(cards, baseLimits, TODAY);
     expect(queues.perType.reverse.reviewsDoneToday).toBe(2);
@@ -622,8 +617,8 @@ describe('buildQueueCounters', () => {
         lastReview: '2026-05-01',
         dueDate: '2026-05-09',
         learningStep: null,
-        repetitions: 2,
-        interval: 8,
+        reps:2,
+        scheduledDays:8,
       }), // review: due today, not reviewed today
     ];
     const result = buildQueueCounters(cards, TODAY);
@@ -641,8 +636,8 @@ describe('buildQueueCounters', () => {
         learningStep: 0,
         lastReview: '2026-05-01',
         dueDate: '2026-05-09',
-        repetitions: 1,
-        interval: 8,
+        reps:1,
+        scheduledDays:8,
       }),
     ];
     const result = buildQueueCounters(cards, TODAY);
@@ -657,8 +652,8 @@ describe('buildQueueCounters', () => {
         lastReview: TODAY,
         dueDate: TODAY,
         learningStep: null,
-        repetitions: 2,
-        interval: 1,
+        reps:2,
+        scheduledDays:1,
         firstSeen: '2026-05-01',
       }),
     ];
@@ -674,8 +669,8 @@ describe('buildQueueCounters', () => {
         lastReview: '2026-05-01',
         dueDate: '2026-05-20',
         learningStep: null,
-        repetitions: 3,
-        interval: 19,
+        reps:3,
+        scheduledDays:19,
         firstSeen: '2026-04-01',
       }),
     ];

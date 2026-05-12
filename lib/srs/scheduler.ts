@@ -1,28 +1,23 @@
 /**
- * SM-2 scheduler with Anki-style learning and relearning steps.
+ * FSRS scheduler with Anki-style learning and relearning steps.
  *
- * Algorithm reference: P.A. Wozniak, "Optimization of Learning" (1990).
- *
- * Constants
- * ---------
- * DEFAULT_EASE_FACTOR  2.5   — starting multiplier for all new cards
- * MIN_EASE_FACTOR      1.3   — floor imposed by the SM-2 spec
+ * Graduated cards delegate the interval math to `ts-fsrs` (see
+ * https://github.com/open-spaced-repetition/ts-fsrs). The Anki-style
+ * learning-step layer (`learningStep`, `stepStartedAt`, LEARNING_STEPS_MS,
+ * RELEARNING_STEPS_MS) is preserved — FSRS schedules graduated cards only;
+ * the learning loop is the same wall-clock-driven flow it has always been.
  *
  * Grade mapping
- *   Again → 1   (failed, reset)
+ *   Again → 1   (failed)
  *   Hard  → 2   (difficult, partial credit)
  *   Good  → 4   (passed)
  *   Easy  → 5   (passed, early graduation)
  *
- * Learning / relearning steps
- * ---------------------------
- * New cards go through [1m, 10m] learning steps before graduating to the
- * normal SM-2 schedule. Lapsed cards go through a single [10m] relearning
- * step. The in-memory wall-clock timing is managed by the UI component;
- * this module tracks only the step index in `learningStep`.
+ * The 1/2/4/5 grades match our internal convention. FSRS's Rating enum is
+ * 1/2/3/4; the mapping is applied at the FSRS boundary.
  *
  * `learningStep` meanings
- *   null           — graduated card (or brand new card, before first grade)
+ *   null           — graduated card (or brand-new before first touch)
  *   0, 1, 2, …    — current step index in the applicable steps array
  *
  * Distinguishing new-card learning from relearning (no extra flag needed):
@@ -33,17 +28,16 @@
  * This keeps `firstSeen === today` as the sole gate for `newIntroducedToday`
  * and `lastReview === today && firstSeen !== today` as the sole gate for
  * `reviewsDoneToday`.
- *
- * Interval rules (graduated path only)
- *   rep 1 (first graduation)  → GRAD_INTERVAL_GOOD (1 day) or GRAD_INTERVAL_EASY (4 days)
- *   rep 2                     → 6 days
- *   rep ≥ 3                   → floor(prevInterval * easeFactor)
- *
- * Ease-factor update (graduated card path only; frozen during step grading)
- *   EF ← max(1.3, EF + 0.1 − (5 − q) × (0.08 + (5 − q) × 0.02))
- *   Exception: a lapse (graduated card → Again) fires the EF penalty once,
- *   then parks the card in relearning at step 0.
  */
+
+import {
+  fsrs as createFsrs,
+  createEmptyCard,
+  Rating,
+  State,
+  type Card as FsrsCard,
+  type Grade as FsrsGrade,
+} from "ts-fsrs";
 
 import {
   LEARNING_STEPS_MS,
@@ -52,93 +46,138 @@ import {
   GRAD_INTERVAL_EASY,
 } from "@/lib/srs/constants";
 
+export type FsrsStateLabel = "new" | "learning" | "review" | "relearning";
+
 export type ReviewState = {
-  repetitions: number;
-  interval: number;
-  easeFactor: number;
+  // FSRS core (graduated-path math)
+  stability: number;
+  difficulty: number;
+  elapsedDays: number;
+  scheduledDays: number;
+  reps: number;
+  lapses: number;
+  fsrsState: FsrsStateLabel;
+  // Unchanged across the SM-2 → FSRS swap
   dueDate: string;           // ISO 8601 "YYYY-MM-DD"
   lastReview: string | null;
   firstSeen: string | null;  // ISO date of first-ever grade. Set once; never overwritten.
-  /**
-   * null  → graduated (or brand-new, not yet graded)
-   * 0..N  → current step index in the applicable steps array
-   *          (LEARNING_STEPS_MS for new cards, RELEARNING_STEPS_MS for lapses)
-   */
   learningStep: number | null;
-  /**
-   * Wall-clock epoch (ms) when the card entered its current learning step.
-   * null when graduated or not yet graded.
-   * Used on remount to reconstruct residual countdown: dueAt = stepStartedAt + stepDurationMs.
-   */
   stepStartedAt: number | null;
 };
 
 export type Grade = 1 | 2 | 4 | 5;
 
-const DEFAULT_EASE_FACTOR = 2.5;
-const MIN_EASE_FACTOR = 1.3;
+const scheduler = createFsrs();
 
-// Returns the date `days` after `date` as an ISO date string ("YYYY-MM-DD").
-// Note: this combines local-time `setDate` with `toISOString` (UTC). The
-// inconsistency is intentional and consistent with how due-date comparisons
-// derive "today" — both sides slice toISOString, so the comparison is
-// internally coherent. Don't switch one side to a local-timezone format
-// without updating both, or you'll introduce off-by-one due-date bugs in
-// negative-UTC-offset timezones.
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 function addDays(date: Date, days: number): string {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
-  return result.toISOString().slice(0, 10);
+  return isoDate(result);
 }
 
-/**
- * Apply the SM-2 ease-factor update formula.
- * Used for the graduated card path and for the lapse EF penalty.
- */
-function updatedEaseFactor(ef: number, grade: Grade): number {
-  return Math.max(
-    MIN_EASE_FACTOR,
-    ef + 0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02),
-  );
+const STATE_LABEL_TO_ENUM: Record<FsrsStateLabel, State> = {
+  new: State.New,
+  learning: State.Learning,
+  review: State.Review,
+  relearning: State.Relearning,
+};
+
+const STATE_ENUM_TO_LABEL: Record<State, FsrsStateLabel> = {
+  [State.New]: "new",
+  [State.Learning]: "learning",
+  [State.Review]: "review",
+  [State.Relearning]: "relearning",
+};
+
+const GRADE_TO_RATING: Record<Grade, FsrsGrade> = {
+  1: Rating.Again,
+  2: Rating.Hard,
+  4: Rating.Good,
+  5: Rating.Easy,
+};
+
+function toFsrsCard(state: ReviewState, now: Date): FsrsCard {
+  if (state.fsrsState === "new" && state.lastReview === null) {
+    return createEmptyCard(now);
+  }
+  return {
+    due: new Date(state.dueDate),
+    stability: state.stability,
+    difficulty: state.difficulty,
+    elapsed_days: state.elapsedDays,
+    scheduled_days: state.scheduledDays,
+    learning_steps: 0, // we manage the in-step layer ourselves
+    reps: state.reps,
+    lapses: state.lapses,
+    state: STATE_LABEL_TO_ENUM[state.fsrsState],
+    last_review: state.lastReview ? new Date(state.lastReview) : undefined,
+  };
+}
+
+type FsrsResult = Pick<
+  ReviewState,
+  | "stability"
+  | "difficulty"
+  | "elapsedDays"
+  | "scheduledDays"
+  | "reps"
+  | "lapses"
+  | "fsrsState"
+  | "dueDate"
+>;
+
+function fromFsrsCard(card: FsrsCard): FsrsResult {
+  return {
+    stability: card.stability,
+    difficulty: card.difficulty,
+    elapsedDays: card.elapsed_days,
+    scheduledDays: card.scheduled_days,
+    reps: card.reps,
+    lapses: card.lapses,
+    fsrsState: STATE_ENUM_TO_LABEL[card.state],
+    dueDate: isoDate(card.due),
+  };
 }
 
 /**
  * Compute the next ReviewState given the current state, the grade, and today.
  *
- * Behaviour tree:
+ * Case A: state.learningStep === null (graduated or brand-new card)
+ *   A1. Brand new (lastReview === null) + Again/Hard/Good → enter learning step 0.
+ *       lastReview stays null; firstSeen set if null.
+ *   A2. Brand new + Easy → graduate immediately via FSRS.
+ *   A3. Graduated (lastReview !== null) + Again → lapse: FSRS computes new
+ *       stability/difficulty for an Again, then card enters relearning step 0.
+ *   A4. Graduated + Hard/Good/Easy → FSRS standard update.
  *
- *   Case A: state.learningStep === null (graduated or brand-new card)
- *     A1. Brand new (lastReview === null) + Again/Hard/Good → enter learning step 0.
- *         lastReview stays null; firstSeen set if null.
- *     A2. Brand new + Easy → graduate immediately with GRAD_INTERVAL_EASY.
- *     A3. Graduated (lastReview !== null) + Again → lapse: EF penalised, enter
- *         relearning step 0, lastReview = today, repetitions = 0, interval = 1.
- *     A4. Graduated + Hard/Good/Easy → standard SM-2, no step change.
+ * Case B: state.learningStep !== null (card in a learning or relearning step)
+ *   B1. Again → reset to step 0.
+ *   B2. Hard  → repeat current step (no change to learningStep).
+ *   B3. Good  → advance one step, or graduate via FSRS if at the last step.
+ *   B4. Easy  → graduate immediately via FSRS.
  *
- *   Case B: state.learningStep !== null (card in a learning or relearning step)
- *     B1. Again → reset to step 0.
- *     B2. Hard  → repeat current step (no change to learningStep).
- *     B3. Good  → advance one step, or graduate if at the last step.
- *     B4. Easy  → graduate immediately with GRAD_INTERVAL_EASY.
- *     EF is frozen during all step grading (the lapse EF penalty fires in A3,
- *     before the card enters relearning).
+ * FSRS is never called for B1, B2, or A1 — those touches stay inside the
+ * in-step / brand-new layer and don't affect stability/difficulty.
  */
 export function nextReview(
   state: ReviewState,
   grade: Grade,
   now: Date,
 ): ReviewState {
-  const today = now.toISOString().slice(0, 10);
+  const today = isoDate(now);
 
   // --------------------------------------------------------------------------
   // Case B: card is currently in a learning or relearning step
   // --------------------------------------------------------------------------
   if (state.learningStep !== null) {
-    // Number of steps depends on whether this is a new card or a relapse.
     const numSteps =
       state.lastReview === null
-        ? LEARNING_STEPS_MS.length   // new-card learning
-        : RELEARNING_STEPS_MS.length; // relearning after lapse
+        ? LEARNING_STEPS_MS.length
+        : RELEARNING_STEPS_MS.length;
 
     if (grade === 1) {
       // B1: Again → reset to step 0
@@ -155,37 +194,47 @@ export function nextReview(
     }
 
     if (grade === 4) {
-      // Good → advance one step, or graduate
       const nextStep = state.learningStep + 1;
       if (nextStep < numSteps) {
-        // B3 advance: move to next step
+        // B3 advance
         return {
           ...state,
           learningStep: nextStep,
           stepStartedAt: now.getTime(),
         };
       }
-      // B3 graduate: last step reached
+      // B3 graduate: last step reached. FSRS produces the initial stability
+      // and difficulty; we override scheduledDays/dueDate with the constant
+      // grad interval so "Good on the last step → due tomorrow" is exact.
+      // fsrsState is forced to 'review' because our Anki layer has just
+      // satisfied the equivalent of FSRS's internal learning loop.
+      const card = toFsrsCard(state, now);
+      const result = scheduler.next(card, now, Rating.Good);
+      const fsrs = fromFsrsCard(result.card);
       return {
         ...state,
+        ...fsrs,
+        fsrsState: "review",
+        scheduledDays: GRAD_INTERVAL_GOOD,
+        dueDate: addDays(now, GRAD_INTERVAL_GOOD),
         learningStep: null,
         stepStartedAt: null,
-        repetitions: 1,
-        interval: GRAD_INTERVAL_GOOD,
-        dueDate: addDays(now, GRAD_INTERVAL_GOOD),
         lastReview: today,
-        // firstSeen is already set when the card first entered a step; preserve it
       };
     }
 
     // grade === 5: B4: Easy → graduate immediately
+    const card = toFsrsCard(state, now);
+    const result = scheduler.next(card, now, Rating.Easy);
+    const fsrs = fromFsrsCard(result.card);
     return {
       ...state,
+      ...fsrs,
+      fsrsState: "review",
+      scheduledDays: GRAD_INTERVAL_EASY,
+      dueDate: addDays(now, GRAD_INTERVAL_EASY),
       learningStep: null,
       stepStartedAt: null,
-      repetitions: 1,
-      interval: GRAD_INTERVAL_EASY,
-      dueDate: addDays(now, GRAD_INTERVAL_EASY),
       lastReview: today,
     };
   }
@@ -193,101 +242,80 @@ export function nextReview(
   // --------------------------------------------------------------------------
   // Case A: card is graduated or brand-new (learningStep === null)
   // --------------------------------------------------------------------------
-
   const isBrandNew = state.lastReview === null;
 
   if (isBrandNew) {
-    // A1 / A2: first ever touch
     const firstSeen = state.firstSeen ?? today;
 
     if (grade === 5) {
-      // A2: Easy → graduate immediately, skip learning steps
+      // A2: Easy → graduate immediately via FSRS. fsrsState forced to 'review'
+      // because we skipped the Anki learning steps entirely.
+      const card = createEmptyCard(now);
+      const result = scheduler.next(card, now, Rating.Easy);
+      const fsrs = fromFsrsCard(result.card);
       return {
         ...state,
+        ...fsrs,
+        fsrsState: "review",
+        scheduledDays: GRAD_INTERVAL_EASY,
+        dueDate: addDays(now, GRAD_INTERVAL_EASY),
         learningStep: null,
         stepStartedAt: null,
-        repetitions: 1,
-        interval: GRAD_INTERVAL_EASY,
-        easeFactor: state.easeFactor, // EF unchanged on first touch
-        dueDate: addDays(now, GRAD_INTERVAL_EASY),
         lastReview: today,
         firstSeen,
       };
     }
 
-    // A1: Again / Hard / Good → enter learning step 0.
-    // lastReview deliberately stays null so daily counters treat the card as
-    // "new" (firstSeen === today counts it in newIntroducedToday, not
-    // reviewsDoneToday). The wall-clock timer is managed by the UI component.
+    // A1: Again / Hard / Good → enter learning step 0. lastReview stays null
+    // so daily counters treat the card as "new" (firstSeen === today counts
+    // it in newIntroducedToday, not reviewsDoneToday).
     return {
       ...state,
       learningStep: 0,
       stepStartedAt: now.getTime(),
-      // repetitions, interval, easeFactor, dueDate, lastReview all unchanged
       firstSeen,
     };
   }
 
-  // A3: Graduated card + Again → lapse
+  // A3: Graduated card + Again → lapse. FSRS computes new stability and
+  // difficulty for the lapse; we then put the card into relearning step 0.
   if (grade === 1) {
-    const newEF = updatedEaseFactor(state.easeFactor, grade);
+    const card = toFsrsCard(state, now);
+    const result = scheduler.next(card, now, Rating.Again);
+    const fsrs = fromFsrsCard(result.card);
     return {
       ...state,
+      ...fsrs,
+      dueDate: today,
       learningStep: 0,
       stepStartedAt: now.getTime(),
-      repetitions: 0,
-      interval: 1,
-      easeFactor: newEF,
-      dueDate: today,
-      lastReview: today,
-      // firstSeen unchanged
-    };
-  }
-
-  // A4: Graduated card + Hard / Good / Easy → standard SM-2
-  const newEF = updatedEaseFactor(state.easeFactor, grade);
-
-  if (grade === 2) {
-    // A4 Hard: SM-2 treats this as a soft fail (grade < 3),
-    // resetting repetitions and interval. The card does NOT enter relearning —
-    // it just reschedules to tomorrow under the standard graduated path.
-    return {
-      ...state,
-      learningStep: null,
-      stepStartedAt: null,
-      repetitions: 0,
-      interval: 1,
-      easeFactor: newEF,
-      dueDate: addDays(now, 1),
       lastReview: today,
     };
   }
 
-  const newRepetitions = state.repetitions + 1;
-  let newInterval: number;
-  if (newRepetitions === 1) newInterval = GRAD_INTERVAL_GOOD;
-  else if (newRepetitions === 2) newInterval = 6;
-  else newInterval = Math.floor(state.interval * newEF);
-
-  // A4 Good/Easy: standard SM-2 graduation path
+  // A4: Graduated card + Hard / Good / Easy → standard FSRS update
+  const card = toFsrsCard(state, now);
+  const result = scheduler.next(card, now, GRADE_TO_RATING[grade]);
+  const fsrs = fromFsrsCard(result.card);
   return {
     ...state,
+    ...fsrs,
     learningStep: null,
     stepStartedAt: null,
-    repetitions: newRepetitions,
-    interval: newInterval,
-    easeFactor: newEF,
-    dueDate: addDays(now, newInterval),
     lastReview: today,
   };
 }
 
 export function initialReviewState(now: Date = new Date()): ReviewState {
   return {
-    repetitions: 0,
-    interval: 0,
-    easeFactor: DEFAULT_EASE_FACTOR,
-    dueDate: now.toISOString().slice(0, 10),
+    stability: 0,
+    difficulty: 0,
+    elapsedDays: 0,
+    scheduledDays: 0,
+    reps: 0,
+    lapses: 0,
+    fsrsState: "new",
+    dueDate: isoDate(now),
     lastReview: null,
     firstSeen: null,
     learningStep: null,
