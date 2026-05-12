@@ -67,6 +67,7 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | `/go` | On an issue | Triggers the implement job in `auto-issue.yml` |
 | `/continue` | On an issue | Resumes a halted implement run from the saved branch |
 | `/split` | On an issue | Files sub-issues from the planner's **Suggested split** block |
+| `/replan` | On an issue | Re-runs the plan job against the current tree; use after a staleness gate refusal |
 | `/fix` | On a PR | Runs a fix cycle in `auto-pr.yml` (up to 3 cycles per PR) |
 | `/resolve` | On a PR | Merges `origin/main`, resolves conflicts via Claude, runs build gate, pushes (`auto-resolve.yml`) |
 
@@ -109,7 +110,7 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 
 ### `auto-issue.yml` — Auto Issue Worker
 
-Handles four commands: `plan`, `implement`, `continue`, and `split`.
+Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 #### Plan job
 
@@ -126,6 +127,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 |---|---|
 | **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) comments `/go` on an open `auto`-labelled issue |
 | **Conflict gate** | Checks for `<!-- overlap-scan:i+j:conflict -->` markers linked to open issues; refuses to proceed if unresolved |
+| **Staleness gate** | Parses `<!-- plan-meta: base=<sha> files=<list> -->` from the most recent `<!-- auto-plan -->` comment; runs `git diff --name-only <base>..origin/main -- <files>`; non-empty intersection → posts a comment naming the conflicting files and the commits that touched them, then exits 1. Missing `plan-meta` (older plans) → warning only, proceeds. Empty `files=` → proceeds. Comment `/replan` to recover. |
 | **What it does** | Runs the orchestration playbook (plan → research → implement → review), pushes a branch, runs the build gate, opens a PR |
 | **Build gate** | `npm run typecheck && npm run build && npm test` — up to 2 fix attempts before stopping without a PR |
 | **Git credential** | `claude-code-action` URL-embeds the App installation token (passed via `github_token:`) into the origin remote, so subprocess pushes authenticate as `poke-memory-bot` and CI fires on the resulting `synchronize` events. Do NOT add a `git config --global http.https://github.com/.extraheader` step in front of the action — that layers a Bearer header on top of the URL-embedded Basic auth, GitHub rejects the dual-auth request, and the action's internal `git fetch origin main --depth=1` fails before Claude is invoked. |
@@ -150,6 +152,15 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **What it does** | Parses numbered titles from the `**Suggested split:**` block in the most recent planner comment; creates a child issue per title; links as native GitHub sub-issues; inherits the parent's `priority:*` label plus `auto` |
 | **Cascade** | Each child gets the `auto` label, which triggers its own plan run — the planner breaks the work down further without manual intervention |
 | **Idempotency** | Posts `<!-- auto-split:N -->` marker *before* the create loop; re-runs bail when the marker exists |
+
+#### Replan job
+
+| | |
+|---|---|
+| **Trigger** | Maintainer comments `/replan` on an open `auto`-labelled issue |
+| **What it does** | Mirrors the plan job — invokes `planner`, posts a fresh `<!-- auto-plan -->` comment, moves issue to **Planned** |
+| **Use case** | Recovery after a staleness gate refusal (`/go` blocked because `origin/main` moved into planned files); also useful when scope has changed since the original plan |
+| **Salvage** | Same `if: always()` post-step as the plan job |
 
 ---
 
