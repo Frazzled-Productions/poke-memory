@@ -73,7 +73,7 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 - Backlog lives in GitHub Issues, labelled `priority:now` / `priority:next` / `priority:later`.
 - The [Poké Memory roadmap](https://github.com/orgs/Frazzled-Productions/projects/1) is a kanban view over the same issues with a `Priority` field matching those labels.
 - **The user owns priorities.** Don't move issues between priority labels or columns without explicit user direction.
-- Issues filed from mobile (or anywhere) land on the board automatically via `auto-label.yml`.
+- Issues filed from mobile (or anywhere) are labelled manually or by the workflow that created them (e.g. `auto-app-suggest.yml` applies all three label dimensions at creation).
 
 ---
 
@@ -203,15 +203,16 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
-### `auto-label.yml` — Auto Label
+### `pr-check-monitor.yml` — PR Check Monitor
 
 | | |
 |---|---|
-| **Trigger** | `issues: [opened]`; `pull_request: [opened]` |
-| **What it does** | **Issues**: classifies all three dimensions (priority / type / area) via Claude and applies any that are missing. **PRs**: classifies type and area only — priority labels belong to the linked issue, not the PR. Purely additive, never removes existing labels. |
-| **Fork guard** | Fork PRs are excluded from PR labelling (consistent with `auto-review.yml`) |
-| **Fallback** | If Claude doesn't produce a valid priority label for an issue, defaults to `priority:later`. No priority fallback for PRs. |
-| **Effect** | Issues filed from mobile land on the project board correctly without manual triage; PRs are filterable by area/type without manual labelling |
+| **Trigger** | `schedule: '*/15 * * * *'` (every 15 minutes); `workflow_dispatch` |
+| **What it does** | Lists all open, non-draft, non-fork PRs older than 20 minutes and calls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs?check_name=test` for each. If no check run exists (CI was never dispatched), posts a `<!-- pr-check-monitor:{sha} -->` comment on the PR with recovery instructions. |
+| **Dedup** | The SHA-scoped HTML marker prevents duplicate alerts on the same HEAD commit. Re-running on a healthy PR (CI dispatched) produces no comment. |
+| **Why schedule?** | `schedule`-triggered workflows operate on GitHub's internal cron queue, independently of webhook dispatch — they continue firing even when `push`/`pull_request` event dispatch is throttled. |
+| **Permissions** | `contents: read`, `pull-requests: write`. `GITHUB_TOKEN` only — no Claude, no App token. |
+| **Recovery time** | A stuck PR typically receives an alert within 30 minutes of the 20-minute threshold passing (15-minute cron interval plus GitHub cron jitter, which can exceed 15 minutes under load). |
 
 ---
 
@@ -373,6 +374,67 @@ When the planner posts its plan, it assesses scope against four thresholds. When
 Before offering `/split`, the planner runs a **coupling check** — it sketches the boundary between proposed children and checks whether they would share surface area (same symbol name, same `localStorage` key or DB table, same leaf module directory, or same file). If coupling is found, `/split` is **not** offered; the warning still fires but the recommendation is to proceed as a single issue.
 
 When children are cleanly independent, the warning includes a numbered **Suggested split** block. Commenting `/split` triggers the split job (see [auto-issue.yml](#auto-issueyml--auto-issue-worker) above).
+
+---
+
+## Dispatch throttle: detection and recovery
+
+GitHub applies an undocumented per-repo throttle on `push` and `pull_request` event dispatch when automation density crosses an internal heuristic. This section documents how to identify and recover from it.
+
+### Identifying the throttle
+
+The signature is selective silence: `push` and `pull_request` events stop dispatching across all branches while `issues`, `issue_comment`, and `deployment_status` events continue normally.
+
+Quick check — if the most-recent `push`-triggered run is >20 minutes old during active development, suspect the throttle:
+
+```sh
+gh api "repos/fraserbrookhouse/poke-memory/actions/runs?event=push&per_page=1" \
+  --jq '.workflow_runs[0].created_at'
+```
+
+Compare against:
+
+```sh
+gh api "repos/fraserbrookhouse/poke-memory/actions/runs?event=issues&per_page=1" \
+  --jq '.workflow_runs[0].created_at'
+```
+
+If `issues` events are recent but `push` events stopped 15+ minutes ago, the throttle is active.
+
+### Confirmed non-recoveries (from 2026-05-12 incident)
+
+These do **not** recover dispatch during an active throttle window:
+
+- `gh pr close <N> && gh pr reopen <N>` — `pull_request: reopened` is also suppressed.
+- Pushing an empty commit to the PR branch — `push` events are suppressed, so `pull_request: synchronize` does not fire. Vercel picks up the commit but GitHub Actions does not.
+
+### Recovery procedure
+
+1. **Wait for the window to clear.** Anti-abuse throttles typically lift in 15–60 minutes once the dispatch rate drops. Monitor by polling the push-event check above until a run newer than the suspected clear time appears.
+
+2. **Identify stuck PRs.** The `pr-check-monitor` workflow will have posted `<!-- pr-check-monitor:{sha} -->` comments on any PR that had no `test` check dispatched within 20 minutes of opening. Use those comments as your recovery list.
+
+3. **Re-trigger CI on each stuck PR.** Once `push` events resume, push an empty commit to each stuck branch:
+
+```sh
+git fetch origin
+git checkout <branch-name>
+git commit --allow-empty -m "chore: re-trigger CI after dispatch throttle"
+git push
+```
+
+   The `synchronize` event will now dispatch and CI will pick up the commit.
+
+4. **Verify CI ran.** Confirm the `test` check appears:
+
+```sh
+gh api "repos/fraserbrookhouse/poke-memory/commits/<sha>/check-runs?check_name=test" \
+  --jq '.check_runs[].status'
+```
+
+### Root cause context
+
+The throttle is triggered by automation density, not by any single workflow. High-volume bursts — e.g. 4 PR merges in 15 minutes, each cascading through 6–8 workflows plus parallel issue-comment automation — can exceed GitHub's (undocumented) per-repo heuristic for compute-heavier event types. Reducing steady-state dispatch rate (e.g. removing automatic labelling for issues and PRs) lowers the risk of re-triggering the throttle.
 
 ---
 
