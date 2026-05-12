@@ -80,16 +80,60 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
 - Use `revalidatePath('/path')` only when invalidating path-level data, not specific tags.
 - Tag the underlying cached fetches with `cacheTag(...)` inside `'use cache'` functions — without that, there is nothing for `updateTag` to invalidate.
 
+### Sync: invariants and destructive-write protection (READ FIRST)
+
+Before touching anything in `lib/sync/`, `app/api/sync/route.ts`, `db/migrations/`, or any code that pushes to Supabase, read this section. The rules below exist because of incidents that have already happened (#293 wiped 2497 of 2513 cloud rows to zero state) and are enforced both in code and at the database layer.
+
+**Order constraints**
+
+- **Manual sync (`useManualSync`) pulls before pushing.** Order: load local → `pullSession` → `mergeCloudIntoLocal` → `saveSession` → `pushSession` of the merged result. Pushing first lets stale or emptied local state overwrite real cloud progress through the `(user_id, pokemon_id)` upsert key. `components/sync/useManualSync.test.tsx` asserts call order — if you re-order the steps, that test fails by design.
+- **Brand-new device (`loadSession()` returned `null`) must not push back the merged result.** The merged state is entirely cloud-sourced; pushing it back is wasted bandwidth and widens the window for a future regression.
+- **If `pullSession` fails, do not push.** Pushing without knowing cloud state is the exact failure mode of #293. The same rule applies to anywhere else you sync: cards, streak, settings, future tables. Pull first, decide, then push.
+
+**Database trigger (`card_reviews_reject_regression_trigger`, migration 002)**
+
+A `BEFORE UPDATE` trigger on `card_reviews` raises `23514 check_violation` when:
+- `OLD.last_review IS NOT NULL AND NEW.last_review IS NULL` — un-reviewing a card.
+- `OLD.first_seen IS NOT NULL AND NEW.first_seen IS NULL` — un-seeing a card.
+- `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review` — review date moving backward.
+
+`repetitions`, `interval`, `ease_factor` are intentionally **not** checked because SM-2 "Again" legitimately resets them. The trigger only catches lifecycle-timestamp regressions.
+
+**Do not work around the trigger.** A legitimate "reset progress" / "delete account" flow needs a `SECURITY DEFINER` RPC that explicitly bypasses it, plus user confirmation. No such flow exists today; do not invent one without an explicit feature requirement.
+
+**Auxiliary sync legs are best-effort**
+
+Cards are the primary contract. Streak (`streak_days`) and settings (`user_settings`) sync runs inside `useManualSync` after the cards step. Their failures `console.warn` and continue — they must not flip the overall sync into the error state. Surfacing "Sync failed" because the streak push hiccuped is worse than silently degrading.
+
+**Per-table conflict policy**
+
+- `card_reviews` — per-card rule in `mergeCloudIntoLocalSilent` (see the "background pull" section below for the exact rule).
+- `streak_days` — union-merge (`mergeStreak`). Streak data is monotonic; nothing is ever removed by sync.
+- `user_settings` — last-write-wins on the whole `settings` JSONB column. The pull-overlay path runs **only** when `hasStoredSettings()` is `false` (i.e. the user has never written settings on this device). Once local has a stored copy, local is authoritative on that device; we still push local up so other devices can pick it up.
+
+**Schema notes**
+
+- `user_settings.settings` (jsonb) is the source of truth. The legacy flat columns (`max_new_per_day`, `max_reviews_per_day`) are leftovers from migration 001 and are not read or written by current sync paths. A future cleanup can drop them; not worth the destructive migration today.
+- `card_reviews` schema is on SM-2 fields (`repetitions`, `interval`, `ease_factor`) until #264 lands the FSRS migration. The trigger only cares about timestamp columns, so the FSRS swap doesn't disturb it.
+
+**Catastrophic recovery**
+
+There is no Point-in-Time Recovery on the free tier. Issue #298 tracks the upgrade as a launch blocker. Until PITR is enabled, the trigger and the SQL audit you can run via `mcp__supabase__execute_sql` are the only defenses against an unforeseen sync bug. Treat any production sync change as one-way until PITR is in place.
+
 ### Sync (authenticated users)
 
-Two-layer model for pushing review state to Supabase:
+Sync paths to Supabase, in order of how data normally flows:
 
 1. **Per-grade debounced upsert (primary path)** — `usePerGradeSync(client, userId)` returns `{ enqueueGrade, flushPending }`. Call `enqueueGrade(card)` fire-and-forget immediately after each grade. A 200 ms debounce coalesces rapid re-grades; when it fires, one upsert per pending card is sent via `pushSingleCard`. Failed cards stay in the queue for the next grade cycle or the unload safety-net.
 
-2. **Unload safety-net (secondary path)** — `useSyncOnUnload(client, userId, flushPending)` registers `visibilitychange` / `pagehide` listeners. On unload it calls `flushPending()` (from `usePerGradeSync`) to get the still-unsynced cards; if non-empty, it dispatches them via `navigator.sendBeacon('/api/sync', blob)`. When the per-grade path is working normally, `flushPending()` returns `[]` and the unload push is skipped entirely.
+2. **Unload safety-net** — `useSyncOnUnload(client, userId, flushPending)` registers `visibilitychange` / `pagehide` listeners. On unload it calls `flushPending()` (from `usePerGradeSync`) to get the still-unsynced cards; if non-empty, it dispatches them via `navigator.sendBeacon('/api/sync', blob)`. When the per-grade path is working normally, `flushPending()` returns `[]` and the unload push is skipped entirely.
 
-- **Unload-time send mechanism:** `useSyncOnUnload` uses `navigator.sendBeacon('/api/sync', blob)` rather than calling the Supabase JS client directly. `sendBeacon` is the W3C-specified mechanism for guaranteed delivery during page hide and carries same-origin cookies automatically — ITP does not affect same-origin requests, so mobile Safari auth cookies are included. The receiver is `app/api/sync/route.ts` — a POST Route Handler that authenticates via session cookie and upserts server-side. `lastPushFailed` in sync status reflects whether the browser accepted the beacon (the synchronous return value of `sendBeacon`), not whether the server upserted. `pushSession` is not replaced — it remains the manual-sync / force-resync path (runs while the page is visible, no keepalive needed).
-- **`pushSession` is not deleted** — it remains the batched fallback and the escape hatch for "force resync" scenarios.
+3. **Background pull on visibility** — see the dedicated section below.
+
+4. **Manual sync (`useManualSync`)** — wired to the Stats-page "Sync" button. **Pulls before pushing** — see the invariants section above for why. Order: load local → pull cards → merge → save → push merged cards → streak (pull → union-merge → save → push) → settings (push local; pull only when `hasStoredSettings()` is false). Cards drive success/error state; streak and settings failures `console.warn` and continue. `pushSession` (batched) is reused for the cards push.
+
+- **Unload-time send mechanism:** `useSyncOnUnload` uses `navigator.sendBeacon('/api/sync', blob)` rather than calling the Supabase JS client directly. `sendBeacon` is the W3C-specified mechanism for guaranteed delivery during page hide and carries same-origin cookies automatically — ITP does not affect same-origin requests, so mobile Safari auth cookies are included. The receiver is `app/api/sync/route.ts` — a POST Route Handler that authenticates via session cookie and upserts server-side. `lastPushFailed` in sync status reflects whether the browser accepted the beacon (the synchronous return value of `sendBeacon`), not whether the server upserted.
+- **`pushSession` is not deleted** — it remains the batched escape hatch and is what `useManualSync` calls for the cards push step.
 - **Volume**: 100 reviews/day → at most 100 single-row upserts (often fewer after debounce coalescing). Well within Supabase free-tier limits.
 - Guest-mode guard runs on every `enqueueGrade` call, not just at mount, so mid-session sign-out is safe.
 
