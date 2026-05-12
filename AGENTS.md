@@ -152,7 +152,7 @@ A React hook can live in `lib/` (e.g. `lib/review/useStorageQuota.ts`), but if i
 ### Documentation
 
 - **README.md** is the user-facing entry point — audience is a curious visitor or contributor. Concise, scannable, includes run-locally instructions.
-- **CHANGELOG.md** tracks notable user-facing changes. Loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Add an entry under `## [Unreleased]` whenever a commit changes user-facing behavior or adds a feature.
+- **CHANGELOG.md** tracks notable user-facing changes. Loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Add a fragment file under `changelog.d/unreleased/` whenever a commit changes user-facing behavior or adds a feature — **do not edit `CHANGELOG.md` directly** (see `changelog.d/README.md` for the format).
 - **WORKFLOW.md** is the process map — sub-agent roster, orchestration playbook, GitHub Actions catalog, issue lifecycle, build gates, and retrospectives. Update it in the same commit that changes a workflow or orchestration behavior.
 - **All three files are updated as part of the same commit that lands the change** — no separate docs-only commit. Orchestrator handles the edit inline; no specialist agent.
 - Internal conventions (this file, `AGENTS.md`) are kept separate from user-facing docs. Don't merge them.
@@ -160,12 +160,22 @@ A React hook can live in `lib/` (e.g. `lib/review/useStorageQuota.ts`), but if i
 ### Versioning
 
 - **Standard**: SemVer 2.0.0.
-- **Pre-v1 semantics**: `0.MINOR.PATCH` for all pre-v1 releases by default. To cut a minor bump (`0.N.0 → 0.N+1.0`) instead, add a bare `> bump: minor` line anywhere in the `[Unreleased]` section. Major (`1.0.0`) remains a manual decision.
-- **Cadence: release on merge to `main`.** `auto-release.yml` runs on every push to `main`. If `[Unreleased]` has any entry under Added/Changed/Removed/Deprecated/Fixed/Security, the workflow bumps the SemVer, promotes the section, commits, tags, pushes, and creates a GitHub Release. If `[Unreleased]` is empty (or only contains internal-convention notes outside the six standard subsections), the workflow no-ops. Since Vercel auto-deploys on every push to `main`, "tagged release" and "deployed to production" are the same event in this project.
+- **Pre-v1 semantics**: `0.MINOR.PATCH` for all pre-v1 releases. Bump rules (applied per-release to the set of merged fragments):
+  - `kind: minor-bump` fragment present, **or** any fragment with `kind: added/changed/removed/deprecated` → minor bump (`0.N.0 → 0.N+1.0`)
+  - only `kind: fixed/security` fragments → patch bump (`0.N.P → 0.N.P+1`)
+  - major (`1.0.0`) remains a manual decision
+- **Cadence: release on merge to `main`.** `auto-release.yml` runs on every push to `main`. If `changelog.d/unreleased/` contains any `*.md` fragments, the workflow assembles them into the next `## [X.Y.Z]` section, bumps the SemVer, commits (deleting the consumed fragments), tags, pushes, and creates a GitHub Release. If no fragments exist, the workflow no-ops. Since Vercel auto-deploys on every push to `main`, "tagged release" and "deployed to production" are the same event in this project.
 - **Version source**: `package.json` is the single source of truth. The release workflow bumps it automatically — never edit the version field by hand.
-- **`[Unreleased]` promotion**: when a release is cut, `## [Unreleased]` becomes `## [X.Y.Z] — YYYY-MM-DD`, a fresh empty `## [Unreleased]` is prepended, and a reference link is appended at the bottom of `CHANGELOG.md`.
+- **Fragment promotion**: when a release is cut, `cut-release.mjs` assembles the fragments into a new `## [X.Y.Z] — YYYY-MM-DD` block inserted after the static `## [Unreleased]` stub in `CHANGELOG.md`, and the release commit deletes all `changelog.d/unreleased/*.md` files. The `## [Unreleased]` heading and its HTML comment remain in `CHANGELOG.md` as a permanent stub.
 - **Loop break**: the workflow's own commit is `chore(release): vX.Y.Z [skip ci]`. The `[skip ci]` marker suppresses all workflows on that commit, and the `chore(release):` prefix is a defensive `if:` guard on the job. Combined, this prevents the release run from re-triggering itself.
-- **`[Unreleased]` content guidance for contributors**: only add bullets you are happy to ship in the very next release — every merge to `main` cuts one. Internal-only notes that should not bump the version (e.g. agent-roster tweaks) belong outside the standard subsections (use a custom heading like `### Project conventions (internal)` if you need a CHANGELOG slot for them, or skip the CHANGELOG entirely for purely internal changes). To request a minor bump instead of the default patch bump, add `> bump: minor` on its own line anywhere in `[Unreleased]`; `cut-release.mjs` strips this line from both the promoted CHANGELOG entry and the published GitHub Release notes.
+- **Fragment content guidance for contributors**: only add fragments you are happy to ship in the very next release — every merge to `main` cuts one. Internal-only changes that should not bump the version (e.g. agent-roster tweaks) should not have a fragment at all. The fragment format is:
+  ```
+  ---
+  kind: added | changed | removed | deprecated | fixed | security | minor-bump
+  ---
+  - Your changelog bullet here.
+  ```
+  Name the file `<issue-or-pr-number>-<short-slug>.md` and place it under `changelog.d/unreleased/`. See `changelog.d/README.md` for full details.
 - **Prerequisite**: the `poke-memory-bot` App must be configured as a bypass actor on the `main-protection` ruleset (ID 16176438) so its release commit can land on `main` without going through a PR. If `auto-release.yml` ever fails with a protected-branch error on `git push origin main`, that is the missing setup.
 
 ### Stack decisions

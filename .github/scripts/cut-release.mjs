@@ -1,27 +1,30 @@
 #!/usr/bin/env node
-// Promotes [Unreleased] in CHANGELOG.md to the next SemVer version, bumps
-// package.json, and writes release notes to a file for `gh release create`.
+// Promotes changelog fragments from changelog.d/unreleased/ to CHANGELOG.md,
+// bumps package.json, and writes release notes for `gh release create`.
 //
 // Reads:
-//   CHANGELOG.md, package.json
+//   changelog.d/unreleased/*.md, CHANGELOG.md, package.json
 //
-// Writes (only when [Unreleased] has content):
-//   CHANGELOG.md (rewritten with [Unreleased] promoted)
+// Writes (only when fragments exist):
+//   CHANGELOG.md (new [X.Y.Z] section inserted after [Unreleased] stub)
 //   package.json (version bumped)
 //   $RUNNER_TEMP/release-notes.md
 //   $GITHUB_OUTPUT keys: skip, version, bodyFile, bumpType
 //
 // Bump rules (pre-v1 SemVer per AGENTS.md):
-//   - `> bump: minor` in [Unreleased]  → minor bump (0.N.0 → 0.N+1.0)
-//   - any other non-empty [Unreleased] → patch bump (0.N.M → 0.N.M+1)
-//   - empty [Unreleased]               → skip=true, no-op
+//   - any fragment with kind: minor-bump  → minor bump (0.N.0 → 0.N+1.0)
+//   - Added/Changed/Removed/Deprecated   → minor bump
+//   - only Fixed/Security                → patch bump
+//   - no fragments                       → skip=true, no-op
 
 import fs from 'node:fs';
 import path from 'node:path';
 
 const CHANGELOG = 'CHANGELOG.md';
 const PACKAGE = 'package.json';
-const TRIGGER_SECTIONS = ['Added', 'Changed', 'Removed', 'Deprecated', 'Fixed', 'Security'];
+const FRAGMENTS_DIR = 'changelog.d/unreleased';
+const KIND_ORDER = ['Added', 'Changed', 'Removed', 'Deprecated', 'Fixed', 'Security'];
+const MINOR_KINDS = new Set(['added', 'changed', 'removed', 'deprecated']);
 
 function setOutput(name, value) {
   const out = process.env.GITHUB_OUTPUT;
@@ -37,6 +40,76 @@ function fail(msg) {
   process.exit(1);
 }
 
+// --- Read fragment files -----------------------------------------------------
+
+let fragmentFiles = [];
+if (fs.existsSync(FRAGMENTS_DIR)) {
+  fragmentFiles = fs.readdirSync(FRAGMENTS_DIR).filter((f) => /\.md$/i.test(f)).sort();
+}
+
+if (fragmentFiles.length === 0) {
+  console.log('No changelog fragments found — nothing to release.');
+  setOutput('skip', 'true');
+  process.exit(0);
+}
+
+// --- Parse each fragment -----------------------------------------------------
+
+// Maps title-case kind name → array of bullet strings.
+const bulletsByKind = {};
+let hasMinorBump = false;
+
+for (const filename of fragmentFiles) {
+  const filePath = path.join(FRAGMENTS_DIR, filename);
+  const raw = fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
+
+  const match = raw.match(/^---\s*\nkind:\s*(\S+)\s*\n---\s*\n?([\s\S]*)$/);
+  if (!match) {
+    fail(`Fragment ${filename} does not match expected front-matter format (---\\nkind: VALUE\\n---).`);
+  }
+
+  const kind = match[1].toLowerCase();
+  const body = match[2].trim();
+
+  if (kind === 'minor-bump') {
+    hasMinorBump = true;
+    continue;
+  }
+
+  // Normalise kind to title-case for grouping (e.g. 'added' → 'Added').
+  const titleKind = kind.charAt(0).toUpperCase() + kind.slice(1);
+  if (!KIND_ORDER.includes(titleKind)) {
+    fail(`Fragment ${filename} has unknown kind: "${kind}". Expected one of: minor-bump, ${KIND_ORDER.map((k) => k.toLowerCase()).join(', ')}.`);
+  }
+
+  const bullets = body.split('\n').filter((l) => /^\s*-\s+\S/.test(l));
+  if (bullets.length > 0) {
+    if (!bulletsByKind[titleKind]) bulletsByKind[titleKind] = [];
+    bulletsByKind[titleKind].push(...bullets);
+  }
+}
+
+// --- Determine bump type -----------------------------------------------------
+
+const nonEmptyKinds = Object.keys(bulletsByKind);
+
+if (!hasMinorBump && nonEmptyKinds.length === 0) {
+  // Fragments exist but all have empty bodies and none is minor-bump — skip.
+  console.log('No changelog fragments with content — nothing to release.');
+  setOutput('skip', 'true');
+  process.exit(0);
+}
+
+let bumpType;
+if (hasMinorBump) {
+  bumpType = 'minor';
+} else {
+  const allPatch = nonEmptyKinds.every((k) => !MINOR_KINDS.has(k.toLowerCase()));
+  bumpType = allPatch ? 'patch' : 'minor';
+}
+
+// --- Read package.json and compute new version --------------------------------
+
 const changelog = fs.readFileSync(CHANGELOG, 'utf8');
 const pkg = JSON.parse(fs.readFileSync(PACKAGE, 'utf8'));
 
@@ -46,7 +119,23 @@ if (versionParts.length !== 3 || versionParts.some(Number.isNaN)) {
 }
 const [major, minor, patch] = versionParts;
 
-// --- Slice [Unreleased] section ---------------------------------------------
+let newVersion;
+if (major === 0) {
+  newVersion = bumpType === 'minor' ? `0.${minor + 1}.0` : `0.${minor}.${patch + 1}`;
+} else {
+  newVersion = bumpType === 'minor' ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
+}
+
+const today = new Date().toISOString().slice(0, 10);
+
+// --- Build cleanBody from fragments ------------------------------------------
+
+const sections = KIND_ORDER.filter((k) => bulletsByKind[k] && bulletsByKind[k].length > 0).map(
+  (k) => `### ${k}\n\n${bulletsByKind[k].join('\n')}`,
+);
+const cleanBody = sections.join('\n\n');
+
+// --- Rewrite CHANGELOG -------------------------------------------------------
 
 const unreleasedStart = changelog.indexOf('## [Unreleased]');
 if (unreleasedStart < 0) fail('No `## [Unreleased]` heading in CHANGELOG.md.');
@@ -56,83 +145,16 @@ if (afterUnreleased < 0) {
   fail('No previous `## [X.Y.Z]` heading after [Unreleased]; CHANGELOG must have at least one prior version.');
 }
 
-const unreleasedSection = changelog.slice(unreleasedStart, afterUnreleased + 1);
-const unreleasedBody = unreleasedSection
-  .replace(/^## \[Unreleased\][^\n]*\n+/, '')
-  .replace(/\s+$/, '');
-
-// --- Parse subsections ------------------------------------------------------
-
-function parseSubsections(body) {
-  const result = {};
-  const lines = body.split('\n');
-  let current = null;
-  let buffer = [];
-  for (const line of lines) {
-    const head = line.match(/^### (.+?)\s*$/);
-    if (head) {
-      if (current) result[current] = buffer;
-      current = head[1];
-      buffer = [];
-    } else if (current) {
-      buffer.push(line);
-    }
-  }
-  if (current) result[current] = buffer;
-  return result;
-}
-
-function hasBullet(lines) {
-  return lines.some((l) => /^\s*-\s+\S/.test(l));
-}
-
-const sections = parseSubsections(unreleasedBody);
-const nonEmpty = TRIGGER_SECTIONS.filter((s) => sections[s] && hasBullet(sections[s]));
-
-if (nonEmpty.length === 0) {
-  console.log('[Unreleased] is empty — nothing to release.');
-  setOutput('skip', 'true');
-  process.exit(0);
-}
-
-// --- Compute next version ---------------------------------------------------
-
-// Shared source keeps the detect and strip regexes in sync — tighten one place only.
-const BUMP_MINOR_SOURCE = String.raw`^>\s*bump:\s*minor\s*`;
-const BUMP_MINOR_DETECT_RE = new RegExp(BUMP_MINOR_SOURCE + '$', 'm');
-const BUMP_MINOR_STRIP_RE = new RegExp(BUMP_MINOR_SOURCE + '\\n?', 'gm');
-
-const needsMinor = BUMP_MINOR_DETECT_RE.test(unreleasedBody);
-let newVersion;
-if (major === 0) {
-  newVersion = needsMinor ? `0.${minor + 1}.0` : `0.${minor}.${patch + 1}`;
-} else {
-  newVersion = needsMinor ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
-}
-const bumpType = needsMinor ? 'minor' : 'patch';
-const today = new Date().toISOString().slice(0, 10);
-
-// Strip the directive from both the promoted CHANGELOG section and release notes.
-// Trailing .trim() absorbs any extra blank lines left behind.
-const cleanBody = unreleasedBody.replace(BUMP_MINOR_STRIP_RE, '').trim();
-
-// --- Rewrite CHANGELOG ------------------------------------------------------
-
-const promoted =
-  `## [Unreleased]\n\n` +
-  `## [${newVersion}] — ${today}\n\n` +
-  cleanBody +
-  `\n\n`;
+// Insert the new version section right before the existing `\n## [X.Y.Z]` block,
+// preserving the [Unreleased] stub (with any HTML comment) exactly as-is.
+const newSection = `\n## [${newVersion}] — ${today}\n\n${cleanBody}\n`;
 
 let newChangelog =
-  changelog.slice(0, unreleasedStart) +
-  promoted +
-  changelog.slice(afterUnreleased + 1);
+  changelog.slice(0, afterUnreleased) +
+  newSection +
+  changelog.slice(afterUnreleased);
 
 // Reference links at the bottom.
-// Existing pattern:
-//   [Unreleased]: https://github.com/OWNER/REPO/compare/vPREV...HEAD
-//   [PREV]: https://github.com/OWNER/REPO/releases/tag/vPREV
 const refRe = /^\[Unreleased\]: (https:\/\/github\.com\/[^/\s]+\/[^/\s]+)\/compare\/v[^\s]+\.\.\.HEAD\s*$/m;
 const refMatch = newChangelog.match(refRe);
 if (refMatch) {
@@ -146,7 +168,7 @@ if (refMatch) {
 
 fs.writeFileSync(CHANGELOG, newChangelog);
 
-// --- Bump package.json (preserve trailing newline) --------------------------
+// --- Bump package.json (preserve trailing newline) ---------------------------
 
 const oldPkgRaw = fs.readFileSync(PACKAGE, 'utf8');
 const trailing = oldPkgRaw.endsWith('\n') ? '\n' : '';
@@ -154,7 +176,7 @@ const previousVersion = pkg.version;
 pkg.version = newVersion;
 fs.writeFileSync(PACKAGE, JSON.stringify(pkg, null, 2) + trailing);
 
-// --- Write release notes ----------------------------------------------------
+// --- Write release notes -----------------------------------------------------
 
 const tmp = process.env.RUNNER_TEMP || '/tmp';
 const notesPath = path.join(tmp, 'release-notes.md');

@@ -1,12 +1,12 @@
 name: Auto Release
 
-# Cuts a SemVer release on every push to `main` when CHANGELOG.md's
-# `[Unreleased]` section has any entry under Added/Changed/Removed/Deprecated/
-# Fixed/Security. Otherwise the run no-ops.
+# Cuts a SemVer release on every push to `main` when changelog fragments exist
+# under changelog.d/unreleased/. Otherwise the run no-ops.
 #
 # Per AGENTS.md "Versioning":
-#   - `> bump: minor` in [Unreleased]  → minor bump (0.N.0 → 0.N+1.0)
-#   - any other non-empty [Unreleased] → patch bump (0.N.M → 0.N.M+1)
+#   - kind: minor-bump fragment          → minor bump (0.N.0 → 0.N+1.0)
+#   - Added/Changed/Removed/Deprecated   → minor bump
+#   - only Fixed/Security                → patch bump
 #
 # Per merge → one commit, one tag, one GitHub Release. The release commit
 # carries `[skip ci]` so subsequent workflow runs (including this one) do not
@@ -83,7 +83,7 @@ jobs:
               --notes-file "${RUNNER_TEMP}/v010-notes.md"
           fi
 
-      - name: Cut release (promote [Unreleased], bump package.json)
+      - name: Cut release (assemble fragments, bump package.json)
         id: cut
         run: node .github/scripts/cut-release.mjs
 
@@ -94,6 +94,7 @@ jobs:
           BUMP_TYPE: ${{ steps.cut.outputs.bumpType }}
         run: |
           set -euo pipefail
+          git rm --ignore-unmatch changelog.d/unreleased/*.md
           git add CHANGELOG.md package.json
           git commit -m "chore(release): v${NEW_VERSION} (${BUMP_TYPE}) [skip ci]"
           git tag "v${NEW_VERSION}"
