@@ -3,7 +3,8 @@
 // lib/pokemon/generated.json.  Run with: node scripts/seed-pokemon.mjs
 // Node 20+ — uses global fetch, node:fs/promises, node:path, node:url.
 
-import { writeFile } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -98,6 +99,65 @@ async function fetchWithRetry(url, label) {
 }
 
 
+/**
+ * Download a sprite from `url` to `destPath`.
+ * Skips download if the file already exists (idempotent).
+ * Retries on network errors and 5xx responses, same policy as fetchWithRetry.
+ * Returns { ok, skipped }.
+ */
+async function downloadSprite(url, destPath) {
+  if (existsSync(destPath)) return { ok: true, skipped: true };
+
+  let attempt = 0;
+  while (true) {
+    let res;
+    try {
+      res = await fetch(url);
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        const delay = BACKOFF_MS[attempt];
+        process.stderr.write(
+          `[seed] WARN: network error downloading sprite (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms: ${err.message}\n`
+        );
+        await sleep(delay);
+        attempt++;
+        continue;
+      }
+      return { ok: false, skipped: false, reason: err.message };
+    }
+
+    if (res.status === 429) {
+      process.stderr.write(`[seed] WARN: rate-limited downloading sprite, skipping\n`);
+      return { ok: false, skipped: false, reason: "rate-limited" };
+    }
+
+    if (res.status >= 500) {
+      if (attempt < MAX_RETRIES) {
+        const delay = BACKOFF_MS[attempt];
+        process.stderr.write(
+          `[seed] WARN: HTTP ${res.status} downloading sprite (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms\n`
+        );
+        await sleep(delay);
+        attempt++;
+        continue;
+      }
+      return { ok: false, skipped: false, reason: `HTTP ${res.status}` };
+    }
+
+    if (!res.ok) {
+      return { ok: false, skipped: false, reason: `HTTP ${res.status}` };
+    }
+
+    try {
+      const buffer = Buffer.from(await res.arrayBuffer());
+      await writeFile(destPath, buffer);
+      return { ok: true, skipped: false };
+    } catch (err) {
+      return { ok: false, skipped: false, reason: err.message };
+    }
+  }
+}
+
 function extractFlavorTexts(flavorTextEntries) {
   const en = (flavorTextEntries ?? []).filter(e => e.language?.name === "en");
   if (en.length === 0) return [];
@@ -189,12 +249,12 @@ async function processSpecies(id) {
   const pokemonData = pokemonResult.data;
 
   // Sprite preference: official-artwork → front_default → skip
-  const spriteUrl =
+  const remoteSpriteUrl =
     pokemonData.sprites?.other?.["official-artwork"]?.front_default ??
     pokemonData.sprites?.front_default ??
     null;
 
-  if (!spriteUrl) {
+  if (!remoteSpriteUrl) {
     process.stderr.write(
       `[seed] WARN: no sprite for ${id} (${name})\n`
     );
@@ -221,7 +281,7 @@ async function processSpecies(id) {
   const baseExperience = pokemonData.base_experience ?? null;
 
   return {
-    id, name, spriteUrl,
+    id, name, remoteSpriteUrl,
     height, weight, baseExperience,
     types, stats, flavorText, flavorTexts,
     genus, generation, captureRate, baseHappiness,
@@ -360,16 +420,58 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
+  // Step 3.5: Download sprites to public/sprites/pokemon/
+  // ------------------------------------------------------------------
+  const spritesDir = resolve(__dirname, "../public/sprites/pokemon");
+  await mkdir(spritesDir, { recursive: true });
+
+  let spritesDownloaded = 0;
+  let spritesSkipped = 0;
+  let spritesFailed = 0;
+  const failedSpriteIds = new Set();
+
+  for (let i = 0; i < partialRecords.length; i += CONCURRENCY) {
+    const batch = partialRecords.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (record) => {
+      const destPath = resolve(spritesDir, `${record.id}.png`);
+      const result = await downloadSprite(record.remoteSpriteUrl, destPath);
+      if (!result.ok) {
+        process.stderr.write(
+          `[seed] WARN: sprite download failed for ${record.id} (${record.name}): ${result.reason}\n`
+        );
+        spritesFailed++;
+        failedSpriteIds.add(record.id);
+      } else if (result.skipped) {
+        spritesSkipped++;
+      } else {
+        spritesDownloaded++;
+      }
+    }));
+    if ((i + CONCURRENCY) % (CONCURRENCY * 5) === 0) {
+      process.stderr.write(
+        `[seed] [sprites] ${Math.min(i + CONCURRENCY, partialRecords.length)}/${partialRecords.length} processed\n`
+      );
+    }
+  }
+
+  process.stderr.write(
+    `[seed] Sprites: ${spritesDownloaded} downloaded, ${spritesSkipped} already existed, ${spritesFailed} failed\n`
+  );
+
+  // ------------------------------------------------------------------
   // Step 4: Merge chains, sort, and write output
   // ------------------------------------------------------------------
-  const records = partialRecords.map(({ evolutionChainUrl: _url, ...rest }) => ({
+  const records = partialRecords.map(({ evolutionChainUrl: _url, remoteSpriteUrl, ...rest }) => ({
     ...rest,
+    spriteUrl: failedSpriteIds.has(rest.id)
+      ? remoteSpriteUrl
+      : `/sprites/pokemon/${rest.id}.png`,
     evolutionChain: _url ? (chainDataMap.get(_url) ?? []) : [],
   }));
 
   records.sort((a, b) => a.id - b.id);
 
-  const json = JSON.stringify(records, null, 2);
+  const json = JSON.stringify(records, null, 2) + "\n";
   await writeFile(outputPath, json, "utf-8");
 
   process.stderr.write(
@@ -385,4 +487,7 @@ async function main() {
   }
 }
 
-main();
+main().catch((err) => {
+  process.stderr.write(`[seed] FATAL: ${err.message}\n`);
+  process.exit(1);
+});
