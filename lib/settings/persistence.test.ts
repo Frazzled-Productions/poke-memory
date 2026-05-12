@@ -113,6 +113,9 @@ describe('loadSettings migration', () => {
       maxNewReversePerDay: 15,
       maxReviewsReversePerDay: 50,
       playCryOnReveal: true,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 12,
+      maxReviewsCryPerDay: 80,
       favouriteTheme: null,
       retentionTarget: 0.95,
     };

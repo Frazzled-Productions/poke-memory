@@ -25,6 +25,9 @@ vi.mock("@/lib/settings/persistence", () => ({
     nameCardsEnabled: true,
     evolutionCardsEnabled: true,
     playCryOnReveal: false,
+    cryCardsEnabled: false,
+    maxNewCryPerDay: 10,
+    maxReviewsCryPerDay: 100,
   },
 }));
 
@@ -39,6 +42,7 @@ const VALID_LIMITS: DailyLimits = {
   name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
   evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
   reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
 const VALID_SETTINGS: UserSettings = {
@@ -53,6 +57,9 @@ const VALID_SETTINGS: UserSettings = {
   nameCardsEnabled: true,
   evolutionCardsEnabled: true,
   playCryOnReveal: false,
+  cryCardsEnabled: false,
+  maxNewCryPerDay: 10,
+  maxReviewsCryPerDay: 100,
   favouriteTheme: null,
   retentionTarget: 0.9,
 };

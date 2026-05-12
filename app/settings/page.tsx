@@ -344,6 +344,7 @@ export default function SettingsPage() {
         if (card.cardType === "name" && !clamped.nameCardsEnabled) return false;
         if (card.cardType === "evolution" && !clamped.evolutionCardsEnabled) return false;
         if (card.cardType === "reverse" && !clamped.reverseCardsEnabled) return false;
+        if (card.cardType === "cry" && !clamped.cryCardsEnabled) return false;
         return true;
       });
       if (filtered.length !== session.cards.length) {
@@ -678,6 +679,46 @@ export default function SettingsPage() {
                     ))}
                   </>
                 )}
+              </section>
+
+              {/* Cry-direction cards */}
+              <section className="flex flex-col gap-4" aria-labelledby="cry-heading">
+                <h2
+                  id="cry-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Cry → name cards
+                </h2>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Enable cry cards
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Audio prompt — hear the cry and name the Pokémon. Species without a cry are skipped automatically.
+                        Re-enabling after disabling will reset cry-card progress.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.cryCardsEnabled}
+                      onClick={() => handleToggle("cryCardsEnabled")}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        settings.cryCardsEnabled
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          settings.cryCardsEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
               </section>
 
               {/* Audio section */}

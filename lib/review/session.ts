@@ -1,7 +1,7 @@
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
-import { SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+import { SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET, CRY_ID_OFFSET } from "@/lib/pokemon/seed";
 import { FNV_PRIME, FNV_OFFSET, fnv1a } from "@/lib/utils/fnv1a";
 
 export type { Grade };
@@ -26,7 +26,22 @@ export type ReverseReviewCard = Omit<SeedPokemon, "id"> & {
   state: ReviewState;
 };
 
-export type ReviewableCard = NameReviewCard | EvolutionReviewCard | ReverseReviewCard;
+// Cry card: audio cry plays as prompt, sprite + name revealed on tap.
+// id = CRY_ID_OFFSET + pokemon.id; only generated for species with a
+// non-null cryUrl. Same field shape as ReverseReviewCard so existing
+// helpers that handle "non-name id-aliased cards" generalise.
+export type CryReviewCard = Omit<SeedPokemon, "id"> & {
+  cardType: "cry";
+  id: number;        // CRY_ID_OFFSET + pokemonId
+  pokemonId: number;
+  state: ReviewState;
+};
+
+export type ReviewableCard =
+  | NameReviewCard
+  | EvolutionReviewCard
+  | ReverseReviewCard
+  | CryReviewCard;
 
 // Backward-compat alias
 export type ReviewCard = ReviewableCard;
@@ -36,25 +51,32 @@ export type PerTypeLimits = {
   maxReviewsPerDay: number;
 };
 
-export type CardTypeKey = "name" | "evolution" | "reverse";
+export type CardTypeKey = "name" | "evolution" | "reverse" | "cry";
 
 export type DailyLimits = {
   name: PerTypeLimits;
   evolution: PerTypeLimits;
   reverse: PerTypeLimits;
+  cry: PerTypeLimits;
 };
 
 export const DEFAULT_LIMITS: DailyLimits = {
   name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
   evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
   reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
 export function buildSession(
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: { reverseEnabled?: boolean; nameEnabled?: boolean; evolutionEnabled?: boolean } = {},
+  opts: {
+    reverseEnabled?: boolean;
+    nameEnabled?: boolean;
+    evolutionEnabled?: boolean;
+    cryEnabled?: boolean;
+  } = {},
 ): ReviewableCard[] {
   const { nameEnabled = true, evolutionEnabled = true } = opts;
   const nameCards: NameReviewCard[] = nameEnabled
@@ -79,7 +101,20 @@ export function buildSession(
         state: initialReviewState(now),
       }))
     : [];
-  return [...nameCards, ...evoCards, ...reverseCards];
+  // Cry cards are only generated for species with a non-null cry — there
+  // is no point scheduling a card that can never have a prompt to play.
+  const cryCards: CryReviewCard[] = opts.cryEnabled
+    ? seed
+        .filter((p) => p.cryUrl !== null)
+        .map((p) => ({
+          ...p,
+          id: CRY_ID_OFFSET + p.id,
+          pokemonId: p.id,
+          cardType: "cry" as const,
+          state: initialReviewState(now),
+        }))
+    : [];
+  return [...nameCards, ...evoCards, ...reverseCards, ...cryCards];
 }
 
 // Merge saved cards with the current seed, refreshing seed fields (e.g. newly
@@ -92,9 +127,19 @@ export function hydrateSession(
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: { reverseEnabled?: boolean; nameEnabled?: boolean; evolutionEnabled?: boolean } = {},
+  opts: {
+    reverseEnabled?: boolean;
+    nameEnabled?: boolean;
+    evolutionEnabled?: boolean;
+    cryEnabled?: boolean;
+  } = {},
 ): ReviewableCard[] {
-  const { reverseEnabled = false, nameEnabled = true, evolutionEnabled = true } = opts;
+  const {
+    reverseEnabled = false,
+    nameEnabled = true,
+    evolutionEnabled = true,
+    cryEnabled = false,
+  } = opts;
   const seedById = new Map(seed.map((p) => [p.id, p]));
   const evoSeedById = new Map(evoSeed.map((e) => [e.id, e]));
 
@@ -102,6 +147,9 @@ export function hydrateSession(
   let filteredSaved = reverseEnabled
     ? saved
     : saved.filter((c) => c.cardType !== "reverse");
+  if (!cryEnabled) {
+    filteredSaved = filteredSaved.filter((c) => c.cardType !== "cry");
+  }
   if (!nameEnabled) {
     filteredSaved = filteredSaved.filter((c) => c.cardType !== "name");
   }
@@ -122,6 +170,16 @@ export function hydrateSession(
         id: card.id,
         pokemonId: fresh.id,
         cardType: "reverse" as const,
+        state: card.state,
+      };
+    } else if (card.cardType === "cry") {
+      const fresh = seedById.get(card.pokemonId);
+      if (!fresh) return card;
+      return {
+        ...fresh,
+        id: card.id,
+        pokemonId: fresh.id,
+        cardType: "cry" as const,
         state: card.state,
       };
     } else {
@@ -157,7 +215,19 @@ export function hydrateSession(
         }))
     : [];
 
-  const additions = [...nameAdditions, ...evoAdditions, ...reverseAdditions];
+  const cryAdditions: CryReviewCard[] = cryEnabled
+    ? seed
+        .filter((p) => p.cryUrl !== null && !savedIds.has(CRY_ID_OFFSET + p.id))
+        .map((p) => ({
+          ...p,
+          id: CRY_ID_OFFSET + p.id,
+          pokemonId: p.id,
+          cardType: "cry" as const,
+          state: initialReviewState(now),
+        }))
+    : [];
+
+  const additions = [...nameAdditions, ...evoAdditions, ...reverseAdditions, ...cryAdditions];
   if (additions.length === 0) return refreshed;
   return [...refreshed, ...additions];
 }
@@ -245,10 +315,11 @@ export function buildSessionQueues(
     name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
     evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
     reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+    cry: { newIntroducedToday: 0, reviewsDoneToday: 0 },
   };
 
-  const reviewCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [] };
-  const newCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [] };
+  const reviewCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [], cry: [] };
+  const newCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [], cry: [] };
 
   for (const card of cards) {
     const type = card.cardType;
@@ -273,7 +344,7 @@ export function buildSessionQueues(
   const reviewQueue: number[] = [];
   const newQueue: number[] = [];
 
-  for (const type of ["name", "evolution", "reverse"] as const) {
+  for (const type of ["name", "evolution", "reverse", "cry"] as const) {
     const reviewSlots = Math.max(
       0,
       limits[type].maxReviewsPerDay - perType[type].reviewsDoneToday,
@@ -298,11 +369,13 @@ export function buildSessionQueues(
   const newIntroducedToday =
     perType.name.newIntroducedToday +
     perType.evolution.newIntroducedToday +
-    perType.reverse.newIntroducedToday;
+    perType.reverse.newIntroducedToday +
+    perType.cry.newIntroducedToday;
   const reviewsDoneToday =
     perType.name.reviewsDoneToday +
     perType.evolution.reviewsDoneToday +
-    perType.reverse.reviewsDoneToday;
+    perType.reverse.reviewsDoneToday +
+    perType.cry.reviewsDoneToday;
 
   return {
     learningCardIds,
