@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.6.13] — 2026-05-12
+
+### Added
+
+- Added a Screenshots section to the README with images of the practice, Pokédex grid, and Stats pages.
+
 ## [0.6.12] — 2026-05-12
 
 ### Added
@@ -304,7 +310,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.6.12...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.6.13...HEAD
+[0.6.13]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.13
 [0.6.12]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.12
 [0.6.11]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.11
 [0.6.10]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.10
