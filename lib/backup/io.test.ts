@@ -53,6 +53,7 @@ const VALID_SETTINGS: UserSettings = {
   nameCardsEnabled: true,
   evolutionCardsEnabled: true,
   playCryOnReveal: false,
+  favouriteTheme: null,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

@@ -1,5 +1,17 @@
+import type { ThemeColors } from "@/lib/theme/curated-pokemon";
+
 // localStorage key for all user-configurable settings
-const STORAGE_KEY = "poke-memory:settings:v1";
+export const STORAGE_KEY = "poke-memory:settings:v1";
+
+// Mirror of the structure stored under `favouriteTheme`. Validation of the
+// values (HEX_COLOR / known Pokémon id) happens in lib/theme/persistence.ts
+// — here we treat the field as an opaque container.
+export type StoredFavouriteTheme = {
+  id: number;
+  name: string;
+  colors: ThemeColors;
+  spriteUrl: string | null;
+};
 
 export type UserSettings = {
   masteryRepetitions: number;        // cards with this many consecutive correct reviews = mastered
@@ -13,6 +25,7 @@ export type UserSettings = {
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
   playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
+  favouriteTheme: StoredFavouriteTheme | null; // chosen mastery accent Pokémon
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -27,6 +40,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
+  favouriteTheme: null,
 };
 
 // Returns DEFAULT_SETTINGS on fresh load, server, or corruption. Never throws.
@@ -85,6 +99,12 @@ export function loadSettings(): UserSettings {
         typeof obj.playCryOnReveal === "boolean"
           ? obj.playCryOnReveal
           : DEFAULT_SETTINGS.playCryOnReveal,
+      // Shallow validation only — lib/theme/persistence.ts does the deep
+      // validation (HEX_COLOR, known Pokémon id) on read.
+      favouriteTheme:
+        typeof obj.favouriteTheme === "object" && obj.favouriteTheme !== null
+          ? (obj.favouriteTheme as StoredFavouriteTheme)
+          : null,
     };
   } catch {
     return DEFAULT_SETTINGS;
