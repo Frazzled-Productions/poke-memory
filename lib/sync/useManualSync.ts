@@ -4,8 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { mergeCloudIntoLocal, pullSession, pushSession } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
+import { mergeStreak, pullStreak, pushStreak } from "@/lib/sync/streak";
+import { pullSettings, pushSettings } from "@/lib/sync/settings";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
+import { loadStreakData, saveStreakData, STREAK_UPDATED_EVENT } from "@/lib/streak/persistence";
+import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { SEED_EVOLUTION_CARDS, SEED_POKEMON } from "@/lib/pokemon/seed";
 
 export type ManualSyncState = "idle" | "syncing" | "success" | "error";
@@ -144,7 +148,51 @@ export function useManualSync(
         }
       }
 
-      // Step e: record successful sync metadata.
+      // Step e: streak sync. Union-merge — never destructive; failures are
+      // logged but do not flip the overall sync into the error state, since
+      // streak is auxiliary to card review state.
+      const cloudStreak = await pullStreak(client, userId);
+      if (cancelledRef.current) return;
+      if (cloudStreak !== null) {
+        const localStreak = loadStreakData();
+        const merged = mergeStreak(localStreak, cloudStreak);
+        if (
+          merged.length !== localStreak.length ||
+          merged.some((d, i) => d !== localStreak[i])
+        ) {
+          saveStreakData(merged);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
+          }
+        }
+        if (merged.length > 0) {
+          const streakOk = await pushStreak(client, userId, merged);
+          if (!streakOk) {
+            console.warn("[sync] streak push failed; continuing");
+          }
+        }
+      } else {
+        console.warn("[sync] streak pull failed; continuing");
+      }
+
+      // Step f: settings sync. Last-write-wins on the whole object. If local
+      // has never been written explicitly (post-logout, fresh device), let
+      // cloud overlay local; otherwise the local copy is authoritative and we
+      // push it up. Cross-device "I changed it on A, see it on B" is a known
+      // limitation tracked separately — see #294.
+      const localHasSettings = hasStoredSettings();
+      const cloudSettings = await pullSettings(client, userId);
+      if (cancelledRef.current) return;
+      if (cloudSettings !== null && !localHasSettings) {
+        saveSettings(cloudSettings);
+      }
+      const settingsOk = await pushSettings(client, userId, loadSettings());
+      if (!settingsOk) {
+        console.warn("[sync] settings push failed; continuing");
+      }
+      if (cancelledRef.current) return;
+
+      // Step g: record successful sync metadata.
       const now = new Date().toISOString();
       const prev = loadSyncStatus();
       saveSyncStatus({
