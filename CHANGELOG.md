@@ -7,6 +7,11 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 ### Changed
 
 - **Sprites are now self-hosted** — all 1025 Pokémon sprites are served as static assets from the same Vercel deployment (`/sprites/pokemon/{id}.png`) instead of being fetched from `raw.githubusercontent.com` at runtime. No sprite requests leave our infrastructure.
+## [0.5.1] — 2026-05-12
+
+### Changed
+
+- Pre-v1 release bump default changed from minor (on Added/Changed/Removed/Deprecated) to patch. Minor bump is now opt-in via `> bump: minor` in `[Unreleased]`.
 
 ## [0.5.0] — 2026-05-12
 
@@ -216,7 +221,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.5.1
 [0.5.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.5.0
 [0.4.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.4.0
 [0.3.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.3.0
