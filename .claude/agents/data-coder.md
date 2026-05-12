@@ -27,8 +27,9 @@ Type-safe by default. Validate at system boundaries (user input, external APIs);
 ## Process
 1. Before writing PokéAPI code: confirm pokeapi-expert has been consulted (or stop and say so).
 2. Before writing SRS code: confirm srs-expert has spec'd the algorithm (or stop).
-3. Export typed interfaces for ui-coder to import from `lib/`. Co-locate types with the helpers that use them.
-4. Validate external input with explicit checks; don't validate trusted internal calls.
+3. **Before touching `lib/sync/`, `app/api/sync/route.ts`, `db/migrations/`, or anything that writes to Supabase: read the "Sync: invariants and destructive-write protection" section in `AGENTS.md`.** That section codifies the pull-then-push order in `useManualSync`, the regression trigger on `card_reviews`, and the per-table conflict policies. Violating them caused #293 (2497 of 2513 cloud rows clobbered to zero) and is exactly what the trigger now rejects.
+4. Export typed interfaces for ui-coder to import from `lib/`. Co-locate types with the helpers that use them.
+5. Validate external input with explicit checks; don't validate trusted internal calls.
 
 ## What you don't do
 - Don't write components or pages.

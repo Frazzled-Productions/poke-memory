@@ -43,33 +43,27 @@ Supabase Auth (GitHub OAuth), per-user RLS policies, `@supabase/ssr` client spli
 - Migration ordering matters: `CREATE TABLE` → `ALTER TABLE ENABLE ROW LEVEL SECURITY` → `CREATE POLICY` in a single migration file. Never enable RLS without policies; an empty policy set blocks all access for non-service-role clients.
 - `user_id` column type: `uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE`. The cascade ensures a user's rows are deleted if they delete their Supabase account.
 
-### SM-2 schema
+### Card schema
 
-The canonical per-card review state shape (from AGENTS.md — do not propose alternatives):
+The current `card_reviews` table (migration 001, with regression trigger added in migration 002):
 
-```ts
-type ReviewState = {
-  repetitions: number;       // consecutive successful reviews
-  interval: number;          // days until next review
-  easeFactor: number;        // multiplier, min 1.3, default 2.5
-  dueDate: string;           // ISO 8601 date "YYYY-MM-DD"
-  lastReview: string | null; // null sentinel = never reviewed
-  firstSeen: string | null;  // ISO date of first-ever grade; set once, never overwritten
-};
-```
+- Primary key: `id uuid` (gen_random_uuid), with `UNIQUE (user_id, pokemon_id)` as the upsert conflict target. Standard Pokémon use `pokemon_id` = Pokédex number; evolution cards use `pokemon_id` = `EVOLUTION_ID_OFFSET + pokédex_number` (≥ 1_000_001). There is no `card_type` column — the offset encodes type.
+- SM-2 state columns: `repetitions`, `interval`, `ease_factor`. These will be replaced by FSRS columns (`stability`, `difficulty`, `reps`, `lapses`, `fsrs_state`, etc.) once issue #264 lands. Until then, the client emits SM-2-shape rows.
+- Lifecycle timestamps: `due_date`, `last_review`, `first_seen`, `updated_at`. These persist across the SM-2 → FSRS migration; they are also the columns the regression trigger guards.
+- Dates are stored as `date` (not `timestamp`) to match the `"YYYY-MM-DD"` string convention used throughout the app. No timezone math needed.
 
-Suggested Postgres column mapping:
-- `pokemon_id integer NOT NULL` — Pokédex number
-- `card_type text NOT NULL` — e.g. `'name'`, `'evolution'`, `'reverse'`
-- `repetitions integer NOT NULL DEFAULT 0`
-- `interval integer NOT NULL DEFAULT 0`
-- `ease_factor numeric(4,2) NOT NULL DEFAULT 2.5`
-- `due_date date NOT NULL`
-- `last_review date` — nullable; null = never reviewed
-- `first_seen date` — nullable; null = never seen
-- Primary key: `(user_id, pokemon_id, card_type)` — one row per user per card type per species.
+### Destructive-write protection (read before designing any change)
 
-Dates are stored as `date` (not `timestamp`) to match the `"YYYY-MM-DD"` string convention used throughout the app. No timezone math needed.
+Migration 002 installed a `BEFORE UPDATE` trigger on `card_reviews` named `card_reviews_reject_regression_trigger`. It raises `23514 check_violation` when:
+- `OLD.last_review IS NOT NULL AND NEW.last_review IS NULL`
+- `OLD.first_seen IS NOT NULL AND NEW.first_seen IS NULL`
+- `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review`
+
+Repetitions / interval / ease decreasing is allowed (SM-2 "Again" semantics). The trigger is the last line of defense against client bugs like #293, which clobbered 99.4% of one user's cloud rows. Any feature that legitimately resets a card (delete account, "wipe my progress") needs a `SECURITY DEFINER` RPC that bypasses the trigger AND explicit user confirmation. Do not propose disabling the trigger without one of those.
+
+### Settings schema
+
+`user_settings.settings` (jsonb, NOT NULL DEFAULT `'{}'`) added in migration 003 is the source of truth. The legacy flat columns (`max_new_per_day`, `max_reviews_per_day`) predate the per-card-type-limit feature and are not read or written by the current sync paths. Future cleanup may drop them.
 
 ### Privacy constraints
 
@@ -81,12 +75,16 @@ Dates are stored as `date` (not `timestamp`) to match the `"YYYY-MM-DD"` string 
 
 ### Sync model (locked — do not propose alternatives)
 
-Two-layer model as defined in AGENTS.md:
+Four paths as defined in AGENTS.md (see the "Sync: invariants and destructive-write protection" section there):
 
-1. **Per-grade debounced upsert (primary)** — `usePerGradeSync(client, userId)` returns `{ enqueueGrade, flushPending }`. Debounce: 200 ms. One upsert per card per fire. Failed cards stay in queue.
-2. **Unload safety-net (secondary)** — `useSyncOnUnload(client, userId, flushPending)` registers `visibilitychange` / `pagehide` listeners. Calls `flushPending()` and falls back to batched `pushSession` only for still-unsynced cards.
+1. **Per-grade debounced upsert (primary)** — `usePerGradeSync` debounced 200 ms, one upsert per card via `pushSingleCard`.
+2. **Unload safety-net** — `useSyncOnUnload` flushes pending cards via `navigator.sendBeacon` to `app/api/sync/route.ts`.
+3. **Background pull on visibility** — `useVisibilityPull` calls `pullAndMerge` after a tab is hidden ≥ 30s. Per-card conflict rule based on `lastPullAt`.
+4. **Manual sync** — `useManualSync` is wired to the Stats-page Sync button. **Order: pull → merge → save → push.** Pushing first lets stale/empty local clobber cloud (this is what caused #293). Streak and settings sync happen at the end of `useManualSync` and are best-effort: their failures `console.warn` but do not flip the overall sync into the error state.
 
-`pushSession` (batched) is retained as the fallback/escape-hatch; it is not deleted.
+`pushSession` (batched) is retained as the cards-push step inside `useManualSync` and as the escape hatch.
+
+Streak sync: `streak_days` rows are union-merged (monotonic). Settings sync: `user_settings.settings` is last-write-wins on the whole jsonb object; cloud overlays local only when `hasStoredSettings()` is false.
 
 ### Hand-offs
 
