@@ -114,6 +114,8 @@ vi.mock("@/lib/settings/persistence", () => ({
 
 vi.mock("@/lib/streak", () => ({
   recordReview: vi.fn(),
+  loadStreakData: vi.fn(() => []),
+  computeStreak: vi.fn(() => 0),
 }));
 
 vi.mock("@/lib/auth/AuthContext", () => ({
