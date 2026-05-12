@@ -8,6 +8,8 @@ import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
 import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -67,6 +69,8 @@ export default function RootLayout({
             </FavouriteThemeProvider>
           </SuperuserProvider>
         </AuthProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
