@@ -3,10 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --theme-primary: #DC0A2D;
-  --theme-secondary: #f4a0a0;
-  --theme-accent: #FFD700;
-  --theme-fg-on-primary: #ffffff;
+  --theme-primary: var(--background);
+  --theme-secondary: #e4e4e7;
+  --theme-accent: var(--foreground);
+  --theme-fg-on-primary: var(--foreground);
 }
 
 @theme inline {
@@ -24,6 +24,7 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --theme-secondary: #27272a;
   }
 }
 

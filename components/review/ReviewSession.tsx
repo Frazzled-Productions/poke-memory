@@ -26,6 +26,7 @@ import { loadSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
+import { playCry } from "@/lib/audio/cry";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
@@ -662,6 +663,15 @@ export function ReviewSession() {
     }
     setRevealed(true);
     revealedCardId.current = currentCard.id;
+    if (loadSettings().playCryOnReveal) {
+      if (currentCard.cardType === "name") {
+        playCry(currentCard.cryUrl ?? null);
+      } else if (currentCard.cardType === "evolution") {
+        const target = SEED_POKEMON.find((p) => p.id === currentCard.pokemonId);
+        playCry(target?.cryUrl ?? null);
+      }
+      // reverse cards never reach handleReveal — no case needed
+    }
   }
 
   function handleGrade(grade: Grade) {

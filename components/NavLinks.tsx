@@ -29,8 +29,8 @@ export function NavLinks() {
                 className={[
                   LINK_BASE,
                   isActive
-                    ? "bg-foreground text-background"
-                    : "text-zinc-600 hover:text-foreground dark:text-zinc-400 dark:hover:text-foreground",
+                    ? "bg-theme-fg-on-primary text-theme-primary"
+                    : "text-theme-fg-on-primary opacity-75 hover:opacity-100",
                 ].join(" ")}
               >
                 {label}
@@ -51,7 +51,7 @@ export function NavLinksFallback() {
         <li key={href}>
           <Link
             href={href}
-            className={`${LINK_BASE} text-zinc-600 hover:text-foreground dark:text-zinc-400 dark:hover:text-foreground`}
+            className={`${LINK_BASE} text-theme-fg-on-primary opacity-75 hover:opacity-100`}
           >
             {label}
           </Link>

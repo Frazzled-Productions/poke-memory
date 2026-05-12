@@ -14,7 +14,6 @@ import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
 import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
 import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
 import { loadFavourite, saveFavourite } from "@/lib/theme/persistence";
-import { applyTheme } from "@/lib/theme/apply";
 import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
 import { isMastered } from "@/lib/stats/derive";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
@@ -48,39 +47,40 @@ function FavouritePicker({
   onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
 }) {
   const { superuser } = useSuperuser();
+  // Empty deps: session is loaded once at mount. Nothing on this page writes
+  // to the session, so a snapshot is safe and avoids re-reading on every render.
   const cardStateById = useMemo(() => {
     const session = loadSession();
     return new Map((session?.cards ?? []).map((c) => [c.id, c.state]));
   }, []);
 
+  const unlockedEntries = CURATED_POKEMON.filter((entry) => {
+    const state = cardStateById.get(entry.id);
+    return superuser || (state !== undefined && isMastered(state, settings.masteryRepetitions));
+  });
+
+  if (unlockedEntries.length === 0) return null;
+
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="favourite-heading">
+    <section className="flex flex-col gap-4" aria-labelledby="theme-heading">
       <h2
-        id="favourite-heading"
+        id="theme-heading"
         className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
       >
-        Favourite Pokémon
+        App Theme
       </h2>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Master a Pokémon to unlock its colour theme. Electing a favourite re-skins the whole app.
+        Master a Pokémon to unlock it as an app colour theme.
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {CURATED_POKEMON.map((entry) => {
+        {unlockedEntries.map((entry) => {
           const seed = SEED_POKEMON.find((p) => p.id === entry.id);
-          const state = cardStateById.get(entry.id);
-          const mastered =
-            superuser ||
-            (state !== undefined && isMastered(state, settings.masteryRepetitions));
           const selected = favouriteId === entry.id;
 
           return (
             <div
               key={entry.id}
-              className={`relative rounded-xl border px-4 py-3 flex flex-col items-center gap-2 transition-colors ${
-                mastered
-                  ? "border-zinc-200 bg-background dark:border-zinc-800"
-                  : "border-zinc-100 bg-zinc-50 opacity-60 dark:border-zinc-900 dark:bg-zinc-900"
-              }`}
+              className="relative rounded-xl border border-zinc-200 bg-background px-4 py-3 flex flex-col items-center gap-2 transition-colors dark:border-zinc-800"
             >
               <div
                 className="h-2 w-full rounded-full mb-1"
@@ -101,36 +101,26 @@ function FavouritePicker({
               <p className="text-sm font-medium text-foreground text-center">
                 {entry.name}
               </p>
-              {mastered ? (
-                selected ? (
-                  <div className="flex flex-col items-center gap-1 w-full">
-                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      Selected ✓
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(null, null)}
-                      className="w-full min-h-[36px] rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-400"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : (
+              {selected ? (
+                <div className="flex flex-col items-center gap-1 w-full">
+                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    Selected ✓
+                  </span>
                   <button
                     type="button"
-                    onClick={() => onSelect(entry, seed?.spriteUrl ?? null)}
-                    className="w-full min-h-[36px] rounded-lg bg-foreground px-3 py-1 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+                    onClick={() => onSelect(null, null)}
+                    className="w-full min-h-[36px] rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-400"
                   >
-                    Set as favourite
+                    Remove
                   </button>
-                )
+                </div>
               ) : (
                 <button
                   type="button"
-                  disabled
-                  className="w-full min-h-[36px] rounded-lg border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-400 cursor-not-allowed dark:border-zinc-800 dark:text-zinc-600"
+                  onClick={() => onSelect(entry, seed?.spriteUrl ?? null)}
+                  className="w-full min-h-[36px] rounded-lg bg-foreground px-3 py-1 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
                 >
-                  Not yet mastered
+                  Set as theme
                 </button>
               )}
             </div>
@@ -307,7 +297,6 @@ export default function SettingsPage() {
     }
     saveFavourite(null);
     clearLocalProgress();
-    applyTheme(null);
     setFavouriteId(null);
     updateFavourite(null);
     router.replace("/");
@@ -646,12 +635,50 @@ export default function SettingsPage() {
                 )}
               </section>
 
+              {/* Audio section */}
+              <section className="flex flex-col gap-4" aria-labelledby="audio-heading">
+                <h2
+                  id="audio-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Audio
+                </h2>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Play cry on reveal
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Plays the Pokémon&apos;s cry once when you reveal a name or evolution card. Does not affect reverse cards.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.playCryOnReveal}
+                      onClick={() => handleToggle("playCryOnReveal")}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        settings.playCryOnReveal
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          settings.playCryOnReveal ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </section>
+
               <FavouritePicker
                 settings={settings}
                 favouriteId={favouriteId}
                 onSelect={(entry, spriteUrl) => {
                   saveFavourite(entry, spriteUrl);
-                  applyTheme(entry?.colors ?? null);
                   setFavouriteId(entry?.id ?? null);
                   updateFavourite(
                     entry

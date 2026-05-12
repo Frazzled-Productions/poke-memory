@@ -238,13 +238,14 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 Two paths exist -- guest and authenticated. The constraints differ.
 
-**Guest path (unchanged)**
-- No personal data leaves the user browser. All session state lives in localStorage; nothing is transmitted to a server we control. No analytics, no error tracking, no telemetry.
+**Guest path**
+- All card/session data stays in the browser. Review state lives in localStorage; it is never transmitted to a server we control.
 - Sprites are self-hosted as static files under `public/sprites/pokemon/` and served from the same Vercel deployment as the app. No sprite requests leave our infrastructure.
+- **Aggregate telemetry**: Vercel Analytics and Speed Insights collect anonymous, aggregate page-view metrics (URL path, referrer, country, device type) and Core Web Vitals. This data goes to Vercel's infrastructure — it does not include card progress, review history, or any personally identifying information. Both components are rendered unconditionally in the root layout.
 
 **Authenticated path (Supabase sync)**
 - When a user signs in with GitHub, their per-card review history (SM-2 state: repetitions, interval, ease factor, due date, last review, first seen) is stored in Supabase Postgres.
 - We **are a data controller** for authenticated users. GDPR / UK-GDPR obligations apply: we need a privacy notice, a lawful basis for processing (legitimate interest / contract performance), and a data-processing agreement with Supabase (covered by Supabase standard DPA).
 - A user-facing privacy notice is required before this feature is made generally available. Filing it as a follow-up issue is the right next step -- it is out of scope for the initial sync implementation.
-- Supabase is the sole sub-processor for authenticated user data. Row-Level Security ensures each user can only read/write their own rows.
+- Supabase is the sub-processor for authenticated user data. Row-Level Security ensures each user can only read/write their own rows. (Vercel Analytics is a second sub-processor for aggregate telemetry across all users — see the guest-path note above.)
 - Sign-out does **not** clear localStorage -- local data is preserved so users can sign out and continue as guests without losing progress.

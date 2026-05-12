@@ -8,6 +8,8 @@ import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
 import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,8 +32,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#DC0A2D" },
-    { media: "(prefers-color-scheme: dark)", color: "#8b0000" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
   ],
   colorScheme: "light dark",
 };
@@ -67,6 +69,8 @@ export default function RootLayout({
             </FavouriteThemeProvider>
           </SuperuserProvider>
         </AuthProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

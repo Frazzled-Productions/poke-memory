@@ -6,6 +6,48 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.6.15] — 2026-05-12
+
+### Added
+
+- Add Vercel Analytics and Speed Insights to track page views, visitor metrics, and Core Web Vitals in production deployments.
+
+## [0.6.14] — 2026-05-12
+
+### Fixed
+
+- Remove leftover `app/favicon.ico` from `create-next-app` so the browser tab shows the custom Pokéball icon from `app/icon.tsx` instead of the Next.js starter favicon.
+
+## [0.6.13] — 2026-05-12
+
+### Added
+
+- Added a Screenshots section to the README with images of the practice, Pokédex grid, and Stats pages.
+
+## [0.6.12] — 2026-05-12
+
+### Added
+
+- Plan staleness gate: `/go` now refuses to implement when `origin/main` has moved into planned files since the plan was written. A new `/replan` command re-runs planning against the current tree.
+
+## [0.6.11] — 2026-05-12
+
+### Fixed
+
+- Settings: mastered-Pokémon theme picker now correctly re-skins the app nav; the section is hidden until at least one Pokémon is mastered, locked options no longer appear, and the section heading now reads "App Theme" instead of "Favourite Pokémon".
+
+## [0.6.10] — 2026-05-12
+
+### Fixed
+
+- Pokédex type filter now uses AND/intersection when multiple types are selected — picking Fire + Flying returns only dual Fire/Flying Pokémon, not every Fire-type and every Flying-type.
+
+## [0.6.9] — 2026-05-12
+
+### Added
+
+- Added "Play cry on reveal" setting. When enabled, plays the Pokémon's cry audio once on card reveal for name and evolution cards. Reverse cards are not affected.
+
 ## [0.6.8] — 2026-05-12
 
 ### Added
@@ -280,7 +322,14 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.6.8...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.6.15...HEAD
+[0.6.15]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.15
+[0.6.14]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.14
+[0.6.13]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.13
+[0.6.12]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.12
+[0.6.11]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.11
+[0.6.10]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.10
+[0.6.9]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.9
 [0.6.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.8
 [0.6.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.7
 [0.6.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.6

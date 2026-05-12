@@ -12,6 +12,7 @@ export type UserSettings = {
   reverseCardsEnabled: boolean;      // show name as prompt; reveal sprite
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
+  playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -25,6 +26,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   reverseCardsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
+  playCryOnReveal: false,
 };
 
 // Returns DEFAULT_SETTINGS on fresh load, server, or corruption. Never throws.
@@ -79,6 +81,10 @@ export function loadSettings(): UserSettings {
         typeof obj.maxReviewsReversePerDay === "number"
           ? obj.maxReviewsReversePerDay
           : DEFAULT_SETTINGS.maxReviewsReversePerDay,
+      playCryOnReveal:
+        typeof obj.playCryOnReveal === "boolean"
+          ? obj.playCryOnReveal
+          : DEFAULT_SETTINGS.playCryOnReveal,
     };
   } catch {
     return DEFAULT_SETTINGS;

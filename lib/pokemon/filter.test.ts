@@ -37,6 +37,7 @@ const noFilters: PokedexFilters = { query: '', types: [], gen: null };
 const FIXTURES: PokemonCellData[] = [
   basePokemon({ id: 1,   name: 'bulbasaur',  types: ['grass', 'poison'] }),
   basePokemon({ id: 4,   name: 'charmander', types: ['fire'] }),
+  basePokemon({ id: 6,   name: 'charizard',  types: ['fire', 'flying'] }),
   basePokemon({ id: 7,   name: 'squirtle',   types: ['water'] }),
   basePokemon({ id: 152, name: 'chikorita',  types: ['grass'] }),
   basePokemon({ id: 155, name: 'cyndaquil',  types: ['fire'] }),
@@ -50,7 +51,7 @@ describe('filterPokemon', () => {
   });
 
   it('query filter matches substring case-insensitively', () => {
-    const result = filterPokemon(FIXTURES, { ...noFilters, query: 'CHAR' });
+    const result = filterPokemon(FIXTURES, { ...noFilters, query: 'CHARMANDER' });
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('charmander');
   });
@@ -60,10 +61,15 @@ describe('filterPokemon', () => {
     expect(result).toHaveLength(0);
   });
 
-  it('type filter uses OR logic — pokemon with any selected type passes', () => {
-    const result = filterPokemon(FIXTURES, { ...noFilters, types: ['fire', 'water'] });
-    const names = result.map((p) => p.name).sort();
-    expect(names).toEqual(['charmander', 'cyndaquil', 'squirtle'].sort());
+  it('type filter uses AND/intersection logic — pokemon must have all selected types', () => {
+    // fire + flying → only charizard (not mono-fire charmander/cyndaquil, not mono-water squirtle)
+    const dualResult = filterPokemon(FIXTURES, { ...noFilters, types: ['fire', 'flying'] });
+    expect(dualResult).toHaveLength(1);
+    expect(dualResult[0].name).toBe('charizard');
+
+    // fire + water → no pokemon has both
+    const crossResult = filterPokemon(FIXTURES, { ...noFilters, types: ['fire', 'water'] });
+    expect(crossResult).toHaveLength(0);
   });
 
   it('type filter excludes pokemon with none of the selected types', () => {
@@ -71,7 +77,7 @@ describe('filterPokemon', () => {
     expect(result).toHaveLength(0);
   });
 
-  it('type filter matches multi-type pokemon when one type matches', () => {
+  it('single-type filter matches multi-type pokemon that carries that type', () => {
     // bulbasaur has ['grass', 'poison']; filtering on poison should include it
     const result = filterPokemon(FIXTURES, { ...noFilters, types: ['poison'] });
     expect(result).toHaveLength(1);
@@ -82,7 +88,7 @@ describe('filterPokemon', () => {
     // Gen 1: IDs 1–151
     const result = filterPokemon(FIXTURES, { ...noFilters, gen: 1 });
     const ids = result.map((p) => p.id).sort((a, b) => a - b);
-    expect(ids).toEqual([1, 4, 7]);
+    expect(ids).toEqual([1, 4, 6, 7]);
   });
 
   it('gen filter for gen 2 returns only gen-2 pokemon', () => {
@@ -92,8 +98,8 @@ describe('filterPokemon', () => {
   });
 
   it('combined query + gen: both axes must match (AND)', () => {
-    // "char" matches charmander (gen 1) and nothing in gen 2
-    const result = filterPokemon(FIXTURES, { query: 'char', types: [], gen: 1 });
+    // "charman" matches only charmander (gen 1), not anything in gen 2
+    const result = filterPokemon(FIXTURES, { query: 'charman', types: [], gen: 1 });
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('charmander');
   });

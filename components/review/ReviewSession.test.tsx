@@ -18,6 +18,10 @@ vi.mock("next/image", () => ({
   ),
 }));
 
+const { mockPlayCry } = vi.hoisted(() => ({ mockPlayCry: vi.fn() }));
+
+vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
+
 // vi.mock factories are hoisted — define seed data via vi.hoisted so the
 // factory closure can reference it before the module-level const is initialised.
 const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.hoisted(() => {
@@ -73,6 +77,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     maxReviewsReversePerDay: 100,
     nameCardsEnabled: true,
     evolutionCardsEnabled: true,
+    playCryOnReveal: false,
   };
 
   return {
@@ -133,6 +138,7 @@ beforeEach(() => {
     maxReviewsReversePerDay: 100,
     nameCardsEnabled: true,
     evolutionCardsEnabled: true,
+    playCryOnReveal: false,
   });
   vi.mocked(loadSession).mockReturnValue(null);
 });
@@ -160,6 +166,30 @@ describe("ReviewSession reveal flow", () => {
     for (const label of ["Again", "Hard", "Good", "Easy"]) {
       expect(screen.getByRole("button", { name: new RegExp(label, "i") })).toBeInTheDocument();
     }
+  });
+
+  it("calls playCry with the card's cryUrl when playCryOnReveal is true", async () => {
+    const user = userEvent.setup();
+    mockSeedPokemon.mockReturnValue([{ ...FIXTURE_CARD, cryUrl: "https://example.com/bulbasaur.ogg" }]);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: true,
+    });
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg");
   });
 
   it("advances to next card and resets reveal state after grading", async () => {
@@ -195,6 +225,7 @@ describe("ReviewSession reverse card flow", () => {
     maxReviewsReversePerDay: 100,
     nameCardsEnabled: false,
     evolutionCardsEnabled: false,
+    playCryOnReveal: false,
   };
 
   beforeEach(() => {
