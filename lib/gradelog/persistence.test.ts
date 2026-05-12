@@ -58,11 +58,30 @@ describe("loadGradeLog", () => {
 
   it("returns valid entries", () => {
     const entries: GradeLogEntry[] = [
-      { date: "2026-05-09", grade: 4, cardType: "name" },
-      { date: "2026-05-09", grade: 1, cardType: "evolution" },
+      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000 },
+      { date: "2026-05-09", grade: 1, cardType: "evolution", occurredAt: 1700000000001 },
     ];
     storage.setItem(KEY, JSON.stringify(entries));
     expect(loadGradeLog()).toEqual(entries);
+  });
+
+  it("synthesizes occurredAt for legacy entries that lack it", () => {
+    storage.setItem(
+      KEY,
+      JSON.stringify([
+        { date: "2026-05-09", grade: 4, cardType: "name" },
+        { date: "2026-05-09", grade: 1, cardType: "name" },
+        { date: "2026-05-10", grade: 5, cardType: "evolution" },
+      ]),
+    );
+    const result = loadGradeLog();
+    expect(result).toHaveLength(3);
+    // Same-day legacy entries get distinct synthesized occurredAt values.
+    expect(result[0].occurredAt).not.toBe(result[1].occurredAt);
+    // Earlier date sorts before later date numerically.
+    expect(result[0].occurredAt).toBeLessThan(result[2].occurredAt);
+    // All entries now have a numeric occurredAt field.
+    expect(result.every((e) => typeof e.occurredAt === "number")).toBe(true);
   });
 });
 
@@ -81,7 +100,10 @@ describe("appendGradeEntry", () => {
 
   it("appends to an empty log", () => {
     appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
-    expect(loadGradeLog()).toEqual([{ date: "2026-05-09", grade: 4, cardType: "name" }]);
+    const log = loadGradeLog();
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatchObject({ date: "2026-05-09", grade: 4, cardType: "name" });
+    expect(typeof log[0].occurredAt).toBe("number");
   });
 
   it("appends to an existing log without overwriting prior entries", () => {
@@ -120,9 +142,9 @@ describe("appendGradeEntry", () => {
 
 describe("pruneGradeLog", () => {
   const log: GradeLogEntry[] = [
-    { date: "2026-04-01", grade: 4, cardType: "name" },
-    { date: "2026-04-20", grade: 2, cardType: "name" },
-    { date: "2026-05-09", grade: 5, cardType: "evolution" },
+    { date: "2026-04-01", grade: 4, cardType: "name", occurredAt: 1 },
+    { date: "2026-04-20", grade: 2, cardType: "name", occurredAt: 2 },
+    { date: "2026-05-09", grade: 5, cardType: "evolution", occurredAt: 3 },
   ];
 
   it("retains entries within the cutoff window", () => {
@@ -153,10 +175,10 @@ describe("computeGradeTotals", () => {
 
   it("counts each grade correctly", () => {
     const log: GradeLogEntry[] = [
-      { date: "2026-05-09", grade: 1, cardType: "name" },
-      { date: "2026-05-09", grade: 1, cardType: "name" },
-      { date: "2026-05-09", grade: 4, cardType: "evolution" },
-      { date: "2026-05-09", grade: 5, cardType: "name" },
+      { date: "2026-05-09", grade: 1, cardType: "name", occurredAt: 1 },
+      { date: "2026-05-09", grade: 1, cardType: "name", occurredAt: 2 },
+      { date: "2026-05-09", grade: 4, cardType: "evolution", occurredAt: 3 },
+      { date: "2026-05-09", grade: 5, cardType: "name", occurredAt: 4 },
     ];
     expect(computeGradeTotals(log)).toEqual({ 1: 2, 2: 0, 4: 1, 5: 1 });
   });

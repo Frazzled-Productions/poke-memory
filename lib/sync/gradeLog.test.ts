@@ -1,0 +1,109 @@
+import { describe, it, expect, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { mergeGradeLog, pullGradeLog, pushGradeLog } from "./gradeLog";
+import type { GradeLogEntry } from "@/lib/gradelog/persistence";
+
+function makeClientWithUpsert(error: null | object = null) {
+  const upsert = vi.fn().mockResolvedValue({ error });
+  const from = vi.fn().mockReturnValue({ upsert });
+  return { client: { from } as unknown as SupabaseClient, upsert, from };
+}
+
+function makeClientWithOrderedSelect(data: unknown, error: null | object = null) {
+  const order = vi.fn().mockResolvedValue({ data, error });
+  const eq = vi.fn().mockReturnValue({ order });
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+  return { client: { from } as unknown as SupabaseClient, order };
+}
+
+function makeEntry(occurredAt: number, overrides: Partial<GradeLogEntry> = {}): GradeLogEntry {
+  return {
+    occurredAt,
+    date: "2026-05-12",
+    grade: 4,
+    cardType: "name",
+    ...overrides,
+  };
+}
+
+describe("mergeGradeLog", () => {
+  it("unions local and cloud entries by occurredAt", () => {
+    const result = mergeGradeLog(
+      [makeEntry(10), makeEntry(20)],
+      [makeEntry(20), makeEntry(30)],
+    );
+    expect(result.map((e) => e.occurredAt)).toEqual([10, 20, 30]);
+  });
+
+  it("local wins when timestamps collide (stable tiebreaker)", () => {
+    const result = mergeGradeLog(
+      [makeEntry(10, { grade: 5 })],
+      [makeEntry(10, { grade: 1 })],
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].grade).toBe(5);
+  });
+
+  it("returns sorted ascending", () => {
+    const result = mergeGradeLog(
+      [makeEntry(30), makeEntry(10)],
+      [makeEntry(20)],
+    );
+    expect(result.map((e) => e.occurredAt)).toEqual([10, 20, 30]);
+  });
+
+  it("returns [] when both inputs are empty", () => {
+    expect(mergeGradeLog([], [])).toEqual([]);
+  });
+});
+
+describe("pushGradeLog", () => {
+  it("upserts entries with the correct cloud row shape and ignoreDuplicates", async () => {
+    const { client, upsert, from } = makeClientWithUpsert();
+    const entries = [
+      makeEntry(100, { date: "2026-05-12", grade: 4, cardType: "name" }),
+      makeEntry(101, { date: "2026-05-12", grade: 1, cardType: "evolution" }),
+    ];
+    const ok = await pushGradeLog(client, "user-1", entries);
+    expect(ok).toBe(true);
+    expect(from).toHaveBeenCalledWith("grade_log");
+    expect(upsert).toHaveBeenCalledWith(
+      [
+        { user_id: "user-1", occurred_at: 100, entry_date: "2026-05-12", card_type: "name", grade: 4 },
+        { user_id: "user-1", occurred_at: 101, entry_date: "2026-05-12", card_type: "evolution", grade: 1 },
+      ],
+      { onConflict: "user_id,occurred_at", ignoreDuplicates: true },
+    );
+  });
+
+  it("returns true without a network call when entries is empty", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    expect(await pushGradeLog(client, "u", [])).toBe(true);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("returns false on supabase error", async () => {
+    const { client } = makeClientWithUpsert({ message: "boom" });
+    expect(await pushGradeLog(client, "u", [makeEntry(1)])).toBe(false);
+  });
+});
+
+describe("pullGradeLog", () => {
+  it("returns entries mapped from cloud rows", async () => {
+    const { client } = makeClientWithOrderedSelect([
+      { occurred_at: 200, entry_date: "2026-05-12", card_type: "name", grade: 4 },
+      { occurred_at: 201, entry_date: "2026-05-12", card_type: "reverse", grade: 5 },
+    ]);
+    const result = await pullGradeLog(client, "u");
+    expect(result).toEqual([
+      { occurredAt: 200, date: "2026-05-12", cardType: "name", grade: 4 },
+      { occurredAt: 201, date: "2026-05-12", cardType: "reverse", grade: 5 },
+    ]);
+  });
+
+  it("returns null on supabase error", async () => {
+    const { client } = makeClientWithOrderedSelect(null, { message: "boom" });
+    expect(await pullGradeLog(client, "u")).toBeNull();
+  });
+});
