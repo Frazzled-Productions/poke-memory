@@ -1,3 +1,0 @@
----
-kind: minor-bump
----
