@@ -494,16 +494,19 @@ jobs:
             exit 0
           fi
 
-          # Parse base SHA and files list
-          BASE=$(printf '%s' "$META" | sed -E 's/.*base=([a-f0-9]+).*/\1/')
-          FILES=$(printf '%s' "$META" | sed -E 's/.*files=([^ ]*) -->.*/\1/')
+          # Parse base SHA and files list.
+          # Use grep -oE so a non-matching pattern returns empty string rather
+          # than the full input (which sed -E 's/.../\1/' does on no-match).
+          BASE=$(printf '%s' "$META" | grep -oE 'base=[a-f0-9]+' | sed 's/base=//' || true)
+          FILES=$(printf '%s' "$META" | grep -oE 'files=[^[:space:]>]*' | sed 's/files=//' || true)
 
-          if [ -z "$BASE" ]; then
+          if [[ ! "$BASE" =~ ^[a-f0-9]{7,40}$ ]]; then
             echo "::warning::Could not parse base SHA from plan-meta — skipping staleness check."
             exit 0
           fi
 
           if [ -z "$FILES" ]; then
+            # Pure-docs plans intentionally set files=; plain echo, not ::warning::
             echo "No planned files in plan-meta — skipping staleness check."
             exit 0
           fi
@@ -1356,6 +1359,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 40 --disable-slash-commands --disallowed-tools Skill
           show_full_output: true
+          allowed_bots: poke-memory-bot
           prompt: |
             You are the orchestrator for issue #${{ github.event.issue.number }}.
 

@@ -158,7 +158,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | | |
 |---|---|
 | **Trigger** | Maintainer comments `/replan` on an open `auto`-labelled issue |
-| **What it does** | Identical to the plan job — invokes `planner`, posts a fresh `<!-- auto-plan -->` comment, moves issue to **Planned** |
+| **What it does** | Mirrors the plan job — invokes `planner`, posts a fresh `<!-- auto-plan -->` comment, moves issue to **Planned** |
 | **Use case** | Recovery after a staleness gate refusal (`/go` blocked because `origin/main` moved into planned files); also useful when scope has changed since the original plan |
 | **Salvage** | Same `if: always()` post-step as the plan job |
 
