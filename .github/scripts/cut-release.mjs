@@ -12,9 +12,9 @@
 //   $GITHUB_OUTPUT keys: skip, version, bodyFile, bumpType
 //
 // Bump rules (pre-v1 SemVer per AGENTS.md):
-//   - any of Added/Changed/Removed/Deprecated → minor bump (0.N.0 → 0.N+1.0)
-//   - else (only Fixed and/or Security)       → patch bump (0.N.M → 0.N.M+1)
-//   - empty [Unreleased]                      → skip=true, no-op
+//   - `> bump: minor` in [Unreleased]  → minor bump (0.N.0 → 0.N+1.0)
+//   - any other non-empty [Unreleased] → patch bump (0.N.M → 0.N.M+1)
+//   - empty [Unreleased]               → skip=true, no-op
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,6 @@ import path from 'node:path';
 const CHANGELOG = 'CHANGELOG.md';
 const PACKAGE = 'package.json';
 const TRIGGER_SECTIONS = ['Added', 'Changed', 'Removed', 'Deprecated', 'Fixed', 'Security'];
-const MINOR_SECTIONS = new Set(['Added', 'Changed', 'Removed', 'Deprecated']);
 
 function setOutput(name, value) {
   const out = process.env.GITHUB_OUTPUT;
@@ -98,7 +97,7 @@ if (nonEmpty.length === 0) {
 
 // --- Compute next version ---------------------------------------------------
 
-const needsMinor = nonEmpty.some((s) => MINOR_SECTIONS.has(s));
+const needsMinor = /^>\s*bump:\s*minor\s*$/m.test(unreleasedBody);
 let newVersion;
 if (major === 0) {
   newVersion = needsMinor ? `0.${minor + 1}.0` : `0.${minor}.${patch + 1}`;
@@ -150,7 +149,8 @@ fs.writeFileSync(PACKAGE, JSON.stringify(pkg, null, 2) + trailing);
 
 const tmp = process.env.RUNNER_TEMP || '/tmp';
 const notesPath = path.join(tmp, 'release-notes.md');
-fs.writeFileSync(notesPath, unreleasedBody.trim() + '\n');
+const notesBody = unreleasedBody.replace(/^>\s*bump:\s*minor\s*\n?/gm, '').trim();
+fs.writeFileSync(notesPath, notesBody + '\n');
 
 setOutput('skip', 'false');
 setOutput('version', newVersion);
