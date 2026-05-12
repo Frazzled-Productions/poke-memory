@@ -40,6 +40,13 @@ export function loadFavourite(): StoredFavourite | null {
     ) {
       return null;
     }
+    const rawSpriteUrl = typeof obj.spriteUrl === "string" ? obj.spriteUrl : null;
+    // Migrate legacy remote sprite URLs stored before sprites were self-hosted.
+    // raw.githubusercontent.com is no longer in next.config.ts remotePatterns.
+    const spriteUrl =
+      rawSpriteUrl !== null && rawSpriteUrl.startsWith("https://raw.githubusercontent.com")
+        ? `/sprites/pokemon/${obj.id}.png`
+        : rawSpriteUrl;
     return {
       id: obj.id,
       name: curated.name,
@@ -49,7 +56,7 @@ export function loadFavourite(): StoredFavourite | null {
         accent: c.accent,
         fgOnPrimary: c.fgOnPrimary,
       },
-      spriteUrl: typeof obj.spriteUrl === "string" ? obj.spriteUrl : null,
+      spriteUrl,
     };
   } catch {
     return null;

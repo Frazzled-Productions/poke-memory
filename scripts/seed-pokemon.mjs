@@ -126,6 +126,11 @@ async function downloadSprite(url, destPath) {
       return { ok: false, skipped: false, reason: err.message };
     }
 
+    if (res.status === 429) {
+      process.stderr.write(`[seed] WARN: rate-limited downloading sprite, skipping\n`);
+      return { ok: false, skipped: false, reason: "rate-limited" };
+    }
+
     if (res.status >= 500) {
       if (attempt < MAX_RETRIES) {
         const delay = BACKOFF_MS[attempt];
@@ -482,4 +487,7 @@ async function main() {
   }
 }
 
-main();
+main().catch((err) => {
+  process.stderr.write(`[seed] FATAL: ${err.message}\n`);
+  process.exit(1);
+});
