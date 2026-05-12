@@ -205,6 +205,38 @@ describe("computeStats.dueForecast", () => {
     expect(totalInWindow).toBe(3);
   });
 
+  it("perType covers all 18 types and double-counts dual-type cards", () => {
+    const cards = [
+      // monotype fire, locked
+      { ...card(1), types: ["fire"] },
+      // dual fire/flying, mastered
+      {
+        ...card(2, {
+          lastReview: TODAY,
+          reps: MASTERY_REPETITIONS,
+          scheduledDays: MASTERY_INTERVAL_DAYS,
+        }),
+        types: ["fire", "flying"],
+      },
+      // unknown type — silently ignored
+      { ...card(3), types: ["mystery"] },
+    ];
+    const result = computeStats(cards, TODAY);
+    expect(result.perType).toHaveLength(18);
+
+    const fire = result.perType.find((t) => t.type === "fire")!;
+    expect(fire.total).toBe(2);
+    expect(fire.mastered).toBe(1);
+
+    const flying = result.perType.find((t) => t.type === "flying")!;
+    expect(flying.total).toBe(1);
+    expect(flying.mastered).toBe(1);
+
+    const water = result.perType.find((t) => t.type === "water")!;
+    expect(water.total).toBe(0);
+    expect(water.mastered).toBe(0);
+  });
+
   it("never-reviewed cards (lastReview null) are excluded from every forecast day", () => {
     const cards = [
       card(1, { lastReview: null, dueDate: TODAY }),

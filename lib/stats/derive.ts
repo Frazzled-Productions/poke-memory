@@ -1,5 +1,6 @@
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
+import { POKEMON_TYPES } from "@/lib/pokemon/types";
 
 // ---------------------------------------------------------------------------
 // Mastery classification
@@ -98,6 +99,14 @@ export type DueForecastDay = {
   count: number;    // cards whose dueDate falls on this day
 };
 
+export type TypeStats = {
+  /** Lowercase canonical type slug (`fire`, `water`, ...) — same vocabulary as `POKEMON_TYPES`. */
+  type: string;
+  total: number;       // name cards whose `types[]` includes this type
+  introduced: number;
+  mastered: number;
+};
+
 export type StatsResult = {
   totalCards: number;                    // name cards only, ~1025
   introduced: number;                    // lastReview !== null
@@ -113,6 +122,7 @@ export type StatsResult = {
    */
   dueForecast: readonly DueForecastDay[];
   perGeneration: readonly GenerationStats[];
+  perType: readonly TypeStats[];          // 18 entries, alphabetical by `POKEMON_TYPES` order
   struggling: readonly StrugglingCard[]; // bottom-N introduced cards by easeFactor, ascending
 };
 
@@ -189,6 +199,17 @@ export function computeStats(
   const genIntroduced = new Array<number>(GEN_RANGES.length).fill(0);
   const genMastered   = new Array<number>(GEN_RANGES.length).fill(0);
 
+  // Per-type accumulators keyed by type slug. Always all 18 types so the UI
+  // can render a stable grid regardless of which species the user has touched.
+  const typeTotal      = new Map<string, number>();
+  const typeIntroduced = new Map<string, number>();
+  const typeMastered   = new Map<string, number>();
+  for (const t of POKEMON_TYPES) {
+    typeTotal.set(t, 0);
+    typeIntroduced.set(t, 0);
+    typeMastered.set(t, 0);
+  }
+
   let introduced = 0;
   let learning   = 0;
   let mastered   = 0;
@@ -235,6 +256,18 @@ export function computeStats(
       if (isIntroduced)   genIntroduced[idx]++;
       if (isCardMastered) genMastered[idx]++;
     }
+
+    // Per-type tallies. A dual-type card increments both buckets, so the
+    // sum across types exceeds `totalCards` (≈1025 × ~1.7 types/card).
+    // Unknown / typo'd types are silently ignored — the buckets are
+    // pre-seeded only with `POKEMON_TYPES`.
+    for (const t of card.types) {
+      const total = typeTotal.get(t);
+      if (total === undefined) continue;
+      typeTotal.set(t, total + 1);
+      if (isIntroduced)   typeIntroduced.set(t, (typeIntroduced.get(t) ?? 0) + 1);
+      if (isCardMastered) typeMastered.set(t, (typeMastered.get(t) ?? 0) + 1);
+    }
   }
 
   // Build perGeneration array — all 9 gens always present.
@@ -277,6 +310,13 @@ export function computeStats(
     count: forecastCounts[i],
   }));
 
+  const perType: TypeStats[] = POKEMON_TYPES.map((t) => ({
+    type:       t,
+    total:      typeTotal.get(t)      ?? 0,
+    introduced: typeIntroduced.get(t) ?? 0,
+    mastered:   typeMastered.get(t)   ?? 0,
+  }));
+
   return {
     totalCards: cards.length,
     introduced,
@@ -285,6 +325,7 @@ export function computeStats(
     locked: cards.length - introduced,
     dueForecast,
     perGeneration,
+    perType,
     struggling,
   };
 }
