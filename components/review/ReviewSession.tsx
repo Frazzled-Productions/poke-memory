@@ -38,6 +38,14 @@ import { previewIntervals } from "@/lib/srs/intervalPreview";
 import { isMastered } from "@/lib/stats/derive";
 import { formatDailySummary } from "@/lib/review/share";
 import { computeStreak, loadStreakData } from "@/lib/streak";
+import {
+  cardMatchesScope,
+  isScopeEmpty,
+  loadScope,
+  saveScope,
+  type PracticeScope,
+} from "@/lib/review/scope";
+import { ScopeControl } from "@/components/review/ScopeControl";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
@@ -336,6 +344,17 @@ export function ReviewSession() {
   const [sessionGradeSeq, setSessionGradeSeq] = useState<Grade[]>([]);
   const [newCardsThisSession, setNewCardsThisSession] = useState(0);
   const [masteredThisSession, setMasteredThisSession] = useState(0);
+  const [scope, setScope] = useState<PracticeScope>({ gens: [], types: [], presets: [] });
+
+  // Load persisted scope on mount.
+  useEffect(() => {
+    setScope(loadScope());
+  }, []);
+
+  function handleScopeChange(next: PracticeScope) {
+    setScope(next);
+    saveScope(next);
+  }
   // Single-step undo: snapshot of pre-grade state. Captured in handleGrade
   // and consumed by handleUndo. Cleared when the next grade fires.
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
@@ -556,8 +575,15 @@ export function ReviewSession() {
       }
     : limits;
 
+  // Filter cards by the active practice scope before they reach the queue
+  // builder. Out-of-scope cards keep their own SR state (dueDate continues
+  // advancing); they simply don't surface during a scoped session.
+  const scopedCards = isScopeEmpty(scope)
+    ? cards
+    : cards.filter((c) => cardMatchesScope(c, scope));
+
   const { reviewQueue, newQueue, perType, learningCardIds } = buildSessionQueues(
-    cards,
+    scopedCards,
     effectiveLimits,
     today,
   );
@@ -900,6 +926,7 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+        <ScopeControl scope={scope} onChange={handleScopeChange} />
         <SpritePicker
           key={effectiveCard.id}
           targetPokemon={reverseTarget}
@@ -933,6 +960,7 @@ export function ReviewSession() {
   return (
     <div className="flex flex-col items-center gap-8">
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+      <ScopeControl scope={scope} onChange={handleScopeChange} />
       {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard
           spriteUrl={effectiveCard.spriteUrl}

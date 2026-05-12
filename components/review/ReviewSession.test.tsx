@@ -130,6 +130,20 @@ vi.mock("@/lib/sync/useSyncOnUnload", () => ({
 // Tests
 // ---------------------------------------------------------------------------
 
+/**
+ * Buttons rendered inside the SpritePicker — excludes the new Undo and
+ * Scope-toggle buttons that ReviewSession adds at the page level. Lets
+ * the existing "exactly 4 tile buttons" assertions stay readable.
+ */
+function getTileButtons(): HTMLElement[] {
+  return screen.getAllByRole("button").filter((b) => {
+    if (/undo/i.test(b.getAttribute("aria-label") ?? "")) return false;
+    if (b.getAttribute("aria-controls") === "scope-panel") return false;
+    if (/^Clear$/.test(b.textContent ?? "")) return false;
+    return true;
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockSeedPokemon.mockReturnValue([FIXTURE_CARD]);
@@ -257,7 +271,7 @@ describe("ReviewSession reverse card flow", () => {
     // 4 sprite tile buttons are rendered — no Reveal button.
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
-      expect(screen.getAllByRole("button")).toHaveLength(4);
+      expect(getTileButtons()).toHaveLength(4);
     });
 
     // The name prompt is shown (from SpritePicker's group aria-label).
@@ -268,7 +282,7 @@ describe("ReviewSession reverse card flow", () => {
   it("correct tile tap grades Good and advances to the next card", async () => {
     render(<ReviewSession />);
     // Wait for initial render with real timers (waitFor uses setTimeout internally).
-    await waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(4));
+    await waitFor(() => expect(getTileButtons()).toHaveLength(4));
 
     const targetName = getTargetName();
     const correctTile = screen.getByRole("button", { name: targetName });
@@ -280,22 +294,20 @@ describe("ReviewSession reverse card flow", () => {
     await act(async () => { vi.advanceTimersByTime(700); });
     vi.useRealTimers();
 
-    const tiles = screen
-      .getAllByRole("button")
-      .filter((b) => !/undo/i.test(b.getAttribute("aria-label") ?? ""));
+    const tiles = getTileButtons();
     expect(tiles).toHaveLength(4);
     tiles.forEach((tile) => expect(tile).not.toBeDisabled());
   });
 
   it("incorrect tile tap shows feedback then grades Again and advances", async () => {
     render(<ReviewSession />);
-    await waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(4));
+    await waitFor(() => expect(getTileButtons()).toHaveLength(4));
 
     const targetName = getTargetName();
     const knownWrongNames = ["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"].filter(
       (n) => n !== targetName,
     );
-    const tiles = screen.getAllByRole("button");
+    const tiles = getTileButtons();
 
     // Click a tile that is NOT the correct answer.
     const incorrectTile = tiles.find((tile) =>
@@ -306,10 +318,7 @@ describe("ReviewSession reverse card flow", () => {
     act(() => { fireEvent.click(incorrectTile); });
 
     // Tiles are disabled immediately and the correct-answer label appears.
-    screen
-      .getAllByRole("button")
-      .filter((b) => !/undo/i.test(b.getAttribute("aria-label") ?? ""))
-      .forEach((tile) => expect(tile).toBeDisabled());
+    getTileButtons().forEach((tile) => expect(tile).toBeDisabled());
     expect(
       screen.getByText(new RegExp(`correct answer was ${targetName}`, "i")),
     ).toBeInTheDocument();
@@ -318,9 +327,7 @@ describe("ReviewSession reverse card flow", () => {
     await act(async () => { vi.advanceTimersByTime(1300); });
     vi.useRealTimers();
 
-    const nextTiles = screen
-      .getAllByRole("button")
-      .filter((b) => !/undo/i.test(b.getAttribute("aria-label") ?? ""));
+    const nextTiles = getTileButtons();
     expect(nextTiles).toHaveLength(4);
     nextTiles.forEach((tile) => expect(tile).not.toBeDisabled());
   });
