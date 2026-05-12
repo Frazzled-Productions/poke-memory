@@ -144,8 +144,10 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR), or the `poke-memory-bot` GitHub App, posts `/fix` on a PR |
 | **Cycle cap** | 3 auto-review cycles per PR (counted by `<!-- auto-review:N -->` markers). After 3, the workflow posts a stop comment and exits. |
 | **LGTM short-circuit** | Bare `/fix` on an already-approved PR does nothing — the orchestrator posts a note and stops. `/fix <inline findings>` overrides and forces a fix run using the inline body as the punch list. |
+| **CI pre-flight** | Before the agent runs, a bash step fetches the PR's `statusCheckRollup` for the `test` check and sets `CI_FAILING_AT_HEAD=true` in the environment when CI is currently failing. The agent prompt checks this env var first: if `true`, the LGTM short-circuit is bypassed unconditionally, and the CI error excerpt in `FIX_COMMENT_BODY` becomes the punch list. This prevents the race where a queued fix run inherits a stale LGTM verdict from a previous cycle. |
+| **Post-push CI poll** | After pushing a fix commit, the agent polls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` (filtering for the `test` job) for up to 10 minutes (matching `ci.yml`'s own `timeout-minutes: 10` — the CI job's wall-clock limit, not this workflow's 60-minute job timeout). `<!-- auto-review:N+1 -->` is only posted when the check completes with `conclusion == "success"`. If CI fails or times out, the agent posts an explanatory comment and stops — no LGTM auto-review is posted on a red or unverified commit. |
 | **No-progress guard** | If a fix cycle produces zero commits, no new review is posted and the chain ends. |
-| **What it does** | Reads the latest `<!-- auto-review:N -->` comment (or the inline `/fix` body), addresses findings, commits, pushes, runs `code-reviewer`, posts `<!-- auto-review:N+1 -->` |
+| **What it does** | Reads the latest `<!-- auto-review:N -->` comment (or the inline `/fix` body), addresses findings, commits, pushes, waits for CI, runs `code-reviewer`, posts `<!-- auto-review:N+1 -->` |
 | **Git credential** | `actions/checkout` writes the App token to the repo-local `.git/config`. `claude-code-action`'s `git-config.ts` then unsets that local extraheader and embeds the App token directly in the remote URL (`https://x-access-token:${TOKEN}@github.com/...`), so subprocess fetches and pushes authenticate as `poke-memory-bot`. No global git credential is set: doing so injects a second `Authorization` header (Bearer) on top of the URL-embedded Basic auth, which GitHub rejects, and the action's `git fetch origin main --depth=1` step fails before Claude is invoked. |
 | **Project status** | Moves to **In Progress** during the fix; to **PR** or **Ready to merge** after based on the new review verdict |
 
@@ -254,6 +256,22 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
+### `auto-backlog-groom.yml` — Weekly Backlog Grooming Digest
+
+| | |
+|---|---|
+| **Trigger** | Weekly cron Friday 09:00 UTC + `workflow_dispatch` |
+| **Idempotency key** | ISO week string in issue title (`Weekly backlog grooming — YYYY-Www`). Checks all states (open + closed). |
+| **Inputs** | All open issues across `priority:now`, `priority:next`, `priority:later`; comment threads for retro signals, blocking cross-references, and overlap-scan conflict markers |
+| **Staleness thresholds** | `priority:now` ≥ 4 weeks, `priority:next` ≥ 8 weeks, `priority:later` ≥ 16 weeks |
+| **Move types** | Promote, Demote, Leapfrog, Flag stale |
+| **Output** | One digest issue per ISO week, ≤5 curated proposals, each citing a specific named signal |
+| **No-op** | Skips silently when nothing crosses the signal bar or when a digest issue already exists for the week |
+| **Scope** | Proposals only — never edits labels or moves issues |
+| **Label** | Digest issue is labelled `area:backlog`; label is created if absent |
+
+---
+
 ### `vercel-failure-autofix.yml` — Vercel Auto-fix
 
 | | |
@@ -273,6 +291,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **What it does** | Finds the failed `test` job, fetches the last 80 lines of its log, and posts a `/fix` comment on the PR — which triggers `auto-pr.yml`'s fix cycle |
 | **Idempotency** | Skips if a `<!-- ci-autofix:$RUN_ID -->` comment already exists on the PR — exact match by run ID, so re-delivery of the same `workflow_run` event is a no-op |
 | **Cycle-cap interaction** | `auto-pr.yml`'s 3-cycle cap does not prevent this workflow from posting a `/fix` on the next CI failure. On a capped PR, `auto-pr.yml` will silently drop the comment; no further fix cycles run, but stale `/fix` comments may accumulate. |
+| **Race-condition guard** | When a `/fix` posted by this workflow queues behind an active `auto-pr.yml` run, the queued run may encounter an LGTM verdict posted by the active run even though CI is still red. `auto-pr.yml`'s CI pre-flight step (`Check CI status at HEAD`) detects this: it reads the PR's `statusCheckRollup` before the agent starts and sets `CI_FAILING_AT_HEAD=true` when CI is failing. The agent bypasses the LGTM short-circuit when that env var is set, so the fix cycle runs regardless of what auto-review verdict was posted by the previous cycle. |
 | **Coupling** | Job selector matches by name `"test"` (the API-returned display name). After any `ci.yml` change, verify the name with `gh api repos/{owner}/{repo}/actions/runs/{id}/jobs --jq '.jobs[].name'` and update the `jq` selector in the `Fetch failing job log` step if needed. |
 
 ---
