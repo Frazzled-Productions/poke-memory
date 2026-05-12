@@ -99,7 +99,13 @@ jobs:
             fi
 
             echo "PR #$NUMBER: posting monitor alert comment..."
-            gh pr comment "$NUMBER" --repo "$REPO" --body "$(cat <<EOF
+            # Build the body via a temp file rather than $(cat <<EOF). A
+            # heredoc inside a YAML `run: |` block requires the closing line
+            # of the $(...) substitution to be at >= block-indent — easy to
+            # get wrong, and a previous version did, breaking the whole
+            # workflow's YAML parse. --body-file sidesteps the foot-gun.
+            BODY_FILE=$(mktemp)
+            cat >"$BODY_FILE" <<EOF
           $DEDUP_MARKER
           **CI was never dispatched on this PR.**
 
@@ -120,6 +126,7 @@ jobs:
 
           See the \`pr-check-monitor\` workflow and WORKFLOW.md for full context.
           EOF
-)"
+            gh pr comment "$NUMBER" --repo "$REPO" --body-file "$BODY_FILE"
+            rm -f "$BODY_FILE"
             echo "PR #$NUMBER: alert comment posted"
           done < <(echo "$PRS" | jq -c '.[]')
