@@ -102,28 +102,54 @@ async function fetchWithRetry(url, label) {
 /**
  * Download a sprite from `url` to `destPath`.
  * Skips download if the file already exists (idempotent).
+ * Retries on network errors and 5xx responses, same policy as fetchWithRetry.
  * Returns { ok, skipped }.
  */
 async function downloadSprite(url, destPath) {
   if (existsSync(destPath)) return { ok: true, skipped: true };
 
-  let res;
-  try {
-    res = await fetch(url);
-  } catch (err) {
-    return { ok: false, skipped: false, reason: err.message };
-  }
+  let attempt = 0;
+  while (true) {
+    let res;
+    try {
+      res = await fetch(url);
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        const delay = BACKOFF_MS[attempt];
+        process.stderr.write(
+          `[seed] WARN: network error downloading sprite (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms: ${err.message}\n`
+        );
+        await sleep(delay);
+        attempt++;
+        continue;
+      }
+      return { ok: false, skipped: false, reason: err.message };
+    }
 
-  if (!res.ok) {
-    return { ok: false, skipped: false, reason: `HTTP ${res.status}` };
-  }
+    if (res.status >= 500) {
+      if (attempt < MAX_RETRIES) {
+        const delay = BACKOFF_MS[attempt];
+        process.stderr.write(
+          `[seed] WARN: HTTP ${res.status} downloading sprite (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms\n`
+        );
+        await sleep(delay);
+        attempt++;
+        continue;
+      }
+      return { ok: false, skipped: false, reason: `HTTP ${res.status}` };
+    }
 
-  try {
-    const buffer = Buffer.from(await res.arrayBuffer());
-    await writeFile(destPath, buffer);
-    return { ok: true, skipped: false };
-  } catch (err) {
-    return { ok: false, skipped: false, reason: err.message };
+    if (!res.ok) {
+      return { ok: false, skipped: false, reason: `HTTP ${res.status}` };
+    }
+
+    try {
+      const buffer = Buffer.from(await res.arrayBuffer());
+      await writeFile(destPath, buffer);
+      return { ok: true, skipped: false };
+    } catch (err) {
+      return { ok: false, skipped: false, reason: err.message };
+    }
   }
 }
 
@@ -397,6 +423,7 @@ async function main() {
   let spritesDownloaded = 0;
   let spritesSkipped = 0;
   let spritesFailed = 0;
+  const failedSpriteIds = new Set();
 
   for (let i = 0; i < partialRecords.length; i += CONCURRENCY) {
     const batch = partialRecords.slice(i, i + CONCURRENCY);
@@ -408,6 +435,7 @@ async function main() {
           `[seed] WARN: sprite download failed for ${record.id} (${record.name}): ${result.reason}\n`
         );
         spritesFailed++;
+        failedSpriteIds.add(record.id);
       } else if (result.skipped) {
         spritesSkipped++;
       } else {
@@ -428,15 +456,17 @@ async function main() {
   // ------------------------------------------------------------------
   // Step 4: Merge chains, sort, and write output
   // ------------------------------------------------------------------
-  const records = partialRecords.map(({ evolutionChainUrl: _url, remoteSpriteUrl: _remoteUrl, ...rest }) => ({
+  const records = partialRecords.map(({ evolutionChainUrl: _url, remoteSpriteUrl, ...rest }) => ({
     ...rest,
-    spriteUrl: `/sprites/pokemon/${rest.id}.png`,
+    spriteUrl: failedSpriteIds.has(rest.id)
+      ? remoteSpriteUrl
+      : `/sprites/pokemon/${rest.id}.png`,
     evolutionChain: _url ? (chainDataMap.get(_url) ?? []) : [],
   }));
 
   records.sort((a, b) => a.id - b.id);
 
-  const json = JSON.stringify(records, null, 2);
+  const json = JSON.stringify(records, null, 2) + "\n";
   await writeFile(outputPath, json, "utf-8");
 
   process.stderr.write(

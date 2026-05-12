@@ -1,4 +1,9 @@
 // scripts/migrate-sprites.mjs
+// OBSOLETE: this one-off script bootstrapped the initial sprite download from
+// the pre-existing generated.json that had remote URLs. seed-pokemon.mjs now
+// handles sprite downloads natively, so this script is no longer needed.
+// Kept for reference only.
+//
 // One-off: reads lib/pokemon/generated.json, downloads sprites to
 // public/sprites/pokemon/, rewrites spriteUrl to local paths.
 // Run with: node scripts/migrate-sprites.mjs
@@ -83,7 +88,7 @@ async function main() {
     spriteUrl: `/sprites/pokemon/${r.id}.png`,
   }));
 
-  await writeFile(generatedPath, JSON.stringify(updated, null, 2), "utf-8");
+  await writeFile(generatedPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
   process.stderr.write(
     `[migrate-sprites] Rewrote ${updated.length} spriteUrl entries to local paths\n`
   );
