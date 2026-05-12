@@ -3,7 +3,8 @@
 // lib/pokemon/generated.json.  Run with: node scripts/seed-pokemon.mjs
 // Node 20+ — uses global fetch, node:fs/promises, node:path, node:url.
 
-import { writeFile } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -98,6 +99,34 @@ async function fetchWithRetry(url, label) {
 }
 
 
+/**
+ * Download a sprite from `url` to `destPath`.
+ * Skips download if the file already exists (idempotent).
+ * Returns { ok, skipped }.
+ */
+async function downloadSprite(url, destPath) {
+  if (existsSync(destPath)) return { ok: true, skipped: true };
+
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (err) {
+    return { ok: false, skipped: false, reason: err.message };
+  }
+
+  if (!res.ok) {
+    return { ok: false, skipped: false, reason: `HTTP ${res.status}` };
+  }
+
+  try {
+    const buffer = Buffer.from(await res.arrayBuffer());
+    await writeFile(destPath, buffer);
+    return { ok: true, skipped: false };
+  } catch (err) {
+    return { ok: false, skipped: false, reason: err.message };
+  }
+}
+
 function extractFlavorTexts(flavorTextEntries) {
   const en = (flavorTextEntries ?? []).filter(e => e.language?.name === "en");
   if (en.length === 0) return [];
@@ -189,12 +218,12 @@ async function processSpecies(id) {
   const pokemonData = pokemonResult.data;
 
   // Sprite preference: official-artwork → front_default → skip
-  const spriteUrl =
+  const remoteSpriteUrl =
     pokemonData.sprites?.other?.["official-artwork"]?.front_default ??
     pokemonData.sprites?.front_default ??
     null;
 
-  if (!spriteUrl) {
+  if (!remoteSpriteUrl) {
     process.stderr.write(
       `[seed] WARN: no sprite for ${id} (${name})\n`
     );
@@ -221,7 +250,7 @@ async function processSpecies(id) {
   const baseExperience = pokemonData.base_experience ?? null;
 
   return {
-    id, name, spriteUrl,
+    id, name, remoteSpriteUrl,
     height, weight, baseExperience,
     types, stats, flavorText, flavorTexts,
     genus, generation, captureRate, baseHappiness,
@@ -360,10 +389,48 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
+  // Step 3.5: Download sprites to public/sprites/pokemon/
+  // ------------------------------------------------------------------
+  const spritesDir = resolve(__dirname, "../public/sprites/pokemon");
+  await mkdir(spritesDir, { recursive: true });
+
+  let spritesDownloaded = 0;
+  let spritesSkipped = 0;
+  let spritesFailed = 0;
+
+  for (let i = 0; i < partialRecords.length; i += CONCURRENCY) {
+    const batch = partialRecords.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (record) => {
+      const destPath = resolve(spritesDir, `${record.id}.png`);
+      const result = await downloadSprite(record.remoteSpriteUrl, destPath);
+      if (!result.ok) {
+        process.stderr.write(
+          `[seed] WARN: sprite download failed for ${record.id} (${record.name}): ${result.reason}\n`
+        );
+        spritesFailed++;
+      } else if (result.skipped) {
+        spritesSkipped++;
+      } else {
+        spritesDownloaded++;
+      }
+    }));
+    if (i > 0 && i % (CONCURRENCY * 5) === 0) {
+      process.stderr.write(
+        `[seed] [sprites] ${Math.min(i + CONCURRENCY, partialRecords.length)}/${partialRecords.length} processed\n`
+      );
+    }
+  }
+
+  process.stderr.write(
+    `[seed] Sprites: ${spritesDownloaded} downloaded, ${spritesSkipped} already existed, ${spritesFailed} failed\n`
+  );
+
+  // ------------------------------------------------------------------
   // Step 4: Merge chains, sort, and write output
   // ------------------------------------------------------------------
-  const records = partialRecords.map(({ evolutionChainUrl: _url, ...rest }) => ({
+  const records = partialRecords.map(({ evolutionChainUrl: _url, remoteSpriteUrl: _remoteUrl, ...rest }) => ({
     ...rest,
+    spriteUrl: `/sprites/pokemon/${rest.id}.png`,
     evolutionChain: _url ? (chainDataMap.get(_url) ?? []) : [],
   }));
 
