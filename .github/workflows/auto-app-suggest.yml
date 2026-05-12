@@ -156,7 +156,7 @@ jobs:
             ```
             List component files:
             ```bash
-            ls components/
+            find components -name '*.tsx' | sort
             ```
             Read pages that look thin (few interactions, no secondary state). Identify
             surfaces where a small addition would meaningfully improve the user experience.
@@ -178,7 +178,7 @@ jobs:
 
             ### Signal 5 — Latest auto-workflow-suggest digest
             ```bash
-            gh issue list --search "Weekly workflow review" \
+            gh issue list --search "\"Weekly workflow review — \"" \
               --state all --limit 1 --json number,title,body --jq '.[0]'
             ```
             Scan for any user-experience themes that the retro aggregation flagged.

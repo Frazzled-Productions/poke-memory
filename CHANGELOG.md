@@ -4,9 +4,9 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
-### Changed
+### Project conventions (internal)
 
-- **Weekly digest split in two**: `auto-app-suggest.yml` renamed to
+- **Weekly digest split in two**: `auto-app-suggest.yml` split into
   `auto-codequality-suggest.yml` (Wednesday 09:00 UTC, title prefix
   "Weekly code-quality review"), and a new `auto-app-suggest.yml` added
   (Thursday 09:00 UTC) that surfaces user-facing feature ideas from open

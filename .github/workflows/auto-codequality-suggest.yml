@@ -224,7 +224,7 @@ jobs:
             ```
 
             Then create the issue:
-            ```
+            ```bash
             gh issue create \
               --title "Weekly code-quality review — ${{ steps.week.outputs.key }}" \
               --body-file /tmp/digest-body.md \
@@ -233,7 +233,7 @@ jobs:
 
             Store the issue number in `/tmp/digest-issue-number.txt` (just the
             number, no other text):
-            ```
+            ```bash
             gh issue list \
               --search "\"Weekly code-quality review — ${{ steps.week.outputs.key }}\" in:title" \
               --state all --limit 1 --json number --jq '.[0].number' \
