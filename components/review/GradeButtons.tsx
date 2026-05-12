@@ -5,6 +5,7 @@ import type { Grade } from "@/lib/review/session";
 type Props = {
   onGrade: (grade: Grade) => void;
   disabled?: boolean;
+  previews?: Partial<Record<Grade, string>>;
 };
 
 type GradeOption = {
@@ -40,7 +41,7 @@ const GRADE_OPTIONS: GradeOption[] = [
   },
 ];
 
-export function GradeButtons({ onGrade, disabled = false }: Props) {
+export function GradeButtons({ onGrade, disabled = false, previews }: Props) {
   return (
     <div className="flex flex-wrap justify-center gap-3" role="group" aria-label="Grade your answer">
       {GRADE_OPTIONS.map(({ grade, label, className }) => (
@@ -58,7 +59,12 @@ export function GradeButtons({ onGrade, disabled = false }: Props) {
             className,
           ].join(" ")}
         >
-          {label}
+          <span className="block leading-tight">{label}</span>
+          {previews?.[grade] && (
+            <span className="block text-xs font-normal opacity-70 mt-0.5 leading-none">
+              {previews[grade]}
+            </span>
+          )}
         </button>
       ))}
     </div>

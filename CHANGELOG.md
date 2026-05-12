@@ -6,6 +6,18 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.6.8] — 2026-05-12
+
+### Added
+
+- Playwright E2E smoke tests running against Vercel preview deployments.
+
+## [0.6.7] — 2026-05-12
+
+### Added
+
+- Added Anki-style learning affordances: per-button interval previews showing how soon each grade would reschedule the card, a live New/Learning/Review counter row updated on every grade, and a 20-minute learn-ahead that eliminates "wait N minutes" screens during active sessions.
+
 ## [0.6.6] — 2026-05-12
 
 ### Added
@@ -268,7 +280,9 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.6.8...HEAD
+[0.6.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.8
+[0.6.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.7
 [0.6.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.6
 [0.6.5]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.5
 [0.6.4]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.6.4
