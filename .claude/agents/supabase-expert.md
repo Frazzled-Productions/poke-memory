@@ -63,7 +63,7 @@ Repetitions / interval / ease decreasing is allowed (SM-2 "Again" semantics). Th
 
 ### Settings schema
 
-`user_settings.settings` (jsonb, NOT NULL DEFAULT `'{}'`) added in migration 003 is the source of truth. The legacy flat columns (`max_new_per_day`, `max_reviews_per_day`) predate the per-card-type-limit feature and are not read or written by the current sync paths. Future cleanup may drop them.
+`user_settings.settings` (jsonb, NOT NULL DEFAULT `'{}'`) added in migration 003 is the source of truth for per-user settings. The original flat columns from migration 001 (`max_new_per_day`, `max_reviews_per_day`) were dropped in migration 005 once nothing read them; the table is now `(user_id, settings, updated_at)`.
 
 ### Privacy constraints
 
