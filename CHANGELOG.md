@@ -4,6 +4,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- **Digest proposals can now be filed as issues** — `auto-codequality-suggest` and `auto-app-suggest` digest issues now include a `- [ ] File this as an issue` checkbox on each proposal; checking one triggers the new `auto-digest-fanout.yml` workflow, which creates a child issue carrying the correct priority label, `area:app`, and a backlink to the digest. Closes #221.
+
 ## [0.4.0] — 2026-05-12
 
 ### Changed

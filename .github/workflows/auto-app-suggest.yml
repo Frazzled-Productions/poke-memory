@@ -198,7 +198,7 @@ jobs:
                 to the practice complete screen")
               - **Surface**: the page(s) or component(s) affected
               - **Why it matters**: 1–2 sentences on the user benefit
-              - **Recommended priority**: `priority:now`, `priority:next`, or `priority:later`
+              - **Priority:** `priority:now`, `priority:next`, or `priority:later`
 
             ## No-op rule
 
