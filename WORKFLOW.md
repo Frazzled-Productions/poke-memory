@@ -254,6 +254,22 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
+### `auto-backlog-groom.yml` — Weekly Backlog Grooming Digest
+
+| | |
+|---|---|
+| **Trigger** | Weekly cron Friday 09:00 UTC + `workflow_dispatch` |
+| **Idempotency key** | ISO week string in issue title (`Weekly backlog grooming — YYYY-Www`). Checks all states (open + closed). |
+| **Inputs** | All open issues across `priority:now`, `priority:next`, `priority:later`; comment threads for retro signals, blocking cross-references, and overlap-scan conflict markers |
+| **Staleness thresholds** | `priority:now` ≥ 4 weeks, `priority:next` ≥ 8 weeks, `priority:later` ≥ 16 weeks |
+| **Move types** | Promote, Demote, Leapfrog, Flag stale |
+| **Output** | One digest issue per ISO week, ≤5 curated proposals, each citing a specific named signal |
+| **No-op** | Skips silently when nothing crosses the signal bar or when a digest issue already exists for the week |
+| **Scope** | Proposals only — never edits labels or moves issues |
+| **Label** | Digest issue is labelled `area:backlog`; label is created if absent |
+
+---
+
 ### `vercel-failure-autofix.yml` — Vercel Auto-fix
 
 | | |
