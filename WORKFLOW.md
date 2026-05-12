@@ -22,6 +22,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist | Yes |
 | [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling | No |
 | [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations | No |
+| [playwright](.claude/agents/playwright.md) | E2E smoke tests after user-facing changes; owns `e2e/**` | No |
 | [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change | Yes |
 | [workflow-expert](.claude/agents/workflow-expert.md) | GitHub Actions / orchestration changes — idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
 
@@ -36,7 +37,8 @@ Standard flow for non-trivial work:
 1. **Plan** — invoke `planner`. It surfaces unknowns tagged as `[EXPERT-RESEARCH]`, `[USER-DECISION + RESEARCH]`, or `[USER-DECISION]`.
 2. **Research in parallel** — dispatch specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `researcher`) in a single message when their questions are independent. Fold answers into the plan.
 3. **Implement** — invoke `ui-coder` and/or `data-coder` with full context (research findings + spec). Run in parallel when their work is independent.
-4. **Review** — invoke `code-reviewer` at the end. Iterate on its punch list.
+4. **E2E** — if the change is user-facing, invoke `playwright` to add or update E2E smoke tests. Pass the diff summary and affected pages.
+5. **Review** — invoke `code-reviewer` at the end. Iterate on its punch list.
 
 When *not* to use a sub-agent: small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value.
 
@@ -88,6 +90,20 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | **What it does** | `npm ci && npm run typecheck && npm run build && npm test` |
 | **Required check** | The `test` job is the required status check for `main` (not the workflow name `CI`). Branch protection enforces strict-up-to-date; the bot app bypasses for auto-merges. |
 | **Concurrency** | Cancels concurrent runs on the same ref — only the latest push on a branch completes. |
+
+---
+
+### `e2e.yml` — E2E
+
+| | |
+|---|---|
+| **Trigger** | `deployment_status` (Vercel webhook) |
+| **Gate** | Runs only when: deployment state is `success`, environment is not `Production`, and creator is `vercel[bot]` |
+| **Job** | `playwright` |
+| **What it does** | Installs chromium + webkit, runs Playwright smoke tests against the Vercel preview URL (`deployment_status.target_url`), uploads the HTML report as an artifact (14-day retention) |
+| **Required check** | No — non-blocking. Promote to required once flake rate is proven stable. |
+| **Concurrency** | Serialized per deployment ID (`cancel-in-progress: false`) |
+| **Scope** | Guest-mode flows only — page loads, navigation, card flip, grade buttons, key sections on Stats / Pokédex / Settings. No auth flows. |
 
 ---
 

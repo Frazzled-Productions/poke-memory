@@ -31,6 +31,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist. |
 | [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling. |
 | [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations. |
+| [playwright](.claude/agents/playwright.md) | E2E smoke tests after a user-facing change. Owns `e2e/**`. |
 | [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change. Read-only. |
 
 ## Orchestration playbook
@@ -40,7 +41,8 @@ The main agent (Claude in the user's session) orchestrates. Coder agents do not 
 1. **Plan** — invoke `planner`. It surfaces unknowns to research first.
 2. **Research in parallel** — invoke specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `researcher`) in a single message when their questions are independent. Pass findings to coders via prompt.
 3. **Implement** — invoke `ui-coder` and/or `data-coder` with full context (research findings + spec). Run them in parallel when their work is independent.
-4. **Review** — invoke `code-reviewer` at the end. Iterate on its punch list.
+4. **E2E** — if the change is user-facing, invoke `playwright` to add or update E2E smoke tests. Pass the diff summary and affected pages.
+5. **Review** — invoke `code-reviewer` at the end. Iterate on its punch list.
 
 When *not* to use a sub-agent: small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value. Seeing when to skip an agent is part of the practice.
 
@@ -58,6 +60,7 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
 | Supabase schema / RLS | supabase-expert designs; data-coder implements |
 | `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
+| `e2e/**` | playwright |
 | `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
 | `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
 
@@ -142,12 +145,26 @@ The `>=` date comparison is conservative: any review on the same calendar day as
 
 ### Testing
 
+#### Unit / component tests (vitest)
+
 Two vitest projects in `vitest.config.ts`, partitioned by directory:
 
 - **`node` project**: `lib/**/*.test.ts` and `lib/**/*.test.tsx`. Environment `node` — no DOM. Pure-logic tests only.
 - **`jsdom` project**: `components/**/*.test.tsx` and `app/**/*.test.tsx`. Environment `jsdom` plus `vitest.setup.ts`. All tests that render React (`render` / `renderHook` from `@testing-library/react`) live here.
 
 A React hook can live in `lib/` (e.g. `lib/review/useStorageQuota.ts`), but if its test calls `renderHook`, the test file must live under `components/` so the jsdom project picks it up. Imports are absolute (`@/lib/...`), so co-locating a hook test next to its source is not required and will fail in CI with `ReferenceError: document is not defined`.
+
+#### E2E tests (Playwright)
+
+Playwright smoke tests live in `e2e/` and run against Vercel preview deployments via `e2e.yml`. Config is in `playwright.config.ts`.
+
+- **Scope**: guest-mode flows only (no auth). Tests verify page loads, navigation, interactive flows (card flip, grade buttons), and key content on each page.
+- **Projects**: `chromium` and `mobile-safari` (Webkit with iPhone 14 viewport) — both run in CI.
+- **Base URL**: set via `PLAYWRIGHT_BASE_URL` env var (preview URL in CI, `http://localhost:3000` locally).
+- **Run locally**: `npm run test:e2e` (requires `npx playwright install` first).
+- **Selectors**: prefer `getByRole`, `getByText`, and `getByLabel` over CSS selectors or test IDs. Match the accessible names already in the markup (ARIA labels, headings, button text).
+- **When to add E2E tests**: any change that adds a new page, a new interactive flow, or modifies an existing user-facing flow should include or update an E2E test in `e2e/`. The bar is smoke-level coverage — verify the happy path loads and key interactions work, not exhaustive edge cases.
+- **File naming**: one spec file per feature area (e.g. `e2e/smoke.spec.ts` for cross-cutting smoke tests, `e2e/pokedex.spec.ts` for Pokédex-specific flows).
 
 ### Documentation
 
