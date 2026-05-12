@@ -5,6 +5,7 @@ import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
+import { AutoSyncOnChange } from "@/components/sync/AutoSyncOnChange";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
 import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
@@ -64,6 +65,7 @@ export default function RootLayout({
               <Suspense fallback={null}>
                 <SyncOnVisible />
               </Suspense>
+              <AutoSyncOnChange />
               <div className="flex flex-1 flex-col">{children}</div>
               <Footer />
             </FavouriteThemeProvider>

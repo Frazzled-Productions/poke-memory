@@ -111,10 +111,21 @@ export function loadSettings(): UserSettings {
   }
 }
 
+/**
+ * Fires on every successful `saveSettings` write. The detail carries the
+ * settings object that was just persisted. Consumed by
+ * `components/sync/AutoSyncOnChange.tsx` to push the change to Supabase
+ * without waiting for the next manual Sync (#319).
+ */
+export const SETTINGS_SAVED_EVENT = "poke-memory:settings-saved";
+
 // Serialises to localStorage. No-op on server. Never throws.
 export function saveSettings(settings: UserSettings): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  window.dispatchEvent(
+    new CustomEvent(SETTINGS_SAVED_EVENT, { detail: settings }),
+  );
 }
 
 // True if a settings blob has been explicitly written. loadSettings cannot

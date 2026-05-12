@@ -23,7 +23,7 @@ function makeLocalStorageMock() {
 const mockLocalStorage = makeLocalStorageMock();
 
 // Stub window and localStorage before any tests run.
-vi.stubGlobal('window', { localStorage: mockLocalStorage });
+vi.stubGlobal('window', { localStorage: mockLocalStorage, dispatchEvent: vi.fn() });
 vi.stubGlobal('localStorage', mockLocalStorage);
 
 beforeEach(() => {

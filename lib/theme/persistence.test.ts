@@ -36,7 +36,7 @@ describe("loadFavourite", () => {
 
   beforeEach(() => {
     storage = makeMockStorage();
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
     vi.stubGlobal("localStorage", storage);
   });
 
@@ -99,7 +99,7 @@ describe("saveFavourite", () => {
 
   beforeEach(() => {
     storage = makeMockStorage();
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
     vi.stubGlobal("localStorage", storage);
   });
 
