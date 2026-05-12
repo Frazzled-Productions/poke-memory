@@ -62,9 +62,13 @@ function makeMinimalCard(id: number): Record<string, unknown> {
     spriteUrl: "",
     cardType: "name",
     state: {
-      repetitions: 0,
-      interval: 0,
-      easeFactor: 2.5,
+      stability: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      scheduledDays: 0,
+      reps: 0,
+      lapses: 0,
+      fsrsState: "new",
       dueDate: "2026-05-09",
       lastReview: null,
       firstSeen: null,
@@ -166,7 +170,7 @@ describe("isBackupFile", () => {
   it("rejects when a card state is missing dueDate", () => {
     const card = {
       ...makeMinimalCard(1),
-      state: { repetitions: 0, interval: 0 },
+      state: { reps: 0, scheduledDays: 0 },
     };
     expect(isBackupFile(makeValidBackup({ cards: [card as BackupFile["cards"][number]] }))).toBe(false);
   });
@@ -396,9 +400,9 @@ describe("validateBackup + applyBackup", () => {
     const validId = SEED_POKEMON[0].id;
     const state = {
       ...(makeMinimalCard(validId).state as Record<string, unknown>),
-      repetitions: 5,
-      interval: 10,
-      easeFactor: 2.3,
+      reps: 5,
+      scheduledDays: 10,
+      difficulty: 4,
       stepStartedAt: 99999,
     };
     const card = { ...makeMinimalCard(validId), state };
@@ -406,8 +410,8 @@ describe("validateBackup + applyBackup", () => {
     const result = await validateBackup(makeBackupFile(backup));
     if (!result.ok) throw new Error("unreachable");
     expect(result.data.cards[0].state.stepStartedAt).toBeNull();
-    expect(result.data.cards[0].state.repetitions).toBe(5);
-    expect(result.data.cards[0].state.interval).toBe(10);
-    expect(result.data.cards[0].state.easeFactor).toBe(2.3);
+    expect(result.data.cards[0].state.reps).toBe(5);
+    expect(result.data.cards[0].state.scheduledDays).toBe(10);
+    expect(result.data.cards[0].state.difficulty).toBe(4);
   });
 });

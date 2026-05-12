@@ -13,7 +13,10 @@ export const MASTERY_REPETITIONS = 3;
 export const MASTERY_INTERVAL_DAYS = 21;
 
 export function isMastered(state: ReviewState, masteryRepetitions = MASTERY_REPETITIONS): boolean {
-  return state.repetitions >= masteryRepetitions && state.interval >= MASTERY_INTERVAL_DAYS;
+  // FSRS swap: reps replaces repetitions, scheduledDays replaces interval.
+  // Mastery semantics are unchanged — N successful reviews and the next
+  // scheduled interval is ≥ MASTERY_INTERVAL_DAYS.
+  return state.reps >= masteryRepetitions && state.scheduledDays >= MASTERY_INTERVAL_DAYS;
 }
 
 /**
@@ -210,24 +213,31 @@ export function computeStats(
     mastered:   genMastered[idx],
   }));
 
-  // Build struggling list: bottom-N introduced cards by easeFactor ascending,
-  // tie-broken by lower repetitions, then lower id.
+  // Build struggling list: bottom-N introduced cards by FSRS difficulty,
+  // descending (higher difficulty = struggling), tie-broken by fewer reps,
+  // then lower id. The exported StrugglingCard keeps the legacy
+  // `easeFactor` / `repetitions` field names — they are derived from the
+  // FSRS state so existing UI consumers continue to work. (`easeFactor` here
+  // is the inverse of FSRS difficulty, mapped onto the old SM-2 1.3..2.5 range.)
   const struggling: StrugglingCard[] = [...introducedCards]
     .sort((a, b) => {
-      const efDiff = a.state.easeFactor - b.state.easeFactor;
-      if (efDiff !== 0) return efDiff;
-      const repDiff = a.state.repetitions - b.state.repetitions;
+      const diffDiff = b.state.difficulty - a.state.difficulty;
+      if (diffDiff !== 0) return diffDiff;
+      const repDiff = a.state.reps - b.state.reps;
       if (repDiff !== 0) return repDiff;
       return a.id - b.id;
     })
     .slice(0, strugglingLimit)
-    .map((card) => ({
-      id:          card.id,
-      name:        card.name,
-      spriteUrl:   card.spriteUrl,
-      easeFactor:  card.state.easeFactor,
-      repetitions: card.state.repetitions,
-    }));
+    .map((card) => {
+      const ease = 2.5 - ((card.state.difficulty - 1) * 1.2) / 9;
+      return {
+        id:          card.id,
+        name:        card.name,
+        spriteUrl:   card.spriteUrl,
+        easeFactor:  Math.min(2.5, Math.max(1.3, ease)),
+        repetitions: card.state.reps,
+      };
+    });
 
   return {
     totalCards: cards.length,

@@ -59,7 +59,7 @@ import { DEFAULT_LIMITS } from "@/lib/review/session";
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
 
-function makeCard(id: number, lastReview: string | null, repetitions: number) {
+function makeCard(id: number, lastReview: string | null, reps: number) {
   return {
     id,
     cardType: "name" as const,
@@ -84,9 +84,13 @@ function makeCard(id: number, lastReview: string | null, repetitions: number) {
     isMythical: false,
     cryUrl: null,
     state: {
-      repetitions,
-      interval: repetitions === 0 ? 0 : 1,
-      easeFactor: 2.5,
+      stability: reps === 0 ? 0 : 1,
+      difficulty: 0,
+      elapsedDays: 0,
+      scheduledDays: reps === 0 ? 0 : 1,
+      reps,
+      lapses: 0,
+      fsrsState: (reps === 0 ? "new" : "review") as "new" | "review",
       dueDate: "2026-05-12",
       lastReview,
       firstSeen: lastReview,

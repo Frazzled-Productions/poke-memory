@@ -12,12 +12,18 @@ import {
 const NOW = new Date("2026-05-08T12:00:00Z");
 const TODAY = "2026-05-08";
 
-// Helper: a graduated card (has been reviewed at least once).
+// Helper: a graduated card (has been reviewed at least once). FSRS shape;
+// stability/difficulty values approximate the result of an SM-2 → FSRS
+// migration from `{ repetitions: 2, interval: 6, easeFactor: 2.5 }`.
 function graduatedCard(overrides: Partial<ReviewState> = {}): ReviewState {
   return {
-    repetitions: 2,
-    interval: 6,
-    easeFactor: 2.5,
+    stability: 6,
+    difficulty: 1,
+    elapsedDays: 0,
+    scheduledDays: 6,
+    reps: 2,
+    lapses: 0,
+    fsrsState: "review",
     dueDate: TODAY,
     lastReview: "2026-05-02",
     firstSeen: "2026-04-26",
@@ -27,7 +33,6 @@ function graduatedCard(overrides: Partial<ReviewState> = {}): ReviewState {
   };
 }
 
-// Helper: a brand-new card (never graded).
 function newCard(overrides: Partial<ReviewState> = {}): ReviewState {
   return {
     ...initialReviewState(NOW),
@@ -35,7 +40,6 @@ function newCard(overrides: Partial<ReviewState> = {}): ReviewState {
   };
 }
 
-// Helper: a card in a learning or relearning step.
 function cardInStep(
   step: number,
   lastReview: string | null = null,
@@ -70,8 +74,13 @@ describe("constants", () => {
 // initialReviewState
 // ============================================================
 describe("initialReviewState", () => {
-  it("includes learningStep: null", () => {
+  it("starts a brand-new card in fsrsState='new' with null timestamps", () => {
     const state = initialReviewState(NOW);
+    expect(state.fsrsState).toBe("new");
+    expect(state.stability).toBe(0);
+    expect(state.difficulty).toBe(0);
+    expect(state.reps).toBe(0);
+    expect(state.lapses).toBe(0);
     expect(state.learningStep).toBeNull();
     expect(state.lastReview).toBeNull();
     expect(state.firstSeen).toBeNull();
@@ -79,516 +88,364 @@ describe("initialReviewState", () => {
 });
 
 // ============================================================
-// Case A1: Brand-new card graded Good → enter learning step 0
+// Case A1: brand-new + Again/Hard/Good → enter learning step 0
 // ============================================================
-describe("Case A1: brand-new card graded Good", () => {
-  const state = newCard();
-  const result = nextReview(state, 4, NOW);
-
-  it("enters learningStep 0", () => {
-    expect(result.learningStep).toBe(0);
+describe("Case A1: brand-new card graded Good enters learning step", () => {
+  it("sets learningStep=0 and firstSeen=today, leaves lastReview null", () => {
+    const next = nextReview(newCard(), 4, NOW);
+    expect(next.learningStep).toBe(0);
+    expect(next.stepStartedAt).toBe(NOW.getTime());
+    expect(next.lastReview).toBeNull();
+    expect(next.firstSeen).toBe(TODAY);
   });
+});
 
-  it("lastReview stays null (not yet graduated)", () => {
-    expect(result.lastReview).toBeNull();
+describe("Case A1: brand-new card graded Again enters learning step", () => {
+  it("sets learningStep=0 and firstSeen=today, leaves lastReview null", () => {
+    const next = nextReview(newCard(), 1, NOW);
+    expect(next.learningStep).toBe(0);
+    expect(next.lastReview).toBeNull();
+    expect(next.firstSeen).toBe(TODAY);
   });
+});
 
-  it("firstSeen is set to today", () => {
-    expect(result.firstSeen).toBe(TODAY);
-  });
-
-  it("easeFactor is unchanged", () => {
-    expect(result.easeFactor).toBe(state.easeFactor);
+describe("Case A1: brand-new card graded Hard enters learning step", () => {
+  it("sets learningStep=0 and firstSeen=today, leaves lastReview null", () => {
+    const next = nextReview(newCard(), 2, NOW);
+    expect(next.learningStep).toBe(0);
+    expect(next.lastReview).toBeNull();
   });
 });
 
 // ============================================================
-// Case A1: Brand-new card graded Again → enter learning step 0
-// ============================================================
-describe("Case A1: brand-new card graded Again", () => {
-  const state = newCard();
-  const result = nextReview(state, 1, NOW);
-
-  it("enters learningStep 0", () => {
-    expect(result.learningStep).toBe(0);
-  });
-
-  it("lastReview stays null", () => {
-    expect(result.lastReview).toBeNull();
-  });
-
-  it("firstSeen is set to today", () => {
-    expect(result.firstSeen).toBe(TODAY);
-  });
-});
-
-// ============================================================
-// Case A1: Brand-new card graded Hard → enter learning step 0
-// ============================================================
-describe("Case A1: brand-new card graded Hard", () => {
-  const state = newCard();
-  const result = nextReview(state, 2, NOW);
-
-  it("enters learningStep 0", () => {
-    expect(result.learningStep).toBe(0);
-  });
-
-  it("lastReview stays null", () => {
-    expect(result.lastReview).toBeNull();
-  });
-});
-
-// ============================================================
-// Case A2: Brand-new card graded Easy → graduate immediately
+// Case A2: brand-new card graded Easy graduates immediately
 // ============================================================
 describe("Case A2: brand-new card graded Easy", () => {
-  const state = newCard();
-  const result = nextReview(state, 5, NOW);
-
-  it("learningStep is null (graduated)", () => {
-    expect(result.learningStep).toBeNull();
-  });
-
-  it("repetitions = 1", () => {
-    expect(result.repetitions).toBe(1);
-  });
-
-  it("interval = GRAD_INTERVAL_EASY (4 days)", () => {
-    expect(result.interval).toBe(GRAD_INTERVAL_EASY);
-  });
-
-  it("dueDate is 4 days from now", () => {
-    expect(result.dueDate).toBe("2026-05-12");
-  });
-
-  it("lastReview = today", () => {
-    expect(result.lastReview).toBe(TODAY);
-  });
-
-  it("firstSeen = today", () => {
-    expect(result.firstSeen).toBe(TODAY);
+  it("graduates immediately with FSRS-initialised state and GRAD_INTERVAL_EASY", () => {
+    const next = nextReview(newCard(), 5, NOW);
+    expect(next.learningStep).toBeNull();
+    expect(next.stepStartedAt).toBeNull();
+    expect(next.lastReview).toBe(TODAY);
+    expect(next.firstSeen).toBe(TODAY);
+    expect(next.fsrsState).toBe("review");
+    expect(next.scheduledDays).toBe(GRAD_INTERVAL_EASY);
+    // FSRS sets stability and difficulty for the first successful review.
+    expect(next.stability).toBeGreaterThan(0);
+    expect(next.difficulty).toBeGreaterThanOrEqual(1);
+    expect(next.difficulty).toBeLessThanOrEqual(10);
   });
 });
 
 // ============================================================
-// Case A3: Graduated card graded Again → lapse
+// Case A3: graduated card graded Again (lapse → relearning)
 // ============================================================
 describe("Case A3: graduated card graded Again (lapse)", () => {
-  const state = graduatedCard({ easeFactor: 2.5 });
-  const result = nextReview(state, 1, NOW);
-
-  it("enters learningStep 0 (relearning)", () => {
-    expect(result.learningStep).toBe(0);
-  });
-
-  it("repetitions reset to 0", () => {
-    expect(result.repetitions).toBe(0);
-  });
-
-  it("interval = 1", () => {
-    expect(result.interval).toBe(1);
-  });
-
-  it("easeFactor is penalised (EF decreased)", () => {
-    // EF' = max(1.3, 2.5 + 0.1 - (5-1)*(0.08 + (5-1)*0.02))
-    //      = max(1.3, 2.5 + 0.1 - 4*(0.08 + 0.08))
-    //      = max(1.3, 2.5 + 0.1 - 4*0.16)
-    //      = max(1.3, 2.5 + 0.1 - 0.64) = max(1.3, 1.96)
-    expect(result.easeFactor).toBeCloseTo(1.96, 5);
-    expect(result.easeFactor).toBeLessThan(state.easeFactor);
-  });
-
-  it("dueDate = today (stays in today's queue)", () => {
-    expect(result.dueDate).toBe(TODAY);
-  });
-
-  it("lastReview = today", () => {
-    expect(result.lastReview).toBe(TODAY);
-  });
-
-  it("firstSeen is preserved (not today)", () => {
-    expect(result.firstSeen).toBe("2026-04-26");
+  it("enters relearning step 0, sets lastReview=today, updates FSRS state", () => {
+    const graduated = graduatedCard();
+    const next = nextReview(graduated, 1, NOW);
+    expect(next.learningStep).toBe(0);
+    expect(next.stepStartedAt).toBe(NOW.getTime());
+    expect(next.lastReview).toBe(TODAY);
+    expect(next.dueDate).toBe(TODAY);
+    expect(next.fsrsState).toBe("relearning");
+    // FSRS records the lapse in stability/difficulty — values move, exact
+    // numbers are FSRS-parameter-dependent so we only assert directionality.
+    expect(next.stability).toBeLessThan(graduated.stability + 1);
+    expect(next.difficulty).toBeGreaterThanOrEqual(graduated.difficulty);
   });
 });
 
 // ============================================================
-// Case B1: In-step Again → reset to step 0
+// Case A4: graduated card + Hard / Good / Easy
+// ============================================================
+describe("Case A4: graduated card + Good", () => {
+  it("advances reps, sets lastReview=today, stays graduated", () => {
+    const graduated = graduatedCard();
+    const next = nextReview(graduated, 4, NOW);
+    expect(next.learningStep).toBeNull();
+    expect(next.stepStartedAt).toBeNull();
+    expect(next.lastReview).toBe(TODAY);
+    expect(next.fsrsState).toBe("review");
+    expect(next.reps).toBe(graduated.reps + 1);
+    expect(next.scheduledDays).toBeGreaterThan(0);
+  });
+});
+
+describe("Case A4: graduated card + Hard", () => {
+  it("stays graduated, sets lastReview=today, may reduce scheduledDays", () => {
+    const graduated = graduatedCard();
+    const next = nextReview(graduated, 2, NOW);
+    expect(next.learningStep).toBeNull();
+    expect(next.stepStartedAt).toBeNull();
+    expect(next.lastReview).toBe(TODAY);
+    expect(next.fsrsState).toBe("review");
+    expect(next.scheduledDays).toBeGreaterThan(0);
+  });
+});
+
+describe("Case A4: graduated card + Easy", () => {
+  it("stays graduated, sets lastReview=today, larger scheduledDays than Good", () => {
+    const graduated = graduatedCard();
+    const afterGood = nextReview(graduated, 4, NOW);
+    const afterEasy = nextReview(graduated, 5, NOW);
+    expect(afterEasy.scheduledDays).toBeGreaterThanOrEqual(afterGood.scheduledDays);
+  });
+});
+
+// ============================================================
+// Case B1: in-step Again → reset to step 0
 // ============================================================
 describe("Case B1: in-step Again resets to step 0", () => {
-  it("from step 1 back to step 0", () => {
-    const state = cardInStep(1);
-    const result = nextReview(state, 1, NOW);
-    expect(result.learningStep).toBe(0);
-    // Other fields unchanged
-    expect(result.lastReview).toBe(state.lastReview);
-    expect(result.easeFactor).toBe(state.easeFactor);
+  it("resets learningStep to 0 when on step > 0", () => {
+    const inStep = cardInStep(1);
+    const next = nextReview(inStep, 1, NOW);
+    expect(next.learningStep).toBe(0);
+    expect(next.stepStartedAt).toBe(NOW.getTime());
   });
 
-  it("from step 0 stays at step 0", () => {
-    const state = cardInStep(0);
-    const result = nextReview(state, 1, NOW);
-    expect(result.learningStep).toBe(0);
+  it("stays on step 0 (no-op) when already there", () => {
+    const inStep = cardInStep(0);
+    const next = nextReview(inStep, 1, NOW);
+    expect(next.learningStep).toBe(0);
   });
 });
 
 // ============================================================
-// Case B2: In-step Hard → repeat current step
+// Case B2: in-step Hard → repeat current step
 // ============================================================
 describe("Case B2: in-step Hard repeats current step", () => {
-  it("learningStep unchanged", () => {
-    const state = cardInStep(0);
-    const result = nextReview(state, 2, NOW);
-    expect(result.learningStep).toBe(0);
-    expect(result.lastReview).toBe(state.lastReview);
-    expect(result.easeFactor).toBe(state.easeFactor);
+  it("keeps learningStep unchanged and preserves stepStartedAt", () => {
+    const inStep = cardInStep(1);
+    const original = inStep.stepStartedAt;
+    const next = nextReview(inStep, 2, NOW);
+    expect(next.learningStep).toBe(1);
+    expect(next.stepStartedAt).toBe(original);
   });
 });
 
 // ============================================================
-// Case B3: In-step Good → advance or graduate
+// Case B3: in-step Good → advance step, or graduate at last step
 // ============================================================
 describe("Case B3: in-step Good advances step", () => {
-  it("new-card step 0 → step 1 (not yet graduated; 2 total steps)", () => {
-    const state = cardInStep(0, null); // new-card learning, lastReview null
-    const result = nextReview(state, 4, NOW);
-    expect(result.learningStep).toBe(1);
-    expect(result.lastReview).toBeNull(); // still not graduated
+  it("advances learningStep on a non-final step", () => {
+    const inStep = cardInStep(0); // first of two new-card learning steps
+    const next = nextReview(inStep, 4, NOW);
+    expect(next.learningStep).toBe(1);
+    expect(next.stepStartedAt).toBe(NOW.getTime());
   });
 
-  it("new-card step 1 (final step) → graduate with interval=1", () => {
-    const state = cardInStep(1, null); // step 1 of 2
-    const result = nextReview(state, 4, NOW);
-    expect(result.learningStep).toBeNull();
-    expect(result.repetitions).toBe(1);
-    expect(result.interval).toBe(GRAD_INTERVAL_GOOD);
-    expect(result.dueDate).toBe("2026-05-09"); // +1 day
-    expect(result.lastReview).toBe(TODAY);
+  it("graduates at the final new-card learning step", () => {
+    const inStep = cardInStep(LEARNING_STEPS_MS.length - 1, null, { firstSeen: TODAY });
+    const next = nextReview(inStep, 4, NOW);
+    expect(next.learningStep).toBeNull();
+    expect(next.stepStartedAt).toBeNull();
+    expect(next.lastReview).toBe(TODAY);
+    expect(next.scheduledDays).toBe(GRAD_INTERVAL_GOOD);
+    expect(next.fsrsState).toBe("review");
   });
 
-  it("relearning step 0 (final step) → graduate with interval=1", () => {
-    const state = cardInStep(0, "2026-05-01"); // lastReview set = relearning
-    const result = nextReview(state, 4, NOW);
-    expect(result.learningStep).toBeNull();
-    expect(result.repetitions).toBe(1);
-    expect(result.interval).toBe(GRAD_INTERVAL_GOOD);
-    expect(result.lastReview).toBe(TODAY);
+  it("graduates at the final relearning step (lastReview is preserved)", () => {
+    const inStep = cardInStep(RELEARNING_STEPS_MS.length - 1, "2026-05-01");
+    const next = nextReview(inStep, 4, NOW);
+    expect(next.learningStep).toBeNull();
+    expect(next.scheduledDays).toBe(GRAD_INTERVAL_GOOD);
+    expect(next.lastReview).toBe(TODAY);
   });
 });
 
 // ============================================================
-// Case B4: In-step Easy → graduate immediately
+// Case B4: in-step Easy → graduate immediately
 // ============================================================
 describe("Case B4: in-step Easy graduates immediately", () => {
-  it("from step 0 (new-card learning)", () => {
-    const state = cardInStep(0, null);
-    const result = nextReview(state, 5, NOW);
-    expect(result.learningStep).toBeNull();
-    expect(result.repetitions).toBe(1);
-    expect(result.interval).toBe(GRAD_INTERVAL_EASY);
-    expect(result.dueDate).toBe("2026-05-12"); // +4 days
-    expect(result.lastReview).toBe(TODAY);
-  });
-
-  it("from step 0 (relearning)", () => {
-    const state = cardInStep(0, "2026-05-01");
-    const result = nextReview(state, 5, NOW);
-    expect(result.learningStep).toBeNull();
-    expect(result.interval).toBe(GRAD_INTERVAL_EASY);
+  it("graduates with GRAD_INTERVAL_EASY", () => {
+    const inStep = cardInStep(0);
+    const next = nextReview(inStep, 5, NOW);
+    expect(next.learningStep).toBeNull();
+    expect(next.stepStartedAt).toBeNull();
+    expect(next.lastReview).toBe(TODAY);
+    expect(next.scheduledDays).toBe(GRAD_INTERVAL_EASY);
+    expect(next.fsrsState).toBe("review");
   });
 });
 
 // ============================================================
-// EF frozen during in-step grading
+// FSRS state is frozen during in-step grading (B1, B2)
 // ============================================================
-describe("EF is frozen during in-step grading", () => {
-  it("Again in step does not change EF", () => {
-    const state = cardInStep(0);
-    const ef = state.easeFactor;
-    expect(nextReview(state, 1, NOW).easeFactor).toBe(ef);
+describe("FSRS state is frozen during in-step Again/Hard", () => {
+  it("stability and difficulty unchanged on in-step Again", () => {
+    const inStep = cardInStep(1, "2026-05-01", { stability: 6, difficulty: 4 });
+    const next = nextReview(inStep, 1, NOW);
+    expect(next.stability).toBe(6);
+    expect(next.difficulty).toBe(4);
   });
 
-  it("Hard in step does not change EF", () => {
-    const state = cardInStep(0);
-    const ef = state.easeFactor;
-    expect(nextReview(state, 2, NOW).easeFactor).toBe(ef);
-  });
-
-  it("Good in step does not change EF", () => {
-    const state = cardInStep(0);
-    const ef = state.easeFactor;
-    expect(nextReview(state, 4, NOW).easeFactor).toBe(ef);
-  });
-
-  it("Easy in step does not change EF", () => {
-    const state = cardInStep(0);
-    const ef = state.easeFactor;
-    expect(nextReview(state, 5, NOW).easeFactor).toBe(ef);
+  it("stability and difficulty unchanged on in-step Hard", () => {
+    const inStep = cardInStep(0, null, { stability: 0, difficulty: 0 });
+    const next = nextReview(inStep, 2, NOW);
+    expect(next.stability).toBe(0);
+    expect(next.difficulty).toBe(0);
   });
 });
 
 // ============================================================
-// Full scenario: new card Good → Good → graduate
+// Full scenarios
 // ============================================================
-describe("Full scenario: new card Good twice → graduates with interval=1", () => {
-  it("step 0 → step 1 → graduated", () => {
-    const initial = newCard();
-
-    const after1 = nextReview(initial, 4, NOW); // enter step 0
-    expect(after1.learningStep).toBe(0);
-    expect(after1.lastReview).toBeNull();
-
-    const after2 = nextReview(after1, 4, NOW); // advance to step 1
-    expect(after2.learningStep).toBe(1);
-    expect(after2.lastReview).toBeNull();
-
-    const after3 = nextReview(after2, 4, NOW); // graduate
-    expect(after3.learningStep).toBeNull();
-    expect(after3.repetitions).toBe(1);
-    expect(after3.interval).toBe(1);
-    expect(after3.lastReview).toBe(TODAY);
+describe("Full scenario: new card Good twice → graduates", () => {
+  it("ends in fsrsState='review' with scheduledDays=GRAD_INTERVAL_GOOD", () => {
+    let state: ReviewState = newCard();
+    state = nextReview(state, 4, NOW); // learning step 0 → 1
+    expect(state.learningStep).toBe(0);
+    state = nextReview(state, 4, NOW); // step 1 → step 2 (graduate)
+    expect(state.learningStep).toBe(1);
+    state = nextReview(state, 4, NOW); // step 2 (no such step) → graduates
+    expect(state.learningStep).toBeNull();
+    expect(state.fsrsState).toBe("review");
+    expect(state.scheduledDays).toBe(GRAD_INTERVAL_GOOD);
   });
 });
 
-// ============================================================
-// Full scenario: graduated → Again (lapse) → relearning Good → graduate
-// ============================================================
 describe("Full scenario: graduated → lapse → relearning Good → graduate", () => {
-  it("lapse → relearning step 0 → graduate with interval=1", () => {
-    const graduated = graduatedCard();
-
-    const lapsed = nextReview(graduated, 1, NOW); // lapse
-    expect(lapsed.learningStep).toBe(0);
-    expect(lapsed.lastReview).toBe(TODAY);
-    expect(lapsed.repetitions).toBe(0);
-
-    const relearned = nextReview(lapsed, 4, NOW); // only 1 relearning step
-    expect(relearned.learningStep).toBeNull();
-    expect(relearned.repetitions).toBe(1);
-    expect(relearned.interval).toBe(GRAD_INTERVAL_GOOD);
-    expect(relearned.lastReview).toBe(TODAY);
+  it("returns to fsrsState='review' after relearning completes", () => {
+    let state: ReviewState = graduatedCard();
+    state = nextReview(state, 1, NOW); // lapse → relearning step 0
+    expect(state.learningStep).toBe(0);
+    expect(state.fsrsState).toBe("relearning");
+    state = nextReview(state, 4, NOW); // good → graduate (single relearning step)
+    expect(state.learningStep).toBeNull();
+    expect(state.fsrsState).toBe("review");
+    expect(state.scheduledDays).toBe(GRAD_INTERVAL_GOOD);
   });
 });
 
 // ============================================================
-// Migration: legacy state without learningStep field
+// firstSeen preservation
 // ============================================================
-describe("migration of legacy state (no learningStep field)", () => {
-  it("backfills learningStep: null via migrateReviewState", () => {
-    const legacyState: Record<string, unknown> = {
-      repetitions: 1,
+describe("firstSeen preservation through graduation", () => {
+  it("preserves firstSeen when a learning-step card graduates via Easy", () => {
+    const inStep = cardInStep(0, null, { firstSeen: TODAY });
+    const next = nextReview(inStep, 5, NOW);
+    expect(next.firstSeen).toBe(TODAY);
+  });
+
+  it("preserves firstSeen when a learning-step card graduates via Good at the last step", () => {
+    const inStep = cardInStep(LEARNING_STEPS_MS.length - 1, null, { firstSeen: TODAY });
+    const next = nextReview(inStep, 4, NOW);
+    expect(next.firstSeen).toBe(TODAY);
+  });
+
+  it("preserves firstSeen on graduated card paths (A3 lapse, A4 standard)", () => {
+    const graduated = graduatedCard({ firstSeen: "2026-04-01" });
+    const lapsed = nextReview(graduated, 1, NOW);
+    const reviewed = nextReview(graduated, 4, NOW);
+    expect(lapsed.firstSeen).toBe("2026-04-01");
+    expect(reviewed.firstSeen).toBe("2026-04-01");
+  });
+});
+
+// ============================================================
+// stepStartedAt tracking
+// ============================================================
+describe("stepStartedAt tracking", () => {
+  it("stamps stepStartedAt when entering a step (brand-new + Good)", () => {
+    const next = nextReview(newCard(), 4, NOW);
+    expect(next.stepStartedAt).toBe(NOW.getTime());
+  });
+
+  it("re-stamps stepStartedAt on B3 advance", () => {
+    const inStep = cardInStep(0, null, { stepStartedAt: NOW.getTime() - 60_000 });
+    const next = nextReview(inStep, 4, NOW);
+    expect(next.stepStartedAt).toBe(NOW.getTime());
+  });
+
+  it("preserves stepStartedAt on B2 (Hard, no advance)", () => {
+    const original = NOW.getTime() - 60_000;
+    const inStep = cardInStep(0, null, { stepStartedAt: original });
+    const next = nextReview(inStep, 2, NOW);
+    expect(next.stepStartedAt).toBe(original);
+  });
+
+  it("nullifies stepStartedAt on graduation paths", () => {
+    const inStep = cardInStep(0);
+    const next = nextReview(inStep, 5, NOW);
+    expect(next.stepStartedAt).toBeNull();
+  });
+});
+
+// ============================================================
+// Legacy migration via migrateReviewState
+// ============================================================
+describe("migrateReviewState: SM-2 → FSRS conversion", () => {
+  it("converts a graduated SM-2 row to FSRS state and removes legacy fields", () => {
+    const legacy: Record<string, unknown> = {
+      repetitions: 2,
       interval: 6,
       easeFactor: 2.5,
       dueDate: "2026-05-10",
       lastReview: "2026-05-04",
       firstSeen: "2026-05-04",
-      // learningStep is absent
     };
-
-    migrateReviewState(legacyState);
-
-    expect(legacyState.learningStep).toBeNull();
+    migrateReviewState(legacy);
+    expect(legacy.stability).toBe(6);
+    expect(legacy.scheduledDays).toBe(6);
+    expect(legacy.reps).toBe(2);
+    expect(legacy.lapses).toBe(0);
+    expect(legacy.fsrsState).toBe("review");
+    // SM-2 fields are removed
+    expect(legacy.repetitions).toBeUndefined();
+    expect(legacy.interval).toBeUndefined();
+    expect(legacy.easeFactor).toBeUndefined();
   });
 
-  it("does not overwrite an existing learningStep value", () => {
+  it("converts a brand-new SM-2 row to fsrsState='new' with zeroed FSRS fields", () => {
+    const legacy: Record<string, unknown> = {
+      repetitions: 0,
+      interval: 0,
+      easeFactor: 2.5,
+      dueDate: "2026-05-08",
+      lastReview: null,
+      firstSeen: null,
+    };
+    migrateReviewState(legacy);
+    expect(legacy.fsrsState).toBe("new");
+    expect(legacy.stability).toBe(0);
+    expect(legacy.reps).toBe(0);
+  });
+
+  it("is a no-op on already-FSRS state (stability present)", () => {
     const state: Record<string, unknown> = {
-      learningStep: 0,
+      stability: 5,
+      difficulty: 3,
+      reps: 1,
+      lapses: 0,
+      fsrsState: "review",
+      learningStep: null,
+      stepStartedAt: null,
+      firstSeen: "2026-05-01",
+      lastReview: "2026-05-04",
+      dueDate: "2026-05-09",
     };
-
     migrateReviewState(state);
-
-    expect(state.learningStep).toBe(0); // preserved
+    expect(state.stability).toBe(5);
+    expect(state.difficulty).toBe(3);
   });
 
-  it("backfills firstSeen from lastReview on a pre-firstSeen legacy card", () => {
-    const legacyState: Record<string, unknown> = {
+  it("backfills learningStep and firstSeen on a pre-firstSeen legacy card", () => {
+    const legacy: Record<string, unknown> = {
       repetitions: 1,
       interval: 6,
       easeFactor: 2.5,
       dueDate: "2026-05-10",
       lastReview: "2026-05-04",
-      // firstSeen and learningStep both absent (oldest legacy shape)
     };
-
-    migrateReviewState(legacyState);
-
-    expect(legacyState.firstSeen).toBe("2026-05-04");
-    expect(legacyState.learningStep).toBeNull();
-  });
-});
-
-// ============================================================
-// Graduated card + Hard (A4 path, soft fail)
-// ============================================================
-describe("Case A4: graduated card + Hard", () => {
-  it("resets repetitions and interval but does NOT enter relearning", () => {
-    const graduated = graduatedCard();
-
-    const next = nextReview(graduated, 2, NOW);
-
-    expect(next.learningStep).toBeNull(); // stays graduated, no relearning step
-    expect(next.repetitions).toBe(0);
-    expect(next.interval).toBe(1);
-    expect(next.lastReview).toBe(TODAY);
-    // EF is penalised (this is the graduated path, not in-step)
-    expect(next.easeFactor).toBeLessThan(graduated.easeFactor);
-    expect(next.easeFactor).toBeGreaterThanOrEqual(1.3);
-  });
-});
-
-// ============================================================
-// firstSeen preservation through graduation paths
-// ============================================================
-describe("firstSeen preservation through graduation", () => {
-  it("preserves firstSeen when a learning-step card graduates via Easy", () => {
-    const inStep = cardInStep(0, null, { firstSeen: TODAY });
-
-    const next = nextReview(inStep, 5, NOW);
-
-    expect(next.learningStep).toBeNull();
-    expect(next.firstSeen).toBe(TODAY); // preserved unchanged
+    migrateReviewState(legacy);
+    expect(legacy.firstSeen).toBe("2026-05-04");
+    expect(legacy.learningStep).toBeNull();
+    expect(legacy.fsrsState).toBe("review");
   });
 
-  it("preserves firstSeen when a learning-step card graduates via Good", () => {
-    const inStep = cardInStep(1, null, { firstSeen: TODAY }); // last new-card step
-
-    const next = nextReview(inStep, 4, NOW);
-
-    expect(next.learningStep).toBeNull();
-    expect(next.firstSeen).toBe(TODAY); // preserved unchanged
-  });
-});
-
-// ============================================================
-// stepStartedAt: set on step entry, null on graduation
-// ============================================================
-describe('stepStartedAt tracking', () => {
-  it('A1: brand-new Good → enter step 0 sets stepStartedAt to now.getTime()', () => {
-    const state = newCard();
-    const result = nextReview(state, 4, NOW);
-    expect(result.stepStartedAt).toBe(NOW.getTime());
-  });
-
-  it('A1: brand-new Again → enter step 0 sets stepStartedAt', () => {
-    const state = newCard();
-    const result = nextReview(state, 1, NOW);
-    expect(result.stepStartedAt).toBe(NOW.getTime());
-  });
-
-  it('A1: brand-new Hard → enter step 0 sets stepStartedAt', () => {
-    const state = newCard();
-    const result = nextReview(state, 2, NOW);
-    expect(result.stepStartedAt).toBe(NOW.getTime());
-  });
-
-  it('A2: brand-new Easy → graduate immediately → stepStartedAt null', () => {
-    const state = newCard();
-    const result = nextReview(state, 5, NOW);
-    expect(result.stepStartedAt).toBeNull();
-  });
-
-  it('A3: graduated + Again (lapse) → relearning step 0 → stepStartedAt set', () => {
-    const state = graduatedCard();
-    const result = nextReview(state, 1, NOW);
-    expect(result.stepStartedAt).toBe(NOW.getTime());
-  });
-
-  it('A4 Hard: graduated + Hard → stays graduated → stepStartedAt null', () => {
-    const state = graduatedCard();
-    const result = nextReview(state, 2, NOW);
-    expect(result.stepStartedAt).toBeNull();
-  });
-
-  it('A4 Good/Easy: graduated + Good → stays graduated → stepStartedAt null', () => {
-    const state = graduatedCard();
-    const result = nextReview(state, 4, NOW);
-    expect(result.stepStartedAt).toBeNull();
-  });
-
-  it('B1: in-step Again → reset to step 0 → stepStartedAt updated to now', () => {
-    const state = cardInStep(1, null, { stepStartedAt: NOW.getTime() - 30000 });
-    const result = nextReview(state, 1, NOW);
-    expect(result.learningStep).toBe(0);
-    expect(result.stepStartedAt).toBe(NOW.getTime());
-  });
-
-  it('B2: in-step Hard → repeat step → stepStartedAt preserved', () => {
-    const original = NOW.getTime() - 30000;
-    const state = cardInStep(0, null, { stepStartedAt: original });
-    const result = nextReview(state, 2, NOW);
-    expect(result.learningStep).toBe(0);
-    expect(result.stepStartedAt).toBe(original); // unchanged
-  });
-
-  it('B3 advance: in-step Good → advance → stepStartedAt updated to now', () => {
-    const state = cardInStep(0, null, { stepStartedAt: NOW.getTime() - 60000 });
-    const result = nextReview(state, 4, NOW);
-    expect(result.learningStep).toBe(1);
-    expect(result.stepStartedAt).toBe(NOW.getTime());
-  });
-
-  it('B3 graduate: in-step Good at final step → graduate → stepStartedAt null', () => {
-    const state = cardInStep(1, null, { stepStartedAt: NOW.getTime() - 60000 });
-    const result = nextReview(state, 4, NOW);
-    expect(result.learningStep).toBeNull();
-    expect(result.stepStartedAt).toBeNull();
-  });
-
-  it('B4: in-step Easy → graduate → stepStartedAt null', () => {
-    const state = cardInStep(0, null, { stepStartedAt: NOW.getTime() - 30000 });
-    const result = nextReview(state, 5, NOW);
-    expect(result.learningStep).toBeNull();
-    expect(result.stepStartedAt).toBeNull();
-  });
-
-  it('initialReviewState includes stepStartedAt: null', () => {
-    const state = initialReviewState(NOW);
-    expect(state.stepStartedAt).toBeNull();
-  });
-});
-
-// ============================================================
-// Migration 3: stepStartedAt backfill
-// ============================================================
-describe('migration of legacy state (no stepStartedAt field)', () => {
-  it('sets stepStartedAt to null for graduated cards (learningStep: null, stepStartedAt absent)', () => {
-    const legacyState: Record<string, unknown> = {
-      repetitions: 1,
-      interval: 6,
-      easeFactor: 2.5,
-      dueDate: '2026-05-10',
-      lastReview: '2026-05-04',
-      firstSeen: '2026-05-04',
-      learningStep: null,
-      // stepStartedAt absent
-    };
-    migrateReviewState(legacyState);
-    expect(legacyState.stepStartedAt).toBeNull();
-  });
-
-  it('sets stepStartedAt to a concrete timestamp for in-learning cards (learningStep: non-null, stepStartedAt absent)', () => {
-    const before = Date.now();
-    const legacyState: Record<string, unknown> = {
-      repetitions: 0,
-      interval: 0,
-      easeFactor: 2.5,
-      dueDate: '2026-05-10',
-      lastReview: null,
-      firstSeen: null,
-      learningStep: 0,
-      // stepStartedAt absent
-    };
-    migrateReviewState(legacyState);
-    const after = Date.now();
-    expect(typeof legacyState.stepStartedAt).toBe('number');
-    expect(legacyState.stepStartedAt as number).toBeGreaterThanOrEqual(before);
-    expect(legacyState.stepStartedAt as number).toBeLessThanOrEqual(after);
-  });
-
-  it('does not overwrite an existing stepStartedAt value', () => {
-    const state: Record<string, unknown> = {
-      stepStartedAt: 1234567890,
-    };
+  it("does not overwrite an existing learningStep value", () => {
+    const state: Record<string, unknown> = { learningStep: 0 };
     migrateReviewState(state);
-    expect(state.stepStartedAt).toBe(1234567890);
+    expect(state.learningStep).toBe(0);
   });
 });

@@ -37,7 +37,7 @@ export function previewIntervals(
       const minutes = Math.max(1, Math.ceil(remainingMs / 60_000));
       result[grade] = `<${minutes}m`;
     } else {
-      result[grade] = formatGraduatedLabel(next.interval);
+      result[grade] = formatGraduatedLabel(next.scheduledDays);
     }
   }
 
