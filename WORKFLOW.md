@@ -119,6 +119,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Trigger** | Issue labeled `auto` |
 | **What it does** | Invokes the `planner` sub-agent; posts `<!-- auto-plan -->` comment; moves issue to **Planned** on the project board |
 | **Scope check** | Planner assesses scope (≥4 files, ≥3 surfaces, infra+logic, ≥6 acceptance criteria) and runs a coupling check before offering `/split` |
+| **Overlap annotation** | If the issue has `<!-- overlap-scan:i+j:<kind> -->` markers, the orchestrator extracts the verbatim reason from each marker's comment body and passes the list to the planner, which appends a `**Related issues:**` section to the plan (one `- #<num> (<kind>): <reason>` line per linked issue) — informational only |
 | **Salvage** | Post-step runs with `if: always()` — if the orchestrator halts before posting the plan, it salvages `/tmp/plan-body.md` to the issue |
 
 #### Implement job
@@ -160,6 +161,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Trigger** | Maintainer comments `/replan` on an open `auto`-labelled issue |
 | **What it does** | Mirrors the plan job — invokes `planner`, posts a fresh `<!-- auto-plan -->` comment, moves issue to **Planned** |
 | **Use case** | Recovery after a staleness gate refusal (`/go` blocked because `origin/main` moved into planned files); also useful when scope has changed since the original plan |
+| **Overlap annotation** | Same as plan job — overlap-scan markers are parsed and passed to the planner, which appends a `**Related issues:**` section to the plan |
 | **Salvage** | Same `if: always()` post-step as the plan job |
 
 ---
@@ -247,11 +249,12 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 | | |
 |---|---|
-| **Trigger** | `workflow_dispatch` (manual only) |
+| **Trigger** | Issues labeled `auto`; `workflow_dispatch` (manual) |
 | **Scope** | Only `priority:now` and `priority:next` issues |
 | **Kinds** | `merge` (duplicate intent), `overlap` (same area, partial intersection), `conflict` (mutually exclusive — one blocks the other) |
 | **Markers** | Posts `<!-- overlap-scan:i+j:<kind> -->` on both issues in each pair; de-dupes on exact (i, j, kind) across runs |
 | **Load-bearing** | `conflict` markers are checked by `auto-issue.yml`'s implement job — `/go` refuses to run on an issue with an unresolved conflict marker linked to an open issue |
+| **Plan annotation** | When overlap-scan markers exist on an issue, the plan-job and replan-job append a `**Related issues:**` section to the plan body (one line per linked issue, format `#<num> (<kind>): <reason>`) — informational only, does not affect scope decisions |
 
 ---
 
