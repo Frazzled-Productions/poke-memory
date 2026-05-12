@@ -1,0 +1,123 @@
+name: PR Check Monitor
+
+# Detect PRs where the CI `test` check was never dispatched — a symptom of
+# GitHub's push/pull_request event throttle. Runs on a schedule (independent
+# of webhook dispatch) so it fires even during a throttle window.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: pr-check-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    name: Flag PRs without CI dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Check for stuck PRs and comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          AGE_MINUTES: "20"
+        run: |
+          set -euo pipefail
+
+          NOW=$(date -u +%s)
+          THRESHOLD=$(( AGE_MINUTES * 60 ))
+
+          echo "Fetching open non-draft PRs..."
+          PRS=$(gh pr list \
+            --repo "$REPO" \
+            --state open \
+            --json number,headRefOid,isDraft,createdAt,headRepositoryOwner,headRepository \
+            --limit 100)
+
+          OWNER=$(echo "$REPO" | cut -d/ -f1)
+
+          echo "$PRS" | jq -c '.[]' | while IFS= read -r pr; do
+            NUMBER=$(echo "$pr" | jq -r '.number')
+            SHA=$(echo "$pr" | jq -r '.headRefOid')
+            IS_DRAFT=$(echo "$pr" | jq -r '.isDraft')
+            CREATED_AT=$(echo "$pr" | jq -r '.createdAt')
+            HEAD_OWNER=$(echo "$pr" | jq -r '.headRepositoryOwner.login')
+
+            # Skip drafts
+            if [ "$IS_DRAFT" = "true" ]; then
+              echo "PR #$NUMBER: draft, skipping"
+              continue
+            fi
+
+            # Skip fork PRs (head repo owner differs from the repo owner)
+            if [ "$HEAD_OWNER" != "$OWNER" ]; then
+              echo "PR #$NUMBER: fork PR (head owner: $HEAD_OWNER), skipping"
+              continue
+            fi
+
+            # Skip PRs younger than the threshold
+            PR_TIME=$(date -u -d "$CREATED_AT" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo 0)
+            AGE=$(( NOW - PR_TIME ))
+            if [ "$AGE" -lt "$THRESHOLD" ]; then
+              echo "PR #$NUMBER: only ${AGE}s old (threshold ${THRESHOLD}s), skipping"
+              continue
+            fi
+
+            echo "PR #$NUMBER (sha: ${SHA:0:7}): checking for CI dispatch..."
+
+            # Check if ANY check run for the `test` job exists at this SHA
+            CHECK_COUNT=$(gh api \
+              "repos/$REPO/commits/$SHA/check-runs?check_name=test&per_page=10" \
+              --jq '.total_count' 2>/dev/null || echo "0")
+
+            if [ "$CHECK_COUNT" -gt 0 ]; then
+              echo "PR #$NUMBER: $CHECK_COUNT check run(s) found — CI dispatched OK"
+              continue
+            fi
+
+            echo "PR #$NUMBER: no 'test' check run found — CI was never dispatched"
+
+            # Check for existing monitor comment at this SHA to avoid duplicates
+            DEDUP_MARKER="<!-- pr-check-monitor:$SHA -->"
+            EXISTING=$(gh pr view "$NUMBER" --repo "$REPO" \
+              --json comments \
+              --jq ".comments[] | select(.body | contains(\"$DEDUP_MARKER\")) | .body" \
+              2>/dev/null | head -1 || echo "")
+
+            if [ -n "$EXISTING" ]; then
+              echo "PR #$NUMBER: dedup marker already exists for SHA ${SHA:0:7}, skipping"
+              continue
+            fi
+
+            echo "PR #$NUMBER: posting monitor alert comment..."
+            gh pr comment "$NUMBER" --repo "$REPO" --body "$(cat <<EOF
+$DEDUP_MARKER
+**CI was never dispatched on this PR.**
+
+The \`test\` check has no record at \`${SHA:0:7}\` — this typically means GitHub's \`push\`/\`pull_request\` event dispatch was throttled when this PR was opened.
+
+**Recovery steps once the throttle clears:**
+1. Confirm \`push\` events are flowing again:
+   \`\`\`
+   gh api "repos/$REPO/actions/runs?event=push&per_page=1" --jq '.workflow_runs[0].created_at'
+   \`\`\`
+2. Push an empty commit to re-trigger CI on this PR:
+   \`\`\`
+   git fetch origin
+   git checkout $(gh pr view $NUMBER --repo $REPO --json headRefName --jq .headRefName)
+   git commit --allow-empty -m "chore: re-trigger CI after dispatch throttle"
+   git push
+   \`\`\`
+
+See the \`pr-check-monitor\` workflow and WORKFLOW.md for full context.
+EOF
+)"
+            echo "PR #$NUMBER: alert comment posted"
+          done

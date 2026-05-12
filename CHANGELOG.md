@@ -4,6 +4,14 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ## [Unreleased]
 
+### Changed
+
+- **Auto-labelling removed** — `auto-label.yml` (which classified issues and PRs via Claude) has been deleted. Labels on new issues and PRs are applied manually or by the workflow that creates them (e.g. the weekly digest workflows already apply all three label dimensions at creation). This reduces steady-state workflow dispatch volume. Closes #225.
+
+### Added
+
+- **PR dispatch monitor** — a new `pr-check-monitor.yml` workflow runs every 15 minutes and detects PRs where the CI `test` check was never dispatched (a symptom of GitHub's push/pull_request event throttle). When it finds a stuck PR, it posts a `<!-- pr-check-monitor:{sha} -->` comment with step-by-step recovery instructions. The workflow uses a schedule trigger (independent of webhook dispatch) so it fires even during a throttle window. Closes #225.
+
 ## [0.3.0] — 2026-05-12
 
 ### Changed
