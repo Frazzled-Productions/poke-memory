@@ -33,7 +33,11 @@ import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { appendGradeEntry, removeGradeEntry } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
+import { ShareTodayButton } from "@/components/review/ShareTodayButton";
 import { previewIntervals } from "@/lib/srs/intervalPreview";
+import { isMastered } from "@/lib/stats/derive";
+import { formatDailySummary } from "@/lib/review/share";
+import { computeStreak, loadStreakData } from "@/lib/streak";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
@@ -50,6 +54,9 @@ type LearningQueueEntry = { cardId: number; dueAt: number };
 type UndoSnapshot = {
   cards: ReviewableCard[];
   sessionGrades: Record<Grade, number>;
+  sessionGradeSeq: Grade[];
+  newCardsThisSession: number;
+  masteredThisSession: number;
   learningQueue: LearningQueueEntry[];
   cardId: number;
   // `occurredAt` of the grade-log entry written by this grade — used to
@@ -169,11 +176,14 @@ function SessionCompleteScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  shareText,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  /** Pre-formatted share summary; null when the user hasn't graded anything yet. */
+  shareText: string | null;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
@@ -182,6 +192,7 @@ function SessionCompleteScreen({
         No more cards due today. Come back tomorrow to keep going.
       </p>
       <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
     </div>
   );
 }
@@ -320,6 +331,11 @@ export function ReviewSession() {
   // Live session grade tally — resets on page navigation by design. Labelled
   // "this session" in the UI to set expectations.
   const [sessionGrades, setSessionGrades] = useState<Record<Grade, number>>({ 1: 0, 2: 0, 4: 0, 5: 0 });
+  // Per-card grade history for the daily share card. Wiped on session
+  // reload; not persisted (the share is a one-tap end-of-session affordance).
+  const [sessionGradeSeq, setSessionGradeSeq] = useState<Grade[]>([]);
+  const [newCardsThisSession, setNewCardsThisSession] = useState(0);
+  const [masteredThisSession, setMasteredThisSession] = useState(0);
   // Single-step undo: snapshot of pre-grade state. Captured in handleGrade
   // and consumed by handleUndo. Cleared when the next grade fires.
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
@@ -478,6 +494,9 @@ export function ReviewSession() {
         // definitions later in the component.
         setCards(undoSnapshot.cards);
         setSessionGrades(undoSnapshot.sessionGrades);
+        setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
+        setNewCardsThisSession(undoSnapshot.newCardsThisSession);
+        setMasteredThisSession(undoSnapshot.masteredThisSession);
         setLearningQueue(undoSnapshot.learningQueue);
         notifySaveResult(saveSession({ cards: undoSnapshot.cards, limits }));
         if (undoSnapshot.gradeLogOccurredAt !== null) {
@@ -703,8 +722,26 @@ export function ReviewSession() {
       );
     }
 
+    const today = todayString(new Date());
+    const shareText =
+      sessionGradeSeq.length > 0
+        ? formatDailySummary({
+            date: today,
+            streak: computeStreak(loadStreakData(), today),
+            reviewed: sessionGradeSeq.length,
+            newCards: newCardsThisSession,
+            mastered: masteredThisSession,
+            gradeSequence: sessionGradeSeq,
+          })
+        : null;
     return (
-      <SessionCompleteScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+      <SessionCompleteScreen
+        perType={perType}
+        nameEnabled={nameCardsEnabled}
+        evolutionEnabled={evolutionCardsEnabled}
+        reverseEnabled={reverseEnabled}
+        shareText={shareText}
+      />
     );
   }
 
@@ -752,6 +789,9 @@ export function ReviewSession() {
     const snapshot: UndoSnapshot = {
       cards,
       sessionGrades,
+      sessionGradeSeq,
+      newCardsThisSession,
+      masteredThisSession,
       learningQueue,
       cardId: effectiveCard.id,
       gradeLogOccurredAt: null,
@@ -773,6 +813,18 @@ export function ReviewSession() {
     enqueueGrade({ ...effectiveCard, state: nextState });
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
+    setSessionGradeSeq((prev) => [...prev, grade]);
+    // Track new / mastered transitions for the daily share card. Uses
+    // `isMastered` against the current mastery threshold.
+    const wasNew = effectiveCard.state.firstSeen === null;
+    if (wasNew && nextState.firstSeen !== null) {
+      setNewCardsThisSession((n) => n + 1);
+    }
+    const wasMastered = isMastered(effectiveCard.state, loadSettings().masteryRepetitions);
+    const nowMastered = isMastered(nextState, loadSettings().masteryRepetitions);
+    if (!wasMastered && nowMastered) {
+      setMasteredThisSession((n) => n + 1);
+    }
 
     // Update the learning queue based on the new state.
     setLearningQueue((prev) => {
@@ -814,6 +866,9 @@ export function ReviewSession() {
     // Revert local state to the pre-grade snapshot.
     setCards(undoSnapshot.cards);
     setSessionGrades(undoSnapshot.sessionGrades);
+    setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
+    setNewCardsThisSession(undoSnapshot.newCardsThisSession);
+    setMasteredThisSession(undoSnapshot.masteredThisSession);
     setLearningQueue(undoSnapshot.learningQueue);
     notifySaveResult(saveSession({ cards: undoSnapshot.cards, limits }));
     if (undoSnapshot.gradeLogOccurredAt !== null) {
