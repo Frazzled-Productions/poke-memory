@@ -131,12 +131,12 @@ describe("previewIntervals", () => {
       expect(previewIntervals(state, NOW)[2]).toBe("1d");
     });
 
-    it("Grade 4 (Good) → a day value matching /^\\d+d$/", () => {
-      expect(previewIntervals(state, NOW)[4]).toMatch(/^\d+d$/);
+    it("Grade 4 (Good) → 15d (rep 3, interval = floor(6 * 2.5))", () => {
+      expect(previewIntervals(state, NOW)[4]).toBe("15d");
     });
 
-    it("Grade 5 (Easy) → a day value matching /^\\d+d$/", () => {
-      expect(previewIntervals(state, NOW)[5]).toMatch(/^\d+d$/);
+    it("Grade 5 (Easy) → 15d (rep 3, interval = floor(6 * 2.6))", () => {
+      expect(previewIntervals(state, NOW)[5]).toBe("15d");
     });
   });
 });

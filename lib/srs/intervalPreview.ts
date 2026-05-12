@@ -30,6 +30,8 @@ export function previewIntervals(
       const steps =
         next.lastReview === null ? LEARNING_STEPS_MS : RELEARNING_STEPS_MS;
       const stepMs = steps[Math.min(next.learningStep, steps.length - 1)];
+      // Fallback handles migrated sessions where stepStartedAt was never stamped;
+      // ReviewSession stamps it at mount, so null only occurs for pre-migration data.
       const stepStartedAt = next.stepStartedAt ?? now.getTime();
       const remainingMs = Math.max(0, stepStartedAt + stepMs - now.getTime());
       const minutes = Math.max(1, Math.ceil(remainingMs / 60_000));

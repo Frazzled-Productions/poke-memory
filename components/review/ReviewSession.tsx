@@ -8,7 +8,6 @@ import { GradeButtons } from "@/components/review/GradeButtons";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { pickDistractors } from "@/lib/pokemon/distractors";
 import {
-  buildQueueCounters,
   buildSession,
   buildSessionQueues,
   getNextCardId,
@@ -485,7 +484,7 @@ export function ReviewSession() {
       }
     : limits;
 
-  const { reviewQueue, newQueue, perType } = buildSessionQueues(
+  const { reviewQueue, newQueue, perType, learningCardIds } = buildSessionQueues(
     cards,
     effectiveLimits,
     today,
@@ -538,8 +537,11 @@ export function ReviewSession() {
   const gradePreviewsOrNull =
     effectiveCard !== null ? previewIntervals(effectiveCard.state, new Date()) : null;
 
-  // Queue counters: New / Learning / Review — updated on every grade.
-  const { newCount, learningCount, reviewCount } = buildQueueCounters(cards, today);
+  // Queue counters: sourced from buildSessionQueues so newCount and reviewCount
+  // reflect the daily-capped queue sizes, matching what actually gets served.
+  const newCount = newQueue.length;
+  const learningCount = learningCardIds.length;
+  const reviewCount = reviewQueue.length;
 
   // --- Determine end state when there is no current card ---
   function resolveEndState(): EndState {
@@ -608,6 +610,10 @@ export function ReviewSession() {
           </div>
         );
       }
+      // futureLearning is empty: all entries are overdue. Overdue entries
+      // populate dueLearning → currentLearningEntry → a non-null effectiveCard,
+      // so reaching this branch with effectiveCard === null is unreachable.
+      // Fall through to resolveEndState() safely.
     }
 
     const endState = resolveEndState();
