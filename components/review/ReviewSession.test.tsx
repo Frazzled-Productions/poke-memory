@@ -627,5 +627,7 @@ describe("QueueCounterRow: live queue counters", () => {
     expect(counterRow).toHaveTextContent("New");
     expect(counterRow).toHaveTextContent("Learning");
     expect(counterRow).toHaveTextContent("Review");
+    expect(counterRow).toHaveTextContent("1 New");
+    expect(counterRow).toHaveTextContent("1 Learning");
   });
 });

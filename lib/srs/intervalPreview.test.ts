@@ -99,6 +99,10 @@ describe("previewIntervals", () => {
       expect(previewIntervals(state, NOW)[1]).toBe("<10m");
     });
 
+    it("Grade 2 (Hard) → <10m (repeats step 0 via RELEARNING_STEPS_MS, preserves stepStartedAt)", () => {
+      expect(previewIntervals(state, NOW)[2]).toBe("<10m");
+    });
+
     it("Grade 4 (Good) → 1d (graduates from relearning)", () => {
       expect(previewIntervals(state, NOW)[4]).toBe("1d");
     });

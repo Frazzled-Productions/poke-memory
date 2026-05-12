@@ -8,6 +8,7 @@ import { GradeButtons } from "@/components/review/GradeButtons";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { pickDistractors } from "@/lib/pokemon/distractors";
 import {
+  buildQueueCounters,
   buildSession,
   buildSessionQueues,
   getNextCardId,
@@ -33,7 +34,6 @@ import { appendGradeEntry } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 import { previewIntervals } from "@/lib/srs/intervalPreview";
-import { buildQueueCounters } from "@/lib/review/session";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
