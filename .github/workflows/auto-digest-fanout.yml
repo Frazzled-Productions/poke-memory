@@ -1,0 +1,137 @@
+name: Auto Digest Fan-out
+
+# Fires on every issue edit. Guards using the auto-suggest HTML markers so
+# only digest issues are handled. For each newly-checked proposal checkbox,
+# files a child issue with the extracted priority label and a backlink, then
+# writes a "→ filed as #N" marker on the heading so it cannot be double-filed.
+#
+# Idempotency: the "→ filed as #N" marker on the heading is the single source
+# of truth. Checked-but-marked proposals are skipped unconditionally.
+#
+# Re-trigger: each PATCH to write back-markers triggers another issues.edited
+# event. The concurrency queue serialises runs; subsequent runs see all markers
+# present and exit cleanly as a no-op.
+
+on:
+  issues:
+    types: [edited]
+
+concurrency:
+  group: digest-fanout-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  fanout:
+    name: File checked proposals
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+
+    if: |
+      contains(github.event.issue.body, '<!-- auto-codequality-suggest -->') ||
+      contains(github.event.issue.body, '<!-- auto-app-suggest -->')
+
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Fan out checked proposals
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: |
+          set -euo pipefail
+
+          # Re-fetch current body — the event payload can be truncated on long issues.
+          gh api "repos/${REPO}/issues/${ISSUE}" | jq -r '.body // ""' > /tmp/issue-body.txt
+
+          cat > /tmp/fanout.py << 'PYEOF'
+          import re, subprocess, os, sys, json
+
+          repo     = os.environ['REPO']
+          issue    = os.environ['ISSUE']
+          issue_url = os.environ['ISSUE_URL']
+
+          body = open('/tmp/issue-body.txt').read()
+          updated_body = body
+          filed = []
+
+          # Scan each numbered proposal heading in document order.
+          for hm in re.finditer(r'^(### (\d+)\. (.+?))$', body, re.MULTILINE):
+              heading_full = hm.group(1)   # e.g. "### 1. Some title"
+              n            = hm.group(2)   # e.g. "1"
+              title        = hm.group(3).strip()
+
+              # Idempotency: skip if a back-marker was already written.
+              if '→ filed as #' in heading_full:
+                  continue
+
+              # Extract the proposal block (until the next ### heading or end).
+              block_start = hm.end()
+              next_hm     = re.search(r'^###', body[block_start:], re.MULTILINE)
+              block_end   = block_start + next_hm.start() if next_hm else len(body)
+              block       = body[block_start:block_end]
+
+              # Only proceed if the checkbox for this proposal is ticked.
+              if not re.search(rf'-\s*\[x\][^\n]*<!--\s*proposal:{n}\s*-->', block, re.IGNORECASE):
+                  continue
+
+              # Extract priority; fall back to priority:later if malformed.
+              pm       = re.search(r'\*\*Priority:\*\*\s*`(priority:[^`]+)`', block)
+              priority = pm.group(1) if pm else 'priority:later'
+
+              # Build child issue body: strip the checkbox line, add backlink.
+              clean_block = re.sub(rf'\s*-\s*\[.\][^\n]*<!--\s*proposal:{n}\s*-->[^\n]*\n?', '\n', block)
+              child_body  = f'> Filed from [digest #{issue}]({issue_url}) proposal {n}.\n\n{clean_block.strip()}'
+
+              open('/tmp/child-body.txt', 'w').write(child_body)
+
+              r = subprocess.run(
+                  ['gh', 'issue', 'create',
+                   '--title', title,
+                   '--body-file', '/tmp/child-body.txt',
+                   '--label', priority,
+                   '--label', 'area:app',
+                   '--repo', repo],
+                  capture_output=True, text=True, check=True
+              )
+              new_number = r.stdout.strip().rstrip('/').split('/')[-1]
+              print(f'Filed proposal {n} as #{new_number}: {title}')
+              filed.append(new_number)
+
+              # Append back-marker to the heading in the working copy.
+              updated_body = updated_body.replace(
+                  heading_full,
+                  f'{heading_full} → filed as #{new_number}',
+                  1
+              )
+
+          if not filed:
+              print('No newly-checked proposals — no-op.')
+              sys.exit(0)
+
+          # Write the updated body back to the parent issue.
+          open('/tmp/patch-body.json', 'w').write(json.dumps({'body': updated_body}))
+          subprocess.run(
+              ['gh', 'api', '-X', 'PATCH', f'repos/{repo}/issues/{issue}',
+               '--input', '/tmp/patch-body.json'],
+              check=True
+          )
+
+          # Post a summary comment on the parent.
+          refs    = ', '.join(f'#{n}' for n in filed)
+          comment = f'Filed {len(filed)} proposal(s) as issue(s): {refs}'
+          subprocess.run(
+              ['gh', 'issue', 'comment', issue, '--repo', repo, '--body', comment],
+              check=True
+          )
+          PYEOF
+
+          python3 /tmp/fanout.py

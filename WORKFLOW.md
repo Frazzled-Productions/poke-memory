@@ -250,7 +250,7 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **Idempotency key** | ISO week string in issue title (`Weekly code-quality review — YYYY-Www`). Checks all states (open + closed). |
 | **Inputs** | Files changed in `app/**`, `components/**`, `lib/**`, `db/**` in the last 30 days |
 | **Signal constraints** | A — Recency filter (only recently-changed files); B — Recurrence filter (only patterns spanning ≥2 files) |
-| **Output** | One digest issue per ISO week, ≤5 curated items, each with file paths and a concrete evidence snippet |
+| **Output** | One digest issue per ISO week, ≤5 curated items, each with file paths, a concrete evidence snippet, and a `- [ ] File this as an issue <!-- proposal:N -->` checkbox |
 | **No-op** | Skips silently when nothing crosses the recurrence threshold or when a digest issue already exists for the week |
 | **Scope** | Tech debt, missing tests, dead code, and accessibility gaps within `app/**`, `components/**`, `lib/**`, or `db/**` — never workflow files, feature ideas, or individual issue filings |
 | **Label** | Digest issue is labelled `area:app`; label is created if absent |
@@ -268,6 +268,21 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 | **No-op** | Skips silently when nothing crosses the bar or when a digest issue already exists for the week |
 | **Scope** | User-facing behaviour changes only — explicitly forbids refactors, test additions, dead-code removal, dependency bumps, accessibility gaps, and CI/workflow changes |
 | **Labels** | Digest issue is labelled `area:app`, `enhancement`, `priority:later`; labels are created if absent |
+
+---
+
+### `auto-digest-fanout.yml` — Digest Fan-out
+
+| | |
+|---|---|
+| **Trigger** | `issues: [edited]` |
+| **Guard** | Issue body contains `<!-- auto-codequality-suggest -->` or `<!-- auto-app-suggest -->` |
+| **Permissions** | `issues: write` only — never touches the git tree |
+| **Concurrency** | `digest-fanout-{issue}`, `cancel-in-progress: false` — queues runs, never cancels, so each re-trigger after a body PATCH does a fast no-op |
+| **What it does** | For each proposal whose `- [ ] File this as an issue <!-- proposal:N -->` checkbox is newly checked: extracts the title and `**Priority:**` label, creates a child issue (with `area:app` and the extracted priority, never `auto`), writes ` → filed as #N` onto the proposal heading as an idempotency marker, then posts a single summary comment on the parent |
+| **Idempotency** | The `→ filed as #N` back-marker on the heading is the source of truth — checked proposals that already carry a marker are skipped unconditionally |
+| **Un-check behaviour** | Un-checking a filed proposal does NOT close or delete the child — manual cleanup only (out of scope for v1) |
+| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY` |
 
 ---
 
