@@ -178,7 +178,7 @@ jobs:
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: --max-turns 80 --disable-slash-commands --disallowed-tools Skill
+          claude_args: --max-turns 120 --disable-slash-commands --disallowed-tools Skill
           show_full_output: true
           # `auto-review.yml` posts `<!-- auto-review-autofix:N -->\n/fix\n` as
           # `poke-memory-bot[bot]` when the verdict is `Needs fixes`. Without
@@ -268,8 +268,11 @@ jobs:
                  attribution in commit messages.
                - Push to the PR branch (the current checkout is already on it).
                - **Wait for CI on the pushed SHA before posting any review.**
-                 After `git push`, capture the pushed SHA and poll the `test`
-                 check run until it completes (or 10 minutes elapse):
+                 Run the entire poll as **one single Bash tool call** — pass
+                 the complete script below as the command string. Do NOT call
+                 `gh api`, `sleep`, `git`, or any other command as separate
+                 tool invocations for this polling step; the whole loop must
+                 be one atomic Bash invocation that blocks until CI completes:
                  ```bash
                  PUSHED_SHA=$(git rev-parse HEAD)
                  REPO="${GITHUB_REPOSITORY}"
