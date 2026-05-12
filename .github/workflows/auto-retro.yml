@@ -100,7 +100,7 @@ jobs:
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: --max-turns 20
+          claude_args: --max-turns 20 --disable-slash-commands
           prompt: |
             You are writing a retrospective on issue #${{ github.event.issue.number }},
             which just closed via merged PR #${{ env.RETRO_PR }}.

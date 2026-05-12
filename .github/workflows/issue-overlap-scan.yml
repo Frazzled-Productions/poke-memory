@@ -37,7 +37,7 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: --max-turns 30
+          claude_args: --max-turns 30 --disable-slash-commands
           prompt: |
             You are running an issue-overlap scan on this repository.
 
