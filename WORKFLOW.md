@@ -247,11 +247,12 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 | | |
 |---|---|
-| **Trigger** | `workflow_dispatch` (manual only) |
+| **Trigger** | Issues labeled `auto`; `workflow_dispatch` (manual) |
 | **Scope** | Only `priority:now` and `priority:next` issues |
 | **Kinds** | `merge` (duplicate intent), `overlap` (same area, partial intersection), `conflict` (mutually exclusive — one blocks the other) |
 | **Markers** | Posts `<!-- overlap-scan:i+j:<kind> -->` on both issues in each pair; de-dupes on exact (i, j, kind) across runs |
 | **Load-bearing** | `conflict` markers are checked by `auto-issue.yml`'s implement job — `/go` refuses to run on an issue with an unresolved conflict marker linked to an open issue |
+| **Plan annotation** | When overlap-scan markers exist on an issue, the plan-job and replan-job append a `**Related issues:**` section to the plan body (one line per linked issue, format `#<num> (<kind>): <reason>`) — informational only, does not affect scope decisions |
 
 ---
 

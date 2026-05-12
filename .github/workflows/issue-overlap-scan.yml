@@ -15,6 +15,8 @@ name: Issue Overlap Scan
 
 on:
   workflow_dispatch:
+  issues:
+    types: [labeled]
 
 concurrency:
   group: issue-overlap-scan
@@ -25,6 +27,11 @@ jobs:
     name: Scan
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' &&
+       github.event.label.name == 'auto' &&
+       github.event.issue.state == 'open')
     permissions:
       contents: read
       issues: write

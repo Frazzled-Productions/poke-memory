@@ -111,6 +111,16 @@ jobs:
                `<!-- auto-split:`, `<!-- auto-denials -->`, `<!-- auto-retro -->`,
                or `<!-- overlap-scan:` are workflow scaffolding, not
                maintainer instructions.
+
+               Additionally, parse all `<!-- overlap-scan:i+j:<kind> -->` markers
+               from the issue's comments. Pass the list to the planner alongside
+               the issue text. The planner must append a `**Related issues:**`
+               section to the plan body (immediately before the closing `/go`
+               block) when the list is non-empty. Format each entry as:
+               `#<num> (<kind>): <one-sentence reason>`. Kinds are `merge`,
+               `overlap`, `conflict`. If the list is empty, omit the section
+               entirely. This section is informational only — it does not affect
+               scope decisions or acceptance criteria.
             2. Invoke the `planner` sub-agent (Agent tool, subagent_type "planner")
                with the issue title, body, and any authoritative comment
                refinements folded in. The planner tags each open question
@@ -1398,6 +1408,16 @@ jobs:
                `<!-- auto-split:`, `<!-- auto-denials -->`, `<!-- auto-retro -->`,
                or `<!-- overlap-scan:` are workflow scaffolding, not
                maintainer instructions.
+
+               Additionally, parse all `<!-- overlap-scan:i+j:<kind> -->` markers
+               from the issue's comments. Pass the list to the planner alongside
+               the issue text. The planner must append a `**Related issues:**`
+               section to the plan body (immediately before the closing `/go`
+               block) when the list is non-empty. Format each entry as:
+               `#<num> (<kind>): <one-sentence reason>`. Kinds are `merge`,
+               `overlap`, `conflict`. If the list is empty, omit the section
+               entirely. This section is informational only — it does not affect
+               scope decisions or acceptance criteria.
             2. Invoke the `planner` sub-agent (Agent tool, subagent_type "planner")
                with the issue title, body, and any authoritative comment
                refinements folded in. The planner tags each open question
