@@ -1,6 +1,6 @@
 ---
 name: supabase-expert
-description: Use for any task involving Supabase Auth, Postgres + RLS, schema design for SM-2 state, or Next.js 16 App Router client patterns. Use BEFORE writing any Supabase integration code. Read-only.
+description: Use for any task involving Supabase Auth, Postgres + RLS, schema design for persisted user data (FSRS scheduling state, streak, settings, grade log), or Next.js 16 App Router client patterns. Use BEFORE writing any Supabase integration code. Read-only.
 tools: Read, Grep, Glob, WebFetch
 model: sonnet
 ---
@@ -43,14 +43,21 @@ Supabase Auth (GitHub OAuth), per-user RLS policies, `@supabase/ssr` client spli
 - Migration ordering matters: `CREATE TABLE` → `ALTER TABLE ENABLE ROW LEVEL SECURITY` → `CREATE POLICY` in a single migration file. Never enable RLS without policies; an empty policy set blocks all access for non-service-role clients.
 - `user_id` column type: `uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE`. The cascade ensures a user's rows are deleted if they delete their Supabase account.
 
-### Card schema
+### Schema today
 
-The current `card_reviews` table (migration 001, with regression trigger added in migration 002):
+Four tables in `public`. All RLS-on. All FK'd to `auth.users(id) ON DELETE CASCADE`.
 
-- Primary key: `id uuid` (gen_random_uuid), with `UNIQUE (user_id, pokemon_id)` as the upsert conflict target. Standard Pokémon use `pokemon_id` = Pokédex number; evolution cards use `pokemon_id` = `EVOLUTION_ID_OFFSET + pokédex_number` (≥ 1_000_001). There is no `card_type` column — the offset encodes type.
-- SM-2 state columns: `repetitions`, `interval`, `ease_factor`. These will be replaced by FSRS columns (`stability`, `difficulty`, `reps`, `lapses`, `fsrs_state`, etc.) once issue #264 lands. Until then, the client emits SM-2-shape rows.
-- Lifecycle timestamps: `due_date`, `last_review`, `first_seen`, `updated_at`. These persist across the SM-2 → FSRS migration; they are also the columns the regression trigger guards.
-- Dates are stored as `date` (not `timestamp`) to match the `"YYYY-MM-DD"` string convention used throughout the app. No timezone math needed.
+**`card_reviews`** (migrations 001 → 002 (trigger) → 004 (FSRS swap)):
+- Primary key: `id uuid` (gen_random_uuid). `UNIQUE (user_id, pokemon_id)` is the upsert conflict target. Standard Pokémon use `pokemon_id` = Pokédex number; evolution cards use `pokemon_id` = `EVOLUTION_ID_OFFSET + pokédex_number` (≥ 1_000_001). No `card_type` column — the offset encodes type.
+- FSRS state columns: `stability` (numeric), `difficulty` (numeric), `elapsed_days` (int), `scheduled_days` (int), `reps` (int), `lapses` (int), `fsrs_state` (text, CHECK in `('new','learning','review','relearning')`).
+- Lifecycle timestamps: `due_date`, `last_review`, `first_seen`, `updated_at`. Guarded by the regression trigger.
+- Dates are `date` (not `timestamp`) to match the `"YYYY-MM-DD"` string convention used throughout the app. No timezone math.
+
+**`streak_days`** (migration 001): `(user_id, review_date)` UNIQUE. One row per day the user reviewed. Append-only by convention. Streak length is derived from the date set — don't denormalize it onto a column.
+
+**`user_settings`** (migrations 001 → 003 (jsonb) → 005 (drop legacy cols)): `(user_id PK, settings jsonb NOT NULL DEFAULT '{}', updated_at)`. Whole-object last-write-wins for cross-device sync. New per-user toggles go inside `settings`, not as new columns.
+
+**`grade_log`** (migration 006): `(user_id, occurred_at bigint, entry_date date, card_type, grade smallint)`. `UNIQUE (user_id, occurred_at)` is the cross-device dedup key. 365-day rolling history; client prunes on append.
 
 ### Destructive-write protection (read before designing any change)
 
@@ -59,11 +66,17 @@ Migration 002 installed a `BEFORE UPDATE` trigger on `card_reviews` named `card_
 - `OLD.first_seen IS NOT NULL AND NEW.first_seen IS NULL`
 - `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review`
 
-Repetitions / interval / ease decreasing is allowed (SM-2 "Again" semantics). The trigger is the last line of defense against client bugs like #293, which clobbered 99.4% of one user's cloud rows. Any feature that legitimately resets a card (delete account, "wipe my progress") needs a `SECURITY DEFINER` RPC that bypasses the trigger AND explicit user confirmation. Do not propose disabling the trigger without one of those.
+Reps / scheduled_days / stability / difficulty decreasing is allowed — FSRS lapse semantics. The trigger is the last line of defense against client bugs like #293, which clobbered 99.4% of one user's cloud rows. Any feature that legitimately resets a card (delete account, "wipe my progress") needs a `SECURITY DEFINER` RPC that bypasses the trigger AND explicit user confirmation. Do not propose disabling the trigger without one of those.
 
-### Settings schema
+### Designing a new table
 
-`user_settings.settings` (jsonb, NOT NULL DEFAULT `'{}'`) added in migration 003 is the source of truth for per-user settings. The original flat columns from migration 001 (`max_new_per_day`, `max_reviews_per_day`) were dropped in migration 005 once nothing read them; the table is now `(user_id, settings, updated_at)`.
+Before recommending a new table or column, confirm:
+
+1. **Can it live in `user_settings.settings` instead?** If the data is per-user, last-write-wins, no per-event granularity, JSONB is the lowest-friction choice. Settings sync already carries new fields automatically (see #307 favourite-theme).
+2. **Is it monotonic / per-event?** A new table is the right answer (model: `streak_days`, `grade_log`).
+3. **Is it per-card state?** Add a column to `card_reviews`; check whether the regression trigger needs extending (only if the new column has a "moves forward only" invariant).
+
+For a new table, see the **"Adding a feature that needs to persist data"** runbook section in `AGENTS.md` — that's the canonical template (RLS-on, four named policies, FK cascade, dedup-friendly UNIQUE constraint, indexed user_id-hot column, applied via `mcp__supabase__apply_migration` after merge). Don't reinvent it.
 
 ### Privacy constraints
 
