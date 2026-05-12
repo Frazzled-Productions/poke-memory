@@ -99,7 +99,7 @@ jobs:
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: --max-turns 30
+          claude_args: --max-turns 30 --disable-slash-commands --disallowed-tools Skill
           prompt: |
             You are generating a weekly app codebase improvement digest for this repository.
 
