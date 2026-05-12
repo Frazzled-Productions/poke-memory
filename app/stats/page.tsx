@@ -16,6 +16,8 @@ import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
 import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
+import { RecordsCard } from "@/components/stats/RecordsCard";
+import { computeRecords, type Records } from "@/lib/stats/records";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -399,6 +401,8 @@ export default function StatsPage() {
   const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
   const [accuracyPoints, setAccuracyPoints] = useState<AccuracyPoint[]>([]);
   const [rolling7d, setRolling7d] = useState<number | null>(null);
+  const [streakDates, setStreakDates] = useState<string[]>([]);
+  const [gradeLog, setGradeLog] = useState<ReturnType<typeof loadGradeLog>>([]);
 
   useEffect(() => {
     if (syncState === "success") {
@@ -416,22 +420,28 @@ export default function StatsPage() {
     }
     setMasteryRepetitions(settings.masteryRepetitions);
     setNameCardsEnabled(settings.nameCardsEnabled);
-    setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
-    const log = loadGradeLog();
-    setGradeTotals(computeGradeTotals(log));
+    const dates = loadStreakData();
+    setStreakDates(dates);
     const today = todayString(new Date());
+    setCurrentStreak(computeStreak(dates, today));
+    const log = loadGradeLog();
+    setGradeLog(log);
+    setGradeTotals(computeGradeTotals(log));
     setAccuracyPoints(computeAccuracySparkline(log, today, 30));
     setRolling7d(computeRollingAccuracy(log, today, 7));
   }, [syncRefreshKey, storageVersion]);
 
+  const nameCards =
+    cards !== null
+      ? (cards.filter((c) => c.cardType === "name") as Parameters<typeof computeStats>[0])
+      : null;
   const stats: StatsResult | null =
-    cards !== null && masteryRepetitions !== null
-      ? computeStats(
-          cards.filter((c) => c.cardType === "name"),
-          todayString(new Date()),
-          10,
-          masteryRepetitions,
-        )
+    nameCards !== null && masteryRepetitions !== null
+      ? computeStats(nameCards, todayString(new Date()), 10, masteryRepetitions)
+      : null;
+  const records: Records | null =
+    nameCards !== null && masteryRepetitions !== null
+      ? computeRecords(nameCards, gradeLog, streakDates, masteryRepetitions)
       : null;
 
   return (
@@ -471,6 +481,7 @@ export default function StatsPage() {
                 </p>
               )}
             </section>
+            {records !== null ? <RecordsCard records={records} /> : null}
             <GradeBreakdownBar
               again={gradeTotals[1]}
               hard={gradeTotals[2]}
