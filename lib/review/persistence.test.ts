@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { loadSession, saveSession } from "./persistence";
-import type { ReverseReviewCard, DailyLimits } from "./session";
+import type { ReverseReviewCard, NameReviewCard, DailyLimits } from "./session";
 import { DEFAULT_LIMITS } from "./session";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
@@ -25,6 +25,36 @@ function makeMockStorage() {
       Object.keys(store).forEach((k) => delete store[k]);
     },
     _store: store,
+  };
+}
+
+function makeNameCard(): NameReviewCard {
+  return {
+    id: 1,
+    cardType: "name",
+    name: "bulbasaur",
+    spriteUrl: "https://example.com/1.png",
+    types: ["grass"],
+    stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
+    flavorText: "A strange seed was planted on its back at birth.",
+    flavorTexts: ["A strange seed.", "It bears the seed."],
+    evolutionChain: [
+      { speciesId: 1, name: "bulbasaur", evolvesFromId: null },
+      { speciesId: 2, name: "ivysaur", evolvesFromId: 1 },
+    ],
+    height: 7,
+    weight: 69,
+    baseExperience: 64,
+    genus: "Seed Pokémon",
+    generation: "generation-i",
+    captureRate: 45,
+    baseHappiness: 50,
+    growthRate: "medium-slow",
+    habitat: "grassland",
+    genderRate: 1,
+    isLegendary: false,
+    isMythical: false,
+    state: initialReviewState(NOW),
   };
 }
 
@@ -161,5 +191,44 @@ describe("loadSession (round-trip slimmed reverse card)", () => {
     const loaded = result!.cards[0];
     expect(loaded.cardType).toBe("reverse");
     expect(loaded.state.dueDate).toBe(state.dueDate);
+  });
+});
+
+describe("saveSession (name card stripping)", () => {
+  let storage: ReturnType<typeof makeMockStorage>;
+
+  beforeEach(() => {
+    storage = makeMockStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("localStorage", storage);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("strips flavorTexts and evolutionChain from name cards before writing", () => {
+    const card = makeNameCard();
+    saveSession({ cards: [card], limits: defaultLimits });
+
+    const raw = storage._store[KEY];
+    expect(raw).toBeDefined();
+    const parsed = JSON.parse(raw) as { cards: unknown[] };
+    expect(parsed.cards).toHaveLength(1);
+    const stored = parsed.cards[0] as Record<string, unknown>;
+    expect(stored.flavorTexts).toBeUndefined();
+    expect(stored.evolutionChain).toBeUndefined();
+    expect(stored.cardType).toBe("name");
+    expect(stored.name).toBe("bulbasaur");
+  });
+
+  it("preserves flavorText (singular) on name cards", () => {
+    const card = makeNameCard();
+    saveSession({ cards: [card], limits: defaultLimits });
+
+    const raw = storage._store[KEY];
+    const parsed = JSON.parse(raw) as { cards: unknown[] };
+    const stored = parsed.cards[0] as Record<string, unknown>;
+    expect(stored.flavorText).toBe("A strange seed was planted on its back at birth.");
   });
 });

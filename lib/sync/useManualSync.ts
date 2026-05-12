@@ -105,18 +105,35 @@ export function useManualSync(
       }
 
       // Step d: merge cloud into local and persist.
+      let saveResult;
       if (localSession !== null) {
         const merged = mergeCloudIntoLocal(localSession.cards, cloudRows);
-        saveSession({ cards: merged, limits: localSession.limits });
+        saveResult = saveSession({ cards: merged, limits: localSession.limits });
       } else {
         // Brand-new device: build a fresh base session so cloud state has
         // a card list to merge into; otherwise cloud rows would be discarded.
         const base = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS);
         const merged = mergeCloudIntoLocal(base, cloudRows);
-        saveSession({ cards: merged, limits: DEFAULT_LIMITS });
+        saveResult = saveSession({ cards: merged, limits: DEFAULT_LIMITS });
       }
 
       if (cancelledRef.current) return;
+
+      if (!saveResult.ok) {
+        const prev = loadSyncStatus();
+        saveSyncStatus({
+          ...prev,
+          lastPushFailed: true,
+          lastPushAttemptAt: new Date().toISOString(),
+          failedCardCount: null,
+        });
+        isSyncingRef.current = false;
+        setSyncState("error");
+        setErrorMessage(
+          "Sync failed — storage is full. Clear browser data and try again.",
+        );
+        return;
+      }
 
       // Step e: record successful sync metadata.
       const now = new Date().toISOString();

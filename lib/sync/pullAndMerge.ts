@@ -37,14 +37,20 @@ export async function pullAndMerge(
     const localSession = loadSession();
 
     let merged: ReturnType<typeof buildSession>;
+    let saveResult;
     if (localSession !== null) {
       merged = mergeCloudIntoLocalSilent(localSession.cards, cloudRows, syncStatus.lastPullAt);
-      saveSession({ cards: merged, limits: localSession.limits });
+      saveResult = saveSession({ cards: merged, limits: localSession.limits });
     } else {
       const base = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS);
       merged = mergeCloudIntoLocalSilent(base, cloudRows, syncStatus.lastPullAt);
-      saveSession({ cards: merged, limits: DEFAULT_LIMITS });
+      saveResult = saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
+
+    // If the write failed (e.g. storage quota exceeded), bail out without
+    // dispatching a StorageEvent — subscribers must not receive a stale
+    // notification for a session that was never actually written.
+    if (!saveResult.ok) return "error";
 
     // Use the most-recently-updated cloud row's timestamp as lastPullAt so a
     // drifting device clock cannot produce false "cloud is newer" signals on

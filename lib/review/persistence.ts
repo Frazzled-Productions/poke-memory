@@ -1,4 +1,4 @@
-import type { ReviewableCard, ReverseReviewCard, DailyLimits, PerTypeLimits } from "@/lib/review/session";
+import type { ReviewableCard, DailyLimits, PerTypeLimits } from "@/lib/review/session";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 
 export type { DailyLimits };
@@ -212,14 +212,16 @@ export function loadSession(): SavedSession | null {
   }
 }
 
-// Strips large seed-derived arrays from reverse cards before serialization.
-// hydrateSession re-injects them from the seed on every mount, so persisting
-// them wastes quota (~4.5 MB → ~2.9 MB with ~1025 reverse cards).
+// Strips large seed-derived arrays from name and reverse cards before
+// serialization. hydrateSession re-injects them from the seed on every mount,
+// so persisting them wastes quota and can fill localStorage on mobile.
 function serializeCard(card: ReviewableCard): unknown {
-  if (card.cardType !== "reverse") return card;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { flavorTexts: _ft, evolutionChain: _ec, ...rest } = card as ReverseReviewCard & Record<string, unknown>;
-  return rest;
+  if (card.cardType === "name" || card.cardType === "reverse") {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { flavorTexts: _ft, evolutionChain: _ec, ...rest } = card as Record<string, unknown>;
+    return rest;
+  }
+  return card;
 }
 
 export type SaveResult = { ok: true } | { ok: false; reason: "quota" | "unknown" };
