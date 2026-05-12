@@ -11,7 +11,10 @@ import type { StatsResult } from "@/lib/stats/derive";
 import { loadSettings } from "@/lib/settings/persistence";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import { loadGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
+import { computeAccuracySparkline, computeRollingAccuracy } from "@/lib/stats/accuracy";
+import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
+import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -393,6 +396,8 @@ export default function StatsPage() {
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
   const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
+  const [accuracyPoints, setAccuracyPoints] = useState<AccuracyPoint[]>([]);
+  const [rolling7d, setRolling7d] = useState<number | null>(null);
 
   useEffect(() => {
     if (syncState === "success") {
@@ -411,7 +416,11 @@ export default function StatsPage() {
     setMasteryRepetitions(settings.masteryRepetitions);
     setNameCardsEnabled(settings.nameCardsEnabled);
     setCurrentStreak(computeStreak(loadStreakData(), todayString(new Date())));
-    setGradeTotals(computeGradeTotals(loadGradeLog()));
+    const log = loadGradeLog();
+    setGradeTotals(computeGradeTotals(log));
+    const today = todayString(new Date());
+    setAccuracyPoints(computeAccuracySparkline(log, today, 30));
+    setRolling7d(computeRollingAccuracy(log, today, 7));
   }, [syncRefreshKey, storageVersion]);
 
   const stats: StatsResult | null =
@@ -468,6 +477,7 @@ export default function StatsPage() {
               easy={gradeTotals[5]}
               label="All-time grade breakdown"
             />
+            <AccuracySparkline points={accuracyPoints} rolling7d={rolling7d} />
             <MasteryBar stats={stats} nameCardsEnabled={nameCardsEnabled} />
             <IntroducedBar stats={stats} />
             <DueForecast stats={stats} />
