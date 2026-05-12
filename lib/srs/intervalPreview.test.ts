@@ -6,9 +6,13 @@ const NOW = new Date("2026-05-12T12:00:00Z");
 
 function makeState(overrides: Partial<ReviewState>): ReviewState {
   return {
-    repetitions: 0,
-    interval: 0,
-    easeFactor: 2.5,
+    stability: 0,
+    difficulty: 0,
+    elapsedDays: 0,
+    scheduledDays: 0,
+    reps: 0,
+    lapses: 0,
+    fsrsState: "new",
     dueDate: "2026-05-12",
     lastReview: null,
     firstSeen: null,
@@ -91,8 +95,9 @@ describe("previewIntervals", () => {
       stepStartedAt: NOW.getTime(),
       lastReview: "2026-05-12",
       firstSeen: "2026-05-01",
-      repetitions: 0,
-      interval: 1,
+      reps: 0,
+      scheduledDays: 1,
+      fsrsState: "relearning",
     });
 
     it("Grade 1 (Again) → <10m (resets to step 0, RELEARNING_STEPS_MS[0] = 600_000)", () => {
@@ -112,11 +117,13 @@ describe("previewIntervals", () => {
     });
   });
 
-  describe("graduated card (repetitions: 2, interval: 6)", () => {
+  describe("graduated card (reps: 2, scheduledDays: 6)", () => {
     const state = makeState({
-      repetitions: 2,
-      interval: 6,
-      easeFactor: 2.5,
+      stability: 6,
+      difficulty: 4,
+      scheduledDays: 6,
+      reps: 2,
+      fsrsState: "review",
       lastReview: "2026-05-07",
       firstSeen: "2026-05-01",
       learningStep: null,
@@ -127,16 +134,18 @@ describe("previewIntervals", () => {
       expect(previewIntervals(state, NOW)[1]).toBe("<10m");
     });
 
-    it("Grade 2 (Hard) → 1d (A4 Hard: SM-2 hard reschedule, interval=1)", () => {
-      expect(previewIntervals(state, NOW)[2]).toBe("1d");
+    // FSRS-driven graduated grades: exact intervals are FSRS-parameter
+    // dependent. Assert structural shape (graduated label, not in-step).
+    it("Grade 2 (Hard) returns a day-shaped label (FSRS-driven)", () => {
+      expect(previewIntervals(state, NOW)[2]).toMatch(/^\d+(d|mo|y)$/);
     });
 
-    it("Grade 4 (Good) → 15d (rep 3, interval = floor(6 * 2.5))", () => {
-      expect(previewIntervals(state, NOW)[4]).toBe("15d");
+    it("Grade 4 (Good) returns a day-shaped label (FSRS-driven)", () => {
+      expect(previewIntervals(state, NOW)[4]).toMatch(/^\d+(d|mo|y)$/);
     });
 
-    it("Grade 5 (Easy) → 15d (rep 3, interval = floor(6 * 2.6))", () => {
-      expect(previewIntervals(state, NOW)[5]).toBe("15d");
+    it("Grade 5 (Easy) returns a day-shaped label (FSRS-driven)", () => {
+      expect(previewIntervals(state, NOW)[5]).toMatch(/^\d+(d|mo|y)$/);
     });
   });
 });

@@ -39,9 +39,13 @@ function makeCard(
     isMythical: false,
     cryUrl: null,
     state: {
-      repetitions: 0,
-      interval: 1,
-      easeFactor: 2.5,
+      stability: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      scheduledDays: 0,
+      reps: 0,
+      lapses: 0,
+      fsrsState: "new",
       dueDate: "2026-05-11",
       lastReview,
       firstSeen,
@@ -180,7 +184,7 @@ describe("mergeCloudIntoLocal", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("normalizes a bad cloud row by clearing firstSeen and resetting SM-2 fields", () => {
+  it("normalizes a bad cloud row by clearing firstSeen and resetting FSRS fields", () => {
     const localCard = makeCard(5, null, null);
     const badRow = makeCloudRow(5, "2026-05-10", null);
 
@@ -188,9 +192,9 @@ describe("mergeCloudIntoLocal", () => {
 
     expect(merged.state.firstSeen).toBeNull();
     expect(merged.state.lastReview).toBeNull();
-    expect(merged.state.repetitions).toBe(0);
-    expect(merged.state.interval).toBe(0);
-    expect(merged.state.easeFactor).toBe(2.5);
+    expect(merged.state.reps).toBe(0);
+    expect(merged.state.stability).toBe(0);
+    expect(merged.state.fsrsState).toBe("new");
   });
 
   it("warns when normalizing a bad cloud row", () => {
@@ -210,9 +214,9 @@ describe("mergeCloudIntoLocal", () => {
 
     expect(merged.state.firstSeen).toBe("2026-05-09");
     expect(merged.state.lastReview).toBe("2026-05-10");
-    expect(merged.state.repetitions).toBe(1);
-    expect(merged.state.interval).toBe(1);
-    expect(merged.state.easeFactor).toBe(2.5);
+    expect(merged.state.reps).toBe(1);
+    expect(merged.state.scheduledDays).toBe(1);
+    expect(merged.state.fsrsState).toBe("review");
   });
 
   it("returns card unchanged when no matching cloud row", () => {
