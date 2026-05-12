@@ -161,9 +161,10 @@ A React hook can live in `lib/` (e.g. `lib/review/useStorageQuota.ts`), but if i
 
 - **Standard**: SemVer 2.0.0.
 - **Pre-v1 semantics**: `0.MINOR.PATCH` for all pre-v1 releases. Bump rules (applied per-release to the set of merged fragments):
-  - `kind: minor-bump` fragment present, **or** any fragment with `kind: added/changed/removed/deprecated` → minor bump (`0.N.0 → 0.N+1.0`)
-  - only `kind: fixed/security` fragments → patch bump (`0.N.P → 0.N.P+1`)
+  - `kind: minor-bump` fragment present → minor bump (`0.N.0 → 0.N+1.0`)
+  - any other non-empty set of fragments → patch bump (`0.N.P → 0.N.P+1`)
   - major (`1.0.0`) remains a manual decision
+  - Patch is the default; minor is opt-in via a dedicated `kind: minor-bump` fragment. This preserves PR 230's intent under the fragment-based workflow introduced in PR 234.
 - **Cadence: release on merge to `main`.** `auto-release.yml` runs on every push to `main`. If `changelog.d/unreleased/` contains any `*.md` fragments, the workflow assembles them into the next `## [X.Y.Z]` section, bumps the SemVer, commits (deleting the consumed fragments), tags, pushes, and creates a GitHub Release. If no fragments exist, the workflow no-ops. Since Vercel auto-deploys on every push to `main`, "tagged release" and "deployed to production" are the same event in this project.
 - **Version source**: `package.json` is the single source of truth. The release workflow bumps it automatically — never edit the version field by hand.
 - **Fragment promotion**: when a release is cut, `cut-release.mjs` assembles the fragments into a new `## [X.Y.Z] — YYYY-MM-DD` block inserted after the static `## [Unreleased]` stub in `CHANGELOG.md`, and the release commit deletes all `changelog.d/unreleased/*.md` files. The `## [Unreleased]` heading and its HTML comment remain in `CHANGELOG.md` as a permanent stub.

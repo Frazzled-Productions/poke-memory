@@ -13,9 +13,8 @@
 //
 // Bump rules (pre-v1 SemVer per AGENTS.md):
 //   - any fragment with kind: minor-bump  → minor bump (0.N.0 → 0.N+1.0)
-//   - Added/Changed/Removed/Deprecated   → minor bump
-//   - only Fixed/Security                → patch bump
-//   - no fragments                       → skip=true, no-op
+//   - any other non-empty set of fragments → patch bump (0.N.M → 0.N.M+1)
+//   - no fragments                        → skip=true, no-op
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,7 +23,6 @@ const CHANGELOG = 'CHANGELOG.md';
 const PACKAGE = 'package.json';
 const FRAGMENTS_DIR = 'changelog.d/unreleased';
 const KIND_ORDER = ['Added', 'Changed', 'Removed', 'Deprecated', 'Fixed', 'Security'];
-const MINOR_KINDS = new Set(['added', 'changed', 'removed', 'deprecated']);
 
 function setOutput(name, value) {
   const out = process.env.GITHUB_OUTPUT;
@@ -100,13 +98,7 @@ if (!hasMinorBump && nonEmptyKinds.length === 0) {
   process.exit(0);
 }
 
-let bumpType;
-if (hasMinorBump) {
-  bumpType = 'minor';
-} else {
-  const allPatch = nonEmptyKinds.every((k) => !MINOR_KINDS.has(k.toLowerCase()));
-  bumpType = allPatch ? 'patch' : 'minor';
-}
+const bumpType = hasMinorBump ? 'minor' : 'patch';
 
 // --- Read package.json and compute new version --------------------------------
 

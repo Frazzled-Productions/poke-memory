@@ -4,9 +4,8 @@ name: Auto Release
 # under changelog.d/unreleased/. Otherwise the run no-ops.
 #
 # Per AGENTS.md "Versioning":
-#   - kind: minor-bump fragment          → minor bump (0.N.0 → 0.N+1.0)
-#   - Added/Changed/Removed/Deprecated   → minor bump
-#   - only Fixed/Security                → patch bump
+#   - kind: minor-bump fragment present  → minor bump (0.N.0 → 0.N+1.0)
+#   - any other non-empty set of fragments → patch bump (0.N.M → 0.N.M+1)
 #
 # Per merge → one commit, one tag, one GitHub Release. The release commit
 # carries `[skip ci]` so subsequent workflow runs (including this one) do not
