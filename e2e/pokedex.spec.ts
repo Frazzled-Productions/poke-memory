@@ -23,12 +23,14 @@ test.describe("Pokédex type filter — intersection", () => {
     const typeGroup = page.getByRole("group", { name: "Filter by type" });
 
     await typeGroup.getByRole("button", { name: "Fire" }).click();
-    // Wait for the grid to stabilise after the filter changes
-    await expect(page.getByRole("list", { name: /Pokémon/ }).first()).toBeVisible();
+    // Wait for the URL to reflect the new filter before counting — the filter
+    // is URL-driven (router.replace), so URL settlement = grid re-rendered.
+    await page.waitForURL(/type=fire/);
     const fireCount = await page.getByRole("listitem").count();
     expect(fireCount).toBeGreaterThan(0);
 
     await typeGroup.getByRole("button", { name: "Flying" }).click();
+    await page.waitForURL(/flying/);
     const dualCount = await page.getByRole("listitem").count();
 
     // AND semantics: dual-type results must be a strict subset
