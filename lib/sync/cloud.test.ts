@@ -37,6 +37,7 @@ function makeCard(
     genderRate: null,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
     state: {
       repetitions: 0,
       interval: 1,

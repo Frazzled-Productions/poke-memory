@@ -24,6 +24,7 @@ function basePokemon(overrides: Partial<PokemonCellData> = {}): PokemonCellData 
     genderRate: 1,
     isLegendary: false,
     isMythical: false,
+    cryUrl: null,
     cardClass: 'locked',
     ...overrides,
   };
