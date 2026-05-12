@@ -303,7 +303,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
     vi.useRealTimers();
   });
 
-  it("shows countdown screen instead of Reveal UI after reload when stepStartedAt is null", async () => {
+  it("shows the card via learn-ahead (not countdown) when stepStartedAt is null and dueAt is within 20 min", async () => {
     // Pin Date.now() only (not setTimeout/setInterval) so waitFor still works.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-11T12:00:00Z"));
@@ -315,13 +315,13 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
 
     render(<ReviewSession />);
 
-    // With the fix, the card's dueAt is Date.now() + stepMs (60 s in the
-    // future), so it is not yet due. The component must show the countdown
-    // screen, not the card's Reveal UI.
+    // stepStartedAt is backfilled to Date.now(), so dueAt = now + 60 s.
+    // Since 60 s < 20 min learn-ahead window and the queue is otherwise
+    // empty, the card is pulled forward and presented for review.
     await waitFor(() =>
-      expect(screen.getByText(/next card in/i)).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument(),
     );
-    expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/next card in/i)).not.toBeInTheDocument();
   });
 
   it("persists stamped stepStartedAt so subsequent reloads use the same countdown anchor", async () => {

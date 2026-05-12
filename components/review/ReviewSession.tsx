@@ -499,22 +499,26 @@ export function ReviewSession() {
 
   let currentLearningEntry = dueLearning.length > 0 ? dueLearning[0] : null;
 
-  // Learn-ahead: when no card is due yet, pull the earliest learning card
-  // forward if it's within LEARN_AHEAD_MS. Eliminates the "wait N minutes"
-  // screen for small queues (matches Anki's default 20-minute learn-ahead).
-  if (currentLearningEntry === null) {
-    const ahead = learningQueue
-      .filter((e) => e.dueAt > now && e.dueAt <= now + LEARN_AHEAD_MS)
-      .sort((a, b) => a.dueAt - b.dueAt);
-    if (ahead.length > 0) currentLearningEntry = ahead[0];
-  }
-
   // Resolve the current card: learning first, then review/new.
   let currentCardId: number | null;
   if (currentLearningEntry !== null) {
     currentCardId = currentLearningEntry.cardId;
   } else {
     currentCardId = getNextCardId(reviewQueue, newQueue);
+
+    // Learn-ahead: only when there are no other cards to show. Pull the
+    // earliest learning card forward if it's within LEARN_AHEAD_MS.
+    // This avoids the "wait N minutes" screen when the queue is otherwise
+    // empty (matches Anki's default 20-minute learn-ahead behavior).
+    if (currentCardId === null) {
+      const ahead = learningQueue
+        .filter((e) => e.dueAt > now && e.dueAt <= now + LEARN_AHEAD_MS)
+        .sort((a, b) => a.dueAt - b.dueAt);
+      if (ahead.length > 0) {
+        currentLearningEntry = ahead[0];
+        currentCardId = ahead[0].cardId;
+      }
+    }
   }
 
   const currentCard =
