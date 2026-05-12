@@ -68,26 +68,10 @@ export function useManualSync(
       // Step a: load local session.
       const localSession = loadSession();
 
-      // Step b: push local session to cloud if present.
-      if (localSession !== null) {
-        const pushOk = await pushSession(client, userId, localSession.cards);
-        if (cancelledRef.current) return;
-        if (!pushOk) {
-          const prev = loadSyncStatus();
-          saveSyncStatus({
-            ...prev,
-            lastPushFailed: true,
-            lastPushAttemptAt: new Date().toISOString(),
-            failedCardCount: null,
-          });
-          isSyncingRef.current = false;
-          setSyncState("error");
-          setErrorMessage("Sync failed — check your connection and try again.");
-          return;
-        }
-      }
-
-      // Step c: pull cloud rows.
+      // Step b: pull cloud rows FIRST. Pulling before pushing means a local
+      // session that has lost progress (Safari ITP eviction, fresh device,
+      // manual storage clear) cannot upload its emptied state over real
+      // cloud data. See #293 for the incident that motivated this order.
       const cloudRows = await pullSession(client, userId);
       if (cancelledRef.current) return;
       if (cloudRows === null) {
@@ -104,18 +88,21 @@ export function useManualSync(
         return;
       }
 
-      // Step d: merge cloud into local and persist.
-      let saveResult;
+      // Step c: merge cloud into local and persist.
+      let mergedCards;
+      let mergedLimits;
       if (localSession !== null) {
-        const merged = mergeCloudIntoLocal(localSession.cards, cloudRows);
-        saveResult = saveSession({ cards: merged, limits: localSession.limits });
+        mergedCards = mergeCloudIntoLocal(localSession.cards, cloudRows);
+        mergedLimits = localSession.limits;
       } else {
         // Brand-new device: build a fresh base session so cloud state has
         // a card list to merge into; otherwise cloud rows would be discarded.
         const base = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS);
-        const merged = mergeCloudIntoLocal(base, cloudRows);
-        saveResult = saveSession({ cards: merged, limits: DEFAULT_LIMITS });
+        mergedCards = mergeCloudIntoLocal(base, cloudRows);
+        mergedLimits = DEFAULT_LIMITS;
       }
+
+      const saveResult = saveSession({ cards: mergedCards, limits: mergedLimits });
 
       if (cancelledRef.current) return;
 
@@ -133,6 +120,28 @@ export function useManualSync(
           "Sync failed — storage is full. Clear browser data and try again.",
         );
         return;
+      }
+
+      // Step d: push merged session back so any local-only progress reaches
+      // cloud. Skip when starting from a brand-new device (no localSession):
+      // the merged state is entirely cloud-sourced, so pushing it would be
+      // a no-op round trip.
+      if (localSession !== null) {
+        const pushOk = await pushSession(client, userId, mergedCards);
+        if (cancelledRef.current) return;
+        if (!pushOk) {
+          const prev = loadSyncStatus();
+          saveSyncStatus({
+            ...prev,
+            lastPushFailed: true,
+            lastPushAttemptAt: new Date().toISOString(),
+            failedCardCount: null,
+          });
+          isSyncingRef.current = false;
+          setSyncState("error");
+          setErrorMessage("Sync failed — check your connection and try again.");
+          return;
+        }
       }
 
       // Step e: record successful sync metadata.
