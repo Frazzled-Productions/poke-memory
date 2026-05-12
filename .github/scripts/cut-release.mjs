@@ -97,7 +97,12 @@ if (nonEmpty.length === 0) {
 
 // --- Compute next version ---------------------------------------------------
 
-const needsMinor = /^>\s*bump:\s*minor\s*$/m.test(unreleasedBody);
+// Shared source keeps the detect and strip regexes in sync — tighten one place only.
+const BUMP_MINOR_SOURCE = String.raw`^>\s*bump:\s*minor\s*`;
+const BUMP_MINOR_DETECT_RE = new RegExp(BUMP_MINOR_SOURCE + '$', 'm');
+const BUMP_MINOR_STRIP_RE = new RegExp(BUMP_MINOR_SOURCE + '\\n?', 'gm');
+
+const needsMinor = BUMP_MINOR_DETECT_RE.test(unreleasedBody);
 let newVersion;
 if (major === 0) {
   newVersion = needsMinor ? `0.${minor + 1}.0` : `0.${minor}.${patch + 1}`;
@@ -107,12 +112,16 @@ if (major === 0) {
 const bumpType = needsMinor ? 'minor' : 'patch';
 const today = new Date().toISOString().slice(0, 10);
 
+// Strip the directive from both the promoted CHANGELOG section and release notes.
+// Trailing .trim() absorbs any extra blank lines left behind.
+const cleanBody = unreleasedBody.replace(BUMP_MINOR_STRIP_RE, '').trim();
+
 // --- Rewrite CHANGELOG ------------------------------------------------------
 
 const promoted =
   `## [Unreleased]\n\n` +
   `## [${newVersion}] — ${today}\n\n` +
-  unreleasedBody +
+  cleanBody +
   `\n\n`;
 
 let newChangelog =
@@ -149,8 +158,7 @@ fs.writeFileSync(PACKAGE, JSON.stringify(pkg, null, 2) + trailing);
 
 const tmp = process.env.RUNNER_TEMP || '/tmp';
 const notesPath = path.join(tmp, 'release-notes.md');
-const notesBody = unreleasedBody.replace(/^>\s*bump:\s*minor\s*\n?/gm, '').trim();
-fs.writeFileSync(notesPath, notesBody + '\n');
+fs.writeFileSync(notesPath, cleanBody + '\n');
 
 setOutput('skip', 'false');
 setOutput('version', newVersion);
