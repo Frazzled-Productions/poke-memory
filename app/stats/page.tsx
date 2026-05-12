@@ -15,6 +15,7 @@ import { computeAccuracySparkline, computeRollingAccuracy } from "@/lib/stats/ac
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
+import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -482,6 +483,7 @@ export default function StatsPage() {
             <IntroducedBar stats={stats} />
             <DueForecast stats={stats} />
             <GenerationBreakdown stats={stats} />
+            <TypeBreakdown perType={stats.perType} />
             <StrugglingCards stats={stats} />
           </div>
         )}
