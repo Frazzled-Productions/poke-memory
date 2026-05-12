@@ -6,7 +6,7 @@ export type PokemonCellData = SeedPokemon & { cardClass: CardClass };
 
 export type PokedexFilters = {
   query: string;      // substring match on name; empty = no filter
-  types: string[];    // OR logic; empty = no type filter
+  types: string[];    // AND/intersection: pokemon must have all selected types; empty = no type filter
   gen: number | null; // null = all gens; 1–9 = specific gen
 };
 
@@ -22,7 +22,7 @@ export function filterPokemon(
     }
 
     if (filters.types.length > 0) {
-      if (!p.types.some((t) => filters.types.includes(t))) {
+      if (!filters.types.every((t) => p.types.includes(t))) {
         return false;
       }
     }
