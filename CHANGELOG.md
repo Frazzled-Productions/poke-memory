@@ -8,6 +8,33 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 - **Sprites are now self-hosted** — all 1025 Pokémon sprites are served as static assets from the same Vercel deployment (`/sprites/pokemon/{id}.png`) instead of being fetched from `raw.githubusercontent.com` at runtime. No sprite requests leave our infrastructure.
 
+## [0.5.0] — 2026-05-12
+
+### Added
+
+- **Digest proposals can now be filed as issues** — `auto-codequality-suggest` and `auto-app-suggest` digest issues now include a `- [ ] File this as an issue` checkbox on each proposal; checking one triggers the new `auto-digest-fanout.yml` workflow, which creates a child issue carrying the correct priority label, `area:app`, and a backlink to the digest. Closes #221.
+
+## [0.4.0] — 2026-05-12
+
+### Changed
+
+- **Auto-labelling removed** — `auto-label.yml` (which classified issues and PRs via Claude) has been deleted. Labels on new issues and PRs are applied manually or by the workflow that creates them (e.g. the weekly digest workflows already apply all three label dimensions at creation). This reduces steady-state workflow dispatch volume. Closes #225.
+
+### Added
+
+- **PR dispatch monitor** — a new `pr-check-monitor.yml` workflow runs every 15 minutes and detects PRs where the CI `test` check was never dispatched (a symptom of GitHub's push/pull_request event throttle). When it finds a stuck PR, it posts a `<!-- pr-check-monitor:{sha} -->` comment with step-by-step recovery instructions. The workflow uses a schedule trigger (independent of webhook dispatch) so it fires even during a throttle window. Closes #225.
+
+## [0.3.0] — 2026-05-12
+
+### Changed
+
+- **Weekly digest split in two**: `auto-app-suggest.yml` renamed to
+  `auto-codequality-suggest.yml` (Wednesday 09:00 UTC, title prefix
+  "Weekly code-quality review"), and a new `auto-app-suggest.yml` added
+  (Thursday 09:00 UTC) that surfaces user-facing feature ideas from open
+  enhancement issues, thin app surfaces, README gaps, CHANGELOG themes, and
+  the latest workflow digest. Closes #220.
+
 ## [0.2.0] — 2026-05-12
 
 ### Added
@@ -189,6 +216,9 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.5.0
+[0.4.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.4.0
+[0.3.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.3.0
 [0.2.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.2.0
 [0.1.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.1.0

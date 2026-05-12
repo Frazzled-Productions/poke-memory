@@ -1,23 +1,22 @@
 name: Auto App Suggest
 
-# Weekly cron that scans app-layer source files changed in the last 30 days
-# and creates a single digest issue per ISO week with ≤5 curated improvement
-# proposals targeting tech debt, missing tests, dead code, and accessibility
-# gaps in the app codebase.
+# Weekly cron that surfaces user-facing feature ideas for this repository.
+# Grounds the suggestions in open enhancement issues, thin app surfaces,
+# README vs. codebase gaps, recent CHANGELOG themes, and the latest
+# workflow-suggest digest.
 #
-# Signal-quality constraints (A + B):
-#   A — Recency filter: only analyses files changed in the last 30 days
-#       (keeps signal fresh; avoids surfacing ancient stable code)
-#   B — Recurrence filter: only flags patterns that appear across ≥2 files
-#       (suppresses one-off nits; surfaces systemic issues)
+# Synthesis constraints:
+#   - ≤5 proposals per digest; quiet weeks skip silently
+#   - Every proposal must describe a behaviour change a user would notice
+#   - FORBIDDEN: refactors, test additions, dead-code removal, dependency
+#     bumps, accessibility gaps, CI/workflow changes
 #
 # Idempotency: skips silently when a digest issue for the current ISO week
-# already exists (open or closed), or when nothing crosses the relevance
-# threshold.
+# already exists (open or closed), or when nothing crosses the bar.
 
 on:
   schedule:
-    - cron: '0 9 * * 3'   # Wednesday 09:00 UTC
+    - cron: '0 9 * * 4'   # Thursday 09:00 UTC
   workflow_dispatch:
 
 concurrency:
@@ -26,7 +25,7 @@ concurrency:
 
 jobs:
   suggest:
-    name: Weekly App Digest
+    name: Weekly Feature Ideas Digest
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -62,7 +61,7 @@ jobs:
           WEEK_KEY: ${{ steps.week.outputs.key }}
         run: |
           set -euo pipefail
-          TITLE="Weekly app review — ${WEEK_KEY}"
+          TITLE="Weekly feature ideas — ${WEEK_KEY}"
           COUNT=$(gh issue list \
             --search "\"${TITLE}\" in:title" \
             --state all \
@@ -90,6 +89,34 @@ jobs:
             echo "area:app label already exists."
           fi
 
+      - name: Ensure enhancement label exists
+        if: steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          EXISTS=$(gh label list --json name --jq '[.[].name] | index("enhancement") != null')
+          if [ "$EXISTS" = "false" ]; then
+            gh label create "enhancement" --color "a2eeef" --description "New feature or request"
+            echo "Created enhancement label."
+          else
+            echo "enhancement label already exists."
+          fi
+
+      - name: Ensure priority:later label exists
+        if: steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          EXISTS=$(gh label list --json name --jq '[.[].name] | index("priority:later") != null')
+          if [ "$EXISTS" = "false" ]; then
+            gh label create "priority:later" --color "e4e4e4" --description "Nice to have, no urgent timeline"
+            echo "Created priority:later label."
+          else
+            echo "priority:later label already exists."
+          fi
+
       - uses: anthropics/claude-code-action@v1
         if: steps.idempotency.outputs.skip != 'true'
         id: claude
@@ -101,122 +128,105 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: --max-turns 30
           prompt: |
-            You are generating a weekly app codebase improvement digest for this repository.
+            You are generating a weekly feature ideas digest for this repository.
 
             Today is ${{ steps.date.outputs.date }}. The current ISO week is **${{ steps.week.outputs.key }}**.
 
             ## Your task
 
-            1. Build the recency list — files in `app/**`, `components/**`, `lib/**`, or
-               `db/**` changed in the last 30 days (constraint A).
-            2. Scan those files for patterns that recur across ≥2 files (constraint B).
-            3. Synthesise ≤5 curated improvement proposals covering tech debt, missing
-               tests, dead code, and accessibility gaps. Each item MUST recur across
-               ≥2 recently-changed files — one-off nits are silently dropped.
-            4. If nothing crosses the threshold, skip silently — do NOT create a digest issue.
-            5. If you have ≥1 item, create exactly one digest issue for this week
-               (title: `Weekly app review — ${{ steps.week.outputs.key }}`).
+            1. Gather the signals below.
+            2. Synthesise ≤5 user-facing feature proposals.
+               If nothing crosses the bar, skip silently — do NOT create a digest issue.
+               Write a short stdout note explaining why and exit.
+            3. If you have ≥1 item, create exactly one digest issue.
 
-            ## Step 1 — Build the recency list
+            ## Signals to gather
 
+            ### Signal 1 — Open enhancement issues
             ```bash
-            git log --since="30 days ago" --name-only --format="" \
-              -- 'app/**' 'components/**' 'lib/**' 'db/**' \
-              | sort -u | grep -v '^$'
+            gh issue list --label "enhancement" --state open --limit 50 \
+              --json number,title,body,labels
             ```
+            Identify clusters (3+ issues touching the same surface) and uncovered gaps.
 
-            This is your working set. Only analyse files on this list.
-            If the list is empty, exit cleanly with a note — no digest issue.
-
-            ## Step 2 — Scan for recurring patterns (constraint B)
-
-            Work through these signal categories sequentially. For each candidate,
-            record which files it appears in. Only keep a candidate if it appears
-            in ≥2 files from the recency list.
-
-            ### 2a. Missing co-located tests
-            Cross-reference each `lib/**` file on the recency list against:
+            ### Signal 2 — User-facing pages and components
+            List page files:
             ```bash
-            find . -path './lib/**' \( -name '*.test.ts' -o -name '*.test.tsx' \)
+            find app -name 'page.tsx' | sort
             ```
-            Flag lib modules with no co-located test file — but only if ≥2 such
-            modules appear on the recency list.
-
-            ### 2b. Repeated inline patterns worth extracting
-            Read each file on the recency list. Look for:
-            - Identical or near-identical code blocks copy-pasted across ≥2 files
-              (e.g. the same `useEffect` shape, the same fetch pattern, the same
-              Tailwind class combination that should be a component)
-            - Inline constants that appear in ≥2 files and should be a shared export
-
-            ### 2c. Dead or unreachable exports
-            For each exported function/type in the recency list, check whether
-            it is imported anywhere in the repo:
+            List component files:
             ```bash
-            grep -r "<symbol>" --include="*.ts" --include="*.tsx" . | grep -v "export"
+            ls components/
             ```
-            Flag symbols that appear to have zero import sites — but only if ≥2
-            such symbols are found across ≥2 files.
+            Read pages that look thin (few interactions, no secondary state). Identify
+            surfaces where a small addition would meaningfully improve the user experience.
 
-            ### 2d. Accessibility gaps
-            Read JSX in the recency list. Flag patterns that recur across ≥2 files:
-            - Interactive elements missing `aria-label` or `aria-labelledby`
-            - Images missing `alt` attributes
-            - Form inputs not associated with a `<label>`
-
-            ### 2e. Dependency upgrade opportunities
-            Check `package.json` for dependencies also used in ≥2 recently-changed
-            files that have a major version bump available. Use:
+            ### Signal 3 — README "Features" section vs. codebase
             ```bash
-            cat package.json
+            cat README.md
             ```
-            Do not run `npm outdated` — just note packages where you know a newer
-            major is available based on your training data. Because this relies on
-            training-data knowledge of package versions (which may be stale or
-            incorrect), items in this category MUST be recommended as
-            `priority:later` only — never `priority:now` or `priority:next`.
+            Cross-reference documented features against what pages and components actually
+            exist. Note features mentioned in README that lack implementation, or
+            implemented capabilities not yet surfaced in the README.
 
-            ## Step 3 — Synthesis rules
+            ### Signal 4 — Recent CHANGELOG entries
+            ```bash
+            cat CHANGELOG.md
+            ```
+            Read `[Unreleased]` and the last 3 released sections. What feature themes
+            are emerging? What complementary features would naturally follow?
+
+            ### Signal 5 — Latest auto-workflow-suggest digest
+            ```bash
+            gh issue list --search "Weekly workflow review" \
+              --state all --limit 1 --json number,title,body --jq '.[0]'
+            ```
+            Scan for any user-experience themes that the retro aggregation flagged.
+            If no workflow digest exists yet, skip this signal silently.
+
+            ## Synthesis rules
 
             - Maximum 5 items. Choose the highest-signal ones.
-            - Each item MUST include:
-              - A one-line proposal (imperative: "Extract X", "Add test for Y", "Remove dead export Z")
-              - **File paths**: list every file from the recency list where the pattern was found
-              - **Evidence**: a concrete code snippet or description (≤3 lines) showing the pattern
-              - **Recommended priority**: `priority:now`, `priority:next`, or `priority:later`
-            - Do NOT auto-file individual sub-issues. The digest is for human triage.
-            - Do NOT recommend workflow, agent, or process changes — only app code improvements.
-            - Do NOT recommend changes to files outside `app/**`, `components/**`,
-              `lib/**`, or `db/**`.
+            - **EXPLICITLY FORBIDDEN** — silently drop any item that:
+              - Contains the words "refactor", "test", "extract helper", "dead code",
+                "dependency", or "accessibility"
+              - Proposes a code-quality improvement rather than a user behaviour change
+              - Touches only CI, workflow, or agent files
+            - **REQUIRED** — every item must describe a behaviour change a user would notice.
+            - Each item must include:
+              - A one-line proposal written as an imperative (e.g. "Add a streak counter
+                to the practice complete screen")
+              - **Surface**: the page(s) or component(s) affected
+              - **Why it matters**: 1–2 sentences on the user benefit
+              - **Priority:** `priority:now`, `priority:next`, or `priority:later`
 
             ## No-op rule
 
-            If after the scan you have no candidates that meet the recurrence threshold
-            (≥2 recently-changed files), write a short note to stdout explaining what
-            you found (recency list size, categories checked, why nothing crossed the
-            threshold) and exit cleanly — **do not create a digest issue**.
-            A quiet week is fine.
+            If no items meet the requirements after scanning all signals, write a short
+            note to stdout (signals scanned, why nothing crossed the bar) and exit —
+            **do not create a digest issue**. A quiet week is fine.
 
             ## Issue creation
 
             If you have ≥1 item, write the digest body to `/tmp/digest-body.md`
-            in this format:
+            in this exact format:
 
             ```markdown
             <!-- auto-app-suggest -->
-            ## Weekly app review — WEEK_KEY
+            ## Weekly feature ideas — WEEK_KEY
 
-            Signals scanned: files changed in `app/**`, `components/**`, `lib/**`,
-            `db/**` in the last 30 days. Only patterns recurring across ≥2 files
-            are included.
+            Signals scanned: open enhancement issues, user-facing pages/components,
+            README vs. codebase gap, last 3 CHANGELOG releases, latest workflow digest.
 
             ---
 
             ### 1. <one-line proposal>
 
-            **Files:** `path/to/a.ts`, `path/to/b.ts`
-            **Evidence:** <concrete snippet or description>
+            **Surface:** `app/path/page.tsx`
+            **Why it matters:** <1–2 sentences>
             **Priority:** `priority:next`
+
+            - [ ] File this as an issue <!-- proposal:1 -->
 
             ---
 
@@ -224,18 +234,18 @@ jobs:
             ```
 
             Then create the issue:
-            ```
+            ```bash
             gh issue create \
-              --title "Weekly app review — ${{ steps.week.outputs.key }}" \
+              --title "Weekly feature ideas — ${{ steps.week.outputs.key }}" \
               --body-file /tmp/digest-body.md \
-              --label "area:app"
+              --label "area:app" --label "enhancement" --label "priority:later"
             ```
 
             Store the issue number in `/tmp/digest-issue-number.txt` (just the
             number, no other text):
-            ```
+            ```bash
             gh issue list \
-              --search "\"Weekly app review — ${{ steps.week.outputs.key }}\" in:title" \
+              --search "\"Weekly feature ideas — ${{ steps.week.outputs.key }}\" in:title" \
               --state all --limit 1 --json number --jq '.[0].number' \
               > /tmp/digest-issue-number.txt
             ```
@@ -279,7 +289,7 @@ jobs:
 
           {
             printf '<!-- auto-denials:app-suggest -->\n'
-            printf '## %s tool denial(s) during weekly app digest run\n\n' "$DENIAL_COUNT"
+            printf '## %s tool denial(s) during weekly feature ideas digest run\n\n' "$DENIAL_COUNT"
             printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
             if [ -n "$DENIAL_DETAILS" ]; then
               printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
