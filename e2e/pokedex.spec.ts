@@ -14,7 +14,7 @@ test.describe("Pokédex type filter — intersection", () => {
 
     // Grid should still have results for a single type
     await expect(page.getByText("No Pokémon match your filters.")).not.toBeVisible();
-    await expect(page.getByRole("list")).toBeVisible();
+    await expect(page.getByRole("list", { name: /Pokémon/ }).first()).toBeVisible();
   });
 
   test("Fire + Flying returns fewer results than Fire alone", async ({ page }) => {
@@ -23,6 +23,8 @@ test.describe("Pokédex type filter — intersection", () => {
     const typeGroup = page.getByRole("group", { name: "Filter by type" });
 
     await typeGroup.getByRole("button", { name: "Fire" }).click();
+    // Wait for the grid to stabilise after the filter changes
+    await expect(page.getByRole("list", { name: /Pokémon/ }).first()).toBeVisible();
     const fireCount = await page.getByRole("listitem").count();
     expect(fireCount).toBeGreaterThan(0);
 
@@ -35,6 +37,8 @@ test.describe("Pokédex type filter — intersection", () => {
   });
 
   test("three types selected renders empty state", async ({ page }) => {
+    // This relies on the seeded dataset: no Pokémon has Fire + Flying + Water
+    // simultaneously. The filter logic itself is unit-tested in filter.test.ts.
     await page.goto("/pokedex");
 
     const typeGroup = page.getByRole("group", { name: "Filter by type" });

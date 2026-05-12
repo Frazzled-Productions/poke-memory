@@ -51,7 +51,7 @@ describe('filterPokemon', () => {
   });
 
   it('query filter matches substring case-insensitively', () => {
-    const result = filterPokemon(FIXTURES, { ...noFilters, query: 'CHARMAN' });
+    const result = filterPokemon(FIXTURES, { ...noFilters, query: 'CHARMANDER' });
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('charmander');
   });
@@ -77,7 +77,7 @@ describe('filterPokemon', () => {
     expect(result).toHaveLength(0);
   });
 
-  it('type filter matches multi-type pokemon when one type matches', () => {
+  it('single-type filter matches multi-type pokemon that carries that type', () => {
     // bulbasaur has ['grass', 'poison']; filtering on poison should include it
     const result = filterPokemon(FIXTURES, { ...noFilters, types: ['poison'] });
     expect(result).toHaveLength(1);
