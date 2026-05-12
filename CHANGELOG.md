@@ -8,6 +8,10 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 - **Copyright footer** — a "© [year] Frazzled Productions" notice now appears at the bottom of every page.
 
+### Changed
+
+- **Releases now cut automatically on every merge to `main`.** A new `auto-release.yml` workflow promotes `[Unreleased]` in `CHANGELOG.md`, bumps `package.json`, commits as `chore(release): vX.Y.Z [skip ci]`, tags, pushes, and creates a matching GitHub Release. Pre-v1 SemVer rule: any `### Added`/`### Changed`/`### Removed`/`### Deprecated` entry triggers a minor bump (e.g. 0.1.0 → 0.2.0); only `### Fixed`/`### Security` entries trigger a patch bump. An empty `[Unreleased]` no-ops the workflow. The first run also backfills the missing `v0.1.0` tag and Release at the commit where v0.1.0 was originally cut. Closes #200.
+
 ### Fixed
 
 - **Sync: storage-full condition no longer silently loses a day's progress** — three interacting bugs caused a full review session to vanish when localStorage ran out of space: (1) name-card payloads were serialized with large seed-only arrays (`flavorTexts`, `evolutionChain`) inflating the session to ~2.5 MB on mobile browsers; (2) `pullAndMerge` ignored `saveSession` failures and dispatched a stale `StorageEvent`; (3) the manual sync button reported "all synced" even when the local write failed. The fix strips the large arrays from all card types before serialization (they are re-injected from the seed on every mount), propagates write failures out of `pullAndMerge`, and surfaces a storage-full error message on the manual sync button instead of a false success. Closes #208.

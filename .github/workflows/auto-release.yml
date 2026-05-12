@@ -1,0 +1,113 @@
+name: Auto Release
+
+# Cuts a SemVer release on every push to `main` when CHANGELOG.md's
+# `[Unreleased]` section has any entry under Added/Changed/Removed/Deprecated/
+# Fixed/Security. Otherwise the run no-ops.
+#
+# Per AGENTS.md "Versioning":
+#   - Added/Changed/Removed/Deprecated → minor bump (0.N.0 → 0.N+1.0)
+#   - Only Fixed/Security              → patch bump (0.N.M → 0.N.M+1)
+#
+# Per merge → one commit, one tag, one GitHub Release. The release commit
+# carries `[skip ci]` so subsequent workflow runs (including this one) do not
+# fire on it, breaking the loop.
+#
+# One-time bootstrap: if no `v0.1.0` tag exists when this workflow first runs,
+# the bootstrap step creates the tag at SHA cddb3a8 (the last commit whose
+# CHANGELOG content matched the current `[0.1.0]` section) and a matching
+# GitHub Release. Subsequent runs no-op the bootstrap.
+#
+# Prerequisite: the `poke-memory-bot` App must be added as a bypass actor on
+# the `main-protection` ruleset (ID 16176438) so direct pushes to `main`
+# succeed. If the push step fails with a protected-branch error, that is the
+# fix.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Cut release
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Configure git identity
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+${APP_SLUG}[bot]@users.noreply.github.com"
+
+      - name: Backfill v0.1.0 tag + release (one-time bootstrap)
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          git fetch --tags origin --quiet
+          if git rev-parse --verify --quiet refs/tags/v0.1.0 > /dev/null; then
+            echo "v0.1.0 tag already exists — skipping bootstrap."
+            exit 0
+          fi
+          BOOTSTRAP_SHA=cddb3a8f004a81d1fbc60f4117895770c137adea
+          echo "Creating v0.1.0 tag at ${BOOTSTRAP_SHA}..."
+          git tag v0.1.0 "${BOOTSTRAP_SHA}"
+          git push origin v0.1.0
+          node .github/scripts/extract-changelog-section.mjs 0.1.0 > "${RUNNER_TEMP}/v010-notes.md"
+          if gh release view v0.1.0 --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            echo "v0.1.0 release already exists — skipping release create."
+          else
+            gh release create v0.1.0 \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "v0.1.0" \
+              --notes-file "${RUNNER_TEMP}/v010-notes.md"
+          fi
+
+      - name: Cut release (promote [Unreleased], bump package.json)
+        id: cut
+        run: node .github/scripts/cut-release.mjs
+
+      - name: Commit, tag, push
+        if: steps.cut.outputs.skip != 'true'
+        env:
+          NEW_VERSION: ${{ steps.cut.outputs.version }}
+          BUMP_TYPE: ${{ steps.cut.outputs.bumpType }}
+        run: |
+          set -euo pipefail
+          git add CHANGELOG.md package.json
+          git commit -m "chore(release): v${NEW_VERSION} (${BUMP_TYPE}) [skip ci]"
+          git tag "v${NEW_VERSION}"
+          git push origin main
+          git push origin "v${NEW_VERSION}"
+
+      - name: Create GitHub Release
+        if: steps.cut.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NEW_VERSION: ${{ steps.cut.outputs.version }}
+          BODY_FILE: ${{ steps.cut.outputs.bodyFile }}
+        run: |
+          gh release create "v${NEW_VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "v${NEW_VERSION}" \
+            --notes-file "${BODY_FILE}"

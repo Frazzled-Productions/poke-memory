@@ -161,9 +161,12 @@ A React hook can live in `lib/` (e.g. `lib/review/useStorageQuota.ts`), but if i
 
 - **Standard**: SemVer 2.0.0.
 - **Pre-v1 semantics**: `0.MINOR.0` for any release containing `### Added`, `### Changed`, `### Removed`, or `### Deprecated` entries; `0.MINOR.PATCH` for releases containing only `### Fixed` and/or `### Security` entries.
-- **Cadence**: weekly automated cut — see `auto-release.yml` and `WORKFLOW.md` (implemented by #200).
+- **Cadence: release on merge to `main`.** `auto-release.yml` runs on every push to `main`. If `[Unreleased]` has any entry under Added/Changed/Removed/Deprecated/Fixed/Security, the workflow bumps the SemVer, promotes the section, commits, tags, pushes, and creates a GitHub Release. If `[Unreleased]` is empty (or only contains internal-convention notes outside the six standard subsections), the workflow no-ops. Since Vercel auto-deploys on every push to `main`, "tagged release" and "deployed to production" are the same event in this project.
 - **Version source**: `package.json` is the single source of truth. The release workflow bumps it automatically — never edit the version field by hand.
 - **`[Unreleased]` promotion**: when a release is cut, `## [Unreleased]` becomes `## [X.Y.Z] — YYYY-MM-DD`, a fresh empty `## [Unreleased]` is prepended, and a reference link is appended at the bottom of `CHANGELOG.md`.
+- **Loop break**: the workflow's own commit is `chore(release): vX.Y.Z [skip ci]`. The `[skip ci]` marker suppresses all workflows on that commit, and the `chore(release):` prefix is a defensive `if:` guard on the job. Combined, this prevents the release run from re-triggering itself.
+- **`[Unreleased]` content guidance for contributors**: only add bullets you are happy to ship in the very next release — every merge to `main` cuts one. Internal-only notes that should not bump the version (e.g. agent-roster tweaks) belong outside the standard subsections (use a custom heading like `### Project conventions (internal)` if you need a CHANGELOG slot for them, or skip the CHANGELOG entirely for purely internal changes).
+- **Prerequisite**: the `poke-memory-bot` App must be configured as a bypass actor on the `main-protection` ruleset (ID 16176438) so its release commit can land on `main` without going through a PR. If `auto-release.yml` ever fails with a protected-branch error on `git push origin main`, that is the missing setup.
 
 ### Stack decisions
 

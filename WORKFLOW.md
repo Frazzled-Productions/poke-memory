@@ -277,6 +277,22 @@ Handles four commands: `plan`, `implement`, `continue`, and `split`.
 
 ---
 
+### `auto-release.yml` — Auto Release
+
+| | |
+|---|---|
+| **Trigger** | `push` to `main` |
+| **Gate** | Skipped if the head commit message starts with `chore(release):` (defensive guard — the release commit also carries `[skip ci]`, which suppresses workflow runs entirely) |
+| **What it does** | Runs `.github/scripts/cut-release.mjs`: parses `[Unreleased]` in `CHANGELOG.md`, decides bump type (minor if Added/Changed/Removed/Deprecated present, else patch), rewrites `CHANGELOG.md` and `package.json`, commits as `chore(release): vX.Y.Z (TYPE) [skip ci]`, tags `vX.Y.Z`, pushes commit + tag to `main`, and creates a matching GitHub Release with the promoted section as the body |
+| **No-op condition** | `[Unreleased]` has no bullet under Added/Changed/Removed/Deprecated/Fixed/Security → script writes `skip=true` and the workflow exits cleanly. Internal-convention notes outside the six standard subsections do not trigger a release. |
+| **Bootstrap** | One-time: on first run, if no `v0.1.0` tag exists, creates `v0.1.0` at SHA `cddb3a8` (last commit whose CHANGELOG content matched the current `[0.1.0]` section) and the matching GitHub Release. Subsequent runs no-op the bootstrap. |
+| **Loop break** | The release commit carries `[skip ci]`, which suppresses all GitHub Actions on it — so neither `ci.yml` nor `auto-release.yml` re-fires. If `[skip ci]` is ever bypassed, the `chore(release):` prefix guard and the now-empty `[Unreleased]` provide two further layers of defense. |
+| **Vercel interaction** | The release commit touches `package.json`, which is in `WATCH_PATHS` in `scripts/vercel-ignored-build.sh` — so Vercel rebuilds and the in-app version banner (`NEXT_PUBLIC_APP_VERSION`) updates. |
+| **Prerequisite** | The `poke-memory-bot` App must be a bypass actor on the `main-protection` ruleset so the release commit can land directly on `main`. If `git push origin main` fails with a protected-branch error, that is the missing setup. |
+| **Concurrency** | `group: auto-release` with `cancel-in-progress: false` — back-to-back merges queue rather than collapse. |
+
+---
+
 ## Build gates
 
 Two separate gates catch type/build/test errors at different points:
