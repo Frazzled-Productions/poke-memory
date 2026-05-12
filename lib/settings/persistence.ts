@@ -96,3 +96,11 @@ export function saveSettings(settings: UserSettings): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
+
+// True if a settings blob has been explicitly written. loadSettings cannot
+// distinguish "never written" from "written with defaults" — sync logic needs
+// this to know whether a pulled cloud value should overlay local defaults.
+export function hasStoredSettings(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(STORAGE_KEY) !== null;
+}
