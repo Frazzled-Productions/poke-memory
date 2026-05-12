@@ -91,8 +91,10 @@ export function loadGradeLog(): GradeLog {
   }
 }
 
-export function appendGradeEntry(entry: Omit<GradeLogEntry, "occurredAt">): void {
-  if (typeof window === "undefined") return;
+export function appendGradeEntry(
+  entry: Omit<GradeLogEntry, "occurredAt">,
+): GradeLogEntry | null {
+  if (typeof window === "undefined") return null;
   try {
     const stamped: GradeLogEntry = { ...entry, occurredAt: Date.now() };
     const pruned = pruneGradeLog(loadGradeLog(), 365, entry.date);
@@ -101,12 +103,30 @@ export function appendGradeEntry(entry: Omit<GradeLogEntry, "occurredAt">): void
     window.dispatchEvent(
       new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: stamped }),
     );
+    return stamped;
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
       console.warn("poke-memory: grade log write failed — localStorage quota exceeded");
     } else {
       console.error("poke-memory: grade log write failed", err);
     }
+    return null;
+  }
+}
+
+/**
+ * Remove the entry with the matching `occurredAt` from the persisted
+ * grade log, if present. Used by the practice-page Undo affordance to
+ * roll back the most recent grade — keyed on `occurredAt` rather than
+ * by position so it survives parallel writes from sync.
+ */
+export function removeGradeEntry(occurredAt: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    const log = loadGradeLog().filter((e) => e.occurredAt !== occurredAt);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+  } catch (err) {
+    console.error("poke-memory: grade log remove failed", err);
   }
 }
 
