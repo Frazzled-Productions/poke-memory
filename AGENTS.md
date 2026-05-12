@@ -35,7 +35,11 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 
 ## Orchestration playbook
 
-The main agent (Claude in the user's session) orchestrates. Coder agents do not call other agents directly — they receive research findings via the prompt. The standard flow for non-trivial work:
+The main agent (Claude in the user's session) orchestrates — whether running via GitHub Actions (`auto-issue.yml`) or interactively (CLI, agent view, IDE). The playbook applies in all contexts; interactive sessions should follow the same flow, adapting only where real-time user input replaces async commands like `/go`.
+
+**Issue-first rule.** Every non-trivial change must have a GitHub issue before implementation begins. Create one if it doesn't exist. PRs reference the issue (`closes #N`) so work is tracked on the project board.
+
+Coder agents do not call other agents directly — they receive research findings via the prompt. The standard flow for non-trivial work:
 
 1. **Plan** — invoke `planner`. It surfaces unknowns to research first.
 2. **Research in parallel** — invoke specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `researcher`) in a single message when their questions are independent. Pass findings to coders via prompt.
