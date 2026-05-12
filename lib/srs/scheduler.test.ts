@@ -449,3 +449,22 @@ describe("migrateReviewState: SM-2 → FSRS conversion", () => {
     expect(state.learningStep).toBe(0);
   });
 });
+
+// ============================================================
+// Retention target threading
+// ============================================================
+describe("retentionTarget option", () => {
+  it("0.97 schedules sooner than 0.85 for the same Good grade on a graduated card", () => {
+    const base = graduatedCard();
+    const low = nextReview(base, 4, NOW, { retentionTarget: 0.85 });
+    const high = nextReview(base, 4, NOW, { retentionTarget: 0.97 });
+    expect(high.scheduledDays).toBeLessThan(low.scheduledDays);
+  });
+
+  it("omitting retentionTarget behaves identically to the FSRS default 0.9", () => {
+    const base = graduatedCard();
+    const omitted = nextReview(base, 4, NOW);
+    const explicit = nextReview(base, 4, NOW, { retentionTarget: 0.9 });
+    expect(explicit.scheduledDays).toBe(omitted.scheduledDays);
+  });
+});

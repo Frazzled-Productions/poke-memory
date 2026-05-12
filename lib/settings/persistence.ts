@@ -26,6 +26,12 @@ export type UserSettings = {
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
   playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
   favouriteTheme: StoredFavouriteTheme | null; // chosen mastery accent Pokémon
+  /**
+   * FSRS desired-retention target. Range 0.80..0.97; default 0.90 matches
+   * `ts-fsrs` and Anki defaults. Lower = fewer reviews, more forgetting.
+   * Higher = more reviews, better retention.
+   */
+  retentionTarget: number;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -41,7 +47,19 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
   favouriteTheme: null,
+  retentionTarget: 0.9,
 };
+
+/** Inclusive bounds for the retention-target slider. */
+export const RETENTION_TARGET_MIN = 0.8;
+export const RETENTION_TARGET_MAX = 0.97;
+
+function clampRetention(v: number): number {
+  if (!Number.isFinite(v)) return DEFAULT_SETTINGS.retentionTarget;
+  if (v < RETENTION_TARGET_MIN) return RETENTION_TARGET_MIN;
+  if (v > RETENTION_TARGET_MAX) return RETENTION_TARGET_MAX;
+  return v;
+}
 
 // Returns DEFAULT_SETTINGS on fresh load, server, or corruption. Never throws.
 // Legacy stored objects without the evolution-* keys are silently upgraded
@@ -105,6 +123,10 @@ export function loadSettings(): UserSettings {
         typeof obj.favouriteTheme === "object" && obj.favouriteTheme !== null
           ? (obj.favouriteTheme as StoredFavouriteTheme)
           : null,
+      retentionTarget:
+        typeof obj.retentionTarget === "number"
+          ? clampRetention(obj.retentionTarget)
+          : DEFAULT_SETTINGS.retentionTarget,
     };
   } catch {
     return DEFAULT_SETTINGS;

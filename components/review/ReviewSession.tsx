@@ -536,7 +536,11 @@ export function ReviewSession() {
 
   // Per-button interval previews — computed for every render (O(1) per grade, cheap).
   const gradePreviewsOrNull =
-    effectiveCard !== null ? previewIntervals(effectiveCard.state, new Date()) : null;
+    effectiveCard !== null
+      ? previewIntervals(effectiveCard.state, new Date(), {
+          retentionTarget: loadSettings().retentionTarget,
+        })
+      : null;
 
   // Queue counters: sourced from buildSessionQueues so newCount and reviewCount
   // reflect the daily-capped queue sizes, matching what actually gets served.
@@ -682,7 +686,9 @@ export function ReviewSession() {
     setGrading(true);
 
     const now = new Date();
-    const nextState = nextReview(effectiveCard.state, grade, now);
+    const nextState = nextReview(effectiveCard.state, grade, now, {
+      retentionTarget: loadSettings().retentionTarget,
+    });
     const newCards = cards.map((card) =>
       card.id === effectiveCard.id ? { ...card, state: nextState } : card,
     );
