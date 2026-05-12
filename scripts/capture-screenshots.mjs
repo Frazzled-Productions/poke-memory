@@ -30,8 +30,6 @@ const STORAGE_KEY = "poke-memory:review-session:v1";
 const MASTERY_REPETITIONS = 3;
 const MASTERY_INTERVAL = 21;
 
-const TODAY = new Date().toISOString().slice(0, 10);
-
 function pastDate(daysAgo) {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
@@ -55,7 +53,7 @@ function futureDate(daysAhead) {
 function buildSeedSession() {
   const cards = [];
 
-  // Mastered cards (ids 1–15): repetitions=5, interval=30, due in future
+  // Mastered cards (ids 1–15)
   for (let id = 1; id <= 15; id++) {
     cards.push({
       id,
@@ -81,12 +79,14 @@ function buildSeedSession() {
       isMythical: false,
       cryUrl: null,
       state: {
-        repetitions: 5,
-        interval: 30,
+        repetitions: MASTERY_REPETITIONS + 2,
+        interval: MASTERY_INTERVAL + 9,
         easeFactor: 2.5,
         dueDate: futureDate(15),
         lastReview: pastDate(15),
         firstSeen: pastDate(60),
+        learningStep: null,
+        stepStartedAt: null,
       },
     });
   }
@@ -124,6 +124,8 @@ function buildSeedSession() {
         dueDate: futureDate(reps),
         lastReview: pastDate(1),
         firstSeen: pastDate(10),
+        learningStep: null,
+        stepStartedAt: null,
       },
     });
   }
@@ -137,6 +139,27 @@ function buildSeedSession() {
   return JSON.stringify({ cards, limits });
 }
 
+async function withPage(browser, contextOptions, fn) {
+  const ctx = await browser.newContext({
+    ...contextOptions,
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: BASE_URL,
+          localStorage: [{ name: STORAGE_KEY, value: buildSeedSession() }],
+        },
+      ],
+    },
+  });
+  const page = await ctx.newPage();
+  try {
+    await fn(page);
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
 
@@ -144,101 +167,42 @@ async function main() {
 
   try {
     // ── Practice screenshots (iPhone 14 viewport) ──────────────────────────
-    {
-      const ctx = await browser.newContext({
-        ...devices["iPhone 14"],
-        storageState: {
-          cookies: [],
-          origins: [
-            {
-              origin: BASE_URL,
-              localStorage: [{ name: STORAGE_KEY, value: buildSeedSession() }],
-            },
-          ],
-        },
-      });
-      const page = await ctx.newPage();
-
+    await withPage(browser, { ...devices["iPhone 14"] }, async (page) => {
       await page.goto(BASE_URL, { waitUntil: "networkidle" });
-
-      // Wait for the card front to render (Reveal button or sprite visible)
-      await page.waitForSelector("button, img[alt]", { timeout: 15_000 });
-      // Extra settle time for animations
-      await page.waitForTimeout(800);
-      await page.screenshot({
-        path: join(OUT_DIR, "practice-front.png"),
-        fullPage: false,
-      });
+      // Wait for sprite — confirms localStorage session was read and card rendered
+      await page.waitForSelector('img[src*="/sprites/pokemon/"]', { timeout: 15_000 });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: join(OUT_DIR, "practice-front.png"), fullPage: false });
       console.log("  practice-front.png");
 
-      // Flip the card
       const revealBtn = page.getByRole("button", { name: /reveal/i });
       if (await revealBtn.isVisible()) {
         await revealBtn.click();
-        await page.waitForTimeout(600);
+        await page.waitForTimeout(400);
       }
-      await page.screenshot({
-        path: join(OUT_DIR, "practice-flipped.png"),
-        fullPage: false,
-      });
+      await page.screenshot({ path: join(OUT_DIR, "practice-flipped.png"), fullPage: false });
       console.log("  practice-flipped.png");
-
-      await ctx.close();
-    }
+    });
 
     // ── Pokédex grid (desktop viewport, 1280×900) ──────────────────────────
-    {
-      const ctx = await browser.newContext({
-        viewport: { width: 1280, height: 900 },
-        storageState: {
-          cookies: [],
-          origins: [
-            {
-              origin: BASE_URL,
-              localStorage: [{ name: STORAGE_KEY, value: buildSeedSession() }],
-            },
-          ],
-        },
-      });
-      const page = await ctx.newPage();
-
+    await withPage(browser, { viewport: { width: 1280, height: 900 } }, async (page) => {
       await page.goto(`${BASE_URL}/pokedex`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(800);
-      await page.screenshot({
-        path: join(OUT_DIR, "pokedex-grid.png"),
-        fullPage: false,
-      });
+      // Wait for at least one sprite — confirms localStorage was read and grid rendered
+      await page.waitForSelector('img[src*="/sprites/pokemon/"]', { timeout: 15_000 });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: join(OUT_DIR, "pokedex-grid.png"), fullPage: false });
       console.log("  pokedex-grid.png");
-
-      await ctx.close();
-    }
+    });
 
     // ── Stats page (iPhone 14 viewport) ───────────────────────────────────
-    {
-      const ctx = await browser.newContext({
-        ...devices["iPhone 14"],
-        storageState: {
-          cookies: [],
-          origins: [
-            {
-              origin: BASE_URL,
-              localStorage: [{ name: STORAGE_KEY, value: buildSeedSession() }],
-            },
-          ],
-        },
-      });
-      const page = await ctx.newPage();
-
+    await withPage(browser, { ...devices["iPhone 14"] }, async (page) => {
       await page.goto(`${BASE_URL}/stats`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(800);
-      await page.screenshot({
-        path: join(OUT_DIR, "stats.png"),
-        fullPage: false,
-      });
+      // Wait for mastery heading — confirms localStorage was read and stats computed
+      await page.waitForSelector("h2#mastery-heading", { timeout: 15_000 });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: join(OUT_DIR, "stats.png"), fullPage: false });
       console.log("  stats.png");
-
-      await ctx.close();
-    }
+    });
   } finally {
     await browser.close();
   }
