@@ -55,6 +55,7 @@ test.describe("Pokédex type filter — intersection", () => {
     await typeGroup.getByRole("button", { name: "Flying" }).click();
     await page.waitForURL(/type=.*flying/);
     await typeGroup.getByRole("button", { name: "Water" }).click();
+    await page.waitForURL(/type=.*water/);
 
     // No Pokémon has all three types — empty state must appear
     await expect(
