@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.7.18] — 2026-05-12
+
+### Added
+
+- New "Audio mode" toggle on the Practice page. When on, the screen stays awake via the Wake Lock API and the Pokémon cry plays automatically on reveal regardless of the standalone Cry-on-Reveal setting.
+
 ## [0.7.17] — 2026-05-12
 
 ### Added
@@ -448,7 +454,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.7.17...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.7.18...HEAD
+[0.7.18]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.18
 [0.7.17]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.17
 [0.7.16]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.16
 [0.7.15]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.15
