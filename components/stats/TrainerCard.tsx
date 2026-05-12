@@ -1,0 +1,78 @@
+"use client";
+
+import type { GenerationStats } from "@/lib/stats/derive";
+
+type Props = {
+  handle: string | null;
+  totalMastered: number;
+  perGeneration: readonly GenerationStats[];
+};
+
+/**
+ * Trainer level: pinned to total mastered count via a square-root curve.
+ * Picks 16 as the scaling constant so the early game feels rewarding
+ * (10 mastered → level 5, 100 mastered → level 16, 1025 mastered → level 51).
+ * Deterministic and pure — no persistence needed.
+ */
+export function trainerLevel(mastered: number): number {
+  if (mastered <= 0) return 1;
+  return Math.max(1, Math.floor(Math.sqrt(mastered) * 1.6));
+}
+
+const GEN_LABELS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
+
+export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
+  const level = trainerLevel(totalMastered);
+  return (
+    <section
+      aria-label="Trainer card"
+      className="rounded-xl border border-zinc-200 bg-gradient-to-r from-amber-50 via-rose-50 to-sky-50 p-4 dark:border-zinc-800 dark:from-amber-950/30 dark:via-rose-950/30 dark:to-sky-950/30"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col">
+          <span className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Trainer
+          </span>
+          <span className="text-lg font-semibold text-foreground">
+            {handle ?? "Trainer"}
+          </span>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Lv
+          </span>
+          <span className="text-3xl font-bold tabular-nums text-foreground">
+            {level}
+          </span>
+        </div>
+      </div>
+      <ul
+        role="list"
+        className="mt-3 flex flex-wrap gap-1.5"
+        aria-label="Generation completion badges"
+      >
+        {perGeneration.map((gen, idx) => {
+          const completed = gen.total > 0 && gen.mastered === gen.total;
+          return (
+            <li
+              key={gen.gen}
+              title={
+                completed
+                  ? `${gen.name}: complete!`
+                  : `${gen.name}: ${gen.mastered}/${gen.total} mastered`
+              }
+              className={
+                "flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-semibold tabular-nums transition-colors " +
+                (completed
+                  ? "border-amber-400 bg-amber-300 text-amber-950 dark:border-amber-500 dark:bg-amber-400"
+                  : "border-zinc-300 bg-zinc-100 text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-500")
+              }
+            >
+              {GEN_LABELS[idx] ?? gen.gen}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
