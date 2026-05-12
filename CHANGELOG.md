@@ -16,6 +16,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 ### Fixed
 
+- **CI: `label-pr` job in `auto-label.yml` no longer fails on every fresh PR** — the job was missing an `actions/checkout` step before the Claude action, causing `git fetch` to exit with code 128. Mirrors the checkout step already present in the sibling `label` job. Closes #215.
 - **CI: `auto-backlog-groom.yml` no longer crashes on first `gh` call** — the workflow was missing an `actions/checkout@v6` step, causing `gh` to fail with `fatal: not a git repository` before any issue data could be fetched. Closes #216.
 - **Sync: storage-full condition no longer silently loses a day's progress** — three interacting bugs caused a full review session to vanish when localStorage ran out of space: (1) name-card payloads were serialized with large seed-only arrays (`flavorTexts`, `evolutionChain`) inflating the session to ~2.5 MB on mobile browsers; (2) `pullAndMerge` ignored `saveSession` failures and dispatched a stale `StorageEvent`; (3) the manual sync button reported "all synced" even when the local write failed. The fix strips the large arrays from all card types before serialization (they are re-injected from the seed on every mount), propagates write failures out of `pullAndMerge`, and surfaces a storage-full error message on the manual sync button instead of a false success. Closes #208.
 
