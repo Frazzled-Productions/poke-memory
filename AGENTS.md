@@ -113,8 +113,8 @@ Cards are the primary contract. Streak (`streak_days`) and settings (`user_setti
 
 **Schema notes**
 
-- `user_settings.settings` (jsonb) is the source of truth. The legacy flat columns (`max_new_per_day`, `max_reviews_per_day`) are leftovers from migration 001 and are not read or written by current sync paths. A future cleanup can drop them; not worth the destructive migration today.
-- `card_reviews` schema is on SM-2 fields (`repetitions`, `interval`, `ease_factor`) until #264 lands the FSRS migration. The trigger only cares about timestamp columns, so the FSRS swap doesn't disturb it.
+- `user_settings.settings` (jsonb) is the source of truth for per-user settings. The schema is `(user_id, settings, updated_at)` after migration 005 dropped the original flat columns from migration 001.
+- `card_reviews` is on FSRS columns (`stability`, `difficulty`, `elapsed_days`, `scheduled_days`, `reps`, `lapses`, `fsrs_state`) after migration 004. The regression trigger on lifecycle timestamps from migration 002 was unaffected by the swap.
 
 **Catastrophic recovery**
 
