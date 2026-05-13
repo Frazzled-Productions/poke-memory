@@ -1,8 +1,22 @@
 import type { ReviewableCard } from "@/lib/review/session";
 import { generationOf } from "@/lib/stats/derive";
 import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
+import type { FormCategory } from "@/lib/pokemon/forms";
 
 export type PracticeScopePreset = "starters" | "legendaries";
+
+/**
+ * Controls which alternate-form cards surface in practice sessions.
+ *
+ * - `all`          — default forms + every form category present in the seed.
+ * - `default-only` — only base species (isDefaultForm === true). Excludes all
+ *                    alternate forms (Alolan Raichu, Rotom appliances, etc.).
+ * - `include`      — default forms PLUS an explicit allow-list of categories.
+ */
+export type FormCategoryFilter =
+  | { mode: "all" }
+  | { mode: "default-only" }
+  | { mode: "include"; categories: FormCategory[] };
 
 export type PracticeScope = {
   /** Empty array == all generations included. */
@@ -11,9 +25,25 @@ export type PracticeScope = {
   types: string[];
   /** Preset groups OR'd onto the gen/type filters. */
   presets: PracticeScopePreset[];
+  /**
+   * Alternate-form filter axis. Defaults to `{mode:'all'}` so new users see
+   * all seeded forms. Persisted scopes without this field migrate to
+   * `{mode:'all'}` on load — existing users see no behaviour change.
+   *
+   * Optional at the TypeScript level for backwards-compatibility with
+   * pre-#450 code that constructs `PracticeScope` literals without the field
+   * (e.g. tests, legacy migration paths). All runtime paths treat a missing
+   * value as `{mode:'all'}`.
+   */
+  formCategories?: FormCategoryFilter;
 };
 
-export const EMPTY_SCOPE: PracticeScope = { gens: [], types: [], presets: [] };
+export const EMPTY_SCOPE: PracticeScope = {
+  gens: [],
+  types: [],
+  presets: [],
+  formCategories: { mode: "all" },
+};
 
 /**
  * Pre-#333 storage key. The scope is now folded into `UserSettings` and
@@ -47,7 +77,12 @@ function getLegendaryIds(): ReadonlySet<number> {
 }
 
 export function isScopeEmpty(scope: PracticeScope): boolean {
-  return scope.gens.length === 0 && scope.types.length === 0 && scope.presets.length === 0;
+  return (
+    scope.gens.length === 0 &&
+    scope.types.length === 0 &&
+    scope.presets.length === 0 &&
+    (scope.formCategories?.mode ?? "all") === "all"
+  );
 }
 
 /**
@@ -55,23 +90,49 @@ export function isScopeEmpty(scope: PracticeScope): boolean {
  * active non-empty scope? Used by both `cardMatchesScope` (name-card path)
  * and `countMatchingSpecies` so the two cannot drift.
  *
- *   gens    – ANY-OF semantics; passes if `generationOf(id)` is listed.
- *   types   – ANY-OF semantics; passes if any of the species' types is listed.
- *   presets – OR'd with gens/types; passes if the species id is in any
- *             active preset's id set.
+ *   gens           – ANY-OF semantics; passes if `generationOf(id)` is listed.
+ *   types          – ANY-OF semantics; passes if any of the species' types is listed.
+ *   presets        – OR'd with gens/types; passes if the species id is in any
+ *                    active preset's id set.
+ *   formCategories – evaluated first; returns false immediately when the card's
+ *                    form fails the filter, regardless of other axes.
  *
- * Within the scope, the categories are OR'd: passing any active category
- * passes the species. Within each category, an empty list is "no
- * contribution to the OR" (does not match anything).
+ * Within the scope, the gens/types/presets categories are OR'd: passing any
+ * active category passes the species. Within each category, an empty list is
+ * "no contribution to the OR" (does not match anything).
  *
  * Empty scope is handled by callers — this function is only reached for
  * non-empty scopes.
+ *
+ * @param isDefaultForm  Whether this is the primary form of its species.
+ *   Defaults to `true` (safe fallback for seeds that pre-date #445).
+ * @param formCategory   The broad category of the form. Defaults to `"default"`.
  */
 function speciesMatchesScope(
   speciesId: number,
   speciesTypes: readonly string[],
   scope: PracticeScope,
+  isDefaultForm: boolean = true,
+  formCategory: FormCategory = "default",
 ): boolean {
+  // ── formCategories gate (hard filter applied before the OR axes) ───────
+  // When mode !== 'all', a form that fails the gate is excluded regardless of
+  // the gens/types/presets axes.
+  const fc = scope.formCategories ?? { mode: "all" };
+  if (fc.mode === "default-only") {
+    if (!isDefaultForm) return false;
+  } else if (fc.mode === "include") {
+    if (!isDefaultForm && !fc.categories.includes(formCategory)) return false;
+  }
+  // fc.mode === 'all' — passthrough; form is never excluded
+
+  // ── gens / types / presets (OR'd) ──────────────────────────────────────
+  // If none of these axes are active, the species passes the scope based on
+  // the form gate alone (all other axes are permissive by default).
+  const hasActiveAxes =
+    scope.gens.length > 0 || scope.types.length > 0 || scope.presets.length > 0;
+  if (!hasActiveAxes) return true;
+
   if (scope.gens.length > 0) {
     const gen = generationOf(speciesId);
     if (scope.gens.includes(gen)) return true;
@@ -91,6 +152,15 @@ function speciesMatchesScope(
  * Evolution cards lack a `types[]` field (they prompt for the next-stage
  * sprite, not the parent species' typing), so the type-axis path is
  * skipped for them — gens and presets still apply.
+ *
+ * For the `formCategories` axis, name/reverse/cry cards carry `isDefaultForm`
+ * and `formCategory` directly (spread from SeedPokemon). For evolution cards,
+ * form-specific evolution edges are always excluded (#448 is the follow-up) —
+ * they are treated as default forms to avoid spurious exclusions while the
+ * form-edge feature is in progress.
+ *
+ * Cards built from a pre-#445 seed (generated.json without `isDefaultForm`)
+ * receive safe defaults: `isDefaultForm=true`, `formCategory='default'`.
  */
 export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): boolean {
   if (isScopeEmpty(scope)) return true;
@@ -98,10 +168,15 @@ export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): bo
   // "about" the pre-evolution — Bulbasaur → Ivysaur is a Gen 1 / Starters card
   // because of Bulbasaur, not Ivysaur). Reverse-evolution cards use the same
   // pre-evo anchor — the answer-side species. Other card types use their own id.
+  //
+  // For alternate-form cards (e.g. Alolan Raichu, id=10100), the card's own id
+  // is outside the 1-1025 gen range so `generationOf(id)` returns 0. We use
+  // `speciesId` instead — the base species ID that maps back into the gen table.
+  // This follows the `card.speciesId ?? card.id` pattern from the brief.
   const pokemonId =
     card.cardType === "evolution" || card.cardType === "reverse-evolution"
       ? card.preEvoId
-      : card.id;
+      : (card as { speciesId?: number }).speciesId ?? card.id;
   // Evolution cards (both directions) don't carry the parent species' `types[]`
   // on the card itself; downgrade to an effectively-empty types array so the
   // type axis is a no-op for them. Other card types use their own types.
@@ -109,7 +184,21 @@ export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): bo
     card.cardType === "evolution" || card.cardType === "reverse-evolution"
       ? []
       : card.types;
-  return speciesMatchesScope(pokemonId, types, scope);
+
+  // Resolve form metadata. Name/reverse/cry cards spread SeedPokemon and carry
+  // these fields. Evolution cards are treated as default forms (form-specific
+  // evolution edges are a follow-up — #448). Fall back to safe defaults for
+  // seeds built before #445 where the fields may be absent.
+  const isDefaultForm: boolean =
+    card.cardType === "evolution" || card.cardType === "reverse-evolution"
+      ? true
+      : (card as { isDefaultForm?: boolean }).isDefaultForm ?? true;
+  const formCategory: FormCategory =
+    card.cardType === "evolution" || card.cardType === "reverse-evolution"
+      ? "default"
+      : (card as { formCategory?: FormCategory }).formCategory ?? "default";
+
+  return speciesMatchesScope(pokemonId, types, scope, isDefaultForm, formCategory);
 }
 
 /**
@@ -128,9 +217,42 @@ export function countMatchingSpecies(
   if (isScopeEmpty(scope)) return seed.length;
   let count = 0;
   for (const s of seed) {
-    if (speciesMatchesScope(s.id, s.types, scope)) count += 1;
+    // For alternate-form entries, s.id is outside the 1-1025 gen range.
+    // Use speciesId (the base species ID) so the gens axis resolves correctly.
+    // Falls back to s.id for pre-#445 seeds where speciesId is absent.
+    const resolvedId = (s as { speciesId?: number }).speciesId ?? s.id;
+    // isDefaultForm and formCategory may be absent in a pre-#445 seed; fall
+    // back to 'true' / 'default' so existing seeds always pass the form gate.
+    const isDefaultForm = (s as { isDefaultForm?: boolean }).isDefaultForm ?? true;
+    const formCategory = (s as { formCategory?: FormCategory }).formCategory ?? "default";
+    if (speciesMatchesScope(resolvedId, s.types, scope, isDefaultForm, formCategory)) count += 1;
   }
   return count;
+}
+
+const VALID_FORM_CATEGORIES: readonly FormCategory[] = [
+  "default", "regional", "mega", "gmax", "primal", "forme",
+];
+
+/**
+ * Internal: parse a raw JSON value into a `FormCategoryFilter`.
+ * Returns `{mode:'all'}` on absent / malformed input so persisted scopes
+ * without this field silently upgrade to the safe default.
+ */
+export function parseFormCategoryFilter(value: unknown): FormCategoryFilter {
+  if (typeof value !== "object" || value === null) return { mode: "all" };
+  const obj = value as Record<string, unknown>;
+  if (obj.mode === "default-only") return { mode: "default-only" };
+  if (obj.mode === "include") {
+    const cats = Array.isArray(obj.categories)
+      ? (obj.categories as unknown[]).filter(
+          (v): v is FormCategory =>
+            typeof v === "string" && (VALID_FORM_CATEGORIES as readonly string[]).includes(v),
+        )
+      : [];
+    return { mode: "include", categories: cats };
+  }
+  return { mode: "all" };
 }
 
 /**
@@ -158,7 +280,9 @@ function parseScopeShape(value: unknown): PracticeScope | null {
         (v): v is PracticeScopePreset => v === "starters" || v === "legendaries",
       )
     : [];
-  return { gens, types, presets };
+  // formCategories: absent in pre-#450 persisted scopes → default to {mode:'all'}.
+  const formCategories: FormCategoryFilter = parseFormCategoryFilter(obj.formCategories);
+  return { gens, types, presets, formCategories };
 }
 
 /**
@@ -247,5 +371,13 @@ export function scopeLabel(scope: PracticeScope): string {
   }
   if (scope.presets.includes("starters")) parts.push("Starters");
   if (scope.presets.includes("legendaries")) parts.push("Legendaries");
+  const fc = scope.formCategories ?? { mode: "all" };
+  if (fc.mode === "default-only") parts.push("Default forms only");
+  else if (fc.mode === "include" && fc.categories.length > 0) {
+    const catLabels = fc.categories.map(
+      (c) => c.charAt(0).toUpperCase() + c.slice(1),
+    );
+    parts.push(catLabels.join(", ") + " forms");
+  }
   return parts.join(" · ");
 }
