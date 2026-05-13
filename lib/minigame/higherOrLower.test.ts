@@ -59,6 +59,7 @@ const seenState: ReviewState = {
   lastReview: "2026-01-01",
   firstSeen: "2026-01-01",
   hiddenSince: null,
+  seenInPasture: false,
   learningStep: null,
   stepStartedAt: null,
 };
