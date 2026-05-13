@@ -1,11 +1,19 @@
 "use client";
 
 import type { GenerationStats } from "@/lib/stats/derive";
+import type { BadgeDefinition } from "@/lib/badges/catalog";
 
 type Props = {
   handle: string | null;
   totalMastered: number;
   perGeneration: readonly GenerationStats[];
+  /**
+   * Gym badges (#420) the user has earned. Optional so existing tests that
+   * predate the prop still render the component without setup. When empty
+   * or omitted, the badge rail is not rendered — unearned badges must
+   * not be hinted at anywhere in the UI.
+   */
+  earnedBadges?: readonly BadgeDefinition[];
 };
 
 /**
@@ -28,7 +36,7 @@ const TOTAL_SPECIES = 1025;
 
 const GEN_LABELS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
 
-export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
+export function TrainerCard({ handle, totalMastered, perGeneration, earnedBadges }: Props) {
   const level = trainerLevel(totalMastered);
   const next = nextLevelMastered(level);
   const needed = next - totalMastered;
@@ -95,6 +103,24 @@ export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
           );
         })}
       </ul>
+      {earnedBadges && earnedBadges.length > 0 ? (
+        <ul
+          role="list"
+          className="mt-3 flex flex-wrap gap-1.5"
+          aria-label="Gym badges earned"
+        >
+          {earnedBadges.map((badge) => (
+            <li
+              key={badge.id}
+              title={badge.description}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-950/70 dark:text-amber-200"
+            >
+              <span aria-hidden="true">★</span>
+              {badge.name}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

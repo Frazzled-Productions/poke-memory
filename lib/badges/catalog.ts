@@ -1,0 +1,152 @@
+/**
+ * Gym badges (#420). Awarded when a user has mastered every species in
+ * the badge's `speciesIds` list. Secret until earned — there is no UI
+ * surface that hints at any badge before it is unlocked.
+ *
+ * The catalog ships as code (not data fetched at runtime). IDs are
+ * immutable once shipped — changing an existing id re-awards the badge
+ * to existing earners on their next badge check. New badges are added
+ * by appending entries; users earn them the moment they meet the
+ * criterion after the new build deploys.
+ *
+ * Mastery here means name-card mastery: `reps >= masteryRepetitions &&
+ * scheduledDays >= 21` on the species' name card. Other card directions
+ * (evolution, reverse, cry) do not contribute. The species ID is the
+ * raw PokéAPI species id (1..1025), which is also the name-card id.
+ */
+
+export type BadgeCriterion =
+  | { kind: "all-mastered"; speciesIds: readonly number[] };
+
+export type BadgeDefinition = {
+  /** Stable kebab-case identifier. Immutable once a release ships it. */
+  id: string;
+  name: string;
+  description: string;
+  criterion: BadgeCriterion;
+};
+
+export const BADGE_CATALOG: readonly BadgeDefinition[] = [
+  // Kanto gym leader rosters — anime-iconic pairs rather than full
+  // game-canon 6-Pokémon teams. Two Pokémon is enough for a satisfying
+  // reveal and keeps the early badges achievable.
+  {
+    id: "boulder-badge",
+    name: "Boulder Badge",
+    description: "You've mastered Brock's roster.",
+    criterion: { kind: "all-mastered", speciesIds: [74, 95] },
+  },
+  {
+    id: "cascade-badge",
+    name: "Cascade Badge",
+    description: "You've mastered Misty's roster.",
+    criterion: { kind: "all-mastered", speciesIds: [120, 121] },
+  },
+  {
+    id: "thunder-badge",
+    name: "Thunder Badge",
+    description: "You've mastered Lt. Surge's electric roster.",
+    criterion: { kind: "all-mastered", speciesIds: [26, 100] },
+  },
+  {
+    id: "rainbow-badge",
+    name: "Rainbow Badge",
+    description: "You've mastered Erika's grass roster.",
+    criterion: { kind: "all-mastered", speciesIds: [70, 71] },
+  },
+  {
+    id: "soul-badge",
+    name: "Soul Badge",
+    description: "You've mastered Koga's poison roster.",
+    criterion: { kind: "all-mastered", speciesIds: [49, 110] },
+  },
+  {
+    id: "marsh-badge",
+    name: "Marsh Badge",
+    description: "You've mastered Sabrina's psychic roster.",
+    criterion: { kind: "all-mastered", speciesIds: [63, 65] },
+  },
+  {
+    id: "volcano-badge",
+    name: "Volcano Badge",
+    description: "You've mastered Blaine's fire roster.",
+    criterion: { kind: "all-mastered", speciesIds: [59, 78] },
+  },
+  {
+    id: "earth-badge",
+    name: "Earth Badge",
+    description: "You've mastered Giovanni's ground roster.",
+    criterion: { kind: "all-mastered", speciesIds: [76, 112] },
+  },
+
+  // Themed groupings — fan-favourites that span generations.
+  {
+    id: "kanto-starters",
+    name: "Kanto Starters",
+    description: "Bulbasaur, Charmander, Squirtle and their final evolutions.",
+    criterion: { kind: "all-mastered", speciesIds: [1, 3, 4, 6, 7, 9] },
+  },
+  {
+    id: "johto-starters",
+    name: "Johto Starters",
+    description: "Chikorita, Cyndaquil, Totodile and their final evolutions.",
+    criterion: {
+      kind: "all-mastered",
+      speciesIds: [152, 154, 155, 157, 158, 160],
+    },
+  },
+  {
+    id: "hoenn-starters",
+    name: "Hoenn Starters",
+    description: "Treecko, Torchic, Mudkip and their final evolutions.",
+    criterion: {
+      kind: "all-mastered",
+      speciesIds: [252, 254, 255, 257, 258, 260],
+    },
+  },
+  {
+    id: "sinnoh-starters",
+    name: "Sinnoh Starters",
+    description: "Turtwig, Chimchar, Piplup and their final evolutions.",
+    criterion: {
+      kind: "all-mastered",
+      speciesIds: [387, 389, 390, 392, 393, 395],
+    },
+  },
+  {
+    id: "galar-starters",
+    name: "Galar Starters",
+    description: "Grookey, Scorbunny, Sobble and their final evolutions.",
+    criterion: {
+      kind: "all-mastered",
+      speciesIds: [810, 812, 813, 815, 816, 818],
+    },
+  },
+  {
+    id: "legendary-birds",
+    name: "Legendary Birds",
+    description: "Articuno, Zapdos, and Moltres.",
+    criterion: { kind: "all-mastered", speciesIds: [144, 145, 146] },
+  },
+  {
+    id: "legendary-beasts",
+    name: "Legendary Beasts",
+    description: "Raikou, Entei, and Suicune.",
+    criterion: { kind: "all-mastered", speciesIds: [243, 244, 245] },
+  },
+  {
+    id: "lake-trio",
+    name: "Lake Trio",
+    description: "Uxie, Mesprit, and Azelf — the lake guardians of Sinnoh.",
+    criterion: { kind: "all-mastered", speciesIds: [480, 481, 482] },
+  },
+  {
+    id: "eeveelutions",
+    name: "Eeveelutions",
+    description: "Eevee and all eight of its evolutions.",
+    criterion: {
+      kind: "all-mastered",
+      speciesIds: [133, 134, 135, 136, 196, 197, 470, 471, 700],
+    },
+  },
+];

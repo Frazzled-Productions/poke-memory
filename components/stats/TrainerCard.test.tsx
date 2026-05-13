@@ -113,4 +113,61 @@ describe("TrainerCard", () => {
     const levelSpan = screen.getByText("1", { selector: '[aria-describedby="trainer-level-desc"]' });
     expect(levelSpan).toBeInTheDocument();
   });
+
+  it("renders no badge rail when earnedBadges is omitted or empty", () => {
+    const { container } = render(
+      <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
+    );
+    expect(container.querySelector('[aria-label="Gym badges earned"]')).toBeNull();
+  });
+
+  it("does not hint at unearned badges in any UI text (secret until earned)", () => {
+    render(
+      <TrainerCard
+        handle={null}
+        totalMastered={0}
+        perGeneration={ALL_INCOMPLETE}
+        earnedBadges={[]}
+      />,
+    );
+    // None of the launch badge names should appear anywhere on the trainer
+    // card while the earned list is empty.
+    for (const name of [
+      "Cascade Badge",
+      "Boulder Badge",
+      "Eeveelutions",
+      "Legendary Birds",
+    ]) {
+      expect(screen.queryByText(name)).toBeNull();
+    }
+  });
+
+  it("renders an earned-badge chip for each entry", () => {
+    render(
+      <TrainerCard
+        handle={null}
+        totalMastered={9}
+        perGeneration={ALL_INCOMPLETE}
+        earnedBadges={[
+          {
+            id: "eeveelutions",
+            name: "Eeveelutions",
+            description: "Eevee + all eight evolutions.",
+            criterion: { kind: "all-mastered", speciesIds: [133] },
+          },
+          {
+            id: "cascade-badge",
+            name: "Cascade Badge",
+            description: "x",
+            criterion: { kind: "all-mastered", speciesIds: [120, 121] },
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Eeveelutions")).toBeInTheDocument();
+    expect(screen.getByText("Cascade Badge")).toBeInTheDocument();
+    expect(
+      screen.getByRole("list", { name: "Gym badges earned" }),
+    ).toBeInTheDocument();
+  });
 });

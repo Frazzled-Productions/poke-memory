@@ -43,6 +43,10 @@ import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 import { ShareTodayButton } from "@/components/review/ShareTodayButton";
 import { previewIntervals } from "@/lib/srs/intervalPreview";
 import { isMastered } from "@/lib/stats/derive";
+import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
+import { checkBadges } from "@/lib/badges/check";
+import { masteredSpeciesIds } from "@/lib/badges/derive";
+import { BadgeToast } from "@/components/badges/BadgeToast";
 import { formatDailySummary } from "@/lib/review/share";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import {
@@ -367,6 +371,21 @@ export function ReviewSession() {
   // `buildSessionQueues` still see the full card set, so daily caps stay
   // stable when scope changes mid-day (#333).
   const [eligibleCardIds, setEligibleCardIds] = useState<Set<number>>(new Set());
+  // Queue of newly-earned badges awaiting their reveal toast (#420). One is
+  // rendered at a time; dismiss shifts the head off. Persisting is handled
+  // in handleGrade — this queue only drives the in-session UI.
+  const [pendingBadgeToasts, setPendingBadgeToasts] = useState<BadgeDefinition[]>([]);
+  // Render the head of the queue — `position: fixed` on the toast itself, so
+  // it doesn't matter which branch renders this node. Shared between every
+  // user-facing return below so the reveal fires on session-complete too.
+  const badgeToastSlot = pendingBadgeToasts.length > 0 ? (
+    <BadgeToast
+      key={pendingBadgeToasts[0].id}
+      badgeName={pendingBadgeToasts[0].name}
+      badgeDescription={pendingBadgeToasts[0].description}
+      onDismiss={() => setPendingBadgeToasts((prev) => prev.slice(1))}
+    />
+  ) : null;
 
   function handleScopeChange(next: PracticeScope) {
     setScope(next);
@@ -889,6 +908,7 @@ export function ReviewSession() {
           {seenPokemon.length >= 2 && (
             <HigherOrLowerGame seenPokemon={seenPokemon} />
           )}
+          {badgeToastSlot}
         </div>
       );
     }
@@ -900,6 +920,7 @@ export function ReviewSession() {
           {seenPokemon.length >= 2 && (
             <HigherOrLowerGame seenPokemon={seenPokemon} />
           )}
+          {badgeToastSlot}
         </div>
       );
     }
@@ -928,6 +949,7 @@ export function ReviewSession() {
         {seenPokemon.length >= 2 && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />
         )}
+        {badgeToastSlot}
       </div>
     );
   }
@@ -1058,6 +1080,39 @@ export function ReviewSession() {
     const nowMastered = isMastered(nextState, loadSettings().masteryRepetitions);
     if (!wasMastered && nowMastered) {
       setMasteredThisSession((n) => n + 1);
+      // Badge award (#420). Only fires when a card just crossed the mastery
+      // threshold — `checkBadges` is then O(catalog × ids-per-badge) against a
+      // Set, which is cheap. Non-name directions never contribute to badge
+      // criteria, so a `cry`/`reverse`/`evolution` mastery cannot earn one.
+      //
+      // Superuser guard: with `pretendAllMastered` on, every species is
+      // already "mastered" — the first grade would award every badge and
+      // persist that to localStorage. `AutoSyncOnChange` suppresses the
+      // cloud write, but exit cleanup does not restore `user_settings`, so
+      // the fake earned-set would survive the QA session. Skip the award
+      // path entirely while any flag is on. The catalog overlay on Stats
+      // continues to show all badges read-only.
+      if (effectiveCard.cardType === "name" && !superuserGuarded) {
+        const masteredIds = masteredSpeciesIds(
+          newCards,
+          settings.masteryRepetitions,
+          false,
+        );
+        const earnedIds = new Set(settings.earnedBadges.map((b) => b.id));
+        const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIds);
+        if (newlyEarned.length > 0) {
+          const nowIso = now.toISOString();
+          const nextSettings: UserSettings = {
+            ...settings,
+            earnedBadges: [
+              ...settings.earnedBadges,
+              ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
+            ],
+          };
+          saveSettings(nextSettings);
+          setPendingBadgeToasts((prev) => [...prev, ...newlyEarned]);
+        }
+      }
     }
 
     // Update the learning queue based on the new state.
@@ -1186,6 +1241,7 @@ export function ReviewSession() {
           label="This session"
           hideZeroSegments
         />
+        {badgeToastSlot}
       </div>
     );
   }
@@ -1234,6 +1290,7 @@ export function ReviewSession() {
           label="This session"
           hideZeroSegments
         />
+        {badgeToastSlot}
       </div>
     );
   }
@@ -1296,6 +1353,7 @@ export function ReviewSession() {
         easy={sessionGrades[5]}
         label="This session"
       />
+      {badgeToastSlot}
     </div>
   );
 }

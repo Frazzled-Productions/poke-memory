@@ -85,6 +85,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     evolutionCardsEnabled: true,
     playCryOnReveal: false,
     practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
   };
 
   return {
@@ -167,6 +168,7 @@ beforeEach(() => {
     evolutionCardsEnabled: true,
     playCryOnReveal: false,
     practiceScope: { gens: [], types: [], presets: [] },
+    earnedBadges: [],
   });
   vi.mocked(loadSession).mockReturnValue(null);
 });
@@ -212,6 +214,7 @@ describe("ReviewSession reveal flow", () => {
       evolutionCardsEnabled: true,
       playCryOnReveal: true,
       practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
     });
     render(<ReviewSession />);
 
@@ -258,6 +261,7 @@ describe("ReviewSession reverse card flow", () => {
     evolutionCardsEnabled: false,
     playCryOnReveal: false,
     practiceScope: { gens: [], types: [], presets: [] },
+    earnedBadges: [],
   };
 
   beforeEach(() => {
@@ -781,6 +785,7 @@ describe("Practice scope (#333)", () => {
       evolutionCardsEnabled: true,
       playCryOnReveal: false,
       practiceScope: { gens: [9], types: [], presets: [] },
+      earnedBadges: [],
     });
 
     render(<ReviewSession />);
@@ -839,6 +844,7 @@ describe("Practice scope (#333)", () => {
       playCryOnReveal: false,
       // Excludes Bulbasaur (Gen I).
       practiceScope: { gens: [9], types: [], presets: [] },
+      earnedBadges: [],
     });
 
     render(<ReviewSession />);

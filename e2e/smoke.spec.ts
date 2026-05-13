@@ -349,6 +349,28 @@ test.describe("Stats page", () => {
     ).toBeVisible();
     await expect(page.getByText(/\d+ \/ \d+ mastered · \d+ to Lv \d+/)).toBeVisible();
   });
+
+  // Gym badges (#420) are secret until earned: a fresh guest must see no
+  // hint of any badge name on the trainer card. The full superuser overlay
+  // path is exercised by component tests; this smoke test guards the
+  // discoverability contract end-to-end.
+  test("gym badges are not hinted before any are earned", async ({ page }) => {
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "Gym badges earned" }),
+    ).toHaveCount(0);
+    for (const name of [
+      "Cascade Badge",
+      "Boulder Badge",
+      "Eeveelutions",
+      "Legendary Birds",
+    ]) {
+      await expect(page.getByText(name, { exact: true })).toHaveCount(0);
+    }
+  });
 });
 
 test.describe("Pokédex page", () => {

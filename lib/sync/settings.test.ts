@@ -40,6 +40,7 @@ const SAMPLE: UserSettings = {
   practiceScope: { gens: [], types: [], presets: [] },
   miniGameBestScore: 0,
   seenStreakMilestones: [],
+  earnedBadges: [],
 };
 
 describe("pushSettings", () => {

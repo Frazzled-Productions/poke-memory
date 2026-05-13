@@ -70,6 +70,14 @@ export type UserSettings = {
    */
   seenStreakMilestones: number[];
   /**
+   * Gym badges the user has earned (#420). Append-only on award. The
+   * id matches a `BadgeDefinition.id` from `lib/badges/catalog.ts`;
+   * `earnedAt` is an ISO timestamp. The list is the source of truth for
+   * which badges to render on the Trainer card. Unearned badges have no
+   * entry — there is no progress hint anywhere in the UI.
+   */
+  earnedBadges: readonly { id: string; earnedAt: string }[];
+  /**
    * Per-user optimized FSRS weight vector (#268). When present, the scheduler
    * uses these weights instead of the ts-fsrs defaults. Set by the
    * /api/srs/optimize route after a successful `computeParameters` call.
@@ -103,6 +111,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   practiceScope: EMPTY_SCOPE,
   miniGameBestScore: 0,
   seenStreakMilestones: [],
+  earnedBadges: [],
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -270,6 +279,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
         ? (obj.miniGameBestScore as number)
         : DEFAULT_SETTINGS.miniGameBestScore,
     seenStreakMilestones: validateSeenStreakMilestones(obj.seenStreakMilestones),
+    earnedBadges: validateEarnedBadges(obj.earnedBadges),
   };
 }
 
@@ -282,6 +292,26 @@ function validateSeenStreakMilestones(value: unknown): number[] {
     if (seen.has(v)) continue;
     seen.add(v);
     out.push(v);
+  }
+  return out;
+}
+
+/**
+ * Defensive parser: silently drops malformed entries but keeps the
+ * well-formed ones. A user with 10 legitimate badges should not lose
+ * all of them because a single entry was corrupted by a manual edit.
+ * A non-array top-level value still falls back to `[]`.
+ */
+function validateEarnedBadges(
+  value: unknown,
+): readonly { id: string; earnedAt: string }[] {
+  if (!Array.isArray(value)) return [];
+  const out: { id: string; earnedAt: string }[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    if (typeof e.id !== "string" || typeof e.earnedAt !== "string") continue;
+    out.push({ id: e.id, earnedAt: e.earnedAt });
   }
   return out;
 }
