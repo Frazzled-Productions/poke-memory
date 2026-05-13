@@ -51,7 +51,7 @@ function SignInPicker({ isPending, onChoose }: { isPending: boolean; onChoose: (
           id="sign-in-picker-panel"
           role="menu"
           aria-label="Choose a sign-in provider"
-          className="absolute right-0 z-50 mt-2 w-64 rounded-md border border-zinc-200 bg-background p-3 shadow-lg dark:border-zinc-700"
+          className="absolute left-0 z-50 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-md border border-zinc-200 bg-background p-3 shadow-lg sm:left-auto sm:right-0 dark:border-zinc-700"
         >
           <p
             id="sign-in-picker-hint"
