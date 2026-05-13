@@ -57,6 +57,9 @@ export default function PokedexPage() {
             <span className="inline-block h-4 w-36 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
           ) : (
             <>
+              {/* TODO(#449): split into base-species vs forms counts once
+                  PokedexFiltered distinguishes them in the grid. For now,
+                  SEED_POKEMON.length is still 1025 (no forms in seed yet). */}
               {introduced.toLocaleString()} / {SEED_POKEMON.length.toLocaleString()}{" "}
               introduced
             </>

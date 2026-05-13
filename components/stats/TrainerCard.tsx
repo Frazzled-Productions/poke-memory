@@ -2,6 +2,7 @@
 
 import type { GenerationStats } from "@/lib/stats/derive";
 import type { BadgeDefinition } from "@/lib/badges/catalog";
+import { SEED_POKEMON } from "@/lib/pokemon/seed";
 
 type Props = {
   handle: string | null;
@@ -14,6 +15,18 @@ type Props = {
    * not be hinted at anywhere in the UI.
    */
   earnedBadges?: readonly BadgeDefinition[];
+  /**
+   * Number of alternate-form name cards the user has mastered.
+   * Optional — omit (or pass 0) to suppress the forms line.
+   * Kept separate from `totalMastered` so the level calc (which is keyed
+   * on base species) is not affected when forms are added (#446).
+   */
+  formsMastered?: number;
+  /**
+   * Total number of alternate-form name cards available (form-only count,
+   * not including base species). Passed alongside `formsMastered`.
+   */
+  totalFormCards?: number;
 };
 
 /**
@@ -32,11 +45,30 @@ export function nextLevelMastered(level: number): number {
   return Math.ceil(((level + 1) / 1.6) ** 2);
 }
 
-const TOTAL_SPECIES = 1025;
+/**
+ * Base species count — count of default-form entries (isDefaultForm=true) in
+ * the seed. Equals 1025 for the v1 seed, grows with future seed expansions.
+ * Level calculation is pinned to this value so existing users' levels are
+ * unaffected when alternate-form cards are added.
+ */
+export const BASE_SPECIES_COUNT = SEED_POKEMON.filter((p) => p.isDefaultForm).length || 1025;
+
+/**
+ * Total card count — all entries in the seed (base + alternate forms).
+ * Grows beyond BASE_SPECIES_COUNT once alternate forms are seeded.
+ */
+export const TOTAL_CARD_COUNT = SEED_POKEMON.length;
 
 const GEN_LABELS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
 
-export function TrainerCard({ handle, totalMastered, perGeneration, earnedBadges }: Props) {
+export function TrainerCard({
+  handle,
+  totalMastered,
+  perGeneration,
+  earnedBadges,
+  formsMastered,
+  totalFormCards,
+}: Props) {
   const level = trainerLevel(totalMastered);
   const next = nextLevelMastered(level);
   const needed = next - totalMastered;
@@ -72,10 +104,15 @@ export function TrainerCard({ handle, totalMastered, perGeneration, earnedBadges
         </div>
       </div>
       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        {totalMastered >= TOTAL_SPECIES
+        {totalMastered >= BASE_SPECIES_COUNT
           ? "All mastered"
           : `${totalMastered} / ${next} mastered · ${needed} to Lv ${level + 1}`}
       </p>
+      {totalFormCards !== undefined && totalFormCards > 0 ? (
+        <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+          {formsMastered ?? 0} / {totalFormCards} forms mastered
+        </p>
+      ) : null}
       <ul
         role="list"
         className="mt-3 flex flex-wrap gap-1.5"

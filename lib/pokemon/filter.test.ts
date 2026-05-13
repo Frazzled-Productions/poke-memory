@@ -39,13 +39,14 @@ const noFilters: PokedexFilters = { query: '', types: [], gen: null };
 
 // A small fixture set covering two gens and multiple types.
 // Gen 1 IDs: 1–151; Gen 2 IDs: 152–251.
+// speciesId must match id so generationOf(p.speciesId) resolves the correct gen.
 const FIXTURES: PokemonCellData[] = [
-  basePokemon({ id: 1,   name: 'bulbasaur',  types: ['grass', 'poison'] }),
-  basePokemon({ id: 4,   name: 'charmander', types: ['fire'] }),
-  basePokemon({ id: 6,   name: 'charizard',  types: ['fire', 'flying'] }),
-  basePokemon({ id: 7,   name: 'squirtle',   types: ['water'] }),
-  basePokemon({ id: 152, name: 'chikorita',  types: ['grass'] }),
-  basePokemon({ id: 155, name: 'cyndaquil',  types: ['fire'] }),
+  basePokemon({ id: 1,   speciesId: 1,   name: 'bulbasaur',  types: ['grass', 'poison'] }),
+  basePokemon({ id: 4,   speciesId: 4,   name: 'charmander', types: ['fire'] }),
+  basePokemon({ id: 6,   speciesId: 6,   name: 'charizard',  types: ['fire', 'flying'] }),
+  basePokemon({ id: 7,   speciesId: 7,   name: 'squirtle',   types: ['water'] }),
+  basePokemon({ id: 152, speciesId: 152, name: 'chikorita',  types: ['grass'] }),
+  basePokemon({ id: 155, speciesId: 155, name: 'cyndaquil',  types: ['fire'] }),
 ];
 
 describe('filterPokemon', () => {

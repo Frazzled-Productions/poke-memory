@@ -231,7 +231,8 @@ export default function PokedexGrid({ pokemon, activeGen }: PokedexGridProps) {
     <div className="flex flex-col gap-12">
       {GEN_RANGES.map((range) => {
         const genPokemon = pokemon.filter(
-          (p) => generationOf(p.id) === range.gen,
+          // speciesId falls back to id for pre-expansion seed entries.
+          (p) => generationOf(p.speciesId ?? p.id) === range.gen,
         );
         if (genPokemon.length === 0) return null;
         return (

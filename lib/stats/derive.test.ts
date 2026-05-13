@@ -3,6 +3,9 @@ import {
   isMastered,
   classifyCard,
   computeStats,
+  generationOf,
+  generationOfPokemonId,
+  GEN_RANGES,
   MASTERY_REPETITIONS,
   MASTERY_INTERVAL_DAYS,
 } from "./derive";
@@ -64,6 +67,67 @@ function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard 
     state: state(overrides),
   };
 }
+
+/**
+ * Build a form card where the pokemon ID (id) differs from the species ID
+ * (speciesId). Mirrors the shape of Alolan/Galarian form entries once the
+ * seed re-run lands.
+ */
+function formCard(
+  id: number,
+  speciesId: number,
+  overrides: Partial<ReviewState> = {},
+): NameReviewCard {
+  return {
+    ...card(id, overrides),
+    id,
+    speciesId,
+    isDefaultForm: false,
+    formCategory: "regional",
+    formSlug: "alola",
+    displayName: `Form of Pokemon ${speciesId}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// generationOf / generationOfPokemonId
+// ---------------------------------------------------------------------------
+
+describe("generationOf", () => {
+  it("returns 1 for species 1 (Bulbasaur)", () => {
+    expect(generationOf(1)).toBe(1);
+  });
+
+  it("returns correct gen for boundary species IDs", () => {
+    for (const range of GEN_RANGES) {
+      expect(generationOf(range.first)).toBe(range.gen);
+      expect(generationOf(range.last)).toBe(range.gen);
+    }
+  });
+
+  it("returns 0 for species IDs outside 1..1025 (e.g. form IDs 10001+)", () => {
+    expect(generationOf(10100)).toBe(0); // Alolan Raichu's raw pokemon ID
+    expect(generationOf(0)).toBe(0);
+    expect(generationOf(1026)).toBe(0);
+  });
+});
+
+describe("generationOfPokemonId", () => {
+  it("resolves a default-form pokemon ID via the seed", () => {
+    // Species 1 (Bulbasaur) is in Gen I
+    expect(generationOfPokemonId(1)).toBe(1);
+  });
+
+  it("returns 0 for a pokemon ID not in the seed", () => {
+    // 10100 (Alolan Raichu) is not in the current seed (forms not seeded yet)
+    expect(generationOfPokemonId(10100)).toBe(0);
+  });
+
+  it("returns 0 for negative or zero IDs", () => {
+    expect(generationOfPokemonId(0)).toBe(0);
+    expect(generationOfPokemonId(-1)).toBe(0);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // isMastered
@@ -305,5 +369,47 @@ describe("computeStats with forceAllMastered", () => {
   it("struggling list is empty under forceAllMastered", () => {
     const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
     expect(result.struggling).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeStats — alternate-form generation bucketing
+// ---------------------------------------------------------------------------
+
+describe("computeStats form-card generation bucketing", () => {
+  it("buckets a form card into its species' generation via speciesId", () => {
+    // Simulates Alolan Raichu: raw id=10100 (hypothetical form id),
+    // speciesId=26 (Raichu, Gen I). The form should land in Gen I, not gen 0.
+    const alolanRaichu = formCard(10100, 26, {
+      lastReview: TODAY,
+      reps: MASTERY_REPETITIONS,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+    });
+    const result = computeStats([alolanRaichu], TODAY);
+    const gen1 = result.perGeneration.find((g) => g.gen === 1)!;
+    expect(gen1.total).toBe(1);
+    expect(gen1.mastered).toBe(1);
+    // No card should end up in gen 0 (out-of-range bucket, not in perGeneration)
+    const allGenTotals = result.perGeneration.reduce((s, g) => s + g.total, 0);
+    expect(allGenTotals).toBe(1);
+  });
+
+  it("a base-species and its form card both count in the same generation", () => {
+    // Raichu (speciesId=26, Gen I) + Alolan Raichu (id=10100, speciesId=26, Gen I)
+    const raichu = card(26, {
+      lastReview: TODAY,
+      reps: MASTERY_REPETITIONS,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+    });
+    const alolanRaichu = formCard(10100, 26, {
+      lastReview: TODAY,
+      reps: 1,
+      scheduledDays: 5,
+    });
+    const result = computeStats([raichu, alolanRaichu], TODAY);
+    const gen1 = result.perGeneration.find((g) => g.gen === 1)!;
+    expect(gen1.total).toBe(2);    // both cards
+    expect(gen1.mastered).toBe(1); // only Raichu mastered
+    expect(gen1.introduced).toBe(2);
   });
 });

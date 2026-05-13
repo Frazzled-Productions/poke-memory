@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { TrainerCard, trainerLevel, nextLevelMastered } from "./TrainerCard";
+import { TrainerCard, trainerLevel, nextLevelMastered, BASE_SPECIES_COUNT } from "./TrainerCard";
 import type { GenerationStats } from "@/lib/stats/derive";
 
 function gen(g: number, mastered: number, total: number): GenerationStats {
@@ -19,7 +19,7 @@ describe("trainerLevel", () => {
 
   it("monotonic in mastered count", () => {
     let last = trainerLevel(1);
-    for (let m = 2; m < 1025; m += 50) {
+    for (let m = 2; m < BASE_SPECIES_COUNT; m += 50) {
       const lvl = trainerLevel(m);
       expect(lvl).toBeGreaterThanOrEqual(last);
       last = lvl;
@@ -31,8 +31,8 @@ describe("trainerLevel", () => {
     expect(trainerLevel(10)).toBe(5);
     // 100 -> 16
     expect(trainerLevel(100)).toBe(16);
-    // 1025 -> 51
-    expect(trainerLevel(1025)).toBe(51);
+    // BASE_SPECIES_COUNT (1025) -> 51
+    expect(trainerLevel(BASE_SPECIES_COUNT)).toBe(51);
   });
 });
 
@@ -47,7 +47,7 @@ describe("nextLevelMastered", () => {
   });
 
   it("always returns more than the mastered count for the same level (full species range)", () => {
-    for (let m = 0; m <= 1025; m++) {
+    for (let m = 0; m <= BASE_SPECIES_COUNT; m++) {
       expect(nextLevelMastered(trainerLevel(m))).toBeGreaterThan(m);
     }
   });
@@ -95,11 +95,43 @@ describe("TrainerCard", () => {
     expect(screen.getByText("10 / 15 mastered · 5 to Lv 6")).toBeInTheDocument();
   });
 
-  it("shows 'All mastered' when totalMastered reaches the species cap", () => {
+  it("shows 'All mastered' when totalMastered reaches the base species cap", () => {
     render(
-      <TrainerCard handle={null} totalMastered={1025} perGeneration={ALL_INCOMPLETE} />,
+      <TrainerCard handle={null} totalMastered={BASE_SPECIES_COUNT} perGeneration={ALL_INCOMPLETE} />,
     );
     expect(screen.getByText("All mastered")).toBeInTheDocument();
+  });
+
+  it("renders no forms line when totalFormCards is omitted or zero", () => {
+    render(
+      <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
+    );
+    expect(screen.queryByText(/forms mastered/)).toBeNull();
+  });
+
+  it("renders the secondary forms line when totalFormCards > 0", () => {
+    render(
+      <TrainerCard
+        handle={null}
+        totalMastered={10}
+        perGeneration={ALL_INCOMPLETE}
+        formsMastered={3}
+        totalFormCards={50}
+      />,
+    );
+    expect(screen.getByText("3 / 50 forms mastered")).toBeInTheDocument();
+  });
+
+  it("renders 0 forms mastered when formsMastered is omitted but totalFormCards is set", () => {
+    render(
+      <TrainerCard
+        handle={null}
+        totalMastered={10}
+        perGeneration={ALL_INCOMPLETE}
+        totalFormCards={50}
+      />,
+    );
+    expect(screen.getByText("0 / 50 forms mastered")).toBeInTheDocument();
   });
 
   it("level number is described by the mastery criterion text", () => {

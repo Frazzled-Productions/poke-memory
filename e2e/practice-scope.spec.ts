@@ -49,8 +49,10 @@ test.describe("Practice scope (#333)", () => {
     await genI.click();
     await expect(genI).toHaveAttribute("aria-pressed", "true");
 
-    // Live count should now be a non-zero subset of the 1025 total.
-    await expect(scopePanel.getByText(/of 1025 Pok[ée]mon match/)).toBeVisible();
+    // Live count should now be a non-zero subset of the total pool.
+    // Using a flexible regex avoids hardcoding the species count, which grows
+    // when alternate-form cards are added (#446 / #447).
+    await expect(scopePanel.getByText(/of \d+ Pok[ée]mon match/)).toBeVisible();
 
     // A practice card should still render — the no-match empty-state must
     // NOT appear. Reveal button visible is the canonical "session running"
