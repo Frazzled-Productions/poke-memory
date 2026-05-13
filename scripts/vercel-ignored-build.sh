@@ -10,14 +10,10 @@ if [[ -z "${VERCEL_GIT_PREVIOUS_SHA:-}" ]]; then
   exit 1
 fi
 
-# Release commits change only package.json version and CHANGELOG — never rebuild.
-SUBJECT=$(git log -1 --format=%s HEAD)
-if [[ "$SUBJECT" == chore\(release\):* ]]; then
-  echo "Release commit — skipping Vercel build."
-  exit 0
-fi
-
 # Files/directories that affect the deployed site.
+# package.json is included because next.config.ts bakes pkg.version into
+# NEXT_PUBLIC_APP_VERSION at build time — release-only commits must rebuild
+# so the displayed version on /settings matches the tagged release.
 WATCH_PATHS=(
   app/
   components/
