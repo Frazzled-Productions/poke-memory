@@ -22,7 +22,13 @@ function state(overrides: Partial<ReviewState> = {}): ReviewState {
 
 function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard {
   return {
-    id, name: `P${id}`, spriteUrl: "", types: ["normal"],
+    id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `P${id}`,
+    name: `P${id}`, spriteUrl: "", types: ["normal"],
     stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },
     flavorText: "", flavorTexts: [""], evolutionChain: [],
     height: 10, weight: 100, baseExperience: 64, genus: "",

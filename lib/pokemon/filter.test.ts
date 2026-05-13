@@ -5,6 +5,11 @@ import type { PokemonCellData, PokedexFilters } from './filter';
 function basePokemon(overrides: Partial<PokemonCellData> = {}): PokemonCellData {
   return {
     id: 1,
+    speciesId: 1,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: 'Bulbasaur',
     name: 'bulbasaur',
     spriteUrl: '',
     types: ['grass', 'poison'],

@@ -27,6 +27,11 @@ vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
 const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.hoisted(() => {
   const card: NameReviewCard = {
     id: 1,
+    speciesId: 1,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: "Bulbasaur",
     name: "Bulbasaur",
     spriteUrl: "https://example.com/bulbasaur.png",
     types: ["grass", "poison"],

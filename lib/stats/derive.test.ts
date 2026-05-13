@@ -34,6 +34,11 @@ function state(overrides: Partial<ReviewState> = {}): ReviewState {
 function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `Pokemon ${id}`,
     cardType: "name",
     subjectKey: String(id),
     name: `Pokemon ${id}`,

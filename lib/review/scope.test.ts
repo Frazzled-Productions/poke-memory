@@ -26,7 +26,13 @@ function state(): ReviewState {
 
 function nameCard(id: number, types: string[] = ["normal"]): NameReviewCard {
   return {
-    id, name: `P${id}`, spriteUrl: "", types,
+    id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `P${id}`,
+    name: `P${id}`, spriteUrl: "", types,
     stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },
     flavorText: "", flavorTexts: [""], evolutionChain: [],
     height: 10, weight: 100, baseExperience: 64, genus: "",
@@ -136,6 +142,11 @@ describe("loadScope / saveScope round-trip (deprecated shims)", () => {
 function makeSeed(id: number, types: string[]): SeedPokemon {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: "pkmn-" + id,
     name: "pkmn-" + id,
     spriteUrl: "",
     types,

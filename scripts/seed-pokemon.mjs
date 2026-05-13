@@ -294,6 +294,63 @@ function flattenChain(node, evolvesFromId, idToName) {
   return nodes;
 }
 
+// ---------------------------------------------------------------------------
+// Form-filtering helpers
+// (Logic mirrors lib/pokemon/forms.ts which is the TS source for unit tests.)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if a PokéAPI pokemon entry is a stub with no real game data.
+ * Stub Megas (IDs 10278+) have base_experience === null and no moves.
+ */
+function isStubEntry(pokemonData) {
+  return (
+    pokemonData.base_experience === null &&
+    (pokemonData.moves ?? []).length === 0
+  );
+}
+
+/**
+ * Returns true if an alternate form is worth including in the seed.
+ * See lib/pokemon/forms.ts for the full v1 scope rationale.
+ */
+function isWorthLearning(formData, pokemonData) {
+  if (isStubEntry(pokemonData)) return false;
+  if (formData.is_battle_only) return false;
+
+  const fn = formData.form_name ?? "";
+  if (fn === "" || fn === "totem") return false;
+  if (/-(meteor)$/.test(fn)) return false;
+  if (/(^|-)(gliding|limited|sprinting|swimming|aquatic|drive|glide|low-power)/.test(fn)) return false;
+
+  return true;
+}
+
+/**
+ * Classifies a form into a broad category for future scope-toggle filtering.
+ */
+function formCategoryFor(formData) {
+  const fn = formData.form_name ?? "";
+  if (/^(alola|galar|hisui|paldea)/.test(fn)) return "regional";
+  if (/^mega/.test(fn)) return "mega";
+  if (fn === "gmax") return "gmax";
+  if (fn === "primal") return "primal";
+  if (fn === "" || formData.is_default) return "default";
+  return "forme";
+}
+
+/**
+ * Converts a kebab-case slug into a title-cased display name fallback.
+ * E.g. "alolan-raichu" → "Alolan Raichu".
+ */
+function slugToDisplayName(slug) {
+  return slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+// ---------------------------------------------------------------------------
 // Edge-ID allocation for one-card-per-evolution-edge.
 //
 // Sub-range carve-out inside the evolution namespace [1_000_001, 1_999_999]:
@@ -398,30 +455,39 @@ async function allocateEdgeIds(records, outputPath) {
   );
 }
 /**
- * Process a single species ID. Returns a record object or null if it should
- * be skipped.
+ * Process a single species ID.
+ *
+ * Returns an array of partial records — one for the default form plus one per
+ * included alternate form. Returns an empty array if the default form should
+ * be skipped entirely (e.g. missing sprite).
+ *
+ * The records at this stage carry `remoteSpriteUrl`, `remoteCryUrl`, and
+ * `evolutionChainUrl` (resolved later); these are stripped before writing
+ * generated.json.
  */
-async function processSpecies(id) {
-  // 1. Fetch species for display name
+async function processSpecies(speciesId) {
+  // ------------------------------------------------------------------
+  // Step 1: Fetch species data (display name, chain, varieties list)
+  // ------------------------------------------------------------------
   const speciesResult = await fetchWithRetry(
-    `https://pokeapi.co/api/v2/pokemon-species/${id}`,
-    `species/${id}`
+    `https://pokeapi.co/api/v2/pokemon-species/${speciesId}`,
+    `species/${speciesId}`
   );
-  if (!speciesResult.ok) return null;
+  if (!speciesResult.ok) return [];
 
   const speciesData = speciesResult.data;
 
-  // Extract English display name
+  // English display name from the species record.
   const englishEntry = speciesData.names?.find(
     (n) => n.language?.name === "en"
   );
   if (!englishEntry) {
     process.stderr.write(
-      `[seed] WARN: no English name for species ${id}, skipping\n`
+      `[seed] WARN: no English name for species ${speciesId}, skipping\n`
     );
-    return null;
+    return [];
   }
-  const name = englishEntry.name;
+  const speciesDisplayName = englishEntry.name;
   const flavorTexts = extractFlavorTexts(speciesData.flavor_text_entries);
   const flavorText = flavorTexts[0] ?? "";
   const evolutionChainUrl = speciesData.evolution_chain?.url ?? null;
@@ -436,62 +502,207 @@ async function processSpecies(id) {
   const isLegendary = speciesData.is_legendary ?? false;
   const isMythical = speciesData.is_mythical ?? false;
 
-  // 2. Fetch the base form's Pokémon data for the sprite
-  const pokemonUrl = speciesData.varieties?.[0]?.pokemon?.url;
-  if (!pokemonUrl) {
+  const varieties = speciesData.varieties ?? [];
+
+  // ------------------------------------------------------------------
+  // Step 2: Fetch default variety (varieties[0])
+  // ------------------------------------------------------------------
+  const defaultVariety = varieties[0];
+  if (!defaultVariety?.pokemon?.url) {
     process.stderr.write(
-      `[seed] WARN: no variety URL for ${id} (${name}), skipping\n`
+      `[seed] WARN: no variety URL for species ${speciesId} (${speciesDisplayName}), skipping\n`
     );
-    return null;
+    return [];
   }
 
-  const pokemonResult = await fetchWithRetry(pokemonUrl, `pokemon/${id}`);
-  if (!pokemonResult.ok) return null;
+  // The default variety's pokemon ID is extracted from the URL.
+  const defaultPokemonIdMatch = defaultVariety.pokemon.url.match(/\/pokemon\/(\d+)\/?$/);
+  const defaultPokemonId = defaultPokemonIdMatch
+    ? parseInt(defaultPokemonIdMatch[1], 10)
+    : speciesId;
 
-  const pokemonData = pokemonResult.data;
+  const defaultPokemonResult = await fetchWithRetry(
+    defaultVariety.pokemon.url,
+    `pokemon/${defaultPokemonId}`
+  );
+  if (!defaultPokemonResult.ok) return [];
 
-  // Sprite preference: official-artwork → front_default → skip
-  const remoteSpriteUrl =
-    pokemonData.sprites?.other?.["official-artwork"]?.front_default ??
-    pokemonData.sprites?.front_default ??
+  const defaultPokemonData = defaultPokemonResult.data;
+
+  const defaultSpriteUrl =
+    defaultPokemonData.sprites?.other?.["official-artwork"]?.front_default ??
+    defaultPokemonData.sprites?.front_default ??
     null;
 
-  if (!remoteSpriteUrl) {
+  if (!defaultSpriteUrl) {
     process.stderr.write(
-      `[seed] WARN: no sprite for ${id} (${name})\n`
+      `[seed] WARN: no sprite for species ${speciesId} (${speciesDisplayName})\n`
     );
-    return null;
+    return [];
   }
 
-  const remoteCryUrl = pokemonData.cries?.latest ?? null;
-
-  const types = (pokemonData.types ?? []).map(t => t.type.name);
-
-  const statsMap = {};
-  for (const s of (pokemonData.stats ?? [])) {
-    statsMap[s.stat.name] = s.base_stat;
+  const defaultCryUrl = defaultPokemonData.cries?.latest ?? null;
+  const defaultTypes = (defaultPokemonData.types ?? []).map(t => t.type.name);
+  const defaultStatsMap = {};
+  for (const s of (defaultPokemonData.stats ?? [])) {
+    defaultStatsMap[s.stat.name] = s.base_stat;
   }
-  const stats = {
-    hp: statsMap["hp"] ?? 0,
-    attack: statsMap["attack"] ?? 0,
-    defense: statsMap["defense"] ?? 0,
-    specialAttack: statsMap["special-attack"] ?? 0,
-    specialDefense: statsMap["special-defense"] ?? 0,
-    speed: statsMap["speed"] ?? 0,
+  const defaultStats = {
+    hp: defaultStatsMap["hp"] ?? 0,
+    attack: defaultStatsMap["attack"] ?? 0,
+    defense: defaultStatsMap["defense"] ?? 0,
+    specialAttack: defaultStatsMap["special-attack"] ?? 0,
+    specialDefense: defaultStatsMap["special-defense"] ?? 0,
+    speed: defaultStatsMap["speed"] ?? 0,
   };
 
-  const height = pokemonData.height ?? null;
-  const weight = pokemonData.weight ?? null;
-  const baseExperience = pokemonData.base_experience ?? null;
+  const results = [];
 
-  return {
-    id, name, remoteSpriteUrl, remoteCryUrl,
-    height, weight, baseExperience,
-    types, stats, flavorText, flavorTexts,
-    genus, generation, captureRate, baseHappiness,
-    growthRate, habitat, genderRate, isLegendary, isMythical,
+  // Default-form record.
+  results.push({
+    id: defaultPokemonId,
+    speciesId,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: speciesDisplayName,
+    name: speciesDisplayName,
+    remoteSpriteUrl: defaultSpriteUrl,
+    remoteCryUrl: defaultCryUrl,
+    height: defaultPokemonData.height ?? null,
+    weight: defaultPokemonData.weight ?? null,
+    baseExperience: defaultPokemonData.base_experience ?? null,
+    types: defaultTypes,
+    stats: defaultStats,
+    flavorText,
+    flavorTexts,
+    genus,
+    generation,
+    captureRate,
+    baseHappiness,
+    growthRate,
+    habitat,
+    genderRate,
+    isLegendary,
+    isMythical,
     evolutionChainUrl,
-  };
+  });
+
+  // ------------------------------------------------------------------
+  // Step 3: Walk alternate varieties (varieties[1..n])
+  // ------------------------------------------------------------------
+  for (let i = 1; i < varieties.length; i++) {
+    const variety = varieties[i];
+    if (!variety?.pokemon?.url) continue;
+
+    const altIdMatch = variety.pokemon.url.match(/\/pokemon\/(\d+)\/?$/);
+    if (!altIdMatch) continue;
+    const altPokemonId = parseInt(altIdMatch[1], 10);
+
+    // Fetch pokemon data for sprite / types / stats / stub check.
+    const altPokemonResult = await fetchWithRetry(
+      variety.pokemon.url,
+      `pokemon/${altPokemonId}`
+    );
+    if (!altPokemonResult.ok) continue;
+    const altPokemonData = altPokemonResult.data;
+
+    // Stub-entry check (fan-wiki Megas with IDs 10278+).
+    if (isStubEntry(altPokemonData)) {
+      process.stderr.write(
+        `[seed] SKIP: stub entry ${altPokemonId} (species ${speciesId})\n`
+      );
+      continue;
+    }
+
+    // Fetch pokemon-form for form_name, is_battle_only, names[].
+    // PokéAPI provides the forms[] array on the pokemon; use the first form slug.
+    const formSlugOrUrl = altPokemonData.forms?.[0]?.url;
+    if (!formSlugOrUrl) {
+      process.stderr.write(
+        `[seed] WARN: no form URL for variety ${altPokemonId} (species ${speciesId}), skipping alt\n`
+      );
+      continue;
+    }
+
+    const formResult = await fetchWithRetry(formSlugOrUrl, `form/${altPokemonId}`);
+    if (!formResult.ok) continue;
+    const formData = formResult.data;
+
+    if (!isWorthLearning(formData, altPokemonData)) {
+      continue;
+    }
+
+    const category = formCategoryFor(formData);
+    const formSlug = formData.form_name || null;
+
+    // Display name: English from pokemon-form.names[], fallback to slug title-case.
+    const formEnglishName = (formData.names ?? []).find(
+      (n) => n.language?.name === "en"
+    )?.name ?? null;
+    const displayName = formEnglishName ?? slugToDisplayName(variety.pokemon.name ?? String(altPokemonId));
+
+    const altSpriteUrl =
+      altPokemonData.sprites?.other?.["official-artwork"]?.front_default ??
+      altPokemonData.sprites?.front_default ??
+      null;
+
+    if (!altSpriteUrl) {
+      process.stderr.write(
+        `[seed] WARN: no sprite for alt form ${altPokemonId} (species ${speciesId}), skipping\n`
+      );
+      continue;
+    }
+
+    const altCryUrl = altPokemonData.cries?.latest ?? null;
+    const altTypes = (altPokemonData.types ?? []).map(t => t.type.name);
+    const altStatsMap = {};
+    for (const s of (altPokemonData.stats ?? [])) {
+      altStatsMap[s.stat.name] = s.base_stat;
+    }
+    const altStats = {
+      hp: altStatsMap["hp"] ?? 0,
+      attack: altStatsMap["attack"] ?? 0,
+      defense: altStatsMap["defense"] ?? 0,
+      specialAttack: altStatsMap["special-attack"] ?? 0,
+      specialDefense: altStatsMap["special-defense"] ?? 0,
+      speed: altStatsMap["speed"] ?? 0,
+    };
+
+    results.push({
+      id: altPokemonId,
+      speciesId,
+      isDefaultForm: false,
+      formCategory: category,
+      formSlug,
+      displayName,
+      // `name` mirrors displayName for compatibility with consumers that read `name`.
+      name: displayName,
+      remoteSpriteUrl: altSpriteUrl,
+      remoteCryUrl: altCryUrl,
+      height: altPokemonData.height ?? null,
+      weight: altPokemonData.weight ?? null,
+      baseExperience: altPokemonData.base_experience ?? null,
+      types: altTypes,
+      stats: altStats,
+      flavorText,
+      flavorTexts,
+      genus,
+      generation,
+      captureRate,
+      baseHappiness,
+      growthRate,
+      habitat,
+      genderRate,
+      isLegendary,
+      isMythical,
+      // Evolution chain is shared with the default form.
+      // Form-aware evolution edges are tracked separately in #448.
+      evolutionChainUrl,
+    });
+  }
+
+  return results;
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +765,7 @@ async function main() {
 
   // ------------------------------------------------------------------
   // Step 2: Process species in batches with concurrency cap
+  // processSpecies now returns an array (default form + included alt forms).
   // ------------------------------------------------------------------
   const partialRecords = [];
   let done = 0;
@@ -564,16 +776,19 @@ async function main() {
     const batchResults = await Promise.all(batch.map((id) => processSpecies(id)));
 
     for (let j = 0; j < batchResults.length; j++) {
-      const record = batchResults[j];
+      const speciesRecords = batchResults[j]; // always an array
       done++;
-      if (record === null) {
+      if (speciesRecords.length === 0) {
         skipped++;
       } else {
-        partialRecords.push(record);
-        // Progress every PROGRESS_INTERVAL species
+        for (const record of speciesRecords) {
+          partialRecords.push(record);
+        }
+        // Progress every PROGRESS_INTERVAL species (keyed on the default form).
         if (done % PROGRESS_INTERVAL === 0) {
+          const defaultRecord = speciesRecords.find(r => r.isDefaultForm) ?? speciesRecords[0];
           process.stderr.write(
-            `[seed] [${done}/${total}] ${record.name}\n`
+            `[seed] [${done}/${total}] ${defaultRecord.displayName} (${speciesRecords.length} form${speciesRecords.length > 1 ? "s" : ""})\n`
           );
         }
       }
@@ -581,14 +796,19 @@ async function main() {
   }
 
   process.stderr.write(
-    `[seed] Phase 1 complete: ${partialRecords.length} records, ${skipped} skipped
-`
+    `[seed] Phase 1 complete: ${partialRecords.length} records (including alt forms), ${skipped} species skipped\n`
   );
 
   // ------------------------------------------------------------------
   // Step 3: Fetch evolution chains (deduped by URL)
+  // idToName is keyed on speciesId (the canonical species integer) since
+  // flattenChain resolves names from speciesId nodes in the chain JSON.
   // ------------------------------------------------------------------
-  const idToName = new Map(partialRecords.map(r => [r.id, r.name]));
+  const idToName = new Map(
+    partialRecords
+      .filter(r => r.isDefaultForm)
+      .map(r => [r.speciesId, r.displayName])
+  );
   const uniqueChainUrls = [...new Set(partialRecords.map(r => r.evolutionChainUrl).filter(Boolean))];
 
   process.stderr.write(

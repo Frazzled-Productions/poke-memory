@@ -25,6 +25,11 @@ const NOW = new Date('2026-05-09T12:00:00Z');
 function makeSeedPokemon(id: number, overrides: Partial<SeedPokemon> = {}): SeedPokemon {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: 'pokemon-' + id,
     name: 'pokemon-' + id,
     spriteUrl: '',
     types: ['normal'],
@@ -538,6 +543,11 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
     // Simulate loading a slimmed card from localStorage — no flavorTexts or evolutionChain
     const slimCard: ReverseReviewCard = {
       id: REVERSE_ID_OFFSET + 1,
+      speciesId: 1,
+      isDefaultForm: true,
+      formCategory: "default",
+      formSlug: null,
+      displayName: "Bulbasaur",
       pokemonId: 1,
       cardType: 'reverse',
       subjectKey: '1',

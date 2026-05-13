@@ -30,6 +30,11 @@ function makeState(firstSeen: string | null = null): ReviewState {
 function makeCard(id: number, firstSeen: string | null = "2026-04-01"): ReviewableCard {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `Pokemon ${id}`,
     cardType: "name",
     subjectKey: String(id),
     name: `Pokemon ${id}`,

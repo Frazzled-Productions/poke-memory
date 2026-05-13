@@ -5,6 +5,11 @@ import type { SeedPokemon } from "@/lib/pokemon/seed";
 function makePokemon(id: number): SeedPokemon {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `pokemon-${id}`,
     name: `pokemon-${id}`,
     spriteUrl: `https://example.com/${id}.png`,
     types: ["normal"],

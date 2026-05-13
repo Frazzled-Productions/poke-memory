@@ -1,6 +1,7 @@
 import seedData from "@/lib/pokemon/generated.json";
 import type { EvolutionDetail } from "@/lib/pokemon/triggers";
 import { triggerPhrase } from "@/lib/pokemon/triggers";
+import type { FormCategory } from "@/lib/pokemon/forms";
 
 export type { EvolutionDetail };
 
@@ -26,8 +27,44 @@ export type PokemonStats = {
   speed: number;
 };
 
+export type { FormCategory };
+
 export type SeedPokemon = {
   id: number;
+  /**
+   * The PokéAPI species ID. For default forms, speciesId === id. For
+   * alternate forms (e.g. Alolan Raichu, id=10100), speciesId is the base
+   * species ID (26 for Raichu). Added in #445.
+   */
+  speciesId: number;
+  /**
+   * True for the primary variety of a species (varieties[0]). False for all
+   * alternate forms. Added in #445.
+   */
+  isDefaultForm: boolean;
+  /**
+   * Broad category used for future scope-toggle filtering. Added in #445.
+   * - "default"  — the base form of a species
+   * - "regional" — Alolan/Galarian/Hisuian/Paldean variant
+   * - "mega"     — Mega Evolution (excluded from v1 scope, is_battle_only)
+   * - "gmax"     — Gigantamax (excluded from v1 scope, is_battle_only)
+   * - "primal"   — Primal Reversion (excluded from v1 scope, is_battle_only)
+   * - "forme"    — other out-of-battle forme (Rotom, Deoxys, Ogerpon, etc.)
+   */
+  formCategory: FormCategory;
+  /**
+   * The PokéAPI form_name slug, or null for default forms.
+   * Examples: "alola", "galar", "mega-x", "gmax", "heat" (Rotom).
+   * Added in #445.
+   */
+  formSlug: string | null;
+  /**
+   * Human-readable display name. For default forms this is the canonical
+   * species name (e.g. "Raichu"). For alternate forms this comes from
+   * pokemon-form.names[] (English), falling back to title-cased slug
+   * (e.g. "Alolan Raichu"). Added in #445.
+   */
+  displayName: string;
   name: string;
   spriteUrl: string;
   types: string[];
@@ -113,9 +150,12 @@ export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
 
   for (const pokemon of SEED_POKEMON) {
     if (pokemon.id <= 0 || pokemon.id > MAX_NAME_ID) {
-      throw new Error(
-        `Pokemon id ${pokemon.id} (${pokemon.name}) falls outside the name-card namespace [1, ${MAX_NAME_ID}]; the evolution-card ID scheme would collide.`,
-      );
+      // Alternate-form IDs (10001+) are outside the name-card namespace and
+      // must not produce evolution cards — their evolution edges are carried by
+      // the default-form record which shares the same chain. Skip rather than
+      // throwing so the seed can include forms without breaking this builder.
+      // Form-aware evolution cards are #447/#448.
+      continue;
     }
     for (const node of pokemon.evolutionChain) {
       if (node.evolvesFromId !== pokemon.id) continue;

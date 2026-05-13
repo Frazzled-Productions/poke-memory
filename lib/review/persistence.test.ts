@@ -31,6 +31,11 @@ function makeMockStorage() {
 function makeNameCard(): NameReviewCard {
   return {
     id: 1,
+    speciesId: 1,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: "Bulbasaur",
     cardType: "name",
     subjectKey: "1",
     name: "bulbasaur",
@@ -63,6 +68,11 @@ function makeNameCard(): NameReviewCard {
 function makeReverseCard(): ReverseReviewCard {
   return {
     id: REVERSE_ID_OFFSET + 1,
+    speciesId: 1,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: "Bulbasaur",
     pokemonId: 1,
     cardType: "reverse",
     subjectKey: "1",

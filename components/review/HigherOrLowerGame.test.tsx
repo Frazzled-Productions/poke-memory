@@ -44,6 +44,11 @@ vi.mock("@/lib/minigame/higherOrLower", async (importOriginal) => {
 
 function makePokemon(overrides: Partial<SeedPokemon> & Pick<SeedPokemon, "id" | "name">): SeedPokemon {
   return {
+    speciesId: overrides.id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: overrides.name,
     spriteUrl: `https://example.com/${overrides.name.toLowerCase()}.png`,
     types: ["normal"],
     stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },

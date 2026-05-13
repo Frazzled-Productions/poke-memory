@@ -42,6 +42,11 @@ const LIMITS = {
 function makeCard(id: number, lastReview: string | null) {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default" as const,
+    formSlug: null,
+    displayName: `pokemon-${id}`,
     cardType: "name" as const,
     subjectKey: String(id),
     name: `pokemon-${id}`,
