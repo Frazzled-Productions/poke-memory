@@ -17,6 +17,12 @@ import {
 import { useAuth } from "@/lib/auth/AuthContext";
 import { pullSession, mergeCloudIntoLocal } from "@/lib/sync/cloud";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import {
+  loadFavourite,
+  saveFavourite,
+  isFavouriteEarned,
+} from "@/lib/theme/persistence";
+import { loadSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY } from "@/lib/settings/persistence";
 
 // Typing "super" anywhere (when not focused on an input) toggles unlocked state.
 const CHORD_SEQUENCE = ["s", "u", "p", "e", "r"];
@@ -69,7 +75,10 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
 
   // Force-pull cloud over local on the "any flag was on → no flags on" transition.
   // Signed-in users get authoritative cloud state restored. Guests get a destructive
-  // confirm (there is no cloud to fall back to).
+  // confirm (there is no cloud to fall back to). After the cards path settles,
+  // re-validate the favourite theme: a cheat-selected one whose underlying card
+  // is no longer mastered (per restored cards) is cleared so it cannot survive
+  // the flag-off transition (#428).
   const exitCleanup = useCallback(async () => {
     const u = userRef.current;
     const sb = supabaseRef.current;
@@ -91,17 +100,35 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.warn("[superuser] cloud→local overwrite failed:", err);
       }
-      return;
+    } else {
+      const confirmed = window.confirm(
+        "Reset local progress?\n\nSuperuser mode may have altered your local card state. Press OK to clear it (you'll start fresh), or Cancel to keep what you have now.",
+      );
+      if (confirmed) {
+        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
+        );
+      }
     }
 
-    const confirmed = window.confirm(
-      "Reset local progress?\n\nSuperuser mode may have altered your local card state. Press OK to clear it (you'll start fresh), or Cancel to keep what you have now.",
-    );
-    if (confirmed) {
-      window.localStorage.removeItem(SESSION_STORAGE_KEY);
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
-      );
+    // Favourite-theme cleanup. Runs in both branches against the now-restored
+    // local card state, so a theme selected only via `pretendAllMastered`
+    // cannot outlive the flag.
+    const favourite = loadFavourite();
+    if (favourite !== null) {
+      const settings = loadSettings();
+      const session = loadSession();
+      const cards = session?.cards ?? [];
+      if (!isFavouriteEarned(favourite, cards, settings.masteryRepetitions)) {
+        saveFavourite(null);
+        // `saveSettings` writes localStorage but does not fire a same-tab
+        // StorageEvent — dispatch one so `FavouriteThemeProvider` re-reads
+        // and clears the active palette.
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: SETTINGS_STORAGE_KEY }),
+        );
+      }
     }
   }, []);
 
