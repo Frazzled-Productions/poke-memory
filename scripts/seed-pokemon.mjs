@@ -245,6 +245,10 @@ function normalizeFlavorText(text) {
 // lib/pokemon/triggers.ts. PokéAPI nests references as { name, url }; we
 // keep only the slug so the persisted form doesn't force defensive
 // null-checks at every consumer.
+//
+// `region` is included here for use during chain post-processing
+// (addFormEdges). It is stripped from the final persisted chain node before
+// writing generated.json — see addFormEdges below.
 function trimDetail(d) {
   if (!d) return null;
   return {
@@ -271,7 +275,114 @@ function trimDetail(d) {
     item: d.item?.name ?? null,
     trade_species: d.trade_species?.name ?? null,
     used_move: d.used_move?.name ?? null,
+    // Seed-time only: which regional variant this edge targets.
+    // Stripped before persisting by addFormEdges.
+    region: d.region?.name ?? null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Form-aware evolution edge helpers
+// (Logic mirrors lib/pokemon/chainExpansion.ts which is the TS source for
+// unit tests.)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a lookup table: speciesId → (formSlug → { pokemonId, displayName }).
+ * Only indexes entries where formSlug is a regional prefix
+ * (alola / galar / hisui / paldea).
+ *
+ * @param {Array} records  Partial records from processSpecies, each with
+ *   { speciesId, isDefaultForm, formSlug, id, displayName }.
+ * @returns {Map<number, Map<string, {pokemonId: number, displayName: string}>>}
+ */
+function buildVarietiesLookup(records) {
+  const lookup = new Map();
+  for (const rec of records) {
+    if (rec.isDefaultForm || !rec.formSlug) continue;
+    // Only index regional slugs — the ones PokéAPI uses in evolution_details.region.
+    if (!/^(alola|galar|hisui|paldea)/.test(rec.formSlug)) continue;
+    if (!lookup.has(rec.speciesId)) {
+      lookup.set(rec.speciesId, new Map());
+    }
+    lookup.get(rec.speciesId).set(rec.formSlug, {
+      pokemonId: rec.id,
+      displayName: rec.displayName,
+    });
+  }
+  return lookup;
+}
+
+/**
+ * Expand region-tagged chain nodes into additional form-aware edge nodes.
+ *
+ * For each node whose detail.region is non-null:
+ *   1. Resolve the child form variety (speciesId → region). Skip if absent.
+ *   2. Resolve the parent form variety (evolvesFromId → region). Fall back
+ *      to the default pokemonId (= speciesId) if no regional variant exists.
+ *   3. Emit an additional node using the form pokemon IDs, stripping `region`
+ *      from the persisted detail.
+ *
+ * Dedup key: `${evolvesFromId}>>>${speciesId}`. Guarantees one node per
+ * unique (from, to) pair in the output regardless of how many times a
+ * species-level edge appears across the input (e.g. shared chains).
+ *
+ * @param {Array} nodes     Flat chain nodes from flattenChain.
+ * @param {Map}   lookup    VarietiesLookup from buildVarietiesLookup.
+ * @returns {Array}         Combined node list, deduped on (evolvesFromId, speciesId).
+ */
+function addFormEdges(nodes, lookup) {
+  const seen = new Set();
+  const result = [];
+
+  function pushIfNew(node) {
+    const key =
+      node.evolvesFromId === null
+        ? `null>>>${node.speciesId}`
+        : `${node.evolvesFromId}>>>${node.speciesId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(node);
+  }
+
+  for (const node of nodes) {
+    // Always emit the node itself (default or no-region).
+    pushIfNew(node);
+
+    // Emit a form-aware edge when a region is tagged.
+    const region = node.detail?.region;
+    if (!region || node.evolvesFromId === null) continue;
+
+    const parentSpeciesId = node.evolvesFromId;
+    const childSpeciesId = node.speciesId;
+
+    // Child form: required — skip if the child has no such regional variant.
+    const childVarieties = lookup.get(childSpeciesId);
+    const childEntry = childVarieties?.get(region);
+    if (!childEntry) continue;
+
+    // Parent form: optional — fall back to default pokemonId (= speciesId
+    // for default forms whose id matches their speciesId).
+    const parentVarieties = lookup.get(parentSpeciesId);
+    const parentEntry = parentVarieties?.get(region);
+    const parentFormId = parentEntry?.pokemonId ?? parentSpeciesId;
+
+    // Strip `region` from the emitted detail so it is not persisted.
+    let detailWithoutRegion = null;
+    if (node.detail !== null) {
+      const { region: _r, ...rest } = node.detail;
+      detailWithoutRegion = rest;
+    }
+
+    pushIfNew({
+      speciesId: childEntry.pokemonId,
+      name: childEntry.displayName,
+      evolvesFromId: parentFormId,
+      detail: detailWithoutRegion,
+    });
+  }
+
+  return result;
 }
 
 // One node per (parent, child) in evolves_to[]. Multiple evolution_details[]
@@ -842,6 +953,23 @@ async function main() {
       }
     }
   }
+
+  // ------------------------------------------------------------------
+  // Step 3.1: Expand region-tagged edges into form-aware edge nodes.
+  // Build a varieties lookup from the partial records (formSlug → pokemonId)
+  // then post-process each chain to add edges using form pokemon IDs.
+  // Dedup key: `${evolvesFromId}>>>${speciesId}`.
+  // ------------------------------------------------------------------
+  const varietiesLookup = buildVarietiesLookup(partialRecords);
+  let formEdgesAdded = 0;
+  for (const [url, nodes] of chainDataMap) {
+    const expanded = addFormEdges(nodes, varietiesLookup);
+    formEdgesAdded += expanded.length - nodes.length;
+    chainDataMap.set(url, expanded);
+  }
+  process.stderr.write(
+    `[seed] Form-aware edges: ${formEdgesAdded} additional edge nodes added across ${chainDataMap.size} chains\n`
+  );
 
   // ------------------------------------------------------------------
   // Step 3.5: Download sprites to public/sprites/pokemon/
