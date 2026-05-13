@@ -7,6 +7,7 @@ import { AuthButton } from "@/components/auth/AuthButton";
 import { loadSession } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 
 const NAV_LINKS = [
   { href: "/", label: "Practice" },
@@ -20,6 +21,7 @@ const LINK_BASE =
 
 export function NavLinks() {
   const pathname = usePathname();
+  const { flags } = useSuperuser();
   const [hasMastered, setHasMastered] = useState(false);
   // Re-runs the mastery check when the session key changes — native cross-tab
   // events and the synthetic dispatch from pullAndMerge / pasture sparkle
@@ -32,6 +34,8 @@ export function NavLinks() {
       session !== null && filterMastered(session.cards).length > 0,
     );
   }, [sessionVersion]);
+
+  const showPasture = hasMastered || flags.pretendAllMastered;
 
   return (
     <>
@@ -55,7 +59,7 @@ export function NavLinks() {
             </li>
           );
         })}
-        {hasMastered && (
+        {showPasture && (
           <li>
             <Link
               href="/pasture"
