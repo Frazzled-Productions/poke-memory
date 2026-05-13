@@ -120,9 +120,13 @@ export function useManualSync(
         // would use DEFAULT_SETTINGS (reverse/cry disabled) and cloud rows for
         // those types would be silently dropped by the merge (#391).
         if (!hasStoredSettings()) {
-          const cloudSettings = await pullSettings(client, userId);
-          if (cancelledRef.current) return;
-          if (cloudSettings !== null) saveSettings(cloudSettings);
+          try {
+            const cloudSettings = await pullSettings(client, userId);
+            if (cancelledRef.current) return;
+            if (cloudSettings !== null) saveSettings(cloudSettings);
+          } catch {
+            console.warn("[sync] brand-new-device settings pull failed; continuing with defaults");
+          }
         }
         const settings = loadSettings();
         const base = buildSession(

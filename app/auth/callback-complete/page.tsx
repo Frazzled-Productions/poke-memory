@@ -96,8 +96,8 @@ export default function CallbackCompletePage() {
           } catch {
             // Best-effort: fall through to default settings.
           }
-          if (cancelled) return;
         }
+        if (cancelled) return;
         const settings = loadSettings();
         const base =
           localSession !== null
