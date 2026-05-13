@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 import type { PokemonFact } from "@/lib/pokemon/facts";
 import { DirectionBadge } from "@/components/review/DirectionBadge";

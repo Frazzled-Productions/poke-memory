@@ -981,6 +981,8 @@ export function ReviewSession() {
         speakName(currentCard.postEvoName);
       } else if (currentCard.cardType === "reverse-evolution") {
         speakName(currentCard.preEvoName);
+      } else if (currentCard.cardType === "cry") {
+        speakName(currentCard.name);
       }
     }
   }
