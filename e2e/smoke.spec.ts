@@ -429,6 +429,26 @@ test.describe("Settings page", () => {
     ).toBeHidden();
   });
 
+  test("numeric field accepts mid-edit value and persists on Save", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(page.getByLabel("Loading settings")).toBeHidden();
+
+    const input = page.getByLabel("New cards per day").first();
+    await input.click();
+    await input.selectText();
+    await input.fill("5");
+    // Blur by clicking away so the draft commits before Save.
+    await page.getByRole("heading", { level: 1, name: "Settings" }).click();
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Saved!")).toBeVisible();
+    // Reload and verify the value persisted.
+    await page.reload();
+    await expect(page.getByLabel("Loading settings")).toBeHidden();
+    await expect(page.getByLabel("New cards per day").first()).toHaveValue("5");
+  });
+
   test("App Theme section hidden when no Pokémon mastered", async ({ page }) => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
