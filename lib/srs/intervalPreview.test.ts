@@ -19,6 +19,7 @@ function makeState(overrides: Partial<ReviewState>): ReviewState {
     learningStep: null,
     stepStartedAt: null,
     hiddenSince: null,
+    seenInPasture: false,
     ...overrides,
   };
 }

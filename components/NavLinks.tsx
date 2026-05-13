@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { AuthButton } from "@/components/auth/AuthButton";
+import { loadSession } from "@/lib/review/persistence";
+import { filterMastered } from "@/lib/pasture/arrivals";
 
 const NAV_LINKS = [
   { href: "/", label: "Practice" },
@@ -16,6 +19,15 @@ const LINK_BASE =
 
 export function NavLinks() {
   const pathname = usePathname();
+  const [hasMastered, setHasMastered] = useState(false);
+
+  useEffect(() => {
+    const session = loadSession();
+    if (session && filterMastered(session.cards).length > 0) {
+      setHasMastered(true);
+    }
+  }, []);
+
   return (
     <>
       <ul className="flex items-center gap-1" role="list">
@@ -38,6 +50,22 @@ export function NavLinks() {
             </li>
           );
         })}
+        {hasMastered && (
+          <li>
+            <Link
+              href="/pasture"
+              aria-current={pathname === "/pasture" ? "page" : undefined}
+              className={[
+                LINK_BASE,
+                pathname === "/pasture"
+                  ? "bg-theme-fg-on-primary text-theme-primary"
+                  : "text-theme-fg-on-primary opacity-75 hover:opacity-100",
+              ].join(" ")}
+            >
+              Pasture
+            </Link>
+          </li>
+        )}
       </ul>
       <AuthButton />
     </>

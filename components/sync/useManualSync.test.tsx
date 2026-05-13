@@ -117,6 +117,7 @@ function makeCard(id: number, lastReview: string | null, reps: number) {
       learningStep: null,
       stepStartedAt: null,
       hiddenSince: null,
+      seenInPasture: false,
     },
   };
 }
@@ -360,6 +361,7 @@ describe("useManualSync", () => {
         last_review: "2026-05-12",
         first_seen: "2026-05-12",
         hidden_since: null,
+        seen_in_pasture: false,
         updated_at: "2026-05-13T09:15:00.000Z",
       },
       {
@@ -375,6 +377,7 @@ describe("useManualSync", () => {
         last_review: "2026-05-12",
         first_seen: "2026-05-12",
         hidden_since: null,
+        seen_in_pasture: false,
         updated_at: "2026-05-13T11:42:00.000Z",
       },
     ]);
@@ -430,6 +433,7 @@ describe("useManualSync", () => {
         last_review: "2026-05-11",
         first_seen: "2026-05-11",
         hidden_since: null,
+        seen_in_pasture: false,
         updated_at: "2026-05-12T07:00:00.000Z",
       },
     ]);
