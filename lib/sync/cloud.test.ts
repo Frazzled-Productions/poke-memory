@@ -4,6 +4,7 @@ import {
   pushSession,
   pushSingleCard,
   mergeCloudIntoLocal,
+  mergeCloudIntoLocalSilent,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { CloudRow } from "./cloud";
@@ -304,5 +305,76 @@ describe("hidden_since (#333) round-trip", () => {
     delete (legacyRow as Partial<CloudRow>).hidden_since;
     const [merged] = mergeCloudIntoLocal([localCard], [legacyRow]);
     expect(merged.state.hiddenSince).toBeNull();
+  });
+});
+
+// ─── mergeCloudIntoLocalSilent (#359) ─────────────────────────────────────
+
+describe("mergeCloudIntoLocalSilent", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  it("when lastPullAt is null: pristine local card takes cloud (bootstrap)", () => {
+    const local = makeCard(1, null, null);
+    const row = makeCloudRow(1, "2026-05-09", "2026-05-10");
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], null);
+    expect(merged.state.lastReview).toBe("2026-05-10");
+    expect(merged.state.firstSeen).toBe("2026-05-09");
+  });
+
+  it("when lastPullAt is null: local card with lastReview is preserved over stale cloud", () => {
+    // The destructive case from #359: local has today's review, cloud is stale.
+    const local = makeCard(1, "2026-05-13", "2026-05-13");
+    const staleRow = makeCloudRow(1, "2026-05-09", "2026-05-10");
+    const [merged] = mergeCloudIntoLocalSilent([local], [staleRow], null);
+    expect(merged).toBe(local);
+  });
+
+  it("when lastPullAt is null: local in-step card (firstSeen set, lastReview null) is preserved", () => {
+    const local = makeCard(1, "2026-05-13", null);
+    const row = makeCloudRow(1, null, null);
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], null);
+    expect(merged).toBe(local);
+  });
+
+  it("keeps local when localLastReview is on the pull date (graded today)", () => {
+    const local = makeCard(1, "2026-05-13", "2026-05-13");
+    const staleRow = makeCloudRow(1, "2026-05-09", "2026-05-10", "2026-05-10T12:00:00.000Z");
+    const [merged] = mergeCloudIntoLocalSilent(
+      [local],
+      [staleRow],
+      "2026-05-13T08:00:00.000Z",
+    );
+    expect(merged).toBe(local);
+  });
+
+  it("takes cloud when cloud.updated_at is newer than lastPullAt and local has no review since pull", () => {
+    const local = makeCard(1, null, null);
+    const freshRow = makeCloudRow(1, "2026-05-12", "2026-05-12", "2026-05-13T10:00:00.000Z");
+    const [merged] = mergeCloudIntoLocalSilent(
+      [local],
+      [freshRow],
+      "2026-05-13T08:00:00.000Z",
+    );
+    expect(merged.state.lastReview).toBe("2026-05-12");
+    expect(merged.state.firstSeen).toBe("2026-05-12");
+  });
+
+  it("keeps local when cloud row is unchanged since last pull", () => {
+    const local = makeCard(1, "2026-05-12", "2026-05-12");
+    const oldRow = makeCloudRow(1, "2026-05-12", "2026-05-12", "2026-05-13T07:00:00.000Z");
+    const [merged] = mergeCloudIntoLocalSilent(
+      [local],
+      [oldRow],
+      "2026-05-13T08:00:00.000Z",
+    );
+    expect(merged).toBe(local);
+  });
+
+  it("returns local unchanged when no matching cloud row", () => {
+    const local = makeCard(42, "2026-05-12", "2026-05-12");
+    const [merged] = mergeCloudIntoLocalSilent([local], [], null);
+    expect(merged).toBe(local);
   });
 });

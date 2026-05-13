@@ -219,6 +219,20 @@ export async function pullSession(
 }
 
 /**
+ * Returns the most-recently-updated cloud row's `updated_at` timestamp, or the
+ * current time as a fallback when no rows have one. Used to anchor `lastPullAt`
+ * to a server-derived value rather than the local clock, which protects the
+ * conflict-resolution rule from clock skew.
+ */
+export function maxCloudUpdatedAt(rows: CloudRow[]): string {
+  if (rows.length === 0) return new Date().toISOString();
+  return rows.reduce<string>((max, r) => {
+    if (!r.updated_at) return max;
+    return r.updated_at > max ? r.updated_at : max;
+  }, rows[0].updated_at ?? new Date().toISOString());
+}
+
+/**
  * Serialises cards to a Blob suitable for navigator.sendBeacon('/api/sync', blob).
  * Content-Type is set to application/json via the Blob constructor — sendBeacon
  * does not accept a headers option, so this is the only way to set it.
@@ -281,7 +295,11 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
 
 /**
  * Silent background-pull merge. Per-card conflict rule:
- *   - lastPullAt is null (first pull): cloud wins unconditionally.
+ *   - lastPullAt is null AND local card has no progress (lastReview === null
+ *     && firstSeen === null): cloud wins. Bootstrap for cards still pristine.
+ *   - lastPullAt is null AND local card has any progress: keep local. Without
+ *     a pull anchor we cannot reason about which side is newer, so any local
+ *     state that represents user effort is protected (closes #359).
  *   - card.state.lastReview >= lastPullAt.slice(0,10): this device graded
  *     since the last pull → keep local.
  *   - cloud row's updated_at > lastPullAt: cloud has newer state → take cloud.
@@ -302,6 +320,11 @@ export function mergeCloudIntoLocalSilent(
     if (!row) return card;
 
     if (lastPullAt === null) {
+      // No pull anchor. Cloud can only seed cards that have never been
+      // touched locally; anything with progress is preserved.
+      if (card.state.lastReview !== null || card.state.firstSeen !== null) {
+        return card;
+      }
       return applyCloudRow(card, row);
     }
 
