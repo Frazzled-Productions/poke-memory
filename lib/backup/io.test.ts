@@ -64,6 +64,7 @@ const VALID_SETTINGS: UserSettings = {
   favouriteTheme: null,
   retentionTarget: 0.9,
   practiceScope: { gens: [], types: [], presets: [] },
+  miniGameBestScore: 0,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

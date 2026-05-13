@@ -120,6 +120,7 @@ describe('loadSettings migration', () => {
       favouriteTheme: null,
       retentionTarget: 0.95,
       practiceScope: { gens: [1, 3], types: ['fire', 'water'], presets: ['starters' as const] },
+      miniGameBestScore: 0,
     };
     saveSettings(custom);
     const loaded = loadSettings();

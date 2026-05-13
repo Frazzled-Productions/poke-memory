@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
@@ -49,6 +49,8 @@ import {
   type PracticeScope,
 } from "@/lib/review/scope";
 import { ScopeControl } from "@/components/review/ScopeControl";
+import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
+import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
@@ -401,6 +403,13 @@ export function ReviewSession() {
   const { user, supabase } = useAuth();
   const { enqueueGrade, flushPending } = usePerGradeSync(supabase, user?.id ?? null);
   useSyncOnUnload(supabase, user?.id ?? null, flushPending);
+
+  // Derive seen Pokémon once per cards change — used by the mini-game on the
+  // SESSION_COMPLETE screen. Must stay unconditional (hooks rule).
+  const seenPokemon = useMemo(
+    () => (cards !== null ? getSeenPokemon(cards, SEED_POKEMON) : []),
+    [cards],
+  );
 
   useEffect(() => {
     const settings = loadSettings();
@@ -887,13 +896,18 @@ export function ReviewSession() {
           })
         : null;
     return (
-      <SessionCompleteScreen
-        perType={perType}
-        nameEnabled={nameCardsEnabled}
-        evolutionEnabled={evolutionCardsEnabled}
-        reverseEnabled={reverseEnabled}
-        shareText={shareText}
-      />
+      <div className="flex flex-col items-center w-full">
+        <SessionCompleteScreen
+          perType={perType}
+          nameEnabled={nameCardsEnabled}
+          evolutionEnabled={evolutionCardsEnabled}
+          reverseEnabled={reverseEnabled}
+          shareText={shareText}
+        />
+        {seenPokemon.length >= 2 && (
+          <HigherOrLowerGame seenPokemon={seenPokemon} />
+        )}
+      </div>
     );
   }
 
