@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { loadSettings, saveSettings, DEFAULT_SETTINGS } from '@/lib/settings/persistence';
+import { loadSettings, saveSettings, DEFAULT_SETTINGS, type ThemeIntensity } from '@/lib/settings/persistence';
 
 const STORAGE_KEY = 'poke-memory:settings:v1';
 
@@ -118,6 +118,7 @@ describe('loadSettings migration', () => {
       maxNewCryPerDay: 12,
       maxReviewsCryPerDay: 80,
       favouriteTheme: null,
+      themeIntensity: 'accents' as const,
       retentionTarget: 0.95,
       practiceScope: { gens: [1, 3], types: ['fire', 'water'], presets: ['starters' as const] },
       miniGameBestScore: 0,
@@ -307,5 +308,41 @@ describe('loadSettings: legacy practice-scope migration', () => {
     mockLocalStorage.setItem(LEGACY_SCOPE_KEY, '{not json');
     expect(() => loadSettings()).not.toThrow();
     expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [] });
+  });
+});
+
+// ─── themeIntensity (#411) ───────────────────────────────────────────────────
+
+describe('themeIntensity setting (#411)', () => {
+  it('loadSettings returns themeIntensity: "accents" for a brand-new device (no localStorage)', () => {
+    // mockLocalStorage is cleared in beforeEach — nothing stored.
+    const settings = loadSettings();
+    expect(settings.themeIntensity).toBe('accents');
+  });
+
+  it('parseStoredSettings accepts each valid ThemeIntensity literal', () => {
+    const intensities: ThemeIntensity[] = ['accents', 'tinted', 'full'];
+    for (const intensity of intensities) {
+      mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, themeIntensity: intensity }));
+      expect(loadSettings().themeIntensity).toBe(intensity);
+    }
+  });
+
+  it('parseStoredSettings falls back to "accents" for any unknown value', () => {
+    for (const bad of ['FULL', 'Full', 'none', '', 42, null, undefined, {}]) {
+      mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, themeIntensity: bad }));
+      expect(loadSettings().themeIntensity).toBe('accents');
+    }
+  });
+
+  it('saveSettings + loadSettings round-trips themeIntensity correctly', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, themeIntensity: 'full' });
+    expect(loadSettings().themeIntensity).toBe('full');
+
+    saveSettings({ ...DEFAULT_SETTINGS, themeIntensity: 'tinted' });
+    expect(loadSettings().themeIntensity).toBe('tinted');
+
+    saveSettings({ ...DEFAULT_SETTINGS, themeIntensity: 'accents' });
+    expect(loadSettings().themeIntensity).toBe('accents');
   });
 });

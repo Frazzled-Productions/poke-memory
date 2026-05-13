@@ -56,7 +56,7 @@ export function TypeBreakdown({ perType }: Props) {
                 aria-hidden="true"
               >
                 <div
-                  className="h-full bg-emerald-500"
+                  className={`h-full ${colors?.bg ?? "bg-zinc-500"}`}
                   style={{ width: `${masteredPct}%` }}
                 />
               </div>

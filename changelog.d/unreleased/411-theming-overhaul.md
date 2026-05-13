@@ -1,0 +1,4 @@
+---
+kind: changed
+---
+- Overhauled theming: light mode now has an off-white body and surfaces carry a faint mascot wash; dark mode buttons and surfaces have stronger contrast against the body; the chosen mascot's palette now drives focus rings, primary CTAs, progress fills and stats type bars in addition to the nav. Added a "Theme intensity" setting (Subtle accents / Tinted backgrounds / Full mascot theme) so users can dial how loud the mascot theming is. Grade buttons (Again/Hard/Good/Easy) now use saturated colour fills with a backdrop-agnostic outline. New brand-default Poké-ball-red palette gives accents even before any mascot is mastered. Added a faint mascot/Poké-ball watermark at higher intensities, and a hidden Theme audit page (linked from the Developer section) for previewing every mascot × intensity × colour scheme combination.

@@ -26,6 +26,7 @@ import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
 import { countOptimizableReviews } from "@/lib/srs/optimizer";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
+import { IntensityPicker } from "@/components/settings/IntensityPicker";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -852,6 +853,15 @@ export default function SettingsPage() {
                 }}
               />
 
+              <IntensityPicker
+                value={settings.themeIntensity}
+                onChange={(next) => {
+                  const updated = { ...settings, themeIntensity: next };
+                  setSettings(updated);
+                  saveSettings(updated);
+                }}
+              />
+
               <section className="flex flex-col gap-4" aria-labelledby="about-heading">
                 <h2
                   id="about-heading"
@@ -965,6 +975,20 @@ export default function SettingsPage() {
                   cloud state for signed-in users, or offers to reset local
                   state for guests.
                 </p>
+                <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <a
+                    href="/audit-themes"
+                    className="block text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                  >
+                    Theme audit →
+                  </a>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Side-by-side preview of every mascot × intensity × colour
+                    scheme. Use when tweaking <code className="font-mono">globals.css</code> to spot
+                    combos where the grade buttons blend into the surface.
+                  </p>
+                </div>
+
                 <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
                   <div className="flex items-center justify-between gap-4">
                     <div>

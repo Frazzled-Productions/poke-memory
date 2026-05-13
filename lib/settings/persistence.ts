@@ -21,6 +21,9 @@ export type StoredFavouriteTheme = {
   spriteUrl: string | null;
 };
 
+/** Controls how broadly the chosen Pokémon palette is applied to the UI. */
+export type ThemeIntensity = "accents" | "tinted" | "full";
+
 export type UserSettings = {
   masteryRepetitions: number;        // cards with this many consecutive correct reviews = mastered
   maxNewPerDay: number;              // hard daily cap for new name cards
@@ -38,6 +41,8 @@ export type UserSettings = {
   maxNewCryPerDay: number;
   maxReviewsCryPerDay: number;
   favouriteTheme: StoredFavouriteTheme | null; // chosen mastery accent Pokémon
+  /** How broadly the chosen palette is painted across the UI (#411). */
+  themeIntensity: ThemeIntensity;
   /**
    * FSRS desired-retention target. Range 0.80..0.97; default 0.90 matches
    * `ts-fsrs` and Anki defaults. Lower = fewer reviews, more forgetting.
@@ -83,6 +88,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxNewCryPerDay: 10,
   maxReviewsCryPerDay: 100,
   favouriteTheme: null,
+  themeIntensity: "accents",
   retentionTarget: 0.9,
   practiceScope: EMPTY_SCOPE,
   miniGameBestScore: 0,
@@ -231,6 +237,12 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.favouriteTheme === "object" && obj.favouriteTheme !== null
         ? (obj.favouriteTheme as StoredFavouriteTheme)
         : null,
+    themeIntensity:
+      obj.themeIntensity === "accents" ||
+      obj.themeIntensity === "tinted" ||
+      obj.themeIntensity === "full"
+        ? obj.themeIntensity
+        : DEFAULT_SETTINGS.themeIntensity,
     retentionTarget:
       typeof obj.retentionTarget === "number"
         ? clampRetention(obj.retentionTarget)

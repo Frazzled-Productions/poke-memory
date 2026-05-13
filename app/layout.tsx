@@ -9,6 +9,7 @@ import { SignInPull } from "@/components/sync/SignInPull";
 import { AutoSyncOnChange } from "@/components/sync/AutoSyncOnChange";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
+import { ThemeWatermark } from "@/components/theme/ThemeWatermark";
 import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
   ],
   colorScheme: "light dark",
@@ -54,7 +55,7 @@ export default function RootLayout({
         {/* Inline script applies saved theme before first paint to avoid flash of default palette */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('poke-memory:favourite:v1');if(t){var d=JSON.parse(t),c=d&&d.colors,r=document.documentElement,h=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;if(c&&h.test(c.primary))r.style.setProperty('--theme-primary',c.primary);if(c&&h.test(c.secondary))r.style.setProperty('--theme-secondary',c.secondary);if(c&&h.test(c.accent))r.style.setProperty('--theme-accent',c.accent);if(c&&h.test(c.fgOnPrimary))r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);}}catch(e){}`,
+            __html: `try{var s=JSON.parse(localStorage.getItem('poke-memory:settings:v1')||'null');if(s){var r=document.documentElement;var h=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;var c=s.favouriteTheme&&s.favouriteTheme.colors;if(c&&h.test(c.primary))r.style.setProperty('--theme-primary',c.primary);if(c&&h.test(c.secondary))r.style.setProperty('--theme-secondary',c.secondary);if(c&&h.test(c.accent))r.style.setProperty('--theme-accent',c.accent);if(c&&h.test(c.fgOnPrimary))r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);var i=s.themeIntensity;if(i==='tinted'||i==='full')r.setAttribute('data-intensity',i);}}catch(e){}`,
           }}
         />
       </head>
@@ -62,6 +63,7 @@ export default function RootLayout({
         <AuthProvider>
           <SuperuserProvider>
             <FavouriteThemeProvider>
+              <ThemeWatermark />
               <Nav />
               <Suspense fallback={null}>
                 <SyncOnVisible />
