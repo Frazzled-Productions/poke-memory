@@ -154,6 +154,12 @@ export function migrateReviewState(state: unknown): void {
     // builder can compute a real countdown; graduated cards keep null.
     s.stepStartedAt = s.learningStep !== null ? Date.now() : null;
   }
+  if (s.hiddenSince === undefined) {
+    // Backfill for sessions saved before #333. Null means "currently eligible
+    // under the filter" — the reconciliation step on next load will set it
+    // forward when applicable.
+    s.hiddenSince = null;
+  }
   if (s.stability === undefined) {
     const repetitions = typeof s.repetitions === "number" ? s.repetitions : 0;
     const interval = typeof s.interval === "number" ? s.interval : 0;

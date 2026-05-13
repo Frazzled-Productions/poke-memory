@@ -109,6 +109,7 @@ function makeCard(id: number, lastReview: string | null, reps: number) {
       firstSeen: lastReview,
       learningStep: null,
       stepStartedAt: null,
+      hiddenSince: null,
     },
   };
 }

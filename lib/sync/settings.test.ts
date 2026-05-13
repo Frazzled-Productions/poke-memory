@@ -34,6 +34,7 @@ const SAMPLE: UserSettings = {
   maxReviewsCryPerDay: 100,
   favouriteTheme: null,
   retentionTarget: 0.9,
+  practiceScope: { gens: [], types: [], presets: [] },
 };
 
 describe("pushSettings", () => {

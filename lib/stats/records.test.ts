@@ -14,7 +14,7 @@ function state(overrides: Partial<ReviewState> = {}): ReviewState {
     stability: 0, difficulty: 0, elapsedDays: 0, scheduledDays: 0,
     reps: 0, lapses: 0, fsrsState: "new",
     dueDate: "2026-05-12", lastReview: null, firstSeen: null,
-    learningStep: null, stepStartedAt: null,
+    learningStep: null, stepStartedAt: null, hiddenSince: null,
     ...overrides,
   };
 }

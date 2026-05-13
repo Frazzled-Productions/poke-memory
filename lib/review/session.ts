@@ -299,6 +299,7 @@ export function buildSessionQueues(
   cards: readonly ReviewableCard[],
   limits: DailyLimits,
   today: string,
+  eligibleCardIds?: ReadonlySet<number>,
 ): {
   learningCardIds: number[];
   reviewQueue: number[];
@@ -321,6 +322,11 @@ export function buildSessionQueues(
   const reviewCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [], cry: [] };
   const newCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [], cry: [] };
 
+  // Counters reflect what already happened (timestamps in firstSeen /
+  // lastReview) and MUST NOT change when a filter is applied — otherwise
+  // daily caps would reset every time the user toggles the filter. The
+  // `eligibleCardIds` gate only applies to candidate collection, not to
+  // counter computation (#333).
   for (const card of cards) {
     const type = card.cardType;
     if (card.state.firstSeen === today) {
@@ -330,6 +336,7 @@ export function buildSessionQueues(
       perType[type].reviewsDoneToday += 1;
     }
     if (card.state.learningStep !== null) continue;
+    if (eligibleCardIds !== undefined && !eligibleCardIds.has(card.id)) continue;
     if (
       card.state.lastReview !== null &&
       card.state.dueDate <= today &&

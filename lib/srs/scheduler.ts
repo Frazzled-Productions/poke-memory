@@ -63,6 +63,11 @@ export type ReviewState = {
   firstSeen: string | null;  // ISO date of first-ever grade. Set once; never overwritten.
   learningStep: number | null;
   stepStartedAt: number | null;
+  // Learning-filter snooze (#333). Set on the day a card first becomes
+  // ineligible under the active filter; cleared on un-hide after dueDate is
+  // shifted forward by the hidden duration. Null when the card is currently
+  // eligible (the normal case).
+  hiddenSince: string | null;
 };
 
 export type Grade = 1 | 2 | 4 | 5;
@@ -349,5 +354,6 @@ export function initialReviewState(now: Date = new Date()): ReviewState {
     firstSeen: null,
     learningStep: null,
     stepStartedAt: null,
+    hiddenSince: null,
   };
 }

@@ -1,4 +1,12 @@
 import type { ThemeColors } from "@/lib/theme/curated-pokemon";
+import {
+  EMPTY_SCOPE,
+  type PracticeScope,
+  type PracticeScopePreset,
+  isScopeEmpty,
+  readLegacyScope,
+  clearLegacyScope,
+} from "@/lib/review/scope";
 
 // localStorage key for all user-configurable settings
 export const STORAGE_KEY = "poke-memory:settings:v1";
@@ -35,6 +43,15 @@ export type UserSettings = {
    * Higher = more reviews, better retention.
    */
   retentionTarget: number;
+  /**
+   * Practice scope (#333). Persisted from `components/review/ScopeControl`.
+   * `EMPTY_SCOPE` ({ gens: [], types: [], presets: [] }) means "no
+   * restriction". Carried into Supabase by the existing settings JSONB
+   * sync (LWW), so scope follows the user across devices for free.
+   *
+   * Schema lives in `lib/review/scope.ts` next to the scope helpers.
+   */
+  practiceScope: PracticeScope;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -54,6 +71,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxReviewsCryPerDay: 100,
   favouriteTheme: null,
   retentionTarget: 0.9,
+  practiceScope: EMPTY_SCOPE,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -67,88 +85,175 @@ function clampRetention(v: number): number {
   return v;
 }
 
+/**
+ * Strict-on-gens, permissive-on-types validator for the persisted scope
+ * payload (#333). Same defensive posture as `favouriteTheme`: a malformed
+ * sub-field must not poison the whole settings payload.
+ *
+ *   - gens: integers in [1, 9], deduped, preserving first-occurrence order.
+ *   - types: any string accepted — the UI restricts the input set; this
+ *     validator just guards JSON shape so a manually-edited localStorage
+ *     blob with a stray type name doesn't drop the whole payload.
+ *   - presets: only the known preset literals (`"starters"`, `"legendaries"`)
+ *     are kept; unknown values are silently dropped.
+ *
+ * Returns `null` on malformed input so `loadSettings` can fall back to
+ * the default.
+ */
+function validatePracticeScope(value: unknown): PracticeScope | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (!Array.isArray(v.gens) || !Array.isArray(v.types) || !Array.isArray(v.presets)) {
+    return null;
+  }
+  const gens: number[] = [];
+  const seenGens = new Set<number>();
+  for (const g of v.gens) {
+    if (typeof g !== "number" || !Number.isInteger(g) || g < 1 || g > 9) {
+      return null;
+    }
+    if (seenGens.has(g)) continue;
+    seenGens.add(g);
+    gens.push(g);
+  }
+  const types: string[] = [];
+  for (const t of v.types) {
+    if (typeof t !== "string") return null;
+    types.push(t);
+  }
+  const presets: PracticeScopePreset[] = [];
+  const seenPresets = new Set<PracticeScopePreset>();
+  for (const p of v.presets) {
+    if (p !== "starters" && p !== "legendaries") continue;
+    if (seenPresets.has(p)) continue;
+    seenPresets.add(p);
+    presets.push(p);
+  }
+  return { gens, types, presets };
+}
+
+/**
+ * Internal: parse settings JSON without applying the legacy-scope migration.
+ * Used by both `loadSettings` and the migration path so the migration can
+ * inspect the parsed payload before triggering side effects.
+ *
+ * Always returns a fresh object so the caller (the migration path) can
+ * mutate `practiceScope` without aliasing back into `DEFAULT_SETTINGS`.
+ */
+function parseStoredSettings(raw: string | null): UserSettings {
+  if (raw === null) return { ...DEFAULT_SETTINGS };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+  if (typeof parsed !== "object" || parsed === null) return { ...DEFAULT_SETTINGS };
+  const obj = parsed as Record<string, unknown>;
+  return {
+    masteryRepetitions:
+      typeof obj.masteryRepetitions === "number"
+        ? obj.masteryRepetitions
+        : DEFAULT_SETTINGS.masteryRepetitions,
+    maxNewPerDay:
+      typeof obj.maxNewPerDay === "number"
+        ? obj.maxNewPerDay
+        : DEFAULT_SETTINGS.maxNewPerDay,
+    maxReviewsPerDay:
+      typeof obj.maxReviewsPerDay === "number"
+        ? obj.maxReviewsPerDay
+        : DEFAULT_SETTINGS.maxReviewsPerDay,
+    maxNewEvolutionPerDay:
+      typeof obj.maxNewEvolutionPerDay === "number"
+        ? obj.maxNewEvolutionPerDay
+        : DEFAULT_SETTINGS.maxNewEvolutionPerDay,
+    maxReviewsEvolutionPerDay:
+      typeof obj.maxReviewsEvolutionPerDay === "number"
+        ? obj.maxReviewsEvolutionPerDay
+        : DEFAULT_SETTINGS.maxReviewsEvolutionPerDay,
+    nameCardsEnabled:
+      typeof obj.nameCardsEnabled === "boolean"
+        ? obj.nameCardsEnabled
+        : DEFAULT_SETTINGS.nameCardsEnabled,
+    evolutionCardsEnabled:
+      typeof obj.evolutionCardsEnabled === "boolean"
+        ? obj.evolutionCardsEnabled
+        : DEFAULT_SETTINGS.evolutionCardsEnabled,
+    reverseCardsEnabled:
+      typeof obj.reverseCardsEnabled === "boolean"
+        ? obj.reverseCardsEnabled
+        : DEFAULT_SETTINGS.reverseCardsEnabled,
+    maxNewReversePerDay:
+      typeof obj.maxNewReversePerDay === "number"
+        ? obj.maxNewReversePerDay
+        : DEFAULT_SETTINGS.maxNewReversePerDay,
+    maxReviewsReversePerDay:
+      typeof obj.maxReviewsReversePerDay === "number"
+        ? obj.maxReviewsReversePerDay
+        : DEFAULT_SETTINGS.maxReviewsReversePerDay,
+    playCryOnReveal:
+      typeof obj.playCryOnReveal === "boolean"
+        ? obj.playCryOnReveal
+        : DEFAULT_SETTINGS.playCryOnReveal,
+    cryCardsEnabled:
+      typeof obj.cryCardsEnabled === "boolean"
+        ? obj.cryCardsEnabled
+        : DEFAULT_SETTINGS.cryCardsEnabled,
+    maxNewCryPerDay:
+      typeof obj.maxNewCryPerDay === "number"
+        ? obj.maxNewCryPerDay
+        : DEFAULT_SETTINGS.maxNewCryPerDay,
+    maxReviewsCryPerDay:
+      typeof obj.maxReviewsCryPerDay === "number"
+        ? obj.maxReviewsCryPerDay
+        : DEFAULT_SETTINGS.maxReviewsCryPerDay,
+    // Shallow validation only — lib/theme/persistence.ts does the deep
+    // validation (HEX_COLOR, known Pokémon id) on read.
+    favouriteTheme:
+      typeof obj.favouriteTheme === "object" && obj.favouriteTheme !== null
+        ? (obj.favouriteTheme as StoredFavouriteTheme)
+        : null,
+    retentionTarget:
+      typeof obj.retentionTarget === "number"
+        ? clampRetention(obj.retentionTarget)
+        : DEFAULT_SETTINGS.retentionTarget,
+    practiceScope:
+      validatePracticeScope(obj.practiceScope) ?? EMPTY_SCOPE,
+  };
+}
+
 // Returns DEFAULT_SETTINGS on fresh load, server, or corruption. Never throws.
 // Legacy stored objects without the evolution-* keys are silently upgraded
 // with the defaults — name-card limits keep their saved values.
+//
+// Also performs a one-shot migration of the legacy practice-scope localStorage
+// key (`poke-memory:practice-scope:v1`, the original storage used before
+// `practiceScope` was folded into `UserSettings`). The migration runs at most
+// once per device: as soon as the legacy key is cleared, the read short-circuits
+// and there is nothing left to copy in. When both the legacy key and a stored
+// `practiceScope` field exist, the stored field wins (it is newer by definition
+// — once `saveSettings` runs it always carries `practiceScope`).
 export function loadSettings(): UserSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw) as unknown;
-    if (typeof parsed !== "object" || parsed === null) return DEFAULT_SETTINGS;
-    const obj = parsed as Record<string, unknown>;
-    return {
-      masteryRepetitions:
-        typeof obj.masteryRepetitions === "number"
-          ? obj.masteryRepetitions
-          : DEFAULT_SETTINGS.masteryRepetitions,
-      maxNewPerDay:
-        typeof obj.maxNewPerDay === "number"
-          ? obj.maxNewPerDay
-          : DEFAULT_SETTINGS.maxNewPerDay,
-      maxReviewsPerDay:
-        typeof obj.maxReviewsPerDay === "number"
-          ? obj.maxReviewsPerDay
-          : DEFAULT_SETTINGS.maxReviewsPerDay,
-      maxNewEvolutionPerDay:
-        typeof obj.maxNewEvolutionPerDay === "number"
-          ? obj.maxNewEvolutionPerDay
-          : DEFAULT_SETTINGS.maxNewEvolutionPerDay,
-      maxReviewsEvolutionPerDay:
-        typeof obj.maxReviewsEvolutionPerDay === "number"
-          ? obj.maxReviewsEvolutionPerDay
-          : DEFAULT_SETTINGS.maxReviewsEvolutionPerDay,
-      nameCardsEnabled:
-        typeof obj.nameCardsEnabled === "boolean"
-          ? obj.nameCardsEnabled
-          : DEFAULT_SETTINGS.nameCardsEnabled,
-      evolutionCardsEnabled:
-        typeof obj.evolutionCardsEnabled === "boolean"
-          ? obj.evolutionCardsEnabled
-          : DEFAULT_SETTINGS.evolutionCardsEnabled,
-      reverseCardsEnabled:
-        typeof obj.reverseCardsEnabled === "boolean"
-          ? obj.reverseCardsEnabled
-          : DEFAULT_SETTINGS.reverseCardsEnabled,
-      maxNewReversePerDay:
-        typeof obj.maxNewReversePerDay === "number"
-          ? obj.maxNewReversePerDay
-          : DEFAULT_SETTINGS.maxNewReversePerDay,
-      maxReviewsReversePerDay:
-        typeof obj.maxReviewsReversePerDay === "number"
-          ? obj.maxReviewsReversePerDay
-          : DEFAULT_SETTINGS.maxReviewsReversePerDay,
-      playCryOnReveal:
-        typeof obj.playCryOnReveal === "boolean"
-          ? obj.playCryOnReveal
-          : DEFAULT_SETTINGS.playCryOnReveal,
-      cryCardsEnabled:
-        typeof obj.cryCardsEnabled === "boolean"
-          ? obj.cryCardsEnabled
-          : DEFAULT_SETTINGS.cryCardsEnabled,
-      maxNewCryPerDay:
-        typeof obj.maxNewCryPerDay === "number"
-          ? obj.maxNewCryPerDay
-          : DEFAULT_SETTINGS.maxNewCryPerDay,
-      maxReviewsCryPerDay:
-        typeof obj.maxReviewsCryPerDay === "number"
-          ? obj.maxReviewsCryPerDay
-          : DEFAULT_SETTINGS.maxReviewsCryPerDay,
-      // Shallow validation only — lib/theme/persistence.ts does the deep
-      // validation (HEX_COLOR, known Pokémon id) on read.
-      favouriteTheme:
-        typeof obj.favouriteTheme === "object" && obj.favouriteTheme !== null
-          ? (obj.favouriteTheme as StoredFavouriteTheme)
-          : null,
-      retentionTarget:
-        typeof obj.retentionTarget === "number"
-          ? clampRetention(obj.retentionTarget)
-          : DEFAULT_SETTINGS.retentionTarget,
-    };
-  } catch {
-    return DEFAULT_SETTINGS;
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const settings = parseStoredSettings(raw);
+
+  // Legacy scope migration. Only fires when the current settings.practiceScope
+  // is the empty default — a non-empty stored field always wins. The legacy
+  // key is cleared after the read regardless, so the migration is strictly
+  // one-shot (no perpetual re-fire).
+  const legacy = readLegacyScope();
+  if (legacy !== null) {
+    clearLegacyScope();
+    if (isScopeEmpty(settings.practiceScope) && !isScopeEmpty(legacy)) {
+      settings.practiceScope = legacy;
+      // Persist so the next load (and the next sync push) carries the scope
+      // without depending on the legacy key.
+      saveSettings(settings);
+    }
   }
+
+  return settings;
 }
 
 /**

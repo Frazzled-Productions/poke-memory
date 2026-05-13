@@ -32,6 +32,11 @@ export type CloudRow = {
   due_date: string;
   last_review: string | null;
   first_seen: string | null;
+  /**
+   * Learning-filter snooze stamp (#333). Nullable. ISO YYYY-MM-DD.
+   * Cleared on un-hide once dueDate has been shifted forward.
+   */
+  hidden_since: string | null;
   /** Present on pull responses. Absent on locally-constructed push rows (added in the upsert batch). */
   updated_at?: string;
 };
@@ -70,6 +75,7 @@ function toCloudRow(card: ReviewableCard): CloudRow {
     due_date: card.state.dueDate,
     last_review: card.state.lastReview,
     first_seen: card.state.firstSeen,
+    hidden_since: card.state.hiddenSince,
   };
 }
 
@@ -146,6 +152,7 @@ export async function pushSingleCard(
         due_date: card.state.dueDate,
         last_review: card.state.lastReview,
         first_seen: card.state.firstSeen,
+        hidden_since: card.state.hiddenSince,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,pokemon_id" },
@@ -196,7 +203,7 @@ export async function pullSession(
       const { data, error } = await client
         .from("card_reviews")
         .select(
-          "pokemon_id,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,updated_at"
+          "pokemon_id,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,hidden_since,updated_at"
         )
         .eq("user_id", userId)
         .range(offset, offset + PAGE - 1);
@@ -227,6 +234,10 @@ export function buildBeaconPayload(cards: ReviewableCard[]): Blob {
  * violations (firstSeen set but lastReview null) the same way mergeCloudIntoLocal does.
  */
 function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
+  // Legacy cloud rows (pre-migration 007) won't have hidden_since on the
+  // wire — treat undefined as null so the normalised local state always
+  // has the field set to a concrete value.
+  const hiddenSince = row.hidden_since ?? null;
   if (row.first_seen !== null && row.last_review === null) {
     console.warn(
       `[sync] normalizing card ${card.id}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
@@ -245,6 +256,7 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
         dueDate: row.due_date,
         lastReview: null,
         firstSeen: null,
+        hiddenSince,
       },
     };
   }
@@ -262,6 +274,7 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
       dueDate: row.due_date,
       lastReview: row.last_review,
       firstSeen: row.first_seen,
+      hiddenSince,
     },
   };
 }

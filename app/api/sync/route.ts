@@ -62,6 +62,11 @@ export async function POST(request: Request) {
       due_date: r.due_date,
       last_review: r.last_review,
       first_seen: r.first_seen,
+      // #333: snooze stamp. Legacy beacons (pre-7) won't include this
+      // field; coalesce undefined to null so a missing key doesn't strip
+      // an existing value via partial update — upsert ignores absent
+      // columns on conflict so this is purely defensive.
+      hidden_since: r.hidden_since ?? null,
       updated_at: updatedAt,
     }));
     try {
