@@ -146,6 +146,15 @@ Playwright smoke tests live in `e2e/` and run against Vercel preview deployments
 - **When to add E2E tests**: any change that adds a new page, a new interactive flow, or modifies an existing user-facing flow should include or update an E2E test in `e2e/`. The bar is smoke-level coverage — verify the happy path loads and key interactions work, not exhaustive edge cases.
 - **File naming**: one spec file per feature area (e.g. `e2e/smoke.spec.ts` for cross-cutting smoke tests, `e2e/pokedex.spec.ts` for Pokédex-specific flows).
 
+### Local development gotchas
+
+`localhost:3000` and `pokememory.com` are different origins → independent `localStorage`. State (practice scope, review session, settings, superuser flags) does not flow between them. When a behaviour differs between local `next dev` and the deployed app, suspect localStorage drift before suspecting framework code — clear the `poke-memory:*` keys on the dev origin and reload, or QA against the latest preview URL from `vercel-preview-on-ready.yml`.
+
+Two card-mix shapes specifically look "broken" on a fresh dev session but aren't:
+
+- **"Unlimited reviews."** `buildSessionQueues` (`lib/review/session.ts`) only increments `reviewsDoneToday` when `lastReview === today && firstSeen !== today` (i.e. the card was first seen on a previous day). Cards first seen today have `firstSeen === today` set permanently on the first grade, so subsequent grades of the same card never count toward `reviewsDoneToday`. The 100/day review soft wall therefore cannot fire on a session built from cleared localStorage — total grades are bounded by the *new*-card caps (10 name + 5 evo + 10 reverse + 10 cry) multiplied by learning-step replays. The wall starts firing once cards introduced on prior days come due as reviews.
+- **No evolution cards under a types-only practice scope.** `cardMatchesScope` (`lib/review/scope.ts`) passes `types: []` for evolution and reverse-evolution cards by design — they don't carry the parent species' typing. `speciesMatchesScope` is ANY-OF across `gens` / `types` / `presets`, so a scope like `{ types: ["fire"] }` matches zero evolution cards and they vanish from the queue while name cards keep flowing. Check the scope chip on the Practice page before assuming evolution cards are broken.
+
 ### Documentation
 
 - **README.md** is the user-facing entry point — audience is a curious visitor or contributor. Concise, scannable, includes run-locally instructions.
