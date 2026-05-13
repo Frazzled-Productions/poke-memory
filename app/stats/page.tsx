@@ -8,7 +8,10 @@ import { loadSession } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
-import { loadSettings } from "@/lib/settings/persistence";
+import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
+import { checkBadges } from "@/lib/badges/check";
+import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import { loadGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
 import { computeAccuracySparkline, computeRollingAccuracy } from "@/lib/stats/accuracy";
@@ -408,15 +411,15 @@ export default function StatsPage() {
   const [rolling7d, setRolling7d] = useState<number | null>(null);
   const [streakDates, setStreakDates] = useState<string[]>([]);
   const [gradeLog, setGradeLog] = useState<ReturnType<typeof loadGradeLog>>([]);
+  const [earnedBadgeIds, setEarnedBadgeIds] = useState<readonly string[]>([]);
 
   useEffect(() => {
     const settings = loadSettings();
     const saved = loadSession();
-    if (saved !== null) {
-      setCards(hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled }));
-    } else {
-      setCards(buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled }));
-    }
+    const sessionCards = saved !== null
+      ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled })
+      : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled });
+    setCards(sessionCards);
     setMasteryRepetitions(settings.masteryRepetitions);
     setNameCardsEnabled(settings.nameCardsEnabled);
     const dates = loadStreakData();
@@ -428,7 +431,36 @@ export default function StatsPage() {
     setGradeTotals(computeGradeTotals(log));
     setAccuracyPoints(computeAccuracySparkline(log, today, 30));
     setRolling7d(computeRollingAccuracy(log, today, 7));
-  }, [storageVersion]);
+
+    // Retroactive badge award (#420). If a user already meets a badge's
+    // criterion when the feature ships (or after a sync pull), award it
+    // silently — no toast. The reveal toast only fires on the grade event
+    // that crosses the threshold (`ReviewSession.handleGrade`). We never
+    // award retroactively while a superuser flag is on; the catalog-wide
+    // overlay below covers that QA case without touching persisted state.
+    if (!anyFlagOn) {
+      const masteredIds = masteredSpeciesIds(
+        sessionCards,
+        settings.masteryRepetitions,
+        false,
+      );
+      const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
+      const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIdSet);
+      if (newlyEarned.length > 0) {
+        const nowIso = new Date().toISOString();
+        const nextEntries = [
+          ...settings.earnedBadges,
+          ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
+        ];
+        saveSettings({ ...settings, earnedBadges: nextEntries });
+        setEarnedBadgeIds(nextEntries.map((e) => e.id));
+      } else {
+        setEarnedBadgeIds(settings.earnedBadges.map((e) => e.id));
+      }
+    } else {
+      setEarnedBadgeIds(settings.earnedBadges.map((e) => e.id));
+    }
+  }, [storageVersion, anyFlagOn]);
 
   const nameCards =
     cards !== null
@@ -444,6 +476,22 @@ export default function StatsPage() {
           flags.pretendAllMastered,
         )
       : null;
+  // Resolve which badge definitions to render on the trainer card. With
+  // `pretendAllMastered` on, every catalog badge is shown without touching
+  // persisted state — exit cleanup will pull the real cloud list back and
+  // the synthetic StorageEvent in `saveSettings` triggers a re-read here.
+  const badgesToShow: readonly BadgeDefinition[] = flags.pretendAllMastered
+    ? BADGE_CATALOG
+    : (() => {
+        const byId = new Map(BADGE_CATALOG.map((b) => [b.id, b]));
+        const out: BadgeDefinition[] = [];
+        for (const id of earnedBadgeIds) {
+          const def = byId.get(id);
+          if (def) out.push(def);
+        }
+        return out;
+      })();
+
   const records: Records | null =
     nameCards !== null && masteryRepetitions !== null
       ? computeRecords(
@@ -483,6 +531,7 @@ export default function StatsPage() {
               }
               totalMastered={stats.mastered}
               perGeneration={stats.perGeneration}
+              earnedBadges={badgesToShow}
             />
             <section aria-labelledby="streak-heading">
               <h2 id="streak-heading" className="mb-3 text-base font-semibold text-foreground">

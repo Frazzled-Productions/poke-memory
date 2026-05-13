@@ -36,6 +36,52 @@ function SkeletonBlock({ className }: { className: string }) {
   );
 }
 
+/**
+ * Developer-only row for clearing the earned-badges list (#420). A QA tool
+ * — no confirmation dialog because the only way to render it is from inside
+ * superuser mode. While any superuser flag is on, cloud sync is paused, so
+ * the click only mutates localStorage; cloud state is untouched until the
+ * user explicitly exits superuser mode.
+ */
+function ResetEarnedBadgesRow() {
+  const [cleared, setCleared] = useState(false);
+
+  useEffect(() => {
+    if (!cleared) return;
+    const t = setTimeout(() => setCleared(false), 1500);
+    return () => clearTimeout(t);
+  }, [cleared]);
+
+  function handleClear() {
+    saveSettings({ ...loadSettings(), earnedBadges: [] });
+    setCleared(true);
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            Reset earned badges
+          </p>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Clears your gym-badge list so you can re-trigger the reveal
+            toasts. Local-only while superuser is on.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleClear}
+          className="min-h-[36px] shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+          aria-label="Reset earned badges"
+        >
+          {cleared ? "Cleared" : "Reset"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading settings">
@@ -1061,6 +1107,8 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
+
+                <ResetEarnedBadgesRow />
               </section>
             )}
 

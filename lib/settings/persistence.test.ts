@@ -123,10 +123,64 @@ describe('loadSettings migration', () => {
       practiceScope: { gens: [1, 3], types: ['fire', 'water'], presets: ['starters' as const] },
       miniGameBestScore: 0,
       seenStreakMilestones: [3, 7],
+      earnedBadges: [{ id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' }],
     };
     saveSettings(custom);
     const loaded = loadSettings();
     expect(loaded).toEqual(custom);
+  });
+});
+
+describe('loadSettings: earnedBadges (#420)', () => {
+  it('defaults to [] when the field is missing', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    expect(loadSettings().earnedBadges).toEqual([]);
+  });
+
+  it('round-trips a populated list', () => {
+    const entries = [
+      { id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' },
+      { id: 'eeveelutions', earnedAt: '2026-05-13T09:01:00.000Z' },
+    ];
+    saveSettings({ ...DEFAULT_SETTINGS, earnedBadges: entries });
+    expect(loadSettings().earnedBadges).toEqual(entries);
+  });
+
+  it('falls back to [] when the field is not an array', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ earnedBadges: 'broken' }));
+    expect(loadSettings().earnedBadges).toEqual([]);
+  });
+
+  it('keeps well-formed entries and silently drops malformed ones', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        earnedBadges: [
+          { id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' },
+          { id: 'no-timestamp' }, // malformed — missing earnedAt
+          { id: 'eeveelutions', earnedAt: '2026-05-13T10:00:00.000Z' },
+        ],
+      }),
+    );
+    expect(loadSettings().earnedBadges).toEqual([
+      { id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' },
+      { id: 'eeveelutions', earnedAt: '2026-05-13T10:00:00.000Z' },
+    ]);
+  });
+
+  it('drops non-object entries (e.g. bare strings)', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        earnedBadges: [
+          'cascade-badge', // wrong shape
+          { id: 'eeveelutions', earnedAt: '2026-05-13T10:00:00.000Z' },
+        ],
+      }),
+    );
+    expect(loadSettings().earnedBadges).toEqual([
+      { id: 'eeveelutions', earnedAt: '2026-05-13T10:00:00.000Z' },
+    ]);
   });
 });
 

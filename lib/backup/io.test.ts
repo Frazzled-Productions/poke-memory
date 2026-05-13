@@ -67,6 +67,7 @@ const VALID_SETTINGS: UserSettings = {
   practiceScope: { gens: [], types: [], presets: [] },
   miniGameBestScore: 0,
   seenStreakMilestones: [],
+  earnedBadges: [],
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {
