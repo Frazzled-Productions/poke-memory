@@ -3,7 +3,32 @@
 import type { HabitatZone, AnchorSlot } from "@/lib/pasture/zones";
 import type { NameReviewCard } from "@/lib/review/session";
 import { PasturePokemon } from "./PasturePokemon";
+import { GrasslandsBiome } from "./biomes/GrasslandsBiome";
+import { ForestBiome } from "./biomes/ForestBiome";
+import { SeaBiome } from "./biomes/SeaBiome";
+import { CaveBiome } from "./biomes/CaveBiome";
+import { MountainBiome } from "./biomes/MountainBiome";
+import { UrbanBiome } from "./biomes/UrbanBiome";
+import { WatersEdgeBiome } from "./biomes/WatersEdgeBiome";
+import { RoughTerrainBiome } from "./biomes/RoughTerrainBiome";
+import { SanctuaryBiome } from "./biomes/SanctuaryBiome";
+import { WildlandsBiome } from "./biomes/WildlandsBiome";
 import styles from "./Pasture.module.css";
+
+// Habitats with an illustrated backdrop. These suppress the flat HABITAT_TINTS
+// fallback below so the SVG scene is the entire visual.
+const BIOME_RENDERERS: Partial<Record<string, () => React.ReactElement>> = {
+  grassland:       () => <GrasslandsBiome />,
+  forest:          () => <ForestBiome />,
+  sea:             () => <SeaBiome />,
+  cave:            () => <CaveBiome />,
+  mountain:        () => <MountainBiome />,
+  urban:           () => <UrbanBiome />,
+  "waters-edge":   () => <WatersEdgeBiome />,
+  "rough-terrain": () => <RoughTerrainBiome />,
+  rare:            () => <SanctuaryBiome />,
+  unknown:         () => <WildlandsBiome />,
+};
 
 type Placement = {
   card: NameReviewCard;
@@ -48,6 +73,7 @@ const LABEL_COLOURS: Record<string, string> = {
 };
 
 export function PastureZone({ zone, placements, onMarkSeen }: Props) {
+  const biomeRenderer = BIOME_RENDERERS[zone.habitat];
   const tint = HABITAT_TINTS[zone.habitat] ?? HABITAT_TINTS.unknown;
   const labelColour = LABEL_COLOURS[zone.habitat] ?? LABEL_COLOURS.unknown;
 
@@ -59,19 +85,34 @@ export function PastureZone({ zone, placements, onMarkSeen }: Props) {
           ({placements.length})
         </span>
       </h2>
-      <div className={[styles.zoneContainer, tint].join(" ")}>
-        {placements.map(({ card, anchor }) => (
-          <div
-            key={card.id}
-            className={styles.spriteAnchor}
-            style={{
-              left: `${anchor.x * 100}%`,
-              top:  `${anchor.y * 100}%`,
-            }}
-          >
-            <PasturePokemon card={card} onMarkSeen={onMarkSeen} />
-          </div>
-        ))}
+      <div className={[styles.zoneContainer, biomeRenderer ? "" : tint].join(" ")}>
+        {biomeRenderer ? biomeRenderer() : null}
+        {(biomeRenderer
+          // Sort back-to-front so foreground sprites paint on top of distant ones.
+          ? [...placements].sort((a, b) => a.anchor.y - b.anchor.y)
+          : placements
+        ).map(({ card, anchor }) => {
+          // Depth scale: lerp from 0.65 (back) to 1.15 (front), keyed off
+          // the "ground-band" y range [0.55, 0.97]. Anchors above 0.55 (e.g.
+          // sea-surface fish at y≈0.28) clamp to the minimum scale instead
+          // of disappearing. Without a biome the zone is a flat colour box,
+          // so no scaling.
+          const t = Math.max(0, Math.min(1, (anchor.y - 0.55) / 0.42));
+          const scale = biomeRenderer ? 0.65 + t * 0.50 : 1;
+          return (
+            <div
+              key={card.id}
+              className={styles.spriteAnchor}
+              style={{
+                left: `${anchor.x * 100}%`,
+                top:  `${anchor.y * 100}%`,
+                transform: `translate(-50%, -50%) scale(${scale})`,
+              }}
+            >
+              <PasturePokemon card={card} onMarkSeen={onMarkSeen} />
+            </div>
+          );
+        })}
       </div>
     </section>
   );
