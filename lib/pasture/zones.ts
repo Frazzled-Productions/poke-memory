@@ -77,72 +77,84 @@ function gridSlots(
 
 export const HABITAT_ZONES: readonly HabitatZone[] = [
   // -------------------------------------------------------------------
-  // Grassland — 80 species → 110 slots (5 sub-regions × ~22 each)
+  // Grassland — 80 species → 90 slots, clustered in the ground band of
+  // the illustrated biome scene. Five horizontal sub-bands sit at the
+  // depths of the SVG terrain layers (distant hills → mid hills →
+  // foreground ground), so sprites stand on terrain instead of floating
+  // in the sky. PastureZone scales sprites by anchor.y for depth.
   // -------------------------------------------------------------------
   {
     habitat: "grassland",
     label: "Grasslands",
     subRegions: [
       {
+        id: "grassland-distant-hills",
+        name: "Distant Hills",
+        anchorSlots: gridSlots(0.04, 0.56, 0.96, 0.62, 14, 1),  // 14 slots, smallest
+      },
+      {
+        id: "grassland-rolling-hills",
+        name: "Rolling Hills",
+        anchorSlots: gridSlots(0.04, 0.66, 0.96, 0.72, 16, 1),  // 16 slots
+      },
+      {
         id: "grassland-meadow",
         name: "Sunlit Meadow",
-        anchorSlots: gridSlots(0.0, 0.0, 0.5, 0.5, 5, 5),   // 25 slots
+        anchorSlots: gridSlots(0.04, 0.76, 0.96, 0.82, 18, 1),  // 18 slots
       },
       {
-        id: "grassland-prairie",
-        name: "Open Prairie",
-        anchorSlots: gridSlots(0.5, 0.0, 1.0, 0.5, 5, 5),   // 25 slots
-      },
-      {
-        id: "grassland-plains",
-        name: "Rolling Plains",
-        anchorSlots: gridSlots(0.0, 0.5, 0.5, 1.0, 5, 5),   // 25 slots
-      },
-      {
-        id: "grassland-hillside",
-        name: "Grassy Hillside",
-        anchorSlots: gridSlots(0.5, 0.5, 1.0, 1.0, 5, 5),   // 25 slots
+        id: "grassland-pasture",
+        name: "Foreground Pasture",
+        anchorSlots: gridSlots(0.04, 0.85, 0.96, 0.90, 20, 1),  // 20 slots
       },
       {
         id: "grassland-flowers",
         name: "Flower Patch",
-        anchorSlots: gridSlots(0.2, 0.2, 0.8, 0.8, 4, 3),   // 12 slots → total 112
+        anchorSlots: gridSlots(0.05, 0.93, 0.95, 0.97, 22, 1),  // 22 slots → total 90
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Forest — 71 species → 100 slots (4 sub-regions × 25 each)
+  // Forest — 71 species → 80 slots clustered along the forest floor.
+  // Bands map to ForestBiome layers: deepest = behind trunks, front =
+  // by the fallen log and ferns.
   // -------------------------------------------------------------------
   {
     habitat: "forest",
     label: "Forest",
     subRegions: [
       {
+        id: "forest-deep",
+        name: "Deep Forest",
+        anchorSlots: gridSlots(0.04, 0.56, 0.96, 0.62, 12, 1),
+      },
+      {
+        id: "forest-canopy-edge",
+        name: "Canopy Edge",
+        anchorSlots: gridSlots(0.04, 0.66, 0.96, 0.72, 14, 1),
+      },
+      {
         id: "forest-clearing",
         name: "Clearing",
-        anchorSlots: gridSlots(0.0, 0.0, 0.5, 0.5, 5, 5),   // 25 slots
+        anchorSlots: gridSlots(0.04, 0.76, 0.96, 0.82, 16, 1),
       },
       {
-        id: "forest-canopy",
-        name: "Canopy",
-        anchorSlots: gridSlots(0.5, 0.0, 1.0, 0.5, 5, 5),   // 25 slots
-      },
-      {
-        id: "forest-stream",
-        name: "Stream Bank",
-        anchorSlots: gridSlots(0.0, 0.5, 0.5, 1.0, 5, 5),   // 25 slots
+        id: "forest-floor",
+        name: "Forest Floor",
+        anchorSlots: gridSlots(0.04, 0.85, 0.96, 0.90, 18, 1),
       },
       {
         id: "forest-undergrowth",
         name: "Undergrowth",
-        anchorSlots: gridSlots(0.5, 0.5, 1.0, 1.0, 5, 5),   // 25 slots → total 100
+        anchorSlots: gridSlots(0.05, 0.93, 0.95, 0.97, 20, 1),  // 12+14+16+18+20 = 80
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Sea — 40 species → 56 slots (3 sub-regions)
+  // Sea — 40 species → 44 slots distributed through the water column
+  // (surface → mid → reef → deep). Sea is full-vertical, not ground-band.
   // -------------------------------------------------------------------
   {
     habitat: "sea",
@@ -151,143 +163,184 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
       {
         id: "sea-surface",
         name: "Surface Waters",
-        anchorSlots: gridSlots(0.0, 0.0, 1.0, 0.4, 7, 3),   // 21 slots
+        anchorSlots: gridSlots(0.05, 0.24, 0.95, 0.32, 10, 1),
+      },
+      {
+        id: "sea-mid",
+        name: "Open Column",
+        anchorSlots: gridSlots(0.05, 0.45, 0.95, 0.55, 12, 1),
       },
       {
         id: "sea-reef",
         name: "Coral Reef",
-        anchorSlots: gridSlots(0.0, 0.4, 0.5, 1.0, 4, 4),   // 16 slots
+        anchorSlots: gridSlots(0.05, 0.66, 0.95, 0.74, 12, 1),
       },
       {
         id: "sea-deep",
-        name: "Deep Water",
-        anchorSlots: gridSlots(0.5, 0.4, 1.0, 1.0, 4, 5),   // 20 slots → total 57
+        name: "Seafloor",
+        anchorSlots: gridSlots(0.05, 0.86, 0.95, 0.93, 10, 1),  // 10+12+12+10 = 44
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Cave — 29 species → 40 slots (3 sub-regions)
+  // Cave — 29 species → 35 slots clustered on the cavern floor with one
+  // band near the crystal hollow further back.
   // -------------------------------------------------------------------
   {
     habitat: "cave",
     label: "Cave",
     subRegions: [
       {
-        id: "cave-entrance",
-        name: "Entrance",
-        anchorSlots: gridSlots(0.1, 0.7, 0.9, 1.0, 6, 2),   // 12 slots
+        id: "cave-crystal-hollow",
+        name: "Crystal Hollow",
+        anchorSlots: gridSlots(0.10, 0.65, 0.90, 0.71, 8, 1),
       },
       {
         id: "cave-deep",
         name: "Deep Cavern",
-        anchorSlots: gridSlots(0.1, 0.3, 0.9, 0.7, 6, 3),   // 18 slots
+        anchorSlots: gridSlots(0.05, 0.78, 0.95, 0.84, 10, 1),
       },
       {
-        id: "cave-crystal",
-        name: "Crystal Hollow",
-        anchorSlots: gridSlots(0.2, 0.0, 0.8, 0.3, 5, 2),   // 10 slots → total 40
+        id: "cave-floor",
+        name: "Cavern Floor",
+        anchorSlots: gridSlots(0.05, 0.88, 0.95, 0.92, 11, 1),
+      },
+      {
+        id: "cave-foreground",
+        name: "Entrance",
+        anchorSlots: gridSlots(0.05, 0.95, 0.95, 0.97, 12, 1),  // 8+10+11+12 = 41
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Mountain — 45 species → 60 slots (3 sub-regions × 20 each)
+  // Mountain — 45 species → 50 slots along the descending slopes and
+  // foreground ridge of MountainBiome.
   // -------------------------------------------------------------------
   {
     habitat: "mountain",
     label: "Mountain",
     subRegions: [
       {
-        id: "mountain-base",
-        name: "Mountain Base",
-        anchorSlots: gridSlots(0.0, 0.6, 1.0, 1.0, 5, 4),   // 20 slots
+        id: "mountain-summit",
+        name: "Summit Ridge",
+        anchorSlots: gridSlots(0.10, 0.56, 0.90, 0.62, 8, 1),
       },
       {
         id: "mountain-slope",
         name: "Rocky Slope",
-        anchorSlots: gridSlots(0.1, 0.3, 0.9, 0.6, 5, 4),   // 20 slots
+        anchorSlots: gridSlots(0.05, 0.68, 0.95, 0.74, 10, 1),
       },
       {
-        id: "mountain-peak",
-        name: "Summit",
-        anchorSlots: gridSlots(0.25, 0.0, 0.75, 0.3, 4, 5),  // 20 slots → total 60
+        id: "mountain-ridge",
+        name: "Mountain Ridge",
+        anchorSlots: gridSlots(0.05, 0.80, 0.95, 0.85, 12, 1),
+      },
+      {
+        id: "mountain-base",
+        name: "Mountain Base",
+        anchorSlots: gridSlots(0.05, 0.92, 0.95, 0.96, 14, 1),  // 8+10+12+14 = 44
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Urban — 37 species → 50 slots (3 sub-regions)
+  // Urban — 37 species → 45 slots along the sidewalk and street strip
+  // of UrbanBiome, with one back row near the skyline base.
   // -------------------------------------------------------------------
   {
     habitat: "urban",
     label: "Urban",
     subRegions: [
       {
-        id: "urban-streets",
-        name: "City Streets",
-        anchorSlots: gridSlots(0.0, 0.0, 0.5, 1.0, 4, 5),   // 20 slots
+        id: "urban-skyline-base",
+        name: "Skyline Base",
+        anchorSlots: gridSlots(0.05, 0.75, 0.95, 0.79, 9, 1),
       },
       {
-        id: "urban-rooftops",
-        name: "Rooftops",
-        anchorSlots: gridSlots(0.5, 0.0, 1.0, 0.5, 4, 3),   // 12 slots
+        id: "urban-sidewalk",
+        name: "Sidewalk",
+        anchorSlots: gridSlots(0.05, 0.83, 0.95, 0.86, 11, 1),
       },
       {
-        id: "urban-park",
-        name: "City Park",
-        anchorSlots: gridSlots(0.5, 0.5, 1.0, 1.0, 4, 5),   // 20 slots → total 52
+        id: "urban-street",
+        name: "City Street",
+        anchorSlots: gridSlots(0.05, 0.91, 0.95, 0.94, 13, 1),
+      },
+      {
+        id: "urban-front",
+        name: "Front Lane",
+        anchorSlots: gridSlots(0.05, 0.96, 0.95, 0.98, 13, 1),  // 9+11+13+13 = 46
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Waters-edge — 47 species → 66 slots (3 sub-regions)
+  // Waters-edge — 47 species → 55 slots distributed along the far bank,
+  // shallow marsh water, lily-pad row, and front shore of WatersEdgeBiome.
   // -------------------------------------------------------------------
   {
     habitat: "waters-edge",
     label: "Waters Edge",
     subRegions: [
       {
-        id: "waters-edge-shore",
-        name: "Shore",
-        anchorSlots: gridSlots(0.0, 0.7, 1.0, 1.0, 7, 3),   // 21 slots
+        id: "waters-edge-far-bank",
+        name: "Far Bank",
+        anchorSlots: gridSlots(0.05, 0.56, 0.95, 0.61, 9, 1),
       },
       {
         id: "waters-edge-marsh",
         name: "Marsh",
-        anchorSlots: gridSlots(0.0, 0.35, 0.5, 0.7, 4, 4),  // 16 slots
+        anchorSlots: gridSlots(0.05, 0.72, 0.95, 0.77, 11, 1),
       },
       {
-        id: "waters-edge-delta",
-        name: "River Delta",
-        anchorSlots: gridSlots(0.5, 0.0, 1.0, 0.7, 5, 6),   // 30 slots → total 67
+        id: "waters-edge-lily-pads",
+        name: "Lily Pads",
+        anchorSlots: gridSlots(0.05, 0.83, 0.95, 0.87, 13, 1),
+      },
+      {
+        id: "waters-edge-shore",
+        name: "Shore",
+        anchorSlots: gridSlots(0.05, 0.92, 0.95, 0.96, 15, 1),  // 9+11+13+15 = 48
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Rough-terrain — 27 species → 40 slots (2 sub-regions)
+  // Rough-terrain — 27 species → 35 slots along the lower mesa ledges
+  // and cracked-earth foreground of RoughTerrainBiome.
   // -------------------------------------------------------------------
   {
     habitat: "rough-terrain",
     label: "Rough Terrain",
     subRegions: [
       {
+        id: "rough-terrain-mesa",
+        name: "Mesa Ledge",
+        anchorSlots: gridSlots(0.05, 0.62, 0.95, 0.66, 7, 1),
+      },
+      {
         id: "rough-terrain-badlands",
         name: "Badlands",
-        anchorSlots: gridSlots(0.0, 0.0, 0.5, 1.0, 4, 5),   // 20 slots
+        anchorSlots: gridSlots(0.05, 0.76, 0.95, 0.81, 9, 1),
       },
       {
         id: "rough-terrain-gorge",
         name: "Rocky Gorge",
-        anchorSlots: gridSlots(0.5, 0.0, 1.0, 1.0, 4, 5),   // 20 slots → total 40
+        anchorSlots: gridSlots(0.05, 0.86, 0.95, 0.90, 10, 1),
+      },
+      {
+        id: "rough-terrain-foreground",
+        name: "Cracked Earth",
+        anchorSlots: gridSlots(0.05, 0.93, 0.95, 0.97, 11, 1),  // 7+9+10+11 = 37
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Rare — 10 species → 20 slots (2 sub-regions)
+  // Rare — 10 species → 14 slots clustered on the Sanctuary floor with
+  // one row near the shrine.
   // -------------------------------------------------------------------
   {
     habitat: "rare",
@@ -295,63 +348,71 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
     subRegions: [
       {
         id: "rare-shrine",
-        name: "Ancient Shrine",
-        anchorSlots: gridSlots(0.0, 0.0, 0.5, 1.0, 4, 3),   // 12 slots
+        name: "Crystal Shrine",
+        anchorSlots: gridSlots(0.25, 0.66, 0.75, 0.70, 3, 1),
       },
       {
-        id: "rare-summit",
-        name: "Sacred Summit",
-        anchorSlots: gridSlots(0.5, 0.0, 1.0, 1.0, 4, 2),   // 8 slots → total 20
+        id: "rare-arches",
+        name: "Ancient Arches",
+        anchorSlots: gridSlots(0.05, 0.78, 0.95, 0.83, 4, 1),
+      },
+      {
+        id: "rare-floor",
+        name: "Sanctuary Floor",
+        anchorSlots: gridSlots(0.05, 0.88, 0.95, 0.92, 4, 1),
+      },
+      {
+        id: "rare-front",
+        name: "Front of Shrine",
+        anchorSlots: gridSlots(0.10, 0.95, 0.90, 0.97, 4, 1),  // 3+4+4+4 = 15
       },
     ],
   },
 
   // -------------------------------------------------------------------
-  // Unknown / null habitat — 639 species → 700 slots across 7 sub-regions
-  // This is the largest bucket; most unclassified species live here.
+  // Unknown / null habitat — 639 species → 240 slots across 7 tightly
+  // stacked ground bands matching the layered hills of WildlandsBiome.
+  // Overflow wraps modularly; with 240 slots, the first ~37% of mastery
+  // covers without visual overlap.
   // -------------------------------------------------------------------
   {
     habitat: "unknown",
     label: "Wildlands",
     subRegions: [
       {
-        id: "wildlands-north",
-        name: "Northern Reaches",
-        anchorSlots: gridSlots(0.0, 0.0, 0.5, 0.33, 5, 4),   // 20 slots
+        id: "wildlands-far-ridge",
+        name: "Far Ridge",
+        anchorSlots: gridSlots(0.04, 0.60, 0.96, 0.64, 24, 1),
       },
       {
-        id: "wildlands-south",
-        name: "Southern Expanse",
-        anchorSlots: gridSlots(0.5, 0.0, 1.0, 0.33, 5, 4),   // 20 slots
+        id: "wildlands-distant-hills",
+        name: "Distant Hills",
+        anchorSlots: gridSlots(0.04, 0.68, 0.96, 0.72, 28, 1),
       },
       {
-        id: "wildlands-east",
-        name: "Eastern Barrens",
-        anchorSlots: gridSlots(0.5, 0.33, 1.0, 0.66, 5, 5),  // 25 slots
+        id: "wildlands-mid-hills",
+        name: "Mid Hills",
+        anchorSlots: gridSlots(0.04, 0.76, 0.96, 0.80, 32, 1),
       },
       {
-        id: "wildlands-west",
-        name: "Western Frontier",
-        anchorSlots: gridSlots(0.0, 0.33, 0.5, 0.66, 5, 5),  // 25 slots
+        id: "wildlands-riverbank",
+        name: "Riverbank",
+        anchorSlots: gridSlots(0.04, 0.84, 0.96, 0.87, 36, 1),
       },
       {
-        id: "wildlands-central",
-        name: "Central Wilds",
-        anchorSlots: gridSlots(0.1, 0.25, 0.9, 0.75, 8, 8),  // 64 slots
+        id: "wildlands-grassland",
+        name: "Open Grassland",
+        anchorSlots: gridSlots(0.03, 0.90, 0.97, 0.93, 40, 1),
       },
       {
-        id: "wildlands-deep-north",
-        name: "Deep North",
-        anchorSlots: gridSlots(0.0, 0.66, 0.5, 1.0, 7, 8),   // 56 slots
+        id: "wildlands-scrub",
+        name: "Front Scrub",
+        anchorSlots: gridSlots(0.03, 0.95, 0.97, 0.97, 40, 1),
       },
       {
-        id: "wildlands-deep-south",
-        name: "Deep South",
-        anchorSlots: gridSlots(0.5, 0.66, 1.0, 1.0, 7, 8),   // 56 slots → total 266
-        // Note: overflow wraps — realistically ~639 × (mastery rate) hits here.
-        // With modular wrapping, 266 slots covers ~40% mastery before any overlap.
-        // For full coverage at 100% mastery the zone would need 639 slots, but
-        // in practice very few players master all ~639 null-habitat species.
+        id: "wildlands-very-front",
+        name: "Very Front",
+        anchorSlots: gridSlots(0.03, 0.985, 0.97, 0.995, 40, 1),  // 24+28+32+36+40+40+40 = 240
       },
     ],
   },
