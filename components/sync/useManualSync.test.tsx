@@ -65,6 +65,16 @@ vi.mock("@/lib/gradelog/persistence", () => ({
   saveGradeLog: vi.fn(),
 }));
 
+vi.mock("@/lib/review/session", () => ({
+  buildSession: vi.fn(() => []),
+  DEFAULT_LIMITS: {
+    name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+    reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  },
+}));
+
 import { pullSession, pushSession } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
@@ -74,7 +84,7 @@ import { loadStreakData, saveStreakData } from "@/lib/streak/persistence";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { pullGradeLog, pushGradeLog } from "@/lib/sync/gradeLog";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
-import { DEFAULT_LIMITS } from "@/lib/review/session";
+import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
@@ -454,5 +464,68 @@ describe("useManualSync", () => {
     const savedCall = vi.mocked(saveSession).mock.calls[0]?.[0];
     expect(savedCall?.cards[0].state.lastReview).toBe("2026-05-13");
     expect(savedCall?.cards[0].state.reps).toBe(5);
+  });
+
+  // #391: a brand-new device with no local settings stored must pull cloud
+  // settings and save them before the merge step builds the base — otherwise
+  // the seed defaults (reverse/cry disabled) silently drop cloud rows for
+  // those types when the merge iterates over local cards.
+  it("brand-new device pulls and saves cloud settings before merging cards", async () => {
+    const order: string[] = [];
+
+    const cloudSettings = {
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: true,
+    } as ReturnType<typeof loadSettings>;
+
+    vi.mocked(loadSession).mockReturnValue(null);
+    vi.mocked(pullSession).mockResolvedValue([]);
+    vi.mocked(hasStoredSettings).mockReturnValue(false);
+    vi.mocked(pullSettings).mockImplementation(async () => {
+      order.push("pull-settings");
+      return cloudSettings;
+    });
+    vi.mocked(saveSettings).mockImplementation((settings) => {
+      order.push("save-settings");
+      // Simulate the real saveSettings writing to storage so that the
+      // subsequent loadSettings() call returns the pulled cloud values.
+      vi.mocked(loadSettings).mockReturnValue(settings as ReturnType<typeof loadSettings>);
+    });
+    vi.mocked(saveSession).mockImplementation(() => {
+      order.push("save-session");
+      return { ok: true };
+    });
+
+    const { result } = renderHook(() => useManualSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      result.current.syncNow();
+    });
+
+    await waitFor(() => {
+      expect(result.current.syncState).toBe("success");
+    });
+
+    // saveSettings must run before saveSession (which persists the merged
+    // base built from the just-pulled settings).
+    const settingsSaveIdx = order.indexOf("save-settings");
+    const sessionSaveIdx = order.indexOf("save-session");
+    expect(settingsSaveIdx).toBeGreaterThan(-1);
+    expect(sessionSaveIdx).toBeGreaterThan(-1);
+    expect(sessionSaveIdx).toBeGreaterThan(settingsSaveIdx);
+
+    // buildSession must receive the reverse/cry-enabled opts from cloud.
+    // A regression where loadSettings() is read before saveSettings() writes
+    // the pulled values would cause reverseEnabled/cryEnabled to be undefined
+    // (DEFAULT_SETTINGS has them off), and this assertion would fail.
+    expect(buildSession).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      expect.objectContaining({ reverseEnabled: true, cryEnabled: true }),
+    );
   });
 });

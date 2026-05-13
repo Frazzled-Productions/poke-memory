@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
+import { pullSettings } from "@/lib/sync/settings";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
+import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
 /**
@@ -37,7 +40,25 @@ export async function pullAndMerge(
       merged = mergeCloudIntoLocalSilent(localSession.cards, cloudRows, syncStatus.lastPullAt);
       saveResult = saveSession({ cards: merged, limits: localSession.limits });
     } else {
-      const base = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS);
+      // Brand-new device: pull cloud settings FIRST when local has none —
+      // otherwise the base is built with DEFAULT_SETTINGS (reverse/cry
+      // disabled) and cloud rows for those types are silently dropped by the
+      // merge (#391).
+      if (!hasStoredSettings()) {
+        try {
+          const cloudSettings = await pullSettings(client, userId);
+          if (cloudSettings !== null) saveSettings(cloudSettings);
+        } catch {
+          // Best-effort: fall through to default settings.
+        }
+      }
+      const settings = loadSettings();
+      const base = buildSession(
+        SEED_POKEMON,
+        SEED_EVOLUTION_CARDS,
+        undefined,
+        seedOptsFromSettings(settings),
+      );
       merged = mergeCloudIntoLocalSilent(base, cloudRows, syncStatus.lastPullAt);
       saveResult = saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
