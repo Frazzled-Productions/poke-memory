@@ -993,7 +993,7 @@ export function ReviewSession() {
   // appear after the user taps Reveal (or the visually-merged Play tile).
   if (effectiveCard.cardType === "cry") {
     return (
-      <div className="flex flex-col items-center gap-8">
+      <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
         <div className="flex w-full max-w-xl flex-col gap-2">
           <ScopeControl scope={scope} onChange={handleScopeChange} />
@@ -1075,7 +1075,7 @@ export function ReviewSession() {
       String(effectiveCard.id),
     );
     return (
-      <div className="flex flex-col items-center gap-8">
+      <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
         <div className="flex w-full max-w-xl flex-col gap-2">
           <ScopeControl scope={scope} onChange={handleScopeChange} />
@@ -1133,7 +1133,7 @@ export function ReviewSession() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-8">
+    <div className="flex flex-col items-center gap-3 sm:gap-8">
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
       <ScopeControl scope={scope} onChange={handleScopeChange} />
       {effectiveCard.cardType === "evolution" ? (

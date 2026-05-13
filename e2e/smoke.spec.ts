@@ -60,6 +60,42 @@ test.describe("Practice page", () => {
       ).toBeVisible();
     }
   });
+
+  test("fits viewport without scrolling on iPhone 17 Pro", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "viewport-fit check is mobile-only",
+    );
+    // iPhone 17 Pro CSS viewport (the device reported in #332). The default
+    // mobile-safari project uses iPhone 14 (390x844); override here so the
+    // assertion matches the actual reported device.
+    await page.setViewportSize({ width: 402, height: 874 });
+    await page.goto("/");
+
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+    await expect(reveal).toBeVisible();
+
+    const overflowBefore = await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight,
+    );
+    expect(overflowBefore).toBeLessThanOrEqual(1);
+
+    await reveal.click();
+    await expect(
+      page.getByRole("group", { name: "Grade your answer" }),
+    ).toBeVisible();
+
+    const overflowAfter = await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight,
+    );
+    expect(overflowAfter).toBeLessThanOrEqual(8);
+  });
 });
 
 test.describe("Stats page", () => {
