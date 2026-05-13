@@ -99,10 +99,11 @@ describe("TrainerCard", () => {
     render(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
-    const descEl = document.getElementById("trainer-level-desc");
-    expect(descEl).toBeInTheDocument();
-    expect(descEl?.textContent).toMatch(/reps.*3.*interval.*21/);
-    const levelSpan = screen.getByTitle(/Level grows with the number/);
-    expect(levelSpan).toHaveAttribute("aria-describedby", "trainer-level-desc");
+    // sr-only element carries the accessible description
+    const descEl = screen.getByText(/reps.*3.*interval.*21/i);
+    expect(descEl).toHaveAttribute("id", "trainer-level-desc");
+    // level span wires up to it
+    const levelSpan = screen.getByText("1", { selector: '[aria-describedby="trainer-level-desc"]' });
+    expect(levelSpan).toBeInTheDocument();
   });
 });

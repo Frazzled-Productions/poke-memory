@@ -51,7 +51,6 @@ export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
           </span>
           <span
             className="text-3xl font-bold tabular-nums text-foreground"
-            title="Level grows with the number of Pokémon name cards you've mastered (reps ≥ 3 and review interval ≥ 21 days)."
             aria-describedby="trainer-level-desc"
           >
             {level}
