@@ -19,10 +19,20 @@ export function trainerLevel(mastered: number): number {
   return Math.max(1, Math.floor(Math.sqrt(mastered) * 1.6));
 }
 
+/** Inverse of trainerLevel: mastered count needed to reach level + 1. */
+export function nextLevelMastered(level: number): number {
+  return Math.ceil(((level + 1) / 1.6) ** 2);
+}
+
 const GEN_LABELS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
 
 export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
   const level = trainerLevel(totalMastered);
+  const next = nextLevelMastered(level);
+  const needed = next - totalMastered;
+  // Unreachable today (1025 species < 1057 threshold for Lv 52), guarded for future-proofing.
+  const atMax = totalMastered >= next;
+
   return (
     <section
       aria-label="Trainer card"
@@ -41,11 +51,19 @@ export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
           <span className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             Lv
           </span>
-          <span className="text-3xl font-bold tabular-nums text-foreground">
+          <span
+            className="text-3xl font-bold tabular-nums text-foreground"
+            title="Level grows with the number of Pokémon name cards you've mastered (reps ≥ 3 and review interval ≥ 21 days)."
+          >
             {level}
           </span>
         </div>
       </div>
+      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        {atMax
+          ? "Max level"
+          : `${totalMastered} / ${next} mastered · ${needed} to Lv ${level + 1}`}
+      </p>
       <ul
         role="list"
         className="mt-3 flex flex-wrap gap-1.5"
