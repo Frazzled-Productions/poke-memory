@@ -188,6 +188,29 @@ describe("filterMastered", () => {
   it("returns empty array for empty input", () => {
     expect(filterMastered([])).toHaveLength(0);
   });
+
+  it("forceAllMastered returns every name card even when none are mastered", () => {
+    const cards = [
+      makeCard(1, "name", learningState),
+      makeCard(2, "name", newState),
+      makeCard(3, "name", masteredState),
+    ];
+    const result = filterMastered(cards, true);
+    expect(result).toHaveLength(3);
+    expect(result.map((c) => c.id).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("forceAllMastered still excludes non-name card types", () => {
+    const cards = [
+      makeCard(1, "name", newState),
+      makeCard(1500001, "evolution", masteredState),
+      makeCard(2000001, "reverse", masteredState),
+      makeCard(3000001, "cry", masteredState),
+    ];
+    const result = filterMastered(cards, true);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

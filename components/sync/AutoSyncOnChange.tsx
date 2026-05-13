@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pushSettings } from "@/lib/sync/settings";
 import { pushStreak } from "@/lib/sync/streak";
 import { pushGradeLog } from "@/lib/sync/gradeLog";
@@ -31,15 +32,19 @@ import {
  */
 export function AutoSyncOnChange() {
   const { user, supabase } = useAuth();
-  const userId = user?.id ?? null;
+  const { anyFlagOn } = useSuperuser();
+  // Treat the user as signed-out when any superuser flag is on, so settings/
+  // streak/grade-log writes all skip the cloud during a QA session.
+  const userId = anyFlagOn ? null : user?.id ?? null;
+  const client = anyFlagOn ? null : supabase;
 
   useEffect(() => {
-    if (!supabase || !userId) return;
+    if (!client || !userId) return;
 
     function handleSettings(e: Event) {
       const detail = (e as CustomEvent<UserSettings>).detail;
       if (!detail) return;
-      void pushSettings(supabase!, userId!, detail).then((ok) => {
+      void pushSettings(client!, userId!, detail).then((ok) => {
         if (!ok) {
           console.warn("[auto-sync] settings push failed; will retry on next save or manual Sync");
         }
@@ -49,7 +54,7 @@ export function AutoSyncOnChange() {
     function handleStreak() {
       const dates = loadStreakData();
       if (dates.length === 0) return;
-      void pushStreak(supabase!, userId!, dates).then((ok) => {
+      void pushStreak(client!, userId!, dates).then((ok) => {
         if (!ok) {
           console.warn("[auto-sync] streak push failed; will retry on next review or manual Sync");
         }
@@ -59,7 +64,7 @@ export function AutoSyncOnChange() {
     function handleGradeLog(e: Event) {
       const detail = (e as CustomEvent<GradeLogEntry>).detail;
       if (!detail) return;
-      void pushGradeLog(supabase!, userId!, [detail]).then((ok) => {
+      void pushGradeLog(client!, userId!, [detail]).then((ok) => {
         if (!ok) {
           console.warn("[auto-sync] grade log push failed; will retry on next grade or manual Sync");
         }

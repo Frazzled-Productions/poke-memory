@@ -183,6 +183,7 @@ export function computeStats(
   today: string,
   strugglingLimit = 10,
   masteryRepetitions = MASTERY_REPETITIONS,
+  forceAllMastered = false,
 ): StatsResult {
   // Pre-compute the 14 forecast date strings so the inner loop can do a
   // single Map lookup per card instead of a 14-way comparison chain.
@@ -316,6 +317,32 @@ export function computeStats(
     introduced: typeIntroduced.get(t) ?? 0,
     mastered:   typeMastered.get(t)   ?? 0,
   }));
+
+  if (forceAllMastered) {
+    // Superuser pretendAllMastered: overlay "everything is mastered" on the
+    // result. Real counters are preserved on dueForecast (a forward-looking
+    // schedule view, not a completion metric). Struggling is cleared because
+    // a fully-mastered user has nothing to struggle with.
+    return {
+      totalCards: cards.length,
+      introduced: cards.length,
+      learning: 0,
+      mastered: cards.length,
+      locked: 0,
+      dueForecast,
+      perGeneration: perGeneration.map((g) => ({
+        ...g,
+        introduced: g.total,
+        mastered: g.total,
+      })),
+      perType: perType.map((t) => ({
+        ...t,
+        introduced: t.total,
+        mastered: t.total,
+      })),
+      struggling: [],
+    };
+  }
 
   return {
     totalCards: cards.length,

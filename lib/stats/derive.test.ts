@@ -248,3 +248,56 @@ describe("computeStats.dueForecast", () => {
     expect(result.dueForecast.every((d) => d.count === 0)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeStats — superuser pretendAllMastered
+// ---------------------------------------------------------------------------
+
+describe("computeStats with forceAllMastered", () => {
+  // Picking IDs in different generations so the per-gen tally exercises both
+  // present and absent generations.
+  const cards = [
+    card(1,   { lastReview: null }),             // gen 1, never seen
+    card(2,   { lastReview: null }),             // gen 1, never seen
+    card(200, { reps: 1, scheduledDays: 1, lastReview: "2026-05-09" }), // gen 2, learning
+  ];
+
+  it("reports everything mastered, nothing learning, nothing locked", () => {
+    const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    expect(result.totalCards).toBe(3);
+    expect(result.introduced).toBe(3);
+    expect(result.mastered).toBe(3);
+    expect(result.learning).toBe(0);
+    expect(result.locked).toBe(0);
+  });
+
+  it("per-generation tallies treat every card as introduced and mastered", () => {
+    const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    const gen1 = result.perGeneration.find((g) => g.gen === 1)!;
+    expect(gen1.total).toBe(2);
+    expect(gen1.introduced).toBe(2);
+    expect(gen1.mastered).toBe(2);
+    const gen2 = result.perGeneration.find((g) => g.gen === 2)!;
+    expect(gen2.total).toBe(1);
+    expect(gen2.introduced).toBe(1);
+    expect(gen2.mastered).toBe(1);
+    // Generations with zero cards stay zero — the overlay only inflates
+    // mastered up to each generation's own total.
+    const gen9 = result.perGeneration.find((g) => g.gen === 9)!;
+    expect(gen9.total).toBe(0);
+    expect(gen9.mastered).toBe(0);
+  });
+
+  it("per-type tallies treat every type bucket's total as mastered", () => {
+    const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    const normal = result.perType.find((t) => t.type === "normal")!;
+    expect(normal.total).toBe(3);
+    expect(normal.mastered).toBe(3);
+    expect(normal.introduced).toBe(3);
+  });
+
+  it("struggling list is empty under forceAllMastered", () => {
+    const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    expect(result.struggling).toHaveLength(0);
+  });
+});

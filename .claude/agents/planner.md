@@ -24,6 +24,7 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 
    **When in doubt, default to blocker.** A false-positive blocker costs one comment round-trip; a false-negative costs a closed PR.
 3. If the change adds or modifies a user-facing page or flow, include a step for `playwright` to add or update E2E smoke tests. This step runs after implementation, before review.
+   Also: if the change adds or modifies a surface that displays mastery state, completion counts, or per-Pokémon collection state, add a **Superuser compatibility** acceptance criterion to that step: "renders fully-mastered state when `useSuperuser().flags.pretendAllMastered` is true (or future appropriate flag)". If the surface genuinely should not be affected by any superuser flag, state the rationale in **Out of scope** instead of skipping the criterion silently. See the "Superuser mode" section in AGENTS.md for the canonical pattern.
 4. If the change adds or modifies persisted user data — a new table, a new column on `card_reviews`, a new field in `user_settings.settings`, or a new sync flow — route the schema design through `supabase-expert` BEFORE the `data-coder` implementation step. The runbook in AGENTS.md (`### Adding a feature that needs to persist data`) is the canonical reference; the plan should point the implementer at it rather than restate it.
 5. Break work into ordered, atomic steps. Each step has:
    - **What** — one sentence

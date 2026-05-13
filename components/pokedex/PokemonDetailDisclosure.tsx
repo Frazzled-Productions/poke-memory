@@ -36,10 +36,11 @@ const SPRITE_BY_ID: Record<number, string> = Object.fromEntries(
 );
 
 function EvolutionChainNode({ node }: { node: EvolutionNode }) {
-  const { superuser } = useSuperuser();
+  const { flags } = useSuperuser();
   const nodeSprite = SPRITE_BY_ID[node.speciesId];
   const rawNodeClass: CardClassOrPending = useCardClass(node.speciesId);
-  const nodeClass: CardClassOrPending = superuser && rawNodeClass !== "pending" ? "mastered" : rawNodeClass;
+  const nodeClass: CardClassOrPending =
+    flags.pretendAllMastered && rawNodeClass !== "pending" ? "mastered" : rawNodeClass;
   const nodePending = nodeClass === "pending";
   const nodeLocked = nodeClass === "locked";
   const nodeLearning = nodeClass === "learning";
@@ -104,10 +105,11 @@ function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
 }
 
 export function PokemonDetailDisclosure({ pokemon }: { pokemon: SeedPokemon }) {
-  const { superuser } = useSuperuser();
+  const { flags } = useSuperuser();
   const { id, name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
   const rawCardClass = useCardClass(id);
-  const cardClass = superuser && rawCardClass !== "pending" ? "mastered" : rawCardClass;
+  const cardClass =
+    flags.pretendAllMastered && rawCardClass !== "pending" ? "mastered" : rawCardClass;
   const isPending = cardClass === "pending";
   const isLocked = cardClass === "locked";
   const isMasteredCard = cardClass === "mastered";

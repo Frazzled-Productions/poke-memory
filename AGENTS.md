@@ -80,6 +80,30 @@ These are decisions made through deliberate research/discussion, not guesses. Ad
 - Use `revalidatePath('/path')` only when invalidating path-level data, not specific tags.
 - Tag the underlying cached fetches with `cacheTag(...)` inside `'use cache'` functions — without that, there is nothing for `updateTag` to invalidate.
 
+### Superuser mode (READ when adding user-facing features)
+
+Superuser mode is a QA cheat unlocked by typing `super` (desktop) or 7-tapping the nav title (mobile). It does **not** itself change behaviour — it reveals a **Developer** section on the Settings page that houses per-behaviour flags.
+
+**Flags are per axis of cheating, not per page.** Today there is one flag (`pretendAllMastered`) that renders every species as mastered. Future axes (e.g. "skip daily limits", "force-reveal cards") get their own flag. Do **not** add a per-page toggle that re-derives mastery — wire the page into `flags.pretendAllMastered` instead.
+
+**Every new user-facing feature must honour the relevant superuser flag.** Specifically: if a feature displays mastery state, completion counts, per-Pokémon collection state, or anything gated on having mastered things, it must read `useSuperuser().flags.pretendAllMastered` (or a future appropriate flag) and treat it as "fully mastered" when on. The canonical pattern is `forceAllMastered || isMastered(...)`; pure functions take an optional `forceAllMastered` parameter (see `computeStats`, `computeRecords`, `filterMastered`).
+
+If a feature genuinely should not be affected (e.g. the all-caught-up Higher-or-Lower minigame samples from real seen-pool, not mastered state), call that out explicitly in the PR description and the planner step's acceptance criterion.
+
+**Sync write-guard.** While any superuser flag is on, all cloud writes are suppressed:
+- `usePerGradeSync.enqueueGrade` and `useSyncOnUnload` short-circuit because `ReviewSession.tsx` passes `null` client/userId.
+- `AutoSyncOnChange` short-circuits the same way.
+- `SyncNowButton` renders disabled with a "Sync paused (superuser)" label.
+- Background pulls (`SyncOnVisible`, `SignInPull`) stay enabled — reads can't corrupt the cloud.
+
+Do not work around this guard. The whole point is that a QA session with cheats on can never leak fake state into Supabase, regardless of which flag is active.
+
+**Exit cleanup.** When the last flag is toggled off (or the chord/tap re-locks superuser while flags were on), `SuperuserContext` runs `exitCleanup`:
+- Signed-in: force-pulls cloud and overlays local via `mergeCloudIntoLocal`, then dispatches a synthetic `StorageEvent` so same-tab listeners re-read. This wipes any QA drift in local state.
+- Guest: `window.confirm` offers a destructive local-state reset since there is no cloud to fall back to.
+
+Both branches assume the user understands they're exiting a QA mode. Do not silently skip the prompt or the pull.
+
 ### Sync: invariants and destructive-write protection (READ FIRST)
 
 Before touching anything in `lib/sync/`, `app/api/sync/route.ts`, `db/migrations/`, or any code that pushes to Supabase, read this section. The rules below exist because of incidents that have already happened (#293 wiped 2497 of 2513 cloud rows to zero state) and are enforced both in code and at the database layer.

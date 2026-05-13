@@ -35,11 +35,19 @@ export function justBecameMastered(
  * Filters a card array to mastered name-cards only. Evolution, reverse, and
  * cry cards are excluded — the pasture shows one entry per species, keyed on
  * the name card.
+ *
+ * When `forceAllMastered` is true (superuser `pretendAllMastered` flag), the
+ * mastery predicate is bypassed and every name-type card flows through. The
+ * cardType filter still applies so the pasture stays one entry per species.
  */
-export function filterMastered(cards: ReviewableCard[]): ReviewableCard[] {
-  return cards.filter(
-    (card) => card.cardType === "name" && isMastered(card.state),
-  );
+export function filterMastered(
+  cards: ReviewableCard[],
+  forceAllMastered = false,
+): ReviewableCard[] {
+  return cards.filter((card) => {
+    if (card.cardType !== "name") return false;
+    return forceAllMastered || isMastered(card.state);
+  });
 }
 
 /**

@@ -18,10 +18,10 @@ function zeroPad(id: number): string {
 // ---------------------------------------------------------------------------
 
 function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
-  const { superuser } = useSuperuser();
+  const { flags } = useSuperuser();
   const { id, name, spriteUrl, cardClass: rawCardClass } = pokemon;
   // PokemonCellData.cardClass is CardClass (never "pending"), so no pending guard needed.
-  const cardClass = superuser ? "mastered" : rawCardClass;
+  const cardClass = flags.pretendAllMastered ? "mastered" : rawCardClass;
 
   const isLocked = cardClass === "locked";
   const isMastered = cardClass === "mastered";
@@ -126,9 +126,11 @@ function GenerationSection({
   name: string;
   pokemon: PokemonCellData[];
 }) {
-  const { superuser } = useSuperuser();
+  const { flags } = useSuperuser();
   const total = pokemon.length;
-  const mastered = superuser ? total : pokemon.filter((p) => p.cardClass === "mastered").length;
+  const mastered = flags.pretendAllMastered
+    ? total
+    : pokemon.filter((p) => p.cardClass === "mastered").length;
 
   return (
     <section aria-labelledby={`gen-${gen}-heading`}>

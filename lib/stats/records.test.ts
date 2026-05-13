@@ -167,4 +167,34 @@ describe("computeRecords", () => {
     expect(r.longestStreak).toBe(3);
     expect(r.bestReviewDay).toBe(2);
   });
+
+  describe("with forceAllMastered (superuser pretendAllMastered)", () => {
+    it("avgDaysToMastery is 0 and mostMasteredIn7d equals card count", () => {
+      const cards = [card(1), card(2), card(3)];
+      const r = computeRecords(cards, [], [], MASTERY_REPETITIONS, true);
+      expect(r.avgDaysToMastery).toBe(0);
+      expect(r.mostMasteredIn7d).toBe(3);
+    });
+
+    it("still plumbs the honest longestStreak and bestReviewDay", () => {
+      const cards = [card(1)];
+      const r = computeRecords(
+        cards,
+        [entry("2026-05-12"), entry("2026-05-12"), entry("2026-05-11")],
+        ["2026-05-10", "2026-05-11", "2026-05-12"],
+        MASTERY_REPETITIONS,
+        true,
+      );
+      expect(r.longestStreak).toBe(3);
+      expect(r.bestReviewDay).toBe(2);
+    });
+
+    it("with zero cards, falls through to the honest computation", () => {
+      // Edge case: forceAllMastered short-circuits only when there are cards
+      // to project mastery onto; an empty card array still produces null.
+      const r = computeRecords([], [], [], MASTERY_REPETITIONS, true);
+      expect(r.avgDaysToMastery).toBeNull();
+      expect(r.mostMasteredIn7d).toBeNull();
+    });
+  });
 });

@@ -4,10 +4,27 @@ type Props = {
   syncState: "idle" | "syncing" | "success" | "error";
   errorMessage: string | null;
   onSync: () => void;
+  /** When true, the button is disabled with a "Paused (superuser)" label. */
+  superuserPaused?: boolean;
 };
 
-export function SyncNowButton({ syncState, errorMessage, onSync }: Props) {
-  const isDisabled = syncState === "syncing" || syncState === "success";
+export function SyncNowButton({ syncState, errorMessage, onSync, superuserPaused = false }: Props) {
+  const isDisabled = superuserPaused || syncState === "syncing" || syncState === "success";
+
+  if (superuserPaused) {
+    return (
+      <div className="flex flex-col gap-1" aria-live="polite">
+        <button
+          type="button"
+          disabled
+          title="Sync is paused while a superuser flag is on."
+          className="inline-flex items-center gap-2 min-h-[44px] rounded-lg bg-zinc-200 text-zinc-500 px-6 py-2 text-sm font-semibold dark:bg-zinc-800 dark:text-zinc-400"
+        >
+          Sync paused (superuser)
+        </button>
+      </div>
+    );
+  }
 
   const baseClasses =
     "inline-flex items-center gap-2 min-h-[44px] rounded-lg px-6 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none";
