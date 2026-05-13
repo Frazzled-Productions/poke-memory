@@ -1,3 +1,10 @@
 {
-  "ignoreCommand": "bash scripts/vercel-ignored-build.sh"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "bash scripts/vercel-ignored-build.sh",
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true
+    }
+  }
 }

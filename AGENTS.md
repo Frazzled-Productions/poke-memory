@@ -355,6 +355,8 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 **Auto-review on PR open.** `auto-review.yml` fires when a PR opens and posts `<!-- auto-review:1 -->`. Do not run `code-reviewer` yourself in the implement stage — it runs automatically after the PR is open. Fork PRs are explicitly excluded (`head.repo.fork == false` in the job-level `if:`) — this is a deliberate guard, not a side-effect of GitHub's default secret-isolation policy.
 
+**Vercel preview gate.** `vercel.json` sets `git.deploymentEnabled` to `{"**": false, "main": true}`, so pushes to feature branches do not auto-deploy. `vercel-preview-on-ready.yml` fires the Vercel Deploy Hook (repo secret `VERCEL_DEPLOY_HOOK_URL`) only when both gates are green on the same HEAD SHA: CI `test` is `success` AND the latest `<!-- auto-review:N -->` carries `Verdict: Looks good to me`. Maintainers can comment `/preview` on a PR to bypass the gate for mid-iteration peeks. The workflow re-runs on both `workflow_run` (after CI completes) and `issue_comment` (after auto-review posts), so whichever signal lands second flips the gate. `e2e.yml` is unchanged — it still triggers on `deployment_status` from Vercel, which now fires only after the gated preview deploys. Production deploys on `main` are unaffected.
+
 ### Privacy
 
 Two paths exist -- guest and authenticated. The constraints differ.
