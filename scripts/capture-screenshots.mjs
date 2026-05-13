@@ -65,7 +65,14 @@ const SHOTS = {
     },
   },
   "pokedex-grid": { url: "/pokedex", file: "pokedex-grid.png", action: null },
-  pasture: { url: "/pasture", file: "pasture.png", action: null },
+  pasture: {
+    url: "/pasture",
+    file: "pasture.png",
+    action: null,
+    // Set before navigation so the idle rAF loop never starts, giving a
+    // deterministic static frame for the screenshot.
+    initScript: () => { window.__PASTURE_FREEZE_IDLE = true; },
+  },
   stats: { url: "/stats", file: "stats.png", action: null },
 };
 
@@ -75,6 +82,11 @@ async function captureSurface(page, name) {
     throw new Error(
       `Unknown surface: ${name}. Known: ${Object.keys(SHOTS).join(", ")}`,
     );
+  }
+  // Inject surface-specific init scripts BEFORE navigation so they run before
+  // any page JS (e.g. the pasture idle freeze flag).
+  if (spec.initScript) {
+    await page.addInitScript(spec.initScript);
   }
   await page.goto(`${BASE_URL}${spec.url}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1200);

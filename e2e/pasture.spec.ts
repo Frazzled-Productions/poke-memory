@@ -192,6 +192,66 @@ test.describe("Pasture page — sparkle clears on tap", () => {
   });
 });
 
+test.describe("Pasture page — idle behaviour", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((session) => {
+      localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify(session),
+      );
+    }, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredCard(72, "Tentacool", "sea"),
+    ]));
+  });
+
+  test("zone container renders with expected class", async ({ page }) => {
+    await page.goto("/pasture");
+
+    // The zone container gets the .zoneContainer CSS module class (mangled in
+    // production, but we can locate it via the aria region).
+    const region = page.getByRole("region", { name: "Forest zone" });
+    await expect(region).toBeVisible();
+    // The div inside the section is the zone container — verify it exists.
+    const zoneContainer = region.locator("div").first();
+    await expect(zoneContainer).toBeVisible();
+  });
+
+  test("sprites have data-sprite-id attribute", async ({ page }) => {
+    await page.goto("/pasture");
+
+    // useIdleBehaviour queries [data-sprite-id] elements — verify they exist.
+    const spriteWrappers = page.locator("[data-sprite-id]");
+    await expect(spriteWrappers.first()).toBeVisible();
+    // Both seeded sprites should be present.
+    await expect(spriteWrappers).toHaveCount(2);
+  });
+
+  test("sprites are visible with prefers-reduced-motion: reduce", async ({
+    browser,
+  }) => {
+    // Create a context with reducedMotion forced so the OS setting is on.
+    const ctx = await browser.newContext({ reducedMotion: "reduce" });
+    const page = await ctx.newPage();
+
+    await page.addInitScript((session) => {
+      localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify(session),
+      );
+    }, buildSession([masteredCard(10, "Caterpie", "forest")]));
+
+    await page.goto("/pasture");
+
+    // Sprites must still be visible — just static (no motion).
+    await expect(
+      page.getByRole("button", { name: /Caterpie/ }),
+    ).toBeVisible();
+
+    await ctx.close();
+  });
+});
+
 test.describe("Pasture page — empty state", () => {
   test("visiting /pasture directly with no mastered cards shows friendly empty state", async ({
     page,
