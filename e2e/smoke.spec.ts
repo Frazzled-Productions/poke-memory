@@ -120,7 +120,7 @@ test.describe("Stats page", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible();
-    await expect(page.getByText(/to Lv/)).toBeVisible();
+    await expect(page.getByText(/\d+ \/ \d+ mastered · \d+ to Lv \d+/)).toBeVisible();
   });
 });
 

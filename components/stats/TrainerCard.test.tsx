@@ -46,15 +46,9 @@ describe("nextLevelMastered", () => {
     expect(nextLevelMastered(16)).toBe(113);
   });
 
-  it("always returns more than the mastered count for the same level", () => {
-    const anchors: [number, number][] = [
-      [0, 1],
-      [10, 5],
-      [100, 16],
-      [1025, 51],
-    ];
-    for (const [mastered, level] of anchors) {
-      expect(nextLevelMastered(level)).toBeGreaterThan(mastered);
+  it("always returns more than the mastered count for the same level (full species range)", () => {
+    for (let m = 0; m <= 1025; m++) {
+      expect(nextLevelMastered(trainerLevel(m))).toBeGreaterThan(m);
     }
   });
 });
@@ -101,11 +95,14 @@ describe("TrainerCard", () => {
     expect(screen.getByText("10 / 15 mastered · 5 to Lv 6")).toBeInTheDocument();
   });
 
-  it("level number has a tooltip explaining the mastery criterion", () => {
+  it("level number is described by the mastery criterion text", () => {
     render(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
+    const descEl = document.getElementById("trainer-level-desc");
+    expect(descEl).toBeInTheDocument();
+    expect(descEl?.textContent).toMatch(/reps.*3.*interval.*21/);
     const levelSpan = screen.getByTitle(/Level grows with the number/);
-    expect(levelSpan).toBeInTheDocument();
+    expect(levelSpan).toHaveAttribute("aria-describedby", "trainer-level-desc");
   });
 });

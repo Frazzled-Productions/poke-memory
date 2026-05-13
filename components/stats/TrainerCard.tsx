@@ -30,8 +30,6 @@ export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
   const level = trainerLevel(totalMastered);
   const next = nextLevelMastered(level);
   const needed = next - totalMastered;
-  // Unreachable today (1025 species < 1057 threshold for Lv 52), guarded for future-proofing.
-  const atMax = totalMastered >= next;
 
   return (
     <section
@@ -54,15 +52,18 @@ export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
           <span
             className="text-3xl font-bold tabular-nums text-foreground"
             title="Level grows with the number of Pokémon name cards you've mastered (reps ≥ 3 and review interval ≥ 21 days)."
+            aria-describedby="trainer-level-desc"
           >
             {level}
+          </span>
+          <span id="trainer-level-desc" className="sr-only">
+            Level grows with the number of Pokémon name cards you&apos;ve mastered
+            (reps ≥ 3 and review interval ≥ 21 days).
           </span>
         </div>
       </div>
       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        {atMax
-          ? "Max level"
-          : `${totalMastered} / ${next} mastered · ${needed} to Lv ${level + 1}`}
+        {`${totalMastered} / ${next} mastered · ${needed} to Lv ${level + 1}`}
       </p>
       <ul
         role="list"
