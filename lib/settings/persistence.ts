@@ -53,6 +53,8 @@ export type UserSettings = {
    * Schema lives in `lib/review/scope.ts` next to the scope helpers.
    */
   practiceScope: PracticeScope;
+  /** Highest streak reached in the Higher-or-Lower mini-game (#349). */
+  miniGameBestScore: number;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -74,6 +76,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   favouriteTheme: null,
   retentionTarget: 0.9,
   practiceScope: EMPTY_SCOPE,
+  miniGameBestScore: 0,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -225,6 +228,11 @@ function parseStoredSettings(raw: string | null): UserSettings {
         : DEFAULT_SETTINGS.retentionTarget,
     practiceScope:
       validatePracticeScope(obj.practiceScope) ?? EMPTY_SCOPE,
+    miniGameBestScore:
+      Number.isFinite(obj.miniGameBestScore) &&
+      (obj.miniGameBestScore as number) >= 0
+        ? (obj.miniGameBestScore as number)
+        : DEFAULT_SETTINGS.miniGameBestScore,
   };
 }
 

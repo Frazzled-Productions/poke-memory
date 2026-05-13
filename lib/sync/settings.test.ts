@@ -36,6 +36,7 @@ const SAMPLE: UserSettings = {
   favouriteTheme: null,
   retentionTarget: 0.9,
   practiceScope: { gens: [], types: [], presets: [] },
+  miniGameBestScore: 0,
 };
 
 describe("pushSettings", () => {
