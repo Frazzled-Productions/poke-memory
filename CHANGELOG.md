@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.18] — 2026-05-13
+
+### Changed
+
+- Overhauled theming: light mode now has an off-white body and surfaces carry a faint mascot wash; dark mode buttons and surfaces have stronger contrast against the body; the chosen mascot's palette now drives focus rings, primary CTAs, progress fills and stats type bars in addition to the nav. Added a "Theme intensity" setting (Subtle accents / Tinted backgrounds / Full mascot theme) so users can dial how loud the mascot theming is. Grade buttons (Again/Hard/Good/Easy) now use saturated colour fills with a backdrop-agnostic outline. New brand-default Poké-ball-red palette gives accents even before any mascot is mastered. Added a faint mascot/Poké-ball watermark at higher intensities, and a hidden Theme audit page (linked from the Developer section) for previewing every mascot × intensity × colour scheme combination.
+
 ## [0.9.17] — 2026-05-13
 
 ### Changed
@@ -642,7 +648,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.17...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.18...HEAD
+[0.9.18]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.18
 [0.9.17]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.17
 [0.9.16]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.16
 [0.9.15]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.15
