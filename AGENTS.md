@@ -209,9 +209,9 @@ When a signed-in tab regains focus after being hidden ≥ 30 seconds, `useVisibi
 
 The `>=` date comparison is conservative: any review on the same calendar day as the pull counts as "graded since pull," preventing incorrect reverts when sub-day ordering cannot be determined from `YYYY-MM-DD` strings.
 
-**Synthetic `StorageEvent` invariant**: `pullAndMerge` dispatches a synthetic `StorageEvent` for `"poke-memory:review-session:v1"` after writing to `localStorage`. Any other code that writes this key must also dispatch this event so same-tab subscribers (`useSessionStorageKey` in Stats and Pokédex pages) are notified. Cross-tab listeners receive the native event automatically.
+**Synthetic `StorageEvent` invariant**: `saveSession` (in `lib/review/persistence.ts`) dispatches a synthetic `StorageEvent` for `"poke-memory:review-session:v1"` after every successful localStorage write, so same-tab subscribers (`useSessionStorageKey` in NavLinks, Stats, and Pokédex) are notified. Cross-tab listeners receive the native event automatically. If you write the session key directly via `localStorage.setItem` (bypassing `saveSession`), dispatch the event yourself — better, route through `saveSession`.
 
-**Reactive re-render**: `useSessionStorageKey` (`lib/review/useSessionStorageKey.ts`) returns an incrementing counter on each matching storage event. Stats and Pokédex pages include this counter in their session-loading `useEffect` dependency arrays so they re-render after a background pull without a page reload.
+**Reactive re-render**: `useSessionStorageKey` (`lib/review/useSessionStorageKey.ts`) returns an incrementing counter on each matching storage event. NavLinks, Stats, and Pokédex include this counter in their session-loading `useEffect` dependency arrays so they re-render after a background pull, a sparkle-clear, or a grade that crosses a mastery threshold — without a page reload.
 
 ### Page params
 

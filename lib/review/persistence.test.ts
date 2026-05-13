@@ -133,6 +133,73 @@ describe("saveSession (quota handling)", () => {
   });
 });
 
+describe("saveSession (synthetic StorageEvent dispatch)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("dispatches a same-tab StorageEvent for the session key on a successful write", () => {
+    const dispatched: Event[] = [];
+    const storage = makeMockStorage();
+    vi.stubGlobal(
+      "StorageEvent",
+      class extends Event {
+        key: string | null;
+        constructor(type: string, init: { key?: string | null } = {}) {
+          super(type);
+          this.key = init.key ?? null;
+        }
+      },
+    );
+    vi.stubGlobal("window", {
+      localStorage: storage,
+      dispatchEvent: (e: Event) => {
+        dispatched.push(e);
+        return true;
+      },
+    });
+    vi.stubGlobal("localStorage", storage);
+
+    const result = saveSession({ cards: [makeReverseCard()], limits: defaultLimits });
+
+    expect(result.ok).toBe(true);
+    expect(dispatched).toHaveLength(1);
+    expect((dispatched[0] as unknown as { key: string }).key).toBe(
+      "poke-memory:review-session:v1",
+    );
+  });
+
+  it("does not dispatch when the write fails (quota exceeded)", () => {
+    const dispatched: Event[] = [];
+    const storage = makeMockStorage();
+    const throwingSetItem = vi.fn(() => {
+      throw new DOMException("QuotaExceededError", "QuotaExceededError");
+    });
+    vi.stubGlobal(
+      "StorageEvent",
+      class extends Event {
+        constructor(type: string) {
+          super(type);
+        }
+      },
+    );
+    vi.stubGlobal("window", {
+      localStorage: { ...storage, setItem: throwingSetItem },
+      dispatchEvent: (e: Event) => {
+        dispatched.push(e);
+        return true;
+      },
+    });
+    vi.stubGlobal("localStorage", { ...storage, setItem: throwingSetItem });
+
+    const result = saveSession({ cards: [makeReverseCard()], limits: defaultLimits });
+
+    expect(result.ok).toBe(false);
+    expect(dispatched).toHaveLength(0);
+  });
+});
+
 describe("saveSession (reverse card stripping)", () => {
   let storage: ReturnType<typeof makeMockStorage>;
 

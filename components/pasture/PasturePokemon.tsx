@@ -25,8 +25,8 @@ const HOP_DURATION_MS = 600;
  */
 export function PasturePokemon({ card, onMarkSeen }: Props) {
   // Stable per-sprite animation delay so sprites bob asynchronously.
-  // useRef initializer runs client-side only (page is "use client"), so no
-  // hydration mismatch.
+  // No hydration mismatch because PasturePage returns null until `loaded=true`
+  // (set in a useEffect), so this component never renders on the server.
   const delayRef = useRef<number | null>(null);
   if (delayRef.current === null) {
     delayRef.current = Math.random() * 2;
@@ -35,7 +35,19 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
   const [isHopping, setIsHopping] = useState(false);
   const [showPopover, setShowPopover] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set true when the long-press timer fires; consumed by the click that
+  // follows pointerUp so a long-press doesn't also trigger cry/hop.
+  const longPressFiredRef = useRef(false);
+  const hopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Clear any pending hop-release on unmount to avoid a setState on an
+  // unmounted component if the user navigates mid-animation.
+  useEffect(() => {
+    return () => {
+      if (hopTimerRef.current !== null) clearTimeout(hopTimerRef.current);
+    };
+  }, []);
 
   const playCry = useCallback(() => {
     try {
@@ -50,12 +62,27 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
 
   const triggerHop = useCallback(() => {
     setIsHopping(true);
-    setTimeout(() => setIsHopping(false), HOP_DURATION_MS);
+    if (hopTimerRef.current !== null) clearTimeout(hopTimerRef.current);
+    hopTimerRef.current = setTimeout(() => {
+      hopTimerRef.current = null;
+      setIsHopping(false);
+    }, HOP_DURATION_MS);
   }, []);
 
   const handleClick = useCallback(() => {
-    // Ignore clicks that were actually long-presses (timer will have fired).
-    if (longPressTimerRef.current === null && showPopover) return;
+    // The click that follows a long-press should not also play the cry — the
+    // user's intent was the popover, not a tap. Consume the flag and bail.
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
+
+    // Tap-on-self while the popover is open: dismiss it and let the tap fall
+    // through to the normal cry/hop interaction. Without this branch the
+    // sprite is a dead zone while its own popover is visible.
+    if (showPopover) {
+      setShowPopover(false);
+    }
 
     playCry();
     triggerHop();
@@ -68,6 +95,7 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
   const handlePointerDown = useCallback(() => {
     longPressTimerRef.current = setTimeout(() => {
       longPressTimerRef.current = null;
+      longPressFiredRef.current = true;
       setShowPopover(true);
     }, LONG_PRESS_MS);
   }, []);
@@ -115,8 +143,11 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
     };
   }, [showPopover]);
 
-  const masteryDate = card.state.firstSeen
-    ? new Date(card.state.firstSeen).toLocaleDateString(undefined, {
+  // Anchor the parse mid-day so timezones west of UTC don't shift the display
+  // back a calendar day (firstSeen is a "YYYY-MM-DD" string, which Date parses
+  // as UTC midnight by default).
+  const firstSeenLabel = card.state.firstSeen
+    ? new Date(card.state.firstSeen + "T12:00:00").toLocaleDateString(undefined, {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -168,8 +199,8 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
           </p>
           <dl className="mt-1.5 space-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
             <div className="flex justify-between">
-              <dt>Mastered</dt>
-              <dd>{masteryDate}</dd>
+              <dt>First seen</dt>
+              <dd>{firstSeenLabel}</dd>
             </div>
             <div className="flex justify-between">
               <dt>Interval</dt>
