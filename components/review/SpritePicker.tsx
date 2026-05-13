@@ -99,11 +99,11 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
       {/* Name prompt */}
       <div className="flex items-center gap-2">
         <p className="text-3xl font-semibold tracking-wide capitalize text-foreground">
-          {targetPokemon.name}
+          {targetPokemon.displayName}
         </p>
         <button
           type="button"
-          aria-label={`Hear ${targetPokemon.name}`}
+          aria-label={`Hear ${targetPokemon.displayName}`}
           onClick={() => speakName(targetPokemon.name)}
           className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
         >
@@ -115,7 +115,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
       <div
         className="grid grid-cols-2 gap-3"
         role="group"
-        aria-label={`Which Pokémon is ${targetPokemon.name}?`}
+        aria-label={`Which Pokémon is ${targetPokemon.displayName}?`}
       >
         {tiles.map((tile) => (
           <button
@@ -124,12 +124,12 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
             disabled={answered}
             aria-label={
               !answered
-                ? tile.name
+                ? tile.displayName
                 : tile.isCorrect
-                  ? `${tile.name} (correct)`
+                  ? `${tile.displayName} (correct)`
                   : tile.id === selectedId
-                    ? `${tile.name} (incorrect)`
-                    : tile.name
+                    ? `${tile.displayName} (incorrect)`
+                    : tile.displayName
             }
             onClick={() => handleTap(tile)}
             className={tileClassName(tile)}
@@ -143,7 +143,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
               className="object-contain w-[150px] h-[150px]"
             />
             {/* Visually hidden name for screen readers */}
-            <span className="sr-only">{tile.name}</span>
+            <span className="sr-only">{tile.displayName}</span>
           </button>
         ))}
       </div>
@@ -154,7 +154,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
           <p className="text-sm font-medium text-center text-zinc-600 dark:text-zinc-300">
             {tiles.find((t) => t.id === selectedId)?.isCorrect
               ? "Correct!"
-              : `The correct answer was ${targetPokemon.name}`}
+              : `The correct answer was ${targetPokemon.displayName}`}
           </p>
         )}
       </div>

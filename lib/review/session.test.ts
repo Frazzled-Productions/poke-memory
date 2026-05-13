@@ -4,10 +4,12 @@ import {
   buildSession,
   buildSessionQueues,
   buildQueueCounters,
+  limitBucket,
   type DailyLimits,
   type EvolutionReviewCard,
   type NameReviewCard,
   type ReverseReviewCard,
+  type CryReviewCard,
   type ReviewableCard,
 } from '@/lib/review/session';
 import type { EvolutionCard, SeedPokemon } from '@/lib/pokemon/seed';
@@ -857,5 +859,215 @@ describe('buildQueueCounters', () => {
     expect(result.newCount).toBe(0);
     expect(result.learningCount).toBe(0);
     expect(result.reviewCount).toBe(0);
+  });
+});
+
+// ─── Alternate-form cards (#447) ─────────────────────────────────────────────
+//
+// Seed contains both the base species and one alternate form. buildSession and
+// hydrateSession should emit cards for both entries without special-casing form
+// IDs. The alternate form uses ID 10100 (Alolan Raichu in the real seed).
+
+describe('alternate-form cards (#447)', () => {
+  // Base: Raichu (id=26, speciesId=26, default form)
+  // Alt:  Alolan Raichu (id=10100, speciesId=26, regional form)
+  const raichu = makeSeedPokemon(26, {
+    speciesId: 26,
+    isDefaultForm: true,
+    formCategory: 'default',
+    formSlug: null,
+    name: 'raichu',
+    displayName: 'Raichu',
+    cryUrl: 'https://example.com/cries/26.ogg',
+  });
+  const alolanRaichu = makeSeedPokemon(10100, {
+    speciesId: 26,
+    isDefaultForm: false,
+    formCategory: 'regional',
+    formSlug: 'alola',
+    name: 'raichu-alola',
+    displayName: 'Alolan Raichu',
+    cryUrl: 'https://example.com/cries/10100.ogg',
+  });
+  const formSeed = [raichu, alolanRaichu];
+
+  describe('buildSession with form seed', () => {
+    it('emits name cards for both base and alternate form', () => {
+      const result = buildSession(formSeed, [], NOW);
+      const nameCards = result.filter((c) => c.cardType === 'name');
+      expect(nameCards).toHaveLength(2);
+      expect(nameCards.map((c) => c.id)).toContain(26);
+      expect(nameCards.map((c) => c.id)).toContain(10100);
+    });
+
+    it('alt-form name card has subjectKey = "10100"', () => {
+      const result = buildSession(formSeed, [], NOW);
+      const altCard = result.find((c) => c.cardType === 'name' && c.id === 10100);
+      expect(altCard?.subjectKey).toBe('10100');
+    });
+
+    it('alt-form name card carries displayName, not the slug', () => {
+      const result = buildSession(formSeed, [], NOW);
+      const altCard = result.find((c) => c.cardType === 'name' && c.id === 10100);
+      if (!altCard || altCard.cardType !== 'name') throw new Error('Expected name card');
+      expect(altCard.displayName).toBe('Alolan Raichu');
+      expect(altCard.name).toBe('raichu-alola');
+    });
+
+    it('emits reverse cards for both base and alternate form when reverseEnabled', () => {
+      const result = buildSession(formSeed, [], NOW, { reverseEnabled: true });
+      const reverseCards = result.filter((c) => c.cardType === 'reverse');
+      expect(reverseCards).toHaveLength(2);
+      const pokemonIds = reverseCards.map((c) => (c as ReverseReviewCard).pokemonId);
+      expect(pokemonIds).toContain(26);
+      expect(pokemonIds).toContain(10100);
+    });
+
+    it('alt-form reverse card has subjectKey = "10100" and pokemonId = 10100', () => {
+      const result = buildSession(formSeed, [], NOW, { reverseEnabled: true });
+      const altRev = result.find(
+        (c): c is ReverseReviewCard =>
+          c.cardType === 'reverse' && (c as ReverseReviewCard).pokemonId === 10100,
+      );
+      expect(altRev?.subjectKey).toBe('10100');
+      expect(altRev?.pokemonId).toBe(10100);
+    });
+
+    it('emits cry cards for both base and alternate form when cryEnabled (both have cryUrl)', () => {
+      const result = buildSession(formSeed, [], NOW, { cryEnabled: true });
+      const cryCards = result.filter((c) => c.cardType === 'cry');
+      expect(cryCards).toHaveLength(2);
+      const pokemonIds = cryCards.map((c) => (c as CryReviewCard).pokemonId);
+      expect(pokemonIds).toContain(26);
+      expect(pokemonIds).toContain(10100);
+    });
+
+    it('no cry card emitted for an alt form with cryUrl=null', () => {
+      const altNoCry = { ...alolanRaichu, cryUrl: null };
+      const result = buildSession([raichu, altNoCry], [], NOW, { cryEnabled: true });
+      const cryCards = result.filter((c) => c.cardType === 'cry');
+      expect(cryCards).toHaveLength(1);
+      expect((cryCards[0] as CryReviewCard).pokemonId).toBe(26);
+    });
+
+    it('total cards = 4 name+reverse, 0 cry when cryEnabled:false', () => {
+      const result = buildSession(formSeed, [], NOW, {
+        nameEnabled: true,
+        reverseEnabled: true,
+        cryEnabled: false,
+        evolutionEnabled: false,
+      });
+      expect(result).toHaveLength(4);
+      expect(result.filter((c) => c.cardType === 'name')).toHaveLength(2);
+      expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(2);
+    });
+
+    it('total cards = 6 name+reverse+cry when all three enabled', () => {
+      const result = buildSession(formSeed, [], NOW, {
+        nameEnabled: true,
+        reverseEnabled: true,
+        cryEnabled: true,
+        evolutionEnabled: false,
+      });
+      expect(result).toHaveLength(6);
+    });
+  });
+
+  describe('daily-limit bucketing for form cards', () => {
+    it('limitBucket for name card cardType returns "name"', () => {
+      expect(limitBucket('name')).toBe('name');
+    });
+
+    it('limitBucket for reverse card cardType returns "reverse"', () => {
+      expect(limitBucket('reverse')).toBe('reverse');
+    });
+
+    it('limitBucket for cry card cardType returns "cry"', () => {
+      expect(limitBucket('cry')).toBe('cry');
+    });
+
+    it('alt-form name card and base-form name card share the same "name" budget', () => {
+      const TODAY = '2026-05-09';
+      const baseLimits: DailyLimits = {
+        name: { maxNewPerDay: 1, maxReviewsPerDay: 10 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      };
+      // Both Raichu and Alolan Raichu are new cards competing for name slots.
+      const cards = buildSession(formSeed, [], NOW);
+      const queues = buildSessionQueues(cards, baseLimits, TODAY);
+      // Only 1 new name card allowed — cap is 1.
+      expect(queues.newQueue.filter((id) => id <= 10277)).toHaveLength(1);
+    });
+
+    it('form name card firstSeen today counts toward perType.name.newIntroducedToday', () => {
+      const TODAY = '2026-05-09';
+      const baseLimits: DailyLimits = {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      };
+      const cards: ReviewableCard[] = buildSession(formSeed, [], NOW).map((c) =>
+        c.id === 10100
+          ? { ...c, state: { ...c.state, firstSeen: TODAY } }
+          : c,
+      );
+      const queues = buildSessionQueues(cards, baseLimits, TODAY);
+      expect(queues.perType.name.newIntroducedToday).toBe(1);
+    });
+  });
+
+  describe('hydration round-trip for form cards', () => {
+    it('hydrateSession matches a persisted subjectKey="10100" name card to the form seed entry', () => {
+      const savedAltName: NameReviewCard = {
+        ...alolanRaichu,
+        cardType: 'name',
+        subjectKey: '10100',
+        state: { ...initialReviewState(NOW), reps: 3, scheduledDays: 10 },
+      };
+      const result = hydrateSession([savedAltName], formSeed, [], NOW);
+      expect(result).toHaveLength(formSeed.length); // 2 total (saved + base raichu appended)
+      const found = result.find((c) => c.id === 10100);
+      expect(found).toBeDefined();
+      expect(found?.state.reps).toBe(3);
+      expect(found?.state.scheduledDays).toBe(10);
+      if (found?.cardType !== 'name') throw new Error('Expected name card');
+      // Seed data refreshed
+      expect(found.displayName).toBe('Alolan Raichu');
+      expect(found.subjectKey).toBe('10100');
+    });
+
+    it('hydrateSession preserves FSRS state on a form reverse card', () => {
+      const savedAltReverse: ReverseReviewCard = {
+        ...alolanRaichu,
+        id: REVERSE_ID_OFFSET + 10100,
+        pokemonId: 10100,
+        cardType: 'reverse',
+        subjectKey: '10100',
+        state: { ...initialReviewState(NOW), reps: 5, scheduledDays: 21 },
+      };
+      const result = hydrateSession([savedAltReverse], formSeed, [], NOW, {
+        reverseEnabled: true,
+        nameEnabled: false,
+        evolutionEnabled: false,
+      });
+      const found = result.find((c) => c.id === REVERSE_ID_OFFSET + 10100);
+      expect(found).toBeDefined();
+      expect(found?.state.reps).toBe(5);
+      expect(found?.state.scheduledDays).toBe(21);
+      if (found?.cardType !== 'reverse') throw new Error('Expected reverse card');
+      expect(found.displayName).toBe('Alolan Raichu');
+      expect(found.subjectKey).toBe('10100');
+    });
+
+    it('hydrateSession adds missing form entries (both name cards) when saved session has none', () => {
+      const result = hydrateSession([], formSeed, [], NOW);
+      expect(result).toHaveLength(2);
+      const ids = result.map((c) => c.id);
+      expect(ids).toContain(26);
+      expect(ids).toContain(10100);
+    });
   });
 });

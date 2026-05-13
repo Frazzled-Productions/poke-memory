@@ -1188,7 +1188,7 @@ export function ReviewSession() {
         {revealed ? (
           <PokemonCard
             spriteUrl={effectiveCard.spriteUrl}
-            name={effectiveCard.name}
+            name={effectiveCard.displayName}
             revealed
             fact={currentFact}
             direction="cry"
@@ -1336,7 +1336,7 @@ export function ReviewSession() {
       ) : (
         <PokemonCard
           spriteUrl={effectiveCard.spriteUrl}
-          name={effectiveCard.name}
+          name={effectiveCard.displayName}
           revealed={revealed}
           fact={currentFact}
         />
