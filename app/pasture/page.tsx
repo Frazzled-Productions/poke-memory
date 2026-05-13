@@ -12,6 +12,8 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
+import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { initialReviewState } from "@/lib/srs/scheduler";
 
 type Placement = {
   card: NameReviewCard;
@@ -111,9 +113,20 @@ export default function PasturePage() {
     return null;
   }
 
-  const masteredCards = session
-    ? (filterMastered(session.cards, flags.pretendAllMastered) as NameReviewCard[])
-    : [];
+  // Superuser pretendAllMastered: source every species from SEED_POKEMON
+  // directly so the pasture is fully populated even on a fresh or sparse
+  // localStorage session. seenInPasture is forced true so the synthesized
+  // cards don't sparkle as "new arrivals" in QA mode. Persisted state is left
+  // untouched — markSeenInPasture is a no-op for ids not in session.cards.
+  const masteredCards: NameReviewCard[] = flags.pretendAllMastered
+    ? SEED_POKEMON.map((p) => ({
+        ...p,
+        cardType: "name" as const,
+        state: { ...initialReviewState(new Date()), seenInPasture: true },
+      }))
+    : session
+      ? (filterMastered(session.cards, false) as NameReviewCard[])
+      : [];
 
   if (masteredCards.length === 0) {
     return (
