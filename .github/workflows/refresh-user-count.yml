@@ -8,8 +8,11 @@ name: Refresh user count badge
 # auto-release.yml is reused so the commit lands on `main` despite branch
 # protection.
 #
-# The commit message carries `[skip ci]` so this run does not retrigger
-# `ci.yml`, `auto-release.yml`, etc.
+# The commit message carries the GitHub-native skip marker so this run
+# does not retrigger any push-triggered workflow (CI, auto-release,
+# migration-check). The marker is platform-level — once present in a
+# commit message, GitHub does not dispatch any push or pull_request
+# workflows for that commit, so no per-workflow guard is required here.
 
 on:
   schedule:
