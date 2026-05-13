@@ -3,246 +3,139 @@
  *
  * Usage:
  *   npx playwright install --with-deps chromium   # first time only
- *   BASE_URL=http://localhost:3000 node scripts/capture-screenshots.mjs
+ *   npm run dev &                                  # background dev server
+ *   npm run screenshots                            # captures all five
+ *   npm run screenshots -- --page=practice         # capture one surface
  *
- * Outputs four PNGs into docs/screenshots/:
- *   practice-front.png   – card front (sprite + "What Pokémon is this?")
- *   practice-flipped.png – card flipped (name revealed + grade buttons)
- *   pokedex-grid.png     – Pokédex grid showing all three disclosure tiers
- *   stats.png            – Stats page (grade breakdown + mastery + streak)
+ * Outputs five PNGs into docs/screenshots/, all captured at the same
+ * iPhone 17 Pro viewport (402×874 CSS px @ 3x DPR) so the README layout
+ * lines up cleanly:
  *
- * The script seeds synthetic mid-progress data into localStorage so the grid
- * shows all three tiers (silhouette / greyscale / full colour) at once.
+ *   practice-front.png   – card front (sprite, "???", Reveal button)
+ *   practice-flipped.png – card flipped (name + flavour + grade buttons)
+ *   pokedex-grid.png     – Pokédex with all species rendered as mastered
+ *   pasture.png          – Pasture page populated by habitat zones
+ *   stats.png            – Stats hero strip (trainer card + records)
+ *
+ * All screenshots are taken under the superuser `pretendAllMastered` flag
+ * so the rendering is deterministic without depending on a particular
+ * review history. The Next.js dev-tools indicator (<nextjs-portal>) is
+ * hidden inline just before capture.
  */
 
-import { chromium, devices } from "@playwright/test";
+import { chromium } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { parseArgs } from "node:util";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
-const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "docs", "screenshots");
+const OUT_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "docs",
+  "screenshots",
+);
 
-// Storage key must match lib/review/persistence.ts
-const STORAGE_KEY = "poke-memory:review-session:v1";
+// Locked viewport — iPhone 17 Pro CSS dimensions at 3× device-pixel ratio.
+// Don't change without also re-shooting all existing screenshots so the
+// README grid stays uniform.
+const VIEWPORT = { width: 402, height: 874 };
+const DEVICE_SCALE_FACTOR = 3;
 
-// Mastery: repetitions >= 3 AND interval >= 21 (matches lib/stats/derive.ts)
-const MASTERY_REPETITIONS = 3;
-const MASTERY_INTERVAL_DAYS = 21;
+// Storage keys must match lib/superuser/persistence.ts.
+const SUPERUSER_UNLOCKED_KEY = "poke-memory:superuser";
+const SUPERUSER_FLAGS_KEY = "poke-memory:superuser:flags:v1";
 
-function pastDate(daysAgo) {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().slice(0, 10);
-}
-
-function futureDate(daysAhead) {
-  const d = new Date();
-  d.setDate(d.getDate() + daysAhead);
-  return d.toISOString().slice(0, 10);
-}
-
-/**
- * Build a synthetic session with three tiers:
- *   - ids 1–15:  mastered    (full colour in Pokédex)
- *   - ids 16–50: learning    (greyscale in Pokédex)
- *   - ids 51–1025: unseen   (silhouette in Pokédex)
- *
- * Only the seen cards need to be in the session; unseen ids are absent.
- */
-function buildSeedSession() {
-  const cards = [];
-
-  // Mastered cards (ids 1–15)
-  for (let id = 1; id <= 15; id++) {
-    cards.push({
-      id,
-      cardType: "name",
-      name: `pokemon-${id}`,
-      spriteUrl: `/sprites/pokemon/${id}.png`,
-      types: ["normal"],
-      stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },
-      flavorText: "",
-      flavorTexts: [],
-      evolutionChain: [],
-      height: 10,
-      weight: 100,
-      baseExperience: 100,
-      genus: null,
-      generation: "generation-i",
-      captureRate: 45,
-      baseHappiness: 70,
-      growthRate: "medium",
-      habitat: null,
-      genderRate: 4,
-      isLegendary: false,
-      isMythical: false,
-      cryUrl: null,
-      state: {
-        repetitions: MASTERY_REPETITIONS + 2,
-        interval: MASTERY_INTERVAL_DAYS + 9,
-        easeFactor: 2.5,
-        dueDate: futureDate(15),
-        lastReview: pastDate(15),
-        firstSeen: pastDate(60),
-        learningStep: null,
-        stepStartedAt: null,
-      },
-    });
-  }
-
-  // Learning cards (ids 16–50): reviewed but not mastered (greyscale)
-  for (let id = 16; id <= 50; id++) {
-    const reps = 1 + ((id - 16) % 2); // 1 or 2 reps — below mastery threshold
-    cards.push({
-      id,
-      cardType: "name",
-      name: `pokemon-${id}`,
-      spriteUrl: `/sprites/pokemon/${id}.png`,
-      types: ["normal"],
-      stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },
-      flavorText: "",
-      flavorTexts: [],
-      evolutionChain: [],
-      height: 10,
-      weight: 100,
-      baseExperience: 100,
-      genus: null,
-      generation: "generation-i",
-      captureRate: 45,
-      baseHappiness: 70,
-      growthRate: "medium",
-      habitat: null,
-      genderRate: 4,
-      isLegendary: false,
-      isMythical: false,
-      cryUrl: null,
-      state: {
-        repetitions: reps,
-        interval: reps === 1 ? 1 : 6,
-        easeFactor: 2.5,
-        dueDate: futureDate(reps),
-        lastReview: pastDate(1),
-        firstSeen: pastDate(10),
-        learningStep: null,
-        stepStartedAt: null,
-      },
-    });
-  }
-
-  const limits = {
-    name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-    evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-    reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-  };
-
-  return JSON.stringify({ cards, limits });
-}
-
-// CSS injected on every captured page: hide Next.js dev-mode UI (route
-// announcer, dev-tools indicator) so it never appears in screenshots.
-const HIDE_DEV_UI_CSS = `
-  nextjs-portal,
-  [data-nextjs-toast],
-  [data-nextjs-dialog-overlay],
-  #__next-build-watcher,
-  #__next-route-announcer__,
-  next-route-announcer { display: none !important; }
-`;
-
-async function withPage(browser, contextOptions, fn) {
-  const ctx = await browser.newContext({
-    ...contextOptions,
-    storageState: {
-      cookies: [],
-      origins: [
-        {
-          origin: BASE_URL,
-          localStorage: [{ name: STORAGE_KEY, value: buildSeedSession() }],
-        },
-      ],
+const SHOTS = {
+  "practice-front": {
+    url: "/",
+    file: "practice-front.png",
+    action: null,
+  },
+  "practice-flipped": {
+    url: "/",
+    file: "practice-flipped.png",
+    action: async (page) => {
+      await page
+        .getByRole("button", { name: /reveal/i })
+        .first()
+        .click();
+      await page.waitForTimeout(800);
     },
-  });
-  const page = await ctx.newPage();
-  try {
-    await fn(page);
-  } finally {
-    await ctx.close();
-  }
-}
+  },
+  "pokedex-grid": { url: "/pokedex", file: "pokedex-grid.png", action: null },
+  pasture: { url: "/pasture", file: "pasture.png", action: null },
+  stats: { url: "/stats", file: "stats.png", action: null },
+};
 
-async function hideDevUi(page) {
-  await page.addStyleTag({ content: HIDE_DEV_UI_CSS }).catch(() => {});
+async function captureSurface(page, name) {
+  const spec = SHOTS[name];
+  if (!spec) {
+    throw new Error(
+      `Unknown surface: ${name}. Known: ${Object.keys(SHOTS).join(", ")}`,
+    );
+  }
+  await page.goto(`${BASE_URL}${spec.url}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1200);
+  if (spec.action) await spec.action(page);
+  await page.waitForTimeout(600);
+  // Hide the Next.js dev-tools indicator (custom <nextjs-portal> element)
+  // just before capture so it doesn't appear in screenshots.
+  await page.evaluate(() => {
+    document
+      .querySelectorAll("nextjs-portal")
+      .forEach((el) => (el.style.display = "none"));
+  });
+  const path = join(OUT_DIR, spec.file);
+  await page.screenshot({ path, fullPage: false });
+  console.log(`  ${spec.file}`);
 }
 
 async function main() {
+  const { values } = parseArgs({
+    options: { page: { type: "string" } },
+    strict: false,
+  });
+
+  const targets = values.page
+    ? [values.page]
+    : Object.keys(SHOTS);
+
   await mkdir(OUT_DIR, { recursive: true });
-
   const browser = await chromium.launch();
-
   try {
-    // ── Practice screenshots (iPhone 14 viewport) ──────────────────────────
-    await withPage(browser, { ...devices["iPhone 14"] }, async (page) => {
-      await page.goto(BASE_URL, { waitUntil: "networkidle" });
-      // Wait for sprite — confirms localStorage session was read and card rendered.
-      // next/image rewrites src to /_next/image?url=%2Fsprites%2Fpokemon%2F…, so
-      // match the encoded path (and decoded fallback) instead of the raw URL.
-      await page.waitForSelector(
-        'img[src*="sprites%2Fpokemon"], img[src*="/sprites/pokemon/"]',
-        { timeout: 30_000 },
-      );
-      await hideDevUi(page);
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: join(OUT_DIR, "practice-front.png"), fullPage: false });
-      console.log("  practice-front.png");
-
-      const revealBtn = page.getByRole("button", { name: /reveal/i });
-      if (await revealBtn.isVisible()) {
-        await revealBtn.click();
-        await page.waitForTimeout(400);
-      }
-      // The reveal expands the card with grade buttons below the sprite, which
-      // overflow the iPhone 14 viewport. Capture the full page so the grade
-      // buttons (Again / Hard / Good / Easy) are included in the screenshot.
-      await page.screenshot({ path: join(OUT_DIR, "practice-flipped.png"), fullPage: true });
-      console.log("  practice-flipped.png");
+    const ctx = await browser.newContext({
+      viewport: VIEWPORT,
+      deviceScaleFactor: DEVICE_SCALE_FACTOR,
+      isMobile: true,
+      hasTouch: true,
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
     });
 
-    // ── Pokédex grid (desktop viewport, 1280×900) ──────────────────────────
-    await withPage(browser, { viewport: { width: 1280, height: 900 } }, async (page) => {
-      await page.goto(`${BASE_URL}/pokedex`, { waitUntil: "networkidle" });
-      // Wait for at least one sprite — confirms localStorage was read and grid rendered.
-      // next/image rewrites src to /_next/image?url=%2Fsprites%2Fpokemon%2F…, so
-      // match the encoded path (and decoded fallback) instead of the raw URL.
-      await page.waitForSelector(
-        'img[src*="sprites%2Fpokemon"], img[src*="/sprites/pokemon/"]',
-        { timeout: 30_000 },
-      );
-      await hideDevUi(page);
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: join(OUT_DIR, "pokedex-grid.png"), fullPage: false });
-      console.log("  pokedex-grid.png");
-    });
+    // Seed superuser flags so pretendAllMastered renders every species as
+    // mastered. Must happen before any /pokedex, /pasture, /stats navigation.
+    const page = await ctx.newPage();
+    await page.goto(`${BASE_URL}/`, { waitUntil: "domcontentloaded" });
+    await page.evaluate(
+      ({ unlockedKey, flagsKey }) => {
+        localStorage.setItem(unlockedKey, "true");
+        localStorage.setItem(
+          flagsKey,
+          JSON.stringify({ pretendAllMastered: true }),
+        );
+      },
+      { unlockedKey: SUPERUSER_UNLOCKED_KEY, flagsKey: SUPERUSER_FLAGS_KEY },
+    );
 
-    // ── Stats page (iPhone 14 viewport) ───────────────────────────────────
-    await withPage(browser, { ...devices["iPhone 14"] }, async (page) => {
-      await page.goto(`${BASE_URL}/stats`, { waitUntil: "networkidle" });
-      // Wait for mastery heading — confirms localStorage was read and stats computed
-      await page.waitForSelector("h2#mastery-heading", { timeout: 15_000 });
-      await hideDevUi(page);
-      await page.waitForTimeout(400);
-      // Stats content (streak + grade breakdown + mastery distribution + progress
-      // bar) is taller than an iPhone 14 viewport. Capture the full page so the
-      // mastery cards and "X / 1,025 introduced" row are both visible.
-      await page.screenshot({ path: join(OUT_DIR, "stats.png"), fullPage: true });
-      console.log("  stats.png");
-    });
+    for (const name of targets) await captureSurface(page, name);
   } finally {
     await browser.close();
   }
 
   console.log(`\nScreenshots saved to ${OUT_DIR}`);
-  console.log("Review the images, then commit them to the branch.");
+  console.log("Review the images, then commit them with the PR.");
 }
 
 main().catch((err) => {

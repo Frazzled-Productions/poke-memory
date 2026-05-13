@@ -383,6 +383,21 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `vercel-preview-on-ready.yml` — Vercel Preview on Ready
+
+| | |
+|---|---|
+| **Trigger** | `workflow_run` on `CI` (`completed`); `issue_comment: created` |
+| **Gate** | Fires the Vercel Deploy Hook only when both conditions hold on the same HEAD SHA: the `test` check is `success` AND the latest `<!-- auto-review:N -->` comment scoped to that SHA carries `Verdict: Looks good to me`. The auto-review SHA scope comes from the `<!-- auto-review-sha:<sha> -->` row that `auto-review.yml` writes on every comment. |
+| **Manual override** | A `/preview` PR comment from OWNER / MEMBER / COLLABORATOR bypasses both gates and fires the hook unconditionally — for mid-iteration peeks before LGTM. |
+| **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm relies on `auto-review.yml` already excluding forks (so no LGTM verdict is ever posted for a fork PR). |
+| **Idempotency** | Posts `<!-- vercel-preview-fired:<sha> -->` on the PR after a successful fire; subsequent re-evaluations at the same SHA are no-ops. |
+| **Why two triggers** | CI and auto-review run independently; whichever finishes second flips the gate. Both events re-evaluate against the current HEAD SHA, so order doesn't matter. |
+| **Required secrets** | `VERCEL_DEPLOY_HOOK_URL`, `BOT_APP_PRIVATE_KEY`, `BOT_APP_ID` (var). |
+| **Context** | `vercel.json` sets `git.deploymentEnabled = { "**": false, "main": true }`, so non-`main` branches do not auto-deploy. This workflow is the only path that creates preview deployments. Production deploys on `main` are unaffected. `e2e.yml` triggers on the `deployment_status` that Vercel fires when the gated preview deploys, so it inherits the gate. |
+
+---
+
 ### `auto-release.yml` — Auto Release
 
 | | |

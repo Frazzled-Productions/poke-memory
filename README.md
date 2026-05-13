@@ -20,11 +20,18 @@
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/practice-front.png" width="240" alt="Practice — card front" />
-  <img src="docs/screenshots/practice-flipped.png" width="240" alt="Practice — card flipped" />
-  <img src="docs/screenshots/pokedex-grid.png" width="240" alt="Pokédex grid" />
-  <img src="docs/screenshots/stats.png" width="240" alt="Stats" />
+  <img src="docs/screenshots/practice-front.png" width="180" alt="Practice — card front" />
+  &nbsp;
+  <img src="docs/screenshots/practice-flipped.png" width="180" alt="Practice — card flipped, with grade buttons" />
+  &nbsp;
+  <img src="docs/screenshots/stats.png" width="180" alt="Stats" />
 </p>
+<p align="center">
+  <img src="docs/screenshots/pokedex-grid.png" width="180" alt="Pokédex grid" />
+  &nbsp;
+  <img src="docs/screenshots/pasture.png" width="180" alt="Pasture" />
+</p>
+<p align="center"><em>Practice (front and flipped), Stats, Pokédex, and Pasture — captured on iPhone 17 Pro.</em></p>
 
 ## How a review works
 
@@ -61,6 +68,9 @@ A trainer-card hero strip (level + generation badges), current streak, a four-ce
 ### Pokédex
 1025-cell grid with progressive disclosure — unlearned Pokémon appear as silhouettes, reviewed Pokémon greyscale, mastered ones in full colour. Tap any cell to open a detail page that reveals more as you progress: types and flavour text unlock when you start learning; base stats, facts, and the evolution chain unlock once mastered.
 
+### Pasture
+A nav link that unlocks the moment you master your first Pokémon. Mastered Pokémon are placed into habitat-themed zones (grasslands, forest, mountain, open sea, cave, urban, and more), with newly arrived ones drawing a sparkle until you've seen them once. A miniature collection wall that grows as your mastery does.
+
 ### Settings
 Mastery threshold, new/review caps per direction, reverse-card and cry-card toggles, and an **FSRS recall-target slider** (80% – 97%) that trades off review frequency against retention.
 
@@ -75,7 +85,7 @@ Mastery threshold, new/review caps per direction, reverse-card and cry-card togg
 
 ## Sync your progress
 
-Sign in with GitHub (the **Sign in** button in the nav) to sync your review history across devices. Once signed in, your progress is pushed to the cloud at the end of each session.
+Sign in with GitHub (the **Sign in** button in the nav) to sync your review history across devices. Once signed in, every grade is pushed to the cloud immediately (with a short debounce to coalesce rapid re-grades), and a safety-net beacon flushes any unsent grades on tab close.
 
 - **Guest mode** — no account needed; everything stays in your browser.
 - **Sign in** — ties your session to a GitHub account via Supabase Auth; data stored in Postgres.
@@ -122,7 +132,7 @@ E2E smoke tests run automatically against Vercel preview deployments in CI.
 
 - **Framework** — Next.js 16 (App Router, Cache Components)
 - **UI** — React 19, Tailwind CSS 4
-- **Language** — TypeScript 5
+- **Language** — TypeScript 6
 - **Sync** — Supabase (Auth + Postgres with RLS)
 - **Hosting** — Vercel (auto-deploys on every push to `main`)
 - **Testing** — vitest for unit/component, Playwright for E2E

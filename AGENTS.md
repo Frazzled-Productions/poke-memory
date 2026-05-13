@@ -5,10 +5,10 @@ An Anki-style spaced-repetition app for learning Pokémon names and evolutions, 
 This repo also serves as a sandbox for practicing Claude Code sub-agent workflows — see the roster and playbook below. When choosing how to do work here, lean toward demonstrating sub-agent patterns over the fastest path, but only when the agent earns its keep.
 
 ## Stack
-- Next.js 16.2.5 (App Router)
-- React 19.2.4
+- Next.js 16.2.6 (App Router)
+- React 19.2.6
 - Tailwind CSS 4
-- TypeScript 5
+- TypeScript 6
 
 <!-- BEGIN:nextjs-agent-rules -->
 ## This is NOT the Next.js you know
@@ -16,39 +16,13 @@ This repo also serves as a sandbox for practicing Claude Code sub-agent workflow
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-## Sub-agent roster
+## Sub-agents and orchestration
 
-Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagent_type: "<name>"`.
-
-| Agent | When to use |
-|---|---|
-| [next16-expert](.claude/agents/next16-expert.md) | Any Next.js 16 API / caching / routing / rendering question. Read-only. |
-| [pokeapi-expert](.claude/agents/pokeapi-expert.md) | Choosing PokéAPI endpoints, schemas, caching. Use BEFORE writing integration code. |
-| [srs-expert](.claude/agents/srs-expert.md) | Designing/implementing the spaced-repetition scheduler. |
-| [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth, Postgres + RLS, schema design for FSRS state, Next.js 16 App Router client patterns. Use BEFORE writing any Supabase integration code. Read-only. |
-| [workflow-expert](.claude/agents/workflow-expert.md) | Any non-trivial change to `.github/workflows/**` or `.claude/agents/**`. Read-only. |
-| [planner](.claude/agents/planner.md) | Designing an implementation plan before any code is written. |
-| [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist. |
-| [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling. |
-| [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations. |
-| [playwright](.claude/agents/playwright.md) | E2E smoke tests after a user-facing change. Owns `e2e/**`. |
-| [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change. Read-only. |
-
-## Orchestration playbook
-
-The main agent (Claude in the user's session) orchestrates — whether running via GitHub Actions (`auto-issue.yml`) or interactively (CLI, agent view, IDE). The playbook applies in all contexts; interactive sessions should follow the same flow, adapting only where real-time user input replaces async commands like `/go`.
+Custom agents live in `.claude/agents/`. The full roster, when to use each, and the standard plan → research → implement → E2E → review playbook are in [WORKFLOW.md](WORKFLOW.md#sub-agent-roster).
 
 **Issue-first rule.** Every non-trivial change must have a GitHub issue before implementation begins. Create one if it doesn't exist. PRs reference the issue (`closes #N`) so work is tracked on the project board.
 
-Coder agents do not call other agents directly — they receive research findings via the prompt. The standard flow for non-trivial work:
-
-1. **Plan** — invoke `planner`. It surfaces unknowns to research first.
-2. **Research in parallel** — invoke specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `researcher`) in a single message when their questions are independent. Pass findings to coders via prompt.
-3. **Implement** — invoke `ui-coder` and/or `data-coder` with full context (research findings + spec). Run them in parallel when their work is independent.
-4. **E2E** — if the change is user-facing, invoke `playwright` to add or update E2E smoke tests. Pass the diff summary and affected pages.
-5. **Review** — invoke `code-reviewer` at the end. Iterate on its punch list.
-
-When *not* to use a sub-agent: small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value. Seeing when to skip an agent is part of the practice.
+**Skip sub-agents** for small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value. Seeing when to skip is part of the practice.
 
 ## File ownership
 
@@ -104,138 +78,25 @@ Do not work around this guard. The whole point is that a QA session with cheats 
 
 Both branches assume the user understands they're exiting a QA mode. Do not silently skip the prompt or the pull.
 
-### Sync: invariants and destructive-write protection (READ FIRST)
+### Sync (READ FIRST when touching `lib/sync/`, `app/api/sync/route.ts`, `db/migrations/`)
 
-Before touching anything in `lib/sync/`, `app/api/sync/route.ts`, `db/migrations/`, or any code that pushes to Supabase, read this section. The rules below exist because of incidents that have already happened (#293 wiped 2497 of 2513 cloud rows to zero state) and are enforced both in code and at the database layer.
+The canonical reference is **[docs/sync.md](docs/sync.md)** — read it before touching anything that pushes to Supabase. Headline rules:
 
-**Order constraints**
+- **Pull before push.** Manual sync pulls and merges before pushing; if `pullSession` fails, do not push. Pushing on stale local state is the exact failure mode that wiped 2497 of 2513 cloud rows (#293).
+- **`card_reviews_reject_regression_trigger` (migration 002)** blocks lifecycle-timestamp regressions on `card_reviews` at the DB layer. Do not work around it.
+- **Cards drive success/error state.** Streak and settings sync legs are best-effort — they `console.warn` and continue rather than flip the overall sync into the error state.
+- **No PITR yet** (#298). Treat any production sync change as one-way until PITR is enabled.
 
-- **Manual sync (`useManualSync`) pulls before pushing.** Order: load local → `pullSession` → `mergeCloudIntoLocal` → `saveSession` → `pushSession` of the merged result. Pushing first lets stale or emptied local state overwrite real cloud progress through the `(user_id, pokemon_id)` upsert key. `components/sync/useManualSync.test.tsx` asserts call order — if you re-order the steps, that test fails by design.
-- **Brand-new device (`loadSession()` returned `null`) must not push back the merged result.** The merged state is entirely cloud-sourced; pushing it back is wasted bandwidth and widens the window for a future regression.
-- **If `pullSession` fails, do not push.** Pushing without knowing cloud state is the exact failure mode of #293. The same rule applies to anywhere else you sync: cards, streak, settings, future tables. Pull first, decide, then push.
-
-**Database trigger (`card_reviews_reject_regression_trigger`, migration 002)**
-
-A `BEFORE UPDATE` trigger on `card_reviews` raises `23514 check_violation` when:
-- `OLD.last_review IS NOT NULL AND NEW.last_review IS NULL` — un-reviewing a card.
-- `OLD.first_seen IS NOT NULL AND NEW.first_seen IS NULL` — un-seeing a card.
-- `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review` — review date moving backward.
-
-`repetitions`, `interval`, `ease_factor` are intentionally **not** checked because SM-2 "Again" legitimately resets them. The trigger only catches lifecycle-timestamp regressions.
-
-**Do not work around the trigger.** A legitimate "reset progress" / "delete account" flow needs a `SECURITY DEFINER` RPC that explicitly bypasses it, plus user confirmation. No such flow exists today; do not invent one without an explicit feature requirement.
-
-**Auxiliary sync legs are best-effort**
-
-Cards are the primary contract. Streak (`streak_days`) and settings (`user_settings`) sync runs inside `useManualSync` after the cards step. Their failures `console.warn` and continue — they must not flip the overall sync into the error state. Surfacing "Sync failed" because the streak push hiccuped is worse than silently degrading.
-
-**Per-table conflict policy**
-
-- `card_reviews` — per-card rule in `mergeCloudIntoLocalSilent` (see the "background pull" section below for the exact rule).
-- `streak_days` — union-merge (`mergeStreak`). Streak data is monotonic; nothing is ever removed by sync.
-- `user_settings` — last-write-wins on the whole `settings` JSONB column. The pull-overlay path runs **only** when `hasStoredSettings()` is `false` (i.e. the user has never written settings on this device). Once local has a stored copy, local is authoritative on that device; we still push local up so other devices can pick it up.
-
-**Schema notes**
-
-- `user_settings.settings` (jsonb) is the source of truth for per-user settings. The schema is `(user_id, settings, updated_at)` after migration 005 dropped the original flat columns from migration 001.
-- `card_reviews` is on FSRS columns (`stability`, `difficulty`, `elapsed_days`, `scheduled_days`, `reps`, `lapses`, `fsrs_state`) after migration 004. The regression trigger on lifecycle timestamps from migration 002 was unaffected by the swap.
-- `card_reviews.pokemon_id` is just an integer with no CHECK constraint, so the namespaced ID ranges (name, evolution, reverse, cry) round-trip through the same table without schema work.
-- `grade_log.card_type` currently CHECK-constrains `IN ('name','evolution','reverse')`. The cry-name direction (#255) is shipped but `pushGradeLog` drops `cry` entries until a follow-up migration extends the CHECK to include `'cry'`. Cry card_reviews state syncs fully; only the per-grade analytics rows are local-only for now.
-
-**Catastrophic recovery**
-
-There is no Point-in-Time Recovery on the free tier. Issue #298 tracks the upgrade as a launch blocker. Until PITR is enabled, the trigger and the SQL audit you can run via `mcp__supabase__execute_sql` are the only defenses against an unforeseen sync bug. Treat any production sync change as one-way until PITR is in place.
+[docs/sync.md](docs/sync.md) covers the four sync paths (per-grade debounced upsert, unload beacon, background pull on visibility, manual sync), the per-card conflict rule, the regression trigger, per-table conflict policy, schema notes for `user_settings` / `card_reviews` / `grade_log`, and catastrophic-recovery posture.
 
 ### Adding a feature that needs to persist data
 
-Tables today: `card_reviews`, `streak_days`, `user_settings`, `grade_log`. All RLS-protected, all FK'd to `auth.users(id) ON DELETE CASCADE`. The patterns below cover the common shapes — extend rather than reinvent.
+The full decision tree — JSONB field on `user_settings` vs. column on `card_reviews` vs. new table, plus the new-table checklist (uuid PK, FK to `auth.users` with `ON DELETE CASCADE`, four named RLS policies, indexes, regression-trigger pattern) — lives in **[docs/persistence.md](docs/persistence.md)**. Tables today are `card_reviews`, `streak_days`, `user_settings`, `grade_log`.
 
-**Decide where the data lives**
+Two things to remember at runtime without leaving AGENTS.md:
 
-1. **Per-user setting / toggle / preference** → add a field to `user_settings.settings` (jsonb). No schema migration needed. Extend the `UserSettings` type in `lib/settings/persistence.ts`; the existing settings sync flow carries the new field automatically (see #307 favourite-theme for the canonical example).
-2. **Per-card scheduling state** → add a column to `card_reviews` via a migration. The regression trigger from migration 002 currently guards only the lifecycle timestamps (`last_review`, `first_seen`) — if your new column has its own "only moves forward" invariant, extend the trigger; otherwise leave it alone.
-3. **Monotonic / per-event data** (logs, daily markers, audit trails) → new table. See checklist below.
-
-**New table checklist**
-
-A new migration `db/migrations/NNN_<snake_case_name>.sql` MUST contain:
-
-```sql
-CREATE TABLE <name> (
-  id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  -- your columns, ideally with CHECK constraints on enum-like text fields
-  --   e.g. card_type text NOT NULL CHECK (card_type IN ('name','evolution','reverse'))
-  -- and a UNIQUE constraint that doubles as the upsert / dedup key
-  --   e.g. UNIQUE (user_id, occurred_at)
-);
-
-CREATE INDEX <name>_user_<hot_col> ON <name> (user_id, <hot_col> DESC);
-
-ALTER TABLE <name> ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "<name>_select" ON <name>
-  FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "<name>_insert" ON <name>
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "<name>_update" ON <name>
-  FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "<name>_delete" ON <name>
-  FOR DELETE USING (auth.uid() = user_id);
-```
-
-Four named policies (one per verb) beat a single `FOR ALL` — easier to audit and to drop selectively. `ON DELETE CASCADE` ensures rows die with their user. Always combine `CREATE TABLE` + `ENABLE RLS` + policies in the same migration; an enabled-RLS-without-policies state silently blocks the client.
-
-Reference shapes: `streak_days` (migration 001) for an append-only monotonic table, `grade_log` (migration 006) for an indexed event log.
-
-**Invariants on existing data**
-
-If a column has a "this value only moves forward" semantic (review dates, counters, etc.), add a `BEFORE UPDATE` trigger that `RAISE EXCEPTION ... USING ERRCODE = 'check_violation'` (errcode `23514`). Model: migration 002's `card_reviews_reject_regression_trigger`. The client surfaces the error as a sync failure; users see "Sync failed" rather than silent data loss. Do not work around an existing trigger — a legitimate reset / delete-account flow needs a `SECURITY DEFINER` RPC plus user confirmation, not a trigger bypass.
-
-**Apply the migration**
-
-Apply the migration to the live Supabase project **before merging** the PR that adds it — typically right after opening the PR. Call `mcp__supabase__apply_migration(name, query)` with `name` matching the filename's `<NNN>_<name>` part (drop the number and the `.sql` extension). The `migration-check.yml` workflow fails the PR's required CI check until file-vs-applied parity holds, so applying *after* merge is not an option: the PR can't merge without the migration already in place.
-
-**Wire cross-device sync**
-
-If the new table needs to follow users across devices: add `lib/sync/<feature>.ts` exporting `push`, `pull`, and a `merge` helper. Match the union-merge or last-write-wins pattern from `streak.ts` / `gradeLog.ts` / `settings.ts`. Wire into `useManualSync` after the existing legs; failures are best-effort — `console.warn` and continue, do not flip the overall sync into the error state. Add module tests in `lib/sync/<feature>.test.ts` plus mocks in `components/sync/useManualSync.test.tsx`.
-
-### Sync (authenticated users)
-
-Sync paths to Supabase, in order of how data normally flows:
-
-1. **Per-grade debounced upsert (primary path)** — `usePerGradeSync(client, userId)` returns `{ enqueueGrade, flushPending }`. Call `enqueueGrade(card)` fire-and-forget immediately after each grade. A 200 ms debounce coalesces rapid re-grades; when it fires, one upsert per pending card is sent via `pushSingleCard`. Failed cards stay in the queue for the next grade cycle or the unload safety-net.
-
-2. **Unload safety-net** — `useSyncOnUnload(client, userId, flushPending)` registers `visibilitychange` / `pagehide` listeners. On unload it calls `flushPending()` (from `usePerGradeSync`) to get the still-unsynced cards; if non-empty, it dispatches them via `navigator.sendBeacon('/api/sync', blob)`. When the per-grade path is working normally, `flushPending()` returns `[]` and the unload push is skipped entirely.
-
-3. **Background pull on visibility** — see the dedicated section below.
-
-4. **Manual sync (`useManualSync`)** — wired to the Stats-page "Sync" button. **Pulls before pushing** — see the invariants section above for why. Order: load local → pull cards → merge → save → push merged cards → streak (pull → union-merge → save → push) → settings (push local; pull only when `hasStoredSettings()` is false). Cards drive success/error state; streak and settings failures `console.warn` and continue. `pushSession` (batched) is reused for the cards push.
-
-- **Unload-time send mechanism:** `useSyncOnUnload` uses `navigator.sendBeacon('/api/sync', blob)` rather than calling the Supabase JS client directly. `sendBeacon` is the W3C-specified mechanism for guaranteed delivery during page hide and carries same-origin cookies automatically — ITP does not affect same-origin requests, so mobile Safari auth cookies are included. The receiver is `app/api/sync/route.ts` — a POST Route Handler that authenticates via session cookie and upserts server-side. `lastPushFailed` in sync status reflects whether the browser accepted the beacon (the synchronous return value of `sendBeacon`), not whether the server upserted.
-- **`pushSession` is not deleted** — it remains the batched escape hatch and is what `useManualSync` calls for the cards push step.
-- **Volume**: 100 reviews/day → at most 100 single-row upserts (often fewer after debounce coalescing). Well within Supabase free-tier limits.
-- Guest-mode guard runs on every `enqueueGrade` call, not just at mount, so mid-session sign-out is safe.
-
-### Sync: background pull on visibility
-
-When a signed-in tab regains focus after being hidden ≥ 30 seconds, `useVisibilityPull` (mounted via `SyncOnVisible` in the root layout) silently calls `pullAndMerge`, which pulls all cloud rows and merges them into `localStorage`.
-
-**Blocked routes**: `["/"]` — the practice session is excluded to avoid interrupting an active review. The block is route-level; the session-complete screen (still at `/`) is also excluded, which is the accepted tradeoff for keeping the implementation simple.
-
-**`lastPullAt` and clock-skew mitigation**: `SyncStatus.lastPullAt` stores the ISO timestamp from the most-recently-updated cloud row in the pull response (server-side `updated_at`), not `Date.now()`. This prevents a device with a drifting local clock from producing false "cloud is newer" signals on subsequent pulls.
-
-**Per-card conflict rule** (implemented in `mergeCloudIntoLocalSilent` in `lib/sync/cloud.ts`):
-1. `lastPullAt` is `null` (first pull on this device) → cloud wins unconditionally.
-2. `card.state.lastReview !== null && lastReview >= lastPullAt.slice(0, 10)` → this device graded since the last pull (same calendar day or later) → **keep local**.
-3. `cloudRow.updated_at > lastPullAt` → cloud has newer state → **take cloud**.
-4. Otherwise (cloud row unchanged since last pull) → **keep local**.
-
-The `>=` date comparison is conservative: any review on the same calendar day as the pull counts as "graded since pull," preventing incorrect reverts when sub-day ordering cannot be determined from `YYYY-MM-DD` strings.
-
-**Synthetic `StorageEvent` invariant**: `saveSession` (in `lib/review/persistence.ts`) dispatches a synthetic `StorageEvent` for `"poke-memory:review-session:v1"` after every successful localStorage write, so same-tab subscribers (`useSessionStorageKey` in NavLinks, Stats, and Pokédex) are notified. Cross-tab listeners receive the native event automatically. If you write the session key directly via `localStorage.setItem` (bypassing `saveSession`), dispatch the event yourself — better, route through `saveSession`.
-
-**Reactive re-render**: `useSessionStorageKey` (`lib/review/useSessionStorageKey.ts`) returns an incrementing counter on each matching storage event. NavLinks, Stats, and Pokédex include this counter in their session-loading `useEffect` dependency arrays so they re-render after a background pull, a sparkle-clear, or a grade that crosses a mastery threshold — without a page reload.
+- **Apply the migration BEFORE merging the PR.** `migration-check.yml` fails the required CI check until file-vs-applied parity holds. Call `mcp__supabase__apply_migration(name, query)` after opening the PR.
+- **Wire cross-device sync** by adding `lib/sync/<feature>.ts` and hooking it into `useManualSync` after the existing legs. Auxiliary legs are best-effort — `console.warn` and continue, never flip the overall sync into the error state.
 
 ### Page params
 
@@ -253,42 +114,14 @@ The `>=` date comparison is conservative: any review on the same calendar day as
 
 ### Spaced repetition
 
-- **Algorithm**: FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default parameters per FSRS, with a user-controlled `request_retention` knob (Settings → Recall target, 0.80–0.97, default 0.90). Per-user weight optimisation is a separate follow-up (#268).
-- **Anki-style learning steps layer**: kept on top of FSRS. FSRS schedules graduated cards only; new and lapsed cards go through wall-clock learning steps via `learningStepsFor(difficulty)` / `relearningStepsFor(difficulty)` (`lib/srs/constants.ts`). The bands are: easy (FSRS difficulty ≤ 4) `[1m]`; medium (5–7) `[1m, 10m]` for learning and `[10m]` for relearning — the historic default, preserved as `LEARNING_STEPS_MS` / `RELEARNING_STEPS_MS`; hard (≥ 8) `[1m, 5m, 15m]` for learning and `[5m, 15m]` for relearning. The in-step layer is what `learningStep` / `stepStartedAt` track.
-- **Scheduler call options**: `nextReview(state, grade, now, options?)` accepts `{ retentionTarget }` and is the single chokepoint that reads it. `previewIntervals` accepts the same options shape. FSRS instances are cached per retention value so a session that holds one target doesn't reinstantiate per grade.
-- **Grading UX**: 4 buttons — `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). The 1/2/4/5 internal convention maps to FSRS's `Rating` enum (1/2/3/4) at the boundary in `lib/srs/scheduler.ts`.
-- **Per-card review state**:
-  ```ts
-  type ReviewState = {
-    // FSRS core (graduated-path math)
-    stability: number;
-    difficulty: number;
-    elapsedDays: number;
-    scheduledDays: number;
-    reps: number;
-    lapses: number;
-    fsrsState: 'new' | 'learning' | 'review' | 'relearning';
-    // Lifecycle timestamps (unchanged across the SM-2 → FSRS swap)
-    dueDate: string;           // ISO 8601 "YYYY-MM-DD"
-    lastReview: string | null;
-    firstSeen: string | null;  // ISO date of first-ever grade. Set once; never overwritten.
-    // Anki layer (in-memory wall-clock countdown)
-    learningStep: number | null;
-    stepStartedAt: number | null;
-  };
-  ```
-- Dates as `"YYYY-MM-DD"` strings (string-comparable, no timezone math). The `nextReview` scheduler is a pure function and lives in `lib/srs/`.
-- **Queue policy**: two queues — review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today` (stable for the day, rotates daily).
-- **Daily limits**: 10 new cards/day (hard wall — exceeding inflates tomorrow's review queue), 100 reviews/day (soft wall with "Keep reviewing" override). Counters: `newIntroducedToday = firstSeen === today`; `reviewsDoneToday = lastReview === today && firstSeen !== today`.
-- **Persisted session shape**: `{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` runs `migrateReviewState` on every card — including the SM-2 → FSRS conversion for any legacy persisted state — so the migration is idempotent and runs once per device automatically.
-- **Card directions**: three directions, each its own FSRS stream:
-  - `name` (forward): sprite prompt → name. IDs `1..MAX_NAME_ID`.
-  - `reverse`: name prompt → sprite tile picker. IDs `REVERSE_ID_OFFSET + speciesId` (≥ 2_000_001).
-  - `cry`: cry plays as prompt → sprite + name reveal. IDs `CRY_ID_OFFSET + speciesId` (≥ 3_000_001). Only generated for species with a non-null `cryUrl`.
-  - Evolution cards (`EVOLUTION_ID_OFFSET + speciesId`, ≥ 1_000_001) are a fourth stream layered on top of the species; they are not a direction of the same card.
-- **Practice scope** (`lib/review/scope.ts`): a runtime filter over the cards array before `buildSessionQueues` sees it. Persists in `localStorage` (`poke-memory:practice-scope:v1`). Out-of-scope cards' `dueDate` keeps advancing — the scope only affects which cards surface in a session.
-- **Undo** (single-step, session-only): `ReviewSession` captures a pre-grade snapshot of `cards`, session tally, sequence, learning queue, and the `occurredAt` of the just-appended grade-log entry. `handleUndo` (or ⌘/Ctrl+Z) restores them and pops the grade-log entry via `removeGradeEntry(occurredAt)`. Cloud sync rollback is best-effort: the per-grade debounce may already have fired, in which case the cloud retains the post-grade state.
-- **Mastery**: `reps >= masteryRepetitions && scheduledDays >= 21`. The legacy `easeFactor` / `repetitions` field names survive on `StrugglingCard` (in `lib/stats/derive.ts`) — they are derived from FSRS state at the stats boundary so existing UI consumers stay stable.
+The full reference — FSRS algorithm + per-user weights (#268), the Anki-style learning-steps layer with difficulty-based bands, `ReviewState` shape, queue policy, daily limits, card directions (`name` / `reverse` / `cry` / evolution streams), practice scope (`practiceScope` on `UserSettings`), undo, and mastery — lives in **[docs/srs.md](docs/srs.md)**. Read it before touching `lib/srs/`.
+
+Headline facts to keep top of mind:
+
+- **Grading**: `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). The 1/2/4/5 convention maps to FSRS's `Rating` enum at the boundary in `lib/srs/scheduler.ts`.
+- **Mastery**: `reps >= masteryRepetitions && scheduledDays >= 21`.
+- **Dates**: `"YYYY-MM-DD"` strings; string-comparable, no timezone math.
+- **Scheduler is pure** and lives in `lib/srs/`. `nextReview(state, grade, now, options?)` is the single chokepoint that reads `retentionTarget`.
 
 ### Testing
 
@@ -318,8 +151,27 @@ Playwright smoke tests live in `e2e/` and run against Vercel preview deployments
 - **README.md** is the user-facing entry point — audience is a curious visitor or contributor. Concise, scannable, includes run-locally instructions.
 - **CHANGELOG.md** tracks notable user-facing changes. Loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Add a fragment file under `changelog.d/unreleased/` whenever a commit changes user-facing behavior or adds a feature — **do not edit `CHANGELOG.md` directly** (see `changelog.d/README.md` for the format).
 - **WORKFLOW.md** is the process map — sub-agent roster, orchestration playbook, GitHub Actions catalog, issue lifecycle, build gates, and retrospectives. Update it in the same commit that changes a workflow or orchestration behavior.
-- **All three files are updated as part of the same commit that lands the change** — no separate docs-only commit. Orchestrator handles the edit inline; no specialist agent.
-- Internal conventions (this file, `AGENTS.md`) are kept separate from user-facing docs. Don't merge them.
+- **AGENTS.md** (this file) is the implementer conventions index. Internal conventions are kept separate from user-facing docs — don't merge them.
+- **Topic files under `docs/`** are the canonical references for the heavy subsystems, kept out of AGENTS.md to keep the always-loaded context small:
+  - [docs/sync.md](docs/sync.md) — sync invariants, the four sync paths, per-card conflict rule, regression trigger.
+  - [docs/persistence.md](docs/persistence.md) — adding new persisted data: JSONB field vs. column vs. new table, RLS template, migration timing.
+  - [docs/srs.md](docs/srs.md) — FSRS scheduler, learning-step bands, `ReviewState`, queue policy, mastery.
+  Update the topic file in the same commit that changes its subsystem; the pointer in AGENTS.md stays short.
+- **All of these are updated inline in the commit that lands the change** — no separate docs-only commit, no specialist agent.
+
+### Screenshots
+
+The README shows five screenshots (`docs/screenshots/{practice-front,practice-flipped,pokedex-grid,pasture,stats}.png`), all captured at the **iPhone 17 Pro viewport** (402×874 CSS px @ 3× DPR) so the README grid lines up uniformly. The capture script is `scripts/capture-screenshots.mjs`, wrapped as `npm run screenshots`.
+
+**Rule.** When a change visibly affects any of those five surfaces — `app/page.tsx` (Practice), `app/pokedex/**`, `app/pasture/**`, `app/stats/**`, or a `components/**` change that the surface renders — regenerate the affected screenshot(s) and commit them in the same PR. **Run locally on macOS only.** CI does not regenerate, because Linux font anti-aliasing differs visibly from macOS Core Text and would clobber every screenshot on every PR.
+
+```bash
+npm run dev &                          # in another terminal, or in the background
+npm run screenshots                    # all five
+npm run screenshots -- --page=pasture  # one surface
+```
+
+The script uses the `pretendAllMastered` superuser flag so renders are deterministic without depending on a particular review history. Don't change the viewport, the device-scale factor, or the surface list without updating every existing screenshot in the same commit — the README layout assumes consistent shape.
 
 ### Versioning
 
@@ -354,33 +206,19 @@ These are screening criteria for new vendors, services, and libraries. Any addit
 
 ### Backlog / process
 
-> For the full process map (GitHub Actions catalog, issue lifecycle state machine, build-gate details, graceful-exit / WIP salvage, and retrospectives), see [WORKFLOW.md](WORKFLOW.md). This section records the implementer-action rules agents need at runtime.
+For the full process map — GitHub Actions catalog, issue lifecycle state machine, build-gate details, scope-warning thresholds, graceful-exit / WIP salvage, branch protection, the Vercel preview gate, and retrospectives — see [WORKFLOW.md](WORKFLOW.md). This section keeps only the runtime-action rules agents need without leaving AGENTS.md.
 
-The backlog lives on GitHub Issues, labelled `priority:now` / `priority:next` / `priority:later`. The [Poké Memory roadmap](https://github.com/orgs/Frazzled-Productions/projects/1) is a kanban view over the same data.
-
-When starting a new change, the orchestrator runs `gh issue list --label "priority:now"` (or checks the project board) to find candidates. Usually grabs the top `priority:now` item; otherwise asks the user to pick.
+The backlog lives on GitHub Issues, labelled `priority:now` / `priority:next` / `priority:later`. The orchestrator usually starts with `gh issue list --label "priority:now"` and picks the top item.
 
 **The user owns priorities.** Don't move issues between priority labels (or columns) without explicit user direction. Items that come up mid-change as out-of-scope captures get filed as new issues with `priority:later` (or `priority:next` if clearly higher) — never auto-promoted to `priority:now`.
 
 When a change closes an issue, reference it in the commit message (`closes #N`) so it auto-closes on push.
 
-**Retrospectives.** When an issue closes via a merged PR, `auto-retro.yml` posts a `<!-- auto-retro -->` comment. The retro is *process reflection* — it does not recommend code changes. Retro comments are one of four input channels consumed weekly by `auto-workflow-suggest.yml` — that workflow is where cross-retro aggregation happens, producing a single digest issue per ISO week. Promoting digest patterns to convention (adding them to this file) remains the human's responsibility.
-
-**Branch protection on `main`.** A repository ruleset (`main-protection`, ID `16176438`) enforces: required status check `test` (the job from `ci.yml`), no force pushes, linear history. Manage via `gh api /repos/fraserbrookhouse/poke-memory/rulesets/16176438`; toggle `enforcement` between `active` / `evaluate` / `disabled` to stage changes.
-
 **Pre-PR build gate.** After pushing a branch, run `npm run typecheck && npm run build && npm test`. If any step fails, apply a targeted fix and retry — up to two attempts. After the second failure, post a comment with the last 80 lines of build output and stop without opening a PR.
-
-**CI check.** `ci.yml` runs the same triple on every `pull_request` event and push to `main`. The required-check name is `test` (the job ID, not the workflow name `CI`).
-
-**Migration drift check.** `migration-check.yml` runs `scripts/check-migrations.mjs` on every PR that touches `db/migrations/**`. It calls the Supabase Management API and fails if any committed `db/migrations/*.sql` file is not in the applied list. Requires two repo secrets — `SUPABASE_ACCESS_TOKEN` (a personal access token with read access to the project) and `SUPABASE_PROJECT_REF` (the dashboard slug). Migration 001 is exempt — it was applied via the dashboard during project bootstrap before the `apply_migration` MCP workflow existed. Fork PRs skip the check (no secrets exposed to forks).
 
 **Graceful exit on halt.** If the implement run halts, the post-step commits any uncommitted edits as `WIP: halted run on #N` and pushes to origin, so `/continue` always has a branch to resume from. On resume, check `git log -1 --format=%s` — if the subject starts with `WIP:`, inspect `git diff HEAD~1` and amend or revert before continuing.
 
-**Scope warning + `/split`.** When the planner detects large scope (≥4 files, ≥3 surfaces, infra + logic with ≥3 files, or ≥6 acceptance criteria), it runs a coupling check before offering `/split`. Coupling exists when proposed children share a symbol name, `localStorage` key, DB table, leaf module directory, or file — coupled children produce PRs that don't compose at merge time. If coupling is found, `/split` is not offered; proceed as a single issue. When children are cleanly independent, the planner appends a **Suggested split** block and `/split` is available. Each child inherits the `auto` label and triggers its own plan run.
-
-**Auto-review on PR open.** `auto-review.yml` fires when a PR opens and posts `<!-- auto-review:1 -->`. Do not run `code-reviewer` yourself in the implement stage — it runs automatically after the PR is open. Fork PRs are explicitly excluded (`head.repo.fork == false` in the job-level `if:`) — this is a deliberate guard, not a side-effect of GitHub's default secret-isolation policy.
-
-**Vercel preview gate.** `vercel.json` sets `git.deploymentEnabled` to `{"**": false, "main": true}`, so pushes to feature branches do not auto-deploy. `vercel-preview-on-ready.yml` fires the Vercel Deploy Hook (repo secret `VERCEL_DEPLOY_HOOK_URL`) only when both gates are green on the same HEAD SHA: CI `test` is `success` AND the latest `<!-- auto-review:N -->` carries `Verdict: Looks good to me`. Maintainers can comment `/preview` on a PR to bypass the gate for mid-iteration peeks. The workflow re-runs on both `workflow_run` (after CI completes) and `issue_comment` (after auto-review posts), so whichever signal lands second flips the gate. `e2e.yml` is unchanged — it still triggers on `deployment_status` from Vercel, which now fires only after the gated preview deploys. Production deploys on `main` are unaffected.
+**Auto-review on PR open.** `auto-review.yml` fires when a PR opens and posts `<!-- auto-review:1 -->`. Do not run `code-reviewer` yourself in the implement stage — it runs automatically after the PR is open.
 
 ### Privacy
 
