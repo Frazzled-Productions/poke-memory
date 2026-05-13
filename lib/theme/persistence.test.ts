@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { loadFavourite, saveFavourite } from "./persistence";
+import { loadFavourite, saveFavourite, isFavouriteEarned } from "./persistence";
 import { CURATED_POKEMON } from "./curated-pokemon";
+import { initialReviewState } from "@/lib/srs/scheduler";
+import type { ReviewState } from "@/lib/srs/scheduler";
+import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 
 function makeMockStorage() {
   const store: Record<string, string> = {};
@@ -123,5 +126,52 @@ describe("saveFavourite", () => {
     saveFavourite(null);
     const settings = JSON.parse(storage.getItem(SETTINGS_KEY)!);
     expect(settings.favouriteTheme).toBeNull();
+  });
+});
+
+describe("isFavouriteEarned", () => {
+  function masteredState(): ReviewState {
+    return {
+      ...initialReviewState(new Date("2026-05-13")),
+      reps: 5,
+      scheduledDays: MASTERY_INTERVAL_DAYS + 1,
+      lastReview: "2026-05-12",
+    };
+  }
+
+  function learningState(): ReviewState {
+    return {
+      ...initialReviewState(new Date("2026-05-13")),
+      reps: 2,
+      scheduledDays: 3,
+      lastReview: "2026-05-12",
+    };
+  }
+
+  it("returns true when favourite is null", () => {
+    expect(isFavouriteEarned(null, [], 3)).toBe(true);
+  });
+
+  it("returns true when the underlying card is mastered", () => {
+    const cards = [{ id: SAMPLE.id, state: masteredState() }];
+    expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(true);
+  });
+
+  it("returns false when the underlying card exists but is not mastered", () => {
+    const cards = [{ id: SAMPLE.id, state: learningState() }];
+    expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(false);
+  });
+
+  it("returns false when there is no card for the favourite", () => {
+    const cards = [{ id: 999, state: masteredState() }];
+    expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(false);
+  });
+
+  it("respects a higher masteryRepetitions threshold", () => {
+    // reps = 5 satisfies the default 3 but not a 6-rep threshold; the
+    // scheduledDays gate also still applies.
+    const cards = [{ id: SAMPLE.id, state: masteredState() }];
+    expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(true);
+    expect(isFavouriteEarned(SAMPLE_FAV, cards, 6)).toBe(false);
   });
 });

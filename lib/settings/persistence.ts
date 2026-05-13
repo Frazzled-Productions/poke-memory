@@ -37,6 +37,7 @@ export type UserSettings = {
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
   playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
+  speakNameOnReveal: boolean;        // speak Pokémon name aloud (TTS) on card reveal
   cryCardsEnabled: boolean;          // enable third-direction cards: audio prompt → name
   maxNewCryPerDay: number;
   maxReviewsCryPerDay: number;
@@ -100,6 +101,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
+  speakNameOnReveal: false,
   cryCardsEnabled: false,
   maxNewCryPerDay: 10,
   maxReviewsCryPerDay: 100,
@@ -237,6 +239,10 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.playCryOnReveal === "boolean"
         ? obj.playCryOnReveal
         : DEFAULT_SETTINGS.playCryOnReveal,
+    speakNameOnReveal:
+      typeof obj.speakNameOnReveal === "boolean"
+        ? obj.speakNameOnReveal
+        : DEFAULT_SETTINGS.speakNameOnReveal,
     cryCardsEnabled:
       typeof obj.cryCardsEnabled === "boolean"
         ? obj.cryCardsEnabled

@@ -32,6 +32,7 @@ import { nextReview } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
+import { speakName } from "@/lib/audio/tts";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
@@ -982,17 +983,42 @@ export function ReviewSession() {
     }
     setRevealed(true);
     revealedCardId.current = currentCard.id;
-    if (loadSettings().playCryOnReveal) {
-      if (currentCard.cardType === "name") {
-        playCry(currentCard.cryUrl ?? null);
-      } else if (currentCard.cardType === "evolution") {
+    const revealSettings = loadSettings();
+    const cryOn = revealSettings.playCryOnReveal;
+    const speakOn = revealSettings.speakNameOnReveal;
+
+    // Pick the name to speak per direction (cry cards: speak the answer name; reverse
+    // picker cards never reach handleReveal so they're absent here).
+    let nameToSpeak: string | null = null;
+    if (currentCard.cardType === "name") nameToSpeak = currentCard.name;
+    else if (currentCard.cardType === "evolution") nameToSpeak = currentCard.postEvoName;
+    else if (currentCard.cardType === "reverse-evolution") nameToSpeak = currentCard.preEvoName;
+    else if (currentCard.cardType === "cry") nameToSpeak = currentCard.name;
+
+    // Pick the cry URL per direction. Cry cards: the cry was the prompt, so don't
+    // replay it on reveal.
+    let cryUrlOnReveal: string | null = null;
+    if (cryOn) {
+      if (currentCard.cardType === "name") cryUrlOnReveal = currentCard.cryUrl ?? null;
+      else if (currentCard.cardType === "evolution") {
         const target = SEED_POKEMON.find((p) => p.id === currentCard.postEvoId);
-        playCry(target?.cryUrl ?? null);
+        cryUrlOnReveal = target?.cryUrl ?? null;
       } else if (currentCard.cardType === "reverse-evolution") {
         const target = SEED_POKEMON.find((p) => p.id === currentCard.preEvoId);
-        playCry(target?.cryUrl ?? null);
+        cryUrlOnReveal = target?.cryUrl ?? null;
       }
-      // reverse (sprite-picker) cards never reach handleReveal — no case needed
+    }
+
+    const speakAfterCry =
+      speakOn && nameToSpeak !== null ? () => speakName(nameToSpeak!) : undefined;
+
+    // Branch on whether a cry will play. If yes, chain TTS to fire after `ended`.
+    // If no cry (toggle off or no url), fall through to TTS directly so they don't
+    // both fire on the same tick.
+    if (cryOn && (currentCard.cardType === "name" || currentCard.cardType === "evolution" || currentCard.cardType === "reverse-evolution")) {
+      playCry(cryUrlOnReveal, 0.6, speakAfterCry);
+    } else if (speakOn && nameToSpeak !== null) {
+      speakName(nameToSpeak);
     }
   }
 

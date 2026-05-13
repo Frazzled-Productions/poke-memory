@@ -5,6 +5,8 @@ import {
   saveSettings,
   type StoredFavouriteTheme,
 } from "@/lib/settings/persistence";
+import type { ReviewState } from "@/lib/srs/scheduler";
+import { isMastered } from "@/lib/stats/derive";
 
 // Legacy localStorage key. The favourite theme used to live here standalone;
 // since #307 the canonical store is `user_settings.settings.favouriteTheme`
@@ -96,6 +98,21 @@ export function loadFavourite(): StoredFavourite | null {
   } catch {
     return null;
   }
+}
+
+// Pure. Returns true if there is no favourite, or its underlying name card
+// meets the mastery bar. Used by the superuser exit-cleanup and by the
+// FavouriteThemeProvider as a load-time invariant — a cheat-selected theme
+// must not survive a flag-off transition or a subsequent page load.
+export function isFavouriteEarned(
+  favourite: StoredFavourite | null,
+  cards: ReadonlyArray<{ id: number; state: ReviewState }>,
+  masteryRepetitions: number,
+): boolean {
+  if (favourite === null) return true;
+  const card = cards.find((c) => c.id === favourite.id);
+  if (card === undefined) return false;
+  return isMastered(card.state, masteryRepetitions);
 }
 
 export function saveFavourite(

@@ -17,6 +17,12 @@ import {
 import { useAuth } from "@/lib/auth/AuthContext";
 import { pullSession, mergeCloudIntoLocal } from "@/lib/sync/cloud";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import {
+  loadFavourite,
+  saveFavourite,
+  isFavouriteEarned,
+} from "@/lib/theme/persistence";
+import { loadSettings } from "@/lib/settings/persistence";
 
 // Typing "super" anywhere (when not focused on an input) toggles unlocked state.
 const CHORD_SEQUENCE = ["s", "u", "p", "e", "r"];
@@ -69,10 +75,17 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
 
   // Force-pull cloud over local on the "any flag was on → no flags on" transition.
   // Signed-in users get authoritative cloud state restored. Guests get a destructive
-  // confirm (there is no cloud to fall back to).
+  // confirm (there is no cloud to fall back to). After the cards path settles —
+  // and only when card state is trusted (pull succeeded, or guest confirmed the
+  // wipe) — re-validate the favourite theme so a cheat-selected one cannot
+  // survive the flag-off transition (#428). On the un-trusted paths (pull threw,
+  // guest pressed Cancel) the local session still reflects cheat-inflated state,
+  // so a mastery check would spuriously return earned; `FavouriteThemeProvider`'s
+  // mount-time belt-and-braces handles those cases on the next page load.
   const exitCleanup = useCallback(async () => {
     const u = userRef.current;
     const sb = supabaseRef.current;
+    let cardsTrusted = false;
     if (u && sb) {
       try {
         const rows = await pullSession(sb, u.id);
@@ -87,21 +100,34 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
               new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
             );
           }
+          cardsTrusted = true;
         }
       } catch (err) {
         console.warn("[superuser] cloud→local overwrite failed:", err);
       }
-      return;
+    } else {
+      const confirmed = window.confirm(
+        "Reset local progress?\n\nSuperuser mode may have altered your local card state. Press OK to clear it (you'll start fresh), or Cancel to keep what you have now.",
+      );
+      if (confirmed) {
+        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
+        );
+        cardsTrusted = true;
+      }
     }
 
-    const confirmed = window.confirm(
-      "Reset local progress?\n\nSuperuser mode may have altered your local card state. Press OK to clear it (you'll start fresh), or Cancel to keep what you have now.",
-    );
-    if (confirmed) {
-      window.localStorage.removeItem(SESSION_STORAGE_KEY);
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
-      );
+    if (!cardsTrusted) return;
+    const favourite = loadFavourite();
+    if (favourite === null) return;
+    const settings = loadSettings();
+    const cards = loadSession()?.cards ?? [];
+    if (!isFavouriteEarned(favourite, cards, settings.masteryRepetitions)) {
+      // `saveFavourite` → `saveSettings` already fires `SETTINGS_SAVED_EVENT`,
+      // which `FavouriteThemeProvider` listens for — no synthetic StorageEvent
+      // is needed for same-tab refresh.
+      saveFavourite(null);
     }
   }, []);
 

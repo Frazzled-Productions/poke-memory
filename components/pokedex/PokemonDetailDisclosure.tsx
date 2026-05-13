@@ -8,6 +8,7 @@ import { getPokemonFacts } from "@/lib/pokemon/facts";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import type { CardClassOrPending } from "@/lib/review/useCardClass";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { speakName } from "@/lib/audio/tts";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -149,7 +150,17 @@ export function PokemonDetailDisclosure({ pokemon }: { pokemon: SeedPokemon }) {
         {isLocked ? (
           <h1 className="text-3xl font-bold tracking-tight text-zinc-300 dark:text-zinc-700">???</h1>
         ) : (
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{name}</h1>
+            <button
+              type="button"
+              aria-label={`Hear ${name}`}
+              onClick={() => speakName(name)}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            >
+              🔊
+            </button>
+          </div>
         )}
         {!isLocked && (
           <div className="flex gap-2" aria-label="Types">

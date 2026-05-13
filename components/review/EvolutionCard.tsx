@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { PokemonFact } from "@/lib/pokemon/facts";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
+import { speakName } from "@/lib/audio/tts";
 
 type Props = {
   preEvoSpriteUrl: string;
@@ -17,6 +18,10 @@ const ARROW_CLASS =
   "text-3xl font-semibold text-zinc-400 dark:text-zinc-500 sm:text-5xl";
 const PLACEHOLDER_CLASS =
   "flex h-28 w-28 items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 text-3xl font-semibold text-zinc-400 sm:h-48 sm:w-48 sm:text-5xl dark:border-zinc-700 dark:text-zinc-600";
+const INLINE_SPEAK_BUTTON_CLASS =
+  "ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full align-middle text-sm text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
+const REVEAL_SPEAK_BUTTON_CLASS =
+  "flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
 
 export function EvolutionCard({
   preEvoSpriteUrl,
@@ -31,8 +36,16 @@ export function EvolutionCard({
     <div className="flex flex-col items-center gap-3 sm:gap-4">
       <DirectionBadge direction="evolution" />
       <p className="text-base font-semibold text-foreground sm:text-lg">
-        What does <span className="capitalize">{preEvoName}</span> evolve into
-        {triggerPhrase ? <> {triggerPhrase}</> : null}?
+        What does <span className="capitalize">{preEvoName}</span>
+        <button
+          type="button"
+          aria-label={`Hear ${preEvoName}`}
+          onClick={() => speakName(preEvoName)}
+          className={INLINE_SPEAK_BUTTON_CLASS}
+        >
+          🔊
+        </button>{" "}
+        evolve into{triggerPhrase ? <> {triggerPhrase}</> : null}?
       </p>
       <div
         className="flex items-center justify-center gap-3 sm:gap-6"
@@ -67,9 +80,19 @@ export function EvolutionCard({
       <div className="min-h-[2.5rem] flex flex-col items-center justify-center">
         {revealed ? (
           <>
-            <span className="text-2xl font-semibold tracking-wide capitalize text-foreground sm:text-3xl">
-              {postEvoName}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-semibold tracking-wide capitalize text-foreground sm:text-3xl">
+                {postEvoName}
+              </span>
+              <button
+                type="button"
+                aria-label={`Hear ${postEvoName}`}
+                onClick={() => speakName(postEvoName)}
+                className={REVEAL_SPEAK_BUTTON_CLASS}
+              >
+                🔊
+              </button>
+            </div>
             {fact && (
               <div className="w-full mt-1 text-center sm:mt-2">
                 <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
