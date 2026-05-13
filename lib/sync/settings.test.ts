@@ -41,6 +41,12 @@ const SAMPLE: UserSettings = {
   miniGameBestScore: 0,
   seenStreakMilestones: [],
   earnedBadges: [],
+  onboarding: {
+    welcomeDismissed: false,
+    practiceHintDismissed: false,
+    statsHintDismissed: false,
+    settingsHintDismissed: false,
+  },
 };
 
 describe("pushSettings", () => {

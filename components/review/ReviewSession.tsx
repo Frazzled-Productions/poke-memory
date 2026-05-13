@@ -8,6 +8,7 @@ import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
+import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
 import { pickDistractors } from "@/lib/pokemon/distractors";
@@ -159,6 +160,9 @@ function TodayPill({
 }) {
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
+      <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        Done today
+      </p>
       {nameEnabled && (
         <p>
           <span className="text-zinc-600 dark:text-zinc-300">Name:</span>{" "}
@@ -167,7 +171,7 @@ function TodayPill({
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.name.reviewsDoneToday} reviews
+            {perType.name.reviewsDoneToday} reviewed
           </span>
         </p>
       )}
@@ -179,7 +183,7 @@ function TodayPill({
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.evolution.reviewsDoneToday} reviews
+            {perType.evolution.reviewsDoneToday} reviewed
           </span>
         </p>
       )}
@@ -191,7 +195,7 @@ function TodayPill({
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.reverse.reviewsDoneToday} reviews
+            {perType.reverse.reviewsDoneToday} reviewed
           </span>
         </p>
       )}
@@ -1207,11 +1211,21 @@ export function ReviewSession() {
         )}
 
         {revealed ? (
-          <GradeButtons
-            onGrade={handleGrade}
-            disabled={grading}
-            previews={gradePreviewsOrNull ?? undefined}
-          />
+          <>
+            <OnboardingHint id="practiceHintDismissed" title="How to grade">
+              <p>
+                <strong>Again</strong> — forgot. <strong>Hard</strong> —
+                struggled. <strong>Good</strong> — recalled with effort.{" "}
+                <strong>Easy</strong> — instant. Grade honestly; FSRS uses
+                this to space your next review.
+              </p>
+            </OnboardingHint>
+            <GradeButtons
+              onGrade={handleGrade}
+              disabled={grading}
+              previews={gradePreviewsOrNull ?? undefined}
+            />
+          </>
         ) : (
           <button
             type="button"
@@ -1329,11 +1343,21 @@ export function ReviewSession() {
       )}
 
       {revealed ? (
-        <GradeButtons
-          onGrade={handleGrade}
-          disabled={grading}
-          previews={gradePreviewsOrNull ?? undefined}
-        />
+        <>
+          <OnboardingHint id="practiceHintDismissed" title="How to grade">
+            <p>
+              <strong>Again</strong> — forgot. <strong>Hard</strong> —
+              struggled. <strong>Good</strong> — recalled with effort.{" "}
+              <strong>Easy</strong> — instant. Grade honestly; FSRS uses
+              this to space your next review.
+            </p>
+          </OnboardingHint>
+          <GradeButtons
+            onGrade={handleGrade}
+            disabled={grading}
+            previews={gradePreviewsOrNull ?? undefined}
+          />
+        </>
       ) : (
         <button
           type="button"

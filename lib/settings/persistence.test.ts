@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { loadSettings, saveSettings, DEFAULT_SETTINGS, type ThemeIntensity } from '@/lib/settings/persistence';
+import {
+  loadSettings,
+  saveSettings,
+  DEFAULT_SETTINGS,
+  DEFAULT_ONBOARDING,
+  type ThemeIntensity,
+} from '@/lib/settings/persistence';
 
 const STORAGE_KEY = 'poke-memory:settings:v1';
 
@@ -125,6 +131,7 @@ describe('loadSettings migration', () => {
       miniGameBestScore: 0,
       seenStreakMilestones: [3, 7],
       earnedBadges: [{ id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' }],
+      onboarding: { ...DEFAULT_ONBOARDING },
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -400,5 +407,68 @@ describe('themeIntensity setting (#411)', () => {
 
     saveSettings({ ...DEFAULT_SETTINGS, themeIntensity: 'accents' });
     expect(loadSettings().themeIntensity).toBe('accents');
+  });
+
+  describe('onboarding flags (#433)', () => {
+    it('defaults all flags to false on a fresh load', () => {
+      expect(loadSettings().onboarding).toEqual(DEFAULT_ONBOARDING);
+    });
+
+    it('stored settings missing the onboarding field default to all false', () => {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, onboarding: undefined }),
+      );
+      expect(loadSettings().onboarding).toEqual(DEFAULT_ONBOARDING);
+    });
+
+    it('round-trips dismissals via saveSettings', () => {
+      saveSettings({
+        ...DEFAULT_SETTINGS,
+        onboarding: {
+          welcomeDismissed: true,
+          practiceHintDismissed: false,
+          statsHintDismissed: true,
+          settingsHintDismissed: false,
+        },
+      });
+      expect(loadSettings().onboarding).toEqual({
+        welcomeDismissed: true,
+        practiceHintDismissed: false,
+        statsHintDismissed: true,
+        settingsHintDismissed: false,
+      });
+    });
+
+    it('treats malformed onboarding payloads as all false', () => {
+      for (const bad of [null, 'oops', 42, true, []]) {
+        mockLocalStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ ...DEFAULT_SETTINGS, onboarding: bad }),
+        );
+        expect(loadSettings().onboarding).toEqual(DEFAULT_ONBOARDING);
+      }
+    });
+
+    it('non-boolean per-flag values coerce to false', () => {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          ...DEFAULT_SETTINGS,
+          onboarding: {
+            welcomeDismissed: 'true',
+            practiceHintDismissed: 1,
+            statsHintDismissed: null,
+            settingsHintDismissed: true,
+          },
+        }),
+      );
+      expect(loadSettings().onboarding).toEqual({
+        welcomeDismissed: false,
+        practiceHintDismissed: false,
+        statsHintDismissed: false,
+        settingsHintDismissed: true,
+      });
+    });
   });
 });

@@ -24,6 +24,7 @@ import { computeRecords, type Records } from "@/lib/stats/records";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
 import { TrainerCard } from "@/components/stats/TrainerCard";
+import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
@@ -561,6 +562,16 @@ export default function StatsPage() {
             <ReviewHeatmap
               columns={computeReviewHeatmap(gradeLog, todayString(new Date()))}
             />
+            <OnboardingHint id="statsHintDismissed" title="What &quot;mastered&quot; means">
+              <p>
+                A card is mastered once you&apos;ve recalled it correctly{" "}
+                {masteryRepetitions} time{masteryRepetitions === 1 ? "" : "s"}{" "}
+                in a row <em>and</em> the next review is scheduled at least 21
+                days out — that&apos;s when the scheduler is confident
+                you&apos;ve actually learnt it, not just memorised it short
+                term.
+              </p>
+            </OnboardingHint>
             <MasteryBar stats={stats} nameCardsEnabled={nameCardsEnabled} />
             <IntroducedBar stats={stats} />
             <DueForecast stats={stats} />
