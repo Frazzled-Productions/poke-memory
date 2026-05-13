@@ -231,6 +231,36 @@ test.describe("Settings page", () => {
   });
 });
 
+test.describe("Sign-in picker (#360)", () => {
+  test("opens menu with GitHub and Google options plus provider warning", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const signIn = page.getByRole("button", { name: "Sign in" });
+    if (!(await signIn.isVisible().catch(() => false))) {
+      // AuthButton renders nothing when Supabase env vars are absent — skip
+      // rather than fail in environments without auth configured.
+      test.skip();
+      return;
+    }
+
+    await signIn.click();
+
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    await expect(
+      menu.getByRole("menuitem", { name: "Continue with GitHub" }),
+    ).toBeVisible();
+    await expect(
+      menu.getByRole("menuitem", { name: "Continue with Google" }),
+    ).toBeVisible();
+    await expect(
+      menu.getByText(/Use the same provider you signed up with/i),
+    ).toBeVisible();
+  });
+});
+
 test.describe("Evolution edge card prompt (#262)", () => {
   test("renders 'What does {preEvo} evolve into {trigger}?' for an edge card", async ({ page }) => {
     // Seed a deterministic session containing exactly one evolution edge card
