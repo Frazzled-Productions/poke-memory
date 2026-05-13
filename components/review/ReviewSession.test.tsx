@@ -74,8 +74,8 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     },
   };
 
-  function makeExtra(id: number, name: string): typeof card {
-    return { ...card, id, name, subjectKey: String(id), spriteUrl: `https://example.com/${name.toLowerCase()}.png` };
+  function makeExtra(id: number, name: string, displayName?: string): typeof card {
+    return { ...card, id, name, displayName: displayName ?? name, subjectKey: String(id), spriteUrl: `https://example.com/${name.toLowerCase()}.png` };
   }
 
   const defaultSettings = {
