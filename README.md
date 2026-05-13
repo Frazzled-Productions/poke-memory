@@ -1,6 +1,7 @@
 # poke-memory
 
 [![Release](https://img.shields.io/github/v/release/fraserbrookhouse/poke-memory)](https://github.com/fraserbrookhouse/poke-memory/releases)
+[![Users](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffraserbrookhouse%2Fpoke-memory%2Fmain%2F.github%2Fstats%2Fusers.json)](https://github.com/fraserbrookhouse/poke-memory/blob/main/.github/stats/users.json)
 
 <p align="center">
   <img src="public/sprites/pokemon/25.png" width="110" alt="Pikachu" />
