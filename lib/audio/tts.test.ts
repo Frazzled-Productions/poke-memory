@@ -210,6 +210,18 @@ describe("speakName", () => {
     expect((synth.speak.mock.calls[1][0] as MockUtterance).voice).toBe(localGB);
   });
 
+  it("applies phonetic overrides to the utterance text when one exists", async () => {
+    const synth = makeSynthesis([voice("en-GB", true)]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Mewtwo");
+    vi.runAllTimers();
+
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance;
+    expect(utterance.text).toBe("mew two");
+  });
+
   it("registers the voiceschanged listener only once across multiple speakName calls", async () => {
     const synth = makeSynthesis([voice("en-GB", true)]);
     const addSpy = vi.spyOn(synth, "addEventListener");
@@ -223,5 +235,121 @@ describe("speakName", () => {
 
     const voiceschangedRegistrations = addSpy.mock.calls.filter(([type]) => type === "voiceschanged");
     expect(voiceschangedRegistrations.length).toBe(1);
+  });
+
+  it("prefers a Premium en-GB voice over a Compact en-GB voice", async () => {
+    const compact = voice("en-GB", true, "Daniel");
+    const premium = voice("en-GB", true, "Daniel (Premium)");
+    const synth = makeSynthesis([compact, premium]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur");
+    vi.runAllTimers();
+
+    expect((synth.speak.mock.calls[0][0] as MockUtterance).voice).toBe(premium);
+  });
+
+  it("prefers an Enhanced en-GB voice over a Compact en-GB voice", async () => {
+    const compact = voice("en-GB", true, "Daniel");
+    const enhanced = voice("en-GB", true, "Serena (Enhanced)");
+    const synth = makeSynthesis([compact, enhanced]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur");
+    vi.runAllTimers();
+
+    expect((synth.speak.mock.calls[0][0] as MockUtterance).voice).toBe(enhanced);
+  });
+
+  it("prefers Premium over Enhanced within en-GB", async () => {
+    const enhanced = voice("en-GB", true, "Serena (Enhanced)");
+    const premium = voice("en-GB", true, "Daniel (Premium)");
+    const synth = makeSynthesis([enhanced, premium]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur");
+    vi.runAllTimers();
+
+    expect((synth.speak.mock.calls[0][0] as MockUtterance).voice).toBe(premium);
+  });
+
+  it("still keeps a Compact en-GB voice over a Premium en-US voice (locale dominates tier)", async () => {
+    const compactGB = voice("en-GB", true, "Daniel");
+    const premiumUS = voice("en-US", true, "Samantha (Premium)");
+    const synth = makeSynthesis([premiumUS, compactGB]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur");
+    vi.runAllTimers();
+
+    expect((synth.speak.mock.calls[0][0] as MockUtterance).voice).toBe(compactGB);
+  });
+
+  it("prefers Enhanced en-US over Compact en-US when no en-GB exists", async () => {
+    const compact = voice("en-US", true, "Samantha");
+    const enhanced = voice("en-US", true, "Samantha (Enhanced)");
+    const synth = makeSynthesis([compact, enhanced]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur");
+    vi.runAllTimers();
+
+    expect((synth.speak.mock.calls[0][0] as MockUtterance).voice).toBe(enhanced);
+  });
+
+  it("treats a Siri voice as premium tier", async () => {
+    const compact = voice("en-GB", true, "Daniel");
+    const siri = voice("en-GB", true, "Siri Voice 1");
+    const synth = makeSynthesis([compact, siri]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur");
+    vi.runAllTimers();
+
+    expect((synth.speak.mock.calls[0][0] as MockUtterance).voice).toBe(siri);
+  });
+});
+
+describe("voiceTier", () => {
+  it("classifies voices by name keyword", async () => {
+    const { voiceTier } = await import("./tts");
+    expect(voiceTier({ name: "Daniel" } as SpeechSynthesisVoice)).toBe("compact");
+    expect(voiceTier({ name: "Daniel (Premium)" } as SpeechSynthesisVoice)).toBe("premium");
+    expect(voiceTier({ name: "Serena (Enhanced)" } as SpeechSynthesisVoice)).toBe("enhanced");
+    expect(voiceTier({ name: "Siri Voice 1" } as SpeechSynthesisVoice)).toBe("premium");
+    expect(voiceTier({ name: "Google UK English Neural" } as SpeechSynthesisVoice)).toBe("enhanced");
+    expect(voiceTier(null)).toBe("compact");
+  });
+});
+
+describe("getPreferredVoice", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("returns null when speechSynthesis is unavailable", async () => {
+    vi.stubGlobal("window", {});
+    const { getPreferredVoice } = await import("./tts");
+    expect(getPreferredVoice()).toBeNull();
+  });
+
+  it("returns the picked voice once voices are loaded", async () => {
+    const daniel = voice("en-GB", true, "Daniel");
+    const synth = makeSynthesis([daniel]);
+    stubSpeechAPIs(synth);
+    const { getPreferredVoice } = await import("./tts");
+
+    expect(getPreferredVoice()).toBe(daniel);
   });
 });
