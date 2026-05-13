@@ -37,6 +37,8 @@ export type CloudRow = {
    * Cleared on un-hide once dueDate has been shifted forward.
    */
   hidden_since: string | null;
+  /** Pasture feature (#350). True once the user has acknowledged the card in the pasture. */
+  seen_in_pasture: boolean;
   /** Present on pull responses. Absent on locally-constructed push rows (added in the upsert batch). */
   updated_at?: string;
 };
@@ -76,6 +78,7 @@ function toCloudRow(card: ReviewableCard): CloudRow {
     last_review: card.state.lastReview,
     first_seen: card.state.firstSeen,
     hidden_since: card.state.hiddenSince,
+    seen_in_pasture: card.state.seenInPasture,
   };
 }
 
@@ -153,6 +156,7 @@ export async function pushSingleCard(
         last_review: card.state.lastReview,
         first_seen: card.state.firstSeen,
         hidden_since: card.state.hiddenSince,
+        seen_in_pasture: card.state.seenInPasture,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,pokemon_id" },
@@ -203,7 +207,7 @@ export async function pullSession(
       const { data, error } = await client
         .from("card_reviews")
         .select(
-          "pokemon_id,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,hidden_since,updated_at"
+          "pokemon_id,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,hidden_since,seen_in_pasture,updated_at"
         )
         .eq("user_id", userId)
         .range(offset, offset + PAGE - 1);
@@ -252,6 +256,9 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
   // wire — treat undefined as null so the normalised local state always
   // has the field set to a concrete value.
   const hiddenSince = row.hidden_since ?? null;
+  // Legacy cloud rows (pre-migration 008) won't have seen_in_pasture on the
+  // wire — treat undefined as false.
+  const seenInPasture = row.seen_in_pasture ?? false;
   if (row.first_seen !== null && row.last_review === null) {
     console.warn(
       `[sync] normalizing card ${card.id}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
@@ -271,6 +278,8 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
         lastReview: null,
         firstSeen: null,
         hiddenSince,
+        // A card reset to new-card state is not in the pasture.
+        seenInPasture: false,
       },
     };
   }
@@ -289,6 +298,7 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
       lastReview: row.last_review,
       firstSeen: row.first_seen,
       hiddenSince,
+      seenInPasture,
     },
   };
 }

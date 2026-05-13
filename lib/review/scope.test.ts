@@ -20,6 +20,7 @@ function state(): ReviewState {
     reps: 0, lapses: 0, fsrsState: "new",
     dueDate: "2026-05-12", lastReview: null, firstSeen: null,
     learningStep: null, stepStartedAt: null, hiddenSince: null,
+    seenInPasture: false,
   };
 }
 

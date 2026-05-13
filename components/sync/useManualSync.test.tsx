@@ -117,6 +117,7 @@ function makeCard(id: number, lastReview: string | null, reps: number) {
       learningStep: null,
       stepStartedAt: null,
       hiddenSince: null,
+      seenInPasture: false,
     },
   };
 }

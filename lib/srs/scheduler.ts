@@ -68,6 +68,10 @@ export type ReviewState = {
   // shifted forward by the hidden duration. Null when the card is currently
   // eligible (the normal case).
   hiddenSince: string | null;
+  // Pasture feature (#350). True once the user has viewed the card on the
+  // pasture page after mastery. Reset to false if a card regresses below the
+  // mastery threshold (not currently possible, kept for future-proofing).
+  seenInPasture: boolean;
 };
 
 export type Grade = 1 | 2 | 4 | 5;
@@ -355,5 +359,6 @@ export function initialReviewState(now: Date = new Date()): ReviewState {
     learningStep: null,
     stepStartedAt: null,
     hiddenSince: null,
+    seenInPasture: false,
   };
 }

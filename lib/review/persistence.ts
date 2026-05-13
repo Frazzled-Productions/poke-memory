@@ -161,6 +161,12 @@ export function migrateReviewState(state: unknown): void {
     // forward when applicable.
     s.hiddenSince = null;
   }
+  if (typeof s.seenInPasture !== "boolean") {
+    // Backfill for sessions saved before #350. Existing mastered cards have
+    // not yet been acknowledged in the pasture — default to false so they
+    // appear as "new arrivals" the first time the pasture page is visited.
+    s.seenInPasture = false;
+  }
   if (s.stability === undefined) {
     const repetitions = typeof s.repetitions === "number" ? s.repetitions : 0;
     const interval = typeof s.interval === "number" ? s.interval : 0;

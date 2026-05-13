@@ -54,6 +54,7 @@ function makeCard(
       learningStep: null,
       stepStartedAt: null,
       hiddenSince,
+      seenInPasture: false,
     },
   } as ReviewableCard;
 }
@@ -78,6 +79,7 @@ function makeCloudRow(
     last_review: lastReview,
     first_seen: firstSeen,
     hidden_since: hiddenSince,
+    seen_in_pasture: false,
     updated_at: updatedAt,
   };
 }

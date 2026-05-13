@@ -64,6 +64,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
       learningStep: null,
       stepStartedAt: null,
       hiddenSince: null,
+      seenInPasture: false,
     },
   };
 
@@ -361,6 +362,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
       learningStep: 0,     // in learning step
       stepStartedAt: null, // migration gap — no start time recorded
       hiddenSince: null,
+      seenInPasture: false,
     },
   };
 
@@ -438,6 +440,7 @@ describe("Baseline: due review card reveal → grade cycle", () => {
         learningStep: null,
         stepStartedAt: null,
         hiddenSince: null,
+        seenInPasture: false,
       },
     };
 
@@ -496,6 +499,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
         learningStep: null,
         stepStartedAt: null,
         hiddenSince: null,
+        seenInPasture: false,
       },
     };
 
@@ -519,6 +523,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
         learningStep: 0,
         stepStartedAt: now - (LEARNING_STEPS_MS[0] - 100), // dueAt = now + 100 ms
         hiddenSince: null,
+        seenInPasture: false,
       },
     };
 
@@ -604,6 +609,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
         learningStep: 0,
         stepStartedAt: T + 9 * 60_000, // dueAt = T + 9*60_000 + 600_000 = T + 19*60_000
         hiddenSince: null,
+        seenInPasture: false,
       },
     };
 
@@ -646,6 +652,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
         learningStep: 0,
         stepStartedAt: T + 11 * 60_000, // dueAt = T + 11*60_000 + 600_000 = T + 21*60_000
         hiddenSince: null,
+        seenInPasture: false,
       },
     };
 
@@ -685,6 +692,7 @@ describe("QueueCounterRow: live queue counters", () => {
         learningStep: null,
         stepStartedAt: null,
         hiddenSince: null,
+        seenInPasture: false,
       },
     };
 
@@ -707,6 +715,7 @@ describe("QueueCounterRow: live queue counters", () => {
         learningStep: 0,
         stepStartedAt: Date.now() - LEARNING_STEPS_MS[0], // already due
         hiddenSince: null,
+        seenInPasture: false,
       },
     };
 
@@ -804,6 +813,7 @@ describe("Practice scope (#333)", () => {
         learningStep: null,
         stepStartedAt: null,
         hiddenSince: null,
+        seenInPasture: false,
       },
     };
 
