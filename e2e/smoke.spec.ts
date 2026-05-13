@@ -279,6 +279,29 @@ test.describe("Sign-in picker (#360)", () => {
       menu.getByText(/Use the same provider you signed up with/i),
     ).toBeVisible();
   });
+
+  test("popup stays within the viewport (#406)", async ({ page }) => {
+    await page.goto("/");
+
+    const signIn = page.getByRole("button", { name: "Sign in" });
+    if (!(await signIn.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await signIn.click();
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+
+    const menuBox = await menu.boundingBox();
+    const viewport = page.viewportSize();
+    expect(menuBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    if (!menuBox || !viewport) return;
+
+    expect(menuBox.x).toBeGreaterThanOrEqual(0);
+    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport.width);
+  });
 });
 
 test.describe("Evolution edge card prompt (#262)", () => {
