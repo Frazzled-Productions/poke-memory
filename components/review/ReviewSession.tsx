@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
+import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
@@ -14,6 +15,7 @@ import {
   buildSessionQueues,
   getNextCardId,
   hydrateSession,
+  limitBucket,
   todayString,
   type DailyLimits,
   type ReviewableCard,
@@ -330,6 +332,7 @@ export function ReviewSession() {
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
   const [reverseEnabled, setReverseEnabled] = useState(false);
+  const [reverseEvolutionEnabled, setReverseEvolutionEnabled] = useState(false);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [revealed, setRevealed] = useState(false);
@@ -409,6 +412,7 @@ export function ReviewSession() {
     const enabled = settings.reverseCardsEnabled;
     const nameEnabled = settings.nameCardsEnabled;
     const evolutionEnabled = settings.evolutionCardsEnabled;
+    const reverseEvolutionEnabledLocal = settings.reverseEvolutionCardsEnabled;
     const cryEnabled = settings.cryCardsEnabled;
 
     // poke-memory:settings:v1 is the source of truth for limits.
@@ -423,7 +427,13 @@ export function ReviewSession() {
         SEED_POKEMON,
         SEED_EVOLUTION_CARDS,
         now,
-        { reverseEnabled: enabled, nameEnabled, evolutionEnabled, cryEnabled },
+        {
+          reverseEnabled: enabled,
+          nameEnabled,
+          evolutionEnabled,
+          reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
+          cryEnabled,
+        },
       );
       sessionLimits = settingsLimits;
       if (hydrated.length !== saved.cards.length) {
@@ -431,7 +441,13 @@ export function ReviewSession() {
       }
       sessionCards = hydrated;
     } else {
-      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, { reverseEnabled: enabled, nameEnabled, evolutionEnabled, cryEnabled });
+      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, {
+        reverseEnabled: enabled,
+        nameEnabled,
+        evolutionEnabled,
+        reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
+        cryEnabled,
+      });
       notifySaveResult(saveSession({ cards: fresh, limits: settingsLimits }));
       sessionCards = fresh;
       sessionLimits = settingsLimits;
@@ -475,6 +491,7 @@ export function ReviewSession() {
     setCards(sessionCards);
     setLimits(sessionLimits);
     setReverseEnabled(enabled);
+    setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
     setNameCardsEnabled(nameEnabled);
     setEvolutionCardsEnabled(evolutionEnabled);
     setScope(persistedScope);
@@ -626,7 +643,12 @@ export function ReviewSession() {
   }
 
   // --- All card types disabled ---
-  if (!nameCardsEnabled && !evolutionCardsEnabled && !reverseEnabled) {
+  if (
+    !nameCardsEnabled &&
+    !evolutionCardsEnabled &&
+    !reverseEnabled &&
+    !reverseEvolutionEnabled
+  ) {
     return (
       <div className="flex flex-col items-center gap-4 text-center">
         <p className="text-2xl font-semibold text-foreground">No card types enabled</p>
@@ -752,6 +774,9 @@ export function ReviewSession() {
     // *that* type has more candidates. Mixed-type sessions therefore keep
     // serving cards from the type that still has budget; the end-state UI
     // appears only when no type has any work left.
+    // Compare by limit bucket, not raw cardType — reverse-evolution cards
+    // count under "evolution" so the wall-detection matches the per-type
+    // counters in `perType`.
     function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse"): boolean {
       // Mirror the candidate filter in buildSessionQueues — cards in a
       // learning/relearning step are served via the in-memory learning
@@ -759,7 +784,7 @@ export function ReviewSession() {
       // reviews exist" or the soft-wall would fire spuriously.
       return cards!.some(
         (c) =>
-          c.cardType === type &&
+          limitBucket(c.cardType) === type &&
           c.state.learningStep === null &&
           c.state.lastReview !== null &&
           c.state.dueDate <= today &&
@@ -769,7 +794,7 @@ export function ReviewSession() {
     function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse"): boolean {
       return cards!.some(
         (c) =>
-          c.cardType === type &&
+          limitBucket(c.cardType) === type &&
           c.state.lastReview === null &&
           c.state.learningStep === null,
       );
@@ -887,6 +912,15 @@ export function ReviewSession() {
         console.warn(`[handleReveal] seed data missing for evolution target: ${currentCard.postEvoName}`);
         setCurrentFact(null);
       }
+    } else if (currentCard.cardType === "reverse-evolution") {
+      // Reverse direction: the answer is the pre-evo, so surface its facts.
+      const preEvo = SEED_POKEMON.find((p) => p.id === currentCard.preEvoId);
+      if (preEvo) {
+        setCurrentFact(selectFact(getPokemonFacts(preEvo)));
+      } else {
+        console.warn(`[handleReveal] seed data missing for reverse-evolution source: ${currentCard.preEvoName}`);
+        setCurrentFact(null);
+      }
     } else {
       setCurrentFact(null);
     }
@@ -898,8 +932,11 @@ export function ReviewSession() {
       } else if (currentCard.cardType === "evolution") {
         const target = SEED_POKEMON.find((p) => p.id === currentCard.postEvoId);
         playCry(target?.cryUrl ?? null);
+      } else if (currentCard.cardType === "reverse-evolution") {
+        const target = SEED_POKEMON.find((p) => p.id === currentCard.preEvoId);
+        playCry(target?.cryUrl ?? null);
       }
-      // reverse cards never reach handleReveal — no case needed
+      // reverse (sprite-picker) cards never reach handleReveal — no case needed
     }
   }
 
@@ -1145,6 +1182,16 @@ export function ReviewSession() {
         <EvolutionCard
           preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
           preEvoName={effectiveCard.preEvoName}
+          postEvoName={effectiveCard.postEvoName}
+          postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
+          triggerPhrase={effectiveCard.triggerPhrase}
+          revealed={revealed}
+          fact={currentFact}
+        />
+      ) : effectiveCard.cardType === "reverse-evolution" ? (
+        <ReverseEvolutionCard
+          preEvoName={effectiveCard.preEvoName}
+          preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
           postEvoName={effectiveCard.postEvoName}
           postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
           triggerPhrase={effectiveCard.triggerPhrase}

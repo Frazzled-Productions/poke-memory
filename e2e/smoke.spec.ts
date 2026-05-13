@@ -114,6 +114,14 @@ test.describe("Stats page", () => {
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();
     }
   });
+
+  test("trainer card shows progress line", async ({ page }) => {
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible();
+    await expect(page.getByText(/\d+ \/ \d+ mastered · \d+ to Lv \d+/)).toBeVisible();
+  });
 });
 
 test.describe("Pokédex page", () => {

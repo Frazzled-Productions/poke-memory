@@ -109,6 +109,7 @@ describe('loadSettings migration', () => {
       maxReviewsEvolutionPerDay: 75,
       nameCardsEnabled: false,
       evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: true,
       reverseCardsEnabled: true,
       maxNewReversePerDay: 15,
       maxReviewsReversePerDay: 50,

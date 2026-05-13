@@ -11,7 +11,12 @@ import {
   type ReviewableCard,
 } from '@/lib/review/session';
 import type { EvolutionCard, SeedPokemon } from '@/lib/pokemon/seed';
-import { REVERSE_ID_OFFSET } from '@/lib/pokemon/seed';
+import {
+  REVERSE_ID_OFFSET,
+  REVERSE_EDGE_ID_BASE,
+  reverseEdgeIdFor,
+  isReverseEdgeId,
+} from '@/lib/pokemon/seed';
 import { initialReviewState } from '@/lib/srs/scheduler';
 import { migrateReviewCard } from '@/lib/review/persistence';
 
@@ -348,6 +353,104 @@ describe('hydrateSession (reverse cards)', () => {
     const found = result.find((c) => c.id === REVERSE_ID_OFFSET + 1);
     expect(found?.state.reps).toBe(4);
     expect(found?.state.scheduledDays).toBe(30);
+  });
+});
+
+describe('reverse-evolution cards (#343)', () => {
+  const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
+  const evoSeed: EvolutionCard[] = [
+    makeEvoEdge({ id: 1_500_001 }),
+    makeEvoEdge({ id: 1_500_002, preEvoId: 2 }),
+  ];
+
+  it('reverseEdgeIdFor maps forward edge id to its reverse counterpart', () => {
+    expect(reverseEdgeIdFor(1_500_001)).toBe(REVERSE_EDGE_ID_BASE + 1);
+    expect(reverseEdgeIdFor(1_500_002)).toBe(REVERSE_EDGE_ID_BASE + 2);
+  });
+
+  it('isReverseEdgeId identifies the reverse sub-range', () => {
+    expect(isReverseEdgeId(REVERSE_EDGE_ID_BASE + 1)).toBe(true);
+    expect(isReverseEdgeId(1_500_001)).toBe(false);
+    expect(isReverseEdgeId(REVERSE_ID_OFFSET + 1)).toBe(false);
+  });
+
+  it('buildSession excludes reverse-evolution cards by default', () => {
+    const result = buildSession(seed, evoSeed, NOW);
+    expect(result.filter((c) => c.cardType === 'reverse-evolution')).toHaveLength(0);
+  });
+
+  it('buildSession adds one reverse-evolution card per forward edge when enabled', () => {
+    const result = buildSession(seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
+    const reverses = result.filter((c) => c.cardType === 'reverse-evolution');
+    expect(reverses).toHaveLength(evoSeed.length);
+    expect(reverses.map((c) => c.id).sort()).toEqual(
+      evoSeed.map((e) => reverseEdgeIdFor(e.id)).sort(),
+    );
+  });
+
+  it('reverse-evolution cards carry the same edge data as the forward direction', () => {
+    const result = buildSession(seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
+    const fwd = result.find(
+      (c): c is EvolutionReviewCard => c.cardType === 'evolution' && c.id === 1_500_001,
+    );
+    const rev = result.find(
+      (c) => c.cardType === 'reverse-evolution' && c.id === reverseEdgeIdFor(1_500_001),
+    );
+    expect(rev?.cardType).toBe('reverse-evolution');
+    if (rev?.cardType === 'reverse-evolution') {
+      expect(rev.preEvoName).toBe(fwd?.preEvoName);
+      expect(rev.postEvoName).toBe(fwd?.postEvoName);
+      expect(rev.triggerPhrase).toBe(fwd?.triggerPhrase);
+    }
+  });
+
+  it('hydrateSession appends reverse-evolution cards when newly enabled', () => {
+    const saved = [makeCard(makeSeedPokemon(1))];
+    const result = hydrateSession(saved, seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
+    expect(result.filter((c) => c.cardType === 'reverse-evolution')).toHaveLength(evoSeed.length);
+  });
+
+  it('hydrateSession strips saved reverse-evolution cards when toggled off', () => {
+    const built = buildSession(seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
+    const result = hydrateSession(built, seed, evoSeed, NOW, { reverseEvolutionEnabled: false });
+    expect(result.filter((c) => c.cardType === 'reverse-evolution')).toHaveLength(0);
+  });
+
+  it('hydrateSession preserves review state on reverse-evolution cards across reloads', () => {
+    const built = buildSession(seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
+    const reverseId = reverseEdgeIdFor(1_500_001);
+    const mutated: ReviewableCard[] = built.map((c) =>
+      c.id === reverseId
+        ? { ...c, state: { ...c.state, reps: 5, scheduledDays: 21 } }
+        : c,
+    );
+    const result = hydrateSession(mutated, seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
+    const found = result.find((c) => c.id === reverseId);
+    expect(found?.state.reps).toBe(5);
+    expect(found?.state.scheduledDays).toBe(21);
+  });
+
+  it('reverse-evolution cards bucket under "evolution" for daily counters', () => {
+    const built = buildSession(seed, evoSeed, NOW, {
+      evolutionEnabled: true,
+      reverseEvolutionEnabled: true,
+    });
+    // Mark one forward and one reverse card as new-introduced today.
+    const today = '2026-05-09';
+    const stamped = built.map((c) =>
+      c.id === 1_500_001 || c.id === reverseEdgeIdFor(1_500_001)
+        ? { ...c, state: { ...c.state, firstSeen: today } }
+        : c,
+    );
+    const baseLimits: DailyLimits = {
+      name: { maxNewPerDay: 100, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 100, maxReviewsPerDay: 100 },
+      reverse: { maxNewPerDay: 100, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 100, maxReviewsPerDay: 100 },
+    };
+    const queues = buildSessionQueues(stamped, baseLimits, today);
+    expect(queues.perType.evolution.newIntroducedToday).toBe(2);
+    expect(queues.perType.reverse.newIntroducedToday).toBe(0);
   });
 });
 

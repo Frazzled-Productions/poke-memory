@@ -1,7 +1,12 @@
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
-import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
-import { SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET, CRY_ID_OFFSET } from "@/lib/pokemon/seed";
+import type { SeedPokemon, EvolutionCard, ReverseEvolutionCard } from "@/lib/pokemon/seed";
+import {
+  SEED_EVOLUTION_CARDS,
+  REVERSE_ID_OFFSET,
+  CRY_ID_OFFSET,
+  reverseEdgeIdFor,
+} from "@/lib/pokemon/seed";
 import { FNV_PRIME, FNV_OFFSET, fnv1a } from "@/lib/utils/fnv1a";
 
 export type { Grade };
@@ -12,6 +17,13 @@ export type NameReviewCard = SeedPokemon & {
 };
 
 export type EvolutionReviewCard = EvolutionCard & {
+  state: ReviewState;
+};
+
+// Reverse-evolution edge card (#343). Same edge data as the forward direction;
+// only the id and cardType differ. Counts against the "evolution" daily-limit
+// bucket so both directions of an edge share one budget.
+export type ReverseEvolutionReviewCard = ReverseEvolutionCard & {
   state: ReviewState;
 };
 
@@ -40,6 +52,7 @@ export type CryReviewCard = Omit<SeedPokemon, "id"> & {
 export type ReviewableCard =
   | NameReviewCard
   | EvolutionReviewCard
+  | ReverseEvolutionReviewCard
   | ReverseReviewCard
   | CryReviewCard;
 
@@ -51,7 +64,16 @@ export type PerTypeLimits = {
   maxReviewsPerDay: number;
 };
 
+// Daily-limit bucket keys. Reverse-evolution cards have cardType
+// "reverse-evolution" but bucket as "evolution" so the two directions share
+// one daily new/review budget — see #343.
 export type CardTypeKey = "name" | "evolution" | "reverse" | "cry";
+
+/** Map a card's cardType to its daily-limit bucket. */
+export function limitBucket(cardType: ReviewableCard["cardType"]): CardTypeKey {
+  if (cardType === "reverse-evolution") return "evolution";
+  return cardType;
+}
 
 export type DailyLimits = {
   name: PerTypeLimits;
@@ -75,6 +97,7 @@ export function buildSession(
     reverseEnabled?: boolean;
     nameEnabled?: boolean;
     evolutionEnabled?: boolean;
+    reverseEvolutionEnabled?: boolean;
     cryEnabled?: boolean;
   } = {},
 ): ReviewableCard[] {
@@ -89,6 +112,17 @@ export function buildSession(
   const evoCards: EvolutionReviewCard[] = evolutionEnabled
     ? evoSeed.map((evo) => ({
         ...evo,
+        state: initialReviewState(now),
+      }))
+    : [];
+  // Reverse-evolution cards are 1:1 derivable from forward edges — same data,
+  // different id, rendered with the prompt direction flipped. Derive from
+  // `evoSeed` so tests can pass a custom edge set without a parallel seed.
+  const reverseEvoCards: ReverseEvolutionReviewCard[] = opts.reverseEvolutionEnabled
+    ? evoSeed.map((fwd) => ({
+        ...fwd,
+        cardType: "reverse-evolution" as const,
+        id: reverseEdgeIdFor(fwd.id),
         state: initialReviewState(now),
       }))
     : [];
@@ -114,7 +148,7 @@ export function buildSession(
           state: initialReviewState(now),
         }))
     : [];
-  return [...nameCards, ...evoCards, ...reverseCards, ...cryCards];
+  return [...nameCards, ...evoCards, ...reverseEvoCards, ...reverseCards, ...cryCards];
 }
 
 // Merge saved cards with the current seed, refreshing seed fields (e.g. newly
@@ -131,6 +165,7 @@ export function hydrateSession(
     reverseEnabled?: boolean;
     nameEnabled?: boolean;
     evolutionEnabled?: boolean;
+    reverseEvolutionEnabled?: boolean;
     cryEnabled?: boolean;
   } = {},
 ): ReviewableCard[] {
@@ -138,15 +173,26 @@ export function hydrateSession(
     reverseEnabled = false,
     nameEnabled = true,
     evolutionEnabled = true,
+    reverseEvolutionEnabled = false,
     cryEnabled = false,
   } = opts;
   const seedById = new Map(seed.map((p) => [p.id, p]));
   const evoSeedById = new Map(evoSeed.map((e) => [e.id, e]));
+  // Derive the reverse-edge lookup from the same evoSeed so tests stay symmetric.
+  const reverseEvoSeedById = new Map<number, ReverseEvolutionCard>(
+    evoSeed.map((e) => [
+      reverseEdgeIdFor(e.id),
+      { ...e, cardType: "reverse-evolution" as const, id: reverseEdgeIdFor(e.id) },
+    ]),
+  );
 
   // When disabled, drop saved cards of that type so re-enabling starts fresh.
   let filteredSaved = reverseEnabled
     ? saved
     : saved.filter((c) => c.cardType !== "reverse");
+  if (!reverseEvolutionEnabled) {
+    filteredSaved = filteredSaved.filter((c) => c.cardType !== "reverse-evolution");
+  }
   if (!cryEnabled) {
     filteredSaved = filteredSaved.filter((c) => c.cardType !== "cry");
   }
@@ -160,6 +206,10 @@ export function hydrateSession(
   const refreshed: ReviewableCard[] = filteredSaved.map((card) => {
     if (card.cardType === "evolution") {
       const fresh = evoSeedById.get(card.id);
+      if (!fresh) return card;
+      return { ...fresh, state: card.state };
+    } else if (card.cardType === "reverse-evolution") {
+      const fresh = reverseEvoSeedById.get(card.id);
       if (!fresh) return card;
       return { ...fresh, state: card.state };
     } else if (card.cardType === "reverse") {
@@ -203,6 +253,17 @@ export function hydrateSession(
         .map((e) => ({ ...e, state: initialReviewState(now) }))
     : [];
 
+  const reverseEvoAdditions: ReverseEvolutionReviewCard[] = reverseEvolutionEnabled
+    ? evoSeed
+        .map((fwd) => ({
+          ...fwd,
+          cardType: "reverse-evolution" as const,
+          id: reverseEdgeIdFor(fwd.id),
+        }))
+        .filter((c) => !savedIds.has(c.id))
+        .map((c) => ({ ...c, state: initialReviewState(now) }))
+    : [];
+
   const reverseAdditions: ReverseReviewCard[] = reverseEnabled
     ? seed
         .filter((p) => !savedIds.has(REVERSE_ID_OFFSET + p.id))
@@ -227,7 +288,13 @@ export function hydrateSession(
         }))
     : [];
 
-  const additions = [...nameAdditions, ...evoAdditions, ...reverseAdditions, ...cryAdditions];
+  const additions = [
+    ...nameAdditions,
+    ...evoAdditions,
+    ...reverseEvoAdditions,
+    ...reverseAdditions,
+    ...cryAdditions,
+  ];
   if (additions.length === 0) return refreshed;
   return [...refreshed, ...additions];
 }
@@ -327,8 +394,11 @@ export function buildSessionQueues(
   // daily caps would reset every time the user toggles the filter. The
   // `eligibleCardIds` gate only applies to candidate collection, not to
   // counter computation (#333).
+  //
+  // Reverse-evolution cards bucket under "evolution" via limitBucket so both
+  // directions of an edge compete for the same daily new/review budget (#343).
   for (const card of cards) {
-    const type = card.cardType;
+    const type = limitBucket(card.cardType);
     if (card.state.firstSeen === today) {
       perType[type].newIntroducedToday += 1;
     }
