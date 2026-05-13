@@ -28,7 +28,9 @@ export function filterPokemon(
     }
 
     if (filters.gen !== null) {
-      if (generationOf(p.id) !== filters.gen) {
+      // speciesId falls back to id for pre-expansion seed entries where the
+      // field is not yet populated (speciesId === id for all default-form seeds).
+      if (generationOf(p.speciesId ?? p.id) !== filters.gen) {
         return false;
       }
     }

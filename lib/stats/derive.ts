@@ -1,6 +1,7 @@
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { POKEMON_TYPES } from "@/lib/pokemon/types";
+import { SEED_POKEMON } from "@/lib/pokemon/seed";
 
 // ---------------------------------------------------------------------------
 // Mastery classification
@@ -66,12 +67,45 @@ export const GEN_RANGES: readonly GenerationRange[] = [
   { gen: 9, name: "Generation IX",   first: 906,  last: 1025 },
 ] as const;
 
-/** Returns 1..9 for any valid PokéDex ID, or 0 if out of range. */
-export function generationOf(id: number): number {
+/** Returns 1..9 for any valid species ID (1..1025), or 0 if out of range. */
+export function generationOf(speciesId: number): number {
   for (const range of GEN_RANGES) {
-    if (id >= range.first && id <= range.last) return range.gen;
+    if (speciesId >= range.first && speciesId <= range.last) return range.gen;
   }
   return 0;
+}
+
+/**
+ * Lazy-initialised Map from pokemon ID → species ID, built from SEED_POKEMON.
+ * Falls back to the pokemon's own `id` for entries where `speciesId` is not
+ * yet populated (pre-seed-expansion state of generated.json, where all IDs
+ * are in 1..1025 and speciesId === id). This keeps generation lookups correct
+ * for the current seed while also correctly routing form IDs (10001+) to
+ * their species' generation once the seed re-runs.
+ */
+let _idToSpeciesIdMap: Map<number, number> | null = null;
+function getIdToSpeciesIdMap(): Map<number, number> {
+  if (_idToSpeciesIdMap === null) {
+    _idToSpeciesIdMap = new Map(
+      SEED_POKEMON.map((p) => [p.id, p.speciesId ?? p.id]),
+    );
+  }
+  return _idToSpeciesIdMap;
+}
+
+/**
+ * Resolve a raw pokemon ID to its species ID via the seed, then return
+ * the generation. Returns 0 for IDs not found in the seed (e.g. retired
+ * namespaced card IDs, or IDs not yet in the seed).
+ *
+ * Use this when the caller only has a pokemon `id` (e.g. a card ID) and
+ * not the seed record itself. When you already have a `SeedPokemon` or
+ * `NameReviewCard`, prefer passing `.speciesId` directly to `generationOf`.
+ */
+export function generationOfPokemonId(pokemonId: number): number {
+  const speciesId = getIdToSpeciesIdMap().get(pokemonId);
+  if (speciesId === undefined) return 0;
+  return generationOf(speciesId);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,8 +283,11 @@ export function computeStats(
       }
     }
 
-    // Per-generation tallies.
-    const gen = generationOf(card.id);
+    // Per-generation tallies. Use speciesId so alternate-form cards (id ≥ 10001)
+    // inherit their base species' generation (e.g. Alolan Raichu → Gen I).
+    // Fall back to card.id for pre-expansion seed entries where speciesId is
+    // not yet populated (speciesId === id for all default-form-only seeds).
+    const gen = generationOf(card.speciesId ?? card.id);
     if (gen >= 1 && gen <= 9) {
       const idx = gen - 1;
       genTotal[idx]++;
