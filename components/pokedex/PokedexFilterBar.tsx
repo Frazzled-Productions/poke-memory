@@ -53,14 +53,14 @@ export default function PokedexFilterBar({
           value={filters.query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder="Search Pokémon…"
-          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-8 text-sm text-foreground placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-foreground dark:border-zinc-700 dark:bg-zinc-900 dark:placeholder:text-zinc-500"
+          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-8 text-sm text-foreground placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 dark:placeholder:text-zinc-500"
         />
         {filters.query && (
           <button
             type="button"
             onClick={() => onQueryChange("")}
             aria-label="Clear search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+            className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
           >
             <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
               <path
@@ -90,7 +90,7 @@ export default function PokedexFilterBar({
               onClick={() => onTypeToggle(type)}
               aria-pressed={isSelected}
               className={[
-                "rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1",
+                "rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
                 isSelected && colors
                   ? `${colors.bg} ${colors.text}`
                   : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
@@ -113,7 +113,7 @@ export default function PokedexFilterBar({
           onClick={() => onGenChange(null)}
           aria-pressed={filters.gen === null}
           className={[
-            "rounded-full px-3 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1",
+            "rounded-full px-3 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
             filters.gen === null
               ? "bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900"
               : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
@@ -128,7 +128,7 @@ export default function PokedexFilterBar({
             onClick={() => onGenChange(gen)}
             aria-pressed={filters.gen === gen}
             className={[
-              "rounded-full px-3 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1",
+              "rounded-full px-3 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
               filters.gen === gen
                 ? "bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900"
                 : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",

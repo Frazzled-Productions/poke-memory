@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { loadFavourite } from "@/lib/theme/persistence";
 import { applyTheme } from "@/lib/theme/apply";
+import { applyIntensity } from "@/lib/theme/intensity";
+import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import type { StoredFavourite } from "@/lib/theme/persistence";
 
 type FavouriteContextValue = {
@@ -35,6 +37,7 @@ export function FavouriteThemeProvider({
     const stored = loadFavourite();
     setFavourite(stored);
     applyTheme(stored?.colors ?? null);
+    applyIntensity(loadSettings().themeIntensity);
 
     function handleStorage(e: StorageEvent) {
       // The favourite theme lives inside the settings blob (#307). Watch
@@ -46,10 +49,24 @@ export function FavouriteThemeProvider({
       const updated = loadFavourite();
       setFavourite(updated);
       applyTheme(updated?.colors ?? null);
+      applyIntensity(loadSettings().themeIntensity);
+    }
+
+    function handleSettingsSaved() {
+      // Same-tab updates dispatched by saveSettings — cross-tab updates come
+      // via the native StorageEvent above.
+      applyIntensity(loadSettings().themeIntensity);
+      const updated = loadFavourite();
+      setFavourite(updated);
+      applyTheme(updated?.colors ?? null);
     }
 
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener(SETTINGS_SAVED_EVENT, handleSettingsSaved);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(SETTINGS_SAVED_EVENT, handleSettingsSaved);
+    };
   }, []);
 
   return (

@@ -34,6 +34,7 @@ const SAMPLE: UserSettings = {
   maxNewCryPerDay: 10,
   maxReviewsCryPerDay: 100,
   favouriteTheme: null,
+  themeIntensity: "accents",
   retentionTarget: 0.9,
   practiceScope: { gens: [], types: [], presets: [] },
   miniGameBestScore: 0,

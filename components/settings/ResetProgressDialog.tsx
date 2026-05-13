@@ -67,7 +67,7 @@ export function ResetProgressDialog({ open, onClose, onConfirm }: Props) {
         onChange={(e) => setValue(e.target.value)}
         placeholder="Type RESET to confirm"
         disabled={pending}
-        className="mt-4 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+        className="mt-4 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 dark:border-zinc-700"
       />
       {error && (
         <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
@@ -79,7 +79,7 @@ export function ResetProgressDialog({ open, onClose, onConfirm }: Props) {
           type="button"
           onClick={onClose}
           disabled={pending}
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:hover:bg-zinc-800 disabled:opacity-50"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 dark:border-zinc-700 dark:hover:bg-zinc-800 disabled:opacity-50"
         >
           Cancel
         </button>

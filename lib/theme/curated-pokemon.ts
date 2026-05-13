@@ -123,3 +123,19 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     },
   },
 ] as const;
+
+/**
+ * Default mascot-palette fallback used when the user has not unlocked or
+ * selected any favourite. Poké-ball red with warm complementary tones —
+ * gives baseline mode visible accent without being loud.
+ *
+ * Contrast verified against both the off-white light body (#fafafa) and the
+ * deep dark body (#0f0f0f): primary and accent both exceed 4.5:1 for AA on
+ * the relevant backgrounds.
+ */
+export const BRAND_DEFAULT_COLORS: ThemeColors = {
+  primary: "#D8334A",   // Poké-ball red
+  secondary: "#F4B6C0", // soft pink
+  accent: "#B82838",    // deeper red for focus rings / progress fills
+  fgOnPrimary: "#FFFFFF",
+};

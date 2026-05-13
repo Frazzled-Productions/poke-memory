@@ -1,17 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  /* Brand-default mascot palette (Poké-ball red) — overridden by the inline
+     <head> script in app/layout.tsx when a favourite is saved. Defined first
+     so the surface tokens below can color-mix against it.
+
+     All `color-mix` calls below use `in srgb` rather than `in oklch`:
+     OKLCH interpolation between a saturated mascot (e.g. brown / green) and a
+     neutral slate can travel through a muddy purple intermediate. srgb stays
+     on a direct numeric path and produces predictable results across mascots. */
+  --theme-primary: #D8334A;
+  --theme-secondary: #F4B6C0;
+  --theme-accent: #B82838;
+  --theme-fg-on-primary: #FFFFFF;
+
+  /* Light-mode baseline. Surfaces carry a faint mascot wash so a chosen
+     mascot is visible everywhere (not just on the nav). */
+  --background: #fafafa;
   --foreground: #171717;
-  --theme-primary: var(--background);
-  --theme-secondary: #e4e4e7;
-  --theme-accent: var(--foreground);
-  --theme-fg-on-primary: var(--foreground);
+  --surface: color-mix(in srgb, var(--theme-primary) 4%, #ffffff);
+  --surface-raised: color-mix(in srgb, var(--theme-primary) 9%, #ffffff);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-theme-primary: var(--theme-primary);
   --color-theme-secondary: var(--theme-secondary);
   --color-theme-accent: var(--theme-accent);
@@ -22,9 +37,52 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #111113;
     --foreground: #ededed;
-    --theme-secondary: #27272a;
+    /* Surface bases are LIGHTER than the body so cards read as raised even
+       when the mascot is dark (Eevee brown, Umbreon black, Garchomp navy). */
+    --surface: color-mix(in srgb, var(--theme-primary) 14%, #2a2a2e);
+    --surface-raised: color-mix(in srgb, var(--theme-primary) 22%, #3a3a3e);
+  }
+}
+
+/* Intensity: tinted — visible mascot wash. Low percentages of vivid mascot
+   primaries (Charizard orange, Pikachu yellow) desaturate into beige/peach
+   when blended with off-white. Mid-teen percentages keep the hue identifiable. */
+:root[data-intensity="tinted"] {
+  --background: color-mix(in srgb, var(--theme-primary) 16%, #fafafa);
+  --surface: color-mix(in srgb, var(--theme-primary) 12%, #ffffff);
+  --surface-raised: color-mix(in srgb, var(--theme-primary) 22%, #ffffff);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-intensity="tinted"] {
+    --background: color-mix(in srgb, var(--theme-primary) 22%, #111113);
+    --surface: color-mix(in srgb, var(--theme-primary) 24%, #2a2a2e);
+    --surface-raised: color-mix(in srgb, var(--theme-primary) 32%, #3a3a3e);
+  }
+}
+
+/* Intensity: full — mascot drives the body. Surfaces use a LIGHT base so they
+   remain visibly raised above the (heavily mascot-coloured) body, giving
+   interactive controls a backdrop with real contrast.
+
+   Note: in dark mode we deliberately do NOT override `--foreground` to
+   `--theme-fg-on-primary` (light mode does). The dark body is already
+   color-mixed toward black, so the inherited `#ededed` from the dark baseline
+   keeps text readable across every mascot — dark-mascot bodies (Umbreon,
+   Garchomp) would actively fight a black `fgOnPrimary`. */
+:root[data-intensity="full"] {
+  --background: var(--theme-primary);
+  --foreground: var(--theme-fg-on-primary);
+  --surface: color-mix(in srgb, var(--theme-primary) 22%, #ffffff);
+  --surface-raised: color-mix(in srgb, var(--theme-primary) 32%, #ffffff);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-intensity="full"] {
+    --background: color-mix(in srgb, var(--theme-primary) 75%, #000000);
+    /* Mid-tone bases (not slate) so the card pops off the dark body. */
+    --surface: color-mix(in srgb, var(--theme-primary) 30%, #4a4a52);
+    --surface-raised: color-mix(in srgb, var(--theme-primary) 25%, #65656d);
   }
 }
 

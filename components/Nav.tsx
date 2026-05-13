@@ -12,7 +12,7 @@ export function Nav() {
       >
         <Link
           href="/"
-          className="flex items-center gap-2 text-sm font-bold tracking-tight text-theme-fg-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
+          className="flex items-center gap-2 text-sm font-bold tracking-tight text-theme-fg-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
           data-superuser-tap="true"
         >
           <span aria-hidden="true">
