@@ -10,14 +10,14 @@ type Props = {
 
 export function PokemonCard({ spriteUrl, name, revealed, fact }: Props) {
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-2 sm:gap-4">
       <Image
         src={spriteUrl}
         alt={revealed ? name : "A Pokémon sprite — answer hidden"}
         width={320}
         height={320}
         priority
-        className="h-56 w-56 object-contain sm:h-80 sm:w-80"
+        className="h-48 w-48 object-contain sm:h-80 sm:w-80"
       />
       {/*
         Use min-h instead of a fixed h so the container can grow when a fact
@@ -30,7 +30,7 @@ export function PokemonCard({ spriteUrl, name, revealed, fact }: Props) {
               {name}
             </p>
             {fact && (
-              <div className="mt-2 text-center">
+              <div className="mt-1 text-center sm:mt-2">
                 <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                   {fact.label}
                 </span>

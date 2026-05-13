@@ -15,7 +15,7 @@ export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: 
   const spriteSize = isBranching ? 96 : 320;
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-2 sm:gap-4">
       {revealed ? (
         <>
           <div
@@ -30,7 +30,11 @@ export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: 
                   alt={evo.name}
                   width={spriteSize}
                   height={spriteSize}
-                  className="object-contain"
+                  className={
+                    isBranching
+                      ? "object-contain"
+                      : "h-48 w-48 object-contain sm:h-80 sm:w-80"
+                  }
                 />
                 <span className="text-lg font-semibold tracking-wide capitalize text-foreground">
                   {evo.name}
@@ -39,7 +43,7 @@ export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: 
             ))}
           </div>
           {!isBranching && fact && (
-            <div className="w-full mt-2 text-center">
+            <div className="w-full mt-1 text-center sm:mt-2">
               <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                 {fact.label}
               </span>
@@ -54,7 +58,7 @@ export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: 
           width={320}
           height={320}
           priority
-          className="h-56 w-56 object-contain sm:h-80 sm:w-80"
+          className="h-48 w-48 object-contain sm:h-80 sm:w-80"
         />
       )}
       <div className="flex flex-col items-center gap-1">
