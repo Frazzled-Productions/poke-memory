@@ -3,6 +3,7 @@ import { useCallback, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
+import { markPushSucceeded } from "@/lib/sync/persistence";
 
 /**
  * Debounced per-grade sync hook. Returns { enqueueGrade, flushPending }.
@@ -62,6 +63,14 @@ export function usePerGradeSync(
     pendingQueueRef.current = pendingQueueRef.current.filter(
       (card) => !sentIds.has(card.id) || failedIds.has(card.id),
     );
+
+    // Update lastPushAt once per debounce flush if at least one card succeeded.
+    // Called here (not per-card) so concurrent drains produce at most one write
+    // per flush rather than N writes for N cards.
+    const anySucceeded = results.some((r) => r.ok);
+    if (anySucceeded) {
+      markPushSucceeded();
+    }
   }, []);
 
   const enqueueGrade = useCallback(

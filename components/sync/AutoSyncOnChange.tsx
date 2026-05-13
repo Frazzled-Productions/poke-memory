@@ -6,6 +6,7 @@ import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pushSettings } from "@/lib/sync/settings";
 import { pushStreak } from "@/lib/sync/streak";
 import { pushGradeLog } from "@/lib/sync/gradeLog";
+import { markPushSucceeded } from "@/lib/sync/persistence";
 import {
   SETTINGS_SAVED_EVENT,
   type UserSettings,
@@ -48,7 +49,9 @@ export function AutoSyncOnChange() {
       const detail = (e as CustomEvent<UserSettings>).detail;
       if (!detail) return;
       void pushSettings(client!, userId!, detail).then((ok) => {
-        if (!ok) {
+        if (ok) {
+          markPushSucceeded();
+        } else {
           console.warn("[auto-sync] settings push failed; will retry on next save");
         }
       });
@@ -58,7 +61,9 @@ export function AutoSyncOnChange() {
       const dates = loadStreakData();
       if (dates.length === 0) return;
       void pushStreak(client!, userId!, dates).then((ok) => {
-        if (!ok) {
+        if (ok) {
+          markPushSucceeded();
+        } else {
           console.warn("[auto-sync] streak push failed; will retry on next review");
         }
       });
@@ -68,7 +73,9 @@ export function AutoSyncOnChange() {
       const detail = (e as CustomEvent<GradeLogEntry>).detail;
       if (!detail) return;
       void pushGradeLog(client!, userId!, [detail]).then((ok) => {
-        if (!ok) {
+        if (ok) {
+          markPushSucceeded();
+        } else {
           console.warn("[auto-sync] grade log push failed; will retry on next grade");
         }
       });
