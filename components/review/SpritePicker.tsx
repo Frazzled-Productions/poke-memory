@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { FNV_PRIME, fnv1a } from "@/lib/utils/fnv1a";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
+import { speakName } from "@/lib/audio/tts";
 
 // How long to show correctness feedback before advancing (ms).
 // Correct tap: brief highlight. Incorrect tap: time to see the right answer.
@@ -96,9 +97,19 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
     <div className="flex flex-col items-center gap-6">
       <DirectionBadge direction="reverse" />
       {/* Name prompt */}
-      <p className="text-3xl font-semibold tracking-wide capitalize text-foreground">
-        {targetPokemon.name}
-      </p>
+      <div className="flex items-center gap-2">
+        <p className="text-3xl font-semibold tracking-wide capitalize text-foreground">
+          {targetPokemon.name}
+        </p>
+        <button
+          type="button"
+          aria-label={`Hear ${targetPokemon.name}`}
+          onClick={() => speakName(targetPokemon.name)}
+          className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+        >
+          🔊
+        </button>
+      </div>
 
       {/* 2×2 sprite tile grid */}
       <div
