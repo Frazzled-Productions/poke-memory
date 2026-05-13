@@ -101,11 +101,11 @@ describe("TrainerCard", () => {
     expect(screen.getByText("10 / 15 mastered · 5 to Lv 6")).toBeInTheDocument();
   });
 
-  it("level number has a tooltip mentioning 'mastered'", () => {
+  it("level number has a tooltip explaining the mastery criterion", () => {
     render(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
-    const levelSpan = screen.getByTitle(/mastered/);
+    const levelSpan = screen.getByTitle(/Level grows with the number/);
     expect(levelSpan).toBeInTheDocument();
   });
 });
