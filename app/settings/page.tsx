@@ -29,6 +29,7 @@ import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection
 import { IntensityPicker } from "@/components/settings/IntensityPicker";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
+import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -923,6 +924,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
+                <VoiceQualityHint />
               </section>
 
               <FavouritePicker
