@@ -20,7 +20,13 @@ vi.mock("@/lib/review/persistence", () => ({
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({
-  loadSyncStatus: vi.fn(() => ({})),
+  loadSyncStatus: vi.fn(() => ({
+    lastPushAt: null,
+    lastPushFailed: false,
+    lastPushAttemptAt: null,
+    failedCardCount: null,
+    lastPullAt: null,
+  })),
   saveSyncStatus: vi.fn(),
 }));
 
@@ -60,7 +66,7 @@ vi.mock("@/lib/gradelog/persistence", () => ({
 }));
 
 import { pullSession, pushSession } from "@/lib/sync/cloud";
-import { saveSyncStatus } from "@/lib/sync/persistence";
+import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { pullStreak, pushStreak } from "@/lib/sync/streak";
 import { pullSettings, pushSettings } from "@/lib/sync/settings";
@@ -392,5 +398,57 @@ describe("useManualSync", () => {
       lastPushFailed: false,
       lastPullAt: "2026-05-13T11:42:00.000Z",
     });
+  });
+
+  // Regression test for #367: manual sync used to call mergeCloudIntoLocal
+  // (unconditional cloud overlay) which silently clobbered local progress when
+  // cloud was stale. The user-initiated Sync button is a reconcile, not a
+  // force-overwrite — local grades since the last anchored pull must survive.
+  it("does not clobber local progress when cloud is stale and lastPullAt is set", async () => {
+    vi.mocked(loadSyncStatus).mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: false,
+      lastPushAttemptAt: null,
+      failedCardCount: null,
+      lastPullAt: "2026-05-12T08:00:00.000Z",
+    });
+    vi.mocked(loadSession).mockReturnValue({
+      cards: [makeCard(1, "2026-05-13", 5)],
+      limits: DEFAULT_LIMITS,
+    });
+    vi.mocked(pullSession).mockResolvedValue([
+      {
+        pokemon_id: 1,
+        stability: 1,
+        difficulty: 1,
+        elapsed_days: 0,
+        scheduled_days: 1,
+        reps: 1,
+        lapses: 0,
+        fsrs_state: "review",
+        due_date: "2026-05-13",
+        last_review: "2026-05-11",
+        first_seen: "2026-05-11",
+        hidden_since: null,
+        updated_at: "2026-05-12T07:00:00.000Z",
+      },
+    ]);
+    vi.mocked(pushSession).mockResolvedValue(true);
+
+    const { result } = renderHook(() => useManualSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      result.current.syncNow();
+    });
+
+    await waitFor(() => {
+      expect(result.current.syncState).toBe("success");
+    });
+
+    // The saved session must keep local's lastReview = "2026-05-13", not be
+    // overwritten by cloud's "2026-05-11".
+    const savedCall = vi.mocked(saveSession).mock.calls[0]?.[0];
+    expect(savedCall?.cards[0].state.lastReview).toBe("2026-05-13");
+    expect(savedCall?.cards[0].state.reps).toBe(5);
   });
 });

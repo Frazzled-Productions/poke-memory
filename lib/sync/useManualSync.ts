@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { mergeCloudIntoLocal, pullSession, pushSession, maxCloudUpdatedAt } from "@/lib/sync/cloud";
+import { mergeCloudIntoLocalSilent, pullSession, pushSession, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { mergeStreak, pullStreak, pushStreak } from "@/lib/sync/streak";
 import { pullSettings, pushSettings } from "@/lib/sync/settings";
@@ -94,17 +94,32 @@ export function useManualSync(
         return;
       }
 
-      // Step c: merge cloud into local and persist.
+      // Step c: merge cloud into local and persist. The merge is anchored on
+      // the pre-existing lastPullAt so any card with local progress since the
+      // last successful pull is protected — the user-initiated Sync button is
+      // a reconcile, not a force-overwrite (closes #367). Brand-new devices
+      // (no localSession) still take cloud naturally: every card is pristine,
+      // so the silent merge applies cloud the same as the old unconditional
+      // overlay did.
+      const preMergeSyncStatus = loadSyncStatus();
       let mergedCards;
       let mergedLimits;
       if (localSession !== null) {
-        mergedCards = mergeCloudIntoLocal(localSession.cards, cloudRows);
+        mergedCards = mergeCloudIntoLocalSilent(
+          localSession.cards,
+          cloudRows,
+          preMergeSyncStatus.lastPullAt,
+        );
         mergedLimits = localSession.limits;
       } else {
         // Brand-new device: build a fresh base session so cloud state has
         // a card list to merge into; otherwise cloud rows would be discarded.
         const base = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS);
-        mergedCards = mergeCloudIntoLocal(base, cloudRows);
+        mergedCards = mergeCloudIntoLocalSilent(
+          base,
+          cloudRows,
+          preMergeSyncStatus.lastPullAt,
+        );
         mergedLimits = DEFAULT_LIMITS;
       }
 
