@@ -875,19 +875,29 @@ export function ReviewSession() {
 
     if (endState === "REVIEW_SOFT_WALL") {
       return (
-        <ReviewSoftWallScreen
-          perType={perType}
-          nameEnabled={nameCardsEnabled}
-          evolutionEnabled={evolutionCardsEnabled}
-          reverseEnabled={reverseEnabled}
-          onKeepReviewing={() => setExtendedReview(true)}
-        />
+        <div className="flex flex-col items-center w-full">
+          <ReviewSoftWallScreen
+            perType={perType}
+            nameEnabled={nameCardsEnabled}
+            evolutionEnabled={evolutionCardsEnabled}
+            reverseEnabled={reverseEnabled}
+            onKeepReviewing={() => setExtendedReview(true)}
+          />
+          {seenPokemon.length >= 2 && (
+            <HigherOrLowerGame seenPokemon={seenPokemon} />
+          )}
+        </div>
       );
     }
 
     if (endState === "NEW_CARDS_LOCKED") {
       return (
-        <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+        <div className="flex flex-col items-center w-full">
+          <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+          {seenPokemon.length >= 2 && (
+            <HigherOrLowerGame seenPokemon={seenPokemon} />
+          )}
+        </div>
       );
     }
 

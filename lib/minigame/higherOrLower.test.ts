@@ -175,6 +175,25 @@ describe("getSeenPokemon", () => {
     expect(result.map((p) => p.id).sort()).toEqual([1, 2]);
   });
 
+  it("includes both preEvo and postEvo for a seen reverse-evolution card", () => {
+    const cards: ReviewableCard[] = [
+      {
+        cardType: "reverse-evolution",
+        id: 1_700_001,
+        preEvoId: 1,
+        preEvoName: "Pokemon1",
+        preEvoSpriteUrl: "",
+        postEvoId: 2,
+        postEvoName: "Pokemon2",
+        postEvoSpriteUrl: "",
+        triggerPhrase: null,
+        state: seenState,
+      },
+    ];
+    const result = getSeenPokemon(cards, seed);
+    expect(result.map((p) => p.id).sort()).toEqual([1, 2]);
+  });
+
   it("deduplicates across multiple card types for the same Pokémon", () => {
     const cards: ReviewableCard[] = [
       { ...p1, cardType: "name", state: seenState },

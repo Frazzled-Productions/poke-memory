@@ -78,10 +78,11 @@ export function scoreGuess(
  * card graded), deduped by Pokémon ID.
  *
  * Card type to Pokémon ID mapping:
- *   - "name"    → card.id  (NameReviewCard extends SeedPokemon, so id === pokemonId)
- *   - "reverse" → card.pokemonId
- *   - "cry"     → card.pokemonId
- *   - "evolution" → card.preEvoId and card.postEvoId (both Pokémon are surfaced)
+ *   - "name"               → card.id  (NameReviewCard extends SeedPokemon, so id === pokemonId)
+ *   - "reverse"            → card.pokemonId
+ *   - "cry"                → card.pokemonId
+ *   - "evolution"          → card.preEvoId and card.postEvoId
+ *   - "reverse-evolution"  → card.preEvoId and card.postEvoId (same edge, prompt flipped)
  */
 export function getSeenPokemon(
   cards: ReviewableCard[],
@@ -96,7 +97,10 @@ export function getSeenPokemon(
       seenIds.add(card.id);
     } else if (card.cardType === "reverse" || card.cardType === "cry") {
       seenIds.add(card.pokemonId);
-    } else if (card.cardType === "evolution") {
+    } else if (
+      card.cardType === "evolution" ||
+      card.cardType === "reverse-evolution"
+    ) {
       seenIds.add(card.preEvoId);
       seenIds.add(card.postEvoId);
     }
