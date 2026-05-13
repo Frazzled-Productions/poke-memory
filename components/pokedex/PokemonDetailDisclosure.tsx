@@ -8,8 +8,8 @@ import { getPokemonFacts } from "@/lib/pokemon/facts";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import type { CardClassOrPending } from "@/lib/review/useCardClass";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { speakName } from "@/lib/audio/tts";
-import { playCry } from "@/lib/audio/cry";
+import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
+import { CryButton } from "@/components/pokedex/CryButton";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -175,20 +175,11 @@ function FormBlock({ form }: { form: SeedPokemon }) {
           })}
         </div>
 
-        {/* Cry preview */}
-        {form.cryUrl && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              aria-label={`Play ${form.displayName} cry`}
-              onClick={() => playCry(form.cryUrl)}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-            >
-              <span aria-hidden="true">🔊</span>
-              Play cry
-            </button>
-          </div>
-        )}
+        {/* Audio buttons */}
+        <div className="flex justify-center gap-2">
+          <NameTtsButton name={form.displayName} />
+          <CryButton cryUrl={form.cryUrl} label={form.displayName} />
+        </div>
       </div>
     </details>
   );
@@ -247,14 +238,8 @@ export function PokemonDetailDisclosure({
         ) : (
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">{name}</h1>
-            <button
-              type="button"
-              aria-label={`Hear ${name}`}
-              onClick={() => speakName(name)}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-            >
-              🔊
-            </button>
+            <NameTtsButton name={pokemon.displayName ?? name} />
+            <CryButton cryUrl={pokemon.cryUrl} label={pokemon.displayName ?? name} />
           </div>
         )}
         {!isLocked && (
