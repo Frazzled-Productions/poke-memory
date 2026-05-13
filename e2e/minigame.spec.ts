@@ -1,5 +1,40 @@
 import { test, expect } from "@playwright/test";
+import seedData from "../lib/pokemon/generated.json";
 
+// ---------------------------------------------------------------------------
+// Seed metadata — derived once at module load from the actual generated.json
+// so these tests survive the seed re-run that adds ~150 alternate-form entries.
+// ---------------------------------------------------------------------------
+
+const EDGE_ID_BASE = 1_500_000;
+const REVERSE_ID_OFFSET = 2_000_000;
+
+/** Number of name-card IDs (1 … nameCardCount). */
+const NAME_CARD_COUNT: number = seedData.length;
+
+/**
+ * Compute the evolution edge IDs using the same logic as SEED_EVOLUTION_CARDS
+ * in lib/pokemon/seed.ts. Each (pre-evo → post-evo) pair in the chain gets one
+ * sequential ID starting at EDGE_ID_BASE + 1.
+ */
+const EVOLUTION_CARD_IDS: number[] = (() => {
+  const ids: number[] = [];
+  let edgeId = EDGE_ID_BASE;
+  for (const pokemon of seedData) {
+    const chain = (pokemon as { evolutionChain?: Array<{ evolvesFromId: number | null }> })
+      .evolutionChain;
+    if (!chain) continue;
+    for (const node of chain) {
+      if (node.evolvesFromId === null) continue;
+      edgeId++;
+      if (edgeId >= REVERSE_ID_OFFSET) break;
+      ids.push(edgeId);
+    }
+  }
+  return ids;
+})();
+
+// ---------------------------------------------------------------------------
 // Pre-seed a SESSION_COMPLETE state.
 //
 // Strategy: ReviewSession calls hydrateSession(saved, SEED_POKEMON, ...) on
@@ -10,16 +45,19 @@ import { test, expect } from "@playwright/test";
 // card ineligible for both the review queue and the new queue, landing the
 // component in SESSION_COMPLETE.
 //
-// - Name cards: IDs 1–1025 (full SEED_POKEMON range from generated.json).
-// - Evolution cards: IDs 1500001–1500484 (SEED_EVOLUTION_CARDS range).
-//
 // Two name cards (Bulbasaur id=1 and Charmander id=4) have firstSeen set so
 // that getSeenPokemon returns length >= 2 and HigherOrLowerGame renders.
 //
 // The persistence validator requires `name` and `spriteUrl` for non-evolution
 // cards, so both are included. Evolution cards need `postEvoId` to pass
 // validation (see isReviewCardShaped in lib/review/persistence.ts).
-function seedCompletedSession() {
+// ---------------------------------------------------------------------------
+
+function seedCompletedSession(args: {
+  nameCardCount: number;
+  evolutionCardIds: number[];
+}) {
+  const { nameCardCount, evolutionCardIds } = args;
   const SEEN_IDS = new Set([1, 4]);
   const PAST_DATE = "2026-01-01";
   const FUTURE_DATE = "2099-12-31";
@@ -41,8 +79,8 @@ function seedCompletedSession() {
 
   const cards: object[] = [];
 
-  // Name cards (1–1025)
-  for (let id = 1; id <= 1025; id++) {
+  // Name cards (1 … nameCardCount)
+  for (let id = 1; id <= nameCardCount; id++) {
     cards.push({
       id,
       name: "pokemon-" + id,
@@ -55,8 +93,8 @@ function seedCompletedSession() {
     });
   }
 
-  // Evolution edge cards (1500001–1500484)
-  for (let id = 1500001; id <= 1500484; id++) {
+  // Evolution edge cards
+  for (const id of evolutionCardIds) {
     cards.push({
       id,
       // Minimal shape that passes isReviewCardShaped — validator checks postEvoId
@@ -88,19 +126,27 @@ function seedCompletedSession() {
   );
 }
 
+// ---------------------------------------------------------------------------
 // Pre-seed a NEW_CARDS_LOCKED state for the `name` card type:
 //   - IDs 1..10 are "introduced today" (firstSeen === today, lastReview === today,
 //     dueDate far future) so name.newIntroducedToday === maxNewPerDay (10).
-//   - ID 1025 is a fresh new card (lastReview === null) so hasMoreNewCardsOf(name)
-//     is true → the new-cards wall fires.
-//   - IDs 11..1024 are already-reviewed, not-due-today (no contribution to either
-//     counter) so they don't accidentally trigger the review soft-wall.
+//   - The last name-card ID is a fresh new card (lastReview === null) so
+//     hasMoreNewCardsOf(name) is true → the new-cards wall fires.
+//   - IDs 11..(nameCardCount-1) are already-reviewed, not-due-today (no
+//     contribution to either counter) so they don't accidentally trigger the
+//     review soft-wall.
 //   - Evolution cards are seeded as the existing helper does — already reviewed,
 //     not due — so no evolution-type queues populate.
 //
 // Default settings have reverseCardsEnabled === false and cryCardsEnabled ===
 // false, so we don't need to seed those types.
-function seedNewCardsLockedSession() {
+// ---------------------------------------------------------------------------
+
+function seedNewCardsLockedSession(args: {
+  nameCardCount: number;
+  evolutionCardIds: number[];
+}) {
+  const { nameCardCount, evolutionCardIds } = args;
   const TODAY = new Date().toISOString().slice(0, 10);
   const PAST_DATE = "2026-01-01";
   const FUTURE_DATE = "2099-12-31";
@@ -122,7 +168,8 @@ function seedNewCardsLockedSession() {
 
   const cards: object[] = [];
 
-  for (let id = 1; id <= 1024; id++) {
+  // IDs 1..(nameCardCount-1): already reviewed
+  for (let id = 1; id <= nameCardCount - 1; id++) {
     const introducedToday = id <= 10;
     cards.push({
       id,
@@ -137,11 +184,12 @@ function seedNewCardsLockedSession() {
     });
   }
 
-  // Fresh new card — satisfies hasMoreNewCardsOf("name") so the wall fires.
+  // Last name card: fresh new card — satisfies hasMoreNewCardsOf("name") so
+  // the new-cards wall fires.
   cards.push({
-    id: 1025,
-    name: "pokemon-1025",
-    spriteUrl: "/sprites/pokemon/1025.png",
+    id: nameCardCount,
+    name: "pokemon-" + nameCardCount,
+    spriteUrl: "/sprites/pokemon/" + nameCardCount + ".png",
     cardType: "name",
     state: {
       ...baseState,
@@ -151,7 +199,7 @@ function seedNewCardsLockedSession() {
     },
   });
 
-  for (let id = 1500001; id <= 1500484; id++) {
+  for (const id of evolutionCardIds) {
     cards.push({
       id,
       cardType: "evolution",
@@ -184,7 +232,10 @@ function seedNewCardsLockedSession() {
 
 test.describe("Higher-or-Lower mini-game", () => {
   test("mini-game section appears on SESSION_COMPLETE", async ({ page }) => {
-    await page.addInitScript(seedCompletedSession);
+    await page.addInitScript(seedCompletedSession, {
+      nameCardCount: NAME_CARD_COUNT,
+      evolutionCardIds: EVOLUTION_CARD_IDS,
+    });
     await page.goto("/");
 
     // Confirm the session-complete end-state is reached
@@ -205,7 +256,10 @@ test.describe("Higher-or-Lower mini-game", () => {
   });
 
   test("clicking a Pokémon tile reveals a result banner", async ({ page }) => {
-    await page.addInitScript(seedCompletedSession);
+    await page.addInitScript(seedCompletedSession, {
+      nameCardCount: NAME_CARD_COUNT,
+      evolutionCardIds: EVOLUTION_CARD_IDS,
+    });
     await page.goto("/");
 
     await expect(page.getByText("All caught up!")).toBeVisible();
@@ -226,7 +280,10 @@ test.describe("Higher-or-Lower mini-game", () => {
   });
 
   test("mini-game section appears on NEW_CARDS_LOCKED", async ({ page }) => {
-    await page.addInitScript(seedNewCardsLockedSession);
+    await page.addInitScript(seedNewCardsLockedSession, {
+      nameCardCount: NAME_CARD_COUNT,
+      evolutionCardIds: EVOLUTION_CARD_IDS,
+    });
     await page.goto("/");
 
     await expect(
