@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.2] — 2026-05-13
+
+### Changed
+
+- Vercel preview deployments are now gated on a green CI run plus an LGTM auto-review verdict on the same commit, eliminating wasted builds on intermediate fix commits. Maintainers can comment `/preview` on a PR to bypass the gate for mid-iteration peeks.
+
 ## [0.9.1] — 2026-05-13
 
 ### Fixed
@@ -539,7 +545,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.2
 [0.9.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.1
 [0.9.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.0
 [0.8.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.8
