@@ -1,4 +1,5 @@
 import { pronunciationFor } from "./pronunciations";
+import { loadSettings } from "@/lib/settings/persistence";
 
 export type VoiceTier = "premium" | "enhanced" | "compact";
 
@@ -71,17 +72,43 @@ export function getPreferredVoice(): SpeechSynthesisVoice | null {
   return preferredVoice;
 }
 
-export function speakName(name: string): void {
+export function speakName(name: string, overrides?: { ttsVoice?: string | null; ttsRate?: number; ttsVolume?: number }): void {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
   initVoices();
 
   // Chrome bug (crbug.com/335907): cancel() + speak() in the same tick silently no-ops.
   if (window.speechSynthesis.speaking || window.speechSynthesis.pending) window.speechSynthesis.cancel();
+  // Read settings synchronously (before setTimeout) so the call captures the
+  // state at the moment speakName is invoked — avoids a stale closure.
+  // Fall back to defaults if overrides aren't provided and settings can't be loaded.
+  let resolvedSettings: { ttsVoice: string | null; ttsRate: number; ttsVolume: number };
+  if (overrides !== undefined) {
+    resolvedSettings = { ttsVoice: overrides.ttsVoice ?? null, ttsRate: overrides.ttsRate ?? 1, ttsVolume: overrides.ttsVolume ?? 1 };
+  } else {
+    try {
+      const s = loadSettings();
+      resolvedSettings = { ttsVoice: s.ttsVoice, ttsRate: s.ttsRate, ttsVolume: s.ttsVolume };
+    } catch {
+      resolvedSettings = { ttsVoice: null, ttsRate: 1, ttsVolume: 1 };
+    }
+  }
+  const { ttsVoice, ttsRate, ttsVolume } = resolvedSettings;
   setTimeout(() => {
     const utterance = new SpeechSynthesisUtterance(pronunciationFor(name));
     utterance.lang = "en-GB";
-    if (preferredVoice !== null) utterance.voice = preferredVoice;
+    utterance.rate = ttsRate ?? 1;
+    utterance.volume = ttsVolume ?? 1;
+
+    // Resolve voice: pinned URI → auto-picked preferred → language-hint fallback.
+    const voiceURI = ttsVoice ?? null;
+    if (voiceURI !== null) {
+      const voices = window.speechSynthesis.getVoices();
+      const pinned = voices.find((v) => v.voiceURI === voiceURI) ?? null;
+      utterance.voice = pinned ?? preferredVoice;
+    } else if (preferredVoice !== null) {
+      utterance.voice = preferredVoice;
+    }
     window.speechSynthesis.speak(utterance);
   }, 0);
 }

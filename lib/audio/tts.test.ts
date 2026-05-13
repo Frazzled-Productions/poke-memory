@@ -54,6 +54,8 @@ function makeSynthesis(initialVoices: MockVoice[], opts: { speaking?: boolean; p
 class MockUtterance {
   lang = "";
   voice: MockVoice | null = null;
+  rate = 1;
+  volume = 1;
   constructor(public text: string) {}
 }
 
@@ -313,6 +315,96 @@ describe("speakName", () => {
     vi.runAllTimers();
 
     expect((synth.speak.mock.calls[0][0] as MockUtterance).voice).toBe(siri);
+  });
+});
+
+describe("speakName with TTS settings (#429)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("applies ttsRate to the utterance", async () => {
+    const synth = makeSynthesis([voice("en-GB", true, "Daniel")]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur", { ttsRate: 1.5, ttsVolume: 1, ttsVoice: null });
+    vi.runAllTimers();
+
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance & { rate: number };
+    expect(utterance.rate).toBe(1.5);
+  });
+
+  it("applies ttsVolume to the utterance", async () => {
+    const synth = makeSynthesis([voice("en-GB", true, "Daniel")]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur", { ttsRate: 1, ttsVolume: 0.6, ttsVoice: null });
+    vi.runAllTimers();
+
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance & { volume: number };
+    expect(utterance.volume).toBe(0.6);
+  });
+
+  it("pins the voice by voiceURI when ttsVoice is set", async () => {
+    const daniel = voice("en-GB", true, "Daniel");
+    const karen = voice("en-AU", true, "Karen");
+    const synth = makeSynthesis([daniel, karen]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur", { ttsVoice: karen.voiceURI, ttsRate: 1, ttsVolume: 1 });
+    vi.runAllTimers();
+
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance;
+    expect(utterance.voice).toBe(karen);
+  });
+
+  it("falls back to the auto-picked preferred voice when pinned URI is not found", async () => {
+    const daniel = voice("en-GB", true, "Daniel");
+    const synth = makeSynthesis([daniel]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur", { ttsVoice: "voice-that-does-not-exist:en-XX", ttsRate: 1, ttsVolume: 1 });
+    vi.runAllTimers();
+
+    // Falls back to preferred (daniel)
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance;
+    expect(utterance.voice).toBe(daniel);
+  });
+
+  it("uses auto-pick logic (preferredVoice) when ttsVoice is null", async () => {
+    const daniel = voice("en-GB", true, "Daniel");
+    const synth = makeSynthesis([daniel]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur", { ttsVoice: null, ttsRate: 1, ttsVolume: 1 });
+    vi.runAllTimers();
+
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance;
+    expect(utterance.voice).toBe(daniel);
+  });
+
+  it("defaults rate=1 and volume=1 when overrides omit those keys", async () => {
+    const synth = makeSynthesis([voice("en-GB", true, "Daniel")]);
+    stubSpeechAPIs(synth);
+    const { speakName } = await import("./tts");
+
+    speakName("Bulbasaur", {});
+    vi.runAllTimers();
+
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance & { rate: number; volume: number };
+    expect(utterance.rate).toBe(1);
+    expect(utterance.volume).toBe(1);
   });
 });
 

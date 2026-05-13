@@ -113,6 +113,23 @@ export type UserSettings = {
   fsrsWeights?: number[];
   /** ISO timestamp of the last successful weight optimization run (#268). */
   fsrsWeightsOptimizedAt?: string;
+  /**
+   * TTS voice URI (#429). When non-null, `speakName` looks up the voice by
+   * `SpeechSynthesisVoice.voiceURI` and pins the utterance to it. Falls back
+   * to the auto-picked preferred voice if the URI is not found (voice list
+   * changes with OS installs). null = auto-pick (current behaviour).
+   */
+  ttsVoice: string | null;
+  /**
+   * TTS speech rate (#429). Maps to `SpeechSynthesisUtterance.rate`.
+   * Valid range 0.5–2.0; default 1.0 preserves current behaviour.
+   */
+  ttsRate: number;
+  /**
+   * TTS volume (#429). Maps to `SpeechSynthesisUtterance.volume`.
+   * Valid range 0–1; default 1.0 preserves current behaviour.
+   */
+  ttsVolume: number;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -140,6 +157,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   seenStreakMilestones: [],
   earnedBadges: [],
   onboarding: DEFAULT_ONBOARDING,
+  ttsVoice: null,
+  ttsRate: 1,
+  ttsVolume: 1,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -312,6 +332,16 @@ function parseStoredSettings(raw: string | null): UserSettings {
     seenStreakMilestones: validateSeenStreakMilestones(obj.seenStreakMilestones),
     earnedBadges: validateEarnedBadges(obj.earnedBadges),
     onboarding: validateOnboarding(obj.onboarding),
+    ttsVoice:
+      typeof obj.ttsVoice === "string" ? obj.ttsVoice : DEFAULT_SETTINGS.ttsVoice,
+    ttsRate:
+      typeof obj.ttsRate === "number" && Number.isFinite(obj.ttsRate)
+        ? Math.max(0.5, Math.min(2.0, obj.ttsRate))
+        : DEFAULT_SETTINGS.ttsRate,
+    ttsVolume:
+      typeof obj.ttsVolume === "number" && Number.isFinite(obj.ttsVolume)
+        ? Math.max(0, Math.min(1, obj.ttsVolume))
+        : DEFAULT_SETTINGS.ttsVolume,
   };
 }
 

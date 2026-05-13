@@ -75,6 +75,9 @@ const VALID_SETTINGS: UserSettings = {
     statsHintDismissed: false,
     settingsHintDismissed: false,
   },
+  ttsVoice: null,
+  ttsRate: 1,
+  ttsVolume: 1,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

@@ -47,6 +47,9 @@ const SAMPLE: UserSettings = {
     statsHintDismissed: false,
     settingsHintDismissed: false,
   },
+  ttsVoice: null,
+  ttsRate: 1,
+  ttsVolume: 1,
 };
 
 describe("pushSettings", () => {

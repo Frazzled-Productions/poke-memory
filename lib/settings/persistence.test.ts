@@ -132,6 +132,9 @@ describe('loadSettings migration', () => {
       seenStreakMilestones: [3, 7],
       earnedBadges: [{ id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' }],
       onboarding: { ...DEFAULT_ONBOARDING },
+      ttsVoice: 'Daniel:en-GB',
+      ttsRate: 1.5,
+      ttsVolume: 0.75,
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -374,6 +377,58 @@ describe('loadSettings: legacy practice-scope migration', () => {
     mockLocalStorage.setItem(LEGACY_SCOPE_KEY, '{not json');
     expect(() => loadSettings()).not.toThrow();
     expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+  });
+});
+
+// ─── TTS settings (#429) ────────────────────────────────────────────────────
+
+describe('TTS settings (#429)', () => {
+  it('defaults ttsVoice to null, ttsRate to 1, ttsVolume to 1 on a fresh load', () => {
+    const s = loadSettings();
+    expect(s.ttsVoice).toBeNull();
+    expect(s.ttsRate).toBe(1);
+    expect(s.ttsVolume).toBe(1);
+  });
+
+  it('round-trips ttsVoice, ttsRate, and ttsVolume via saveSettings', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, ttsVoice: 'Daniel:en-GB', ttsRate: 1.5, ttsVolume: 0.8 });
+    const s = loadSettings();
+    expect(s.ttsVoice).toBe('Daniel:en-GB');
+    expect(s.ttsRate).toBe(1.5);
+    expect(s.ttsVolume).toBe(0.8);
+  });
+
+  it('defaults ttsVoice to null when the stored value is not a string', () => {
+    for (const bad of [42, null, undefined, true, {}]) {
+      mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ttsVoice: bad }));
+      expect(loadSettings().ttsVoice).toBeNull();
+    }
+  });
+
+  it('clamps ttsRate into [0.5, 2.0]', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ttsRate: 0.1 }));
+    expect(loadSettings().ttsRate).toBe(0.5);
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ttsRate: 5.0 }));
+    expect(loadSettings().ttsRate).toBe(2.0);
+  });
+
+  it('clamps ttsVolume into [0, 1]', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ttsVolume: -0.5 }));
+    expect(loadSettings().ttsVolume).toBe(0);
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ttsVolume: 2 }));
+    expect(loadSettings().ttsVolume).toBe(1);
+  });
+
+  it('defaults ttsRate and ttsVolume when the stored value is non-finite', () => {
+    for (const bad of [NaN, Infinity, -Infinity, 'fast', null]) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, ttsRate: bad, ttsVolume: bad }),
+      );
+      const s = loadSettings();
+      expect(s.ttsRate).toBe(1);
+      expect(s.ttsVolume).toBe(1);
+    }
   });
 });
 

@@ -30,6 +30,7 @@ import { IntensityPicker } from "@/components/settings/IntensityPicker";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
 import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
+import { TtsControls } from "@/components/settings/TtsControls";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -924,6 +925,14 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
+                {settings.speakNameOnReveal && (
+                  <TtsControls
+                    ttsVoice={settings.ttsVoice}
+                    ttsRate={settings.ttsRate}
+                    ttsVolume={settings.ttsVolume}
+                    onChange={(patch) => setSettings({ ...settings, ...patch })}
+                  />
+                )}
                 <VoiceQualityHint />
               </section>
 
