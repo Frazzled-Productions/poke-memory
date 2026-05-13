@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
+import { OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -68,6 +69,66 @@ describe("FsrsOptimizerSection", () => {
       const button = screen.getByTestId("fsrs-optimize-button");
       expect(button).toBeDisabled();
       expect(button).toHaveTextContent("Sync paused (superuser)");
+    });
+  });
+
+  describe("cooldown active", () => {
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+    it("disables button with 'Next optimization in N days' when optimized 2 days ago", () => {
+      const optimizedAt = new Date(Date.now() - 2 * MS_PER_DAY).toISOString();
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          superuserPaused={false}
+          optimizableReviewCount={300}
+          fsrsWeightsOptimizedAt={optimizedAt}
+        />,
+      );
+      const button = screen.getByTestId("fsrs-optimize-button");
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent(/Next optimization in \d+ days/);
+      expect(screen.getByTestId("fsrs-optimize-last-run")).toBeInTheDocument();
+    });
+
+    it("enables button at exactly 7-day boundary (sinceMs === COOLDOWN_MS)", () => {
+      const fixedNow = 1_700_000_000_000;
+      vi.useFakeTimers();
+      vi.setSystemTime(fixedNow);
+      try {
+        const optimizedAt = new Date(fixedNow - OPTIMIZER_COOLDOWN_MS).toISOString();
+        render(
+          <FsrsOptimizerSection
+            {...defaultProps}
+            isSignedIn={true}
+            superuserPaused={false}
+            optimizableReviewCount={300}
+            fsrsWeightsOptimizedAt={optimizedAt}
+          />,
+        );
+        const button = screen.getByTestId("fsrs-optimize-button");
+        expect(button).not.toBeDisabled();
+        expect(button).toHaveTextContent("Optimize now");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("enables button when optimized 8 days ago (cooldown elapsed)", () => {
+      const optimizedAt = new Date(Date.now() - 8 * MS_PER_DAY).toISOString();
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          superuserPaused={false}
+          optimizableReviewCount={300}
+          fsrsWeightsOptimizedAt={optimizedAt}
+        />,
+      );
+      const button = screen.getByTestId("fsrs-optimize-button");
+      expect(button).not.toBeDisabled();
+      expect(button).toHaveTextContent("Optimize now");
     });
   });
 
@@ -218,6 +279,33 @@ describe("FsrsOptimizerSection", () => {
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
           "Only 47 reviews synced. Sync first, then try again.",
+        );
+      });
+    });
+
+    it("surfaces 'Try again in N days' message when 429 response has retryAfterMs", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 429,
+          json: async () => ({ error: "cooldown", retryAfterMs: 5 * 24 * 60 * 60 * 1000 }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Try again in 5 days.",
         );
       });
     });

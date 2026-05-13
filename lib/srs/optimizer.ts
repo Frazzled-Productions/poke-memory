@@ -10,6 +10,7 @@
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
 export const MIN_REVIEWS_FOR_OPTIMIZATION = 200;
+export const OPTIMIZER_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * FSRS-native rating (1-4). Our internal grades are 1/2/4/5; the mapping at

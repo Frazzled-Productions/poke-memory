@@ -23,6 +23,7 @@ import { createClient } from "@/lib/supabase/server";
 // (300s on current Vercel plans) is plenty; setting the cap explicitly so
 // a future plan-default change doesn't silently truncate the fit.
 export const maxDuration = 60;
+
 import {
   FSRSBindingItem,
   FSRSBindingReview,
@@ -33,6 +34,7 @@ import {
   gradeLogToOptimizerItems,
   countOptimizableReviews,
   MIN_REVIEWS_FOR_OPTIMIZATION,
+  OPTIMIZER_COOLDOWN_MS,
 } from "@/lib/srs/optimizer";
 import type { UserSettings } from "@/lib/settings/persistence";
 
@@ -43,6 +45,30 @@ type GradeLogCloudRow = {
   grade: GradeLogEntry["grade"];
   card_id: number | null;
 };
+
+type UserSettingsRow = {
+  settings: Partial<UserSettings>;
+  updatedAt: string;
+};
+
+async function fetchUserSettings(
+  client: SupabaseClient,
+  userId: string,
+): Promise<UserSettingsRow | null> {
+  const { data, error } = await client
+    .from("user_settings")
+    .select("settings, updated_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as { settings: unknown; updated_at: string };
+  const settings =
+    row.settings && typeof row.settings === "object"
+      ? (row.settings as Partial<UserSettings>)
+      : {};
+  return { settings, updatedAt: row.updated_at };
+}
 
 async function fetchGradeLog(
   client: SupabaseClient,
@@ -83,48 +109,67 @@ async function fetchGradeLog(
  * under concurrent writes; we retry once with a fresh read on conflict, then
  * give up. A future atomic-merge RPC (jsonb `settings || patch`) would remove
  * the retry path entirely.
+ *
+ * `prefetched` lets the caller pass the row already fetched for the cooldown
+ * check, so the first attempt avoids a second SELECT on `user_settings`. On
+ * conflict-retry we always re-read fresh.
  */
 async function persistWeights(
   client: SupabaseClient,
   userId: string,
   weights: number[],
   optimizedAt: string,
+  prefetched: UserSettingsRow | null,
   attempt = 0,
 ): Promise<boolean> {
   try {
-    const { data: current } = await client
-      .from("user_settings")
-      .select("settings, updated_at")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    const existing: Partial<UserSettings> =
-      current &&
-      typeof (current as { settings: unknown }).settings === "object" &&
-      (current as { settings: unknown }).settings !== null
-        ? ((current as { settings: unknown }).settings as Partial<UserSettings>)
-        : {};
+    let current: UserSettingsRow | null;
+    if (attempt === 0) {
+      current = prefetched;
+    } else {
+      const { data } = await client
+        .from("user_settings")
+        .select("settings, updated_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (data) {
+        const row = data as { settings: unknown; updated_at: string };
+        const settings =
+          row.settings && typeof row.settings === "object"
+            ? (row.settings as Partial<UserSettings>)
+            : {};
+        current = { settings, updatedAt: row.updated_at };
+      } else {
+        current = null;
+      }
+    }
 
     const merged: Partial<UserSettings> = {
-      ...existing,
+      ...(current?.settings ?? {}),
       fsrsWeights: weights,
       fsrsWeightsOptimizedAt: optimizedAt,
     };
 
     if (current) {
-      const currentUpdatedAt = (current as { updated_at: string }).updated_at;
       const { data: updated, error } = await client
         .from("user_settings")
         .update({ settings: merged, updated_at: optimizedAt })
         .eq("user_id", userId)
-        .eq("updated_at", currentUpdatedAt)
+        .eq("updated_at", current.updatedAt)
         .select("user_id")
         .maybeSingle();
       if (error) return false;
       if (!updated) {
         // Concurrent write — retry once with a fresh read.
         if (attempt >= 1) return false;
-        return persistWeights(client, userId, weights, new Date().toISOString(), attempt + 1);
+        return persistWeights(
+          client,
+          userId,
+          weights,
+          new Date().toISOString(),
+          null,
+          attempt + 1,
+        );
       }
       return true;
     }
@@ -147,6 +192,29 @@ export async function POST(): Promise<NextResponse> {
 
   if (authError || !user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // Enforce 7-day cooldown before running the CPU-bound optimizer. The row
+  // we read here is reused by `persistWeights` below to avoid a second SELECT.
+  let currentSettings: UserSettingsRow | null;
+  try {
+    currentSettings = await fetchUserSettings(supabase, user.id);
+  } catch {
+    return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
+  }
+  const last = currentSettings?.settings.fsrsWeightsOptimizedAt;
+  if (last) {
+    const sinceMs = Date.now() - new Date(last).getTime();
+    if (sinceMs < OPTIMIZER_COOLDOWN_MS) {
+      const retryAfterMs = OPTIMIZER_COOLDOWN_MS - sinceMs;
+      return NextResponse.json(
+        { error: "cooldown", retryAfterMs },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
+        },
+      );
+    }
   }
 
   // Fetch grade log from Supabase.
@@ -180,9 +248,15 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ error: "optimization_failed" }, { status: 500 });
   }
 
-  // Persist the new weights.
+  // Persist the new weights, reusing the row fetched for the cooldown check.
   const optimizedAt = new Date().toISOString();
-  const persisted = await persistWeights(supabase, user.id, weights, optimizedAt);
+  const persisted = await persistWeights(
+    supabase,
+    user.id,
+    weights,
+    optimizedAt,
+    currentSettings,
+  );
   if (!persisted) {
     console.error("[/api/srs/optimize] failed to persist weights for user", user.id);
     return NextResponse.json({ error: "optimization_failed" }, { status: 500 });
