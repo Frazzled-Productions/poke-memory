@@ -160,6 +160,9 @@ function TodayPill({
 }) {
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
+      <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        Done today
+      </p>
       {nameEnabled && (
         <p>
           <span className="text-zinc-600 dark:text-zinc-300">Name:</span>{" "}
@@ -168,7 +171,7 @@ function TodayPill({
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.name.reviewsDoneToday} reviews
+            {perType.name.reviewsDoneToday} reviewed
           </span>
         </p>
       )}
@@ -180,7 +183,7 @@ function TodayPill({
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.evolution.reviewsDoneToday} reviews
+            {perType.evolution.reviewsDoneToday} reviewed
           </span>
         </p>
       )}
@@ -192,7 +195,7 @@ function TodayPill({
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.reverse.reviewsDoneToday} reviews
+            {perType.reverse.reviewsDoneToday} reviewed
           </span>
         </p>
       )}
