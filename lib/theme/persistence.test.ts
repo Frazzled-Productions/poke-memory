@@ -163,8 +163,7 @@ describe("isFavouriteEarned", () => {
   });
 
   it("returns false when there is no card for the favourite", () => {
-    const otherId = SAMPLE.id === 1 ? 2 : 1;
-    const cards = [{ id: otherId, state: masteredState() }];
+    const cards = [{ id: 999, state: masteredState() }];
     expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(false);
   });
 

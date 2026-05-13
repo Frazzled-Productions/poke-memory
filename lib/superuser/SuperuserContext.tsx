@@ -22,7 +22,7 @@ import {
   saveFavourite,
   isFavouriteEarned,
 } from "@/lib/theme/persistence";
-import { loadSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY } from "@/lib/settings/persistence";
+import { loadSettings } from "@/lib/settings/persistence";
 
 // Typing "super" anywhere (when not focused on an input) toggles unlocked state.
 const CHORD_SEQUENCE = ["s", "u", "p", "e", "r"];
@@ -75,13 +75,17 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
 
   // Force-pull cloud over local on the "any flag was on → no flags on" transition.
   // Signed-in users get authoritative cloud state restored. Guests get a destructive
-  // confirm (there is no cloud to fall back to). After the cards path settles,
-  // re-validate the favourite theme: a cheat-selected one whose underlying card
-  // is no longer mastered (per restored cards) is cleared so it cannot survive
-  // the flag-off transition (#428).
+  // confirm (there is no cloud to fall back to). After the cards path settles —
+  // and only when card state is trusted (pull succeeded, or guest confirmed the
+  // wipe) — re-validate the favourite theme so a cheat-selected one cannot
+  // survive the flag-off transition (#428). On the un-trusted paths (pull threw,
+  // guest pressed Cancel) the local session still reflects cheat-inflated state,
+  // so a mastery check would spuriously return earned; `FavouriteThemeProvider`'s
+  // mount-time belt-and-braces handles those cases on the next page load.
   const exitCleanup = useCallback(async () => {
     const u = userRef.current;
     const sb = supabaseRef.current;
+    let cardsTrusted = false;
     if (u && sb) {
       try {
         const rows = await pullSession(sb, u.id);
@@ -96,6 +100,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
               new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
             );
           }
+          cardsTrusted = true;
         }
       } catch (err) {
         console.warn("[superuser] cloud→local overwrite failed:", err);
@@ -109,26 +114,20 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
         window.dispatchEvent(
           new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
         );
+        cardsTrusted = true;
       }
     }
 
-    // Favourite-theme cleanup. Runs in both branches against the now-restored
-    // local card state, so a theme selected only via `pretendAllMastered`
-    // cannot outlive the flag.
+    if (!cardsTrusted) return;
     const favourite = loadFavourite();
-    if (favourite !== null) {
-      const settings = loadSettings();
-      const session = loadSession();
-      const cards = session?.cards ?? [];
-      if (!isFavouriteEarned(favourite, cards, settings.masteryRepetitions)) {
-        saveFavourite(null);
-        // `saveSettings` writes localStorage but does not fire a same-tab
-        // StorageEvent — dispatch one so `FavouriteThemeProvider` re-reads
-        // and clears the active palette.
-        window.dispatchEvent(
-          new StorageEvent("storage", { key: SETTINGS_STORAGE_KEY }),
-        );
-      }
+    if (favourite === null) return;
+    const settings = loadSettings();
+    const cards = loadSession()?.cards ?? [];
+    if (!isFavouriteEarned(favourite, cards, settings.masteryRepetitions)) {
+      // `saveFavourite` → `saveSettings` already fires `SETTINGS_SAVED_EVENT`,
+      // which `FavouriteThemeProvider` listens for — no synthetic StorageEvent
+      // is needed for same-tab refresh.
+      saveFavourite(null);
     }
   }, []);
 
