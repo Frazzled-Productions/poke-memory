@@ -149,9 +149,9 @@ jobs:
                    <!-- auto-review-sha:${{ github.event.pull_request.head.sha }} -->
                    ## Auto-review ${{ steps.cycles.outputs.next }}
 
-                   <bulleted punch list of findings, or "No significant issues.">
+                   <bulleted findings list — one bullet per issue; or the single line "No significant issues." (not a bullet) when there are none>
 
-                   Verdict: Looks good to me — @fraserbrookhouse
+                   Verdict: [Looks good to me — @fraserbrookhouse | Needs fixes]
 
                    _Reply with `/fix` to have these findings addressed._
 
@@ -159,14 +159,31 @@ jobs:
                `<!-- auto-review:${{ steps.cycles.outputs.next }} -->` exactly.
                The second line MUST be the SHA marker
                `<!-- auto-review-sha:${{ github.event.pull_request.head.sha }} -->`
-               so re-triggers at the same head SHA are skipped. A verdict line
-               starting with `Verdict: ` MUST be present, with either
-               `Looks good to me — @fraserbrookhouse` (no significant issues) or
-               `Needs fixes`. Use those whole-word phrases verbatim — no acronyms.
-               When (and only when) the verdict is `Needs fixes`, append the
-               italicised footer line shown above so the maintainer knows how to
-               trigger a fix run. Omit the footer when the verdict is
-               `Looks good to me — @fraserbrookhouse`.
+               so re-triggers at the same head SHA are skipped.
+
+               Findings format: post the sub-agent's punch list as a
+               single flat bulleted list. Every bullet MUST begin with a bold
+               severity tag, an em dash, a bold file:line anchor, another em
+               dash, then a one-sentence description and (where applicable)
+               the *why*. For example, a Concern bullet should read:
+               "**Concern** — **app/api/srs/optimize/route.ts:179** — 429
+               response omits the standard Retry-After header. Why: needed
+               for CDNs and generic clients to back off correctly." The four
+               severities are **Blocker**, **Concern**, **Nit**, and
+               **Praise** — sort the list by severity in that order. Do NOT
+               group findings under headings, and do NOT strip the severity
+               prefixes when composing the comment. If the sub-agent returns
+               "No significant issues.", post that single line in place of
+               the bulleted list.
+
+               A verdict line starting with `Verdict: ` MUST be present, with
+               either `Looks good to me — @fraserbrookhouse` (no significant
+               issues, or only Praise / Nit bullets) or `Needs fixes` (one or
+               more Blocker or Concern bullets). Use those whole-word phrases
+               verbatim — no acronyms. When (and only when) the verdict is
+               `Needs fixes`, append the italicised footer line shown above so
+               the maintainer knows how to trigger a fix run. Omit the footer
+               when the verdict is `Looks good to me — @fraserbrookhouse`.
 
                When referencing a prior review in your prose (only relevant when
                this is not the first review): find the comment object in the PR
