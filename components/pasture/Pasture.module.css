@@ -1,0 +1,83 @@
+/* ---------------------------------------------------------------------------
+ * Pasture animations — used by PasturePokemon and ArrivalSparkle.
+ * All durations are set here; components apply them via className.
+ * --------------------------------------------------------------------------- */
+
+/* Gentle vertical bob for idle sprites */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+/* Subtle side-to-side sway — layered on top of bob for larger Pokémon */
+@keyframes sway {
+  0%, 100% { transform: rotate(-2deg); }
+  50%       { transform: rotate(2deg); }
+}
+
+/* Quick hop on tap — translateY up then back */
+@keyframes hop {
+  0%   { transform: translateY(0) scale(1); }
+  30%  { transform: translateY(-14px) scale(1.08); }
+  60%  { transform: translateY(-6px) scale(1.03); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Sparkle burst on new arrivals */
+@keyframes sparkle {
+  0%   { opacity: 1; transform: scale(0.6) rotate(0deg); }
+  40%  { opacity: 1; transform: scale(1.2) rotate(180deg); }
+  70%  { opacity: 0.7; transform: scale(1.0) rotate(270deg); }
+  100% { opacity: 0; transform: scale(1.4) rotate(360deg); }
+}
+
+/* Repeating sparkle twinkle for unseen arrivals */
+@keyframes twinkle {
+  0%, 100% { opacity: 1;   transform: scale(1)   rotate(0deg); }
+  25%       { opacity: 0.6; transform: scale(0.85) rotate(90deg); }
+  50%       { opacity: 1;   transform: scale(1.1)  rotate(180deg); }
+  75%       { opacity: 0.7; transform: scale(0.9)  rotate(270deg); }
+}
+
+/* ---- Applied classes ---- */
+
+.spriteBob {
+  animation: bob 2.4s ease-in-out infinite;
+  /* animationDelay applied inline per-sprite */
+}
+
+.spriteHop {
+  animation: hop 0.6s ease-out forwards;
+}
+
+.sparkleOverlay {
+  position: absolute;
+  inset: -4px;
+  pointer-events: none;
+  animation: twinkle 1.8s ease-in-out infinite;
+}
+
+.sparkleIcon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* Zone container with fixed aspect ratio for anchor coordinate mapping */
+.zoneContainer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 6;
+  overflow: hidden;
+  border-radius: 0.75rem;
+}
+
+/* Sprite positioned absolutely within the zone container */
+.spriteAnchor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
