@@ -151,7 +151,7 @@ jobs:
 
                    <bulleted findings list — one bullet per issue; or the single line "No significant issues." (not a bullet) when there are none>
 
-                   Verdict: <see rule below>
+                   Verdict: [Looks good to me — @fraserbrookhouse | Needs fixes]
 
                    _Reply with `/fix` to have these findings addressed._
 
