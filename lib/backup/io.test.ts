@@ -62,6 +62,7 @@ const VALID_SETTINGS: UserSettings = {
   maxReviewsCryPerDay: 100,
   favouriteTheme: null,
   retentionTarget: 0.9,
+  practiceScope: { gens: [], types: [], presets: [] },
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

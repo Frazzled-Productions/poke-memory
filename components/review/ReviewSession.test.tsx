@@ -63,6 +63,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
       firstSeen: null,
       learningStep: null,
       stepStartedAt: null,
+      hiddenSince: null,
     },
   };
 
@@ -82,6 +83,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     nameCardsEnabled: true,
     evolutionCardsEnabled: true,
     playCryOnReveal: false,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
   };
 
   return {
@@ -159,6 +161,7 @@ beforeEach(() => {
     nameCardsEnabled: true,
     evolutionCardsEnabled: true,
     playCryOnReveal: false,
+    practiceScope: { gens: [], types: [], presets: [] },
   });
   vi.mocked(loadSession).mockReturnValue(null);
 });
@@ -203,6 +206,7 @@ describe("ReviewSession reveal flow", () => {
       nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       playCryOnReveal: true,
+      practiceScope: { gens: [], types: [], presets: [] },
     });
     render(<ReviewSession />);
 
@@ -246,6 +250,7 @@ describe("ReviewSession reverse card flow", () => {
     nameCardsEnabled: false,
     evolutionCardsEnabled: false,
     playCryOnReveal: false,
+    practiceScope: { gens: [], types: [], presets: [] },
   };
 
   beforeEach(() => {
@@ -352,6 +357,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
       firstSeen: "2026-05-11",
       learningStep: 0,     // in learning step
       stepStartedAt: null, // migration gap — no start time recorded
+      hiddenSince: null,
     },
   };
 
@@ -401,6 +407,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
             expect.objectContaining({
               state: expect.objectContaining({
                 stepStartedAt: expect.any(Number),
+                hiddenSince: null,
               }),
             }),
           ]),
@@ -427,6 +434,7 @@ describe("Baseline: due review card reveal → grade cycle", () => {
         firstSeen: "1970-01-01",
         learningStep: null,
         stepStartedAt: null,
+        hiddenSince: null,
       },
     };
 
@@ -484,6 +492,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
         firstSeen: "2026-05-01",
         learningStep: null,
         stepStartedAt: null,
+        hiddenSince: null,
       },
     };
 
@@ -506,6 +515,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
         firstSeen: "2026-05-11",
         learningStep: 0,
         stepStartedAt: now - (LEARNING_STEPS_MS[0] - 100), // dueAt = now + 100 ms
+        hiddenSince: null,
       },
     };
 
@@ -590,6 +600,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
         firstSeen: "2026-05-01",
         learningStep: 0,
         stepStartedAt: T + 9 * 60_000, // dueAt = T + 9*60_000 + 600_000 = T + 19*60_000
+        hiddenSince: null,
       },
     };
 
@@ -631,6 +642,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
         firstSeen: "2026-05-01",
         learningStep: 0,
         stepStartedAt: T + 11 * 60_000, // dueAt = T + 11*60_000 + 600_000 = T + 21*60_000
+        hiddenSince: null,
       },
     };
 
@@ -669,6 +681,7 @@ describe("QueueCounterRow: live queue counters", () => {
         firstSeen: null,
         learningStep: null,
         stepStartedAt: null,
+        hiddenSince: null,
       },
     };
 
@@ -690,6 +703,7 @@ describe("QueueCounterRow: live queue counters", () => {
         firstSeen: "2026-05-12",
         learningStep: 0,
         stepStartedAt: Date.now() - LEARNING_STEPS_MS[0], // already due
+        hiddenSince: null,
       },
     };
 
@@ -713,5 +727,121 @@ describe("QueueCounterRow: live queue counters", () => {
     expect(counterRow).toHaveTextContent("Review");
     expect(counterRow).toHaveTextContent("1 New");
     expect(counterRow).toHaveTextContent("1 Learning");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Learning filters (#333)
+// ---------------------------------------------------------------------------
+
+describe("Practice scope (#333)", () => {
+  it("default empty scope is a no-op — regression guard", async () => {
+    // The default settings mock returns practiceScope { gens: [], types: [], presets: [] }.
+    // The existing reveal-flow expectations should still hold: Reveal button is
+    // visible and the empty-state branch is NOT rendered.
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/no Pok[ée]mon match your scope/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders an empty-state with a Clear scope CTA when scope excludes every fixture card", async () => {
+    // Bulbasaur is Gen I (generation-i). Scope to Gen IX → zero match.
+    // Scope is non-empty AND eligibility is empty, so the dedicated
+    // empty-state branch fires (not the generic complete screen).
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [9], types: [], presets: [] },
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no Pok[ée]mon match your scope/i),
+      ).toBeInTheDocument();
+    });
+
+    // The empty-state must offer a way out — a "Clear scope" button.
+    expect(screen.getByRole("button", { name: /clear scope/i })).toBeInTheDocument();
+  });
+
+  it("persists hiddenSince via saveSession when a graduated card is out of scope", async () => {
+    // Graduated card (firstSeen + lastReview set, learningStep null). The
+    // active scope excludes its species → reconcileHiddenState stamps
+    // hiddenSince, and the session-load effect must persist that change so
+    // it survives a reload.
+    const graduatedCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      state: {
+        stability: 5,
+        difficulty: 1,
+        elapsedDays: 0,
+        scheduledDays: 5,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-20",
+        lastReview: "2026-05-01",
+        firstSeen: "2026-04-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([graduatedCard]);
+    vi.mocked(loadSession).mockReturnValueOnce({
+      cards: [graduatedCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      // Excludes Bulbasaur (Gen I).
+      practiceScope: { gens: [9], types: [], presets: [] },
+    });
+
+    render(<ReviewSession />);
+
+    // saveSession must have been called with the reconciled card whose
+    // hiddenSince is now a non-null ISO string.
+    await waitFor(() => {
+      expect(vi.mocked(saveSession)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: expect.arrayContaining([
+            expect.objectContaining({
+              id: 1,
+              state: expect.objectContaining({
+                hiddenSince: expect.any(String),
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
   });
 });

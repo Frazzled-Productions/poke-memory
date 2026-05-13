@@ -590,6 +590,74 @@ describe('buildSessionQueues (per-type budgets)', () => {
     expect(queues.perType.name.reviewsDoneToday).toBe(0);
     expect(queues.reviewsDoneToday).toBe(2);
   });
+
+  // ─── eligibleCardIds (learning filter, #333) ─────────────────────────────
+  it('omitting eligibleCardIds is identical to passing every id (regression guard)', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1),
+      nameCard(2),
+      nameCard(3, { firstSeen: '2026-05-01', lastReview: '2026-05-03', dueDate: TODAY, reps: 2, scheduledDays: 6 }),
+      evoCard(1_000_001),
+    ];
+    const without = buildSessionQueues(cards, baseLimits, TODAY);
+    const allIds = new Set(cards.map((c) => c.id));
+    const withAll = buildSessionQueues(cards, baseLimits, TODAY, allIds);
+    expect(withAll).toEqual(without);
+  });
+
+  it('excludes ineligible ids from review and new queues', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1),
+      nameCard(2),
+      nameCard(3, { firstSeen: '2026-05-01', lastReview: '2026-05-03', dueDate: TODAY, reps: 2, scheduledDays: 6 }),
+      nameCard(4, { firstSeen: '2026-05-01', lastReview: '2026-05-03', dueDate: TODAY, reps: 2, scheduledDays: 6 }),
+    ];
+    // Only 1 and 3 are eligible.
+    const eligible = new Set([1, 3]);
+    const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
+    expect(queues.newQueue).toEqual([1]);
+    expect(queues.reviewQueue).toEqual([3]);
+  });
+
+  it('keeps reviewsDoneToday unchanged when an eligible-excluded card was reviewed today (counter independence)', () => {
+    // Card 1 was reviewed today (counts toward reviewsDoneToday), then the
+    // user applied a filter that excludes it. The counter must still see it.
+    const cards: ReviewableCard[] = [
+      nameCard(1, { firstSeen: '2026-05-01', lastReview: TODAY, reps: 2 }),
+      nameCard(2), // fresh, eligible
+    ];
+    const eligible = new Set([2]); // 1 is filtered out
+    const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
+    expect(queues.perType.name.reviewsDoneToday).toBe(1);
+    expect(queues.reviewsDoneToday).toBe(1);
+    // 1 must not appear in any queue since it's ineligible.
+    expect(queues.reviewQueue).not.toContain(1);
+    expect(queues.newQueue).not.toContain(1);
+  });
+
+  it('learning-step cards survive the eligibility filter (queue must finish them)', () => {
+    // Mid-step card 1 is excluded by the filter; it must still be reported
+    // via learningCardIds so the in-memory queue can complete the step.
+    const cards: ReviewableCard[] = [
+      nameCard(1, { learningStep: 0, stepStartedAt: NOW.getTime() }),
+      nameCard(2), // eligible, fresh
+    ];
+    const eligible = new Set([2]);
+    const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
+    expect(queues.learningCardIds).toEqual([1]);
+  });
+
+  it('empty eligibleCardIds yields empty review and new queues but preserves counters', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }), // counter-eligible
+      nameCard(2), // fresh
+    ];
+    const eligible = new Set<number>();
+    const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
+    expect(queues.reviewQueue).toEqual([]);
+    expect(queues.newQueue).toEqual([]);
+    expect(queues.perType.name.newIntroducedToday).toBe(1);
+  });
 });
 
 describe('buildQueueCounters', () => {

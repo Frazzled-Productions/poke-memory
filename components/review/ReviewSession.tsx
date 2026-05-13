@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { reconcileHiddenState } from "@/lib/review/filters";
 import { pickDistractors } from "@/lib/pokemon/distractors";
 import {
   buildSession,
@@ -22,7 +24,7 @@ import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useStorageQuota } from "@/lib/review/useStorageQuota";
 import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 import { recordReview } from "@/lib/streak";
-import { loadSettings, type UserSettings } from "@/lib/settings/persistence";
+import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
@@ -39,10 +41,9 @@ import { isMastered } from "@/lib/stats/derive";
 import { formatDailySummary } from "@/lib/review/share";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import {
+  EMPTY_SCOPE,
   cardMatchesScope,
   isScopeEmpty,
-  loadScope,
-  saveScope,
   type PracticeScope,
 } from "@/lib/review/scope";
 import { ScopeControl } from "@/components/review/ScopeControl";
@@ -56,6 +57,10 @@ import {
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
 const LEARN_AHEAD_MS = 20 * 60_000;
+
+// Module-scoped seed lookup map. Built once at module load — the 1025-entry
+// Map would be wasteful to rebuild on every render of ReviewSession.
+const SEED_BY_ID = new Map(SEED_POKEMON.map((p) => [p.id, p]));
 
 // ---------------------------------------------------------------------------
 // Types
@@ -356,10 +361,15 @@ export function ReviewSession() {
   const [masteredThisSession, setMasteredThisSession] = useState(0);
   const [scope, setScope] = useState<PracticeScope>({ gens: [], types: [], presets: [] });
   const [audioMode, setAudioMode] = useState(false);
+  // Card ids that pass the active scope. Recomputed in the session-load
+  // effect; empty + active scope → the empty-state branch fires. Counters in
+  // `buildSessionQueues` still see the full card set, so daily caps stay
+  // stable when scope changes mid-day (#333).
+  const [eligibleCardIds, setEligibleCardIds] = useState<Set<number>>(new Set());
 
-  // Load persisted scope + audio-mode flag on mount.
+  // Load persisted audio-mode flag on mount. Scope is loaded from
+  // user settings inside the main session-load effect below.
   useEffect(() => {
-    setScope(loadScope());
     setAudioMode(loadAudioMode());
   }, []);
 
@@ -390,7 +400,25 @@ export function ReviewSession() {
 
   function handleScopeChange(next: PracticeScope) {
     setScope(next);
-    saveScope(next);
+    // Persist scope through user settings so it syncs cross-device (#333).
+    // Read the latest settings before patching to avoid clobbering other
+    // fields that may have been updated since this component mounted.
+    const current = loadSettings();
+    saveSettings({ ...current, practiceScope: next });
+    // Recompute eligibility from the new scope against the current card
+    // set + apply snooze reconciliation so hiddenSince / dueDate updates
+    // are durable. Persist if any card mutated.
+    if (cards !== null) {
+      const today = todayString(new Date());
+      reconcileHiddenState(cards, next, today);
+      const eligibleIds = isScopeEmpty(next)
+        ? new Set(cards.map((c) => c.id))
+        : new Set(
+            cards.filter((c) => cardMatchesScope(c, next)).map((c) => c.id),
+          );
+      setEligibleCardIds(eligibleIds);
+      notifySaveResult(saveSession({ cards, limits }));
+    }
   }
 
   function handleAudioModeToggle() {
@@ -471,16 +499,35 @@ export function ReviewSession() {
       notifySaveResult(saveSession({ cards: sessionCards, limits: sessionLimits }));
     }
 
+    // --- Scope load + snooze reconciliation (#333) -------------------------
+    // Scope now persists in user settings (synced cross-device). Reconcile
+    // each card's hiddenSince/dueDate against the current scope before the
+    // queue builder sees it; persist any state changes (set/clear of
+    // hiddenSince and any forward-shift of dueDate on un-hide).
+    const persistedScope = settings.practiceScope;
+    const today = todayString(now);
+    reconcileHiddenState(sessionCards, persistedScope, today);
+    const eligibleIds = isScopeEmpty(persistedScope)
+      ? new Set(sessionCards.map((c) => c.id))
+      : new Set(
+          sessionCards.filter((c) => cardMatchesScope(c, persistedScope)).map((c) => c.id),
+        );
+    // Persist whenever scope is active so reconciliation results survive a
+    // reload. When scope is empty, the only thing reconcileHiddenState can do
+    // is clear stale hiddenSince — still worth persisting if any cleared.
+    notifySaveResult(saveSession({ cards: sessionCards, limits: sessionLimits }));
+
     setCards(sessionCards);
     setLimits(sessionLimits);
     setReverseEnabled(enabled);
     setNameCardsEnabled(nameEnabled);
     setEvolutionCardsEnabled(evolutionEnabled);
+    setScope(persistedScope);
+    setEligibleCardIds(eligibleIds);
 
     // Initialize the learning queue from persisted learning-step cards.
     // Use stepStartedAt from persisted state so the countdown resumes correctly
     // after navigation instead of resetting to the full step duration.
-    const today = todayString(now);
     const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today);
 
     const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
@@ -637,6 +684,28 @@ export function ReviewSession() {
     );
   }
 
+  // --- Practice scope excludes everything (#333) ---
+  // Distinct from "no card types enabled": here a non-empty scope has been
+  // applied that matches zero species. Surface a one-tap "Clear scope" CTA
+  // rather than showing the generic "all caught up" complete screen.
+  if (!isScopeEmpty(scope) && eligibleCardIds.size === 0) {
+    return (
+      <div className="flex flex-col items-center gap-4 text-center">
+        <p className="text-2xl font-semibold text-foreground">No Pokémon match your scope</p>
+        <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
+          Adjust the filter above, or clear it to keep practising.
+        </p>
+        <button
+          type="button"
+          onClick={() => handleScopeChange(EMPTY_SCOPE)}
+          className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        >
+          Clear scope
+        </button>
+      </div>
+    );
+  }
+
   // --- Derived state (recomputed every render — cheap, pure) ---
   const today = todayString(new Date());
 
@@ -652,17 +721,17 @@ export function ReviewSession() {
       }
     : limits;
 
-  // Filter cards by the active practice scope before they reach the queue
-  // builder. Out-of-scope cards keep their own SR state (dueDate continues
-  // advancing); they simply don't surface during a scoped session.
-  const scopedCards = isScopeEmpty(scope)
-    ? cards
-    : cards.filter((c) => cardMatchesScope(c, scope));
-
+  // Practice scope is enforced via the eligibility set passed into the queue
+  // builder, not by pre-filtering the cards array. This way the counters
+  // (`newIntroducedToday`, `reviewsDoneToday`) still see the full card set —
+  // changing scope mid-day cannot reset daily caps (#333). Out-of-scope cards
+  // are snoozed by `reconcileHiddenState` at session-load time, so their
+  // dueDate doesn't drift while they're hidden.
   const { reviewQueue, newQueue, perType, learningCardIds } = buildSessionQueues(
-    scopedCards,
+    cards,
     effectiveLimits,
     today,
+    isScopeEmpty(scope) ? undefined : eligibleCardIds,
   );
 
   // --- Learning-queue priority (with learn-ahead) ---

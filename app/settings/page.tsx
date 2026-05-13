@@ -136,6 +136,7 @@ function FavouritePicker({
   );
 }
 
+
 type FieldConfig = {
   key: keyof UserSettings;
   label: string;
@@ -295,6 +296,7 @@ export default function SettingsPage() {
     setSettings({ ...settings, [key]: !settings[key] });
   }
 
+
   async function handleReset() {
     if (user && supabase) {
       const ok = await deleteAllCloudProgress(supabase, user.id);
@@ -336,7 +338,10 @@ export default function SettingsPage() {
         Math.max(min, Math.min(max, settings[key] as number)),
       ])
     );
-    const clamped = { ...settings, ...numericClamped } as UserSettings;
+    const clamped = {
+      ...settings,
+      ...numericClamped,
+    } as UserSettings;
     saveSettings(clamped);
     const session = loadSession();
     if (session !== null) {

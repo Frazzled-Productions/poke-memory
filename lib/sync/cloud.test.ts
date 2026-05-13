@@ -13,7 +13,8 @@ import type { CloudRow } from "./cloud";
 function makeCard(
   id: number,
   firstSeen: string | null,
-  lastReview: string | null
+  lastReview: string | null,
+  hiddenSince: string | null = null,
 ): ReviewableCard {
   return {
     id,
@@ -51,6 +52,7 @@ function makeCard(
       firstSeen,
       learningStep: null,
       stepStartedAt: null,
+      hiddenSince,
     },
   } as ReviewableCard;
 }
@@ -59,7 +61,8 @@ function makeCloudRow(
   pokemonId: number,
   firstSeen: string | null,
   lastReview: string | null,
-  updatedAt = "2026-05-11T12:00:00.000Z"
+  updatedAt = "2026-05-11T12:00:00.000Z",
+  hiddenSince: string | null = null,
 ): CloudRow {
   return {
     pokemon_id: pokemonId,
@@ -73,6 +76,7 @@ function makeCloudRow(
     due_date: "2026-05-11",
     last_review: lastReview,
     first_seen: firstSeen,
+    hidden_since: hiddenSince,
     updated_at: updatedAt,
   };
 }
@@ -241,5 +245,64 @@ describe("mergeCloudIntoLocal", () => {
 
     expect(merged[0].state.firstSeen).toBe("2026-05-09");
     expect(merged[1].state.firstSeen).toBeNull();
+  });
+});
+
+// ─── hidden_since round-trip (#333) ───────────────────────────────────────
+
+describe("hidden_since (#333) round-trip", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  it("pushSession sends hidden_since to Supabase", async () => {
+    const client = makeSupabaseClient();
+    const card = makeCard(11, "2026-05-01", "2026-05-08", "2026-05-09");
+    const ok = await pushSession(client, "user-1", [card]);
+    expect(ok).toBe(true);
+    const [batchArg] = client._upsertSpy.mock.calls[0] as [
+      Array<{ pokemon_id: number; hidden_since: string | null }>,
+      unknown,
+    ];
+    expect(batchArg[0].hidden_since).toBe("2026-05-09");
+  });
+
+  it("pushSession sends null hidden_since for cards that are not hidden", async () => {
+    const client = makeSupabaseClient();
+    const card = makeCard(12, "2026-05-01", "2026-05-08", null);
+    await pushSession(client, "user-1", [card]);
+    const [batchArg] = client._upsertSpy.mock.calls[0] as [
+      Array<{ pokemon_id: number; hidden_since: string | null }>,
+      unknown,
+    ];
+    expect(batchArg[0].hidden_since).toBeNull();
+  });
+
+  it("pushSingleCard sends hidden_since to Supabase", async () => {
+    const client = makeSupabaseClient();
+    const card = makeCard(13, "2026-05-01", "2026-05-08", "2026-05-09");
+    const ok = await pushSingleCard(client, "user-1", card);
+    expect(ok).toBe(true);
+    const [row] = client._upsertSpy.mock.calls[0] as [
+      { hidden_since: string | null },
+      unknown,
+    ];
+    expect(row.hidden_since).toBe("2026-05-09");
+  });
+
+  it("mergeCloudIntoLocal pulls hidden_since onto the local state", () => {
+    const localCard = makeCard(20, null, null);
+    const cloudRow = makeCloudRow(20, "2026-05-01", "2026-05-08", undefined, "2026-05-09");
+    const [merged] = mergeCloudIntoLocal([localCard], [cloudRow]);
+    expect(merged.state.hiddenSince).toBe("2026-05-09");
+  });
+
+  it("mergeCloudIntoLocal treats a missing hidden_since column as null (legacy rows)", () => {
+    const localCard = makeCard(21, null, null, "2026-05-09");
+    // Simulate a pre-migration cloud row by stripping the field.
+    const legacyRow = makeCloudRow(21, "2026-05-01", "2026-05-08");
+    delete (legacyRow as Partial<CloudRow>).hidden_since;
+    const [merged] = mergeCloudIntoLocal([localCard], [legacyRow]);
+    expect(merged.state.hiddenSince).toBeNull();
   });
 });

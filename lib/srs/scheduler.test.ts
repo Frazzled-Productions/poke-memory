@@ -29,6 +29,7 @@ function graduatedCard(overrides: Partial<ReviewState> = {}): ReviewState {
     firstSeen: "2026-04-26",
     learningStep: null,
     stepStartedAt: null,
+    hiddenSince: null,
     ...overrides,
   };
 }
@@ -84,6 +85,7 @@ describe("initialReviewState", () => {
     expect(state.learningStep).toBeNull();
     expect(state.lastReview).toBeNull();
     expect(state.firstSeen).toBeNull();
+    expect(state.hiddenSince).toBeNull();
   });
 });
 
@@ -452,6 +454,41 @@ describe("migrateReviewState: SM-2 → FSRS conversion", () => {
     const state: Record<string, unknown> = { learningStep: 0 };
     migrateReviewState(state);
     expect(state.learningStep).toBe(0);
+  });
+
+  it("backfills hiddenSince to null on a legacy state lacking the field", () => {
+    const legacy: Record<string, unknown> = {
+      stability: 5,
+      difficulty: 3,
+      reps: 1,
+      lapses: 0,
+      fsrsState: "review",
+      learningStep: null,
+      stepStartedAt: null,
+      firstSeen: "2026-05-01",
+      lastReview: "2026-05-04",
+      dueDate: "2026-05-09",
+    };
+    migrateReviewState(legacy);
+    expect(legacy.hiddenSince).toBeNull();
+  });
+
+  it("preserves an existing hiddenSince value (idempotent re-run)", () => {
+    const state: Record<string, unknown> = {
+      stability: 5,
+      difficulty: 3,
+      reps: 1,
+      lapses: 0,
+      fsrsState: "review",
+      learningStep: null,
+      stepStartedAt: null,
+      firstSeen: "2026-05-01",
+      lastReview: "2026-05-04",
+      dueDate: "2026-05-09",
+      hiddenSince: "2026-05-05",
+    };
+    migrateReviewState(state);
+    expect(state.hiddenSince).toBe("2026-05-05");
   });
 });
 

@@ -25,6 +25,7 @@ function state(overrides: Partial<ReviewState> = {}): ReviewState {
     firstSeen: null,
     learningStep: null,
     stepStartedAt: null,
+    hiddenSince: null,
     ...overrides,
   };
 }

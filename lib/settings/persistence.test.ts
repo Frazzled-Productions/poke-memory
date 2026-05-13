@@ -118,9 +118,192 @@ describe('loadSettings migration', () => {
       maxReviewsCryPerDay: 80,
       favouriteTheme: null,
       retentionTarget: 0.95,
+      practiceScope: { gens: [1, 3], types: ['fire', 'water'], presets: ['starters' as const] },
     };
     saveSettings(custom);
     const loaded = loadSettings();
     expect(loaded).toEqual(custom);
+  });
+});
+
+describe('loadSettings: practiceScope (#333)', () => {
+  it('loads stored practiceScope with all axes populated', () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      practiceScope: { gens: [1, 2], types: ['fire'], presets: ['starters'] },
+    });
+    const settings = loadSettings();
+    expect(settings.practiceScope).toEqual({
+      gens: [1, 2],
+      types: ['fire'],
+      presets: ['starters'],
+    });
+  });
+
+  it('falls back to the empty scope when the field is missing', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, practiceScope: undefined }));
+    const settings = loadSettings();
+    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [] });
+  });
+
+  it('falls back to the empty scope on a non-object value', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, practiceScope: 'broken' }));
+    const settings = loadSettings();
+    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [] });
+  });
+
+  it('falls back to the empty scope when gens contains an out-of-range value', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: [0], types: [], presets: [] },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [] });
+  });
+
+  it('falls back to the empty scope when gens contains a non-integer', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: [1.5], types: [], presets: [] },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [] });
+  });
+
+  it('falls back to the empty scope when any axis is not an array', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: 1, types: [], presets: [] },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [] });
+
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: [], types: 'fire', presets: [] },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [] });
+
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: [], types: [], presets: 'starters' },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [] });
+  });
+
+  it('dedupes repeated gen values', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: [1, 1, 2, 1], types: [], presets: [] },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({ gens: [1, 2], types: [], presets: [] });
+  });
+
+  it('drops unknown preset literals silently (no payload-wide rejection)', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: [], types: [], presets: ['starters', 'banana', 'legendaries'] },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({
+      gens: [],
+      types: [],
+      presets: ['starters', 'legendaries'],
+    });
+  });
+
+  it('accepts permissive type strings — UI restricts inputs, validator does not', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: [], types: ['fire', 'unknown-but-stringy'], presets: [] },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({
+      gens: [],
+      types: ['fire', 'unknown-but-stringy'],
+      presets: [],
+    });
+  });
+});
+
+// ─── legacy scope migration ──────────────────────────────────────────────
+
+const LEGACY_SCOPE_KEY = 'poke-memory:practice-scope:v1';
+
+describe('loadSettings: legacy practice-scope migration', () => {
+  it('copies a non-empty legacy scope into settings.practiceScope and clears the legacy key', () => {
+    // No settings yet — fresh device with a pre-#333 scope set.
+    mockLocalStorage.setItem(
+      LEGACY_SCOPE_KEY,
+      JSON.stringify({ gens: [1], types: ['fire'], presets: [] }),
+    );
+    const settings = loadSettings();
+    expect(settings.practiceScope).toEqual({ gens: [1], types: ['fire'], presets: [] });
+    // Legacy key removed after migration — never fires again.
+    expect(mockLocalStorage.getItem(LEGACY_SCOPE_KEY)).toBeNull();
+    // Settings persisted, so the next load reads the migrated scope from
+    // the canonical settings blob without needing the legacy key.
+    expect(mockLocalStorage.getItem(STORAGE_KEY)).not.toBeNull();
+    const reloaded = loadSettings();
+    expect(reloaded.practiceScope).toEqual({ gens: [1], types: ['fire'], presets: [] });
+  });
+
+  it('no-ops when the legacy key is absent', () => {
+    // No legacy key → loadSettings returns defaults; no persistence side effect.
+    const settings = loadSettings();
+    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [] });
+    // No settings blob was written (legacy absent → no migration fired).
+    expect(mockLocalStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('stored settings.practiceScope wins over the legacy key; legacy key is still cleared', () => {
+    // Existing settings carry an explicit non-default scope. The legacy
+    // key is treated as stale — clear it without overwriting.
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      practiceScope: { gens: [2], types: [], presets: [] },
+    });
+    mockLocalStorage.setItem(
+      LEGACY_SCOPE_KEY,
+      JSON.stringify({ gens: [1], types: ['fire'], presets: [] }),
+    );
+    const settings = loadSettings();
+    expect(settings.practiceScope).toEqual({ gens: [2], types: [], presets: [] });
+    expect(mockLocalStorage.getItem(LEGACY_SCOPE_KEY)).toBeNull();
+  });
+
+  it('clears a legacy key with an empty scope payload (no copy, just cleanup)', () => {
+    mockLocalStorage.setItem(
+      LEGACY_SCOPE_KEY,
+      JSON.stringify({ gens: [], types: [], presets: [] }),
+    );
+    const settings = loadSettings();
+    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [] });
+    expect(mockLocalStorage.getItem(LEGACY_SCOPE_KEY)).toBeNull();
+  });
+
+  it('ignores a malformed legacy payload without throwing', () => {
+    mockLocalStorage.setItem(LEGACY_SCOPE_KEY, '{not json');
+    expect(() => loadSettings()).not.toThrow();
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [] });
   });
 });
