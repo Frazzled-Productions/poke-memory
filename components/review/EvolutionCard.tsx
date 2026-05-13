@@ -54,7 +54,7 @@ export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: 
           width={320}
           height={320}
           priority
-          className="object-contain"
+          className="h-56 w-56 object-contain sm:h-80 sm:w-80"
         />
       )}
       <div className="flex flex-col items-center gap-1">

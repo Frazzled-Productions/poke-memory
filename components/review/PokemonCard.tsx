@@ -17,7 +17,7 @@ export function PokemonCard({ spriteUrl, name, revealed, fact }: Props) {
         width={320}
         height={320}
         priority
-        className="object-contain"
+        className="h-56 w-56 object-contain sm:h-80 sm:w-80"
       />
       {/*
         Use min-h instead of a fixed h so the container can grow when a fact

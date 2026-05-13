@@ -60,6 +60,38 @@ test.describe("Practice page", () => {
       ).toBeVisible();
     }
   });
+
+  test("fits viewport without scrolling on mobile", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "viewport-fit check is mobile-only",
+    );
+    await page.goto("/");
+
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+    await expect(reveal).toBeVisible();
+
+    const overflowBefore = await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight,
+    );
+    expect(overflowBefore).toBeLessThanOrEqual(1);
+
+    await reveal.click();
+    await expect(
+      page.getByRole("group", { name: "Grade your answer" }),
+    ).toBeVisible();
+
+    const overflowAfter = await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight,
+    );
+    expect(overflowAfter).toBeLessThanOrEqual(1);
+  });
 });
 
 test.describe("Stats page", () => {
