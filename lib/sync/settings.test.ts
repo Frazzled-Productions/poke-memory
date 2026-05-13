@@ -38,6 +38,7 @@ const SAMPLE: UserSettings = {
   retentionTarget: 0.9,
   practiceScope: { gens: [], types: [], presets: [] },
   miniGameBestScore: 0,
+  seenStreakMilestones: [],
 };
 
 describe("pushSettings", () => {

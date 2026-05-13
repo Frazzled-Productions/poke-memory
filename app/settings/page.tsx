@@ -1021,6 +1021,46 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
+
+                <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Force next streak milestone
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Fires the smallest un-seen streak celebration on the
+                        next visit to Practice, regardless of the real streak.
+                        Self-clears after one fire. Locking superuser overwrites
+                        local progress with cloud state for signed-in users.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={flags.forceNextStreakMilestone}
+                      onClick={() =>
+                        void setFlag(
+                          "forceNextStreakMilestone",
+                          !flags.forceNextStreakMilestone,
+                        )
+                      }
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        flags.forceNextStreakMilestone
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          flags.forceNextStreakMilestone
+                            ? "translate-x-5"
+                            : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
               </section>
             )}
 

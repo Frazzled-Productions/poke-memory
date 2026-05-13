@@ -66,6 +66,7 @@ const VALID_SETTINGS: UserSettings = {
   retentionTarget: 0.9,
   practiceScope: { gens: [], types: [], presets: [] },
   miniGameBestScore: 0,
+  seenStreakMilestones: [],
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {
