@@ -1,5 +1,6 @@
 import type { ReviewableCard, DailyLimits, PerTypeLimits } from "@/lib/review/session";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
+import { Subject } from "@/lib/cards/subjectKey";
 
 export type { DailyLimits };
 
@@ -199,9 +200,9 @@ export function migrateReviewState(state: unknown): void {
   }
 }
 
-// Backfills cardType on legacy name cards and migrates state fields. Exported
-// so unit tests can exercise the legacy-shape migration without needing a
-// localStorage harness.
+// Backfills cardType on legacy name cards, backfills subjectKey for all card
+// types that lack it, and migrates state fields. Exported so unit tests can
+// exercise the legacy-shape migration without needing a localStorage harness.
 //
 // Legacy evolution cards (#262 retired the per-pre-evo shape): no migration
 // is attempted here — they're filtered out at session-load time by
@@ -212,6 +213,35 @@ export function migrateReviewCard(card: unknown): void {
   const c = card as Record<string, unknown>;
   if (c.cardType === undefined) {
     c.cardType = "name";
+  }
+  // Backfill subjectKey for cards saved before migration 010. This runs once
+  // per device on the first loadSession after deploy; subsequent saves will
+  // include the field.
+  if (c.subjectKey === undefined) {
+    const cardType = c.cardType as string;
+    if (cardType === "name") {
+      if (typeof c.id === "number" && c.id > 0) {
+        try { c.subjectKey = Subject.forSpecies(c.id); } catch { /* leave undefined */ }
+      }
+    } else if (cardType === "reverse") {
+      // reverse card: pokemonId is the species id
+      const pokemonId = typeof c.pokemonId === "number" ? c.pokemonId : null;
+      if (pokemonId !== null && pokemonId > 0) {
+        try { c.subjectKey = Subject.forSpecies(pokemonId); } catch { /* leave undefined */ }
+      }
+    } else if (cardType === "cry") {
+      const pokemonId = typeof c.pokemonId === "number" ? c.pokemonId : null;
+      if (pokemonId !== null && pokemonId > 0) {
+        try { c.subjectKey = Subject.forSpecies(pokemonId); } catch { /* leave undefined */ }
+      }
+    } else if (cardType === "evolution" || cardType === "reverse-evolution") {
+      // Edge cards: derive from preEvoId/postEvoId when present.
+      const preEvoId = typeof c.preEvoId === "number" ? c.preEvoId : null;
+      const postEvoId = typeof c.postEvoId === "number" ? c.postEvoId : null;
+      if (preEvoId !== null && postEvoId !== null) {
+        try { c.subjectKey = Subject.forEdge(preEvoId, postEvoId); } catch { /* leave undefined */ }
+      }
+    }
   }
   migrateReviewState(c.state);
 }

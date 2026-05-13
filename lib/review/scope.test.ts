@@ -33,7 +33,7 @@ function nameCard(id: number, types: string[] = ["normal"]): NameReviewCard {
     generation: "generation-i", captureRate: 45, baseHappiness: 50,
     growthRate: "medium", habitat: null, genderRate: 0,
     isLegendary: false, isMythical: false, cryUrl: null,
-    cardType: "name", state: state(),
+    cardType: "name", subjectKey: String(id), state: state(),
   };
 }
 

@@ -32,6 +32,7 @@ function makeNameCard(): NameReviewCard {
   return {
     id: 1,
     cardType: "name",
+    subjectKey: "1",
     name: "bulbasaur",
     spriteUrl: "https://example.com/1.png",
     types: ["grass"],
@@ -64,6 +65,7 @@ function makeReverseCard(): ReverseReviewCard {
     id: REVERSE_ID_OFFSET + 1,
     pokemonId: 1,
     cardType: "reverse",
+    subjectKey: "1",
     name: "bulbasaur",
     spriteUrl: "https://example.com/1.png",
     types: ["grass"],

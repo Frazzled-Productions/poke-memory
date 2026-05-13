@@ -31,6 +31,7 @@ function makeCard(id: number, firstSeen: string | null = "2026-04-01"): Reviewab
   return {
     id,
     cardType: "name",
+    subjectKey: String(id),
     name: `Pokemon ${id}`,
     spriteUrl: `/sprites/${id}.png`,
     types: ["normal"],

@@ -122,6 +122,7 @@ export default function PasturePage() {
     ? SEED_POKEMON.map((p) => ({
         ...p,
         cardType: "name" as const,
+        subjectKey: String(p.id),
         state: { ...initialReviewState(new Date()), seenInPasture: true },
       }))
     : session

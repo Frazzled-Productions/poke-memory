@@ -122,7 +122,7 @@ describe("getSeenPokemon", () => {
 
   it("includes a Pokémon seen via a name card", () => {
     const cards: ReviewableCard[] = [
-      { ...p1, cardType: "name", state: seenState },
+      { ...p1, cardType: "name", subjectKey: String(p1.id), state: seenState },
     ];
     const result = getSeenPokemon(cards, seed);
     expect(result.map((p) => p.id)).toEqual([1]);
@@ -135,6 +135,7 @@ describe("getSeenPokemon", () => {
         id: 2_000_002,
         pokemonId: p2.id,
         cardType: "reverse",
+        subjectKey: String(p2.id),
         state: seenState,
       },
     ];
@@ -149,6 +150,7 @@ describe("getSeenPokemon", () => {
         id: 3_000_003,
         pokemonId: p3.id,
         cardType: "cry",
+        subjectKey: String(p3.id),
         state: seenState,
       },
     ];
@@ -161,6 +163,7 @@ describe("getSeenPokemon", () => {
       {
         cardType: "evolution",
         id: 1_500_001,
+        subjectKey: "1>>>2",
         preEvoId: 1,
         preEvoName: "Pokemon1",
         preEvoSpriteUrl: "",
@@ -180,6 +183,7 @@ describe("getSeenPokemon", () => {
       {
         cardType: "reverse-evolution",
         id: 1_700_001,
+        subjectKey: "1>>>2",
         preEvoId: 1,
         preEvoName: "Pokemon1",
         preEvoSpriteUrl: "",
@@ -196,12 +200,13 @@ describe("getSeenPokemon", () => {
 
   it("deduplicates across multiple card types for the same Pokémon", () => {
     const cards: ReviewableCard[] = [
-      { ...p1, cardType: "name", state: seenState },
+      { ...p1, cardType: "name", subjectKey: String(p1.id), state: seenState },
       {
         ...p1,
         id: 2_000_001,
         pokemonId: p1.id,
         cardType: "reverse",
+        subjectKey: String(p1.id),
         state: seenState,
       },
       {
@@ -209,6 +214,7 @@ describe("getSeenPokemon", () => {
         id: 3_000_001,
         pokemonId: p1.id,
         cardType: "cry",
+        subjectKey: String(p1.id),
         state: seenState,
       },
     ];
@@ -218,8 +224,8 @@ describe("getSeenPokemon", () => {
 
   it("excludes cards where firstSeen is null", () => {
     const cards: ReviewableCard[] = [
-      { ...p1, cardType: "name", state: unseenState },
-      { ...p2, cardType: "name", state: seenState },
+      { ...p1, cardType: "name", subjectKey: String(p1.id), state: unseenState },
+      { ...p2, cardType: "name", subjectKey: String(p2.id), state: seenState },
     ];
     const result = getSeenPokemon(cards, seed);
     expect(result.map((p) => p.id)).toEqual([2]);
@@ -227,7 +233,7 @@ describe("getSeenPokemon", () => {
 
   it("returns empty array when no cards are seen", () => {
     const cards: ReviewableCard[] = [
-      { ...p1, cardType: "name", state: unseenState },
+      { ...p1, cardType: "name", subjectKey: String(p1.id), state: unseenState },
     ];
     const result = getSeenPokemon(cards, seed);
     expect(result).toEqual([]);
@@ -235,12 +241,13 @@ describe("getSeenPokemon", () => {
 
   it("handles mixed seen and unseen cards for the same Pokémon", () => {
     const cards: ReviewableCard[] = [
-      { ...p1, cardType: "name", state: unseenState },
+      { ...p1, cardType: "name", subjectKey: String(p1.id), state: unseenState },
       {
         ...p1,
         id: 2_000_001,
         pokemonId: p1.id,
         cardType: "reverse",
+        subjectKey: String(p1.id),
         state: seenState,
       },
     ];

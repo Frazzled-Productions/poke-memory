@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
+import { appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
 
 // Sync is best-effort: all errors are swallowed so a network hiccup never
 // breaks the local-first review flow.
@@ -15,13 +16,26 @@ export function isSyncSafe(card: ReviewableCard): boolean {
   return !(card.state.firstSeen !== null && card.state.lastReview === null);
 }
 
-// pokemon_id encoding:
-//   Standard Pokémon:  pokemon_id = Pokédex number (1–1025)
-//   Evolution cards:   pokemon_id = EVOLUTION_ID_OFFSET + pokédex_number (≥ 1_000_001)
-// The round-trip works because push and pull match on the same value, but any
-// direct SQL query against card_reviews must account for the offset.
+/**
+ * Cloud row shape after migration 010.
+ *
+ * Primary identity: (card_type, subject_key).
+ *   card_type   — DB discriminator (e.g. "name", "evolution-edge"). Note: the
+ *                 app internally uses "evolution" / "reverse-evolution"; these
+ *                 are mapped by appTypeToDbType / dbTypeToAppType.
+ *   subject_key — type-specific opaque key: species ID string for species cards,
+ *                 "fromId>>>toId" for edge cards.
+ *
+ * The legacy pokemon_id column is kept in the DB for one release and is still
+ * written by push during the transition window so that a rollback to the
+ * old schema does not lose data. It is NOT included here — the server upserts
+ * via (user_id, card_type, subject_key).
+ */
 export type CloudRow = {
-  pokemon_id: number;
+  /** DB card_type discriminator. Use appTypeToDbType / dbTypeToAppType to convert to/from app types. */
+  card_type: string;
+  /** Type-specific identity key. Null for unmigrated edge rows (skipped on pull). */
+  subject_key: string | null;
   stability: number;
   difficulty: number;
   elapsed_days: number;
@@ -54,7 +68,7 @@ export async function hasCloudData(
   try {
     const { count, error } = await client
       .from("card_reviews")
-      .select("id", { count: "exact", head: true })
+      .select("card_type", { count: "exact", head: true })
       .eq("user_id", userId)
       .limit(1);
     if (error) return false;
@@ -66,7 +80,8 @@ export async function hasCloudData(
 
 function toCloudRow(card: ReviewableCard): CloudRow {
   return {
-    pokemon_id: card.id,
+    card_type: appTypeToDbType(card.cardType),
+    subject_key: card.subjectKey,
     stability: card.state.stability,
     difficulty: card.state.difficulty,
     elapsed_days: card.state.elapsedDays,
@@ -100,7 +115,7 @@ export async function pushSession(
   const safeCards = cards.filter((card) => {
     if (isSyncSafe(card)) return true;
     console.warn(
-      `[sync] skipping card ${card.id}: firstSeen set but lastReview null (in-step, not graduated)`
+      `[sync] skipping card ${card.cardType}:${card.subjectKey}: firstSeen set but lastReview null (in-step, not graduated)`
     );
     return false;
   });
@@ -115,7 +130,7 @@ export async function pushSession(
     try {
       const { error } = await client
         .from("card_reviews")
-        .upsert(batch, { onConflict: "user_id,pokemon_id" });
+        .upsert(batch, { onConflict: "user_id,card_type,subject_key" });
       if (error) allOk = false;
     } catch {
       allOk = false;
@@ -136,7 +151,7 @@ export async function pushSingleCard(
 ): Promise<boolean> {
   if (!isSyncSafe(card)) {
     console.warn(
-      `[sync] skipping card ${card.id}: firstSeen set but lastReview null (in-step, not graduated)`
+      `[sync] skipping card ${card.cardType}:${card.subjectKey}: firstSeen set but lastReview null (in-step, not graduated)`
     );
     return false;
   }
@@ -144,7 +159,8 @@ export async function pushSingleCard(
     const { error } = await client.from("card_reviews").upsert(
       {
         user_id: userId,
-        pokemon_id: card.id,
+        card_type: appTypeToDbType(card.cardType),
+        subject_key: card.subjectKey,
         stability: card.state.stability,
         difficulty: card.state.difficulty,
         elapsed_days: card.state.elapsedDays,
@@ -159,7 +175,7 @@ export async function pushSingleCard(
         seen_in_pasture: card.state.seenInPasture,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id,pokemon_id" },
+      { onConflict: "user_id,card_type,subject_key" },
     );
     return !error;
   } catch {
@@ -207,12 +223,15 @@ export async function pullSession(
       const { data, error } = await client
         .from("card_reviews")
         .select(
-          "pokemon_id,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,hidden_since,seen_in_pasture,updated_at"
+          "card_type,subject_key,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,hidden_since,seen_in_pasture,updated_at"
         )
         .eq("user_id", userId)
         .range(offset, offset + PAGE - 1);
       if (error || !data) return null;
-      allRows.push(...(data as CloudRow[]));
+      // Skip rows with null subject_key — these are unmigrated edge rows that
+      // will be re-pushed on the next sync after the app-side backfill runs.
+      const rows = (data as CloudRow[]).filter((r) => r.subject_key !== null);
+      allRows.push(...rows);
       if (data.length < PAGE) break;
       offset += PAGE;
     }
@@ -261,7 +280,7 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
   const seenInPasture = row.seen_in_pasture ?? false;
   if (row.first_seen !== null && row.last_review === null) {
     console.warn(
-      `[sync] normalizing card ${card.id}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
+      `[sync] normalizing card ${row.card_type}:${row.subject_key}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
     );
     return {
       ...card,
@@ -319,14 +338,24 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
  * the pull counts as "graded since pull," preventing incorrect reverts in
  * same-day scenarios.
  */
+/** Returns a composite key for a cloud row to match against local cards. */
+function cloudRowKey(r: CloudRow): string {
+  return `${r.card_type}:${r.subject_key ?? ""}`;
+}
+
+/** Returns the same composite key for a local card. */
+function cardKey(card: ReviewableCard): string {
+  return `${appTypeToDbType(card.cardType)}:${card.subjectKey}`;
+}
+
 export function mergeCloudIntoLocalSilent(
   local: ReviewableCard[],
   cloud: CloudRow[],
   lastPullAt: string | null,
 ): ReviewableCard[] {
-  const byId = new Map(cloud.map((r) => [r.pokemon_id, r]));
+  const byKey = new Map(cloud.map((r) => [cloudRowKey(r), r]));
   return local.map((card) => {
-    const row = byId.get(card.id);
+    const row = byKey.get(cardKey(card));
     if (!row) return card;
 
     if (lastPullAt === null) {
@@ -372,9 +401,9 @@ export function mergeCloudIntoLocal(
   local: ReviewableCard[],
   cloud: CloudRow[],
 ): ReviewableCard[] {
-  const byId = new Map(cloud.map((r) => [r.pokemon_id, r]));
+  const byKey = new Map(cloud.map((r) => [cloudRowKey(r), r]));
   return local.map((card) => {
-    const row = byId.get(card.id);
+    const row = byKey.get(cardKey(card));
     if (!row) return card;
     return applyCloudRow(card, row);
   });

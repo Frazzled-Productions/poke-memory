@@ -43,6 +43,7 @@ function makeCard(id: number, lastReview: string | null) {
   return {
     id,
     cardType: "name" as const,
+    subjectKey: String(id),
     name: `pokemon-${id}`,
     spriteUrl: "",
     types: ["normal"],
