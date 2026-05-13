@@ -65,6 +65,24 @@ describe("loadGradeLog", () => {
     expect(loadGradeLog()).toEqual(entries);
   });
 
+  it("loads entries with cardId set", () => {
+    const entries = [
+      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000, cardId: 42 },
+    ];
+    storage.setItem(KEY, JSON.stringify(entries));
+    const log = loadGradeLog();
+    expect(log[0].cardId).toBe(42);
+  });
+
+  it("loads legacy entries without cardId as cardId: undefined", () => {
+    const entries = [
+      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000 },
+    ];
+    storage.setItem(KEY, JSON.stringify(entries));
+    const log = loadGradeLog();
+    expect(log[0].cardId).toBeUndefined();
+  });
+
   it("synthesizes occurredAt for legacy entries that lack it", () => {
     storage.setItem(
       KEY,
@@ -104,6 +122,18 @@ describe("appendGradeEntry", () => {
     expect(log).toHaveLength(1);
     expect(log[0]).toMatchObject({ date: "2026-05-09", grade: 4, cardType: "name" });
     expect(typeof log[0].occurredAt).toBe("number");
+  });
+
+  it("persists cardId when provided", () => {
+    appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name", cardId: 7 });
+    const log = loadGradeLog();
+    expect(log[0].cardId).toBe(7);
+  });
+
+  it("does not set cardId when not provided", () => {
+    appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    const log = loadGradeLog();
+    expect(log[0].cardId).toBeUndefined();
   });
 
   it("appends to an existing log without overwriting prior entries", () => {

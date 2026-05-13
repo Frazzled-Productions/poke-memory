@@ -79,19 +79,42 @@ export type Grade = 1 | 2 | 4 | 5;
 const DEFAULT_RETENTION = 0.9;
 const defaultScheduler = createFsrs();
 
-// Small cache so a session that only uses one retention setting doesn't
-// instantiate a new FSRS object per grade. Keyed on the retention value
-// rounded to 2 decimals (matches the settings slider granularity).
+// Small cache so a session that only uses one retention setting + weight
+// combination doesn't instantiate a new FSRS object per grade.
+// Key: "<retention_2dp>|<weights_fingerprint>" where the fingerprint is
+// the weights array joined with commas (rounded to 6 dp to avoid float noise)
+// or the empty string when no custom weights are provided.
 const schedulerCache = new Map<string, ReturnType<typeof createFsrs>>();
 
-function getScheduler(retention: number | undefined): ReturnType<typeof createFsrs> {
-  if (retention === undefined || retention === DEFAULT_RETENTION) {
+function weightsFingerprint(weights: number[] | undefined): string {
+  if (!weights || weights.length === 0) return "";
+  return weights.map((w) => w.toFixed(6)).join(",");
+}
+
+function getScheduler(
+  retention: number | undefined,
+  weights?: number[],
+): ReturnType<typeof createFsrs> {
+  const fp = weightsFingerprint(weights);
+  const hasCustomWeights = fp !== "";
+
+  if ((retention === undefined || retention === DEFAULT_RETENTION) && !hasCustomWeights) {
     return defaultScheduler;
   }
-  const key = retention.toFixed(2);
+
+  const retKey = (retention ?? DEFAULT_RETENTION).toFixed(2);
+  const key = `${retKey}|${fp}`;
   const cached = schedulerCache.get(key);
   if (cached !== undefined) return cached;
-  const fresh = createFsrs({ request_retention: retention });
+
+  const opts: Parameters<typeof createFsrs>[0] = {};
+  if (retention !== undefined && retention !== DEFAULT_RETENTION) {
+    opts.request_retention = retention;
+  }
+  if (hasCustomWeights) {
+    opts.w = weights;
+  }
+  const fresh = createFsrs(opts);
   schedulerCache.set(key, fresh);
   return fresh;
 }
@@ -196,6 +219,13 @@ export type NextReviewOptions = {
    * library default (0.9) when omitted or set to the default value.
    */
   retentionTarget?: number;
+  /**
+   * Per-user optimized FSRS weight vector (#268). When provided, the FSRS
+   * instance is initialized with these weights instead of the ts-fsrs
+   * defaults. Sourced from `UserSettings.fsrsWeights` after a successful
+   * optimizer run. Undefined means use defaults.
+   */
+  weights?: number[];
 };
 
 export function nextReview(
@@ -205,7 +235,7 @@ export function nextReview(
   options: NextReviewOptions = {},
 ): ReviewState {
   const today = isoDate(now);
-  const scheduler = getScheduler(options.retentionTarget);
+  const scheduler = getScheduler(options.retentionTarget, options.weights);
 
   // --------------------------------------------------------------------------
   // Case B: card is currently in a learning or relearning step

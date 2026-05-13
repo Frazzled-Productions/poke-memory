@@ -12,6 +12,12 @@ export type GradeLogEntry = {
    * day so the cloud can still dedup against pre-existing local logs.
    */
   occurredAt: number;
+  /**
+   * The card's numeric ID (e.g. species ID for name cards, offset ID for
+   * evolution/reverse/cry). Added in #268 so the FSRS optimizer can group
+   * reviews per card. Legacy entries (written before #268) lack this field.
+   */
+  cardId?: number;
 };
 
 export type GradeLog = GradeLogEntry[];
@@ -35,7 +41,7 @@ function isGrade(v: unknown): v is Grade {
 }
 
 // Validate a stored entry shape. Legacy entries are allowed to lack
-// `occurredAt`; the caller (loadGradeLog) backfills it before returning.
+// `occurredAt` and `cardId`; the caller (loadGradeLog) backfills occurredAt.
 function isStoredEntryShape(v: unknown): v is Omit<GradeLogEntry, "occurredAt"> & {
   occurredAt?: number;
 } {
@@ -49,7 +55,8 @@ function isStoredEntryShape(v: unknown): v is Omit<GradeLogEntry, "occurredAt"> 
       e.cardType === "reverse-evolution" ||
       e.cardType === "reverse" ||
       e.cardType === "cry") &&
-    (e.occurredAt === undefined || typeof e.occurredAt === "number")
+    (e.occurredAt === undefined || typeof e.occurredAt === "number") &&
+    (e.cardId === undefined || typeof e.cardId === "number")
   );
 }
 
@@ -82,12 +89,16 @@ export function loadGradeLog(): GradeLog {
         }
         const index = seenPerDay[entry.date] ?? 0;
         seenPerDay[entry.date] = index + 1;
-        return {
+        const backfilled: GradeLogEntry = {
           date: entry.date,
           grade: entry.grade,
           cardType: entry.cardType,
           occurredAt: synthesizeOccurredAt(entry.date, index),
         };
+        if (typeof entry.cardId === "number") {
+          backfilled.cardId = entry.cardId;
+        }
+        return backfilled;
       },
     );
   } catch {
@@ -100,7 +111,13 @@ export function appendGradeEntry(
 ): GradeLogEntry | null {
   if (typeof window === "undefined") return null;
   try {
-    const stamped: GradeLogEntry = { ...entry, occurredAt: Date.now() };
+    const stamped: GradeLogEntry = {
+      date: entry.date,
+      grade: entry.grade,
+      cardType: entry.cardType,
+      occurredAt: Date.now(),
+      ...(typeof entry.cardId === "number" ? { cardId: entry.cardId } : {}),
+    };
     const pruned = pruneGradeLog(loadGradeLog(), 365, entry.date);
     pruned.push(stamped);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));

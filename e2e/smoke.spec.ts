@@ -150,7 +150,7 @@ test.describe("Settings page", () => {
     // Wait for settings to load (skeleton disappears)
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    for (const heading of ["Audio", "Name cards", "About", "Backup", "Danger zone"]) {
+    for (const heading of ["Audio", "Name cards", "About", "Backup", "Danger zone", "Personalize my schedule"]) {
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();
     }
 
@@ -158,6 +158,26 @@ test.describe("Settings page", () => {
     await expect(
       page.getByRole("button", { name: "Save" }),
     ).toBeVisible();
+  });
+
+  test("FSRS optimizer section shows sign-in prompt for guests", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(page.getByLabel("Loading settings")).toBeHidden();
+
+    // Section heading is present
+    await expect(
+      page.getByRole("heading", { name: "Personalize my schedule" }),
+    ).toBeVisible();
+
+    // Guest state: sign-in prompt is visible
+    await expect(
+      page.getByText("Sign in to enable personalized scheduling."),
+    ).toBeVisible();
+
+    // Guest state: the optimize button is NOT rendered
+    await expect(
+      page.locator('[data-testid="fsrs-optimize-button"]'),
+    ).toBeHidden();
   });
 
   test("App Theme section hidden when no Pokémon mastered", async ({ page }) => {
