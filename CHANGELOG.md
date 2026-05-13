@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.8.0] — 2026-05-13
+
+### Added
+
+- Practice scope (generations, types, presets) is now persistent and synced — set it on one device and it follows you across devices. Cards outside the active scope are paused: their review dates shift forward by the time they were hidden, so removing the scope doesn't drop a pile of overdue reviews on you and FSRS doesn't treat the gap as forgetting.
+
 ## [0.7.21] — 2026-05-13
 
 ### Changed
@@ -473,7 +479,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.7.21...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.0
 [0.7.21]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.21
 [0.7.20]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.20
 [0.7.19]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.19
