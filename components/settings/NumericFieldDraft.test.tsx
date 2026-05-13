@@ -80,7 +80,9 @@ describe("NumericInput draft-state pattern", () => {
     await user.clear(input);
     await user.tab(); // blur with empty field
 
-    // No NaN committed; the prior value is restored.
+    // user.clear triggers onChange with "", setting draft to "" (not undefined),
+    // so handleBlur does not early-return. parseInt("", 10) is NaN, so the
+    // committed fallback (10) is used — no NaN reaches onCommit.
     expect(committed).toEqual([10]);
     expect(input).toHaveValue(10);
   });
