@@ -285,7 +285,6 @@ export function saveSession(session: SavedSession): SaveResult {
   const payload = { cards: session.cards.map(serializeCard), limits: session.limits };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    return { ok: true };
   } catch (err) {
     if (
       err instanceof DOMException &&
@@ -297,4 +296,24 @@ export function saveSession(session: SavedSession): SaveResult {
     console.warn("[poke-memory] saveSession: localStorage write failed", err);
     return { ok: false, reason: "unknown" };
   }
+
+  // Same-tab subscribers (useSessionStorageKey) require a synthetic
+  // StorageEvent — the browser only fires the native event in *other* tabs.
+  // Centralising the dispatch here means every writer satisfies the invariant
+  // without remembering it explicitly.
+  try {
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: STORAGE_KEY,
+        storageArea: window.localStorage,
+        newValue: window.localStorage.getItem(STORAGE_KEY),
+      }),
+    );
+  } catch {
+    // Older browsers / non-standard envs without a StorageEvent constructor.
+    // The native cross-tab event still fires, and same-tab callers can fall
+    // back to manual dispatch if they need to.
+  }
+
+  return { ok: true };
 }
