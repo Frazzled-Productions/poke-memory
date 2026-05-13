@@ -119,8 +119,9 @@ describe("generationOfPokemonId", () => {
   });
 
   it("returns 0 for a pokemon ID not in the seed", () => {
-    // 10100 (Alolan Raichu) is not in the current seed (forms not seeded yet)
-    expect(generationOfPokemonId(10100)).toBe(0);
+    // 99999 is well outside any real PokéAPI ID range (default species 1..1025,
+    // alternate forms 10001..10277). The seed never contains this ID.
+    expect(generationOfPokemonId(99999)).toBe(0);
   });
 
   it("returns 0 for negative or zero IDs", () => {
