@@ -25,7 +25,7 @@ export function speakName(name: string): void {
   initVoices();
 
   // Chrome bug (crbug.com/335907): cancel() + speak() in the same tick silently no-ops.
-  if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) window.speechSynthesis.cancel();
   setTimeout(() => {
     const utterance = new SpeechSynthesisUtterance(name);
     utterance.lang = "en-GB";
