@@ -28,6 +28,7 @@ type FilterBarProps = {
   onQueryChange: (q: string) => void;
   onTypeToggle: (type: string) => void;
   onGenChange: (gen: number | null) => void;
+  onAlternateFormsToggle: () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -39,6 +40,7 @@ export default function PokedexFilterBar({
   onQueryChange,
   onTypeToggle,
   onGenChange,
+  onAlternateFormsToggle,
 }: FilterBarProps) {
   return (
     <div className="sticky top-0 z-10 bg-background py-3 border-b border-zinc-200 dark:border-zinc-800 mb-6">
@@ -106,7 +108,7 @@ export default function PokedexFilterBar({
       <div
         role="group"
         aria-label="Filter by generation"
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap gap-2 mb-3"
       >
         <button
           type="button"
@@ -137,6 +139,27 @@ export default function PokedexFilterBar({
             Gen {ROMAN[gen]}
           </button>
         ))}
+      </div>
+
+      {/* Extra toggles */}
+      <div
+        role="group"
+        aria-label="Additional filters"
+        className="flex flex-wrap gap-2"
+      >
+        <button
+          type="button"
+          onClick={onAlternateFormsToggle}
+          aria-pressed={filters.hasAlternateForms}
+          className={[
+            "rounded-full px-3 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
+            filters.hasAlternateForms
+              ? "bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900"
+              : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+          ].join(" ")}
+        >
+          Has alternate forms
+        </button>
       </div>
     </div>
   );

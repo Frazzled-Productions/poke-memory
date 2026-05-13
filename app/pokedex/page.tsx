@@ -36,12 +36,19 @@ export default function PokedexPage() {
     }
   }
 
+  // Default forms only — one tile per species. Falls back to all entries when
+  // the seed hasn't been re-run yet (isDefaultForm will be undefined on older
+  // generated.json) to avoid an empty grid.
+  const defaultFormPokemon = SEED_POKEMON.filter(
+    (p) => p.isDefaultForm === undefined || p.isDefaultForm,
+  );
+
   const introduced =
     cards !== null
       ? cards.filter((c) => c.cardType === "name" && c.state.lastReview !== null).length
       : 0;
 
-  const enrichedPokemon: PokemonCellData[] = SEED_POKEMON.map((p) => ({
+  const enrichedPokemon: PokemonCellData[] = defaultFormPokemon.map((p) => ({
     ...p,
     cardClass: cardClassById.get(p.id) ?? "locked",
   }));
@@ -57,10 +64,7 @@ export default function PokedexPage() {
             <span className="inline-block h-4 w-36 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
           ) : (
             <>
-              {/* TODO(#449): split into base-species vs forms counts once
-                  PokedexFiltered distinguishes them in the grid. For now,
-                  SEED_POKEMON.length is still 1025 (no forms in seed yet). */}
-              {introduced.toLocaleString()} / {SEED_POKEMON.length.toLocaleString()}{" "}
+              {introduced.toLocaleString()} / {defaultFormPokemon.length.toLocaleString()}{" "}
               introduced
             </>
           )}

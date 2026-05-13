@@ -4,7 +4,12 @@ import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { PokemonDetailDisclosure } from "@/components/pokedex/PokemonDetailDisclosure";
 
 export function generateStaticParams() {
-  return SEED_POKEMON.map((p) => ({ id: String(p.id) }));
+  // One route per species — use only default forms (or all entries when the
+  // seed hasn't been re-run with #445 fields yet).
+  const defaultForms = SEED_POKEMON.filter(
+    (p) => p.isDefaultForm === undefined || p.isDefaultForm,
+  );
+  return defaultForms.map((p) => ({ id: String(p.id) }));
 }
 
 export default async function PokemonDetailPage({
@@ -19,6 +24,12 @@ export default async function PokemonDetailPage({
 
   const pokemon = SEED_POKEMON.find((p) => p.id === id);
   if (!pokemon) return notFound();
+
+  // Collect all non-default forms for this species. The speciesId field exists
+  // after the seed is re-run with #445 changes; until then this returns [].
+  const forms = SEED_POKEMON.filter(
+    (p) => p.speciesId === id && !p.isDefaultForm,
+  );
 
   return (
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
@@ -38,7 +49,7 @@ export default async function PokemonDetailPage({
           </svg>
           Pok&#233;dex
         </Link>
-        <PokemonDetailDisclosure pokemon={pokemon} />
+        <PokemonDetailDisclosure pokemon={pokemon} forms={forms} />
       </div>
     </div>
   );
