@@ -10,7 +10,7 @@ import {
   readLegacyScope,
   clearLegacyScope,
 } from "./scope";
-import type { NameReviewCard } from "@/lib/review/session";
+import type { NameReviewCard, EvolutionReviewCard, ReverseEvolutionReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
@@ -75,6 +75,157 @@ describe("cardMatchesScope", () => {
     expect(cardMatchesScope(nameCard(1, ["grass"]), scope)).toBe(true); // gen match
     expect(cardMatchesScope(nameCard(500, ["water"]), scope)).toBe(true); // type match
     expect(cardMatchesScope(nameCard(500, ["grass"]), scope)).toBe(false); // neither
+  });
+});
+
+/**
+ * Build an EvolutionReviewCard for tests. Uses real seed IDs so the
+ * preEvoId→types lookup in cardMatchesScope resolves against SEED_POKEMON.
+ *
+ * Worked IDs:
+ *   Charmander (4, Fire)   → Charmeleon (5, Fire)   edge 1500011
+ *   Eevee      (133, Normal) → Flareon (136, Fire)   edge 1500146
+ *   Squirtle   (7, Water)  → Wartortle (8, Water)   edge 1500019
+ *   Bulbasaur  (1, Grass/Poison) → Ivysaur (2) edge 1500001
+ *   Snivy      (495, Grass) → Servine (496, Grass)  edge 1501080
+ */
+function evoCard(
+  edgeId: number,
+  preEvoId: number,
+  postEvoId: number,
+): EvolutionReviewCard {
+  return {
+    cardType: "evolution",
+    id: edgeId,
+    preEvoId,
+    preEvoName: `P${preEvoId}`,
+    preEvoSpriteUrl: "",
+    postEvoId,
+    postEvoName: `P${postEvoId}`,
+    postEvoSpriteUrl: "",
+    triggerPhrase: null,
+    subjectKey: `${preEvoId}-${postEvoId}`,
+    state: state(),
+  };
+}
+
+function reverseEvoCard(
+  edgeId: number,
+  preEvoId: number,
+  postEvoId: number,
+): ReverseEvolutionReviewCard {
+  return {
+    cardType: "reverse-evolution",
+    id: edgeId,
+    preEvoId,
+    preEvoName: `P${preEvoId}`,
+    preEvoSpriteUrl: "",
+    postEvoId,
+    postEvoName: `P${postEvoId}`,
+    postEvoSpriteUrl: "",
+    triggerPhrase: null,
+    subjectKey: `${preEvoId}-${postEvoId}`,
+    state: state(),
+  };
+}
+
+// ─── Evolution-card scope matching ───────────────────────────────────────────
+// These use real seed IDs so the preEvoId→types lookup resolves correctly
+// against SEED_POKEMON.
+//
+// ID reference (from generated.json):
+//   Charmander (4)  Fire    → Charmeleon (5)  Fire
+//   Eevee      (133) Normal → Flareon   (136) Fire
+//   Squirtle   (7)  Water   → Wartortle  (8)  Water
+//   Bulbasaur  (1)  Grass/Poison → Ivysaur (2)
+//   Snivy      (495) Grass  → Servine   (496) Grass  [Gen V]
+
+describe("cardMatchesScope — evolution cards — gens axis", () => {
+  it("gens:[1] includes a Gen-I evolution card (Charmander → Charmeleon)", () => {
+    const card = evoCard(1500011, 4, 5);
+    expect(cardMatchesScope(card, { gens: [1], types: [], presets: [] })).toBe(true);
+  });
+
+  it("gens:[1] excludes a Gen-V evolution card (Snivy → Servine)", () => {
+    const card = evoCard(1501080, 495, 496);
+    expect(cardMatchesScope(card, { gens: [1], types: [], presets: [] })).toBe(false);
+  });
+
+  it("reverse-evolution card also filters by pre-evo gen", () => {
+    const fwdCard = evoCard(1500011, 4, 5);
+    const revCard = reverseEvoCard(2500011, 4, 5);
+    const scope = { gens: [1], types: [], presets: [] };
+    expect(cardMatchesScope(fwdCard, scope)).toBe(true);
+    expect(cardMatchesScope(revCard, scope)).toBe(true);
+  });
+});
+
+describe("cardMatchesScope — evolution cards — types axis (new behaviour #426)", () => {
+  it("types:[fire] includes Charmander→Charmeleon (Charmander is Fire)", () => {
+    const card = evoCard(1500011, 4, 5);
+    expect(cardMatchesScope(card, { gens: [], types: ["fire"], presets: [] })).toBe(true);
+  });
+
+  it("types:[fire] excludes Eevee→Flareon (Eevee is Normal, not Fire)", () => {
+    const card = evoCard(1500146, 133, 136);
+    expect(cardMatchesScope(card, { gens: [], types: ["fire"], presets: [] })).toBe(false);
+  });
+
+  it("types:[water] includes Squirtle→Wartortle (Squirtle is Water)", () => {
+    const card = evoCard(1500019, 7, 8);
+    expect(cardMatchesScope(card, { gens: [], types: ["water"], presets: [] })).toBe(true);
+  });
+
+  it("types:[fire,water] includes both Charmander→Charmeleon and Squirtle→Wartortle", () => {
+    const fire = evoCard(1500011, 4, 5);
+    const water = evoCard(1500019, 7, 8);
+    const scope = { gens: [], types: ["fire", "water"], presets: [] };
+    expect(cardMatchesScope(fire, scope)).toBe(true);
+    expect(cardMatchesScope(water, scope)).toBe(true);
+  });
+
+  it("types:[fire] excludes a Grass evolution card (Bulbasaur→Ivysaur)", () => {
+    const card = evoCard(1500001, 1, 2);
+    expect(cardMatchesScope(card, { gens: [], types: ["fire"], presets: [] })).toBe(false);
+  });
+
+  it("reverse-evolution card inherits pre-evo types for the type axis", () => {
+    const revCard = reverseEvoCard(2500011, 4, 5); // Charmander→Charmeleon (Fire)
+    expect(cardMatchesScope(revCard, { gens: [], types: ["fire"], presets: [] })).toBe(true);
+
+    const revEevee = reverseEvoCard(2500146, 133, 136); // Eevee→Flareon (Normal pre-evo)
+    expect(cardMatchesScope(revEevee, { gens: [], types: ["fire"], presets: [] })).toBe(false);
+  });
+});
+
+describe("cardMatchesScope — evolution cards — presets axis", () => {
+  it("starters preset includes a Bulbasaur→Ivysaur card (Bulbasaur is a starter)", () => {
+    const card = evoCard(1500001, 1, 2);
+    expect(cardMatchesScope(card, { gens: [], types: [], presets: ["starters"] })).toBe(true);
+  });
+
+  it("starters preset excludes Eevee→Vaporeon (Eevee is not a starter)", () => {
+    const card = evoCard(1500146, 133, 136);
+    expect(cardMatchesScope(card, { gens: [], types: [], presets: ["starters"] })).toBe(false);
+  });
+});
+
+describe("cardMatchesScope — evolution cards — combined axes", () => {
+  it("types:[fire] AND gens:[1] includes a Fire/Gen-I evolution (Charmander→Charmeleon)", () => {
+    const card = evoCard(1500011, 4, 5);
+    expect(cardMatchesScope(card, { gens: [1], types: ["fire"], presets: [] })).toBe(true);
+  });
+
+  it("types:[fire] AND gens:[2] includes a Fire/Gen-II evolution (Cyndaquil-type Pokémon)", () => {
+    // Slugma (218) is Fire, Gen II
+    const card = evoCard(1500500, 218, 219);
+    expect(cardMatchesScope(card, { gens: [2], types: ["fire"], presets: [] })).toBe(true);
+  });
+
+  it("axes are OR'd: a Gen-I Normal evo passes a scope of gens:[1] types:[fire]", () => {
+    // Eevee (133) is Normal/Gen I. Fails the type axis but passes the gen axis.
+    const card = evoCard(1500146, 133, 136);
+    expect(cardMatchesScope(card, { gens: [1], types: ["fire"], presets: [] })).toBe(true);
   });
 });
 

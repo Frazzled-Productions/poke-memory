@@ -149,9 +149,11 @@ function speciesMatchesScope(
  * True if the card matches the active scope. Empty scope matches every
  * card (the practice page's default).
  *
- * Evolution cards lack a `types[]` field (they prompt for the next-stage
- * sprite, not the parent species' typing), so the type-axis path is
- * skipped for them — gens and presets still apply.
+ * Evolution cards don't carry their pre-evolution's `types[]` directly on the
+ * card, so the type-axis check resolves `card.preEvoId` to the corresponding
+ * `SeedPokemon` entry and uses its types. This means a Fire scope includes
+ * `Charmander → Charmeleon` because Charmander is Fire, while `Eevee → Flareon`
+ * is excluded because Eevee is Normal.
  *
  * For the `formCategories` axis, name/reverse/cry cards carry `isDefaultForm`
  * and `formCategory` directly (spread from SeedPokemon). For evolution cards,
@@ -162,6 +164,14 @@ function speciesMatchesScope(
  * Cards built from a pre-#445 seed (generated.json without `isDefaultForm`)
  * receive safe defaults: `isDefaultForm=true`, `formCategory='default'`.
  */
+
+/** Lazy lookup map from pokemon id to SeedPokemon — built once on first use. */
+let _seedById: Map<number, SeedPokemon> | null = null;
+function getSeedById(): Map<number, SeedPokemon> {
+  if (_seedById === null) _seedById = new Map(SEED_POKEMON.map((p) => [p.id, p]));
+  return _seedById;
+}
+
 export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): boolean {
   if (isScopeEmpty(scope)) return true;
   // Evolution edge cards filter on the pre-evo's species ID (the card is
@@ -177,12 +187,14 @@ export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): bo
     card.cardType === "evolution" || card.cardType === "reverse-evolution"
       ? card.preEvoId
       : (card as { speciesId?: number }).speciesId ?? card.id;
-  // Evolution cards (both directions) don't carry the parent species' `types[]`
-  // on the card itself; downgrade to an effectively-empty types array so the
-  // type axis is a no-op for them. Other card types use their own types.
+  // Evolution cards (both directions) don't carry the pre-evo's `types[]` on
+  // the card itself. Resolve them from the seed so the type axis works: a Fire
+  // scope matches Charmander→Charmeleon because Charmander is Fire.
+  // Falls back to [] if the preEvoId is missing from the seed (shouldn't happen
+  // with a well-formed seed, but defensive guard avoids a runtime crash).
   const types: readonly string[] =
     card.cardType === "evolution" || card.cardType === "reverse-evolution"
-      ? []
+      ? (getSeedById().get(card.preEvoId)?.types ?? [])
       : card.types;
 
   // Resolve form metadata. Name/reverse/cry cards spread SeedPokemon and carry
