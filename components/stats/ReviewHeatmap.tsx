@@ -45,14 +45,15 @@ export function ReviewHeatmap({ columns }: Props) {
       >
         Review activity
       </h2>
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
           {total.toLocaleString()} review{total === 1 ? "" : "s"} in the last year
         </p>
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          width={width}
-          height={height}
+          preserveAspectRatio="xMidYMid meet"
+          className="block h-auto w-full"
+          style={{ maxWidth: width }}
           role="img"
           aria-label={`Review activity heatmap for the last 365 days, ${total} total reviews`}
         >
