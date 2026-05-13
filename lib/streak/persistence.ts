@@ -3,6 +3,10 @@ import type { StreakData } from "./types";
 const STREAK_KEY = "poke-memory:streak:v1";
 export const STREAK_UPDATED_EVENT = "poke-memory:streak-updated";
 
+// Minimum graded cards in a day for the day to count toward the streak.
+// "Due queue empty" overrides this for users with a light queue. See #351.
+export const STREAK_MIN_CARDS = 5;
+
 export function loadStreakData(): StreakData {
   if (typeof window === "undefined") return [];
   try {
@@ -27,7 +31,12 @@ export function saveStreakData(data: StreakData): void {
   }
 }
 
-export function recordReview(date: string): void {
+export function recordReview(
+  date: string,
+  gradedToday: number,
+  dueQueueEmpty: boolean,
+): void {
+  if (gradedToday < STREAK_MIN_CARDS && !dueQueueEmpty) return;
   const data = loadStreakData();
   if (data.includes(date)) return;
   data.push(date);
