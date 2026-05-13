@@ -37,6 +37,7 @@ export type UserSettings = {
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
   playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
+  speakNameOnReveal: boolean;        // speak Pokémon name aloud (TTS) on card reveal
   cryCardsEnabled: boolean;          // enable third-direction cards: audio prompt → name
   maxNewCryPerDay: number;
   maxReviewsCryPerDay: number;
@@ -61,6 +62,14 @@ export type UserSettings = {
   /** Highest streak reached in the Higher-or-Lower mini-game (#349). */
   miniGameBestScore: number;
   /**
+   * Streak milestones (in days) the user has already seen celebrated (#419).
+   * Persists in the JSONB settings blob so a milestone fires exactly once
+   * across reloads on a device. Cross-device deduplication is eventually
+   * consistent — settings sync is LWW so a second device will only learn
+   * about a celebration after the next manual sync cycle.
+   */
+  seenStreakMilestones: number[];
+  /**
    * Per-user optimized FSRS weight vector (#268). When present, the scheduler
    * uses these weights instead of the ts-fsrs defaults. Set by the
    * /api/srs/optimize route after a successful `computeParameters` call.
@@ -84,6 +93,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
+  speakNameOnReveal: false,
   cryCardsEnabled: false,
   maxNewCryPerDay: 10,
   maxReviewsCryPerDay: 100,
@@ -92,6 +102,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   retentionTarget: 0.9,
   practiceScope: EMPTY_SCOPE,
   miniGameBestScore: 0,
+  seenStreakMilestones: [],
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -219,6 +230,10 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.playCryOnReveal === "boolean"
         ? obj.playCryOnReveal
         : DEFAULT_SETTINGS.playCryOnReveal,
+    speakNameOnReveal:
+      typeof obj.speakNameOnReveal === "boolean"
+        ? obj.speakNameOnReveal
+        : DEFAULT_SETTINGS.speakNameOnReveal,
     cryCardsEnabled:
       typeof obj.cryCardsEnabled === "boolean"
         ? obj.cryCardsEnabled
@@ -254,7 +269,21 @@ function parseStoredSettings(raw: string | null): UserSettings {
       (obj.miniGameBestScore as number) >= 0
         ? (obj.miniGameBestScore as number)
         : DEFAULT_SETTINGS.miniGameBestScore,
+    seenStreakMilestones: validateSeenStreakMilestones(obj.seenStreakMilestones),
   };
+}
+
+function validateSeenStreakMilestones(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const v of value) {
+    if (typeof v !== "number" || !Number.isInteger(v) || v <= 0) continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
 }
 
 // Returns DEFAULT_SETTINGS on fresh load, server, or corruption. Never throws.

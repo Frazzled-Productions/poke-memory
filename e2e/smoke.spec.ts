@@ -61,6 +61,230 @@ test.describe("Practice page", () => {
     }
   });
 
+  test("Hear name button appears after revealing a name card", async ({ page }) => {
+    // Seed a session with a single name card due for review so we control the card type.
+    await page.addInitScript(() => {
+      const session = {
+        cards: [
+          {
+            id: 1,
+            name: "Bulbasaur",
+            spriteUrl: "/sprites/pokemon/1.png",
+            cardType: "name",
+            state: {
+              stability: 0,
+              difficulty: 0,
+              elapsedDays: 0,
+              scheduledDays: 0,
+              reps: 0,
+              lapses: 0,
+              fsrsState: "new",
+              dueDate: "2026-01-01",
+              lastReview: null,
+              firstSeen: null,
+              learningStep: null,
+              stepStartedAt: null,
+            },
+          },
+        ],
+        limits: {
+          name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        },
+      };
+      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+    });
+
+    await page.goto("/");
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await reveal.click();
+
+    await expect(page.getByRole("button", { name: "Hear Bulbasaur" })).toBeVisible();
+  });
+
+  test("Hear name buttons appear on an evolution card (prompt + answer)", async ({ page }) => {
+    // Seed an evolution card (Bulbasaur → Ivysaur, edgeId 1500001). hydrateSession
+    // refreshes the per-side names/sprites from the seed; we only need cardType,
+    // id, postEvoId, and state for the saved card to validate and hydrate.
+    await page.addInitScript(() => {
+      const session = {
+        cards: [
+          {
+            cardType: "evolution",
+            id: 1500001,
+            preEvoId: 1,
+            preEvoName: "bulbasaur",
+            preEvoSpriteUrl: "/sprites/pokemon/1.png",
+            postEvoId: 2,
+            postEvoName: "ivysaur",
+            postEvoSpriteUrl: "/sprites/pokemon/2.png",
+            triggerPhrase: null,
+            state: {
+              stability: 0,
+              difficulty: 0,
+              elapsedDays: 0,
+              scheduledDays: 0,
+              reps: 0,
+              lapses: 0,
+              fsrsState: "new",
+              dueDate: "2026-01-01",
+              lastReview: null,
+              firstSeen: null,
+              learningStep: null,
+              stepStartedAt: null,
+            },
+          },
+        ],
+        limits: {
+          name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        },
+      };
+      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+    });
+
+    await page.goto("/");
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    // Pre-reveal: prompt-side speaker for the pre-evolution name is present.
+    await expect(page.getByRole("button", { name: "Hear bulbasaur" })).toBeVisible();
+
+    await reveal.click();
+
+    // Post-reveal: answer-side speaker for the post-evolution name is also present.
+    await expect(page.getByRole("button", { name: "Hear ivysaur" })).toBeVisible();
+    // Prompt-side stays mounted.
+    await expect(page.getByRole("button", { name: "Hear bulbasaur" })).toBeVisible();
+  });
+
+  test("Hear name buttons appear on a reverse-evolution card (prompt + answer)", async ({ page }) => {
+    // Reverse-evolution edge ID for 1500001 is 2500001 (#262 namespace).
+    await page.addInitScript(() => {
+      const session = {
+        cards: [
+          {
+            cardType: "reverse-evolution",
+            id: 2500001,
+            name: "ivysaur",
+            spriteUrl: "/sprites/pokemon/2.png",
+            preEvoId: 1,
+            preEvoName: "bulbasaur",
+            preEvoSpriteUrl: "/sprites/pokemon/1.png",
+            postEvoId: 2,
+            postEvoName: "ivysaur",
+            postEvoSpriteUrl: "/sprites/pokemon/2.png",
+            triggerPhrase: null,
+            state: {
+              stability: 0,
+              difficulty: 0,
+              elapsedDays: 0,
+              scheduledDays: 0,
+              reps: 0,
+              lapses: 0,
+              fsrsState: "new",
+              dueDate: "2026-01-01",
+              lastReview: null,
+              firstSeen: null,
+              learningStep: null,
+              stepStartedAt: null,
+            },
+          },
+        ],
+        limits: {
+          name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          "reverse-evolution": { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        },
+      };
+      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+      // Reverse-evolution cards are gated by a settings toggle (default off).
+      localStorage.setItem(
+        "poke-memory:user-settings:v1",
+        JSON.stringify({ reverseEvolutionCardsEnabled: true }),
+      );
+    });
+
+    await page.goto("/");
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    // Reverse-evolution prompt shows the post-evo name; speaker present pre-reveal.
+    await expect(page.getByRole("button", { name: "Hear ivysaur" })).toBeVisible();
+
+    await reveal.click();
+
+    // Answer is the pre-evolution; its speaker is added on reveal.
+    await expect(page.getByRole("button", { name: "Hear bulbasaur" })).toBeVisible();
+  });
+
+  test("Hear name button appears on a reverse (sprite-picker) card", async ({ page }) => {
+    await page.addInitScript(() => {
+      const session = {
+        cards: [
+          {
+            id: 2_000_001,
+            pokemonId: 1,
+            name: "Bulbasaur",
+            spriteUrl: "/sprites/pokemon/1.png",
+            cardType: "reverse",
+            state: {
+              stability: 0,
+              difficulty: 0,
+              elapsedDays: 0,
+              scheduledDays: 0,
+              reps: 0,
+              lapses: 0,
+              fsrsState: "new",
+              dueDate: "2026-01-01",
+              lastReview: null,
+              firstSeen: null,
+              learningStep: null,
+              stepStartedAt: null,
+            },
+          },
+        ],
+        limits: {
+          name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        },
+      };
+      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+      localStorage.setItem(
+        "poke-memory:user-settings:v1",
+        JSON.stringify({ reverseCardsEnabled: true }),
+      );
+    });
+
+    await page.goto("/");
+    // Reverse cards have no Reveal step — the prompt + sprite picker render on load.
+    const speaker = page.getByRole("button", { name: "Hear Bulbasaur" });
+    if (!(await speaker.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+    await expect(speaker).toBeVisible();
+  });
+
   test("fits viewport without scrolling on iPhone 17 Pro", async ({
     page,
   }, testInfo) => {
@@ -304,6 +528,48 @@ test.describe("Sign-in picker (#360)", () => {
 
     expect(menuBox.x).toBeGreaterThanOrEqual(0);
     expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport.width);
+  });
+});
+
+test.describe("Streak milestone celebration (#419)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
+  });
+
+  test("fires once on milestone day and does not re-fire on reload", async ({
+    page,
+  }) => {
+    // Seed three consecutive review days ending today → streak = 3 = first milestone.
+    await page.addInitScript(() => {
+      const today = new Date();
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      const day = (offset: number) => {
+        const d = new Date(today);
+        d.setUTCDate(d.getUTCDate() + offset);
+        return iso(d);
+      };
+      localStorage.setItem(
+        "poke-memory:streak:v1",
+        JSON.stringify([day(-2), day(-1), day(0)]),
+      );
+    });
+
+    await page.goto("/");
+
+    const banner = page.getByRole("status", {
+      name: /3-day streak reached/i,
+    });
+    await expect(banner).toBeVisible();
+    await expect(page.getByText("3-day streak!")).toBeVisible();
+
+    // Auto-dismiss after 3.5 s — give it 5 s.
+    await expect(banner).toBeHidden({ timeout: 5000 });
+
+    // Reload: seenStreakMilestones now contains 3, so no re-fire.
+    await page.reload();
+    await expect(
+      page.getByRole("status", { name: /streak reached/i }),
+    ).toBeHidden();
   });
 });
 

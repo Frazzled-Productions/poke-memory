@@ -114,6 +114,7 @@ describe('loadSettings migration', () => {
       maxNewReversePerDay: 15,
       maxReviewsReversePerDay: 50,
       playCryOnReveal: true,
+      speakNameOnReveal: false,
       cryCardsEnabled: true,
       maxNewCryPerDay: 12,
       maxReviewsCryPerDay: 80,
@@ -122,6 +123,7 @@ describe('loadSettings migration', () => {
       retentionTarget: 0.95,
       practiceScope: { gens: [1, 3], types: ['fire', 'water'], presets: ['starters' as const] },
       miniGameBestScore: 0,
+      seenStreakMilestones: [3, 7],
     };
     saveSettings(custom);
     const loaded = loadSettings();

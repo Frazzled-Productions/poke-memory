@@ -1,6 +1,6 @@
 {
   "name": "poke-memory",
-  "version": "0.9.22",
+  "version": "0.9.24",
   "private": true,
   "scripts": {
     "dev": "next dev",

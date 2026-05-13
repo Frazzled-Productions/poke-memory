@@ -30,6 +30,7 @@ const SAMPLE: UserSettings = {
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
+  speakNameOnReveal: false,
   cryCardsEnabled: false,
   maxNewCryPerDay: 10,
   maxReviewsCryPerDay: 100,
@@ -38,6 +39,7 @@ const SAMPLE: UserSettings = {
   retentionTarget: 0.9,
   practiceScope: { gens: [], types: [], presets: [] },
   miniGameBestScore: 0,
+  seenStreakMilestones: [],
 };
 
 describe("pushSettings", () => {

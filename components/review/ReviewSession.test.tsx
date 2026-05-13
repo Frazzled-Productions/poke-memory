@@ -144,6 +144,7 @@ vi.mock("@/lib/sync/useSyncOnUnload", () => ({
 function getTileButtons(): HTMLElement[] {
   return screen.getAllByRole("button").filter((b) => {
     if (/undo/i.test(b.getAttribute("aria-label") ?? "")) return false;
+    if (/^hear /i.test(b.getAttribute("aria-label") ?? "")) return false;
     if (b.getAttribute("aria-controls") === "scope-panel") return false;
     if (/^Clear$/.test(b.textContent ?? "")) return false;
     return true;
@@ -217,7 +218,9 @@ describe("ReviewSession reveal flow", () => {
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
 
-    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg");
+    // playCry is now always invoked with (url, volume, onEnded?) — onEnded is undefined
+    // when speakNameOnReveal is off, which is the default for this fixture.
+    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg", 0.6, undefined);
   });
 
   it("advances to next card and resets reveal state after grading", async () => {

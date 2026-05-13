@@ -58,6 +58,7 @@ const VALID_SETTINGS: UserSettings = {
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
   playCryOnReveal: false,
+  speakNameOnReveal: false,
   cryCardsEnabled: false,
   maxNewCryPerDay: 10,
   maxReviewsCryPerDay: 100,
@@ -66,6 +67,7 @@ const VALID_SETTINGS: UserSettings = {
   retentionTarget: 0.9,
   practiceScope: { gens: [], types: [], presets: [] },
   miniGameBestScore: 0,
+  seenStreakMilestones: [],
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {
