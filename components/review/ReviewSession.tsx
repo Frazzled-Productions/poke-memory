@@ -32,6 +32,7 @@ import { nextReview } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
+import { speakName } from "@/lib/audio/tts";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
@@ -960,7 +961,8 @@ export function ReviewSession() {
     }
     setRevealed(true);
     revealedCardId.current = currentCard.id;
-    if (loadSettings().playCryOnReveal) {
+    const revealSettings = loadSettings();
+    if (revealSettings.playCryOnReveal) {
       if (currentCard.cardType === "name") {
         playCry(currentCard.cryUrl ?? null);
       } else if (currentCard.cardType === "evolution") {
@@ -971,6 +973,15 @@ export function ReviewSession() {
         playCry(target?.cryUrl ?? null);
       }
       // reverse (sprite-picker) cards never reach handleReveal — no case needed
+    }
+    if (revealSettings.speakNameOnReveal) {
+      if (currentCard.cardType === "name") {
+        speakName(currentCard.name);
+      } else if (currentCard.cardType === "evolution") {
+        speakName(currentCard.postEvoName);
+      } else if (currentCard.cardType === "reverse-evolution") {
+        speakName(currentCard.preEvoName);
+      }
     }
   }
 

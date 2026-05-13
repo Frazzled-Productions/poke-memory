@@ -61,6 +61,54 @@ test.describe("Practice page", () => {
     }
   });
 
+  test("Hear name button appears after revealing a name card", async ({ page }) => {
+    // Seed a session with a single name card due for review so we control the card type.
+    await page.addInitScript(() => {
+      const session = {
+        cards: [
+          {
+            id: 1,
+            name: "Bulbasaur",
+            spriteUrl: "/sprites/pokemon/1.png",
+            cardType: "name",
+            state: {
+              stability: 0,
+              difficulty: 0,
+              elapsedDays: 0,
+              scheduledDays: 0,
+              reps: 0,
+              lapses: 0,
+              fsrsState: "new",
+              dueDate: "2026-01-01",
+              lastReview: null,
+              firstSeen: null,
+              learningStep: null,
+              stepStartedAt: null,
+            },
+          },
+        ],
+        limits: {
+          name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        },
+      };
+      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+    });
+
+    await page.goto("/");
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await reveal.click();
+
+    await expect(page.getByRole("button", { name: "Hear name" })).toBeVisible();
+  });
+
   test("fits viewport without scrolling on iPhone 17 Pro", async ({
     page,
   }, testInfo) => {
