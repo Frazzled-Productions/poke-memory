@@ -27,6 +27,8 @@ import { loadGradeLog } from "@/lib/gradelog/persistence";
 import { countOptimizableReviews } from "@/lib/srs/optimizer";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
 import { IntensityPicker } from "@/components/settings/IntensityPicker";
+import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
+import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -495,6 +497,15 @@ export default function SettingsPage() {
                 >
                   Scheduler
                 </h2>
+                <OnboardingHint id="settingsHintDismissed" title="What recall target does">
+                  <p>
+                    The scheduler aims to show each card just before
+                    you&apos;d forget it. A higher recall target means more
+                    reviews and stronger retention; a lower target means
+                    fewer reviews and a bit more forgetting. Most people
+                    leave this at 90%.
+                  </p>
+                </OnboardingHint>
                 <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
                   <label
                     htmlFor="retentionTarget"
@@ -936,6 +947,67 @@ export default function SettingsPage() {
                   saveSettings(updated);
                 }}
               />
+
+              <section className="flex flex-col gap-4" aria-labelledby="onboarding-heading">
+                <h2
+                  id="onboarding-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  How this works
+                </h2>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
+                  <p className="text-sm text-foreground">
+                    Poké Memory uses{" "}
+                    <a
+                      href="https://github.com/open-spaced-repetition/ts-fsrs"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="underline underline-offset-2"
+                    >
+                      FSRS
+                    </a>
+                    , a spaced-repetition scheduler that picks the best time
+                    to show each card based on how well you remember it.
+                  </p>
+                  <p className="text-sm text-foreground">
+                    After every grade the scheduler updates its model of how
+                    strong your memory of that card is, and sets the next
+                    review for when you&apos;re most likely to be about to
+                    forget it. Forgetting and then re-remembering is what
+                    actually moves a card into long-term memory — so getting
+                    a few <em>Again</em>s is normal and part of the system
+                    working.
+                  </p>
+                  <p className="text-sm text-foreground">
+                    Honest grading matters more than getting every card
+                    right. If you almost forgot, press <em>Hard</em>. If you
+                    truly forgot, press <em>Again</em>. The scheduler
+                    can&apos;t help you if you mark cards <em>Easy</em> when
+                    you only just scraped it.
+                  </p>
+                  <hr className="border-zinc-200 dark:border-zinc-800" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Show onboarding tips again
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Restores the welcome message and the contextual hints on
+                      Practice, Stats, and Settings.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = { ...settings, onboarding: { ...DEFAULT_ONBOARDING } };
+                        setSettings(next);
+                        saveSettings(next);
+                      }}
+                      className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      Show tips again
+                    </button>
+                  </div>
+                </div>
+              </section>
 
               <section className="flex flex-col gap-4" aria-labelledby="about-heading">
                 <h2

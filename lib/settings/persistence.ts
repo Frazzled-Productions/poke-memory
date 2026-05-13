@@ -24,6 +24,24 @@ export type StoredFavouriteTheme = {
 /** Controls how broadly the chosen Pokémon palette is applied to the UI. */
 export type ThemeIntensity = "accents" | "tinted" | "full";
 
+/**
+ * Per-surface dismissal flags for the first-run onboarding hints (#433).
+ * `false` = hint still shows; `true` = user dismissed it.
+ */
+export type OnboardingFlags = {
+  welcomeDismissed: boolean;
+  practiceHintDismissed: boolean;
+  statsHintDismissed: boolean;
+  settingsHintDismissed: boolean;
+};
+
+export const DEFAULT_ONBOARDING: OnboardingFlags = {
+  welcomeDismissed: false,
+  practiceHintDismissed: false,
+  statsHintDismissed: false,
+  settingsHintDismissed: false,
+};
+
 export type UserSettings = {
   masteryRepetitions: number;        // cards with this many consecutive correct reviews = mastered
   maxNewPerDay: number;              // hard daily cap for new name cards
@@ -61,6 +79,14 @@ export type UserSettings = {
   practiceScope: PracticeScope;
   /** Highest streak reached in the Higher-or-Lower mini-game (#349). */
   miniGameBestScore: number;
+  /**
+   * First-run onboarding dismissal flags (#433). Each surface tracks its own
+   * one-shot hint; once dismissed it stays dismissed. The "Reset onboarding"
+   * button in Settings restores all four to `false` at once. Lives in the
+   * settings JSONB so dismissals follow the user across devices via the
+   * existing settings sync (LWW).
+   */
+  onboarding: OnboardingFlags;
   /**
    * Streak milestones (in days) the user has already seen celebrated (#419).
    * Persists in the JSONB settings blob so a milestone fires exactly once
@@ -112,6 +138,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   miniGameBestScore: 0,
   seenStreakMilestones: [],
   earnedBadges: [],
+  onboarding: DEFAULT_ONBOARDING,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -280,6 +307,18 @@ function parseStoredSettings(raw: string | null): UserSettings {
         : DEFAULT_SETTINGS.miniGameBestScore,
     seenStreakMilestones: validateSeenStreakMilestones(obj.seenStreakMilestones),
     earnedBadges: validateEarnedBadges(obj.earnedBadges),
+    onboarding: validateOnboarding(obj.onboarding),
+  };
+}
+
+function validateOnboarding(value: unknown): OnboardingFlags {
+  if (typeof value !== "object" || value === null) return { ...DEFAULT_ONBOARDING };
+  const v = value as Record<string, unknown>;
+  return {
+    welcomeDismissed: v.welcomeDismissed === true,
+    practiceHintDismissed: v.practiceHintDismissed === true,
+    statsHintDismissed: v.statsHintDismissed === true,
+    settingsHintDismissed: v.settingsHintDismissed === true,
   };
 }
 

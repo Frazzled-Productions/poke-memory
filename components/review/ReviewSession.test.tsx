@@ -117,6 +117,8 @@ vi.mock("@/lib/review/persistence", () => ({
 
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
+  saveSettings: vi.fn(),
+  SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
 }));
 
 vi.mock("@/lib/streak", () => ({

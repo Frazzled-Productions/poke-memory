@@ -8,6 +8,7 @@ import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
+import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
 import { pickDistractors } from "@/lib/pokemon/distractors";
@@ -1210,11 +1211,21 @@ export function ReviewSession() {
         )}
 
         {revealed ? (
-          <GradeButtons
-            onGrade={handleGrade}
-            disabled={grading}
-            previews={gradePreviewsOrNull ?? undefined}
-          />
+          <>
+            <OnboardingHint id="practiceHintDismissed" title="How to grade">
+              <p>
+                <strong>Again</strong> — forgot. <strong>Hard</strong> —
+                struggled. <strong>Good</strong> — recalled with effort.{" "}
+                <strong>Easy</strong> — instant. Grade honestly; FSRS uses
+                this to space your next review.
+              </p>
+            </OnboardingHint>
+            <GradeButtons
+              onGrade={handleGrade}
+              disabled={grading}
+              previews={gradePreviewsOrNull ?? undefined}
+            />
+          </>
         ) : (
           <button
             type="button"
@@ -1332,11 +1343,21 @@ export function ReviewSession() {
       )}
 
       {revealed ? (
-        <GradeButtons
-          onGrade={handleGrade}
-          disabled={grading}
-          previews={gradePreviewsOrNull ?? undefined}
-        />
+        <>
+          <OnboardingHint id="practiceHintDismissed" title="How to grade">
+            <p>
+              <strong>Again</strong> — forgot. <strong>Hard</strong> —
+              struggled. <strong>Good</strong> — recalled with effort.{" "}
+              <strong>Easy</strong> — instant. Grade honestly; FSRS uses
+              this to space your next review.
+            </p>
+          </OnboardingHint>
+          <GradeButtons
+            onGrade={handleGrade}
+            disabled={grading}
+            previews={gradePreviewsOrNull ?? undefined}
+          />
+        </>
       ) : (
         <button
           type="button"

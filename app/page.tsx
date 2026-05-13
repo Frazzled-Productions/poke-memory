@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import { StreakBadge } from "@/components/review/StreakBadge";
 
@@ -33,6 +34,19 @@ export default function Home({
         <AuthErrorBanner searchParams={searchParams} />
       </Suspense>
       <main className="w-full max-w-md">
+        <div className="mb-4">
+          <OnboardingHint
+            id="welcomeDismissed"
+            tone="callout"
+            title="Welcome to Poké Memory"
+            ctaHref="/settings#onboarding-heading"
+            ctaLabel="How this works"
+          >
+            Learn every Pokémon&apos;s name and evolutions with spaced
+            repetition. Grade honestly — the app shows each card right before
+            you&apos;d likely forget it, so gaps grow as you remember.
+          </OnboardingHint>
+        </div>
         <StreakBadge />
         <ReviewSession />
       </main>
