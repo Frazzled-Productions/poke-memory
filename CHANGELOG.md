@@ -517,7 +517,7 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 - **Vercel build gating** — preview deploys are now skipped when a push only touches docs, workflows, or other non-app files (e.g. `*.md`, `.github/**`, `.claude/**`). A `vercel.json` `ignoreCommand` script checks `git diff` against the previous deployment SHA and exits 0 (skip) when none of `app/`, `components/`, `lib/`, `db/`, `public/`, or root config/dependency files changed. Dependabot PRs touching `package.json`/`package-lock.json` still trigger a full build. Closes [#114](https://github.com/fraserbrookhouse/poke-memory/issues/114).
 
-- **Live at [poke-memory-alpha.vercel.app](https://poke-memory-alpha.vercel.app)** — hosted on Vercel, auto-deploys on every push to `main`.
+- **Live at [pokememory.com](https://pokememory.com)** — hosted on Vercel, auto-deploys on every push to `main`.
 
 ### Fixed
 
