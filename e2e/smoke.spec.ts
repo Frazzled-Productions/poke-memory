@@ -307,6 +307,48 @@ test.describe("Sign-in picker (#360)", () => {
   });
 });
 
+test.describe("Streak milestone celebration (#419)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
+  });
+
+  test("fires once on milestone day and does not re-fire on reload", async ({
+    page,
+  }) => {
+    // Seed three consecutive review days ending today → streak = 3 = first milestone.
+    await page.addInitScript(() => {
+      const today = new Date();
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      const day = (offset: number) => {
+        const d = new Date(today);
+        d.setUTCDate(d.getUTCDate() + offset);
+        return iso(d);
+      };
+      localStorage.setItem(
+        "poke-memory:streak:v1",
+        JSON.stringify([day(-2), day(-1), day(0)]),
+      );
+    });
+
+    await page.goto("/");
+
+    const banner = page.getByRole("status", {
+      name: /3-day streak reached/i,
+    });
+    await expect(banner).toBeVisible();
+    await expect(page.getByText("3-day streak!")).toBeVisible();
+
+    // Auto-dismiss after 3.5 s — give it 5 s.
+    await expect(banner).toBeHidden({ timeout: 5000 });
+
+    // Reload: seenStreakMilestones now contains 3, so no re-fire.
+    await page.reload();
+    await expect(
+      page.getByRole("status", { name: /streak reached/i }),
+    ).toBeHidden();
+  });
+});
+
 test.describe("Evolution edge card prompt (#262)", () => {
   test("renders 'What does {preEvo} evolve into {trigger}?' for an edge card", async ({ page }) => {
     // Seed a deterministic session containing exactly one evolution edge card

@@ -61,12 +61,15 @@ describe("loadFlags / saveFlags / clearFlags", () => {
   });
 
   it("round-trips a flag through save/load", () => {
-    saveFlags({ pretendAllMastered: true });
-    expect(loadFlags()).toEqual({ pretendAllMastered: true });
+    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false });
+    expect(loadFlags()).toEqual({
+      pretendAllMastered: true,
+      forceNextStreakMilestone: false,
+    });
   });
 
   it("clearFlags removes the persisted key, returning to defaults", () => {
-    saveFlags({ pretendAllMastered: true });
+    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false });
     clearFlags();
     expect(globalThis.localStorage.getItem(FLAGS_KEY)).toBeNull();
     expect(loadFlags()).toEqual(DEFAULT_FLAGS);
@@ -80,9 +83,12 @@ describe("loadFlags / saveFlags / clearFlags", () => {
   it("coerces non-boolean stored values to false", () => {
     globalThis.localStorage.setItem(
       FLAGS_KEY,
-      JSON.stringify({ pretendAllMastered: "yes" }),
+      JSON.stringify({ pretendAllMastered: "yes", forceNextStreakMilestone: 1 }),
     );
-    expect(loadFlags()).toEqual({ pretendAllMastered: false });
+    expect(loadFlags()).toEqual({
+      pretendAllMastered: false,
+      forceNextStreakMilestone: false,
+    });
   });
 });
 
@@ -92,12 +98,17 @@ describe("anyFlagTrue / isAnyFlagOn", () => {
   });
 
   it("anyFlagTrue is true when any single flag is on", () => {
-    expect(anyFlagTrue({ pretendAllMastered: true })).toBe(true);
+    expect(
+      anyFlagTrue({ pretendAllMastered: true, forceNextStreakMilestone: false }),
+    ).toBe(true);
+    expect(
+      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: true }),
+    ).toBe(true);
   });
 
   it("isAnyFlagOn reads from localStorage", () => {
     expect(isAnyFlagOn()).toBe(false);
-    saveFlags({ pretendAllMastered: true });
+    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false });
     expect(isAnyFlagOn()).toBe(true);
   });
 });

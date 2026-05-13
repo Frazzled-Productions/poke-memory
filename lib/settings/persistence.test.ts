@@ -122,6 +122,7 @@ describe('loadSettings migration', () => {
       retentionTarget: 0.95,
       practiceScope: { gens: [1, 3], types: ['fire', 'water'], presets: ['starters' as const] },
       miniGameBestScore: 0,
+      seenStreakMilestones: [3, 7],
     };
     saveSettings(custom);
     const loaded = loadSettings();

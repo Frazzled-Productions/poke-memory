@@ -12,14 +12,22 @@
 export const UNLOCKED_KEY = "poke-memory:superuser";
 export const FLAGS_KEY = "poke-memory:superuser:flags:v1";
 
-export type SuperuserFlagKey = "pretendAllMastered";
+export type SuperuserFlagKey =
+  | "pretendAllMastered"
+  | "forceNextStreakMilestone";
 
 export type SuperuserFlags = {
   pretendAllMastered: boolean;
+  // When true, the next render of StreakBadge fires the smallest un-seen
+  // streak milestone celebration regardless of the actual streak count.
+  // Self-clears after the celebration is dismissed so QA gets a single
+  // forced fire per toggle. See #419.
+  forceNextStreakMilestone: boolean;
 };
 
 export const DEFAULT_FLAGS: SuperuserFlags = {
   pretendAllMastered: false,
+  forceNextStreakMilestone: false,
 };
 
 export function isUnlocked(): boolean {
@@ -40,6 +48,7 @@ export function loadFlags(): SuperuserFlags {
     const parsed = JSON.parse(raw) as Partial<SuperuserFlags> | null;
     return {
       pretendAllMastered: parsed?.pretendAllMastered === true,
+      forceNextStreakMilestone: parsed?.forceNextStreakMilestone === true,
     };
   } catch {
     return DEFAULT_FLAGS;
