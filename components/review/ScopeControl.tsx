@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import type { FormCategory } from "@/lib/pokemon/forms";
 import {
   EMPTY_SCOPE,
   countMatchingSpecies,
   isScopeEmpty,
   scopeLabel,
+  type FormCategoryFilter,
   type PracticeScope,
   type PracticeScopePreset,
 } from "@/lib/review/scope";
@@ -36,6 +38,29 @@ function toggleStr(arr: string[], v: string): string[] {
 function togglePreset(arr: PracticeScopePreset[], v: PracticeScopePreset): PracticeScopePreset[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
+function toggleCategory(arr: FormCategory[], v: FormCategory): FormCategory[] {
+  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+}
+
+/** Derive the set of non-default form categories present in the seed at runtime. */
+function presentFormCategories(seed: typeof SEED_POKEMON): FormCategory[] {
+  const seen = new Set<FormCategory>();
+  for (const p of seed) {
+    const cat = (p as { formCategory?: FormCategory }).formCategory;
+    if (cat && cat !== "default") seen.add(cat);
+  }
+  // Return in a stable, user-facing order.
+  const ORDER: FormCategory[] = ["regional", "forme", "mega", "gmax", "primal"];
+  return ORDER.filter((c) => seen.has(c));
+}
+
+const FORM_CATEGORY_LABELS: Partial<Record<FormCategory, string>> = {
+  regional: "Regional variants",
+  forme: "Out-of-battle formes",
+  mega: "Mega Evolutions",
+  gmax: "Gigantamax",
+  primal: "Primal Reversion",
+};
 
 const UNSELECTED_PILL =
   "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900";
@@ -48,6 +73,13 @@ export function ScopeControl({ scope, onChange }: Props) {
   const active = !isScopeEmpty(scope);
   const matchCount = countMatchingSpecies(SEED_POKEMON, scope);
   const totalCount = SEED_POKEMON.length;
+  const availableFormCategories = useMemo(() => presentFormCategories(SEED_POKEMON), []);
+
+  const formFilter: FormCategoryFilter = scope.formCategories ?? { mode: "all" };
+
+  function setFormFilter(fc: FormCategoryFilter): void {
+    onChange({ ...scope, formCategories: fc });
+  }
 
   return (
     <div className="w-full max-w-xl">
@@ -170,6 +202,75 @@ export function ScopeControl({ scope, onChange }: Props) {
                   </button>
                 );
               })}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Alternate forms
+            </legend>
+            <div className="mt-2 flex flex-col gap-2">
+              {(
+                [
+                  { value: "all", label: "Include all" },
+                  { value: "default-only", label: "Default form only" },
+                  { value: "include", label: "Choose categories…" },
+                ] as const
+              ).map(({ value, label }) => (
+                <label key={value} className="flex cursor-pointer items-center gap-2 text-xs">
+                  <input
+                    type="radio"
+                    name="form-filter-mode"
+                    value={value}
+                    checked={formFilter.mode === value}
+                    onChange={() => {
+                      if (value === "include") {
+                        setFormFilter({ mode: "include", categories: [] });
+                      } else {
+                        setFormFilter({ mode: value });
+                      }
+                    }}
+                    className="accent-rose-500"
+                  />
+                  <span className="text-zinc-700 dark:text-zinc-300">{label}</span>
+                </label>
+              ))}
+              {formFilter.mode === "include" && availableFormCategories.length > 0 ? (
+                <div className="ml-5 mt-1 flex flex-col gap-1.5">
+                  {availableFormCategories.map((cat) => {
+                    const checked =
+                      formFilter.mode === "include" && formFilter.categories.includes(cat);
+                    return (
+                      <label
+                        key={cat}
+                        className="flex cursor-pointer items-center gap-2 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            if (formFilter.mode === "include") {
+                              setFormFilter({
+                                mode: "include",
+                                categories: toggleCategory(formFilter.categories, cat),
+                              });
+                            }
+                          }}
+                          className="accent-rose-500"
+                        />
+                        <span className="text-zinc-700 dark:text-zinc-300">
+                          {FORM_CATEGORY_LABELS[cat] ?? cat}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
+              {formFilter.mode === "include" && availableFormCategories.length === 0 ? (
+                <p className="ml-5 text-xs text-zinc-400 dark:text-zinc-500">
+                  No alternate forms in the current seed.
+                </p>
+              ) : null}
             </div>
           </fieldset>
 

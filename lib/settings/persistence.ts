@@ -6,6 +6,7 @@ import {
   isScopeEmpty,
   readLegacyScope,
   clearLegacyScope,
+  parseFormCategoryFilter,
 } from "@/lib/review/scope";
 
 // localStorage key for all user-configurable settings
@@ -196,7 +197,10 @@ function validatePracticeScope(value: unknown): PracticeScope | null {
     seenPresets.add(p);
     presets.push(p);
   }
-  return { gens, types, presets };
+  // formCategories is additive — absent in pre-#450 persisted scopes; default
+  // to {mode:'all'} so existing users see no behaviour change.
+  const formCategories = parseFormCategoryFilter(v.formCategories);
+  return { gens, types, presets, formCategories };
 }
 
 /**

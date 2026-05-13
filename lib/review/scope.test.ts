@@ -13,6 +13,8 @@ import {
 import type { NameReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
+import type { FormCategory } from "@/lib/pokemon/forms";
+import type { PracticeScopePreset } from "./scope";
 
 function state(): ReviewState {
   return {
@@ -125,7 +127,12 @@ describe("loadScope / saveScope round-trip (deprecated shims)", () => {
   });
 
   it("survives a save → load round-trip", () => {
-    const scope = { gens: [1, 3], types: ["fire"], presets: ["starters" as const] };
+    const scope = {
+      gens: [1, 3],
+      types: ["fire"],
+      presets: ["starters" as const],
+      formCategories: { mode: "all" as const },
+    };
     saveScope(scope);
     expect(loadScope()).toEqual(scope);
   });
@@ -276,6 +283,7 @@ describe("readLegacyScope / clearLegacyScope", () => {
       gens: [1, 3],
       types: ["fire"],
       presets: ["starters"],
+      formCategories: { mode: "all" },
     });
   });
 
@@ -284,7 +292,12 @@ describe("readLegacyScope / clearLegacyScope", () => {
       LEGACY_KEY,
       JSON.stringify({ gens: [1], types: ["fire"] }),
     );
-    expect(readLegacyScope()).toEqual({ gens: [1], types: ["fire"], presets: [] });
+    expect(readLegacyScope()).toEqual({
+      gens: [1],
+      types: ["fire"],
+      presets: [],
+      formCategories: { mode: "all" },
+    });
   });
 
   it("does NOT mutate the key on read (clear is a separate step)", () => {
@@ -300,5 +313,174 @@ describe("readLegacyScope / clearLegacyScope", () => {
     // Second call must not throw on an already-empty key.
     expect(() => clearLegacyScope()).not.toThrow();
     expect(window.localStorage.getItem(LEGACY_KEY)).toBeNull();
+  });
+});
+
+// ─── formCategories ──────────────────────────────────────────────────────────
+
+/**
+ * Build a NameReviewCard for an alternate form (e.g. Alolan Raichu).
+ * id = 10100 (PokéAPI alternate-form ID), speciesId = 26 (Raichu).
+ */
+function formCard(
+  id: number,
+  speciesId: number,
+  formCategory: FormCategory,
+  types: string[] = ["electric"],
+): NameReviewCard {
+  return {
+    ...nameCard(speciesId, types),
+    id,
+    speciesId,
+    isDefaultForm: false,
+    formCategory,
+    displayName: `Form-${id}`,
+    name: `form-${id}`,
+    subjectKey: String(id),
+  };
+}
+
+/**
+ * Build a SeedPokemon entry for an alternate form, for use in
+ * `countMatchingSpecies` tests.
+ */
+function makeFormSeed(
+  id: number,
+  speciesId: number,
+  formCategory: FormCategory,
+  types: string[] = ["electric"],
+): SeedPokemon {
+  return {
+    ...makeSeed(speciesId, types),
+    id,
+    speciesId,
+    isDefaultForm: false,
+    formCategory,
+    formSlug: "alola",
+    displayName: `Form-${id}`,
+  };
+}
+
+describe("formCategories: new users get mode:'all' default", () => {
+  it("EMPTY_SCOPE has formCategories mode:'all'", () => {
+    expect(EMPTY_SCOPE.formCategories).toEqual({ mode: "all" });
+  });
+
+  it("isScopeEmpty is true for EMPTY_SCOPE (formCategories:all does not activate scope)", () => {
+    expect(isScopeEmpty(EMPTY_SCOPE)).toBe(true);
+  });
+
+  it("isScopeEmpty is false when formCategories is default-only", () => {
+    expect(
+      isScopeEmpty({ gens: [], types: [], presets: [], formCategories: { mode: "default-only" } }),
+    ).toBe(false);
+  });
+
+  it("isScopeEmpty is false when formCategories is include", () => {
+    expect(
+      isScopeEmpty({
+        gens: [],
+        types: [],
+        presets: [],
+        formCategories: { mode: "include", categories: ["regional"] },
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("formCategories: persisted scope without field migrates to mode:'all'", () => {
+  it("cardMatchesScope treats a scope without formCategories as mode:'all'", () => {
+    // Pre-#450 scope objects omit the formCategories field.
+    const legacyScope = { gens: [1], types: [], presets: [] };
+    const alolan = formCard(10100, 26, "regional");
+    // scope has gens:[1]; Raichu is Gen 1 — even the form card should pass.
+    expect(cardMatchesScope(alolan, legacyScope)).toBe(true);
+  });
+
+  it("countMatchingSpecies treats a scope without formCategories as mode:'all'", () => {
+    const legacyScope = { gens: [1], types: [], presets: [] };
+    const seed: readonly SeedPokemon[] = [
+      makeSeed(26, ["electric"]),                      // Raichu (default, Gen I)
+      makeFormSeed(10100, 26, "regional", ["electric"]), // Alolan Raichu (form, Gen I)
+    ];
+    // Both should match since mode defaults to 'all'.
+    expect(countMatchingSpecies(seed, legacyScope)).toBe(2);
+  });
+});
+
+describe("formCategories: default-only filter", () => {
+  const scope = { gens: [] as number[], types: [] as string[], presets: [] as PracticeScopePreset[], formCategories: { mode: "default-only" as const } };
+
+  it("matches a default-form card", () => {
+    expect(cardMatchesScope(nameCard(26), scope)).toBe(true);
+  });
+
+  it("excludes an alternate-form card (Alolan Raichu)", () => {
+    const alolan = formCard(10100, 26, "regional");
+    expect(cardMatchesScope(alolan, scope)).toBe(false);
+  });
+
+  it("excludes a forme card (Rotom-Heat)", () => {
+    const rotom = formCard(10008, 479, "forme", ["fire", "electric"]);
+    expect(cardMatchesScope(rotom, scope)).toBe(false);
+  });
+
+  it("countMatchingSpecies excludes form entries from the count", () => {
+    const seed: readonly SeedPokemon[] = [
+      makeSeed(26, ["electric"]),                        // Raichu default
+      makeFormSeed(10100, 26, "regional", ["electric"]), // Alolan Raichu
+      makeSeed(479, ["electric"]),                       // Rotom default
+      makeFormSeed(10008, 479, "forme", ["fire", "electric"]), // Rotom-Heat
+    ];
+    // Only the 2 default forms should match.
+    expect(countMatchingSpecies(seed, scope)).toBe(2);
+  });
+});
+
+describe("formCategories: include regional only", () => {
+  const scope = {
+    gens: [] as number[],
+    types: [] as string[],
+    presets: [] as PracticeScopePreset[],
+    formCategories: { mode: "include" as const, categories: ["regional"] as FormCategory[] },
+  };
+
+  it("matches the default form of a species", () => {
+    expect(cardMatchesScope(nameCard(26), scope)).toBe(true);
+  });
+
+  it("matches a regional form card", () => {
+    const alolan = formCard(10100, 26, "regional");
+    expect(cardMatchesScope(alolan, scope)).toBe(true);
+  });
+
+  it("excludes a non-regional alternate form (forme)", () => {
+    const rotom = formCard(10008, 479, "forme", ["fire", "electric"]);
+    expect(cardMatchesScope(rotom, scope)).toBe(false);
+  });
+
+  it("countMatchingSpecies counts default + regional but not other forms", () => {
+    const seed: readonly SeedPokemon[] = [
+      makeSeed(26, ["electric"]),
+      makeFormSeed(10100, 26, "regional", ["electric"]),  // match
+      makeSeed(479, ["electric"]),
+      makeFormSeed(10008, 479, "forme", ["fire", "electric"]), // no match
+    ];
+    expect(countMatchingSpecies(seed, scope)).toBe(3); // Raichu + Alolan Raichu + Rotom default
+  });
+});
+
+describe("formCategories: mode:'all' (passthrough)", () => {
+  const scope = {
+    gens: [1],
+    types: [] as string[],
+    presets: [] as PracticeScopePreset[],
+    formCategories: { mode: "all" as const },
+  };
+
+  it("includes a Gen I form card when mode is all", () => {
+    // Alolan Raichu: speciesId=26 → Gen I → passes gens:[1]
+    const alolan = formCard(10100, 26, "regional");
+    expect(cardMatchesScope(alolan, scope)).toBe(true);
   });
 });
