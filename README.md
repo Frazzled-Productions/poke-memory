@@ -14,7 +14,7 @@
 
 **poke-memory** is a spaced-repetition app that gives you a fighting chance. Each species becomes a flashcard. You grade yourself on each one. An Anki-style scheduler decides when the card comes back — easy ones drift out to weeks and months, the ones you fluff come back tomorrow.
 
-**[poke-memory-alpha.vercel.app](https://poke-memory-alpha.vercel.app)** — try it now, no sign-in needed.
+**[pokememory.com](https://pokememory.com)** — try it now, no sign-in needed.
 
 ## Screenshots
 
