@@ -1,0 +1,67 @@
+name: Refresh user count badge
+
+# Daily refresh of `.github/stats/users.json` for the README user-count
+# Shields.io badge. See #400 and AGENTS.md "Privacy" / "Sync" sections.
+#
+# Uses the existing SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF secrets
+# (already wired up for migration-check.yml). The bot App identity from
+# auto-release.yml is reused so the commit lands on `main` despite branch
+# protection.
+#
+# The commit message carries the GitHub-native skip marker so this run
+# does not retrigger any push-triggered workflow (CI, auto-release,
+# migration-check). The marker is platform-level — once present in a
+# commit message, GitHub does not dispatch any push or pull_request
+# workflows for that commit, so no per-workflow guard is required here.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: refresh-user-count
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.repository == 'fraserbrookhouse/poke-memory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: write
+
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Refresh user count JSON
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: node scripts/refresh-user-count.mjs
+
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet .github/stats/users.json; then
+            echo "No change — skipping commit."
+            exit 0
+          fi
+          git config user.name "poke-memory-bot[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
+          git add .github/stats/users.json
+          git commit -m "chore(stats): refresh user count [skip ci]"
+          git push origin HEAD:main
