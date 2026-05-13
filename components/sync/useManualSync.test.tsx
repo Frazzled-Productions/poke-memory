@@ -482,6 +482,7 @@ describe("useManualSync", () => {
     } as ReturnType<typeof loadSettings>;
 
     vi.mocked(loadSession).mockReturnValue(null);
+    vi.mocked(pullSession).mockResolvedValue([]);
     vi.mocked(hasStoredSettings).mockReturnValue(false);
     vi.mocked(pullSettings).mockImplementation(async () => {
       order.push("pull-settings");
