@@ -16,6 +16,7 @@ function buildUrl(filters: PokedexFilters): string {
   if (filters.query) params.set("q", filters.query);
   if (filters.types.length > 0) params.set("type", filters.types.join(","));
   if (filters.gen !== null) params.set("gen", String(filters.gen));
+  if (filters.hasAlternateForms) params.set("forms", "1");
   const qs = params.toString();
   return qs ? `/pokedex?${qs}` : "/pokedex";
 }
@@ -72,6 +73,13 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
     [router, filters],
   );
 
+  const handleAlternateFormsToggle = useCallback(() => {
+    router.replace(
+      buildUrl({ ...filters, hasAlternateForms: !filters.hasAlternateForms }),
+      { scroll: false },
+    );
+  }, [router, filters]);
+
   const filtered = filterPokemon(enrichedPokemon, {
     ...filters,
     query: localQuery,
@@ -84,6 +92,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
         onQueryChange={handleQueryChange}
         onTypeToggle={handleTypeToggle}
         onGenChange={handleGenChange}
+        onAlternateFormsToggle={handleAlternateFormsToggle}
       />
       <PokedexGrid
         pokemon={filtered}

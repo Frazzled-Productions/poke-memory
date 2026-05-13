@@ -9,6 +9,7 @@ import { TYPE_COLORS } from "@/lib/pokemon/types";
 import type { CardClassOrPending } from "@/lib/review/useCardClass";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { speakName } from "@/lib/audio/tts";
+import { playCry } from "@/lib/audio/cry";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -105,7 +106,101 @@ function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
   return stages;
 }
 
-export function PokemonDetailDisclosure({ pokemon }: { pokemon: SeedPokemon }) {
+// ---------------------------------------------------------------------------
+// FormBlock — collapsible block for a single alternate form
+// ---------------------------------------------------------------------------
+
+function FormBlock({ form }: { form: SeedPokemon }) {
+  return (
+    <details className="group rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <summary className="flex cursor-pointer select-none list-none items-center gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded-lg">
+        {/* Sprite thumbnail */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/sprites/pokemon/${form.id}.png`}
+          alt={form.displayName}
+          width={40}
+          height={40}
+          className="h-10 w-10 object-contain"
+        />
+        <span className="flex-1 text-sm font-medium text-foreground">
+          {form.displayName}
+        </span>
+        {/* Chevron */}
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        >
+          <path
+            d="M4 6L8 10L12 6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </summary>
+
+      <div className="border-t border-zinc-200 px-4 pb-4 pt-3 dark:border-zinc-800">
+        {/* Full sprite */}
+        <div className="mb-3 flex justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/sprites/pokemon/${form.id}.png`}
+            alt={form.displayName}
+            width={120}
+            height={120}
+            className="h-28 w-28 object-contain"
+          />
+        </div>
+
+        {/* Types */}
+        <div className="mb-3 flex justify-center gap-2" aria-label="Types">
+          {form.types.map((type) => {
+            const colors = TYPE_COLORS[type] ?? { bg: "bg-zinc-400", text: "text-white" };
+            return (
+              <span
+                key={type}
+                className={[
+                  "rounded-full px-3 py-0.5 text-xs font-semibold capitalize",
+                  colors.bg,
+                  colors.text,
+                ].join(" ")}
+              >
+                {type}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Cry preview */}
+        {form.cryUrl && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              aria-label={`Play ${form.displayName} cry`}
+              onClick={() => playCry(form.cryUrl)}
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            >
+              <span aria-hidden="true">🔊</span>
+              Play cry
+            </button>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
+export function PokemonDetailDisclosure({
+  pokemon,
+  forms = [],
+}: {
+  pokemon: SeedPokemon;
+  forms?: SeedPokemon[];
+}) {
   const { flags } = useSuperuser();
   const { id, name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
   const rawCardClass = useCardClass(id);
@@ -276,6 +371,22 @@ export function PokemonDetailDisclosure({ pokemon }: { pokemon: SeedPokemon }) {
                   ))}
                 </div>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {forms.length > 0 && (
+        <section aria-labelledby="forms-heading" className="mt-10">
+          <h2
+            id="forms-heading"
+            className="mb-4 text-sm font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500"
+          >
+            Forms
+          </h2>
+          <div className="flex flex-col gap-2">
+            {forms.map((form) => (
+              <FormBlock key={form.id} form={form} />
             ))}
           </div>
         </section>
