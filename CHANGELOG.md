@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.8.3] — 2026-05-13
+
+### Added
+
+- Reverse-direction evolution cards: opt-in card type that quizzes the opposite direction of every forward evolution edge ("Which Pokémon evolves into Jolteon if you use a Thunder Stone?"). Enable from **Settings → Reverse-evolution cards**. Shares the same daily new/review budget as forward evolution cards.
+
 ## [0.8.2] — 2026-05-13
 
 ### Removed
@@ -491,7 +497,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.3
 [0.8.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.2
 [0.8.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.1
 [0.8.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.0
