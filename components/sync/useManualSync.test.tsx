@@ -455,4 +455,50 @@ describe("useManualSync", () => {
     expect(savedCall?.cards[0].state.lastReview).toBe("2026-05-13");
     expect(savedCall?.cards[0].state.reps).toBe(5);
   });
+
+  // #391: a brand-new device with no local settings stored must pull cloud
+  // settings and save them before the merge step builds the base — otherwise
+  // the seed defaults (reverse/cry disabled) silently drop cloud rows for
+  // those types when the merge iterates over local cards.
+  it("brand-new device pulls and saves cloud settings before merging cards", async () => {
+    const order: string[] = [];
+
+    vi.mocked(loadSession).mockReturnValue(null);
+    vi.mocked(hasStoredSettings).mockReturnValue(false);
+    vi.mocked(pullSettings).mockImplementation(async () => {
+      order.push("pull-settings");
+      return {
+        nameCardsEnabled: true,
+        evolutionCardsEnabled: true,
+        reverseCardsEnabled: true,
+        reverseEvolutionCardsEnabled: false,
+        cryCardsEnabled: true,
+      } as ReturnType<typeof loadSettings>;
+    });
+    vi.mocked(saveSettings).mockImplementation(() => {
+      order.push("save-settings");
+    });
+    vi.mocked(saveSession).mockImplementation(() => {
+      order.push("save-session");
+      return { ok: true };
+    });
+
+    const { result } = renderHook(() => useManualSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      result.current.syncNow();
+    });
+
+    await waitFor(() => {
+      expect(result.current.syncState).toBe("success");
+    });
+
+    // saveSettings must run before saveSession (which persists the merged
+    // base built from the just-pulled settings).
+    const settingsSaveIdx = order.indexOf("save-settings");
+    const sessionSaveIdx = order.indexOf("save-session");
+    expect(settingsSaveIdx).toBeGreaterThan(-1);
+    expect(sessionSaveIdx).toBeGreaterThan(-1);
+    expect(sessionSaveIdx).toBeGreaterThan(settingsSaveIdx);
+  });
 });

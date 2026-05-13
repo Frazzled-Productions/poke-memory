@@ -12,6 +12,7 @@ import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 import { loadStreakData, saveStreakData, STREAK_UPDATED_EVENT } from "@/lib/streak/persistence";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_EVOLUTION_CARDS, SEED_POKEMON } from "@/lib/pokemon/seed";
 
 export type ManualSyncState = "idle" | "syncing" | "success" | "error";
@@ -114,7 +115,22 @@ export function useManualSync(
       } else {
         // Brand-new device: build a fresh base session so cloud state has
         // a card list to merge into; otherwise cloud rows would be discarded.
-        const base = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS);
+        //
+        // Pull cloud settings FIRST when local has none — otherwise the base
+        // would use DEFAULT_SETTINGS (reverse/cry disabled) and cloud rows for
+        // those types would be silently dropped by the merge (#391).
+        if (!hasStoredSettings()) {
+          const cloudSettings = await pullSettings(client, userId);
+          if (cancelledRef.current) return;
+          if (cloudSettings !== null) saveSettings(cloudSettings);
+        }
+        const settings = loadSettings();
+        const base = buildSession(
+          SEED_POKEMON,
+          SEED_EVOLUTION_CARDS,
+          undefined,
+          seedOptsFromSettings(settings),
+        );
         mergedCards = mergeCloudIntoLocalSilent(
           base,
           cloudRows,

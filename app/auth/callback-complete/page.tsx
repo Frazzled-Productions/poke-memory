@@ -6,7 +6,10 @@ import { hasCloudData, mergeCloudIntoLocal, pullSession, pushSession } from "@/l
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS, buildSession } from "@/lib/review/session";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { pullSettings } from "@/lib/sync/settings";
+import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import type { CloudRow } from "@/lib/sync/cloud";
 import type { ReviewableCard } from "@/lib/review/session";
 
@@ -82,7 +85,24 @@ export default function CallbackCompletePage() {
       if (!hasLocal && cloudHasData) {
         // When localSession is null (brand-new device), seed a fresh session so
         // cloud state has a base to merge into; otherwise cloud data is silently lost.
-        const base = localSession !== null ? localSession.cards : buildSession(SEED_POKEMON);
+        //
+        // Pull cloud settings FIRST when local has no stored settings — otherwise
+        // the base is built with DEFAULT_SETTINGS (reverse/cry disabled) and cloud
+        // rows for those types are silently dropped by the merge (see #391).
+        if (!hasStoredSettings()) {
+          try {
+            const cloudSettings = await pullSettings(supabase, user.id);
+            if (cloudSettings !== null) saveSettings(cloudSettings);
+          } catch {
+            // Best-effort: fall through to default settings.
+          }
+          if (cancelled) return;
+        }
+        const settings = loadSettings();
+        const base =
+          localSession !== null
+            ? localSession.cards
+            : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, seedOptsFromSettings(settings));
         const limits = localSession?.limits ?? DEFAULT_LIMITS;
         const merged = mergeCloudIntoLocal(base, cloudRows!);
         saveSession({ cards: merged, limits });
