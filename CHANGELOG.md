@@ -6,6 +6,13 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.7.21] — 2026-05-13
+
+### Changed
+
+- Evolution cards now ask one question per branch, with the trigger named in the prompt — `What does Eevee evolve into using a Thunder Stone?` → Jolteon. Branching pre-evolutions (Eevee, Tyrogue, Slowpoke) become several independently-gradeable cards instead of one card revealing every branch at once.
+- One-time reset: evolution-card FSRS progress is cleared on first load after this release; name, reverse, and cry cards are untouched. Existing cloud rows for the old per-pre-evo cards are orphaned in place (no destructive cloud writes).
+
 ## [0.7.20] — 2026-05-13
 
 ### Fixed
@@ -466,7 +473,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.7.20...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.7.21...HEAD
+[0.7.21]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.21
 [0.7.20]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.20
 [0.7.19]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.19
 [0.7.18]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.18
