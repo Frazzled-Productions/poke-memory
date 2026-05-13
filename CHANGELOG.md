@@ -6,6 +6,14 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.38] — 2026-05-13
+
+### Added
+
+- Pokédex now surfaces alternate forms on species detail pages: each non-default form (regional variants, formes, etc.) appears as a collapsible block with sprite, types, and cry preview.
+- Search in the Pokédex now matches alternate-form display names — typing "alolan" surfaces Raichu, Vulpix, Sandshrew, and other Alolan species tiles.
+- New "Has alternate forms" chip in the Pokédex filter bar narrows the grid to species that have at least one non-default variety.
+
 ## [0.9.37] — 2026-05-13
 
 ### Added
@@ -764,7 +772,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.37...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.38...HEAD
+[0.9.38]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.38
 [0.9.37]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.37
 [0.9.36]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.36
 [0.9.35]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.35
