@@ -94,6 +94,19 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 
 ---
 
+### `version-bump-gate.yml` — Version bump gate
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (opened, synchronize, reopened, labeled, unlabeled) |
+| **Job** | `gate` |
+| **What it does** | Scans `changelog.d/unreleased/*.md` frontmatter for `kind: minor-bump` or `kind: major-bump`. If found and the PR lacks the `version-bump:approved` label, the job fails. |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork contributors cannot apply the label, so running on fork PRs would produce an unresolvable failure). |
+| **Required check** | No — informational. Failure blocks the merge socially but is not enforced by the `main-protection` ruleset. Add `Check version bump approval` to the ruleset to harden. |
+| **Concurrency** | Cancels concurrent runs on the same PR. |
+
+---
+
 ### `migration-check.yml` — Migration drift check
 
 | | |

@@ -5,6 +5,10 @@ name: Version bump gate
 # `version-bump:approved` label. Patch bumps are the only fully-automatic
 # outcome; anything higher requires explicit user approval.
 #
+# Note: `major-bump` is recognised by the gate but is not yet handled by
+# `cut-release.mjs` — a PR landing a `major-bump` fragment would fail at
+# release time until that script is extended.
+#
 # Closes #371.
 
 on:
@@ -12,7 +16,7 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 concurrency:
-  group: version-bump-gate-${{ github.ref }}
+  group: version-bump-gate-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -20,6 +24,7 @@ jobs:
     name: Check version bump approval
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    if: github.event.pull_request.head.repo.fork == false
     permissions:
       contents: read
     steps:
@@ -33,7 +38,10 @@ jobs:
           shopt -s nullglob
           NON_PATCH=()
           for f in changelog.d/unreleased/*.md; do
-            if grep -Eq '^kind:[[:space:]]*(minor-bump|major-bump)[[:space:]]*$' "$f"; then
+            # Scan only the YAML frontmatter (between the two `---` delimiters)
+            # to avoid false positives from example text in the bullet body.
+            if awk 'BEGIN{f=0} /^---$/{f++; next} f==1{print}' "$f" \
+                | grep -Eq '^kind:[[:space:]]*(minor-bump|major-bump)[[:space:]]*$'; then
               NON_PATCH+=("$f")
             fi
           done
@@ -46,6 +54,7 @@ jobs:
           echo "Found non-patch version-bump fragment(s):"
           printf '  - %s\n' "${NON_PATCH[@]}"
 
+          # jq -e exits non-zero when no element matches; stdout suppressed.
           if echo "$PR_LABELS" | jq -e '.[] | select(.name == "version-bump:approved")' >/dev/null; then
             echo "PR has 'version-bump:approved' label — gate passes."
             exit 0
