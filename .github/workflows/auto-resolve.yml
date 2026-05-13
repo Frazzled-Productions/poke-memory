@@ -108,11 +108,9 @@ jobs:
 
       - name: Configure git identity
         if: steps.preflight.outputs.skip == 'false'
-        env:
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
-          git config user.name "${APP_SLUG}[bot]"
-          git config user.email "${{ vars.BOT_APP_ID }}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git config user.name "poke-memory-bot[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
 
       - name: Count existing auto-resolve markers
         id: markers

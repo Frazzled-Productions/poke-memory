@@ -474,11 +474,9 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure git identity
-        env:
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
-          git config user.name "${APP_SLUG}[bot]"
-          git config user.email "${{ vars.BOT_APP_ID }}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git config user.name "poke-memory-bot[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
 
       - uses: actions/setup-node@v6
         with:
@@ -665,8 +663,6 @@ jobs:
           START_SHA: ${{ steps.start.outputs.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LOG: /home/runner/work/_temp/claude-execution-output.json
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
-          BOT_APP_ID: ${{ vars.BOT_APP_ID }}
         run: |
           set -euo pipefail
 
@@ -746,8 +742,8 @@ jobs:
           if [ "$HALTED" = true ] && [ -n "$BRANCH" ]; then
             if ! git diff --quiet HEAD 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard)" ]; then
               git add -A
-              if ! git -c user.name="${APP_SLUG}[bot]" \
-                       -c user.email="${BOT_APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com" \
+              if ! git -c user.name="poke-memory-bot[bot]" \
+                       -c user.email="${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com" \
                        commit -m "WIP: halted run on #$ISSUE"; then
                 echo "::warning::WIP salvage commit failed — staged changes will not be pushed to origin"
               fi
@@ -933,11 +929,9 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure git identity
-        env:
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
-          git config user.name "${APP_SLUG}[bot]"
-          git config user.email "${{ vars.BOT_APP_ID }}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git config user.name "poke-memory-bot[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
 
       - uses: actions/setup-node@v6
         with:
