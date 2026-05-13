@@ -1,0 +1,65 @@
+name: Version bump gate
+
+# Blocks PRs that request a non-patch version bump (via a changelog fragment
+# with `kind: minor-bump` or `kind: major-bump`) unless the PR carries the
+# `version-bump:approved` label. Patch bumps are the only fully-automatic
+# outcome; anything higher requires explicit user approval.
+#
+# Note: `major-bump` is recognised by the gate but is not yet handled by
+# `cut-release.mjs` — a PR landing a `major-bump` fragment would fail at
+# release time until that script is extended.
+#
+# Closes #371.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: version-bump-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Check version bump approval
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: github.event.pull_request.head.repo.fork == false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check for non-patch version bump fragments
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          NON_PATCH=()
+          for f in changelog.d/unreleased/*.md; do
+            # Scan only the YAML frontmatter (between the two `---` delimiters)
+            # to avoid false positives from example text in the bullet body.
+            if awk 'BEGIN{f=0} /^---$/{f++; next} f==1{print}' "$f" \
+                | grep -Eq '^kind:[[:space:]]*(minor-bump|major-bump)[[:space:]]*$'; then
+              NON_PATCH+=("$f")
+            fi
+          done
+
+          if [ ${#NON_PATCH[@]} -eq 0 ]; then
+            echo "No non-patch version-bump fragments present — gate passes."
+            exit 0
+          fi
+
+          echo "Found non-patch version-bump fragment(s):"
+          printf '  - %s\n' "${NON_PATCH[@]}"
+
+          # jq -e exits non-zero when no element matches; stdout suppressed.
+          if echo "$PR_LABELS" | jq -e '.[] | select(.name == "version-bump:approved")' >/dev/null; then
+            echo "PR has 'version-bump:approved' label — gate passes."
+            exit 0
+          fi
+
+          echo "::error::This PR requests a non-patch version bump but is missing the 'version-bump:approved' label."
+          echo "::error::Apply the label to approve the bump, or remove the fragment(s) above to default to a patch release."
+          exit 1
