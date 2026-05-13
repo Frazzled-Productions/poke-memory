@@ -158,13 +158,22 @@ describe("isBackupFile", () => {
     expect(isBackupFile(makeValidBackup({ cards: [card as BackupFile["cards"][number]] }))).toBe(false);
   });
 
-  it("accepts an evolution card with valid evolvesInto shape", () => {
+  it("accepts an evolution card with the new edge shape (postEvoId-keyed)", () => {
+    const card = {
+      ...makeMinimalCard(1_500_001),
+      cardType: "evolution",
+      postEvoId: 2,
+    };
+    expect(isBackupFile(makeValidBackup({ cards: [card as unknown as BackupFile["cards"][number]] }))).toBe(true);
+  });
+
+  it("accepts an evolution card with legacy evolvesInto shape (gets filtered on import)", () => {
     const card = {
       ...makeMinimalCard(1),
       cardType: "evolution",
       evolvesInto: [{ name: "ivysaur", spriteUrl: "" }],
     };
-    expect(isBackupFile(makeValidBackup({ cards: [card as BackupFile["cards"][number]] }))).toBe(true);
+    expect(isBackupFile(makeValidBackup({ cards: [card as unknown as BackupFile["cards"][number]] }))).toBe(true);
   });
 
   it("accepts an evolution card with legacy evolvesIntoNames shape", () => {
@@ -356,9 +365,9 @@ describe("validateBackup + applyBackup", () => {
     const card = {
       ...makeMinimalCard(evoCard.id),
       cardType: "evolution",
-      evolvesInto: [{ name: "ivysaur", spriteUrl: "" }],
+      postEvoId: evoCard.postEvoId,
     };
-    const backup = makeValidBackup({ cards: [card as BackupFile["cards"][number]] });
+    const backup = makeValidBackup({ cards: [card as unknown as BackupFile["cards"][number]] });
     const result = await validateBackup(makeBackupFile(backup));
     expect(result.ok).toBe(true);
   });

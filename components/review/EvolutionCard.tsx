@@ -1,48 +1,46 @@
 import Image from "next/image";
-import type { EvolutionTarget } from "@/lib/pokemon/seed";
 import type { PokemonFact } from "@/lib/pokemon/facts";
 
 type Props = {
-  spriteUrl: string;
-  name: string;
-  evolvesInto: EvolutionTarget[];
+  preEvoSpriteUrl: string;
+  preEvoName: string;
+  postEvoName: string;
+  postEvoSpriteUrl: string;
+  triggerPhrase: string | null;
   revealed: boolean;
   fact?: PokemonFact | null;
 };
 
-export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: Props) {
-  const isBranching = evolvesInto.length > 1;
-  const spriteSize = isBranching ? 96 : 320;
-
+export function EvolutionCard({
+  preEvoSpriteUrl,
+  preEvoName,
+  postEvoName,
+  postEvoSpriteUrl,
+  triggerPhrase,
+  revealed,
+  fact,
+}: Props) {
   return (
     <div className="flex flex-col items-center gap-2 sm:gap-4">
       {revealed ? (
         <>
           <div
-            className="flex flex-wrap gap-4 justify-center"
+            className="flex flex-col items-center gap-1"
             aria-live="polite"
             aria-atomic="true"
           >
-            {evolvesInto.map((evo) => (
-              <div key={evo.name} className="flex flex-col items-center gap-1">
-                <Image
-                  src={evo.spriteUrl}
-                  alt={evo.name}
-                  width={spriteSize}
-                  height={spriteSize}
-                  className={
-                    isBranching
-                      ? "object-contain"
-                      : "h-48 w-48 object-contain sm:h-80 sm:w-80"
-                  }
-                />
-                <span className="text-lg font-semibold tracking-wide capitalize text-foreground">
-                  {evo.name}
-                </span>
-              </div>
-            ))}
+            <Image
+              src={postEvoSpriteUrl}
+              alt={postEvoName}
+              width={320}
+              height={320}
+              className="h-48 w-48 object-contain sm:h-80 sm:w-80"
+            />
+            <span className="text-lg font-semibold tracking-wide capitalize text-foreground">
+              {postEvoName}
+            </span>
           </div>
-          {!isBranching && fact && (
+          {fact && (
             <div className="w-full mt-1 text-center sm:mt-2">
               <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                 {fact.label}
@@ -53,7 +51,7 @@ export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: 
         </>
       ) : (
         <Image
-          src={spriteUrl}
+          src={preEvoSpriteUrl}
           alt="A Pokémon sprite — answer hidden"
           width={320}
           height={320}
@@ -63,7 +61,8 @@ export function EvolutionCard({ spriteUrl, name, evolvesInto, revealed, fact }: 
       )}
       <div className="flex flex-col items-center gap-1">
         <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          What does <span className="capitalize">{name}</span> evolve into?
+          What does <span className="capitalize">{preEvoName}</span> evolve into
+          {triggerPhrase ? <> {triggerPhrase}</> : null}?
         </p>
         <div className="min-h-[2.5rem] flex flex-col items-center justify-center">
           {!revealed && (

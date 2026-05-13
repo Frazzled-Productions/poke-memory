@@ -52,6 +52,29 @@ function makeCard(seedPokemon: SeedPokemon, stateOverrides: Partial<ReturnType<t
   };
 }
 
+function makeEvoEdge(opts: {
+  id?: number;
+  preEvoId?: number;
+  preEvoName?: string;
+  postEvoId?: number;
+  postEvoName?: string;
+  postEvoSpriteUrl?: string;
+  preEvoSpriteUrl?: string;
+  triggerPhrase?: string | null;
+} = {}): EvolutionCard {
+  return {
+    cardType: 'evolution',
+    id: opts.id ?? 1_500_001,
+    preEvoId: opts.preEvoId ?? 1,
+    preEvoName: opts.preEvoName ?? 'bulbasaur',
+    preEvoSpriteUrl: opts.preEvoSpriteUrl ?? '',
+    postEvoId: opts.postEvoId ?? 2,
+    postEvoName: opts.postEvoName ?? 'ivysaur',
+    postEvoSpriteUrl: opts.postEvoSpriteUrl ?? '',
+    triggerPhrase: opts.triggerPhrase ?? null,
+  };
+}
+
 describe('hydrateSession', () => {
   it('appends new seed cards not present in saved session', () => {
     const saved = [makeCard(makeSeedPokemon(1))];
@@ -99,34 +122,16 @@ describe('hydrateSession', () => {
   it('appends evolution cards not present in saved session', () => {
     const saved = [makeCard(makeSeedPokemon(1))];
     const seed = [makeSeedPokemon(1)];
-    const evoSeed = [
-      {
-        cardType: 'evolution' as const,
-        id: 1_000_001,
-        pokemonId: 1,
-        name: 'bulbasaur',
-        spriteUrl: '',
-        evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
-      },
-    ];
+    const evoSeed = [makeEvoEdge({ id: 1_500_001 })];
     const result = hydrateSession(saved, seed, evoSeed, NOW);
     expect(result).toHaveLength(2);
-    expect(result.find((c) => c.id === 1_000_001)).toBeDefined();
+    expect(result.find((c) => c.id === 1_500_001)).toBeDefined();
   });
 });
 
 describe('buildSession', () => {
   const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
-  const evoSeed: EvolutionCard[] = [
-    {
-      cardType: 'evolution',
-      id: 1_000_001,
-      pokemonId: 1,
-      name: 'bulbasaur',
-      spriteUrl: '',
-      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
-    },
-  ];
+  const evoSeed: EvolutionCard[] = [makeEvoEdge({ id: 1_500_001 })];
 
   it('assigns cardType "name" to name cards', () => {
     const result = buildSession(seed, evoSeed, NOW);
@@ -139,7 +144,7 @@ describe('buildSession', () => {
     const result = buildSession(seed, evoSeed, NOW);
     const evoCards = result.filter((c) => c.cardType === 'evolution');
     expect(evoCards).toHaveLength(1);
-    expect(evoCards[0].id).toBe(1_000_001);
+    expect(evoCards[0].id).toBe(1_500_001);
   });
 
   it('produces total count of name + evo cards', () => {
@@ -149,30 +154,29 @@ describe('buildSession', () => {
 });
 
 describe('hydrateSession (evolution refresh)', () => {
-  it('refreshes stale evolvesInto on existing evolution cards', () => {
+  it('refreshes stale sprite/trigger fields on existing evolution edge cards while preserving FSRS state', () => {
     const stale: EvolutionReviewCard = {
-      cardType: 'evolution',
-      id: 1_000_001,
-      pokemonId: 1,
-      name: 'bulbasaur',
-      spriteUrl: 'old-url',
-      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
-      state: { ...initialReviewState(NOW), reps:7, scheduledDays:30 },
+      ...makeEvoEdge({
+        id: 1_500_001,
+        preEvoSpriteUrl: 'old-pre',
+        postEvoSpriteUrl: 'old-post',
+        triggerPhrase: null,
+      }),
+      state: { ...initialReviewState(NOW), reps: 7, scheduledDays: 30 },
     };
-    const freshEvo: EvolutionCard = {
-      cardType: 'evolution',
-      id: 1_000_001,
-      pokemonId: 1,
-      name: 'bulbasaur',
-      spriteUrl: 'new-url',
-      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }, { name: 'venusaur', spriteUrl: '' }],
-    };
+    const freshEvo = makeEvoEdge({
+      id: 1_500_001,
+      preEvoSpriteUrl: 'new-pre',
+      postEvoSpriteUrl: 'new-post',
+      triggerPhrase: 'at level 16',
+    });
     const result = hydrateSession([stale], [], [freshEvo], NOW);
     expect(result).toHaveLength(1);
     const card = result[0];
     if (card.cardType !== 'evolution') throw new Error('Expected evolution card');
-    expect(card.evolvesInto.map((e) => e.name)).toEqual(['ivysaur', 'venusaur']);
-    expect(card.spriteUrl).toBe('new-url');
+    expect(card.preEvoSpriteUrl).toBe('new-pre');
+    expect(card.postEvoSpriteUrl).toBe('new-post');
+    expect(card.triggerPhrase).toBe('at level 16');
     expect(card.state.reps).toBe(7);
     expect(card.state.scheduledDays).toBe(30);
   });
@@ -232,13 +236,17 @@ describe('migrateReviewCard', () => {
     expect(legacy.cardType).toBe('name');
   });
 
-  it('leaves an explicit cardType of "evolution" untouched', () => {
+  it('leaves an explicit cardType of "evolution" untouched (new edge-card shape)', () => {
     const card: Record<string, unknown> = {
       cardType: 'evolution',
-      id: 1_000_001,
-      name: 'bulbasaur',
-      spriteUrl: '',
-      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
+      id: 1_500_001,
+      preEvoId: 1,
+      preEvoName: 'bulbasaur',
+      preEvoSpriteUrl: '',
+      postEvoId: 2,
+      postEvoName: 'ivysaur',
+      postEvoSpriteUrl: '',
+      triggerPhrase: 'at level 16',
       state: {
         reps:0,
         scheduledDays:0,
@@ -345,16 +353,7 @@ describe('hydrateSession (reverse cards)', () => {
 
 describe('buildSession (name/evolution enabled flags)', () => {
   const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
-  const evoSeed: EvolutionCard[] = [
-    {
-      cardType: 'evolution',
-      id: 1_000_001,
-      pokemonId: 1,
-      name: 'bulbasaur',
-      spriteUrl: '',
-      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
-    },
-  ];
+  const evoSeed: EvolutionCard[] = [makeEvoEdge({ id: 1_500_001 })];
 
   it('buildSession with nameEnabled: false → zero name cards', () => {
     const result = buildSession(seed, evoSeed, NOW, { nameEnabled: false });
@@ -384,16 +383,7 @@ describe('buildSession (name/evolution enabled flags)', () => {
 
 describe('hydrateSession (name/evolution enabled flags)', () => {
   const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
-  const evoSeed: EvolutionCard[] = [
-    {
-      cardType: 'evolution',
-      id: 1_000_001,
-      pokemonId: 1,
-      name: 'bulbasaur',
-      spriteUrl: '',
-      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
-    },
-  ];
+  const evoSeed: EvolutionCard[] = [makeEvoEdge({ id: 1_500_001 })];
 
   it('hydrateSession strips saved name cards when nameEnabled: false', () => {
     const saved: ReviewableCard[] = [
@@ -406,12 +396,7 @@ describe('hydrateSession (name/evolution enabled flags)', () => {
 
   it('hydrateSession strips saved evolution cards when evolutionEnabled: false', () => {
     const savedEvo: EvolutionReviewCard = {
-      cardType: 'evolution',
-      id: 1_000_001,
-      pokemonId: 1,
-      name: 'bulbasaur',
-      spriteUrl: '',
-      evolvesInto: [{ name: 'ivysaur', spriteUrl: '' }],
+      ...makeEvoEdge({ id: 1_500_001 }),
       state: initialReviewState(NOW),
     };
     const saved: ReviewableCard[] = [makeCard(makeSeedPokemon(1)), savedEvo];
@@ -501,12 +486,13 @@ describe('buildSessionQueues (per-type budgets)', () => {
   }
   function evoCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): EvolutionReviewCard {
     return {
-      cardType: 'evolution',
-      id,
-      pokemonId: id - 1_000_000,
-      name: 'name-' + id,
-      spriteUrl: '',
-      evolvesInto: [{ name: 'evo-of-' + id, spriteUrl: '' }],
+      ...makeEvoEdge({
+        id,
+        preEvoId: id - 1_500_000,
+        preEvoName: 'pre-' + id,
+        postEvoId: id - 1_500_000 + 100_000,
+        postEvoName: 'post-' + id,
+      }),
       state: { ...initialReviewState(NOW), ...partialState },
     };
   }
@@ -524,7 +510,7 @@ describe('buildSessionQueues (per-type budgets)', () => {
     const cards: ReviewableCard[] = [
       // 5 fresh name cards, 3 fresh evolution cards — all eligible as new
       nameCard(1), nameCard(2), nameCard(3), nameCard(4), nameCard(5),
-      evoCard(1_000_001), evoCard(1_000_002), evoCard(1_000_003),
+      evoCard(1_500_001), evoCard(1_500_002), evoCard(1_500_003),
     ];
     const queues = buildSessionQueues(cards, baseLimits, TODAY);
     const newCards = queues.newQueue.map((id) => cards.find((c) => c.id === id)!);
@@ -542,8 +528,8 @@ describe('buildSessionQueues (per-type budgets)', () => {
       // Fresh candidates of each type
       nameCard(3),
       nameCard(4),
-      evoCard(1_000_001),
-      evoCard(1_000_002),
+      evoCard(1_500_001),
+      evoCard(1_500_002),
     ];
     const queues = buildSessionQueues(cards, baseLimits, TODAY);
     expect(queues.perType.name.newIntroducedToday).toBe(2);
@@ -562,7 +548,7 @@ describe('buildSessionQueues (per-type budgets)', () => {
       nameCard(2, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
       nameCard(3, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
       // 1 evo review done today
-      evoCard(1_000_001, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
+      evoCard(1_500_001, { firstSeen: '2026-05-01', lastReview: TODAY, reps:2 }),
     ];
     const queues = buildSessionQueues(cards, baseLimits, TODAY);
     expect(queues.perType.name.reviewsDoneToday).toBe(3);
@@ -574,7 +560,7 @@ describe('buildSessionQueues (per-type budgets)', () => {
   it('does not let evolution cards consume the name new-card budget', () => {
     const cards: ReviewableCard[] = [
       // 100 fresh evo cards, 1 fresh name card
-      ...Array.from({ length: 100 }, (_, i) => evoCard(1_000_001 + i)),
+      ...Array.from({ length: 100 }, (_, i) => evoCard(1_500_001 + i)),
       nameCard(1),
     ];
     const queues = buildSessionQueues(cards, baseLimits, TODAY);

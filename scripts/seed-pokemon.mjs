@@ -3,7 +3,7 @@
 // lib/pokemon/generated.json.  Run with: node scripts/seed-pokemon.mjs
 // Node 20+ — uses global fetch, node:fs/promises, node:path, node:url.
 
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -241,17 +241,161 @@ function normalizeFlavorText(text) {
   return out.replace(/  +/g, " ").trim();
 }
 
+// Trim a PokéAPI EvolutionDetail to the slug-flat shape consumed by
+// lib/pokemon/triggers.ts. PokéAPI nests references as { name, url }; we
+// keep only the slug so the persisted form doesn't force defensive
+// null-checks at every consumer.
+function trimDetail(d) {
+  if (!d) return null;
+  return {
+    trigger: typeof d.trigger === "string" ? d.trigger : (d.trigger?.name ?? "other"),
+    min_level: d.min_level ?? null,
+    min_happiness: d.min_happiness ?? null,
+    min_affection: d.min_affection ?? null,
+    min_beauty: d.min_beauty ?? null,
+    min_move_count: d.min_move_count ?? null,
+    min_steps: d.min_steps ?? null,
+    min_damage_taken: d.min_damage_taken ?? null,
+    // PokéAPI uses "" as the "any time" sentinel — normalise to null.
+    time_of_day: d.time_of_day === "" || d.time_of_day == null ? null : d.time_of_day,
+    location: d.location?.name ?? null,
+    known_move: d.known_move?.name ?? null,
+    known_move_type: d.known_move_type?.name ?? null,
+    held_item: d.held_item?.name ?? null,
+    needs_overworld_rain: d.needs_overworld_rain === true,
+    turn_upside_down: d.turn_upside_down === true,
+    relative_physical_stats: d.relative_physical_stats ?? null,
+    gender: d.gender ?? null,
+    party_species: d.party_species?.name ?? null,
+    party_type: d.party_type?.name ?? null,
+    item: d.item?.name ?? null,
+    trade_species: d.trade_species?.name ?? null,
+    used_move: d.used_move?.name ?? null,
+  };
+}
+
+// One node per (parent, child) in evolves_to[]. Multiple evolution_details[]
+// entries on a single child (e.g. Urshifu has tower-of-darkness AND
+// use-item:scroll-of-darkness on Single-Strike Urshifu) collapse to the first
+// detail — picking deduplicates the "alternative paths to the same child" case
+// without losing branching, which is encoded as separate evolves_to[] entries.
 function flattenChain(node, evolvesFromId, idToName) {
   const url = node.species?.url ?? "";
   const parts = url.split("/").filter(Boolean);
   const speciesId = parseInt(parts[parts.length - 1] || parts[parts.length - 2], 10);
   if (!speciesId || isNaN(speciesId)) return [];
   const name = idToName.get(speciesId) ?? node.species.name;
-  const nodes = [{ speciesId, name, evolvesFromId }];
+  const details = node.evolution_details ?? [];
+  const detail = details.length > 0 ? trimDetail(details[0]) : null;
+  const nodes = [{ speciesId, name, evolvesFromId, detail }];
   for (const child of (node.evolves_to ?? [])) {
     nodes.push(...flattenChain(child, speciesId, idToName));
   }
   return nodes;
+}
+
+// Edge-ID allocation for one-card-per-evolution-edge.
+//
+// Sub-range carve-out inside the evolution namespace [1_000_001, 1_999_999]:
+//   [1_000_001, 1_500_000]  reserved for legacy per-pre-evo cloud rows (#262
+//                            orphans; never re-issued — see supabase-expert
+//                            recommendation in the #262 plan).
+//   [1_500_001, 1_999_999]  edge cards.
+//
+// Stability across re-seeds: load prior generated.json, preserve every
+// existing (preEvoId, postEvoId) → edgeId mapping, and only allocate fresh
+// IDs for newly-discovered edges (e.g. future generations). Without this,
+// adding a single species in the middle of the sort order would re-number
+// every later edge and orphan more cloud rows.
+const EVOLUTION_ID_OFFSET = 1_000_000;
+const EDGE_ID_BASE = EVOLUTION_ID_OFFSET + 500_000; // first edge = 1_500_001
+const EVOLUTION_ID_MAX = 2_000_000;
+
+async function allocateEdgeIds(records, outputPath) {
+  const priorByKey = new Map(); // "fromId->toId" → edgeId
+
+  if (existsSync(outputPath)) {
+    try {
+      const priorRaw = await readFile(outputPath, "utf-8");
+      const prior = JSON.parse(priorRaw);
+      for (const rec of prior) {
+        for (const node of rec.evolutionChain ?? []) {
+          if (typeof node.edgeId === "number" && node.evolvesFromId !== null) {
+            const key = `${node.evolvesFromId}->${node.speciesId}`;
+            if (!priorByKey.has(key)) priorByKey.set(key, node.edgeId);
+          }
+        }
+      }
+    } catch (err) {
+      process.stderr.write(
+        `[seed] WARN: could not parse prior generated.json for edge-ID reuse: ${err.message}\n`,
+      );
+    }
+  }
+
+  // Gather all unique edges from the freshly-flattened chains.
+  const allEdges = new Set();
+  for (const rec of records) {
+    for (const node of rec.evolutionChain ?? []) {
+      if (node.evolvesFromId !== null) {
+        allEdges.add(`${node.evolvesFromId}->${node.speciesId}`);
+      }
+    }
+  }
+
+  // Sort deterministically: (fromId, toId) ascending. Stable across runs as
+  // long as the species set is unchanged.
+  const sortedEdges = [...allEdges].sort((a, b) => {
+    const [aF, aT] = a.split("->").map(Number);
+    const [bF, bT] = b.split("->").map(Number);
+    return aF - bF || aT - bT;
+  });
+
+  // New IDs start after the highest prior ID (or at base+1 on first run).
+  let nextId = EDGE_ID_BASE + 1;
+  for (const id of priorByKey.values()) {
+    if (id >= nextId) nextId = id + 1;
+  }
+
+  const edgeIdByKey = new Map(priorByKey);
+  let allocated = 0;
+  let reused = 0;
+  for (const key of sortedEdges) {
+    if (edgeIdByKey.has(key)) {
+      reused++;
+    } else {
+      if (nextId >= EVOLUTION_ID_MAX) {
+        throw new Error(`Edge-ID allocator overflowed evolution namespace at ${nextId}`);
+      }
+      edgeIdByKey.set(key, nextId++);
+      allocated++;
+    }
+  }
+
+  // Validate every ID is in-range. Defensive — also catches corrupt priors.
+  for (const id of edgeIdByKey.values()) {
+    if (id <= EDGE_ID_BASE || id >= EVOLUTION_ID_MAX) {
+      throw new Error(
+        `Edge ID ${id} outside reserved sub-range (${EDGE_ID_BASE + 1}..${EVOLUTION_ID_MAX - 1}); namespace integrity check failed.`,
+      );
+    }
+  }
+
+  // Attach to each chain node. The same edge appears in every species record
+  // within its chain (Eevee's chain has 8 edges; each is referenced 9× — once
+  // per species in the chain). Same ID, every time.
+  for (const rec of records) {
+    for (const node of rec.evolutionChain ?? []) {
+      if (node.evolvesFromId !== null) {
+        const key = `${node.evolvesFromId}->${node.speciesId}`;
+        node.edgeId = edgeIdByKey.get(key);
+      }
+    }
+  }
+
+  process.stderr.write(
+    `[seed] Edge IDs: ${reused} reused, ${allocated} newly allocated (range ${EDGE_ID_BASE + 1}..${nextId - 1})\n`,
+  );
 }
 /**
  * Process a single species ID. Returns a record object or null if it should
@@ -573,6 +717,10 @@ async function main() {
   }));
 
   records.sort((a, b) => a.id - b.id);
+
+  // Assign stable edge IDs to each chain entry. Reads prior generated.json
+  // (if present) to preserve existing IDs across re-seeds.
+  await allocateEdgeIds(records, outputPath);
 
   const json = JSON.stringify(records, null, 2) + "\n";
   await writeFile(outputPath, json, "utf-8");
