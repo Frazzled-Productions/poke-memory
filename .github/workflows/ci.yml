@@ -24,3 +24,45 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+
+  e2e:
+    # Canonical pre-merge gate for Playwright E2E (#463). The legacy
+    # deployment_status-triggered e2e.yml remains as a redundant preview-mode
+    # signal, but this job is the one to mark required in the main-protection
+    # ruleset.
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Start Next.js and run Playwright
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+        run: |
+          npm start &
+          echo $! > /tmp/next.pid
+          npx wait-on http://localhost:3000 --timeout 60000
+          npm run test:e2e
+      - name: Stop Next.js
+        if: always()
+        run: |
+          if [ -f /tmp/next.pid ]; then
+            kill "$(cat /tmp/next.pid)" 2>/dev/null || true
+          fi
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
