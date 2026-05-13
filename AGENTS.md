@@ -194,7 +194,7 @@ If a column has a "this value only moves forward" semantic (review dates, counte
 
 **Apply the migration**
 
-After the PR merges, call `mcp__supabase__apply_migration(name, query)` with `name` matching the filename's `<NNN>_<name>` part (drop the number and the `.sql` extension). The `migration-check.yml` workflow asserts file-vs-applied parity on every PR — if you forget, CI complains with the specific filename.
+Apply the migration to the live Supabase project **before merging** the PR that adds it — typically right after opening the PR. Call `mcp__supabase__apply_migration(name, query)` with `name` matching the filename's `<NNN>_<name>` part (drop the number and the `.sql` extension). The `migration-check.yml` workflow fails the PR's required CI check until file-vs-applied parity holds, so applying *after* merge is not an option: the PR can't merge without the migration already in place.
 
 **Wire cross-device sync**
 
