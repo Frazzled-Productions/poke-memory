@@ -13,7 +13,7 @@ type Props = {
   optimizableReviewCount: number;
   /** True when the user is signed in. */
   isSignedIn: boolean;
-  /** True when any superuser flag is on — mirrors SyncNowButton's disabled state. */
+  /** True when any superuser flag is on — disabled while superuser is active. */
   superuserPaused: boolean;
   /** Called after a successful optimization with the updated optimizedAt timestamp. */
   onOptimized: (optimizedAt: string, weights: number[]) => void;
@@ -93,7 +93,7 @@ export function FsrsOptimizerSection({
             Sign in to enable personalized scheduling.
           </p>
         ) : superuserPaused ? (
-          /* Superuser flag(s) on — mirror SyncNowButton's paused style */
+          /* Superuser flag(s) on — paused style */
           <div className="flex flex-col gap-2">
             <p className="text-sm text-foreground">
               Tune scheduling to your memory using your full review history.

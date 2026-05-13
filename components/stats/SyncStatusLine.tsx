@@ -1,14 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
 import { loadSyncStatus } from "@/lib/sync/persistence";
+import { useSyncStatusKey } from "@/lib/sync/useSyncStatusKey";
+import type { RetryState } from "@/lib/sync/useRetryPush";
 
-type SyncState = { text: string; errorDetail: string | null };
+type SyncState = { text: string; errorDetail: string | null; failed: boolean };
 
 type Props = {
-  refreshKey?: number;
+  retryState: RetryState;
+  retryNow: () => void;
+  superuserPaused?: boolean;
 };
 
-export function SyncStatusLine({ refreshKey }: Props) {
+export function SyncStatusLine({
+  retryState,
+  retryNow,
+  superuserPaused = false,
+}: Props) {
+  const syncStatusVersion = useSyncStatusKey();
   const [state, setState] = useState<SyncState | null>(null);
 
   useEffect(() => {
@@ -21,39 +30,97 @@ export function SyncStatusLine({ refreshKey }: Props) {
       const { failedCardCount } = status;
       if (failedCardCount === 0) {
         // Either the unload push succeeded before .then() cleared lastPushFailed,
-        // or a manual sync succeeded and wrote failedCardCount: 0.
-        setState({ text: `Last synced: ${status.lastPushAt ? fmt(status.lastPushAt) : "recently"}`, errorDetail: null });
+        // or a retry succeeded and wrote failedCardCount: 0.
+        setState({
+          text: `Last synced: ${status.lastPushAt ? fmt(status.lastPushAt) : "recently"}`,
+          errorDetail: null,
+          failed: false,
+        });
       } else if (failedCardCount === 1) {
         setState({
           text: `1 card may be out of sync${timeStr}`,
-          errorDetail: "Will retry next time you sync.",
+          errorDetail: null,
+          failed: true,
         });
       } else if (typeof failedCardCount === "number" && failedCardCount > 1) {
         setState({
           text: `${failedCardCount} cards may be out of sync${timeStr}`,
-          errorDetail: "Will retry next time you sync.",
+          errorDetail: null,
+          failed: true,
         });
       } else {
         setState({
           text: `Sync failed${timeStr}`,
-          errorDetail: "Will retry next time you sync.",
+          errorDetail: null,
+          failed: true,
         });
       }
     } else if (status.lastPushAt) {
-      setState({ text: `Last synced: ${fmt(status.lastPushAt)}`, errorDetail: null });
+      setState({ text: `Last synced: ${fmt(status.lastPushAt)}`, errorDetail: null, failed: false });
     } else {
-      setState({ text: "Not synced yet.", errorDetail: null });
+      setState({ text: "Not synced yet.", errorDetail: null, failed: false });
     }
-  }, [refreshKey]);
+  }, [syncStatusVersion]);
 
   if (state === null) return null;
+
+  // While retrying, always show "Retrying…" regardless of stored status.
+  if (retryState === "retrying") {
+    return (
+      <div className="text-sm text-zinc-500 dark:text-zinc-400" aria-live="polite">
+        <span>Retrying…</span>
+      </div>
+    );
+  }
+
+  // The retry attempt itself just failed. Show a dedicated message so the
+  // user knows the click did something, then let the auto-reset window pass
+  // them back to the regular failed-state button.
+  if (retryState === "error") {
+    const isDisabled = superuserPaused;
+    return (
+      <div className="text-sm text-zinc-500 dark:text-zinc-400" aria-live="polite">
+        <button
+          type="button"
+          onClick={retryNow}
+          disabled={isDisabled}
+          title={
+            superuserPaused
+              ? "Sync is paused while a superuser flag is on."
+              : undefined
+          }
+          className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
+        >
+          Retry failed · Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (state.failed) {
+    const isDisabled = superuserPaused;
+    const disabledTitle = superuserPaused
+      ? "Sync is paused while a superuser flag is on."
+      : undefined;
+
+    return (
+      <div className="text-sm text-zinc-500 dark:text-zinc-400" aria-live="polite">
+        <button
+          type="button"
+          onClick={retryNow}
+          disabled={isDisabled}
+          title={disabledTitle}
+          className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
+        >
+          {state.text} · Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="text-sm text-zinc-500 dark:text-zinc-400">
       <span>{state.text}</span>
-      {state.errorDetail && (
-        <span className="ml-2 text-xs text-zinc-400 dark:text-zinc-500">{state.errorDetail}</span>
-      )}
     </div>
   );
 }

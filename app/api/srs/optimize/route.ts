@@ -78,7 +78,7 @@ async function fetchGradeLog(
  *
  * The read-merge-write window is small in practice (the user is staring at
  * a spinner while this request is in flight, and no other surface auto-pushes
- * settings), but `useManualSync.pushSettings` could in theory interleave. The
+ * settings), but AutoSyncOnChange.pushSettings could in theory interleave. The
  * `.eq("updated_at", current.updated_at)` predicate makes the UPDATE no-op
  * under concurrent writes; we retry once with a fresh read on conflict, then
  * give up. A future atomic-merge RPC (jsonb `settings || patch`) would remove

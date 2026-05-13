@@ -22,9 +22,8 @@ import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
 import { TrainerCard } from "@/components/stats/TrainerCard";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
-import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { useManualSync } from "@/lib/sync/useManualSync";
+import { useRetryPush } from "@/lib/sync/useRetryPush";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 
@@ -395,10 +394,11 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 
 export default function StatsPage() {
   const { user, supabase } = useAuth();
-  const { flags } = useSuperuser();
-  const { syncState, errorMessage, syncNow } = useManualSync(supabase, user?.id ?? null);
+  const { flags, anyFlagOn } = useSuperuser();
+  const client = anyFlagOn ? null : supabase;
+  const userId = anyFlagOn ? null : (user?.id ?? null);
+  const { retryState, retryNow } = useRetryPush(client, userId);
   const storageVersion = useSessionStorageKey();
-  const [syncRefreshKey, setSyncRefreshKey] = useState(0);
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
@@ -408,12 +408,6 @@ export default function StatsPage() {
   const [rolling7d, setRolling7d] = useState<number | null>(null);
   const [streakDates, setStreakDates] = useState<string[]>([]);
   const [gradeLog, setGradeLog] = useState<ReturnType<typeof loadGradeLog>>([]);
-
-  useEffect(() => {
-    if (syncState === "success") {
-      setSyncRefreshKey((k) => k + 1);
-    }
-  }, [syncState]);
 
   useEffect(() => {
     const settings = loadSettings();
@@ -434,7 +428,7 @@ export default function StatsPage() {
     setGradeTotals(computeGradeTotals(log));
     setAccuracyPoints(computeAccuracySparkline(log, today, 30));
     setRolling7d(computeRollingAccuracy(log, today, 7));
-  }, [syncRefreshKey, storageVersion]);
+  }, [storageVersion]);
 
   const nameCards =
     cards !== null
@@ -468,13 +462,11 @@ export default function StatsPage() {
           Stats
         </h1>
         {user !== null && (
-          <div className="mb-8 flex items-center justify-between gap-4">
-            <SyncStatusLine refreshKey={syncRefreshKey} />
-            <SyncNowButton
-              syncState={syncState}
-              errorMessage={errorMessage}
-              onSync={syncNow}
-              superuserPaused={flags.pretendAllMastered}
+          <div className="mb-8">
+            <SyncStatusLine
+              retryState={retryState}
+              retryNow={retryNow}
+              superuserPaused={anyFlagOn}
             />
           </div>
         )}
