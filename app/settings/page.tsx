@@ -290,6 +290,11 @@ export default function SettingsPage() {
         return;
       }
     }
+    if (key === "reverseEvolutionCardsEnabled" && settings.reverseEvolutionCardsEnabled) {
+      if (!window.confirm("Disabling reverse-evolution cards will discard all their progress when saved. This cannot be undone. Continue?")) {
+        return;
+      }
+    }
 
     setToggleError(null);
     setToggleErrorKey(null);
@@ -348,6 +353,7 @@ export default function SettingsPage() {
       const filtered = session.cards.filter((card) => {
         if (card.cardType === "name" && !clamped.nameCardsEnabled) return false;
         if (card.cardType === "evolution" && !clamped.evolutionCardsEnabled) return false;
+        if (card.cardType === "reverse-evolution" && !clamped.reverseEvolutionCardsEnabled) return false;
         if (card.cardType === "reverse" && !clamped.reverseCardsEnabled) return false;
         if (card.cardType === "cry" && !clamped.cryCardsEnabled) return false;
         return true;
@@ -608,6 +614,46 @@ export default function SettingsPage() {
                         </p>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="flex flex-col gap-4" aria-labelledby="reverse-evolution-heading">
+                <h2
+                  id="reverse-evolution-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Reverse-evolution cards
+                </h2>
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Enable reverse-evolution cards
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Quiz the opposite direction of evolution edges (&quot;Which Pokémon evolves into X via Y?&quot;).
+                        Shares the same daily new/review budget as forward evolution cards.
+                        Re-enabling after disabling will reset reverse-evolution progress.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.reverseEvolutionCardsEnabled}
+                      onClick={() => handleToggle("reverseEvolutionCardsEnabled")}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        settings.reverseEvolutionCardsEnabled
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          settings.reverseEvolutionCardsEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
               </section>

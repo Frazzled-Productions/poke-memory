@@ -25,6 +25,7 @@ const SAMPLE: UserSettings = {
   maxReviewsEvolutionPerDay: 50,
   nameCardsEnabled: true,
   evolutionCardsEnabled: true,
+  reverseEvolutionCardsEnabled: false,
   reverseCardsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,

@@ -99,8 +99,11 @@ vi.mock("@/lib/pokemon/seed", () => ({
     return mockSeedPokemon();
   },
   SEED_EVOLUTION_CARDS: [],
+  SEED_REVERSE_EVOLUTION_CARDS: [],
   EVOLUTION_ID_OFFSET: 1_000_000,
   REVERSE_ID_OFFSET: 2_000_000,
+  REVERSE_EDGE_ID_BASE: 2_500_000,
+  CRY_ID_OFFSET: 3_000_000,
 }));
 
 // loadSession is a vi.fn() so individual tests can override it with

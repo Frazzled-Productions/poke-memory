@@ -78,14 +78,28 @@ export type EvolutionCard = {
 //                                       Existing cloud rows are orphaned —
 //                                       merge drops them via left-join. No
 //                                       local card ever lives here again.
-//   [1_500_001, 1_999_999]              edge cards (#262).
-//   [2_000_001, 2_999_999]              reverse cards.
+//   [1_500_001, 1_999_999]              forward edge cards (#262).
+//   [2_000_001, 2_500_000]              reverse name cards (sprite-picker).
+//   [2_500_001, 2_999_999]              reverse evolution edge cards (#343):
+//                                       reverseId = REVERSE_EDGE_ID_BASE +
+//                                                   (forwardEdgeId - EDGE_ID_BASE)
 //   [3_000_001, 3_999_999]              cry cards.
 export const EVOLUTION_ID_OFFSET = 1_000_000;
-export const EDGE_ID_BASE = 1_500_000; // first edge ID = 1_500_001
+export const EDGE_ID_BASE = 1_500_000; // first forward edge ID = 1_500_001
 export const REVERSE_ID_OFFSET = 2_000_000;
+export const REVERSE_EDGE_ID_BASE = 2_500_000; // first reverse edge ID = 2_500_001
 export const CRY_ID_OFFSET = 3_000_000;
 const MAX_NAME_ID = EVOLUTION_ID_OFFSET - 1;
+
+/** Map a forward edge ID to its reverse counterpart. */
+export function reverseEdgeIdFor(forwardEdgeId: number): number {
+  return REVERSE_EDGE_ID_BASE + (forwardEdgeId - EDGE_ID_BASE);
+}
+
+/** True when the id falls in the reverse-evolution edge sub-range. */
+export function isReverseEdgeId(id: number): boolean {
+  return id > REVERSE_EDGE_ID_BASE && id < CRY_ID_OFFSET;
+}
 
 export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
   const cards: EvolutionCard[] = [];
@@ -139,3 +153,18 @@ export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
   }
   return cards;
 })();
+
+// One reverse-evolution card per forward edge — same edge data, different ID,
+// rendered with the prompt direction flipped ("Which Pokémon evolves into X
+// via Y?"). The trigger phrase is reused as-is; the rendering layer reads the
+// id namespace to choose the prompt + answer sides.
+export type ReverseEvolutionCard = Omit<EvolutionCard, "cardType"> & {
+  cardType: "reverse-evolution";
+};
+
+export const SEED_REVERSE_EVOLUTION_CARDS: readonly ReverseEvolutionCard[] =
+  SEED_EVOLUTION_CARDS.map((fwd) => ({
+    ...fwd,
+    cardType: "reverse-evolution" as const,
+    id: reverseEdgeIdFor(fwd.id),
+  }));

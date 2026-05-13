@@ -10,11 +10,15 @@ export async function pushGradeLog(
   userId: string,
   entries: GradeLogEntry[],
 ): Promise<boolean> {
-  // Drop cry-card entries until the cry follow-up migration is applied
-  // (extends grade_log.card_type CHECK to include 'cry'). Local data is
-  // preserved either way — this just prevents a sync attempt that the
-  // current CHECK constraint would reject with errcode 23514.
-  const supported = entries.filter((e) => e.cardType !== "cry");
+  // Drop card types whose migration hasn't landed yet — `grade_log.card_type`
+  // CHECK currently only permits ('name','evolution','reverse'). Local data is
+  // preserved either way; this just prevents a sync attempt that the CHECK
+  // would reject with errcode 23514. Pending migrations:
+  //   - `cry` (from #256 follow-up)
+  //   - `reverse-evolution` (this PR / #343 follow-up)
+  const supported = entries.filter(
+    (e) => e.cardType !== "cry" && e.cardType !== "reverse-evolution",
+  );
   if (supported.length === 0) return true;
   try {
     const rows = supported.map((e) => ({
