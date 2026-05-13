@@ -81,3 +81,20 @@
   position: absolute;
   transform: translate(-50%, -50%);
 }
+
+/*
+ * Wander wrapper — sits inside .spriteAnchor and receives CSS transforms from
+ * useIdleBehaviour. Keeping it separate avoids colliding with:
+ *   - The left/top/scale positioning on .spriteAnchor (React-set, static).
+ *   - The bob/hop animation on the <img> inside PasturePokemon.
+ */
+.spriteWander {
+  /* No positioning — inherits from .spriteAnchor. */
+}
+
+/* Honour OS-level "Reduce Motion" preference — stop the idle bob animation. */
+@media (prefers-reduced-motion: reduce) {
+  .spriteBob {
+    animation: none;
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 
-import type { HabitatZone, AnchorSlot } from "@/lib/pasture/zones";
-import type { NameReviewCard } from "@/lib/review/session";
+import { useRef } from "react";
+import type { HabitatZone } from "@/lib/pasture/zones";
 import { PasturePokemon } from "./PasturePokemon";
 import { GrasslandsBiome } from "./biomes/GrasslandsBiome";
 import { ForestBiome } from "./biomes/ForestBiome";
@@ -13,6 +13,7 @@ import { WatersEdgeBiome } from "./biomes/WatersEdgeBiome";
 import { RoughTerrainBiome } from "./biomes/RoughTerrainBiome";
 import { SanctuaryBiome } from "./biomes/SanctuaryBiome";
 import { WildlandsBiome } from "./biomes/WildlandsBiome";
+import { useIdleBehaviour, type Placement } from "./useIdleBehaviour";
 import styles from "./Pasture.module.css";
 
 // Habitats with an illustrated backdrop. These suppress the flat HABITAT_TINTS
@@ -30,11 +31,9 @@ const BIOME_RENDERERS: Partial<Record<string, () => React.ReactElement>> = {
   unknown:         () => <WildlandsBiome />,
 };
 
-type Placement = {
-  card: NameReviewCard;
-  subRegion: { id: string; name: string };
-  anchor: AnchorSlot;
-};
+// Re-export the Placement type so consumers (e.g. the Pasture page) can import
+// it from this module instead of from useIdleBehaviour directly.
+export type { Placement };
 
 type Props = {
   zone: HabitatZone;
@@ -77,6 +76,9 @@ export function PastureZone({ zone, placements, onMarkSeen }: Props) {
   const tint = HABITAT_TINTS[zone.habitat] ?? HABITAT_TINTS.unknown;
   const labelColour = LABEL_COLOURS[zone.habitat] ?? LABEL_COLOURS.unknown;
 
+  const zoneRef = useRef<HTMLDivElement>(null);
+  useIdleBehaviour(zoneRef, placements);
+
   return (
     <section aria-label={`${zone.label} zone`}>
       <h2 className={`mb-1.5 text-sm font-semibold ${labelColour}`}>
@@ -85,7 +87,10 @@ export function PastureZone({ zone, placements, onMarkSeen }: Props) {
           ({placements.length})
         </span>
       </h2>
-      <div className={[styles.zoneContainer, biomeRenderer ? "" : tint].join(" ")}>
+      <div
+        ref={zoneRef}
+        className={[styles.zoneContainer, biomeRenderer ? "" : tint].join(" ")}
+      >
         {biomeRenderer ? biomeRenderer() : null}
         {(biomeRenderer
           // Sort back-to-front so foreground sprites paint on top of distant ones.
@@ -109,7 +114,19 @@ export function PastureZone({ zone, placements, onMarkSeen }: Props) {
                 transform: `translate(-50%, -50%) scale(${scale})`,
               }}
             >
-              <PasturePokemon card={card} onMarkSeen={onMarkSeen} />
+              {/*
+               * spriteWander: the wander wrapper that useIdleBehaviour writes
+               * CSS transforms on. Sits INSIDE .spriteAnchor so it does NOT
+               * conflict with the existing left/top/scale positioning on the
+               * anchor, nor with the bob/hop animation on the img inside
+               * PasturePokemon.
+               */}
+              <div
+                className={styles.spriteWander}
+                data-sprite-id={card.id}
+              >
+                <PasturePokemon card={card} onMarkSeen={onMarkSeen} />
+              </div>
             </div>
           );
         })}
