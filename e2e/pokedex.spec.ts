@@ -39,7 +39,7 @@ test.describe("Pokédex detail — Hear name button", () => {
 
     await page.goto("/pokedex/1");
     await expect(page.getByText("Bulbasaur")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Hear name" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Hear Bulbasaur" })).toBeVisible();
   });
 });
 
