@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { FNV_PRIME, fnv1a } from "@/lib/utils/fnv1a";
+import { DirectionBadge } from "@/components/review/DirectionBadge";
 
 // How long to show correctness feedback before advancing (ms).
 // Correct tap: brief highlight. Incorrect tap: time to see the right answer.
@@ -93,6 +94,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
 
   return (
     <div className="flex flex-col items-center gap-6">
+      <DirectionBadge direction="reverse" />
       {/* Name prompt */}
       <p className="text-3xl font-semibold tracking-wide capitalize text-foreground">
         {targetPokemon.name}

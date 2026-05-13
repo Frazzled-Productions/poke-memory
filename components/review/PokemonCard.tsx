@@ -1,16 +1,20 @@
 import Image from "next/image";
 import type { PokemonFact } from "@/lib/pokemon/facts";
+import { DirectionBadge } from "@/components/review/DirectionBadge";
 
 type Props = {
   spriteUrl: string;
   name: string;
   revealed: boolean;
   fact?: PokemonFact | null;
+  /** Which direction this card is being rendered for. Determines the badge. */
+  direction?: "name" | "cry";
 };
 
-export function PokemonCard({ spriteUrl, name, revealed, fact }: Props) {
+export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name" }: Props) {
   return (
     <div className="flex flex-col items-center gap-2 sm:gap-4">
+      <DirectionBadge direction={direction} />
       <Image
         src={spriteUrl}
         alt={revealed ? name : "A Pokémon sprite — answer hidden"}

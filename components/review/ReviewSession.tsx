@@ -6,6 +6,7 @@ import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
+import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
@@ -1105,9 +1106,11 @@ export function ReviewSession() {
             name={effectiveCard.name}
             revealed
             fact={currentFact}
+            direction="cry"
           />
         ) : (
           <div className="flex flex-col items-center gap-4">
+            <DirectionBadge direction="cry" />
             <button
               type="button"
               onClick={() => playCry(effectiveCard.cryUrl ?? null)}
@@ -1116,8 +1119,8 @@ export function ReviewSession() {
             >
               🔊
             </button>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Cry — name this Pokémon
+            <p className="text-base font-semibold text-foreground">
+              Name this Pokémon from its cry
             </p>
           </div>
         )}
