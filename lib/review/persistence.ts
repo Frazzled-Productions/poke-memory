@@ -23,6 +23,7 @@ function isReviewCardShaped(value: unknown): boolean {
     v.cardType !== undefined &&
     v.cardType !== "name" &&
     v.cardType !== "evolution" &&
+    v.cardType !== "reverse-evolution" &&
     v.cardType !== "reverse" &&
     v.cardType !== "cry"
   ) {

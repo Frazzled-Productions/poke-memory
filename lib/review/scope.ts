@@ -96,13 +96,19 @@ export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): bo
   if (isScopeEmpty(scope)) return true;
   // Evolution edge cards filter on the pre-evo's species ID (the card is
   // "about" the pre-evolution — Bulbasaur → Ivysaur is a Gen 1 / Starters card
-  // because of Bulbasaur, not Ivysaur). Other card types use their own id.
-  const pokemonId = card.cardType === "evolution" ? card.preEvoId : card.id;
-  // Evolution cards don't carry the parent species' `types[]` on the
-  // card itself; downgrade to an effectively-empty types array so the
+  // because of Bulbasaur, not Ivysaur). Reverse-evolution cards use the same
+  // pre-evo anchor — the answer-side species. Other card types use their own id.
+  const pokemonId =
+    card.cardType === "evolution" || card.cardType === "reverse-evolution"
+      ? card.preEvoId
+      : card.id;
+  // Evolution cards (both directions) don't carry the parent species' `types[]`
+  // on the card itself; downgrade to an effectively-empty types array so the
   // type axis is a no-op for them. Other card types use their own types.
   const types: readonly string[] =
-    card.cardType === "evolution" ? [] : card.types;
+    card.cardType === "evolution" || card.cardType === "reverse-evolution"
+      ? []
+      : card.types;
   return speciesMatchesScope(pokemonId, types, scope);
 }
 

@@ -56,6 +56,7 @@ const VALID_SETTINGS: UserSettings = {
   maxReviewsReversePerDay: 100,
   nameCardsEnabled: true,
   evolutionCardsEnabled: true,
+  reverseEvolutionCardsEnabled: false,
   playCryOnReveal: false,
   cryCardsEnabled: false,
   maxNewCryPerDay: 10,

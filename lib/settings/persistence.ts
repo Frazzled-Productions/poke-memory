@@ -29,6 +29,7 @@ export type UserSettings = {
   maxReviewsEvolutionPerDay: number; // soft daily cap for evolution reviews
   nameCardsEnabled: boolean;         // show sprite as prompt; type/select the name
   evolutionCardsEnabled: boolean;    // show sprite; identify evolution chain
+  reverseEvolutionCardsEnabled: boolean; // reverse-direction evolution edge cards (#343)
   reverseCardsEnabled: boolean;      // show name as prompt; reveal sprite
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
@@ -62,6 +63,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxReviewsEvolutionPerDay: 50,
   nameCardsEnabled: true,
   evolutionCardsEnabled: true,
+  reverseEvolutionCardsEnabled: false,
   reverseCardsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
@@ -179,6 +181,10 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.evolutionCardsEnabled === "boolean"
         ? obj.evolutionCardsEnabled
         : DEFAULT_SETTINGS.evolutionCardsEnabled,
+    reverseEvolutionCardsEnabled:
+      typeof obj.reverseEvolutionCardsEnabled === "boolean"
+        ? obj.reverseEvolutionCardsEnabled
+        : DEFAULT_SETTINGS.reverseEvolutionCardsEnabled,
     reverseCardsEnabled:
       typeof obj.reverseCardsEnabled === "boolean"
         ? obj.reverseCardsEnabled
