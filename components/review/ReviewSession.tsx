@@ -34,7 +34,7 @@ import { playCry } from "@/lib/audio/cry";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
-import { appendGradeEntry, removeGradeEntry } from "@/lib/gradelog/persistence";
+import { appendGradeEntry, loadGradeLog, removeGradeEntry } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 import { ShareTodayButton } from "@/components/review/ShareTodayButton";
@@ -969,8 +969,17 @@ export function ReviewSession() {
     );
 
     notifySaveResult(saveSession({ cards: newCards, limits }));
-    recordReview(todayString(now));
-    const appended = appendGradeEntry({ date: todayString(now), grade, cardType: effectiveCard.cardType });
+    const today = todayString(now);
+    const gradedToday = loadGradeLog().filter((e) => e.date === today).length + 1;
+    const dueQueueEmpty = !newCards.some(
+      (c) =>
+        c.state.learningStep === null &&
+        c.state.lastReview !== null &&
+        c.state.dueDate <= today &&
+        c.state.lastReview !== today,
+    );
+    recordReview(today, gradedToday, dueQueueEmpty);
+    const appended = appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType });
     snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
     setUndoSnapshot(snapshot);
     enqueueGrade({ ...effectiveCard, state: nextState });
