@@ -23,6 +23,10 @@ export type SpriteState = {
   x: number;
   /** Current fractional y position within zone container. */
   y: number;
+  /** Original anchor fractional x — used as zero-point for translate delta. */
+  readonly anchorX: number;
+  /** Original anchor fractional y — used as zero-point for translate delta. */
+  readonly anchorY: number;
   /** Wander target fractional x. */
   targetX: number;
   /** Wander target fractional y. */
@@ -99,7 +103,7 @@ const ARRIVE_EPS = 0.005;
  * Creates initial SpriteState for a sprite placed at (anchorX, anchorY),
  * allowed to wander within the band [bandX0, bandX1] × [bandY0, bandY1].
  *
- * `now` is the current `performance.now()` value (or `Date.now()` — same unit).
+ * `now` is the current `performance.now()` value.
  */
 export function createSpriteState(
   anchorX: number,
@@ -113,6 +117,8 @@ export function createSpriteState(
   return {
     x: anchorX,
     y: anchorY,
+    anchorX,
+    anchorY,
     targetX: anchorX,
     targetY: anchorY,
     // Stagger first target pick so not all sprites move simultaneously.
@@ -196,17 +202,18 @@ export function tickSprite(state: SpriteState, now: number): TickResult {
     case "rising": {
       const elapsed = now - state.jumpStartedAt;
       if (elapsed >= RISING_MS) {
-        // Transition to falling.
+        // Transition to falling at exactly the peak — no discontinuity.
         state.jumpPhase = "falling";
         state.jumpStartedAt = now;
-        state.jumpOffsetPx = 0;
+        state.jumpOffsetPx = -JUMP_PEAK_PX; // peak is the falling start point
         state.squashX = 1;
         state.squashY = 1;
       } else {
-        // Parabolic arc upward: t in [0,1], peak at midpoint.
+        // Ease-in arc: sin(t * π/2) reaches 1.0 at t=1, so the last rising
+        // tick lands at the exact peak and the falling phase starts there with
+        // no discontinuity regardless of tick interval.
         const t = elapsed / RISING_MS;
-        // Use sinusoidal ease for smooth arc.
-        state.jumpOffsetPx = -JUMP_PEAK_PX * Math.sin(t * Math.PI);
+        state.jumpOffsetPx = -JUMP_PEAK_PX * Math.sin(t * (Math.PI / 2));
         state.squashX = 1;
         state.squashY = 1;
       }
@@ -223,8 +230,8 @@ export function tickSprite(state: SpriteState, now: number): TickResult {
         state.squashY = SQUASH_SCALE_Y;
       } else {
         const t = elapsed / FALLING_MS;
-        // From peak back down.
-        state.jumpOffsetPx = -JUMP_PEAK_PX * (1 - t);
+        // Ease-out drop: starts at peak (-JUMP_PEAK_PX) and decelerates to 0.
+        state.jumpOffsetPx = -JUMP_PEAK_PX * (1 - t * t);
         state.squashX = 1;
         state.squashY = 1;
       }

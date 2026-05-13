@@ -16,7 +16,7 @@
  * (e.g. by the screenshot capture script), the loop is never started.
  */
 
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import type { NameReviewCard } from "@/lib/review/session";
@@ -107,7 +107,7 @@ export function useIdleBehaviour(
   const docVisibleRef = useRef(true);
   const frozenRef = useRef(false);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const container = zoneRef.current;
     if (!container) return;
 
@@ -198,19 +198,13 @@ export function useIdleBehaviour(
         const result = tickSprite(entry.state, t);
         if (!result.changed) continue;
 
-        // Translate within zone: convert fractional offset from anchor to
-        // percentage-point offset (multiply by 100). We push just the delta
-        // from anchor so the CSS left/top on spriteAnchor remains authoritative.
-        const anchorX = entry.state.bandX0 + (entry.state.bandX1 - entry.state.bandX0) / 2;
-        const anchorY = entry.state.bandY0 + (entry.state.bandY1 - entry.state.bandY0) / 2;
-
-        // dx/dy in percentage points relative to the zone container's dimensions.
-        // We compute the delta from the "centre of band" rather than the static
-        // anchor so that existing left/top CSS stays correct at rest.
+        // Translate within zone: delta from the sprite's true anchor in
+        // percentage points. At rest (state.x === anchorX) this is exactly
+        // zero, so the sprite never shifts from where React placed it.
         // The wander wrapper sits INSIDE the spriteAnchor div, so the transform
         // here is purely extra offset on top of the anchor position.
-        const pctX = (result.x - anchorX) * 100;
-        const pctY = (result.y - anchorY) * 100;
+        const pctX = (result.x - entry.state.anchorX) * 100;
+        const pctY = (result.y - entry.state.anchorY) * 100;
 
         entry.el.style.transform =
           `translate(${pctX}%, ${pctY}%) translateY(${result.jumpOffsetPx}px) ` +

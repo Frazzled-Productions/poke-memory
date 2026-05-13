@@ -201,6 +201,74 @@ describe("tickSprite — jump phase sequencing", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Anchor reference — translate delta must be zero at rest
+// ---------------------------------------------------------------------------
+
+describe("tickSprite — zero translate delta at rest", () => {
+  it("x and y match anchorX/anchorY when sprite has not moved", () => {
+    const now = 0;
+    const state = makeState(now);
+    // Keep sprite at rest: prevent wander target from changing and keep
+    // target at anchor so easing leaves x/y unchanged.
+    state.nextTargetAt = Number.POSITIVE_INFINITY;
+    state.targetX = ANCHOR.x;
+    state.targetY = ANCHOR.y;
+    // Prevent jump from firing.
+    state.nextJumpAt = Number.POSITIVE_INFINITY;
+
+    const result = tickSprite(state, now + TICK_INTERVAL_MS);
+    expect(result.changed).toBe(true);
+    // Delta from anchor must be zero so transform has no visible offset.
+    expect(result.x - state.anchorX).toBeCloseTo(0, 10);
+    expect(result.y - state.anchorY).toBeCloseTo(0, 10);
+  });
+
+  it("anchorX/anchorY are preserved on SpriteState", () => {
+    const state = makeState(0);
+    expect(state.anchorX).toBe(ANCHOR.x);
+    expect(state.anchorY).toBe(ANCHOR.y);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Jump continuity — no pop at rising → falling transition
+// ---------------------------------------------------------------------------
+
+describe("tickSprite — jump apex continuity", () => {
+  it("jumpOffsetPx has no discontinuity at the rising → falling boundary", () => {
+    const now = 0;
+    const state = makeState(now);
+    state.nextJumpAt = 0;
+    state.nextTargetAt = Number.POSITIVE_INFINITY;
+
+    // Drive into rising phase.
+    const t0 = now + TICK_INTERVAL_MS;
+    tickSprite(state, t0);
+    expect(state.jumpPhase).toBe("rising");
+
+    // Fast-forward to just before the rising → falling boundary so the last
+    // rising tick is near the apex. RISING_MS = 280; jump started at t0.
+    // We want elapsed = 240ms (one TICK_INTERVAL_MS before the boundary).
+    const preTransitionT = t0 + 240;
+    tickSprite(state, preTransitionT);
+    expect(state.jumpPhase).toBe("rising");
+    const offsetBeforeTransition = state.jumpOffsetPx;
+
+    // Next tick — at elapsed >= 280 the transition fires.
+    const transitionT = preTransitionT + TICK_INTERVAL_MS; // elapsed = 360 > 280
+    tickSprite(state, transitionT);
+    expect(state.jumpPhase).toBe("falling");
+    const offsetAtTransition = state.jumpOffsetPx;
+
+    // The snap from the last rising offset to the falling start should be < 5 px.
+    // With the old code, rising reset jumpOffsetPx to 0 at transition — a ~17 px
+    // snap when the sprite was near peak. With the fix it carries the peak value
+    // into falling, so the transition is seamless.
+    expect(Math.abs(offsetAtTransition - offsetBeforeTransition)).toBeLessThan(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // createSpriteState initial values
 // ---------------------------------------------------------------------------
 
