@@ -1,12 +1,14 @@
 "use server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { AuthProvider } from "./types";
 
-export async function signIn() {
+export async function signIn(provider: AuthProvider) {
+  if (provider !== "github" && provider !== "google") redirect("/");
   const supabase = await createClient();
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "github",
+    provider,
     options: {
       redirectTo: base + "/api/auth/callback",
     },
