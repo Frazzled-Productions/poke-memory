@@ -88,12 +88,103 @@ function seedCompletedSession() {
   );
 }
 
-test.describe("Higher-or-Lower mini-game", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(seedCompletedSession);
+// Pre-seed a NEW_CARDS_LOCKED state for the `name` card type:
+//   - IDs 1..10 are "introduced today" (firstSeen === today, lastReview === today,
+//     dueDate far future) so name.newIntroducedToday === maxNewPerDay (10).
+//   - ID 1025 is a fresh new card (lastReview === null) so hasMoreNewCardsOf(name)
+//     is true → the new-cards wall fires.
+//   - IDs 11..1024 are already-reviewed, not-due-today (no contribution to either
+//     counter) so they don't accidentally trigger the review soft-wall.
+//   - Evolution cards are seeded as the existing helper does — already reviewed,
+//     not due — so no evolution-type queues populate.
+//
+// Default settings have reverseCardsEnabled === false and cryCardsEnabled ===
+// false, so we don't need to seed those types.
+function seedNewCardsLockedSession() {
+  const TODAY = new Date().toISOString().slice(0, 10);
+  const PAST_DATE = "2026-01-01";
+  const FUTURE_DATE = "2099-12-31";
+
+  const baseState = {
+    stability: 10,
+    difficulty: 5,
+    elapsedDays: 10,
+    scheduledDays: 21,
+    reps: 3,
+    lapses: 0,
+    fsrsState: "review",
+    dueDate: FUTURE_DATE,
+    lastReview: PAST_DATE,
+    firstSeen: PAST_DATE,
+    learningStep: null,
+    stepStartedAt: null,
+  };
+
+  const cards: object[] = [];
+
+  for (let id = 1; id <= 1024; id++) {
+    const introducedToday = id <= 10;
+    cards.push({
+      id,
+      name: "pokemon-" + id,
+      spriteUrl: "/sprites/pokemon/" + id + ".png",
+      cardType: "name",
+      state: {
+        ...baseState,
+        firstSeen: introducedToday ? TODAY : PAST_DATE,
+        lastReview: introducedToday ? TODAY : PAST_DATE,
+      },
+    });
+  }
+
+  // Fresh new card — satisfies hasMoreNewCardsOf("name") so the wall fires.
+  cards.push({
+    id: 1025,
+    name: "pokemon-1025",
+    spriteUrl: "/sprites/pokemon/1025.png",
+    cardType: "name",
+    state: {
+      ...baseState,
+      dueDate: TODAY,
+      lastReview: null,
+      firstSeen: null,
+    },
   });
 
+  for (let id = 1500001; id <= 1500484; id++) {
+    cards.push({
+      id,
+      cardType: "evolution",
+      preEvoId: 1,
+      postEvoId: 2,
+      preEvoName: "bulbasaur",
+      postEvoName: "ivysaur",
+      preEvoSpriteUrl: "/sprites/pokemon/1.png",
+      postEvoSpriteUrl: "/sprites/pokemon/2.png",
+      triggerPhrase: "at level 16",
+      state: { ...baseState },
+    });
+  }
+
+  const session = {
+    cards,
+    limits: {
+      name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+      reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    },
+  };
+
+  localStorage.setItem(
+    "poke-memory:review-session:v1",
+    JSON.stringify(session),
+  );
+}
+
+test.describe("Higher-or-Lower mini-game", () => {
   test("mini-game section appears on SESSION_COMPLETE", async ({ page }) => {
+    await page.addInitScript(seedCompletedSession);
     await page.goto("/");
 
     // Confirm the session-complete end-state is reached
@@ -114,6 +205,7 @@ test.describe("Higher-or-Lower mini-game", () => {
   });
 
   test("clicking a Pokémon tile reveals a result banner", async ({ page }) => {
+    await page.addInitScript(seedCompletedSession);
     await page.goto("/");
 
     await expect(page.getByText("All caught up!")).toBeVisible();
@@ -131,5 +223,21 @@ test.describe("Higher-or-Lower mini-game", () => {
       /correct!|equal — both count\.|game over/i,
     );
     await expect(resultBanner).toBeVisible();
+  });
+
+  test("mini-game section appears on NEW_CARDS_LOCKED", async ({ page }) => {
+    await page.addInitScript(seedNewCardsLockedSession);
+    await page.goto("/");
+
+    await expect(
+      page.getByText("New cards locked for today"),
+    ).toBeVisible();
+
+    const gameRegion = page.getByRole("region", {
+      name: /higher or lower mini-game/i,
+    });
+    await expect(gameRegion).toBeVisible();
+    await expect(page.getByText(/which has higher/i)).toBeVisible();
+    await expect(gameRegion.getByRole("button")).toHaveCount(2);
   });
 });
