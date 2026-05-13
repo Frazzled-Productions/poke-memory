@@ -165,7 +165,7 @@ describe("saveSession (synthetic StorageEvent dispatch)", () => {
 
     expect(result.ok).toBe(true);
     expect(dispatched).toHaveLength(1);
-    expect((dispatched[0] as { key: string }).key).toBe(
+    expect((dispatched[0] as unknown as { key: string }).key).toBe(
       "poke-memory:review-session:v1",
     );
   });
