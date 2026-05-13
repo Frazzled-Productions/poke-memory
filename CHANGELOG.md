@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.11] — 2026-05-13
+
+### Added
+
+- Personalize my schedule: signed-in users with 200+ reviews can now run a one-click FSRS weight optimizer from Settings, tuning the scheduler to their own memory.
+
 ## [0.9.10] — 2026-05-13
 
 ### Fixed
@@ -596,7 +602,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.10...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.11...HEAD
+[0.9.11]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.11
 [0.9.10]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.10
 [0.9.9]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.9
 [0.9.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.8
