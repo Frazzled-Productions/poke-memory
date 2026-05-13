@@ -13,7 +13,7 @@ const PRE_SPRITE = "https://example.com/charmander.png";
 const POST_SPRITE = "https://example.com/charmeleon.png";
 
 describe("EvolutionCard", () => {
-  it("shows the pre-evolution sprite and ??? before reveal", () => {
+  it("shows the pre-evolution sprite plus a ? placeholder before reveal", () => {
     render(
       <EvolutionCard
         preEvoSpriteUrl={PRE_SPRITE}
@@ -25,13 +25,13 @@ describe("EvolutionCard", () => {
       />,
     );
 
-    const img = screen.getByRole("img");
-    expect(img).toHaveAttribute("src", PRE_SPRITE);
-    expect(screen.getByText("???")).toBeInTheDocument();
+    expect(screen.getByAltText("charmander")).toHaveAttribute("src", PRE_SPRITE);
     expect(screen.queryByAltText("charmeleon")).not.toBeInTheDocument();
+    expect(screen.getByText("???")).toBeInTheDocument();
+    expect(screen.getByText("?")).toBeInTheDocument();
   });
 
-  it("shows the post-evolution sprite after reveal", () => {
+  it("shows the post-evolution sprite after reveal alongside the pre-evolution", () => {
     render(
       <EvolutionCard
         preEvoSpriteUrl={PRE_SPRITE}
@@ -43,17 +43,12 @@ describe("EvolutionCard", () => {
       />,
     );
 
-    const answerImg = screen.getByAltText("charmeleon");
-    expect(answerImg).toBeInTheDocument();
-    expect(answerImg).toHaveAttribute("src", POST_SPRITE);
-    // Question sprite should no longer be shown.
-    for (const img of screen.queryAllByRole("img")) {
-      expect(img).not.toHaveAttribute("src", PRE_SPRITE);
-    }
+    expect(screen.getByAltText("charmander")).toHaveAttribute("src", PRE_SPRITE);
+    expect(screen.getByAltText("charmeleon")).toHaveAttribute("src", POST_SPRITE);
     expect(screen.queryByText("???")).not.toBeInTheDocument();
   });
 
-  it("renders the answer sprite at 320px (single-target shape only)", () => {
+  it("renders sprites at intrinsic 320px", () => {
     render(
       <EvolutionCard
         preEvoSpriteUrl={PRE_SPRITE}
@@ -82,8 +77,6 @@ describe("EvolutionCard", () => {
       />,
     );
 
-    // The prompt is split across multiple inline spans, so query by partial
-    // text matches that survive the markup.
     expect(screen.getByText(/evolve into/)).toBeInTheDocument();
     expect(screen.getByText(/using a Thunder Stone/)).toBeInTheDocument();
   });
@@ -100,9 +93,22 @@ describe("EvolutionCard", () => {
       />,
     );
 
-    // The prompt should still ask "What does kadabra evolve into?" with no
-    // extra trigger fragment between "into" and "?".
     expect(screen.getByText(/evolve into\?/)).toBeInTheDocument();
+  });
+
+  it("shows the direction badge", () => {
+    render(
+      <EvolutionCard
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
+        revealed={false}
+      />,
+    );
+
+    expect(screen.getByText("Evolution")).toBeInTheDocument();
   });
 
   it("shows fact label and value when fact prop is provided", () => {
