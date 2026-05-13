@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.8.2] — 2026-05-13
+
+### Removed
+
+- Removed the half-built "Audio mode" pill from the practice page. The pill only rendered on reverse cards (where it had no audible effect because reverse cards never reach the reveal step), and on name/evolution cards the cry was already covered by the existing **Settings → Play cry on reveal** toggle. The wake-lock affordance will return when proper hands-free audio mode is implemented as part of a future change.
+
 ## [0.8.1] — 2026-05-13
 
 ### Fixed
@@ -485,7 +491,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.2
 [0.8.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.1
 [0.8.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.8.0
 [0.7.21]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.7.21
