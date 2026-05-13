@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.26] — 2026-05-13
+
+### Added
+
+- Gym badges (#420): earn hidden badges when you fully master a themed group of Pokémon — gym leaders, starters across five regions, Legendary Birds, Legendary Beasts, the Lake Trio, and the Eeveelutions. Earned badges appear on the Trainer card and a reveal toast fires the moment you unlock one. No checklist, no progress bar — discovery is the fun.
+
 ## [0.9.25] — 2026-05-13
 
 ### Fixed
@@ -690,7 +696,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.25...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.26...HEAD
+[0.9.26]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.26
 [0.9.25]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.25
 [0.9.24]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.24
 [0.9.23]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.23
