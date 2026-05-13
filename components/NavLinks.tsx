@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { loadSession } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
+import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 
 const NAV_LINKS = [
   { href: "/", label: "Practice" },
@@ -20,13 +21,17 @@ const LINK_BASE =
 export function NavLinks() {
   const pathname = usePathname();
   const [hasMastered, setHasMastered] = useState(false);
+  // Re-runs the mastery check when the session key changes — native cross-tab
+  // events and the synthetic dispatch from pullAndMerge / pasture sparkle
+  // clears both flow through this hook.
+  const sessionVersion = useSessionStorageKey();
 
   useEffect(() => {
     const session = loadSession();
-    if (session && filterMastered(session.cards).length > 0) {
-      setHasMastered(true);
-    }
-  }, []);
+    setHasMastered(
+      session !== null && filterMastered(session.cards).length > 0,
+    );
+  }, [sessionVersion]);
 
   return (
     <>

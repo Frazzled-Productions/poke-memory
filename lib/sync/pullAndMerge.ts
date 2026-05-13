@@ -5,11 +5,6 @@ import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
-// Must match the key used in lib/review/persistence.ts.
-// Any code that writes this key must also dispatch a synthetic StorageEvent
-// so same-tab subscribers (useSessionStorageKey) are notified.
-const SESSION_STORAGE_KEY = "poke-memory:review-session:v1";
-
 /**
  * Pulls all cloud rows for the user, merges them into localStorage using the
  * lastPullAt-based conflict rule, then updates lastPullAt from the server
@@ -47,25 +42,12 @@ export async function pullAndMerge(
       saveResult = saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
 
-    // If the write failed (e.g. storage quota exceeded), bail out without
-    // dispatching a StorageEvent — subscribers must not receive a stale
-    // notification for a session that was never actually written.
+    // If the write failed (e.g. storage quota exceeded), bail out — same-tab
+    // subscribers will not have received a synthetic StorageEvent because
+    // saveSession only dispatches on success.
     if (!saveResult.ok) return "error";
 
     saveSyncStatus({ ...syncStatus, lastPullAt: maxCloudUpdatedAt(cloudRows) });
-
-    // Dispatch a synthetic StorageEvent so same-tab subscribers (e.g.
-    // useSessionStorageKey in Stats/Pokédex) see the updated session without a
-    // page reload. Cross-tab listeners receive the native event from saveSession.
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key: SESSION_STORAGE_KEY,
-          storageArea: window.localStorage,
-          newValue: window.localStorage.getItem(SESSION_STORAGE_KEY),
-        }),
-      );
-    }
 
     return "ok";
   } catch {

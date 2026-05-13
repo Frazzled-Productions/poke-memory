@@ -67,6 +67,7 @@ export async function POST(request: Request) {
       // an existing value via partial update — upsert ignores absent
       // columns on conflict so this is purely defensive.
       hidden_since: r.hidden_since ?? null,
+      seen_in_pasture: r.seen_in_pasture ?? false,
       updated_at: updatedAt,
     }));
     try {

@@ -83,6 +83,8 @@ export default function PasturePage() {
 
       const partialUpdated = markSeenInPasture(cardId, session);
       const updated: SavedSession = { ...session, cards: partialUpdated.cards };
+      // saveSession dispatches the synthetic StorageEvent for same-tab
+      // subscribers (useSessionStorageKey).
       saveSession(updated);
       setSession(updated);
 
