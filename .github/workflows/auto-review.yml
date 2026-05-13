@@ -149,7 +149,7 @@ jobs:
                    <!-- auto-review-sha:${{ github.event.pull_request.head.sha }} -->
                    ## Auto-review ${{ steps.cycles.outputs.next }}
 
-                   <bulleted punch list of findings, or "No significant issues.">
+                   <bulleted findings list — one bullet per issue; or the single line "No significant issues." (not a bullet) when there are none>
 
                    Verdict: Looks good to me — @fraserbrookhouse
 
