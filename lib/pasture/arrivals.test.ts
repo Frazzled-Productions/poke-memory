@@ -60,6 +60,11 @@ function makeCard(
 ): ReviewableCard {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `Pokemon ${id}`,
     cardType,
     subjectKey: String(id),
     name: `Pokemon ${id}`,

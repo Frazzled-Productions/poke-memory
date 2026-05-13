@@ -17,6 +17,11 @@ function makePokemon(
 ): SeedPokemon {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `Pokemon${id}`,
     name: `Pokemon${id}`,
     spriteUrl: "",
     types: [],

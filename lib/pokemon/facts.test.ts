@@ -5,6 +5,11 @@ import type { SeedPokemon } from '@/lib/pokemon/seed';
 function basePokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
   return {
     id: 1,
+    speciesId: 1,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: 'Bulbasaur',
     name: 'bulbasaur',
     spriteUrl: '',
     types: ['grass', 'poison'],

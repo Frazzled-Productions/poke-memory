@@ -20,6 +20,11 @@ const NOW = new Date("2026-05-09T12:00:00Z");
 function makeSeed(id: number, types: string[]): SeedPokemon {
   return {
     id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: "pkmn-" + id,
     name: "pkmn-" + id,
     spriteUrl: "",
     types,
