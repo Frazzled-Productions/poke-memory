@@ -186,7 +186,7 @@ describe("TtsControls", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /hear sample/i }));
 
-    const synth = window.speechSynthesis as { speak: ReturnType<typeof vi.fn> };
+    const synth = window.speechSynthesis as unknown as { speak: ReturnType<typeof vi.fn> };
     expect(synth.speak).toHaveBeenCalledOnce();
     const utterance = synth.speak.mock.calls[0][0] as LocalUtterance;
     expect(utterance.rate).toBe(1.5);
