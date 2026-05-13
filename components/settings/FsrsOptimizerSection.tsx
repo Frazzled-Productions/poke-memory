@@ -6,10 +6,16 @@ import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/o
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function daysUntilOptimizeAvailable(optimizedAt: string): number | null {
+type CooldownState = { optimizedAt: string; daysRemaining: number };
+
+function computeCooldown(optimizedAt: string | undefined): CooldownState | null {
+  if (optimizedAt === undefined) return null;
   const sinceMs = Date.now() - new Date(optimizedAt).getTime();
   if (sinceMs >= OPTIMIZER_COOLDOWN_MS) return null;
-  return Math.ceil((OPTIMIZER_COOLDOWN_MS - sinceMs) / MS_PER_DAY);
+  return {
+    optimizedAt,
+    daysRemaining: Math.ceil((OPTIMIZER_COOLDOWN_MS - sinceMs) / MS_PER_DAY),
+  };
 }
 
 type OptimizerState = "idle" | "running" | "error";
@@ -36,10 +42,7 @@ export function FsrsOptimizerSection({
 }: Props) {
   const [optimizerState, setOptimizerState] = useState<OptimizerState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const cooldownDaysRemaining =
-    fsrsWeightsOptimizedAt !== undefined
-      ? daysUntilOptimizeAvailable(fsrsWeightsOptimizedAt)
-      : null;
+  const cooldown = computeCooldown(fsrsWeightsOptimizedAt);
 
   async function handleOptimize() {
     setOptimizerState("running");
@@ -65,9 +68,10 @@ export function FsrsOptimizerSection({
           const body = (await res.json().catch(() => null)) as
             | { retryAfterMs?: number }
             | null;
-          const days = body?.retryAfterMs
-            ? Math.ceil(body.retryAfterMs / MS_PER_DAY)
-            : 7;
+          const days =
+            typeof body?.retryAfterMs === "number"
+              ? Math.max(1, Math.ceil(body.retryAfterMs / MS_PER_DAY))
+              : 7;
           setErrorMsg(`Try again in ${days} day${days === 1 ? "" : "s"}.`);
         } else {
           setErrorMsg("Couldn't optimize — try again later.");
@@ -149,7 +153,7 @@ export function FsrsOptimizerSection({
               Available after ~200 reviews. You have {optimizableReviewCount}.
             </p>
           </div>
-        ) : cooldownDaysRemaining !== null ? (
+        ) : cooldown !== null ? (
           /* Cooldown active — show when next optimization is available */
           <div className="flex flex-col gap-2">
             <p className="text-sm text-foreground">
@@ -161,14 +165,14 @@ export function FsrsOptimizerSection({
               data-testid="fsrs-optimize-button"
               className="mt-2 inline-flex items-center gap-2 min-h-[44px] rounded-lg bg-zinc-200 text-zinc-500 px-6 py-2 text-sm font-semibold dark:bg-zinc-800 dark:text-zinc-400"
             >
-              Next optimization in {cooldownDaysRemaining} day{cooldownDaysRemaining === 1 ? "" : "s"}
+              Next optimization in {cooldown.daysRemaining} day{cooldown.daysRemaining === 1 ? "" : "s"}
             </button>
             <p
               data-testid="fsrs-optimize-last-run"
               className="text-xs text-zinc-500 dark:text-zinc-400"
             >
               Last optimized:{" "}
-              {new Date(fsrsWeightsOptimizedAt!).toLocaleDateString(undefined, {
+              {new Date(cooldown.optimizedAt).toLocaleDateString(undefined, {
                 year: "numeric",
                 month: "short",
                 day: "numeric",
