@@ -26,6 +26,7 @@ import { SyncNowButton } from "@/components/stats/SyncNowButton";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useManualSync } from "@/lib/sync/useManualSync";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -394,6 +395,7 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 
 export default function StatsPage() {
   const { user, supabase } = useAuth();
+  const { flags } = useSuperuser();
   const { syncState, errorMessage, syncNow } = useManualSync(supabase, user?.id ?? null);
   const storageVersion = useSessionStorageKey();
   const [syncRefreshKey, setSyncRefreshKey] = useState(0);
@@ -440,11 +442,23 @@ export default function StatsPage() {
       : null;
   const stats: StatsResult | null =
     nameCards !== null && masteryRepetitions !== null
-      ? computeStats(nameCards, todayString(new Date()), 10, masteryRepetitions)
+      ? computeStats(
+          nameCards,
+          todayString(new Date()),
+          10,
+          masteryRepetitions,
+          flags.pretendAllMastered,
+        )
       : null;
   const records: Records | null =
     nameCards !== null && masteryRepetitions !== null
-      ? computeRecords(nameCards, gradeLog, streakDates, masteryRepetitions)
+      ? computeRecords(
+          nameCards,
+          gradeLog,
+          streakDates,
+          masteryRepetitions,
+          flags.pretendAllMastered,
+        )
       : null;
 
   return (
@@ -460,6 +474,7 @@ export default function StatsPage() {
               syncState={syncState}
               errorMessage={errorMessage}
               onSync={syncNow}
+              superuserPaused={flags.pretendAllMastered}
             />
           </div>
         )}

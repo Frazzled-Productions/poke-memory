@@ -32,6 +32,7 @@ import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { appendGradeEntry, loadGradeLog, removeGradeEntry } from "@/lib/gradelog/persistence";
@@ -401,8 +402,15 @@ export function ReviewSession() {
   const revealedCardId = useRef<number | null>(null);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
   const { user, supabase } = useAuth();
-  const { enqueueGrade, flushPending } = usePerGradeSync(supabase, user?.id ?? null);
-  useSyncOnUnload(supabase, user?.id ?? null, flushPending);
+  const { anyFlagOn: superuserGuarded } = useSuperuser();
+  // When any superuser flag is on, suppress cloud writes by treating sync as
+  // signed-out. Per-grade enqueue, debounced drain, and unload sendBeacon all
+  // short-circuit on null client/userId. Background pulls (SyncOnVisible /
+  // SignInPull) keep running so local stays consistent with cloud.
+  const syncClient = superuserGuarded ? null : supabase;
+  const syncUserId = superuserGuarded ? null : user?.id ?? null;
+  const { enqueueGrade, flushPending } = usePerGradeSync(syncClient, syncUserId);
+  useSyncOnUnload(syncClient, syncUserId, flushPending);
 
   // Derive seen Pokémon once per cards change — used by the mini-game on the
   // SESSION_COMPLETE screen. Must stay unconditional (hooks rule).

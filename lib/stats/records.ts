@@ -81,7 +81,21 @@ export function computeRecords(
   log: GradeLog,
   streakDates: readonly string[],
   masteryRepetitions: number,
+  forceAllMastered = false,
 ): Records {
+  // Superuser pretendAllMastered: project the mastery-derived metrics onto
+  // "you've mastered everything". longestStreak / bestReviewDay derive from
+  // grade-log/streak data and stay honest — pretend-mastered doesn't change
+  // your actual review history.
+  if (forceAllMastered && cards.length > 0) {
+    return {
+      longestStreak: computeLongestStreak(streakDates),
+      bestReviewDay: computeBestReviewDay(log),
+      avgDaysToMastery: 0,
+      mostMasteredIn7d: cards.length,
+    };
+  }
+
   const masteredCards = cards.filter(
     (c) =>
       isMastered(c.state, masteryRepetitions) &&

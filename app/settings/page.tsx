@@ -51,7 +51,7 @@ function FavouritePicker({
   favouriteId: number | null;
   onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
 }) {
-  const { superuser } = useSuperuser();
+  const { flags } = useSuperuser();
   // Empty deps: session is loaded once at mount. Nothing on this page writes
   // to the session, so a snapshot is safe and avoids re-reading on every render.
   const cardStateById = useMemo(() => {
@@ -61,7 +61,10 @@ function FavouritePicker({
 
   const unlockedEntries = CURATED_POKEMON.filter((entry) => {
     const state = cardStateById.get(entry.id);
-    return superuser || (state !== undefined && isMastered(state, settings.masteryRepetitions));
+    return (
+      flags.pretendAllMastered ||
+      (state !== undefined && isMastered(state, settings.masteryRepetitions))
+    );
   });
 
   if (unlockedEntries.length === 0) return null;
@@ -228,6 +231,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user, supabase } = useAuth();
   const { updateFavourite } = useFavourite();
+  const { unlocked, flags, setFlag } = useSuperuser();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -919,6 +923,59 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+
+            {unlocked && (
+              <section
+                className="mt-10 rounded-xl border border-amber-300 p-5 dark:border-amber-700"
+                aria-labelledby="developer-heading"
+              >
+                <h2
+                  id="developer-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400"
+                >
+                  Developer
+                </h2>
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  QA shortcuts. While any flag here is on, sync to the cloud is
+                  paused so QA state can&apos;t leak into your real data.
+                  Turning off the last flag (or locking superuser mode) restores
+                  cloud state for signed-in users, or offers to reset local
+                  state for guests.
+                </p>
+                <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Pretend all Pokémon are mastered
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Renders every species as mastered across the Pokédex,
+                        detail pages, Pasture, Stats, and the theme picker.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={flags.pretendAllMastered}
+                      onClick={() =>
+                        void setFlag("pretendAllMastered", !flags.pretendAllMastered)
+                      }
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        flags.pretendAllMastered
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          flags.pretendAllMastered ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
 
             <section
               className="mt-10 rounded-xl border border-red-200 p-5 dark:border-red-900"

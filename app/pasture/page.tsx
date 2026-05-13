@@ -9,6 +9,7 @@ import { assignAnchors } from "@/lib/pasture/assign";
 import { PastureZone } from "@/components/pasture/PastureZone";
 import { pushSingleCard } from "@/lib/sync/cloud";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 
@@ -67,6 +68,7 @@ function buildZoneData(masteredCards: NameReviewCard[]): ZoneData[] {
 
 export default function PasturePage() {
   const { user, supabase } = useAuth();
+  const { flags } = useSuperuser();
   const [session, setSession] = useState<SavedSession | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -110,7 +112,7 @@ export default function PasturePage() {
   }
 
   const masteredCards = session
-    ? (filterMastered(session.cards) as NameReviewCard[])
+    ? (filterMastered(session.cards, flags.pretendAllMastered) as NameReviewCard[])
     : [];
 
   if (masteredCards.length === 0) {

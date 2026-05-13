@@ -8,7 +8,7 @@ export type SavedSession = {
   limits: DailyLimits;
 };
 
-const STORAGE_KEY = "poke-memory:review-session:v1";
+export const STORAGE_KEY = "poke-memory:review-session:v1";
 
 function isReviewCardShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
