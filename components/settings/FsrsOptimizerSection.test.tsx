@@ -91,6 +91,30 @@ describe("FsrsOptimizerSection", () => {
       expect(screen.getByTestId("fsrs-optimize-last-run")).toBeInTheDocument();
     });
 
+    it("enables button at exactly 7-day boundary (sinceMs === COOLDOWN_MS)", () => {
+      const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+      const fixedNow = 1_700_000_000_000;
+      vi.useFakeTimers();
+      vi.setSystemTime(fixedNow);
+      try {
+        const optimizedAt = new Date(fixedNow - COOLDOWN_MS).toISOString();
+        render(
+          <FsrsOptimizerSection
+            {...defaultProps}
+            isSignedIn={true}
+            superuserPaused={false}
+            optimizableReviewCount={300}
+            fsrsWeightsOptimizedAt={optimizedAt}
+          />,
+        );
+        const button = screen.getByTestId("fsrs-optimize-button");
+        expect(button).not.toBeDisabled();
+        expect(button).toHaveTextContent("Optimize now");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("enables button when optimized 8 days ago (cooldown elapsed)", () => {
       const optimizedAt = new Date(Date.now() - 8 * MS_PER_DAY).toISOString();
       render(

@@ -24,7 +24,6 @@ import { createClient } from "@/lib/supabase/server";
 // a future plan-default change doesn't silently truncate the fit.
 export const maxDuration = 60;
 
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 import {
   FSRSBindingItem,
   FSRSBindingReview,
@@ -35,6 +34,7 @@ import {
   gradeLogToOptimizerItems,
   countOptimizableReviews,
   MIN_REVIEWS_FOR_OPTIMIZATION,
+  OPTIMIZER_COOLDOWN_MS,
 } from "@/lib/srs/optimizer";
 import type { UserSettings } from "@/lib/settings/persistence";
 
@@ -50,19 +50,16 @@ async function fetchUserSettings(
   client: SupabaseClient,
   userId: string,
 ): Promise<Partial<UserSettings> | null> {
-  try {
-    const { data } = await client
-      .from("user_settings")
-      .select("settings")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!data) return null;
-    const s = (data as { settings: unknown }).settings;
-    if (s && typeof s === "object") return s as Partial<UserSettings>;
-    return null;
-  } catch {
-    return null;
-  }
+  const { data, error } = await client
+    .from("user_settings")
+    .select("settings")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const s = (data as { settings: unknown }).settings;
+  if (s && typeof s === "object") return s as Partial<UserSettings>;
+  return null;
 }
 
 async function fetchGradeLog(
@@ -171,14 +168,23 @@ export async function POST(): Promise<NextResponse> {
   }
 
   // Enforce 7-day cooldown before running the CPU-bound optimizer.
-  const currentSettings = await fetchUserSettings(supabase, user.id);
+  let currentSettings: Partial<UserSettings> | null;
+  try {
+    currentSettings = await fetchUserSettings(supabase, user.id);
+  } catch {
+    return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
+  }
   const last = currentSettings?.fsrsWeightsOptimizedAt;
   if (last) {
     const sinceMs = Date.now() - new Date(last).getTime();
-    if (sinceMs < COOLDOWN_MS) {
+    if (sinceMs < OPTIMIZER_COOLDOWN_MS) {
+      const retryAfterMs = OPTIMIZER_COOLDOWN_MS - sinceMs;
       return NextResponse.json(
-        { error: "cooldown", retryAfterMs: COOLDOWN_MS - sinceMs },
-        { status: 429 },
+        { error: "cooldown", retryAfterMs },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
+        },
       );
     }
   }
