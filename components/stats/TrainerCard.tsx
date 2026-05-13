@@ -24,6 +24,8 @@ export function nextLevelMastered(level: number): number {
   return Math.ceil(((level + 1) / 1.6) ** 2);
 }
 
+const TOTAL_SPECIES = 1025;
+
 const GEN_LABELS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
 
 export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
@@ -57,12 +59,14 @@ export function TrainerCard({ handle, totalMastered, perGeneration }: Props) {
           </span>
           <span id="trainer-level-desc" className="sr-only">
             Level grows with the number of Pokémon name cards you&apos;ve mastered
-            (reps ≥ 3 and review interval ≥ 21 days).
+            (reps ≥ 3 and scheduled interval ≥ 21 days).
           </span>
         </div>
       </div>
       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        {`${totalMastered} / ${next} mastered · ${needed} to Lv ${level + 1}`}
+        {totalMastered >= TOTAL_SPECIES
+          ? "All mastered"
+          : `${totalMastered} / ${next} mastered · ${needed} to Lv ${level + 1}`}
       </p>
       <ul
         role="list"

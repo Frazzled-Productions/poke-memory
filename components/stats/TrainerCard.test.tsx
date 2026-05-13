@@ -95,6 +95,13 @@ describe("TrainerCard", () => {
     expect(screen.getByText("10 / 15 mastered · 5 to Lv 6")).toBeInTheDocument();
   });
 
+  it("shows 'All mastered' when totalMastered reaches the species cap", () => {
+    render(
+      <TrainerCard handle={null} totalMastered={1025} perGeneration={ALL_INCOMPLETE} />,
+    );
+    expect(screen.getByText("All mastered")).toBeInTheDocument();
+  });
+
   it("level number is described by the mastery criterion text", () => {
     render(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
