@@ -57,6 +57,7 @@ function nameCardOf(seed: SeedPokemon, state: Partial<ReturnType<typeof initialR
   return {
     ...seed,
     cardType: "name",
+    subjectKey: String(seed.id),
     state: { ...initialReviewState(NOW), ...state },
   };
 }
@@ -67,6 +68,7 @@ function reverseCardOf(seed: SeedPokemon, state: Partial<ReturnType<typeof initi
     id: REVERSE_ID_OFFSET + seed.id,
     pokemonId: seed.id,
     cardType: "reverse",
+    subjectKey: String(seed.id),
     state: { ...initialReviewState(NOW), ...state },
   };
 }

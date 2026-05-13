@@ -29,7 +29,7 @@ function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard 
     generation: "generation-i", captureRate: 45, baseHappiness: 50,
     growthRate: "medium", habitat: null, genderRate: 0,
     isLegendary: false, isMythical: false, cryUrl: null,
-    cardType: "name", state: state(overrides),
+    cardType: "name", subjectKey: String(id), state: state(overrides),
   };
 }
 

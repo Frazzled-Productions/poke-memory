@@ -61,6 +61,7 @@ function makeCard(
   return {
     id,
     cardType,
+    subjectKey: String(id),
     name: `Pokemon ${id}`,
     spriteUrl: `/sprites/${id}.png`,
     types: ["normal"],

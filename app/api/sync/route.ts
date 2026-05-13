@@ -51,7 +51,8 @@ export async function POST(request: Request) {
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH).map((r) => ({
       user_id: user.id,
-      pokemon_id: r.pokemon_id,
+      card_type: r.card_type,
+      subject_key: r.subject_key,
       stability: r.stability,
       difficulty: r.difficulty,
       elapsed_days: r.elapsed_days,
@@ -62,10 +63,9 @@ export async function POST(request: Request) {
       due_date: r.due_date,
       last_review: r.last_review,
       first_seen: r.first_seen,
-      // #333: snooze stamp. Legacy beacons (pre-7) won't include this
-      // field; coalesce undefined to null so a missing key doesn't strip
-      // an existing value via partial update — upsert ignores absent
-      // columns on conflict so this is purely defensive.
+      // Migration 007 / 008 fields — coalesce absent keys to safe defaults so
+      // beacons sent before these migrations don't strip existing values on
+      // conflict (upsert ignores absent columns when they don't change).
       hidden_since: r.hidden_since ?? null,
       seen_in_pasture: r.seen_in_pasture ?? false,
       updated_at: updatedAt,
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     try {
       const { error } = await supabase
         .from("card_reviews")
-        .upsert(batch, { onConflict: "user_id,pokemon_id" });
+        .upsert(batch, { onConflict: "user_id,card_type,subject_key" });
       if (error) allOk = false;
     } catch {
       allOk = false;

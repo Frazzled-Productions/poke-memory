@@ -34,6 +34,8 @@ function state(overrides: Partial<ReviewState> = {}): ReviewState {
 function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard {
   return {
     id,
+    cardType: "name",
+    subjectKey: String(id),
     name: `Pokemon ${id}`,
     spriteUrl: "",
     types: ["normal"],
@@ -54,7 +56,6 @@ function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard 
     isLegendary: false,
     isMythical: false,
     cryUrl: null,
-    cardType: "name",
     state: state(overrides),
   };
 }

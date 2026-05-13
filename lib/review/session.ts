@@ -8,15 +8,24 @@ import {
   reverseEdgeIdFor,
 } from "@/lib/pokemon/seed";
 import { FNV_PRIME, FNV_OFFSET, fnv1a } from "@/lib/utils/fnv1a";
+import { Subject, appTypeToDbType } from "@/lib/cards/subjectKey";
+
+// Re-export so callers that need the DB card_type value can get it without
+// importing subjectKey.ts separately.
+export { appTypeToDbType };
 
 export type { Grade };
 
 export type NameReviewCard = SeedPokemon & {
   cardType: "name";
+  /** DB subject key — equals String(pokemonId). */
+  subjectKey: string;
   state: ReviewState;
 };
 
 export type EvolutionReviewCard = EvolutionCard & {
+  /** DB subject key — equals Subject.forEdge(preEvoId, postEvoId). */
+  subjectKey: string;
   state: ReviewState;
 };
 
@@ -24,6 +33,8 @@ export type EvolutionReviewCard = EvolutionCard & {
 // only the id and cardType differ. Counts against the "evolution" daily-limit
 // bucket so both directions of an edge share one budget.
 export type ReverseEvolutionReviewCard = ReverseEvolutionCard & {
+  /** DB subject key — equals Subject.forEdge(preEvoId, postEvoId). Same key as the forward direction. */
+  subjectKey: string;
   state: ReviewState;
 };
 
@@ -33,7 +44,9 @@ export type ReverseEvolutionReviewCard = ReverseEvolutionCard & {
 // after reveal without a secondary lookup.
 export type ReverseReviewCard = Omit<SeedPokemon, "id"> & {
   cardType: "reverse";
-  id: number;        // REVERSE_ID_OFFSET + pokemonId
+  id: number;         // REVERSE_ID_OFFSET + pokemonId (legacy; kept for one release)
+  /** DB subject key — equals String(pokemonId). Same as the name card for this species. */
+  subjectKey: string;
   pokemonId: number; // original species ID (same as SeedPokemon.id)
   state: ReviewState;
 };
@@ -44,7 +57,9 @@ export type ReverseReviewCard = Omit<SeedPokemon, "id"> & {
 // helpers that handle "non-name id-aliased cards" generalise.
 export type CryReviewCard = Omit<SeedPokemon, "id"> & {
   cardType: "cry";
-  id: number;        // CRY_ID_OFFSET + pokemonId
+  id: number;         // CRY_ID_OFFSET + pokemonId (legacy; kept for one release)
+  /** DB subject key — equals String(pokemonId). */
+  subjectKey: string;
   pokemonId: number;
   state: ReviewState;
 };
@@ -106,12 +121,14 @@ export function buildSession(
     ? seed.map((pokemon) => ({
         ...pokemon,
         cardType: "name",
+        subjectKey: Subject.forSpecies(pokemon.id),
         state: initialReviewState(now),
       }))
     : [];
   const evoCards: EvolutionReviewCard[] = evolutionEnabled
     ? evoSeed.map((evo) => ({
         ...evo,
+        subjectKey: Subject.forEdge(evo.preEvoId, evo.postEvoId),
         state: initialReviewState(now),
       }))
     : [];
@@ -123,6 +140,7 @@ export function buildSession(
         ...fwd,
         cardType: "reverse-evolution" as const,
         id: reverseEdgeIdFor(fwd.id),
+        subjectKey: Subject.forEdge(fwd.preEvoId, fwd.postEvoId),
         state: initialReviewState(now),
       }))
     : [];
@@ -132,6 +150,7 @@ export function buildSession(
         id: REVERSE_ID_OFFSET + p.id,
         pokemonId: p.id,
         cardType: "reverse" as const,
+        subjectKey: Subject.forSpecies(p.id),
         state: initialReviewState(now),
       }))
     : [];
@@ -145,6 +164,7 @@ export function buildSession(
           id: CRY_ID_OFFSET + p.id,
           pokemonId: p.id,
           cardType: "cry" as const,
+          subjectKey: Subject.forSpecies(p.id),
           state: initialReviewState(now),
         }))
     : [];
@@ -207,11 +227,19 @@ export function hydrateSession(
     if (card.cardType === "evolution") {
       const fresh = evoSeedById.get(card.id);
       if (!fresh) return card;
-      return { ...fresh, state: card.state };
+      return {
+        ...fresh,
+        subjectKey: Subject.forEdge(fresh.preEvoId, fresh.postEvoId),
+        state: card.state,
+      };
     } else if (card.cardType === "reverse-evolution") {
       const fresh = reverseEvoSeedById.get(card.id);
       if (!fresh) return card;
-      return { ...fresh, state: card.state };
+      return {
+        ...fresh,
+        subjectKey: Subject.forEdge(fresh.preEvoId, fresh.postEvoId),
+        state: card.state,
+      };
     } else if (card.cardType === "reverse") {
       const fresh = seedById.get(card.pokemonId);
       if (!fresh) return card;
@@ -220,6 +248,7 @@ export function hydrateSession(
         id: card.id,
         pokemonId: fresh.id,
         cardType: "reverse" as const,
+        subjectKey: Subject.forSpecies(fresh.id),
         state: card.state,
       };
     } else if (card.cardType === "cry") {
@@ -230,12 +259,18 @@ export function hydrateSession(
         id: card.id,
         pokemonId: fresh.id,
         cardType: "cry" as const,
+        subjectKey: Subject.forSpecies(fresh.id),
         state: card.state,
       };
     } else {
       const fresh = seedById.get(card.id);
       if (!fresh) return card;
-      return { ...fresh, cardType: "name", state: card.state };
+      return {
+        ...fresh,
+        cardType: "name",
+        subjectKey: Subject.forSpecies(fresh.id),
+        state: card.state,
+      };
     }
   });
 
@@ -244,13 +279,22 @@ export function hydrateSession(
   const nameAdditions: NameReviewCard[] = nameEnabled
     ? seed
         .filter((p) => !savedIds.has(p.id))
-        .map((p) => ({ ...p, cardType: "name", state: initialReviewState(now) }))
+        .map((p) => ({
+          ...p,
+          cardType: "name",
+          subjectKey: Subject.forSpecies(p.id),
+          state: initialReviewState(now),
+        }))
     : [];
 
   const evoAdditions: EvolutionReviewCard[] = evolutionEnabled
     ? evoSeed
         .filter((e) => !savedIds.has(e.id))
-        .map((e) => ({ ...e, state: initialReviewState(now) }))
+        .map((e) => ({
+          ...e,
+          subjectKey: Subject.forEdge(e.preEvoId, e.postEvoId),
+          state: initialReviewState(now),
+        }))
     : [];
 
   const reverseEvoAdditions: ReverseEvolutionReviewCard[] = reverseEvolutionEnabled
@@ -259,6 +303,7 @@ export function hydrateSession(
           ...fwd,
           cardType: "reverse-evolution" as const,
           id: reverseEdgeIdFor(fwd.id),
+          subjectKey: Subject.forEdge(fwd.preEvoId, fwd.postEvoId),
         }))
         .filter((c) => !savedIds.has(c.id))
         .map((c) => ({ ...c, state: initialReviewState(now) }))
@@ -272,6 +317,7 @@ export function hydrateSession(
           id: REVERSE_ID_OFFSET + p.id,
           pokemonId: p.id,
           cardType: "reverse" as const,
+          subjectKey: Subject.forSpecies(p.id),
           state: initialReviewState(now),
         }))
     : [];
@@ -284,6 +330,7 @@ export function hydrateSession(
           id: CRY_ID_OFFSET + p.id,
           pokemonId: p.id,
           cardType: "cry" as const,
+          subjectKey: Subject.forSpecies(p.id),
           state: initialReviewState(now),
         }))
     : [];

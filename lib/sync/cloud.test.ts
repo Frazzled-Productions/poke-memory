@@ -22,6 +22,7 @@ function makeCard(
     id,
     cardType: "name",
     name: `pokemon-${id}`,
+    subjectKey: String(id),
     spriteUrl: `https://example.com/${id}.png`,
     types: ["normal"],
     stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
@@ -69,7 +70,8 @@ function makeCloudRow(
   seenInPasture = false,
 ): CloudRow {
   return {
-    pokemon_id: pokemonId,
+    card_type: "name",
+    subject_key: String(pokemonId),
     stability: 1,
     difficulty: 1,
     elapsed_days: 0,
@@ -137,8 +139,21 @@ describe("pushSession", () => {
     expect(ok).toBe(true);
     // upsert should have been called once for the safe card only
     expect(client._upsertSpy).toHaveBeenCalledTimes(1);
-    const [batchArg] = client._upsertSpy.mock.calls[0] as [Array<{ pokemon_id: number }>, unknown];
-    expect(batchArg.map((r) => r.pokemon_id)).toEqual([1]);
+    const [batchArg] = client._upsertSpy.mock.calls[0] as [
+      Array<{ card_type: string; subject_key: string }>,
+      unknown,
+    ];
+    expect(batchArg).toHaveLength(1);
+    expect(batchArg[0].card_type).toBe("name");
+    expect(batchArg[0].subject_key).toBe("1");
+  });
+
+  it("uses (user_id, card_type, subject_key) as the conflict target", async () => {
+    const client = makeSupabaseClient();
+    const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
+    await pushSession(client, "user-1", [safeCard]);
+    const [, conflictArg] = client._upsertSpy.mock.calls[0] as [unknown, { onConflict: string }];
+    expect(conflictArg.onConflict).toBe("user_id,card_type,subject_key");
   });
 
   it("warns when an unsafe card is skipped", async () => {
@@ -188,6 +203,60 @@ describe("pushSingleCard", () => {
     expect(result).toBe(true);
     expect(client._upsertSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("upsert uses (user_id, card_type, subject_key) as the conflict target", async () => {
+    const client = makeSupabaseClient();
+    const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
+    await pushSingleCard(client, "user-1", safeCard);
+    const [rowArg, conflictArg] = client._upsertSpy.mock.calls[0] as [
+      { card_type: string; subject_key: string },
+      { onConflict: string },
+    ];
+    expect(rowArg.card_type).toBe("name");
+    expect(rowArg.subject_key).toBe("1");
+    expect(conflictArg.onConflict).toBe("user_id,card_type,subject_key");
+  });
+});
+
+// ─── pull-before-push invariant ───────────────────────────────────────────────
+
+describe("pull-before-push invariant (regression guard)", () => {
+  // This test verifies that mergeCloudIntoLocalSilent + mergeCloudIntoLocal key
+  // on (card_type, subject_key) rather than the old pokemon_id, ensuring the
+  // new identity scheme produces correct per-card matching.
+  it("merge keys on (card_type, subject_key), not pokemon_id", () => {
+    // Two cards with the same subject_key but different card_type must NOT match.
+    const nameCard = makeCard(1, null, null);
+    const reverseCloudRow: CloudRow = {
+      card_type: "reverse",
+      subject_key: "1", // same species, different direction
+      stability: 1,
+      difficulty: 1,
+      elapsed_days: 0,
+      scheduled_days: 1,
+      reps: 1,
+      lapses: 0,
+      fsrs_state: "review",
+      due_date: "2026-05-11",
+      last_review: "2026-05-10",
+      first_seen: "2026-05-09",
+      hidden_since: null,
+      seen_in_pasture: false,
+      updated_at: "2026-05-11T12:00:00.000Z",
+    };
+    // The name card should not pick up the reverse-card's cloud row.
+    const merged = mergeCloudIntoLocal([nameCard], [reverseCloudRow]);
+    expect(merged[0].state.lastReview).toBeNull(); // unchanged — no matching cloud row
+  });
+
+  it("merge correctly matches a name card with its cloud row", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const nameCard = makeCard(5, null, null);
+    const cloudRow = makeCloudRow(5, "2026-05-01", "2026-05-10");
+    const [merged] = mergeCloudIntoLocal([nameCard], [cloudRow]);
+    expect(merged.state.lastReview).toBe("2026-05-10");
+    expect(merged.state.firstSeen).toBe("2026-05-01");
+  });
 });
 
 // ─── mergeCloudIntoLocal ──────────────────────────────────────────────────────
@@ -216,7 +285,10 @@ describe("mergeCloudIntoLocal", () => {
 
     mergeCloudIntoLocal([localCard], [badRow]);
 
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("5"));
+    // Warning now includes card_type:subject_key instead of bare id
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringMatching(/name:5|normalizing/)
+    );
   });
 
   it("passes through a good cloud row unchanged", () => {
@@ -251,6 +323,30 @@ describe("mergeCloudIntoLocal", () => {
     expect(merged[0].state.firstSeen).toBe("2026-05-09");
     expect(merged[1].state.firstSeen).toBeNull();
   });
+
+  it("skips cloud rows with null subject_key (unmigrated edges)", () => {
+    const localCard = makeCard(5, null, null);
+    const unmigrated: CloudRow = {
+      card_type: "evolution-edge",
+      subject_key: null, // not yet backfilled
+      stability: 1,
+      difficulty: 1,
+      elapsed_days: 0,
+      scheduled_days: 1,
+      reps: 1,
+      lapses: 0,
+      fsrs_state: "review",
+      due_date: "2026-05-11",
+      last_review: "2026-05-10",
+      first_seen: "2026-05-09",
+      hidden_since: null,
+      seen_in_pasture: false,
+      updated_at: "2026-05-11T12:00:00.000Z",
+    };
+    // The local name card for species 5 should be unaffected by the unmigrated edge row.
+    const [merged] = mergeCloudIntoLocal([localCard], [unmigrated]);
+    expect(merged).toBe(localCard);
+  });
 });
 
 // ─── hidden_since round-trip (#333) ───────────────────────────────────────
@@ -266,9 +362,11 @@ describe("hidden_since (#333) round-trip", () => {
     const ok = await pushSession(client, "user-1", [card]);
     expect(ok).toBe(true);
     const [batchArg] = client._upsertSpy.mock.calls[0] as [
-      Array<{ pokemon_id: number; hidden_since: string | null }>,
+      Array<{ card_type: string; subject_key: string; hidden_since: string | null }>,
       unknown,
     ];
+    expect(batchArg[0].card_type).toBe("name");
+    expect(batchArg[0].subject_key).toBe("11");
     expect(batchArg[0].hidden_since).toBe("2026-05-09");
   });
 
@@ -277,7 +375,7 @@ describe("hidden_since (#333) round-trip", () => {
     const card = makeCard(12, "2026-05-01", "2026-05-08", null);
     await pushSession(client, "user-1", [card]);
     const [batchArg] = client._upsertSpy.mock.calls[0] as [
-      Array<{ pokemon_id: number; hidden_since: string | null }>,
+      Array<{ card_type: string; subject_key: string; hidden_since: string | null }>,
       unknown,
     ];
     expect(batchArg[0].hidden_since).toBeNull();
@@ -289,9 +387,11 @@ describe("hidden_since (#333) round-trip", () => {
     const ok = await pushSingleCard(client, "user-1", card);
     expect(ok).toBe(true);
     const [row] = client._upsertSpy.mock.calls[0] as [
-      { hidden_since: string | null },
+      { card_type: string; subject_key: string; hidden_since: string | null },
       unknown,
     ];
+    expect(row.card_type).toBe("name");
+    expect(row.subject_key).toBe("13");
     expect(row.hidden_since).toBe("2026-05-09");
   });
 
@@ -325,7 +425,7 @@ describe("seen_in_pasture (#350) round-trip", () => {
     const ok = await pushSession(client, "user-1", [card]);
     expect(ok).toBe(true);
     const [batchArg] = client._upsertSpy.mock.calls[0] as [
-      Array<{ pokemon_id: number; seen_in_pasture: boolean }>,
+      Array<{ card_type: string; subject_key: string; seen_in_pasture: boolean }>,
       unknown,
     ];
     expect(batchArg[0].seen_in_pasture).toBe(true);
@@ -336,7 +436,7 @@ describe("seen_in_pasture (#350) round-trip", () => {
     const card = makeCard(32, "2026-05-01", "2026-05-08", null, false);
     await pushSession(client, "user-1", [card]);
     const [batchArg] = client._upsertSpy.mock.calls[0] as [
-      Array<{ pokemon_id: number; seen_in_pasture: boolean }>,
+      Array<{ card_type: string; subject_key: string; seen_in_pasture: boolean }>,
       unknown,
     ];
     expect(batchArg[0].seen_in_pasture).toBe(false);
@@ -438,6 +538,30 @@ describe("mergeCloudIntoLocalSilent", () => {
   it("returns local unchanged when no matching cloud row", () => {
     const local = makeCard(42, "2026-05-12", "2026-05-12");
     const [merged] = mergeCloudIntoLocalSilent([local], [], null);
+    expect(merged).toBe(local);
+  });
+
+  it("skips null-subject_key cloud rows in merge (unmigrated edges do not affect local state)", () => {
+    const local = makeCard(1, null, null);
+    const unmigrated: CloudRow = {
+      card_type: "evolution-edge",
+      subject_key: null,
+      stability: 5,
+      difficulty: 3,
+      elapsed_days: 1,
+      scheduled_days: 7,
+      reps: 3,
+      lapses: 0,
+      fsrs_state: "review",
+      due_date: "2026-05-18",
+      last_review: "2026-05-11",
+      first_seen: "2026-04-01",
+      hidden_since: null,
+      seen_in_pasture: false,
+      updated_at: "2026-05-11T12:00:00.000Z",
+    };
+    const [merged] = mergeCloudIntoLocalSilent([local], [unmigrated], null);
+    // name card should be unaffected by unmigrated edge row
     expect(merged).toBe(local);
   });
 });

@@ -48,6 +48,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     isMythical: false,
     cryUrl: null,
     cardType: "name",
+    subjectKey: "1",
     // buildSession calls initialReviewState(now) for each card, so these
     // values are overwritten and have no effect on test behaviour.
     state: {
@@ -69,7 +70,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
   };
 
   function makeExtra(id: number, name: string): typeof card {
-    return { ...card, id, name, spriteUrl: `https://example.com/${name.toLowerCase()}.png` };
+    return { ...card, id, name, subjectKey: String(id), spriteUrl: `https://example.com/${name.toLowerCase()}.png` };
   }
 
   const defaultSettings = {

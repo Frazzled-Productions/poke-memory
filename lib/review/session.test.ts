@@ -53,6 +53,7 @@ function makeCard(seedPokemon: SeedPokemon, stateOverrides: Partial<ReturnType<t
   return {
     ...seedPokemon,
     cardType: 'name',
+    subjectKey: String(seedPokemon.id),
     state: { ...initialReviewState(NOW), ...stateOverrides },
   };
 }
@@ -167,6 +168,7 @@ describe('hydrateSession (evolution refresh)', () => {
         postEvoSpriteUrl: 'old-post',
         triggerPhrase: null,
       }),
+      subjectKey: '1>>>2',
       state: { ...initialReviewState(NOW), reps: 7, scheduledDays: 30 },
     };
     const freshEvo = makeEvoEdge({
@@ -327,6 +329,7 @@ describe('hydrateSession (reverse cards)', () => {
       id: REVERSE_ID_OFFSET + 1,
       pokemonId: 1,
       cardType: 'reverse',
+      subjectKey: '1',
       state: initialReviewState(NOW),
     };
     const saved = [makeCard(makeSeedPokemon(1)), revCard];
@@ -347,6 +350,7 @@ describe('hydrateSession (reverse cards)', () => {
       id: REVERSE_ID_OFFSET + 1,
       pokemonId: 1,
       cardType: 'reverse',
+      subjectKey: '1',
       state: { ...initialReviewState(NOW), reps:4, scheduledDays:30 },
     };
     const result = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: true });
@@ -500,6 +504,7 @@ describe('hydrateSession (name/evolution enabled flags)', () => {
   it('hydrateSession strips saved evolution cards when evolutionEnabled: false', () => {
     const savedEvo: EvolutionReviewCard = {
       ...makeEvoEdge({ id: 1_500_001 }),
+      subjectKey: '1>>>2',
       state: initialReviewState(NOW),
     };
     const saved: ReviewableCard[] = [makeCard(makeSeedPokemon(1)), savedEvo];
@@ -535,6 +540,7 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
       id: REVERSE_ID_OFFSET + 1,
       pokemonId: 1,
       cardType: 'reverse',
+      subjectKey: '1',
       name: 'bulbasaur',
       spriteUrl: '',
       types: ['grass'],
@@ -584,18 +590,22 @@ describe('buildSessionQueues (per-type budgets)', () => {
     return {
       ...makeSeedPokemon(id),
       cardType: 'name',
+      subjectKey: String(id),
       state: { ...initialReviewState(NOW), ...partialState },
     };
   }
   function evoCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): EvolutionReviewCard {
+    const preEvoId = id - 1_500_000;
+    const postEvoId = id - 1_500_000 + 100_000;
     return {
       ...makeEvoEdge({
         id,
-        preEvoId: id - 1_500_000,
+        preEvoId,
         preEvoName: 'pre-' + id,
-        postEvoId: id - 1_500_000 + 100_000,
+        postEvoId,
         postEvoName: 'post-' + id,
       }),
+      subjectKey: `${preEvoId}>>>${postEvoId}`,
       state: { ...initialReviewState(NOW), ...partialState },
     };
   }
@@ -605,6 +615,7 @@ describe('buildSessionQueues (per-type budgets)', () => {
       id: REVERSE_ID_OFFSET + pokemonId,
       pokemonId,
       cardType: 'reverse',
+      subjectKey: String(pokemonId),
       state: { ...initialReviewState(NOW), ...partialState },
     };
   }
