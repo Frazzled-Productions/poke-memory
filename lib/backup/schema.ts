@@ -15,7 +15,10 @@ export type BackupFile = {
 // Intentionally less strict than isReviewCardShaped in persistence.ts:
 // - name and spriteUrl are omitted — hydrateSession refreshes them from seed on every load.
 // - Only dueDate is validated in state — other ReviewState fields get migration defaults.
-// - evolvesInto IS validated for evolution cards — missing/malformed would crash the review UI.
+// - Evolution cards: either the new edge shape (postEvoId-keyed) or the
+//   legacy per-pre-evo shape are accepted; the import pipeline strips legacy
+//   evolution cards before hydration (#262 — there is no 1:N mapping from a
+//   legacy card to the new edge cards).
 function isMinimalCardShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -26,12 +29,19 @@ function isMinimalCardShaped(value: unknown): boolean {
     v.cardType !== undefined &&
     v.cardType !== "name" &&
     v.cardType !== "evolution" &&
-    v.cardType !== "reverse"
+    v.cardType !== "reverse" &&
+    v.cardType !== "cry"
   ) {
     return false;
   }
   if (v.cardType === "evolution") {
-    // Accept new shape: evolvesInto: { name: string; spriteUrl: string }[]
+    // New edge shape: requires postEvoId (the discriminator that distinguishes
+    // edge cards from legacy per-pre-evo cards). Other edge fields are
+    // refreshed from seed on hydrate, so they're not validated here.
+    if (typeof v.postEvoId === "number") return true;
+    // Legacy shape: evolvesInto: { name, spriteUrl }[] OR evolvesIntoNames.
+    // The import pipeline drops these; we accept them here so the file as a
+    // whole still validates.
     if (
       Array.isArray(v.evolvesInto) &&
       v.evolvesInto.every(
@@ -44,7 +54,6 @@ function isMinimalCardShaped(value: unknown): boolean {
     ) {
       return true;
     }
-    // Accept legacy shape: evolvesIntoNames: string[] (backwards compat window)
     if (
       Array.isArray(v.evolvesIntoNames) &&
       v.evolvesIntoNames.every((n: unknown) => typeof n === "string")

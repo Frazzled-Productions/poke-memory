@@ -9,59 +9,58 @@ vi.mock("next/image", () => ({
   ),
 }));
 
-const QUESTION_SPRITE = "https://example.com/charmander.png";
-const EVOLVES_INTO = [
-  { name: "charmeleon", spriteUrl: "https://example.com/charmeleon.png" },
-];
-const EEVEE_EVOLUTIONS = [
-  { name: "vaporeon", spriteUrl: "https://example.com/vaporeon.png" },
-  { name: "jolteon", spriteUrl: "https://example.com/jolteon.png" },
-  { name: "flareon", spriteUrl: "https://example.com/flareon.png" },
-];
+const PRE_SPRITE = "https://example.com/charmander.png";
+const POST_SPRITE = "https://example.com/charmeleon.png";
 
 describe("EvolutionCard", () => {
-  it("shows questioned Pokémon sprite and ??? before reveal", () => {
+  it("shows the pre-evolution sprite and ??? before reveal", () => {
     render(
       <EvolutionCard
-        spriteUrl={QUESTION_SPRITE}
-        name="charmander"
-        evolvesInto={EVOLVES_INTO}
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
         revealed={false}
       />,
     );
 
     const img = screen.getByRole("img");
-    expect(img).toHaveAttribute("src", QUESTION_SPRITE);
+    expect(img).toHaveAttribute("src", PRE_SPRITE);
     expect(screen.getByText("???")).toBeInTheDocument();
     expect(screen.queryByAltText("charmeleon")).not.toBeInTheDocument();
   });
 
-  it("shows answer sprite(s) instead of question sprite after reveal", () => {
+  it("shows the post-evolution sprite after reveal", () => {
     render(
       <EvolutionCard
-        spriteUrl={QUESTION_SPRITE}
-        name="charmander"
-        evolvesInto={EVOLVES_INTO}
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
         revealed={true}
       />,
     );
 
     const answerImg = screen.getByAltText("charmeleon");
     expect(answerImg).toBeInTheDocument();
-    expect(answerImg).toHaveAttribute("src", "https://example.com/charmeleon.png");
-    // Question sprite should no longer be shown
+    expect(answerImg).toHaveAttribute("src", POST_SPRITE);
+    // Question sprite should no longer be shown.
     for (const img of screen.queryAllByRole("img")) {
-      expect(img).not.toHaveAttribute("src", QUESTION_SPRITE);
+      expect(img).not.toHaveAttribute("src", PRE_SPRITE);
     }
     expect(screen.queryByText("???")).not.toBeInTheDocument();
   });
 
-  it("renders single-evolution sprite at 320px after reveal", () => {
+  it("renders the answer sprite at 320px (single-target shape only)", () => {
     render(
       <EvolutionCard
-        spriteUrl={QUESTION_SPRITE}
-        name="charmander"
-        evolvesInto={EVOLVES_INTO}
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
         revealed={true}
       />,
     );
@@ -71,21 +70,39 @@ describe("EvolutionCard", () => {
     expect(answerImg).toHaveAttribute("height", "320");
   });
 
-  it("renders branching-evolution sprites at 96px after reveal", () => {
+  it("interpolates the trigger phrase into the prompt", () => {
     render(
       <EvolutionCard
-        spriteUrl={QUESTION_SPRITE}
-        name="eevee"
-        evolvesInto={EEVEE_EVOLUTIONS}
-        revealed={true}
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="eevee"
+        postEvoName="jolteon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="using a Thunder Stone"
+        revealed={false}
       />,
     );
 
-    for (const evo of EEVEE_EVOLUTIONS) {
-      const img = screen.getByAltText(evo.name);
-      expect(img).toHaveAttribute("width", "96");
-      expect(img).toHaveAttribute("height", "96");
-    }
+    // The prompt is split across multiple inline spans, so query by partial
+    // text matches that survive the markup.
+    expect(screen.getByText(/evolve into/)).toBeInTheDocument();
+    expect(screen.getByText(/using a Thunder Stone/)).toBeInTheDocument();
+  });
+
+  it("falls back to the bare prompt when triggerPhrase is null", () => {
+    render(
+      <EvolutionCard
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="kadabra"
+        postEvoName="alakazam"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase={null}
+        revealed={false}
+      />,
+    );
+
+    // The prompt should still ask "What does kadabra evolve into?" with no
+    // extra trigger fragment between "into" and "?".
+    expect(screen.getByText(/evolve into\?/)).toBeInTheDocument();
   });
 
   it("shows fact label and value when fact prop is provided", () => {
@@ -93,9 +110,11 @@ describe("EvolutionCard", () => {
 
     render(
       <EvolutionCard
-        spriteUrl={QUESTION_SPRITE}
-        name="charmander"
-        evolvesInto={EVOLVES_INTO}
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
         revealed={true}
         fact={fact}
       />,
@@ -108,48 +127,16 @@ describe("EvolutionCard", () => {
   it("does not show fact when fact prop is omitted", () => {
     render(
       <EvolutionCard
-        spriteUrl={QUESTION_SPRITE}
-        name="charmander"
-        evolvesInto={EVOLVES_INTO}
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
         revealed={true}
       />,
     );
 
     expect(screen.queryByText("Type")).not.toBeInTheDocument();
     expect(screen.queryByText("Fire")).not.toBeInTheDocument();
-  });
-
-  it("does not show fact for branching evolutions even when fact prop is provided", () => {
-    const fact = { label: "Height", value: "0.3 m" };
-
-    render(
-      <EvolutionCard
-        spriteUrl={QUESTION_SPRITE}
-        name="eevee"
-        evolvesInto={EEVEE_EVOLUTIONS}
-        revealed={true}
-        fact={fact}
-      />,
-    );
-
-    expect(screen.queryByText("Height")).not.toBeInTheDocument();
-    expect(screen.queryByText("0.3 m")).not.toBeInTheDocument();
-  });
-
-  it("renders all answer sprites for branching evolutions", () => {
-    render(
-      <EvolutionCard
-        spriteUrl={QUESTION_SPRITE}
-        name="eevee"
-        evolvesInto={EEVEE_EVOLUTIONS}
-        revealed={true}
-      />,
-    );
-
-    for (const evo of EEVEE_EVOLUTIONS) {
-      expect(screen.getByAltText(evo.name)).toBeInTheDocument();
-    }
-    // All three answer sprites are shown
-    expect(screen.getAllByRole("img")).toHaveLength(EEVEE_EVOLUTIONS.length);
   });
 });

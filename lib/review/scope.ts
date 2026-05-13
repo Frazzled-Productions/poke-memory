@@ -59,7 +59,10 @@ export function isScopeEmpty(scope: PracticeScope): boolean {
  */
 export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): boolean {
   if (isScopeEmpty(scope)) return true;
-  const pokemonId = card.cardType === "evolution" ? card.pokemonId : card.id;
+  // Evolution edge cards filter on the pre-evo's species ID (the card is
+  // "about" the pre-evolution — Bulbasaur → Ivysaur is a Gen 1 / Starters card
+  // because of Bulbasaur, not Ivysaur). Other card types use their own id.
+  const pokemonId = card.cardType === "evolution" ? card.preEvoId : card.id;
   // Generation match
   if (scope.gens.length > 0) {
     const gen = generationOf(pokemonId);

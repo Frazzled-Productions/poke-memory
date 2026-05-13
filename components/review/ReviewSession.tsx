@@ -855,13 +855,12 @@ export function ReviewSession() {
     if (currentCard.cardType === "name") {
       const facts = getPokemonFacts(currentCard);
       setCurrentFact(selectFact(facts));
-    } else if (currentCard.cardType === "evolution" && currentCard.evolvesInto.length === 1) {
-      const evoName = currentCard.evolvesInto[0].name;
-      const evoPokemon = SEED_POKEMON.find((p) => p.name === evoName);
+    } else if (currentCard.cardType === "evolution") {
+      const evoPokemon = SEED_POKEMON.find((p) => p.id === currentCard.postEvoId);
       if (evoPokemon) {
         setCurrentFact(selectFact(getPokemonFacts(evoPokemon)));
       } else {
-        console.warn(`[handleReveal] seed data missing for evolution target: ${evoName}`);
+        console.warn(`[handleReveal] seed data missing for evolution target: ${currentCard.postEvoName}`);
         setCurrentFact(null);
       }
     } else {
@@ -876,7 +875,7 @@ export function ReviewSession() {
       if (currentCard.cardType === "name") {
         playCry(currentCard.cryUrl ?? null);
       } else if (currentCard.cardType === "evolution") {
-        const target = SEED_POKEMON.find((p) => p.id === currentCard.pokemonId);
+        const target = SEED_POKEMON.find((p) => p.id === currentCard.postEvoId);
         playCry(target?.cryUrl ?? null);
       }
       // reverse cards never reach handleReveal — no case needed
@@ -1138,9 +1137,11 @@ export function ReviewSession() {
       <ScopeControl scope={scope} onChange={handleScopeChange} />
       {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard
-          spriteUrl={effectiveCard.spriteUrl}
-          name={effectiveCard.name}
-          evolvesInto={effectiveCard.evolvesInto}
+          preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
+          preEvoName={effectiveCard.preEvoName}
+          postEvoName={effectiveCard.postEvoName}
+          postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
+          triggerPhrase={effectiveCard.triggerPhrase}
           revealed={revealed}
           fact={currentFact}
         />

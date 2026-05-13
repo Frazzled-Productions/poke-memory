@@ -222,3 +222,60 @@ test.describe("Settings page", () => {
     await expect(page.getByRole("button", { name: "Remove" })).toBeVisible();
   });
 });
+
+test.describe("Evolution edge card prompt (#262)", () => {
+  test("renders 'What does {preEvo} evolve into {trigger}?' for an edge card", async ({ page }) => {
+    // Seed a deterministic session containing exactly one evolution edge card
+    // (Bulbasaur → Ivysaur, "at level 16") so the assertion isn't sensitive
+    // to which card the queue happens to surface first.
+    await page.addInitScript(() => {
+      const session = {
+        cards: [
+          {
+            id: 1_500_001,
+            cardType: "evolution",
+            preEvoId: 1,
+            preEvoName: "bulbasaur",
+            preEvoSpriteUrl: "/sprites/pokemon/1.png",
+            postEvoId: 2,
+            postEvoName: "ivysaur",
+            postEvoSpriteUrl: "/sprites/pokemon/2.png",
+            triggerPhrase: "at level 16",
+            state: {
+              stability: 0,
+              difficulty: 0,
+              elapsedDays: 0,
+              scheduledDays: 0,
+              reps: 0,
+              lapses: 0,
+              fsrsState: "new",
+              dueDate: "2026-05-09",
+              lastReview: null,
+              firstSeen: null,
+              learningStep: null,
+              stepStartedAt: null,
+            },
+          },
+        ],
+        limits: {
+          name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        },
+      };
+      localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify(session),
+      );
+    });
+
+    await page.goto("/");
+
+    // The prompt is split across inline spans for case styling, so match the
+    // full normalised sentence.
+    await expect(
+      page.getByText(/What does\s+bulbasaur\s+evolve into\s+at level 16\?/i),
+    ).toBeVisible();
+  });
+});

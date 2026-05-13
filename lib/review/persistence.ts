@@ -13,29 +13,29 @@ const STORAGE_KEY = "poke-memory:review-session:v1";
 function isReviewCardShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (
-    typeof v.id !== "number" ||
-    typeof v.name !== "string" ||
-    typeof v.spriteUrl !== "string" ||
-    typeof v.state !== "object" ||
-    v.state === null ||
-    typeof (v.state as Record<string, unknown>).dueDate !== "string"
-  ) {
-    return false;
-  }
+  if (typeof v.id !== "number") return false;
+  if (typeof v.state !== "object" || v.state === null) return false;
+  if (typeof (v.state as Record<string, unknown>).dueDate !== "string") return false;
   // Reject unknown cardType values — undefined is allowed (legacy migration
-  // backfills it to "name") but any explicit value other than "name",
-  // "evolution", or "reverse" indicates corruption or a forward-incompatible schema.
+  // backfills it to "name") but any explicit value other than the known
+  // discriminants indicates corruption or a forward-incompatible schema.
   if (
     v.cardType !== undefined &&
     v.cardType !== "name" &&
     v.cardType !== "evolution" &&
-    v.cardType !== "reverse"
+    v.cardType !== "reverse" &&
+    v.cardType !== "cry"
   ) {
     return false;
   }
   if (v.cardType === "evolution") {
-    // Accept new shape: evolvesInto: { name: string; spriteUrl: string }[]
+    // New edge shape (#262): postEvoId-keyed. Other edge fields are refreshed
+    // from seed on hydrate, so they're not validated here.
+    if (typeof v.postEvoId === "number") return true;
+    // Legacy per-pre-evo shapes (evolvesInto or evolvesIntoNames). Accepted
+    // here so the whole session still validates; isLegacyEvolutionCard()
+    // filters them out before hydration — there's no 1:N mapping from a
+    // legacy card to the new edge cards (#262 plan, resolved decision 2).
     if (
       Array.isArray(v.evolvesInto) &&
       v.evolvesInto.every(
@@ -48,7 +48,6 @@ function isReviewCardShaped(value: unknown): boolean {
     ) {
       return true;
     }
-    // Accept legacy shape: evolvesIntoNames: string[] (backwards compat window)
     if (
       Array.isArray(v.evolvesIntoNames) &&
       v.evolvesIntoNames.every((n: unknown) => typeof n === "string")
@@ -57,7 +56,21 @@ function isReviewCardShaped(value: unknown): boolean {
     }
     return false;
   }
+  // Non-evolution cards still need name + spriteUrl present so the legacy
+  // migration path can backfill cardType="name" safely.
+  if (typeof v.name !== "string") return false;
+  if (typeof v.spriteUrl !== "string") return false;
   return true;
+}
+
+// True when an evolution card is in either of the legacy per-pre-evo shapes
+// retired by #262. Used to drop these from the loaded session on first read
+// post-upgrade.
+function isLegacyEvolutionCard(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (v.cardType !== "evolution") return false;
+  return typeof v.postEvoId !== "number";
 }
 
 function isPerTypeLimitsShaped(value: unknown): boolean {
@@ -176,28 +189,16 @@ export function migrateReviewState(state: unknown): void {
 // Backfills cardType on legacy name cards and migrates state fields. Exported
 // so unit tests can exercise the legacy-shape migration without needing a
 // localStorage harness.
+//
+// Legacy evolution cards (#262 retired the per-pre-evo shape): no migration
+// is attempted here — they're filtered out at session-load time by
+// isLegacyEvolutionCard() because there's no 1:N mapping to the new edge
+// cards. This function is a no-op for them.
 export function migrateReviewCard(card: unknown): void {
   if (typeof card !== "object" || card === null) return;
   const c = card as Record<string, unknown>;
   if (c.cardType === undefined) {
     c.cardType = "name";
-  }
-  // Migrate old evolvesIntoNames: string[] → evolvesInto: { name, spriteUrl }[].
-  // hydrateSession re-populates evolvesInto from seed; [] is a safe placeholder
-  // that prevents component crashes when no seed match exists.
-  if (c.cardType === "evolution") {
-    const hasValidEvolvesInto =
-      Array.isArray(c.evolvesInto) &&
-      c.evolvesInto.every(
-        (e: unknown) =>
-          typeof e === "object" &&
-          e !== null &&
-          typeof (e as Record<string, unknown>).name === "string" &&
-          typeof (e as Record<string, unknown>).spriteUrl === "string",
-      );
-    if (!hasValidEvolvesInto) {
-      c.evolvesInto = [];
-    }
   }
   migrateReviewState(c.state);
 }
@@ -218,8 +219,9 @@ export function loadSession(): SavedSession | null {
       for (const card of parsed) {
         migrateReviewCard(card);
       }
+      const filtered = parsed.filter((c) => !isLegacyEvolutionCard(c));
       return {
-        cards: parsed as ReviewableCard[],
+        cards: filtered as ReviewableCard[],
         limits: DEFAULT_LIMITS,
       };
     }
@@ -236,8 +238,9 @@ export function loadSession(): SavedSession | null {
         for (const card of obj.cards) {
           migrateReviewCard(card);
         }
+        const filtered = obj.cards.filter((c) => !isLegacyEvolutionCard(c));
         return {
-          cards: obj.cards as ReviewableCard[],
+          cards: filtered as ReviewableCard[],
           limits: migrateDailyLimits(obj.limits),
         };
       }
