@@ -21,14 +21,17 @@ import {
 
 /**
  * Renders nothing. Mounted in the root layout to push local-only changes
- * (settings, streak, grade log) to Supabase without waiting for the user
- * to hit the manual Sync button. See #319.
+ * (settings, streak, grade log) to Supabase without waiting for user action.
+ * See #319.
  *
- * Cards already have an equivalent path via `usePerGradeSync`; this
- * covers the three remaining client-stored data types. All three pushes
- * are best-effort — failures `console.warn` and continue. Manual sync
- * (`useManualSync`) remains the cross-device catch-up / force-resync
- * path.
+ * Cards already have an equivalent path via `usePerGradeSync`; this covers
+ * the three remaining client-stored data types. All three pushes are
+ * best-effort — failures `console.warn` and continue.
+ *
+ * Cross-device catch-up is handled by: periodic background pull via
+ * `useVisibilityPull` (`components/sync/SyncOnVisible.tsx`), sign-in pull
+ * (`components/sync/SignInPull.tsx`), and the narrow Retry on the Stats page
+ * for the cards-failed case (`lib/sync/useRetryPush.ts`).
  */
 export function AutoSyncOnChange() {
   const { user, supabase } = useAuth();
@@ -46,7 +49,7 @@ export function AutoSyncOnChange() {
       if (!detail) return;
       void pushSettings(client!, userId!, detail).then((ok) => {
         if (!ok) {
-          console.warn("[auto-sync] settings push failed; will retry on next save or manual Sync");
+          console.warn("[auto-sync] settings push failed; will retry on next save");
         }
       });
     }
@@ -56,7 +59,7 @@ export function AutoSyncOnChange() {
       if (dates.length === 0) return;
       void pushStreak(client!, userId!, dates).then((ok) => {
         if (!ok) {
-          console.warn("[auto-sync] streak push failed; will retry on next review or manual Sync");
+          console.warn("[auto-sync] streak push failed; will retry on next review");
         }
       });
     }
@@ -66,7 +69,7 @@ export function AutoSyncOnChange() {
       if (!detail) return;
       void pushGradeLog(client!, userId!, [detail]).then((ok) => {
         if (!ok) {
-          console.warn("[auto-sync] grade log push failed; will retry on next grade or manual Sync");
+          console.warn("[auto-sync] grade log push failed; will retry on next grade");
         }
       });
     }

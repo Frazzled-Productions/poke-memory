@@ -113,6 +113,9 @@ test.describe("Stats page", () => {
     ]) {
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();
     }
+
+    // SyncNowButton was removed in #396 — assert it is absent in guest mode
+    await expect(page.getByRole("button", { name: /Sync now/i })).toHaveCount(0);
   });
 
   test("trainer card shows progress line", async ({ page }) => {

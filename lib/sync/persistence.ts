@@ -1,4 +1,4 @@
-const STORAGE_KEY = "poke-memory:sync-status:v1";
+export const STORAGE_KEY = "poke-memory:sync-status:v1";
 
 export type SyncStatus = {
   lastPushAt: string | null;
@@ -44,5 +44,24 @@ export function saveSyncStatus(status: SyncStatus): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(status));
   } catch {
     // storage full or unavailable — best effort
+    return;
+  }
+
+  // Same-tab subscribers (useSyncStatusKey) require a synthetic StorageEvent —
+  // the browser only fires the native event in *other* tabs. Centralising the
+  // dispatch here means every writer satisfies the invariant without remembering
+  // it explicitly. Mirrors the saveSession pattern in lib/review/persistence.ts.
+  try {
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: STORAGE_KEY,
+        storageArea: window.localStorage,
+        newValue: window.localStorage.getItem(STORAGE_KEY),
+      }),
+    );
+  } catch {
+    // Older browsers / non-standard envs without a StorageEvent constructor.
+    // The native cross-tab event still fires; same-tab callers can fall back
+    // to polling if they need to.
   }
 }
