@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
+import { OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -92,12 +93,11 @@ describe("FsrsOptimizerSection", () => {
     });
 
     it("enables button at exactly 7-day boundary (sinceMs === COOLDOWN_MS)", () => {
-      const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
       const fixedNow = 1_700_000_000_000;
       vi.useFakeTimers();
       vi.setSystemTime(fixedNow);
       try {
-        const optimizedAt = new Date(fixedNow - COOLDOWN_MS).toISOString();
+        const optimizedAt = new Date(fixedNow - OPTIMIZER_COOLDOWN_MS).toISOString();
         render(
           <FsrsOptimizerSection
             {...defaultProps}

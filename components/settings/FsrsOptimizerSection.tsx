@@ -161,7 +161,7 @@ export function FsrsOptimizerSection({
               data-testid="fsrs-optimize-button"
               className="mt-2 inline-flex items-center gap-2 min-h-[44px] rounded-lg bg-zinc-200 text-zinc-500 px-6 py-2 text-sm font-semibold dark:bg-zinc-800 dark:text-zinc-400"
             >
-              Next optimization in {cooldownDaysRemaining} days
+              Next optimization in {cooldownDaysRemaining} day{cooldownDaysRemaining === 1 ? "" : "s"}
             </button>
             <p
               data-testid="fsrs-optimize-last-run"
