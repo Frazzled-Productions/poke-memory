@@ -23,6 +23,8 @@ import { createClient } from "@/lib/supabase/server";
 // (300s on current Vercel plans) is plenty; setting the cap explicitly so
 // a future plan-default change doesn't silently truncate the fit.
 export const maxDuration = 60;
+
+const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 import {
   FSRSBindingItem,
   FSRSBindingReview,
@@ -43,6 +45,25 @@ type GradeLogCloudRow = {
   grade: GradeLogEntry["grade"];
   card_id: number | null;
 };
+
+async function fetchUserSettings(
+  client: SupabaseClient,
+  userId: string,
+): Promise<Partial<UserSettings> | null> {
+  try {
+    const { data } = await client
+      .from("user_settings")
+      .select("settings")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!data) return null;
+    const s = (data as { settings: unknown }).settings;
+    if (s && typeof s === "object") return s as Partial<UserSettings>;
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 async function fetchGradeLog(
   client: SupabaseClient,
@@ -147,6 +168,19 @@ export async function POST(): Promise<NextResponse> {
 
   if (authError || !user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // Enforce 7-day cooldown before running the CPU-bound optimizer.
+  const currentSettings = await fetchUserSettings(supabase, user.id);
+  const last = currentSettings?.fsrsWeightsOptimizedAt;
+  if (last) {
+    const sinceMs = Date.now() - new Date(last).getTime();
+    if (sinceMs < COOLDOWN_MS) {
+      return NextResponse.json(
+        { error: "cooldown", retryAfterMs: COOLDOWN_MS - sinceMs },
+        { status: 429 },
+      );
+    }
   }
 
   // Fetch grade log from Supabase.

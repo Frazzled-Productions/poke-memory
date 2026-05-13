@@ -71,6 +71,43 @@ describe("FsrsOptimizerSection", () => {
     });
   });
 
+  describe("cooldown active", () => {
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+    it("disables button with 'Next optimization in N days' when optimized 2 days ago", () => {
+      const optimizedAt = new Date(Date.now() - 2 * MS_PER_DAY).toISOString();
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          superuserPaused={false}
+          optimizableReviewCount={300}
+          fsrsWeightsOptimizedAt={optimizedAt}
+        />,
+      );
+      const button = screen.getByTestId("fsrs-optimize-button");
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent(/Next optimization in \d+ days/);
+      expect(screen.getByTestId("fsrs-optimize-last-run")).toBeInTheDocument();
+    });
+
+    it("enables button when optimized 8 days ago (cooldown elapsed)", () => {
+      const optimizedAt = new Date(Date.now() - 8 * MS_PER_DAY).toISOString();
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          superuserPaused={false}
+          optimizableReviewCount={300}
+          fsrsWeightsOptimizedAt={optimizedAt}
+        />,
+      );
+      const button = screen.getByTestId("fsrs-optimize-button");
+      expect(button).not.toBeDisabled();
+      expect(button).toHaveTextContent("Optimize now");
+    });
+  });
+
   describe("signed in — not enough reviews", () => {
     it("shows disabled button and review-count help text", () => {
       render(
@@ -218,6 +255,33 @@ describe("FsrsOptimizerSection", () => {
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
           "Only 47 reviews synced. Sync first, then try again.",
+        );
+      });
+    });
+
+    it("surfaces 'Try again in N days' message when 429 response has retryAfterMs", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 429,
+          json: async () => ({ error: "cooldown", retryAfterMs: 5 * 24 * 60 * 60 * 1000 }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Try again in 5 days.",
         );
       });
     });

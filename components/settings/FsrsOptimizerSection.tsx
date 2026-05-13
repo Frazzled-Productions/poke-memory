@@ -4,6 +4,15 @@ import { useState } from "react";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION } from "@/lib/srs/optimizer";
 
+const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function daysUntilOptimizeAvailable(optimizedAt: string): number | null {
+  const sinceMs = Date.now() - new Date(optimizedAt).getTime();
+  if (sinceMs >= COOLDOWN_MS) return null;
+  return Math.ceil((COOLDOWN_MS - sinceMs) / MS_PER_DAY);
+}
+
 type OptimizerState = "idle" | "running" | "error";
 
 type Props = {
@@ -49,6 +58,14 @@ export function FsrsOptimizerSection({
               ? `Only ${synced} reviews synced. Sync first, then try again.`
               : "Sync your reviews first, then try again.",
           );
+        } else if (res.status === 429) {
+          const body = (await res.json().catch(() => null)) as
+            | { retryAfterMs?: number }
+            | null;
+          const days = body?.retryAfterMs
+            ? Math.ceil(body.retryAfterMs / MS_PER_DAY)
+            : 7;
+          setErrorMsg(`Try again in ${days} day${days === 1 ? "" : "s"}.`);
         } else {
           setErrorMsg("Couldn't optimize — try again later.");
         }
@@ -107,6 +124,33 @@ export function FsrsOptimizerSection({
             >
               Sync paused (superuser)
             </button>
+          </div>
+        ) : fsrsWeightsOptimizedAt !== undefined &&
+          daysUntilOptimizeAvailable(fsrsWeightsOptimizedAt) !== null ? (
+          /* Cooldown active — show when next optimization is available */
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-foreground">
+              Tune scheduling to your memory using your full review history.
+            </p>
+            <button
+              type="button"
+              disabled
+              data-testid="fsrs-optimize-button"
+              className="mt-2 inline-flex items-center gap-2 min-h-[44px] rounded-lg bg-zinc-200 text-zinc-500 px-6 py-2 text-sm font-semibold dark:bg-zinc-800 dark:text-zinc-400"
+            >
+              Next optimization in {daysUntilOptimizeAvailable(fsrsWeightsOptimizedAt)} days
+            </button>
+            <p
+              data-testid="fsrs-optimize-last-run"
+              className="text-xs text-zinc-500 dark:text-zinc-400"
+            >
+              Last optimized:{" "}
+              {new Date(fsrsWeightsOptimizedAt).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </p>
           </div>
         ) : optimizableReviewCount < MIN_REVIEWS_FOR_OPTIMIZATION ? (
           /* Not enough reviews yet */
