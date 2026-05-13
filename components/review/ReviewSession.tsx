@@ -774,9 +774,10 @@ export function ReviewSession() {
   // Per-button interval previews — computed for every render (O(1) per grade, cheap).
   const gradePreviewsOrNull =
     effectiveCard !== null
-      ? previewIntervals(effectiveCard.state, new Date(), {
-          retentionTarget: loadSettings().retentionTarget,
-        })
+      ? previewIntervals(effectiveCard.state, new Date(), (() => {
+          const s = loadSettings();
+          return { retentionTarget: s.retentionTarget, weights: s.fsrsWeights };
+        })())
       : null;
 
   // Queue counters: sourced from buildSessionQueues so newCount and reviewCount
@@ -993,8 +994,10 @@ export function ReviewSession() {
     };
 
     const now = new Date();
+    const settings = loadSettings();
     const nextState = nextReview(effectiveCard.state, grade, now, {
-      retentionTarget: loadSettings().retentionTarget,
+      retentionTarget: settings.retentionTarget,
+      weights: settings.fsrsWeights,
     });
     const newCards = cards.map((card) =>
       card.id === effectiveCard.id ? { ...card, state: nextState } : card,
@@ -1011,7 +1014,7 @@ export function ReviewSession() {
         c.state.lastReview !== today,
     );
     recordReview(today, gradedToday, dueQueueEmpty);
-    const appended = appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType });
+    const appended = appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, cardId: effectiveCard.id });
     snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
     setUndoSnapshot(snapshot);
     enqueueGrade({ ...effectiveCard, state: nextState });

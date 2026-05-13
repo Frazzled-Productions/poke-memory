@@ -23,6 +23,9 @@ import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
 import { isMastered } from "@/lib/stats/derive";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { loadGradeLog } from "@/lib/gradelog/persistence";
+import { countOptimizableReviews } from "@/lib/srs/optimizer";
+import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -231,7 +234,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user, supabase } = useAuth();
   const { updateFavourite } = useFavourite();
-  const { unlocked, flags, setFlag } = useSuperuser();
+  const { unlocked, flags, setFlag, anyFlagOn } = useSuperuser();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -243,9 +246,14 @@ export default function SettingsPage() {
   const toggleErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [optimizableReviewCount, setOptimizableReviewCount] = useState<number>(0);
+
   useEffect(() => {
-    setSettings(loadSettings());
+    const loaded = loadSettings();
+    setSettings(loaded);
     setFavouriteId(loadFavourite()?.id ?? null);
+    // Count optimizable reviews from local grade log
+    setOptimizableReviewCount(countOptimizableReviews(loadGradeLog()));
     return () => {
       if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
       if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
@@ -471,6 +479,21 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </section>
+
+              {/* Personalize my schedule — FSRS per-user weight optimizer (#268) */}
+              <FsrsOptimizerSection
+                fsrsWeightsOptimizedAt={settings.fsrsWeightsOptimizedAt}
+                optimizableReviewCount={optimizableReviewCount}
+                isSignedIn={user !== null}
+                superuserPaused={anyFlagOn}
+                onOptimized={(optimizedAt, weights) => {
+                  setSettings((prev) =>
+                    prev !== null
+                      ? { ...prev, fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt }
+                      : prev,
+                  );
+                }}
+              />
 
               {/* Name cards section */}
               <section className="flex flex-col gap-4" aria-labelledby="name-cards-heading">

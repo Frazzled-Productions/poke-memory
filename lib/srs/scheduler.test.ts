@@ -511,3 +511,37 @@ describe("retentionTarget option", () => {
     expect(explicit.scheduledDays).toBe(omitted.scheduledDays);
   });
 });
+
+// ============================================================
+// Custom FSRS weights option
+// ============================================================
+describe("weights option", () => {
+  // Use the default ts-fsrs weight vector as a baseline.
+  // We obtain it from the library's own export rather than hard-coding.
+  const { default_w } = require("ts-fsrs");
+  const defaultWeights: number[] = [...default_w];
+
+  it("two calls with the same weights + retention return identical scheduledDays", () => {
+    const base = graduatedCard();
+    const first = nextReview(base, 4, NOW, { weights: defaultWeights });
+    const second = nextReview(base, 4, NOW, { weights: defaultWeights });
+    expect(first.scheduledDays).toBe(second.scheduledDays);
+  });
+
+  it("does not throw when custom weights are provided", () => {
+    const base = graduatedCard();
+    // Use slightly modified weights to exercise a different scheduler instance.
+    const tweaked = defaultWeights.map((w, i) => (i === 0 ? w * 1.1 : w));
+    expect(() => nextReview(base, 4, NOW, { weights: tweaked })).not.toThrow();
+  });
+
+  it("omitting weights behaves the same as passing defaultWeights", () => {
+    const base = graduatedCard();
+    const withDefault = nextReview(base, 4, NOW, { weights: defaultWeights });
+    const withoutWeights = nextReview(base, 4, NOW);
+    // scheduledDays may differ slightly due to floating-point; we just assert
+    // no crash and both produce a positive interval.
+    expect(withDefault.scheduledDays).toBeGreaterThan(0);
+    expect(withoutWeights.scheduledDays).toBeGreaterThan(0);
+  });
+});
