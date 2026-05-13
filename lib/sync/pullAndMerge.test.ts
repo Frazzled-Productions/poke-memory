@@ -6,6 +6,7 @@ import { saveSession, loadSession } from "@/lib/review/persistence";
 vi.mock("@/lib/sync/cloud", () => ({
   pullSession: vi.fn(),
   mergeCloudIntoLocalSilent: vi.fn(() => []),
+  maxCloudUpdatedAt: vi.fn(() => "2026-05-13T12:00:00.000Z"),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
+import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
@@ -52,19 +52,7 @@ export async function pullAndMerge(
     // notification for a session that was never actually written.
     if (!saveResult.ok) return "error";
 
-    // Use the most-recently-updated cloud row's timestamp as lastPullAt so a
-    // drifting device clock cannot produce false "cloud is newer" signals on
-    // the next pull. Falls back to the current ISO time only when no rows exist
-    // or none have an updated_at.
-    const serverTs: string =
-      cloudRows.length > 0
-        ? cloudRows.reduce<string>((max, r) => {
-            if (!r.updated_at) return max;
-            return r.updated_at > max ? r.updated_at : max;
-          }, cloudRows[0].updated_at ?? new Date().toISOString())
-        : new Date().toISOString();
-
-    saveSyncStatus({ ...syncStatus, lastPullAt: serverTs });
+    saveSyncStatus({ ...syncStatus, lastPullAt: maxCloudUpdatedAt(cloudRows) });
 
     // Dispatch a synthetic StorageEvent so same-tab subscribers (e.g.
     // useSessionStorageKey in Stats/Pokédex) see the updated session without a

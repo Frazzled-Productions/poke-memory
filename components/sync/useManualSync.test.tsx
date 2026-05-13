@@ -60,6 +60,7 @@ vi.mock("@/lib/gradelog/persistence", () => ({
 }));
 
 import { pullSession, pushSession } from "@/lib/sync/cloud";
+import { saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { pullStreak, pushStreak } from "@/lib/sync/streak";
 import { pullSettings, pushSettings } from "@/lib/sync/settings";
@@ -327,5 +328,69 @@ describe("useManualSync", () => {
     });
 
     expect(pushSession).not.toHaveBeenCalled();
+  });
+
+  // Regression test for #359: a previous version never wrote lastPullAt from
+  // the manual-sync success block. That left lastPullAt = null for users who
+  // sync only via the Stats button, and the subsequent background pullAndMerge
+  // would clobber today's local progress under the "no anchor → cloud wins"
+  // rule (the same defect now also corrected in mergeCloudIntoLocalSilent).
+  it("persists lastPullAt from the server-derived max updated_at on success", async () => {
+    vi.mocked(loadSession).mockReturnValue({
+      cards: [makeCard(1, "2026-05-12", 3)],
+      limits: DEFAULT_LIMITS,
+    });
+    vi.mocked(pullSession).mockResolvedValue([
+      {
+        pokemon_id: 1,
+        stability: 1,
+        difficulty: 1,
+        elapsed_days: 0,
+        scheduled_days: 1,
+        reps: 1,
+        lapses: 0,
+        fsrs_state: "review",
+        due_date: "2026-05-13",
+        last_review: "2026-05-12",
+        first_seen: "2026-05-12",
+        hidden_since: null,
+        updated_at: "2026-05-13T09:15:00.000Z",
+      },
+      {
+        pokemon_id: 2,
+        stability: 1,
+        difficulty: 1,
+        elapsed_days: 0,
+        scheduled_days: 1,
+        reps: 1,
+        lapses: 0,
+        fsrs_state: "review",
+        due_date: "2026-05-13",
+        last_review: "2026-05-12",
+        first_seen: "2026-05-12",
+        hidden_since: null,
+        updated_at: "2026-05-13T11:42:00.000Z",
+      },
+    ]);
+    vi.mocked(pushSession).mockResolvedValue(true);
+
+    const { result } = renderHook(() => useManualSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      result.current.syncNow();
+    });
+
+    await waitFor(() => {
+      expect(result.current.syncState).toBe("success");
+    });
+
+    // The success-block saveSyncStatus call is the last one made by the run.
+    const successCall = vi
+      .mocked(saveSyncStatus)
+      .mock.calls.at(-1)?.[0];
+    expect(successCall).toMatchObject({
+      lastPushFailed: false,
+      lastPullAt: "2026-05-13T11:42:00.000Z",
+    });
   });
 });

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { mergeCloudIntoLocal, pullSession, pushSession } from "@/lib/sync/cloud";
+import { mergeCloudIntoLocal, pullSession, pushSession, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { mergeStreak, pullStreak, pushStreak } from "@/lib/sync/streak";
 import { pullSettings, pushSettings } from "@/lib/sync/settings";
@@ -215,7 +215,11 @@ export function useManualSync(
       }
       if (cancelledRef.current) return;
 
-      // Step h: record successful sync metadata.
+      // Step h: record successful sync metadata. Anchoring lastPullAt to the
+      // server-derived max updated_at across pulled rows is what protects the
+      // conflict-resolution rule in subsequent background pulls — without it,
+      // a user who only ever syncs via this button keeps lastPullAt null and
+      // hits the destructive cloud-wins path on the next pullAndMerge. See #359.
       const now = new Date().toISOString();
       const prev = loadSyncStatus();
       saveSyncStatus({
@@ -224,6 +228,7 @@ export function useManualSync(
         lastPushFailed: false,
         lastPushAttemptAt: now,
         failedCardCount: 0,
+        lastPullAt: maxCloudUpdatedAt(cloudRows),
       });
 
       // Step f: surface success.
