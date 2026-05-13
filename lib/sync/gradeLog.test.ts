@@ -70,11 +70,35 @@ describe("pushGradeLog", () => {
     expect(from).toHaveBeenCalledWith("grade_log");
     expect(upsert).toHaveBeenCalledWith(
       [
-        { user_id: "user-1", occurred_at: 100, entry_date: "2026-05-12", card_type: "name", grade: 4 },
-        { user_id: "user-1", occurred_at: 101, entry_date: "2026-05-12", card_type: "evolution", grade: 1 },
+        { user_id: "user-1", occurred_at: 100, entry_date: "2026-05-12", card_type: "name", grade: 4, card_id: null },
+        { user_id: "user-1", occurred_at: 101, entry_date: "2026-05-12", card_type: "evolution", grade: 1, card_id: null },
       ],
       { onConflict: "user_id,occurred_at", ignoreDuplicates: true },
     );
+  });
+
+  it("includes card_id in the upsert row when set", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    const entries = [makeEntry(200, { date: "2026-05-12", grade: 4, cardType: "name", cardId: 42 })];
+    await pushGradeLog(client, "u", entries);
+    const row = (upsert.mock.calls[0][0] as { card_id: number | null }[])[0];
+    expect(row.card_id).toBe(42);
+  });
+
+  it("pushes cry entries (filter removed after migration 009)", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    const entries = [makeEntry(300, { date: "2026-05-12", grade: 4, cardType: "cry" })];
+    const ok = await pushGradeLog(client, "u", entries);
+    expect(ok).toBe(true);
+    expect(upsert).toHaveBeenCalled();
+  });
+
+  it("pushes reverse-evolution entries (filter removed after migration 009)", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    const entries = [makeEntry(400, { date: "2026-05-12", grade: 4, cardType: "reverse-evolution" })];
+    const ok = await pushGradeLog(client, "u", entries);
+    expect(ok).toBe(true);
+    expect(upsert).toHaveBeenCalled();
   });
 
   it("returns true without a network call when entries is empty", async () => {
@@ -92,14 +116,24 @@ describe("pushGradeLog", () => {
 describe("pullGradeLog", () => {
   it("returns entries mapped from cloud rows", async () => {
     const { client } = makeClientWithOrderedSelect([
-      { occurred_at: 200, entry_date: "2026-05-12", card_type: "name", grade: 4 },
-      { occurred_at: 201, entry_date: "2026-05-12", card_type: "reverse", grade: 5 },
+      { occurred_at: 200, entry_date: "2026-05-12", card_type: "name", grade: 4, card_id: null },
+      { occurred_at: 201, entry_date: "2026-05-12", card_type: "reverse", grade: 5, card_id: null },
     ]);
     const result = await pullGradeLog(client, "u");
     expect(result).toEqual([
       { occurredAt: 200, date: "2026-05-12", cardType: "name", grade: 4 },
       { occurredAt: 201, date: "2026-05-12", cardType: "reverse", grade: 5 },
     ]);
+  });
+
+  it("maps card_id from cloud rows to cardId on the entry", async () => {
+    const { client } = makeClientWithOrderedSelect([
+      { occurred_at: 300, entry_date: "2026-05-12", card_type: "name", grade: 4, card_id: 42 },
+      { occurred_at: 301, entry_date: "2026-05-12", card_type: "name", grade: 1, card_id: null },
+    ]);
+    const result = await pullGradeLog(client, "u");
+    expect(result?.[0].cardId).toBe(42);
+    expect(result?.[1].cardId).toBeUndefined();
   });
 
   it("returns null on supabase error", async () => {

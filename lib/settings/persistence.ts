@@ -55,6 +55,15 @@ export type UserSettings = {
   practiceScope: PracticeScope;
   /** Highest streak reached in the Higher-or-Lower mini-game (#349). */
   miniGameBestScore: number;
+  /**
+   * Per-user optimized FSRS weight vector (#268). When present, the scheduler
+   * uses these weights instead of the ts-fsrs defaults. Set by the
+   * /api/srs/optimize route after a successful `computeParameters` call.
+   * Undefined means the user hasn't run the optimizer yet (defaults apply).
+   */
+  fsrsWeights?: number[];
+  /** ISO timestamp of the last successful weight optimization run (#268). */
+  fsrsWeightsOptimizedAt?: string;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {

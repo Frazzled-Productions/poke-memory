@@ -10,23 +10,17 @@ export async function pushGradeLog(
   userId: string,
   entries: GradeLogEntry[],
 ): Promise<boolean> {
-  // Drop card types whose migration hasn't landed yet — `grade_log.card_type`
-  // CHECK currently only permits ('name','evolution','reverse'). Local data is
-  // preserved either way; this just prevents a sync attempt that the CHECK
-  // would reject with errcode 23514. Pending migrations:
-  //   - `cry` (from #256 follow-up)
-  //   - `reverse-evolution` (this PR / #343 follow-up)
-  const supported = entries.filter(
-    (e) => e.cardType !== "cry" && e.cardType !== "reverse-evolution",
-  );
-  if (supported.length === 0) return true;
+  // Migration 009 extended the card_type CHECK to include 'cry' and
+  // 'reverse-evolution', so all card types are now supported.
+  if (entries.length === 0) return true;
   try {
-    const rows = supported.map((e) => ({
+    const rows = entries.map((e) => ({
       user_id: userId,
       occurred_at: e.occurredAt,
       entry_date: e.date,
       card_type: e.cardType,
       grade: e.grade,
+      card_id: e.cardId ?? null,
     }));
     const { error } = await client
       .from("grade_log")
@@ -45,6 +39,7 @@ type CloudRow = {
   entry_date: string;
   card_type: GradeLogEntry["cardType"];
   grade: GradeLogEntry["grade"];
+  card_id: number | null;
 };
 
 export async function pullGradeLog(
@@ -54,16 +49,22 @@ export async function pullGradeLog(
   try {
     const { data, error } = await client
       .from("grade_log")
-      .select("occurred_at,entry_date,card_type,grade")
+      .select("occurred_at,entry_date,card_type,grade,card_id")
       .eq("user_id", userId)
       .order("occurred_at", { ascending: true });
     if (error || !data) return null;
-    return (data as CloudRow[]).map((r) => ({
-      occurredAt: Number(r.occurred_at),
-      date: r.entry_date,
-      cardType: r.card_type,
-      grade: r.grade,
-    }));
+    return (data as CloudRow[]).map((r) => {
+      const entry: GradeLogEntry = {
+        occurredAt: Number(r.occurred_at),
+        date: r.entry_date,
+        cardType: r.card_type,
+        grade: r.grade,
+      };
+      if (r.card_id !== null && r.card_id !== undefined) {
+        entry.cardId = r.card_id;
+      }
+      return entry;
+    });
   } catch {
     return null;
   }
