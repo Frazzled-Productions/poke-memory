@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AutoSyncOnChange } from "@/components/sync/AutoSyncOnChange";
 
+vi.mock("@/lib/sync/persistence", () => ({
+  markPushSucceeded: vi.fn(),
+}));
+
 // Auth: a signed-in fake. Tests can override by re-mocking inside an `it`.
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = { id: "00000000-0000-0000-0000-000000000000" };
@@ -32,6 +36,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { pushSettings } from "@/lib/sync/settings";
 import { pushStreak } from "@/lib/sync/streak";
 import { pushGradeLog } from "@/lib/sync/gradeLog";
+import { markPushSucceeded } from "@/lib/sync/persistence";
 import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import {
   STREAK_UPDATED_EVENT,
@@ -155,5 +160,114 @@ describe("AutoSyncOnChange", () => {
 
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+
+  it("calls markPushSucceeded when settings push succeeds", async () => {
+    vi.mocked(pushSettings).mockResolvedValue(true);
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: { masteryRepetitions: 3 } }),
+      );
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(vi.mocked(markPushSucceeded)).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call markPushSucceeded when settings push fails", async () => {
+    vi.mocked(pushSettings).mockResolvedValue(false);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: {} }),
+      );
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+  });
+
+  it("calls markPushSucceeded when streak push succeeds", async () => {
+    vi.mocked(pushStreak).mockResolvedValue(true);
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(vi.mocked(markPushSucceeded)).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call markPushSucceeded when streak push fails", async () => {
+    vi.mocked(pushStreak).mockResolvedValue(false);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+  });
+
+  it("calls markPushSucceeded when grade log push succeeds", async () => {
+    vi.mocked(pushGradeLog).mockResolvedValue(true);
+    render(<AutoSyncOnChange />);
+
+    const entry = {
+      occurredAt: 1700000000000,
+      date: "2026-05-13",
+      grade: 4 as const,
+      cardType: "name" as const,
+    };
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: entry }),
+      );
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(vi.mocked(markPushSucceeded)).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call markPushSucceeded when grade log push fails", async () => {
+    vi.mocked(pushGradeLog).mockResolvedValue(false);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    render(<AutoSyncOnChange />);
+
+    const entry = {
+      occurredAt: 1700000000000,
+      date: "2026-05-13",
+      grade: 4 as const,
+      cardType: "name" as const,
+    };
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: entry }),
+      );
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
   });
 });

@@ -38,6 +38,16 @@ export function loadSyncStatus(): SyncStatus {
   }
 }
 
+/**
+ * Record a successful push. Clears lastPushFailed and stamps lastPushAt.
+ * Call this inside the success branch of any push path so the Stats page
+ * "Last synced" indicator stays current after auto-sync runs.
+ */
+export function markPushSucceeded(at = new Date().toISOString()): void {
+  const current = loadSyncStatus();
+  saveSyncStatus({ ...current, lastPushAt: at, lastPushFailed: false });
+}
+
 export function saveSyncStatus(status: SyncStatus): void {
   if (typeof window === "undefined") return;
   try {
