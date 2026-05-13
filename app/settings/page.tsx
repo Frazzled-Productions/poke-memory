@@ -287,6 +287,7 @@ export default function SettingsPage() {
   const { updateFavourite } = useFavourite();
   const { unlocked, flags, setFlag, anyFlagOn } = useSuperuser();
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [draftValues, setDraftValues] = useState<Partial<Record<keyof UserSettings, string>>>({});
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -312,9 +313,17 @@ export default function SettingsPage() {
   }, []);
 
   function handleChange(key: keyof UserSettings, raw: string) {
+    setDraftValues((prev) => ({ ...prev, [key]: raw }));
+  }
+
+  function handleBlur(key: keyof UserSettings, min: number) {
     if (settings === null) return;
-    const value = parseInt(raw, 10);
-    setSettings({ ...settings, [key]: isNaN(value) ? settings[key] : value });
+    const raw = draftValues[key];
+    if (raw === undefined) return;
+    const parsed = parseInt(raw, 10);
+    const value = isNaN(parsed) ? (settings[key] as number) : Math.max(min, parsed);
+    setSettings({ ...settings, [key]: value });
+    setDraftValues((prev) => { const next = { ...prev }; delete next[key]; return next; });
   }
 
   function handleToggle(key: keyof UserSettings) {
@@ -399,15 +408,25 @@ export default function SettingsPage() {
 
   function handleSave() {
     if (settings === null) return;
-    const allNumeric = [...ALL_NUMERIC_FIELDS, ...REVERSE_NUMERIC_FIELDS];
+    // Flush any in-progress drafts (blur may not fire before a Save click).
+    const allNumericFields = [...ALL_NUMERIC_FIELDS, ...REVERSE_NUMERIC_FIELDS];
+    const withDrafts = { ...settings } as Record<string, unknown>;
+    for (const { key, min } of allNumericFields) {
+      const raw = draftValues[key];
+      if (raw !== undefined) {
+        const parsed = parseInt(raw, 10);
+        withDrafts[key] = isNaN(parsed) ? settings[key] : Math.max(min, parsed);
+      }
+    }
+    setDraftValues({});
     const numericClamped = Object.fromEntries(
-      allNumeric.map(({ key, min, max }) => [
+      allNumericFields.map(({ key, min, max }) => [
         key,
-        Math.max(min, Math.min(max, settings[key] as number)),
+        Math.max(min, Math.min(max, withDrafts[key] as number)),
       ])
     );
     const clamped = {
-      ...settings,
+      ...withDrafts,
       ...numericClamped,
     } as UserSettings;
     saveSettings(clamped);
@@ -479,8 +498,9 @@ export default function SettingsPage() {
                         min={min}
                         max={max}
                         step={1}
-                        value={Number(settings[key])}
+                        value={draftValues[key] ?? String(settings[key])}
                         onChange={(e) => handleChange(key, e.target.value)}
+                        onBlur={() => handleBlur(key, min)}
                         className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                       />
                       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -616,8 +636,9 @@ export default function SettingsPage() {
                           min={min}
                           max={max}
                           step={1}
-                          value={Number(settings[key])}
+                          value={draftValues[key] ?? String(settings[key])}
                           onChange={(e) => handleChange(key, e.target.value)}
+                          onBlur={() => handleBlur(key, min)}
                           disabled={!settings.nameCardsEnabled}
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
@@ -691,8 +712,9 @@ export default function SettingsPage() {
                           min={min}
                           max={max}
                           step={1}
-                          value={Number(settings[key])}
+                          value={draftValues[key] ?? String(settings[key])}
                           onChange={(e) => handleChange(key, e.target.value)}
+                          onBlur={() => handleBlur(key, min)}
                           disabled={!settings.evolutionCardsEnabled}
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
@@ -806,8 +828,9 @@ export default function SettingsPage() {
                           min={min}
                           max={max}
                           step={1}
-                          value={Number(settings[key])}
+                          value={draftValues[key] ?? String(settings[key])}
                           onChange={(e) => handleChange(key, e.target.value)}
+                          onBlur={() => handleBlur(key, min)}
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
