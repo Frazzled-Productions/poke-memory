@@ -4,7 +4,7 @@ import { __resetForTests } from "@/lib/idb/db";
 import type { ReverseReviewCard, NameReviewCard, ReverseEvolutionReviewCard, DailyLimits } from "./session";
 import { DEFAULT_LIMITS } from "./session";
 import { initialReviewState } from "@/lib/srs/scheduler";
-import { REVERSE_ID_OFFSET, REVERSE_EDGE_ID_BASE, EDGE_ID_BASE } from "@/lib/pokemon/seed";
+import { REVERSE_ID_OFFSET, REVERSE_EDGE_ID_BASE } from "@/lib/pokemon/seed";
 
 // fake-indexeddb/auto is installed by vitest.setup.node.ts and polyfills
 // globalThis.indexedDB. Reset the database between test suites to avoid
@@ -96,7 +96,6 @@ function makeReverseEvolutionCard(): ReverseEvolutionReviewCard {
   // live on `preEvoName`/`postEvoName` etc. Regression test for the
   // persistence validator falling through to the non-evolution branch and
   // wiping every saved session that contained a rev-evo card (#343 follow-up).
-  const fwdId = EDGE_ID_BASE + 1;
   return {
     cardType: "reverse-evolution",
     id: REVERSE_EDGE_ID_BASE + 1,
