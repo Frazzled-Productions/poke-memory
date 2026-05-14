@@ -54,6 +54,7 @@ function renderInline(text: string): ReactNode[] {
             href={`https://github.com/fraserbrookhouse/poke-memory/issues/${num}`}
             className="text-theme-primary underline underline-offset-2 hover:no-underline"
             rel="noreferrer"
+            target="_blank"
           >
             {`#${num}`}
           </a>

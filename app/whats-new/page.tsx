@@ -55,8 +55,8 @@ export default function WhatsNewPage() {
                       className="list-disc space-y-1 pl-5 text-sm text-zinc-800 dark:text-zinc-200"
                       role="list"
                     >
-                      {section.bullets.map((bullet, idx) => (
-                        <li key={idx}>
+                      {section.bullets.map((bullet) => (
+                        <li key={bullet.slice(0, 32)}>
                           <BulletText text={bullet} />
                         </li>
                       ))}

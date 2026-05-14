@@ -28,7 +28,8 @@ const SECTION_SET = new Set<string>(SECTION_ORDER);
 
 const VERSION_HEADING_RE = /^##\s+\[(\d+\.\d+\.\d+)\]\s+[—-]\s+(\d{4}-\d{2}-\d{2})\s*$/;
 const SECTION_HEADING_RE = /^###\s+(\S.*?)\s*$/;
-const BULLET_RE = /^-\s+(.+)$/;
+const BULLET_RE = /^-\s+(\S.+)$/;
+const CONTINUATION_RE = /^  \S/;
 
 export function parseChangelog(markdown: string): ChangelogRelease[] {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
@@ -37,8 +38,18 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
   let current: ChangelogRelease | null = null;
   let currentSectionKind: ChangelogSectionKind | null = null;
   let currentBullets: string[] = [];
+  let pendingBullet: string | null = null;
+
+  function flushBullet() {
+    if (pendingBullet === null) return;
+    const text = pendingBullet;
+    pendingBullet = null;
+    // Skip internal-only bullets per the changelog convention.
+    if (!/^internal:/i.test(text)) currentBullets.push(text);
+  }
 
   function closeSection() {
+    flushBullet();
     if (current && currentSectionKind && currentBullets.length > 0) {
       current.sections.push({ kind: currentSectionKind, bullets: currentBullets });
     }
@@ -74,14 +85,18 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
       continue;
     }
 
-    const bulletMatch = BULLET_RE.exec(line);
-    if (bulletMatch && currentSectionKind) {
-      const text = bulletMatch[1].trim();
-      // Skip internal-only bullets per the changelog convention: a leading
-      // "Internal:" marks notes that exist only so the version block isn't
-      // empty and should not surface in user-facing changelogs.
-      if (/^internal:/i.test(text)) continue;
-      currentBullets.push(text);
+    if (currentSectionKind) {
+      const bulletMatch = BULLET_RE.exec(line);
+      if (bulletMatch) {
+        flushBullet();
+        pendingBullet = bulletMatch[1].trim();
+        continue;
+      }
+      // Indented continuation lines extend the preceding bullet.
+      if (pendingBullet !== null && CONTINUATION_RE.test(line)) {
+        pendingBullet += " " + line.trim();
+        continue;
+      }
     }
   }
 

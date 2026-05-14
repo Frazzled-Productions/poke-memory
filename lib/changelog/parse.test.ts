@@ -143,6 +143,23 @@ describe("parseChangelog", () => {
     expect(releases[0].version).toBe("1.0.0");
   });
 
+  it("joins indented continuation lines into the preceding bullet", () => {
+    const md = [
+      "## [1.0.0] — 2026-05-14",
+      "",
+      "### Added",
+      "",
+      "- First line of a long bullet",
+      "  that wraps onto a second line.",
+      "- Short bullet.",
+    ].join("\n");
+    const [release] = parseChangelog(md);
+    expect(release.sections[0].bullets).toEqual([
+      "First line of a long bullet that wraps onto a second line.",
+      "Short bullet.",
+    ]);
+  });
+
   it("ignores unknown ### subheadings inside a release", () => {
     const md = [
       "## [1.0.0] — 2026-05-14",
