@@ -20,7 +20,7 @@ A `BEFORE UPDATE` trigger on `card_reviews` raises `23514 check_violation` when:
 
 - `OLD.last_review IS NOT NULL AND NEW.last_review IS NULL` — un-reviewing a card.
 - `OLD.first_seen IS NOT NULL AND NEW.first_seen IS NULL` — un-seeing a card.
-- `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review` — review date moving backward.
+- `OLD.last_review IS NOT NULL AND NEW.last_review IS NOT NULL AND NEW.last_review < OLD.last_review` — review date moving backward.
 - `NEW.reps < OLD.reps` — reps counter decreasing (added in migration 015; FSRS only ever increments this).
 - `NEW.lapses < OLD.lapses` — lapses counter decreasing (added in migration 015; same invariant).
 - `OLD.last_review IS NOT NULL AND NEW.last_review IS NOT NULL AND NEW.last_review = OLD.last_review AND NEW.scheduled_days < OLD.scheduled_days` — `scheduled_days` dropping without `last_review` advancing (added in migration 016; see below).
