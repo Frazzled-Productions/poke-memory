@@ -173,7 +173,7 @@ test.describe("Pasture page — sparkle clears on tap", () => {
     // that use addInitScript-based seeding.
     const idbValue = await page.evaluate(async (): Promise<string | null> => {
       return new Promise((resolve) => {
-        const req = indexedDB.open("poke-memory", 1);
+        const req = indexedDB.open("poke-memory");
         req.onsuccess = () => {
           const tx = req.result.transaction("kv", "readonly");
           const getReq = tx.objectStore("kv").get("poke-memory:review-session:v1");
@@ -271,5 +271,49 @@ test.describe("Pasture page — empty state", () => {
     await expect(
       page.getByText(/master your first Pokémon/i),
     ).toBeVisible();
+  });
+});
+
+test.describe("Pasture page — reacts to clearLocalProgress storage event", () => {
+  test("clearing IDB and dispatching the synthetic storage event re-renders the empty state", async ({
+    page,
+  }) => {
+    // Start with one mastered card so the page renders a populated state.
+    await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
+
+    await page.goto("/pasture");
+
+    await expect(
+      page.getByRole("button", { name: /Caterpie/ }),
+    ).toBeVisible();
+
+    // Simulate clearLocalProgress: wipe the IDB session record, then dispatch
+    // the synthetic StorageEvent the helper fires for same-tab subscribers.
+    await page.evaluate(async () => {
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.open("poke-memory");
+        req.onsuccess = () => {
+          const tx = req.result.transaction("kv", "readwrite");
+          tx.objectStore("kv").delete("poke-memory:review-session:v1");
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        };
+        req.onerror = () => resolve();
+      });
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "poke-memory:review-session:v1",
+        }),
+      );
+    });
+
+    // Without storageVersion in the load useEffect deps, this assertion would
+    // fail — the page would still show Caterpie until a manual reload.
+    await expect(
+      page.getByText(/master your first Pokémon/i),
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.getByRole("button", { name: /Caterpie/ }),
+    ).not.toBeVisible();
   });
 });

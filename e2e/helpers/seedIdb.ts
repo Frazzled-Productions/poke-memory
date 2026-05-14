@@ -16,7 +16,7 @@ export async function seedIdb(
   entries: Record<string, string>,
 ): Promise<void> {
   await page.addInitScript((data: { entries: Record<string, string> }) => {
-    const req = indexedDB.open("poke-memory", 1);
+    const req = indexedDB.open("poke-memory");
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains("kv")) {
         req.result.createObjectStore("kv");

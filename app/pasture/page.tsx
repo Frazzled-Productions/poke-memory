@@ -10,6 +10,7 @@ import { PastureZone } from "@/components/pasture/PastureZone";
 import { pushSingleCard } from "@/lib/sync/cloud";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
@@ -73,8 +74,11 @@ export default function PasturePage() {
   const { flags } = useSuperuser();
   const [session, setSession] = useState<SavedSession | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // Re-load when the session localStorage key changes (post-grade sync, post-reset
+  // via clearLocalProgress). Matches the pattern used by Stats and Pokédex; without
+  // this, a reset that does not navigate away from /pasture would leave stale state.
+  const storageVersion = useSessionStorageKey();
 
-  // Load from IndexedDB on mount
   useEffect(() => {
     async function load() {
       const s = await loadSession();
@@ -82,7 +86,7 @@ export default function PasturePage() {
       setLoaded(true);
     }
     void load();
-  }, []);
+  }, [storageVersion]);
 
   const handleMarkSeen = useCallback(
     async (cardId: number) => {
