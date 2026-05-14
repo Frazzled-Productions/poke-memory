@@ -1,12 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pullSettings, pushSettings } from "./settings";
+import { pullSettings, pushSettings, pushRegionalPrefs, pullRegionalPrefs } from "./settings";
 import type { UserSettings } from "@/lib/settings/persistence";
 
 function makeClientWithUpsert(error: null | object = null) {
   const upsert = vi.fn().mockResolvedValue({ error });
   const from = vi.fn().mockReturnValue({ upsert });
   return { client: { from } as unknown as SupabaseClient, upsert };
+}
+
+function makeClientWithUpdate(error: null | object = null) {
+  const eq = vi.fn().mockResolvedValue({ error });
+  const update = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ update });
+  return { client: { from } as unknown as SupabaseClient, update, eq };
 }
 
 function makeClientWithMaybeSingle(data: unknown, error: null | object = null) {
@@ -50,6 +57,8 @@ const SAMPLE: UserSettings = {
   ttsVoice: null,
   ttsRate: 1,
   ttsVolume: 1,
+  timezone: null,
+  dateFormat: null,
 };
 
 describe("pushSettings", () => {
@@ -84,6 +93,13 @@ describe("pullSettings", () => {
     expect(await pullSettings(client, "user-1")).toBeNull();
   });
 
+  it("returns null when the settings column is null (sparse row from pushRegionalPrefs)", async () => {
+    // A row created by pushRegionalPrefs has settings = NULL; treat as "no real
+    // cloud settings" so it cannot overlay real local choices.
+    const { client } = makeClientWithMaybeSingle({ settings: null });
+    expect(await pullSettings(client, "user-1")).toBeNull();
+  });
+
   it("returns null when the settings column is the default empty object", async () => {
     // Default row written by the migration has settings = '{}'; we treat that
     // as "no real cloud settings" so it cannot overlay real local choices.
@@ -94,5 +110,84 @@ describe("pullSettings", () => {
   it("returns null on supabase error", async () => {
     const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
     expect(await pullSettings(client, "user-1")).toBeNull();
+  });
+});
+
+describe("pushRegionalPrefs", () => {
+  it("calls update with timezone, date_format, and updated_at filtered by user_id", async () => {
+    const { client, update, eq } = makeClientWithUpdate();
+    const ok = await pushRegionalPrefs(client, "user-1", {
+      timezone: "America/New_York",
+      dateFormat: "mdy",
+    });
+    expect(ok).toBe(true);
+    const [row] = update.mock.calls[0] as [Record<string, unknown>];
+    expect(row.timezone).toBe("America/New_York");
+    expect(row.date_format).toBe("mdy");
+    expect(typeof row.updated_at).toBe("string");
+    // UPDATE must not include user_id or settings — those belong to other columns/writes.
+    expect(row).not.toHaveProperty("user_id");
+    expect(row).not.toHaveProperty("settings");
+    expect(eq).toHaveBeenCalledWith("user_id", "user-1");
+  });
+
+  it("returns false on supabase error", async () => {
+    const { client } = makeClientWithUpdate({ message: "boom" });
+    expect(await pushRegionalPrefs(client, "user-1", { timezone: null, dateFormat: null })).toBe(false);
+  });
+});
+
+describe("pullRegionalPrefs", () => {
+  it("returns timezone and dateFormat when both columns are set", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      timezone: "Australia/Sydney",
+      date_format: "dmy",
+    });
+    expect(await pullRegionalPrefs(client, "user-1")).toEqual({
+      timezone: "Australia/Sydney",
+      dateFormat: "dmy",
+    });
+  });
+
+  it("returns timezone-only when date_format is null", async () => {
+    const { client } = makeClientWithMaybeSingle({ timezone: "Europe/London", date_format: null });
+    expect(await pullRegionalPrefs(client, "user-1")).toEqual({
+      timezone: "Europe/London",
+      dateFormat: null,
+    });
+  });
+
+  it("returns null when both columns are null (nothing to overlay)", async () => {
+    const { client } = makeClientWithMaybeSingle({ timezone: null, date_format: null });
+    expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
+  });
+
+  it("returns null when no row exists", async () => {
+    const { client } = makeClientWithMaybeSingle(null);
+    expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
+  });
+
+  it("rejects unknown date_format values", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      timezone: "UTC",
+      date_format: "invalid",
+    });
+    expect(await pullRegionalPrefs(client, "user-1")).toEqual({
+      timezone: "UTC",
+      dateFormat: null,
+    });
+  });
+
+  it("returns null when timezone is also null and date_format is invalid", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      timezone: null,
+      date_format: "bad-value",
+    });
+    expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
+  });
+
+  it("returns null on supabase error", async () => {
+    const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
+    expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
   });
 });

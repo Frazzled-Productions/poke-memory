@@ -3,6 +3,10 @@ import path from "path";
 
 const alias = { "@": path.resolve(__dirname, ".") };
 
+// The integration project spins up a real Supabase branch and is excluded from
+// the default fast suite. Opt in via: VITEST_INTEGRATION=1 npm run test:integration
+const integrationEnabled = process.env.VITEST_INTEGRATION === "1";
+
 export default defineConfig({
   test: {
     projects: [
@@ -13,7 +17,10 @@ export default defineConfig({
           // lib/ tests must be DOM-free. Any lib/ test that uses React
           // rendering would silently run without a DOM here — move it to the
           // jsdom project below instead.
+          // Exclude the integration sub-directory — those tests require a live
+          // Supabase branch and run only when VITEST_INTEGRATION=1 is set.
           include: ["lib/**/*.test.ts", "lib/**/*.test.tsx"],
+          exclude: ["lib/sync/integration/**"],
           environment: "node",
           setupFiles: ["./vitest.setup.node.ts"],
         },
@@ -27,6 +34,29 @@ export default defineConfig({
           setupFiles: ["./vitest.setup.ts"],
         },
       },
+      // Integration project — opt-in only. Runs against a real Supabase branch.
+      // Requires SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF env vars.
+      ...(integrationEnabled
+        ? [
+            {
+              resolve: { alias },
+              test: {
+                name: "integration",
+                include: ["lib/sync/integration/**/*.test.ts"],
+                environment: "node" as const,
+                // Run test files serially so each file gets its own branch rather
+                // than all 5 files spinning up branches in parallel and exhausting
+                // the project's branch quota simultaneously.
+                fileParallelism: false,
+                // Branch operations (create, migrate, teardown) can take up to
+                // 2 minutes; individual test assertions are fast once the branch
+                // is ready.
+                testTimeout: 30_000,
+                hookTimeout: 120_000,
+              },
+            },
+          ]
+        : []),
     ],
   },
 });

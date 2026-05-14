@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { buildSession, hydrateSession, todayString, type ReviewableCard } from "@/lib/review/session";
+import { formatDate, type DateFormat } from "@/lib/utils/format-date";
 import { loadSession } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
@@ -42,16 +43,16 @@ function pct(numerator: number, denominator: number): number {
 
 /**
  * Format a YYYY-MM-DD date for the due-forecast tooltip / aria-label.
- * Uses the user's locale (e.g. "Tue, May 12") so the value reads
- * naturally next to the bar.
+ * Uses en-GB English month/weekday names to avoid locale-leaking French or
+ * German names on non-English browser locales. fmt and tz come from user
+ * settings; they default to dmy / UTC when not yet set.
  */
-function formatForecastDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+function formatForecastDate(
+  iso: string,
+  fmt: DateFormat = "dmy",
+  tz = "UTC",
+): string {
+  return formatDate(iso, fmt, tz);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +100,7 @@ function StatCard({
   return (
     <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
       <p className={`text-2xl font-bold tabular-nums ${accent ?? "text-foreground"}`}>
-        {value.toLocaleString()}
+        {value.toLocaleString('en-GB')}
       </p>
       <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
     </div>
@@ -160,7 +161,7 @@ function MasteryBar({ stats, nameCardsEnabled }: { stats: StatsResult; nameCards
             </span>
           </div>
           <p className="text-xl font-bold tabular-nums text-foreground">
-            {locked.toLocaleString()}
+            {locked.toLocaleString('en-GB')}
           </p>
           <p className="text-xs text-zinc-400 dark:text-zinc-500">{lockedPct}%</p>
         </div>
@@ -173,7 +174,7 @@ function MasteryBar({ stats, nameCardsEnabled }: { stats: StatsResult; nameCards
             </span>
           </div>
           <p className="text-xl font-bold tabular-nums text-foreground">
-            {learning.toLocaleString()}
+            {learning.toLocaleString('en-GB')}
           </p>
           <p className="text-xs text-zinc-400 dark:text-zinc-500">{learningPct}%</p>
         </div>
@@ -186,7 +187,7 @@ function MasteryBar({ stats, nameCardsEnabled }: { stats: StatsResult; nameCards
             </span>
           </div>
           <p className="text-xl font-bold tabular-nums text-foreground">
-            {mastered.toLocaleString()}
+            {mastered.toLocaleString('en-GB')}
           </p>
           <p className="text-xs text-zinc-400 dark:text-zinc-500">{masteredPct}%</p>
         </div>
@@ -206,9 +207,9 @@ function IntroducedBar({ stats }: { stats: StatsResult }) {
           id="introduced-heading"
           className="text-base font-semibold text-foreground"
         >
-          <span className="tabular-nums">{introduced.toLocaleString()}</span>
+          <span className="tabular-nums">{introduced.toLocaleString('en-GB')}</span>
           {" / "}
-          <span className="tabular-nums">{totalCards.toLocaleString()}</span>
+          <span className="tabular-nums">{totalCards.toLocaleString('en-GB')}</span>
           {" introduced"}
         </h2>
         <span className="text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
@@ -229,7 +230,15 @@ function IntroducedBar({ stats }: { stats: StatsResult }) {
   );
 }
 
-function DueForecast({ stats }: { stats: StatsResult }) {
+function DueForecast({
+  stats,
+  fmt = "dmy",
+  tz = "UTC",
+}: {
+  stats: StatsResult;
+  fmt?: DateFormat;
+  tz?: string;
+}) {
   const forecast = stats.dueForecast;
   const max = forecast.reduce((m, d) => (d.count > m ? d.count : m), 0);
   const total = forecast.reduce((s, d) => s + d.count, 0);
@@ -244,14 +253,14 @@ function DueForecast({ stats }: { stats: StatsResult }) {
       </h2>
       <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-          {total.toLocaleString()} card{total === 1 ? "" : "s"} over the next 14
+          {total.toLocaleString('en-GB')} card{total === 1 ? "" : "s"} over the next 14
           days
         </p>
         <div
           className="grid h-24 grid-cols-[repeat(14,minmax(0,1fr))] items-end gap-1"
           role="img"
           aria-label={`14-day due forecast: ${forecast
-            .map((d) => `${formatForecastDate(d.date)} ${d.count}`)
+            .map((d) => `${formatForecastDate(d.date, fmt, tz)} ${d.count}`)
             .join(", ")}`}
         >
           {forecast.map((day, idx) => {
@@ -261,7 +270,7 @@ function DueForecast({ stats }: { stats: StatsResult }) {
               <div
                 key={day.date}
                 className="group relative flex h-full flex-col justify-end"
-                title={`${formatForecastDate(day.date)} · ${day.count} card${day.count === 1 ? "" : "s"}`}
+                title={`${formatForecastDate(day.date, fmt, tz)} · ${day.count} card${day.count === 1 ? "" : "s"}`}
               >
                 <div
                   className={
@@ -407,6 +416,8 @@ export default function StatsPage() {
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
+  const [userTimezone, setUserTimezone] = useState("UTC");
+  const [userDateFormat, setUserDateFormat] = useState<DateFormat>("dmy");
   const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
   const [accuracyPoints, setAccuracyPoints] = useState<AccuracyPoint[]>([]);
   const [rolling7d, setRolling7d] = useState<number | null>(null);
@@ -417,6 +428,10 @@ export default function StatsPage() {
   useEffect(() => {
     async function load() {
     const settings = loadSettings();
+    // Load regional prefs — these are in the local settings blob (not cloud-only)
+    // so they're available immediately without a Supabase round trip.
+    if (settings.timezone) setUserTimezone(settings.timezone);
+    if (settings.dateFormat) setUserDateFormat(settings.dateFormat);
     const saved = await loadSession();
     const sessionCards = saved !== null
       ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled })
@@ -426,7 +441,8 @@ export default function StatsPage() {
     setNameCardsEnabled(settings.nameCardsEnabled);
     const dates = loadStreakData();
     setStreakDates(dates);
-    const today = todayString(new Date());
+    const tz = settings.timezone ?? "UTC";
+    const today = todayString(new Date(), tz);
     setCurrentStreak(computeStreak(dates, today));
     const log = await loadGradeLog();
     setGradeLog(log);
@@ -474,7 +490,7 @@ export default function StatsPage() {
     nameCards !== null && masteryRepetitions !== null
       ? computeStats(
           nameCards,
-          todayString(new Date()),
+          todayString(new Date(), userTimezone),
           10,
           masteryRepetitions,
           flags.pretendAllMastered,
@@ -563,7 +579,7 @@ export default function StatsPage() {
             />
             <AccuracySparkline points={accuracyPoints} rolling7d={rolling7d} />
             <ReviewHeatmap
-              columns={computeReviewHeatmap(gradeLog, todayString(new Date()))}
+              columns={computeReviewHeatmap(gradeLog, todayString(new Date(), userTimezone))}
             />
             <OnboardingHint id="statsHintDismissed" title="What &quot;mastered&quot; means">
               <p>
@@ -577,7 +593,7 @@ export default function StatsPage() {
             </OnboardingHint>
             <MasteryBar stats={stats} nameCardsEnabled={nameCardsEnabled} />
             <IntroducedBar stats={stats} />
-            <DueForecast stats={stats} />
+            <DueForecast stats={stats} fmt={userDateFormat} tz={userTimezone} />
             <GenerationBreakdown stats={stats} />
             <TypeBreakdown perType={stats.perType} />
             <StrugglingCards stats={stats} />

@@ -75,7 +75,7 @@ export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegm
                   </span>
                 </div>
                 <p className="text-xl font-bold tabular-nums text-foreground">
-                  {count.toLocaleString()}
+                  {count.toLocaleString('en-GB')}
                 </p>
               </div>
             ))}
