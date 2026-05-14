@@ -172,6 +172,7 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
   beforeEach(() => {
     mockSpeakName.mockClear();
     mockPlayCry.mockClear();
+    mockCardClass.value = "mastered";
     mockPretendAllMastered.value = false;
   });
 
@@ -233,18 +234,9 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
     render(<PokemonDetailDisclosure pokemon={alolanVulpix} forms={[siblingForm]} />);
 
     expect(screen.getByText("Some Other Form")).toBeInTheDocument();
-    // The current form (Alolan Vulpix as primary pokemon name) appears in heading
-    // but NOT as a FormBlock item
-    const formHeadings = screen.queryAllByText("Alolan Vulpix");
-    // Only the main header h1 contains the name, not a FormBlock summary
-    // The FormBlock would render it as an img alt + summary text
-    const formsSection = screen.getByRole("heading", { name: "Forms", level: 2 });
-    expect(formsSection).toBeInTheDocument();
-    // No FormBlock for Alolan Vulpix itself
-    const summaries = screen.queryAllByText("Alolan Vulpix");
-    // The only "Alolan Vulpix" text should be from the main h1, not inside a FormBlock
-    // We check it's at most 1 occurrence (the main heading)
-    expect(formHeadings.length).toBeLessThanOrEqual(1);
-    expect(summaries.length).toBeLessThanOrEqual(1);
+    expect(screen.getByRole("heading", { name: "Forms", level: 2 })).toBeInTheDocument();
+    // "Alolan Vulpix" must not appear as a FormBlock — the current form is excluded.
+    // (The h1 renders pokemon.name "vulpix-alola", not displayName, so 0 occurrences expected.)
+    expect(screen.queryByText("Alolan Vulpix")).not.toBeInTheDocument();
   });
 });

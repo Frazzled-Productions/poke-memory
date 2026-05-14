@@ -4,12 +4,7 @@ import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { PokemonDetailDisclosure } from "@/components/pokedex/PokemonDetailDisclosure";
 
 export function generateStaticParams() {
-  // One route per species — use only default forms (or all entries when the
-  // seed hasn't been re-run with #445 fields yet).
-  const defaultForms = SEED_POKEMON.filter(
-    (p) => p.isDefaultForm === undefined || p.isDefaultForm,
-  );
-  return defaultForms.map((p) => ({ id: String(p.id) }));
+  return SEED_POKEMON.map((p) => ({ id: String(p.id) }));
 }
 
 export default async function PokemonDetailPage({
@@ -20,16 +15,17 @@ export default async function PokemonDetailPage({
   const { id: idStr } = await params;
   if (!/^\d+$/.test(idStr)) return notFound();
   const id = Number(idStr);
-  if (id < 1 || id > 1025) return notFound();
+  if (id < 1) return notFound();
 
   const pokemon = SEED_POKEMON.find((p) => p.id === id);
   if (!pokemon) return notFound();
 
-  // Collect all non-default forms for this species, excluding the current
-  // pokemon itself (so a page for an alt-form won't list itself).
+  // All other forms of the same species (parent + siblings), excluding self.
+  // On a default-form page this shows alt-forms; on an alt-form page it shows
+  // the base species + any sibling alt-forms.
   // speciesId was added in #445; until the seed is re-run this returns [].
   const forms = SEED_POKEMON.filter(
-    (p) => p.speciesId === pokemon.speciesId && !p.isDefaultForm && p.id !== pokemon.id,
+    (p) => p.speciesId === pokemon.speciesId && p.id !== pokemon.id,
   );
 
   return (
