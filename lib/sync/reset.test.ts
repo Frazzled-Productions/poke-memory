@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { resetAllProgress } from "./reset";
 
 function makeRpcClient(rpcError: null | object = null) {
@@ -14,6 +14,10 @@ function makeRpcClient(rpcError: null | object = null) {
 describe("resetAllProgress", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("calls the reset_all_progress RPC", async () => {

@@ -5,6 +5,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * all rows in `card_reviews`, `grade_log`, and `streak_days` for the currently
  * authenticated user.
  *
+ * `user_settings` is intentionally excluded — the user's preferences (daily
+ * limits, practice scope, etc.) are unrelated to card-review history and
+ * should survive a progress reset.
+ *
  * The RPC reads `auth.uid()` server-side — no `user_id` parameter is needed.
  * Returns `true` on success, `false` on any error (logs to console).
  */

@@ -22,7 +22,7 @@ DROP POLICY IF EXISTS "streak_days_delete" ON streak_days;
 -- The single destructive path. SECURITY DEFINER + explicit auth.uid()
 -- check is the canonical Supabase pattern for "user can wipe their own
 -- data, no one else's".
-CREATE OR REPLACE FUNCTION reset_all_progress()
+CREATE FUNCTION reset_all_progress()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
