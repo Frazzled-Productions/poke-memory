@@ -1,0 +1,58 @@
+name: Integration Tests
+
+# Runs real-DB-backed sync round-trip tests against an ephemeral Supabase
+# branch.  See lib/sync/integration/ for the test suite.
+#
+# Cost note: each run creates one Supabase branch, applies ~15 migrations,
+# runs the full integration suite, and tears the branch down.  Branch
+# creation/deletion counts against the project's branch quota.  The
+# `integration-tests` label gate below limits runs to PRs that explicitly
+# opt in, keeping costs predictable.
+#
+# To run on a PR: add the `integration-tests` label to the PR.
+# To run manually: use the workflow_dispatch trigger below.
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    # Only run when the PR has the `integration-tests` label, or on manual
+    # dispatch.  This prevents accidental branch quota usage on every PR.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'pull_request' &&
+        contains(github.event.pull_request.labels.*.name, 'integration-tests') &&
+        github.actor != 'dependabot[bot]'
+      )
+
+    runs-on: ubuntu-latest
+    # Branch create/migrate/test/delete can take 3–5 minutes.
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Run integration tests
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: npm run test:integration
