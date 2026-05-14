@@ -67,7 +67,7 @@ If a feature genuinely should not be affected (e.g. the all-caught-up Higher-or-
 **Sync write-guard.** While any superuser flag is on, all cloud writes are suppressed:
 - `usePerGradeSync.enqueueGrade` and `useSyncOnUnload` short-circuit because `ReviewSession.tsx` passes `null` client/userId.
 - `AutoSyncOnChange` short-circuits the same way.
-- `SyncNowButton` renders disabled with a "Sync paused (superuser)" label.
+- The FSRS optimizer button on the Settings page (`FsrsOptimizerSection`) renders disabled with a "Sync paused (superuser)" label — it's the only user-visible cloud-write surface gated by this guard.
 - Background pulls (`SyncOnVisible`, `SignInPull`) stay enabled — reads can't corrupt the cloud.
 
 Do not work around this guard. The whole point is that a QA session with cheats on can never leak fake state into Supabase, regardless of which flag is active.
@@ -82,12 +82,12 @@ Both branches assume the user understands they're exiting a QA mode. Do not sile
 
 The canonical reference is **[docs/sync.md](docs/sync.md)** — read it before touching anything that pushes to Supabase. Headline rules:
 
-- **Pull before push.** Manual sync pulls and merges before pushing; if `pullSession` fails, do not push. Pushing on stale local state is the exact failure mode that wiped 2497 of 2513 cloud rows (#293).
+- **Pull before push.** Any orchestrator that merges cloud and local cards must pull and merge before pushing; if `pullSession` fails, do not push. Pushing on stale local state is the exact failure mode that wiped 2497 of 2513 cloud rows (#293). The push-only retry path (`useRetryPush`) is the deliberate exception — it never pulls.
 - **`card_reviews_reject_regression_trigger` (migration 002, extended in 015/016/017)** blocks regressions on `card_reviews` at the DB layer — lifecycle timestamps, monotonic `reps`/`lapses` counters, same-date `scheduled_days` drops, and the one-way `seen_in_pasture` flag. Do not work around it. The only destructive path that bypasses the per-column guards is `reset_all_progress` (migration 018, SECURITY DEFINER RPC).
-- **Cards drive success/error state.** Streak and settings sync legs are best-effort — they `console.warn` and continue rather than flip the overall sync into the error state.
+- **Cards are the primary contract.** Per-grade upsert + unload beacon drive the user-visible sync status. Every other leg — `pushSettings`, `pushStreak`, `pushGradeLog`, `pushRegionalPrefs`, the regional-prefs leg inside `pullAndMerge` — is best-effort: `console.warn` and continue, never flip the overall sync into the error state.
 - **No PITR yet** (#298). Treat any production sync change as one-way until PITR is enabled.
 
-[docs/sync.md](docs/sync.md) covers the four sync paths (per-grade debounced upsert, unload beacon, background pull on visibility, manual sync), the per-card conflict rule, the regression trigger, per-table conflict policy, schema notes for `user_settings` / `card_reviews` / `grade_log`, and catastrophic-recovery posture.
+[docs/sync.md](docs/sync.md) covers the active sync paths (per-grade debounced upsert, unload beacon, background pull on visibility, side-channel auto-syncs, failed-beacon retry, and the Stats-page force-pull), the per-card conflict rule, the regression trigger, per-table conflict policy, schema notes for `user_settings` / `card_reviews` / `grade_log`, and catastrophic-recovery posture.
 
 ### Adding a feature that needs to persist data
 
@@ -98,7 +98,7 @@ For card-shaped persistence — anything keyed by `(user_id, card_type, subject_
 Two things to remember at runtime without leaving AGENTS.md:
 
 - **Apply the migration BEFORE merging the PR.** `migration-check.yml` fails the required CI check until file-vs-applied parity holds. Call `mcp__supabase__apply_migration(name, query)` after opening the PR.
-- **Wire cross-device sync** by adding `lib/sync/<feature>.ts` and hooking it into `useManualSync` after the existing legs. Auxiliary legs are best-effort — `console.warn` and continue, never flip the overall sync into the error state.
+- **Wire cross-device sync** by adding `lib/sync/<feature>.ts` exporting `push` / `pull` (and a `merge` helper when applicable). Plumb the pull side into `pullAndMerge` as a best-effort leg, and the push side wherever the feature's data is written — typically a new handler in `AutoSyncOnChange` listening for that feature's local change event, or a direct call alongside the existing `saveX(...)` write. Auxiliary legs are best-effort — `console.warn` and continue, never flip the overall sync into the error state.
 
 ### Page params
 
