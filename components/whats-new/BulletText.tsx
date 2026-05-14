@@ -7,7 +7,10 @@ export function BulletText({ text }: { text: string }) {
   return <>{renderInline(text)}</>;
 }
 
-const TOKEN_RE = /(`[^`]+`)|(\[[^\]]+\]\([^)]+\))|(\(#(\d+)\))/g;
+// The link form `\[[^\]]+\]\((?:[^()]|\([^()]*\))+\)` allows one level of
+// balanced parens inside the URL, so links to URLs like
+// `https://en.wikipedia.org/wiki/Foo_(bar)` render correctly.
+const TOKEN_RE = /(`[^`]+`)|(\[[^\]]+\]\((?:[^()]|\([^()]*\))+\))|(\(#(\d+)\))/g;
 
 function renderInline(text: string): ReactNode[] {
   const out: ReactNode[] = [];

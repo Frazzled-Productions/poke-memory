@@ -79,9 +79,15 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
     if (!current) continue;
 
     const sectionMatch = SECTION_HEADING_RE.exec(line);
-    if (sectionMatch && SECTION_SET.has(sectionMatch[1])) {
+    if (sectionMatch) {
+      // Any `### ` heading closes the prior section. Known kinds open a new
+      // section; unknown kinds (e.g. a hand-written `### Notes` block) close
+      // the prior section and absorb any subsequent bullets into nothing
+      // until the next known heading or version heading.
       closeSection();
-      currentSectionKind = sectionMatch[1] as ChangelogSectionKind;
+      if (SECTION_SET.has(sectionMatch[1])) {
+        currentSectionKind = sectionMatch[1] as ChangelogSectionKind;
+      }
       continue;
     }
 
@@ -92,10 +98,19 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
         pendingBullet = bulletMatch[1].trim();
         continue;
       }
-      // Indented continuation lines extend the preceding bullet.
-      if (pendingBullet !== null && CONTINUATION_RE.test(line)) {
-        pendingBullet += " " + line.trim();
-        continue;
+      // Indented continuation lines extend the preceding bullet. A blank
+      // line — or any non-indented non-bullet line — terminates the
+      // continuation window so wrapping doesn't accidentally swallow
+      // unrelated prose.
+      if (pendingBullet !== null) {
+        if (CONTINUATION_RE.test(line)) {
+          pendingBullet += " " + line.trim();
+          continue;
+        }
+        if (line.trim() === "") {
+          flushBullet();
+          continue;
+        }
       }
     }
   }

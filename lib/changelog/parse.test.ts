@@ -177,4 +177,48 @@ describe("parseChangelog", () => {
       { kind: "Added", bullets: ["Real feature."] },
     ]);
   });
+
+  it("flushes the pending bullet of a known section before an unknown ### subheading", () => {
+    const md = [
+      "## [1.0.0] — 2026-05-14",
+      "",
+      "### Added",
+      "",
+      "- Real feature.",
+      "",
+      "### Bogus",
+      "",
+      "- This should not appear.",
+      "",
+      "### Removed",
+      "",
+      "- Old thing.",
+    ].join("\n");
+    const [release] = parseChangelog(md);
+    // The bullet under `### Added` must survive the intervening `### Bogus`
+    // heading instead of leaking into a later section or being silently
+    // dropped.
+    expect(release.sections).toEqual([
+      { kind: "Added", bullets: ["Real feature."] },
+      { kind: "Removed", bullets: ["Old thing."] },
+    ]);
+  });
+
+  it("does not extend a bullet across a blank line", () => {
+    const md = [
+      "## [1.0.0] — 2026-05-14",
+      "",
+      "### Added",
+      "",
+      "- First bullet.",
+      "",
+      "  This text starts with two spaces but follows a blank line.",
+    ].join("\n");
+    const [release] = parseChangelog(md);
+    // The indented prose after the blank line is not a continuation of the
+    // preceding bullet — the blank line terminates the continuation window.
+    expect(release.sections).toEqual([
+      { kind: "Added", bullets: ["First bullet."] },
+    ]);
+  });
 });
