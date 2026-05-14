@@ -182,6 +182,61 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
     }
   });
 
+  test("alt-form page (Attack Deoxys /pokedex/10001) loads and shows forms when parent seen", async ({
+    page,
+  }) => {
+    // Seed Deoxys (id=386) as seen. Attack Deoxys's page (id=10001, speciesId=386)
+    // uses the parent's card class after the #484 fix — so seeding 386 unlocks 10001.
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards: [
+            {
+              id: 386,
+              name: "Deoxys",
+              spriteUrl: "/sprites/pokemon/386.png",
+              cardType: "name",
+              state: {
+                stability: 1,
+                difficulty: 5,
+                elapsedDays: 1,
+                scheduledDays: 1,
+                reps: 1,
+                lapses: 0,
+                fsrsState: "learning",
+                dueDate: "2099-01-01",
+                lastReview: "2026-05-13",
+                firstSeen: "2026-05-13",
+                learningStep: null,
+                stepStartedAt: null,
+              },
+            },
+          ],
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
+
+    await page.goto("/pokedex/10001");
+
+    // Page must not 404 — generateStaticParams now covers all alt-form IDs
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+    // Parent (Deoxys, 386) is seen → alt-form page should be unlocked
+    await expect(page.getByText("Attack Deoxys")).toBeVisible();
+
+    // Forms section should show sibling Deoxys formes (Defense, Speed, and base)
+    await expect(
+      page.getByRole("heading", { name: "Forms", level: 2 }),
+    ).toBeVisible();
+  });
+
   test("Raichu detail page shows Forms section when seed has Alolan Raichu", async ({
     page,
   }) => {

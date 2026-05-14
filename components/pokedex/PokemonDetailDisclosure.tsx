@@ -193,8 +193,9 @@ export function PokemonDetailDisclosure({
   forms?: SeedPokemon[];
 }) {
   const { flags } = useSuperuser();
-  const { id, name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
-  const rawCardClass = useCardClass(id);
+  const { id, name, spriteUrl, types, stats, flavorText, evolutionChain, speciesId } = pokemon;
+  // Use speciesId so alt-form pages (id > 1025) gate on the parent species' seen state.
+  const rawCardClass = useCardClass(speciesId ?? id);
   const cardClass =
     flags.pretendAllMastered && rawCardClass !== "pending" ? "mastered" : rawCardClass;
   const isPending = cardClass === "pending";

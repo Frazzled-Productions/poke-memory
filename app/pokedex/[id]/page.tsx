@@ -23,7 +23,6 @@ export default async function PokemonDetailPage({
   // All other forms of the same species (parent + siblings), excluding self.
   // On a default-form page this shows alt-forms; on an alt-form page it shows
   // the base species + any sibling alt-forms.
-  // speciesId was added in #445; until the seed is re-run this returns [].
   const forms = SEED_POKEMON.filter(
     (p) => p.speciesId === pokemon.speciesId && p.id !== pokemon.id,
   );
