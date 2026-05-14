@@ -2,8 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
 import { pullStreak, mergeStreak } from "@/lib/sync/streak";
+import { pullGradeLog, mergeGradeLog } from "@/lib/sync/gradeLog";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
-import { loadSession, saveSession } from "@/lib/review/persistence";
+import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import {
@@ -11,6 +12,7 @@ import {
   saveStreakData,
   STREAK_UPDATED_EVENT,
 } from "@/lib/streak/persistence";
+import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
@@ -151,6 +153,42 @@ export async function pullAndMerge(
     } catch (e) {
       // Best-effort — streak pull failure must not flip sync into error.
       console.warn("[pullAndMerge] streak pull failed (non-fatal)", e);
+    }
+
+    // Pull grade_log and union-merge with local (#575). Grade log entries are
+    // monotonic — keyed by `occurredAt` and never removed by sync — so
+    // mergeGradeLog (a set-union by `occurredAt`) always converges. Without
+    // this leg the accuracy sparkline, grade-breakdown bar, heatmap, and
+    // rolling-7-day on Stats are local-only and never see grades from another
+    // device.
+    //
+    // Stats reads gradeLog inside an effect gated by `useSessionStorageKey`
+    // (the SESSION_STORAGE_KEY of `poke-memory:review-session:v1`). To wake
+    // an open Stats mount after the merge we dispatch a synthetic storage
+    // event for that key — the same channel `saveSession` already uses
+    // earlier in this function — so the effect re-runs and `loadGradeLog`
+    // returns the freshly-written log.
+    try {
+      const cloudLog = await pullGradeLog(client, userId);
+      if (cloudLog !== null) {
+        const localLog = await loadGradeLog();
+        const mergedLog = mergeGradeLog(localLog, cloudLog);
+        // Length-only check: mergeGradeLog is a set-union by `occurredAt`, and
+        // the only way merged.length === local.length is "every cloud entry
+        // shares its occurredAt with a local entry" — which means cloud
+        // contributes nothing new. Avoiding the write in that case skips a
+        // useless IDB round-trip and the synthetic event below.
+        if (mergedLog.length !== localLog.length) {
+          await saveGradeLog(mergedLog);
+          // Re-fire saveSession's notification channel so an open Stats mount
+          // re-runs its useSessionStorageKey effect and reads the freshly-
+          // written grade_log without waiting for the next pull cycle.
+          bumpSessionStorageKey();
+        }
+      }
+    } catch (e) {
+      // Best-effort — grade-log pull failure must not flip sync into error.
+      console.warn("[pullAndMerge] grade-log pull failed (non-fatal)", e);
     }
 
     saveSyncStatus({

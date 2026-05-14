@@ -3,11 +3,13 @@ import { pullAndMerge } from "./pullAndMerge";
 import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
 import { pullSettingsWithTimestamp } from "@/lib/sync/settings";
 import { pullStreak } from "@/lib/sync/streak";
+import { pullGradeLog } from "@/lib/sync/gradeLog";
 import { saveSession, loadSession } from "@/lib/review/persistence";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { buildSession } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings, DEFAULT_SETTINGS } from "@/lib/settings/persistence";
 import { loadStreakData, saveStreakData } from "@/lib/streak/persistence";
+import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
 
 vi.mock("@/lib/sync/cloud", () => ({
   pullSession: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock("@/lib/sync/persistence", () => ({
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: vi.fn(async () => null),
   saveSession: vi.fn(async () => ({ ok: true })),
+  bumpSessionStorageKey: vi.fn(),
 }));
 
 vi.mock("@/lib/review/session", () => ({
@@ -73,9 +76,27 @@ vi.mock("@/lib/streak/persistence", () => ({
   STREAK_UPDATED_EVENT: "poke-memory:streak-updated",
 }));
 
+vi.mock("@/lib/sync/gradeLog", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/sync/gradeLog")>(
+    "@/lib/sync/gradeLog",
+  );
+  return {
+    ...actual,
+    pullGradeLog: vi.fn().mockResolvedValue(null),
+  };
+});
+
+vi.mock("@/lib/gradelog/persistence", () => ({
+  loadGradeLog: vi.fn(async () => []),
+  saveGradeLog: vi.fn(async () => {}),
+}));
+
 const mockPullSession = vi.mocked(pullSession);
 const mockPullSettingsWithTimestamp = vi.mocked(pullSettingsWithTimestamp);
 const mockPullStreak = vi.mocked(pullStreak);
+const mockPullGradeLog = vi.mocked(pullGradeLog);
+const mockLoadGradeLog = vi.mocked(loadGradeLog);
+const mockSaveGradeLog = vi.mocked(saveGradeLog);
 const mockMerge = vi.mocked(mergeCloudIntoLocalSilent);
 const mockSaveSession = vi.mocked(saveSession);
 const mockLoadSession = vi.mocked(loadSession);
@@ -119,6 +140,8 @@ describe("pullAndMerge", () => {
       cryCardsEnabled: false,
     } as ReturnType<typeof loadSettings>);
     mockLoadStreakData.mockReturnValue([]);
+    mockPullGradeLog.mockResolvedValue(null);
+    mockLoadGradeLog.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -366,5 +389,79 @@ describe("pullAndMerge", () => {
     await pullAndMerge(fakeClient, fakeUserId);
 
     expect(mockSaveStreakData).not.toHaveBeenCalled();
+  });
+
+  // ─── grade_log pull (#575) ────────────────────────────────────────────────
+
+  it("union-merges cloud grade-log entries into local when cloud has new occurredAts", async () => {
+    mockLoadGradeLog.mockResolvedValue([
+      { occurredAt: 1000, date: "2026-05-12", cardType: "name", grade: 4 },
+    ]);
+    mockPullGradeLog.mockResolvedValue([
+      { occurredAt: 1000, date: "2026-05-12", cardType: "name", grade: 4 },
+      { occurredAt: 2000, date: "2026-05-13", cardType: "name", grade: 5 },
+    ]);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockPullGradeLog).toHaveBeenCalledOnce();
+    expect(mockSaveGradeLog).toHaveBeenCalledOnce();
+    const written = mockSaveGradeLog.mock.calls[0][0];
+    expect(written).toHaveLength(2);
+    expect(written.map((e) => e.occurredAt)).toEqual([1000, 2000]);
+  });
+
+  it("union-merges when each side has unique entries the other lacks", async () => {
+    mockLoadGradeLog.mockResolvedValue([
+      { occurredAt: 1000, date: "2026-05-12", cardType: "name", grade: 4 },
+      { occurredAt: 2000, date: "2026-05-13", cardType: "name", grade: 5 },
+    ]);
+    mockPullGradeLog.mockResolvedValue([
+      { occurredAt: 1500, date: "2026-05-12", cardType: "name", grade: 2 },
+      { occurredAt: 3000, date: "2026-05-13", cardType: "name", grade: 4 },
+    ]);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockSaveGradeLog).toHaveBeenCalledOnce();
+    const written = mockSaveGradeLog.mock.calls[0][0];
+    expect(written.map((e) => e.occurredAt)).toEqual([1000, 1500, 2000, 3000]);
+  });
+
+  it("does not write when cloud grade-log is a subset of local", async () => {
+    mockLoadGradeLog.mockResolvedValue([
+      { occurredAt: 1000, date: "2026-05-12", cardType: "name", grade: 4 },
+      { occurredAt: 2000, date: "2026-05-13", cardType: "name", grade: 5 },
+    ]);
+    mockPullGradeLog.mockResolvedValue([
+      { occurredAt: 1000, date: "2026-05-12", cardType: "name", grade: 4 },
+    ]);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockPullGradeLog).toHaveBeenCalledOnce();
+    expect(mockSaveGradeLog).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when grade-log pull fails — sync stays 'ok'", async () => {
+    mockPullGradeLog.mockRejectedValue(new Error("network blip"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(result).toBe("ok");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("does not touch local grade-log when pullGradeLog returns null", async () => {
+    mockLoadGradeLog.mockResolvedValue([
+      { occurredAt: 1000, date: "2026-05-12", cardType: "name", grade: 4 },
+    ]);
+    mockPullGradeLog.mockResolvedValue(null);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockSaveGradeLog).not.toHaveBeenCalled();
   });
 });
