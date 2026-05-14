@@ -311,3 +311,39 @@ jobs:
             echo "::error::Auto-review verdict is 'Needs fixes' — failing the check so the PR shows red until /fix lands."
             exit 1
           fi
+
+      - name: Detect divergent verdicts (double-post guard)
+        # Surfaces the failure mode from #516: the review sub-agent occasionally
+        # posts a second `<!-- auto-review:N -->` comment for the same cycle
+        # that drops the `<!-- auto-review-sha:SHA -->` marker. The verdict
+        # gate above only sees the SHA-tagged comment, so a contradictory
+        # marker-less comment can be silently visible to a human reader. Fail
+        # the check with the orphan URLs so the inconsistency is forced into
+        # the open instead of shipping conflicting reviews.
+        if: always() && steps.idem.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          PR="${{ github.event.pull_request.number }}"
+          SHA="${{ github.event.pull_request.head.sha }}"
+          NEXT="${{ steps.cycles.outputs.next }}"
+          COMMENTS=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.body | contains(\"<!-- auto-review:$NEXT -->\"))]")
+          TOTAL=$(printf '%s' "$COMMENTS" | jq 'length')
+          if [[ "$TOTAL" -le 1 ]]; then
+            echo "Cycle $NEXT has $TOTAL comment(s) — no double-post."
+            exit 0
+          fi
+          ORPHANS=$(printf '%s' "$COMMENTS" \
+            | jq -r ".[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\") | not) | .html_url")
+          if [[ -z "$ORPHANS" ]]; then
+            echo "Cycle $NEXT has $TOTAL comments but all carry the SHA marker — accepting."
+            exit 0
+          fi
+          echo "::error::Auto-review cycle $NEXT posted $TOTAL comments; one or more are missing the <!-- auto-review-sha:$SHA --> marker."
+          echo "::error::Divergent verdicts may be visible to a human reviewer. Reconcile before merging."
+          while IFS= read -r url; do
+            [[ -n "$url" ]] && echo "::error::  orphan: $url"
+          done <<< "$ORPHANS"
+          exit 1
