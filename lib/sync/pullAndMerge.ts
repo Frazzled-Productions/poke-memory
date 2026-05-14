@@ -1,10 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
+import { pullStreak, mergeStreak } from "@/lib/sync/streak";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import {
+  loadStreakData,
+  saveStreakData,
+  STREAK_UPDATED_EVENT,
+} from "@/lib/streak/persistence";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
@@ -117,6 +123,34 @@ export async function pullAndMerge(
     } catch (e) {
       // Best-effort — regional prefs failure must not flip sync into error.
       console.warn("[pullAndMerge] regional prefs pull failed (non-fatal)", e);
+    }
+
+    // Pull streak_days and union-merge with local (#574). Streak rows are
+    // monotonic — each date appears at most once and nothing is ever removed
+    // by sync — so a set-union always converges. Without this leg streak data
+    // flows one direction only (push per device) and a Mac signing in after
+    // graded days on a phone would show its own stale local streak.
+    try {
+      const cloudDates = await pullStreak(client, userId);
+      if (cloudDates !== null) {
+        const localDates = loadStreakData();
+        const mergedDates = mergeStreak(localDates, cloudDates);
+        // Both sides are sorted-deduped ISO date strings (mergeStreak guarantees
+        // it on the return; loadStreakData reads back what recordReview wrote,
+        // which sorts after every append). So index-by-index equality is enough.
+        const changed =
+          mergedDates.length !== localDates.length ||
+          mergedDates.some((d, i) => d !== localDates[i]);
+        if (changed) {
+          saveStreakData(mergedDates);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
+          }
+        }
+      }
+    } catch (e) {
+      // Best-effort — streak pull failure must not flip sync into error.
+      console.warn("[pullAndMerge] streak pull failed (non-fatal)", e);
     }
 
     saveSyncStatus({

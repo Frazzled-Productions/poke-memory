@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { pullAndMerge } from "./pullAndMerge";
 import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
 import { pullSettingsWithTimestamp } from "@/lib/sync/settings";
+import { pullStreak } from "@/lib/sync/streak";
 import { saveSession, loadSession } from "@/lib/review/persistence";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { buildSession } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings, DEFAULT_SETTINGS } from "@/lib/settings/persistence";
+import { loadStreakData, saveStreakData } from "@/lib/streak/persistence";
 
 vi.mock("@/lib/sync/cloud", () => ({
   pullSession: vi.fn(),
@@ -55,8 +57,25 @@ vi.mock("@/lib/pokemon/seed", () => ({
   SEED_EVOLUTION_CARDS: [],
 }));
 
+vi.mock("@/lib/sync/streak", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/sync/streak")>(
+    "@/lib/sync/streak",
+  );
+  return {
+    ...actual,
+    pullStreak: vi.fn().mockResolvedValue(null),
+  };
+});
+
+vi.mock("@/lib/streak/persistence", () => ({
+  loadStreakData: vi.fn(() => []),
+  saveStreakData: vi.fn(),
+  STREAK_UPDATED_EVENT: "poke-memory:streak-updated",
+}));
+
 const mockPullSession = vi.mocked(pullSession);
 const mockPullSettingsWithTimestamp = vi.mocked(pullSettingsWithTimestamp);
+const mockPullStreak = vi.mocked(pullStreak);
 const mockMerge = vi.mocked(mergeCloudIntoLocalSilent);
 const mockSaveSession = vi.mocked(saveSession);
 const mockLoadSession = vi.mocked(loadSession);
@@ -66,6 +85,8 @@ const mockBuildSession = vi.mocked(buildSession);
 const mockHasStoredSettings = vi.mocked(hasStoredSettings);
 const mockLoadSettings = vi.mocked(loadSettings);
 const mockSaveSettings = vi.mocked(saveSettings);
+const mockLoadStreakData = vi.mocked(loadStreakData);
+const mockSaveStreakData = vi.mocked(saveStreakData);
 
 const fakeClient = {} as Parameters<typeof pullAndMerge>[0];
 const fakeUserId = "user-123";
@@ -83,6 +104,7 @@ describe("pullAndMerge", () => {
   beforeEach(() => {
     mockPullSession.mockResolvedValue([]);
     mockPullSettingsWithTimestamp.mockResolvedValue(null);
+    mockPullStreak.mockResolvedValue(null);
     mockMerge.mockReturnValue([]);
     mockSaveSession.mockResolvedValue({ ok: true });
     mockLoadSession.mockResolvedValue(null);
@@ -96,6 +118,7 @@ describe("pullAndMerge", () => {
       reverseEvolutionCardsEnabled: false,
       cryCardsEnabled: false,
     } as ReturnType<typeof loadSettings>);
+    mockLoadStreakData.mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -294,5 +317,54 @@ describe("pullAndMerge", () => {
     expect(result).toBe("ok");
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  // ─── streak pull (#574) ───────────────────────────────────────────────────
+  // STREAK_UPDATED_EVENT dispatch sits behind `typeof window !== "undefined"`
+  // and so is only reachable from jsdom tests. The node-project tests here
+  // cover the saveStreakData contract.
+
+  it("union-merges cloud streak dates into local when cloud has new dates", async () => {
+    mockLoadStreakData.mockReturnValue(["2026-05-11"]);
+    mockPullStreak.mockResolvedValue(["2026-05-12", "2026-05-13"]);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockPullStreak).toHaveBeenCalledOnce();
+    expect(mockSaveStreakData).toHaveBeenCalledWith([
+      "2026-05-11",
+      "2026-05-12",
+      "2026-05-13",
+    ]);
+  });
+
+  it("does not write when cloud streak is a subset of local", async () => {
+    mockLoadStreakData.mockReturnValue(["2026-05-11", "2026-05-12", "2026-05-13"]);
+    mockPullStreak.mockResolvedValue(["2026-05-12"]);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockPullStreak).toHaveBeenCalledOnce();
+    expect(mockSaveStreakData).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when streak pull fails — sync stays 'ok'", async () => {
+    mockPullStreak.mockRejectedValue(new Error("network blip"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(result).toBe("ok");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("does not touch local streak when pullStreak returns null", async () => {
+    mockLoadStreakData.mockReturnValue(["2026-05-11"]);
+    mockPullStreak.mockResolvedValue(null);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockSaveStreakData).not.toHaveBeenCalled();
   });
 });
