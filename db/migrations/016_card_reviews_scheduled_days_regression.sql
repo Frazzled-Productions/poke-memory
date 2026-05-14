@@ -10,6 +10,12 @@
 -- blocking real Again grades, real new grades on a future date, or
 -- legitimate scheduling refinements that move both fields forward.
 --
+-- Known limitation: a Hard or Good re-grade of a card already reviewed
+-- earlier the same calendar day also produces NEW.last_review = OLD.last_review
+-- with a potentially lower scheduled_days, and this trigger would reject it.
+-- In practice the session design prevents this (each card appears at most once
+-- per session), but the trigger has no visibility into session semantics.
+--
 -- The function is re-declared in full so the migration is self-contained
 -- and re-applying it on a database at 002/015/016 is idempotent. See #512.
 
@@ -41,9 +47,10 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  -- reps and lapses are NOT NULL columns (enforced by schema), so NULL < OLD.reps
-  -- evaluates to NULL in PL/pgSQL and the guard never fires — the column constraint
-  -- is the defence against NULL here, matching the pattern of the guards above.
+  -- reps and lapses are NOT NULL columns (enforced by schema), so a NULL comparison
+  -- like NULL < OLD.reps produces a NULL-valued expression; an IF whose condition
+  -- evaluates to NULL is treated as false and the body is skipped. The column
+  -- constraint is the defence against NULL here, matching the pattern of the guards above.
   IF NEW.reps < OLD.reps THEN
     RAISE EXCEPTION
       'card_reviews regression: reps cannot decrease from % to % (user_id=%, card_type=%, subject_key=%)',
