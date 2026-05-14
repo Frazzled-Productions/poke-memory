@@ -3,15 +3,20 @@
 -- Extends card_reviews_reject_regression() (originally added in 002) so the
 -- trigger also blocks an UPDATE that decreases reps or lapses. FSRS only
 -- ever monotonically increments these counters; a decrease is always a
--- sync bug. See issue #511 and the 2026-05-14 incident (a corrupted local
+-- sync bug. See issue #511 and the 2026-05-14 near-miss (a corrupted local
 -- IDB session would have written reps=1 over cloud rows with reps=3 had
--- the user re-graded).
+-- the user re-graded; no production rows were actually clobbered — this
+-- migration closes the window for next time).
 --
 -- The function is re-declared in full so the migration is self-contained
 -- and re-running it on a database already at 002, 012, or 015 is idempotent.
--- The DROP TRIGGER + CREATE TRIGGER pair at the bottom executes inside the
--- single implicit transaction Postgres uses for migration files, so there
--- is no observable window where the trigger is unbound.
+-- The DROP TRIGGER + CREATE TRIGGER pair at the bottom is intended to run
+-- inside a single transaction so the trigger is never unbound. Postgres
+-- wraps a multi-statement migration file in a transaction by default, but
+-- `mcp__supabase__apply_migration` submits the SQL as a raw payload to the
+-- Management API and does NOT guarantee a transaction wrapper. Operators
+-- replaying this migration via that path should run it inside an explicit
+-- BEGIN/COMMIT.
 
 CREATE OR REPLACE FUNCTION card_reviews_reject_regression()
 RETURNS trigger
