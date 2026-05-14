@@ -2,13 +2,13 @@
 
 Decision record for how cards are identified in `card_reviews` and the surrounding sync code. AGENTS.md keeps a short pointer here. See also [docs/persistence.md](persistence.md) for the broader "where does new data live" decision tree, and [docs/sync.md](sync.md) for the push/pull/merge rules.
 
-**Status:** Decided 2026-05-13.
+**Status:** Implemented 2026-05-14 (#462). Migrations 010–013 are applied; `card_reviews.pokemon_id` and `grade_log.card_id` are gone.
 
 ## TL;DR
 
 Cards in `card_reviews` are identified by a composite primary key `(user_id, card_type, subject_key)`. `card_type` is a short string slug (`name`, `reverse`, `cry`, `evolution-edge`, `reverse-evolution-edge`). `subject_key` is a card-type-specific opaque text key — either a PokéAPI pokemon ID stringified, or a structured composite for multi-referent cards.
 
-This replaces the prior model where every card carried a single integer `pokemon_id` packed into arithmetic offset ranges (1–999_999 name cards, 2_000_001+ reverse, 3_000_001+ cry, etc.). The offset scheme had run out of headroom and made each new card type a multi-file refactor — `grade_log.card_type` historically dropped `cry` and `reverse-evolution` rows from sync because we never extended its CHECK.
+This replaces the prior model where every card carried a single integer `pokemon_id` packed into arithmetic offset ranges (1–999_999 name cards, 2_000_001+ reverse, 3_000_001+ cry, etc.). The offset scheme had run out of headroom and made each new card type a multi-file refactor — `grade_log.card_type` historically dropped `cry` and `reverse-evolution` rows from sync because the CHECK constraint was never extended.
 
 ## Why this model (B over A and C)
 
@@ -31,7 +31,7 @@ A new card type that reuses FSRS state and just has a different identity shape n
 
 There is no DB migration. No new RLS. No new trigger. No new sync module.
 
-`card_reviews` deliberately has **no CHECK constraint on `card_type`** — validation lives at the app boundary so adding a card type is a pure code change. `grade_log.card_type` follows the same rule (the CHECK from migration 006 is dropped as part of the B refactor).
+`card_reviews` deliberately has **no CHECK constraint on `card_type`** — validation lives at the app boundary so adding a card type is a pure code change. `grade_log.card_type` follows the same rule (the CHECK from migration 006 was dropped by migration 013).
 
 ## When to add a sidecar table instead
 
@@ -65,7 +65,7 @@ The pokemon ID is the canonical PokéAPI ID — 1..1025 for default forms, 10001
 
 - **Adding shared columns to `card_reviews`** follows the existing pattern (one migration; cf. migration 007 `hidden_since`, migration 008 `seen_in_pasture`).
 - **Adding a sidecar table** follows the new-table checklist in [docs/persistence.md](persistence.md).
-- **The regression trigger on `card_reviews`** (migration 002) continues to guard the lifecycle timestamps (`last_review`, `first_seen`) against regression. It is card-type-agnostic and does not need updating per card type.
+- **The regression trigger on `card_reviews`** (migration 002, updated by migration 012) continues to guard the lifecycle timestamps (`last_review`, `first_seen`) against regression. RAISE strings now reference `(card_type, subject_key)` instead of `pokemon_id`. The trigger is card-type-agnostic and does not need updating per card type.
 
 ## If you find yourself wanting C
 

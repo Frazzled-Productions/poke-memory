@@ -3,7 +3,6 @@ import {
   Subject,
   isValidCardType,
   CARD_TYPES,
-  legacyCardId,
   appTypeToDbType,
   dbTypeToAppType,
   type CardType,
@@ -233,24 +232,3 @@ describe("dbTypeToAppType", () => {
   });
 });
 
-// ─── legacyCardId ─────────────────────────────────────────────────────────────
-
-describe("legacyCardId (deprecated)", () => {
-  it("returns the species ID for a name card", () => {
-    expect(legacyCardId("name", "1")).toBe(1);
-    expect(legacyCardId("name", "25")).toBe(25);
-    expect(legacyCardId("name", "1025")).toBe(1025);
-  });
-
-  it("returns REVERSE_ID_OFFSET + speciesId for a reverse card", () => {
-    // REVERSE_ID_OFFSET = 2_000_000
-    expect(legacyCardId("reverse", "1")).toBe(2_000_001);
-    expect(legacyCardId("reverse", "25")).toBe(2_000_025);
-  });
-
-  it("returns CRY_ID_OFFSET + speciesId for a cry card", () => {
-    // CRY_ID_OFFSET = 3_000_000
-    expect(legacyCardId("cry", "1")).toBe(3_000_001);
-    expect(legacyCardId("cry", "25")).toBe(3_000_025);
-  });
-});

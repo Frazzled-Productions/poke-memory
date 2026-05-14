@@ -20,7 +20,7 @@ export async function pushGradeLog(
       entry_date: e.date,
       card_type: e.cardType,
       grade: e.grade,
-      card_id: e.cardId ?? null,
+      subject_key: e.subjectKey ?? null,
     }));
     const { error } = await client
       .from("grade_log")
@@ -39,7 +39,7 @@ type CloudRow = {
   entry_date: string;
   card_type: GradeLogEntry["cardType"];
   grade: GradeLogEntry["grade"];
-  card_id: number | null;
+  subject_key: string | null;
 };
 
 export async function pullGradeLog(
@@ -49,7 +49,7 @@ export async function pullGradeLog(
   try {
     const { data, error } = await client
       .from("grade_log")
-      .select("occurred_at,entry_date,card_type,grade,card_id")
+      .select("occurred_at,entry_date,card_type,grade,subject_key")
       .eq("user_id", userId)
       .order("occurred_at", { ascending: true });
     if (error || !data) return null;
@@ -60,8 +60,8 @@ export async function pullGradeLog(
         cardType: r.card_type,
         grade: r.grade,
       };
-      if (r.card_id !== null && r.card_id !== undefined) {
-        entry.cardId = r.card_id;
+      if (r.subject_key !== null && r.subject_key !== undefined) {
+        entry.subjectKey = r.subject_key;
       }
       return entry;
     });

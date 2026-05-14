@@ -51,7 +51,7 @@ export function FsrsOptimizerSection({
       const res = await fetch("/api/srs/optimize", { method: "POST" });
       if (!res.ok) {
         setOptimizerState("error");
-        // The local count (cardId-tagged grade-log entries) can outrun the
+        // The local count (subjectKey-tagged grade-log entries) can outrun the
         // cloud count (rows that have synced). When the server gates us out,
         // surface its count instead of the generic try-again message.
         if (res.status === 422) {

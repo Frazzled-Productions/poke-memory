@@ -39,23 +39,24 @@ function toFsrsRating(grade: GradeLogEntry["grade"]): FsrsRating {
 }
 
 /**
- * Group grade-log entries by cardId, sort each group chronologically, compute
- * deltaT in days between consecutive reviews (first review deltaT = 0), and
- * build the optimizer input items.
+ * Group grade-log entries by (cardType, subjectKey), sort each group
+ * chronologically, compute deltaT in days between consecutive reviews
+ * (first review deltaT = 0), and build the optimizer input items.
  *
- * Entries without a `cardId` are skipped — they are legacy entries from before
- * migration 009 and cannot be attributed to a specific card.
+ * Entries without a `subjectKey` are skipped — they are legacy entries from
+ * before migration 013 and cannot be attributed to a specific card.
  *
  * Returns one item per card with >= 1 review.
  */
 export function gradeLogToOptimizerItems(entries: GradeLogEntry[]): OptimizerInputItem[] {
-  // Group by cardId, skipping entries without one.
-  const byCard = new Map<number, GradeLogEntry[]>();
+  // Group by composite card key, skipping entries without subjectKey.
+  const byCard = new Map<string, GradeLogEntry[]>();
   for (const entry of entries) {
-    if (typeof entry.cardId !== "number") continue;
-    const list = byCard.get(entry.cardId);
+    if (!entry.subjectKey) continue;
+    const key = `${entry.cardType}:${entry.subjectKey}`;
+    const list = byCard.get(key);
     if (list === undefined) {
-      byCard.set(entry.cardId, [entry]);
+      byCard.set(key, [entry]);
     } else {
       list.push(entry);
     }
@@ -90,10 +91,10 @@ export function gradeLogToOptimizerItems(entries: GradeLogEntry[]): OptimizerInp
 }
 
 /**
- * Count how many entries have a `cardId` set (i.e. are eligible to be fed
- * to the optimizer). Used by the API route to gate on
+ * Count how many entries have a `subjectKey` set (i.e. are eligible to be
+ * fed to the optimizer). Used by the API route to gate on
  * `MIN_REVIEWS_FOR_OPTIMIZATION` before calling `computeParameters`.
  */
 export function countOptimizableReviews(entries: GradeLogEntry[]): number {
-  return entries.filter((e) => typeof e.cardId === "number").length;
+  return entries.filter((e) => Boolean(e.subjectKey)).length;
 }

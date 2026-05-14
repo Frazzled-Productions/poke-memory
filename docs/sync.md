@@ -10,7 +10,7 @@ The rules below exist because of incidents that have already happened (#293 wipe
 
 ### Order constraints
 
-- **Manual sync (`useManualSync`) pulls before pushing.** Order: load local → `pullSession` → `mergeCloudIntoLocal` → `saveSession` → `pushSession` of the merged result. Pushing first lets stale or emptied local state overwrite real cloud progress through the `(user_id, pokemon_id)` upsert key. `components/sync/useManualSync.test.tsx` asserts call order — if you re-order the steps, that test fails by design.
+- **Manual sync (`useManualSync`) pulls before pushing.** Order: load local → `pullSession` → `mergeCloudIntoLocal` → `saveSession` → `pushSession` of the merged result. Pushing first lets stale or emptied local state overwrite real cloud progress through the `(user_id, card_type, subject_key)` upsert key. `components/sync/useManualSync.test.tsx` asserts call order — if you re-order the steps, that test fails by design.
 - **Brand-new device (`loadSession()` returned `null`) must not push back the merged result.** The merged state is entirely cloud-sourced; pushing it back is wasted bandwidth and widens the window for a future regression.
 - **If `pullSession` fails, do not push.** Pushing without knowing cloud state is the exact failure mode of #293. The same rule applies to anywhere else you sync: cards, streak, settings, future tables. Pull first, decide, then push.
 
@@ -40,10 +40,10 @@ Cards are the primary contract. Streak (`streak_days`) and settings (`user_setti
 
 - `user_settings.settings` (jsonb) is the source of truth for per-user settings. The schema is `(user_id, settings, updated_at)` after migration 005 dropped the original flat columns from migration 001.
 - `card_reviews` is on FSRS columns (`stability`, `difficulty`, `elapsed_days`, `scheduled_days`, `reps`, `lapses`, `fsrs_state`) after migration 004. The regression trigger on lifecycle timestamps from migration 002 was unaffected by the swap.
-- `card_reviews.pokemon_id` is just an integer with no CHECK constraint, so the namespaced ID ranges (name, evolution, reverse, cry) round-trip through the same table without schema work.
+- `card_reviews` PRIMARY KEY is `(user_id, card_type, subject_key)` after migration 012. The legacy `pokemon_id` integer column was dropped in the same migration.
 - `card_reviews.hidden_since` (migration 007, nullable date) is set when a card becomes ineligible under the user's learning filter (#333) and cleared when it becomes eligible again. The session-load reconciliation shifts `due_date` forward by the hidden duration so paused cards don't accumulate overdue debt. The regression trigger from migration 002 is unaffected — it guards lifecycle timestamps only, and `due_date` is allowed to move forward.
 - `card_reviews.seen_in_pasture` (migration 008, boolean default `false`) tracks whether a card has been scouted in the Higher-or-Lower minigame on the all-caught-up screen.
-- `grade_log.card_type` currently CHECK-constrains `IN ('name','evolution','reverse')`. The cry-name direction (#255) is shipped but `pushGradeLog` drops `cry` entries until a follow-up migration extends the CHECK to include `'cry'`. Cry card_reviews state syncs fully; only the per-grade analytics rows are local-only for now.
+- `grade_log` carries `(card_type, subject_key)` after migration 013. The legacy `card_id` integer column was dropped and the `grade_log_card_type_check` constraint was removed; `card_type` is now validated at the app boundary only. All card directions (name, evolution, reverse, reverse-evolution, cry) are synced.
 
 ### Catastrophic recovery
 
