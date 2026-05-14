@@ -81,7 +81,6 @@ export function speakName(name: string, overrides?: { ttsVoice?: string | null; 
   if (window.speechSynthesis.speaking || window.speechSynthesis.pending) window.speechSynthesis.cancel();
   // Read settings synchronously (before setTimeout) so the call captures the
   // state at the moment speakName is invoked — avoids a stale closure.
-  // Fall back to defaults if overrides aren't provided and settings can't be loaded.
   let resolvedSettings: { ttsVoice: string | null; ttsRate: number; ttsVolume: number };
   if (overrides !== undefined) {
     resolvedSettings = { ttsVoice: overrides.ttsVoice ?? null, ttsRate: overrides.ttsRate ?? 1, ttsVolume: overrides.ttsVolume ?? 1 };
@@ -90,6 +89,7 @@ export function speakName(name: string, overrides?: { ttsVoice?: string | null; 
       const s = loadSettings();
       resolvedSettings = { ttsVoice: s.ttsVoice, ttsRate: s.ttsRate, ttsVolume: s.ttsVolume };
     } catch {
+      // localStorage may throw in storage-blocked contexts (private browsing, etc.); fall back to defaults.
       resolvedSettings = { ttsVoice: null, ttsRate: 1, ttsVolume: 1 };
     }
   }
@@ -97,8 +97,8 @@ export function speakName(name: string, overrides?: { ttsVoice?: string | null; 
   setTimeout(() => {
     const utterance = new SpeechSynthesisUtterance(pronunciationFor(name));
     utterance.lang = "en-GB";
-    utterance.rate = ttsRate ?? 1;
-    utterance.volume = ttsVolume ?? 1;
+    utterance.rate = ttsRate;
+    utterance.volume = ttsVolume;
 
     // Resolve voice: pinned URI → auto-picked preferred → language-hint fallback.
     const voiceURI = ttsVoice ?? null;
