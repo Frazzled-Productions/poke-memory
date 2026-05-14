@@ -95,6 +95,12 @@ describe("clearLocalProgress", () => {
     // StorageEvent isn't a built-in in node — provide a minimal
     // constructor that captures the key, since the function uses
     // `new StorageEvent("storage", { key })`.
+    // lib/review/persistence.test.ts has a similar stub that also extends
+    // Event and captures storageArea/newValue. The two stubs differ in shape
+    // (this one only needs key; that one drives full-reload assertions), so
+    // extracting a shared helper would force a lowest-common-denominator
+    // interface. Keeping them inline is intentional until a third consumer
+    // makes extraction worthwhile.
     vi.stubGlobal("StorageEvent", class {
       key: string | null;
       constructor(_type: string, init: { key?: string | null }) {

@@ -93,7 +93,7 @@ export async function __resetForTests(): Promise<void> {
   idbAvailable = true;
 }
 
-const MIGRATION_FLAG_KEY = "migration_done_v1";
+export const MIGRATION_FLAG_KEY = "migration_done_v1";
 const SESSION_LS_KEY = "poke-memory:review-session:v1";
 const GRADE_LOG_LS_KEY = "poke-memory:grade-log:v1";
 
