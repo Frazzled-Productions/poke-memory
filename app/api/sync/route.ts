@@ -63,11 +63,12 @@ export async function POST(request: Request) {
       due_date: r.due_date,
       last_review: r.last_review,
       first_seen: r.first_seen,
-      // Migration 007 / 008 fields — coalesce absent keys to safe defaults so
-      // beacons sent before these migrations don't strip existing values on
-      // conflict (upsert ignores absent columns when they don't change).
+      // Migration 007 field — coalesce absent key to null for old clients.
       hidden_since: r.hidden_since ?? null,
-      seen_in_pasture: r.seen_in_pasture ?? false,
+      // Migration 008 field — omit rather than coalesce to false: a false written
+      // over an existing true would trip the one-way trigger (migration 017), and
+      // omitting lets the DB column retain its current value on conflict.
+      ...(r.seen_in_pasture != null ? { seen_in_pasture: r.seen_in_pasture } : {}),
       updated_at: updatedAt,
     }));
     try {

@@ -41,9 +41,8 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  -- reps and lapses are NOT NULL columns (enforced by schema), so NULL < OLD.reps
-  -- evaluates to NULL in PL/pgSQL and the guard never fires — the column constraint
-  -- is the defence against NULL here, matching the pattern of the guards above.
+  -- reps and lapses are NOT NULL by schema constraint, so the comparison is a
+  -- straightforward integer comparison; no explicit NULL guard is needed.
   IF NEW.reps < OLD.reps THEN
     RAISE EXCEPTION
       'card_reviews regression: reps cannot decrease from % to % (user_id=%, card_type=%, subject_key=%)',
@@ -84,6 +83,10 @@ END;
 $$;
 
 -- Re-create the trigger binding in case it was ever dropped.
+-- Note: the DROP / CREATE pair below is not wrapped in an explicit BEGIN/COMMIT.
+-- The two DDL statements are adjacent and fast; the window where the trigger is
+-- unbound is negligible in practice. If applying manually in a transaction, wrap
+-- both statements together to close the window entirely.
 DROP TRIGGER IF EXISTS card_reviews_reject_regression_trigger ON card_reviews;
 
 CREATE TRIGGER card_reviews_reject_regression_trigger
