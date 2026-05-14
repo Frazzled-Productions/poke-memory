@@ -23,8 +23,8 @@ vi.mock("@/lib/sync/persistence", () => ({
 }));
 
 vi.mock("@/lib/review/persistence", () => ({
-  loadSession: vi.fn(() => null),
-  saveSession: vi.fn(() => ({ ok: true })),
+  loadSession: vi.fn(async () => null),
+  saveSession: vi.fn(async () => ({ ok: true })),
 }));
 
 vi.mock("@/lib/review/session", () => ({
@@ -73,8 +73,8 @@ describe("pullAndMerge", () => {
     mockPullSession.mockResolvedValue([]);
     mockPullSettings.mockResolvedValue(null);
     mockMerge.mockReturnValue([]);
-    mockSaveSession.mockReturnValue({ ok: true });
-    mockLoadSession.mockReturnValue(null);
+    mockSaveSession.mockResolvedValue({ ok: true });
+    mockLoadSession.mockResolvedValue(null);
     mockBuildSession.mockReturnValue([]);
     mockHasStoredSettings.mockReturnValue(false);
     mockLoadSettings.mockReturnValue({
@@ -102,7 +102,7 @@ describe("pullAndMerge", () => {
   });
 
   it('returns "error" and does not advance lastPullAt when saveSession fails', async () => {
-    mockSaveSession.mockReturnValue({ ok: false, reason: "quota" });
+    mockSaveSession.mockResolvedValue({ ok: false, reason: "quota" });
 
     const result = await pullAndMerge(fakeClient, fakeUserId);
 

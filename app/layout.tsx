@@ -13,6 +13,7 @@ import { ThemeWatermark } from "@/components/theme/ThemeWatermark";
 import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { IdbMigration } from "@/components/IdbMigration";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -77,6 +78,7 @@ export default function RootLayout({
             </FavouriteThemeProvider>
           </SuperuserProvider>
         </AuthProvider>
+        <IdbMigration />
         <Analytics />
         <SpeedInsights />
       </body>

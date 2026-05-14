@@ -24,11 +24,11 @@ import type { StoredFavourite } from "@/lib/theme/persistence";
 // Conservative on `session === null`: a new sign-in pull may restore
 // settings before cards, so abstain rather than wipe a legitimate
 // favourite. The next mount re-checks once cards are present.
-function resolveFavourite(): StoredFavourite | null {
+async function resolveFavourite(): Promise<StoredFavourite | null> {
   const stored = loadFavourite();
   if (stored === null) return null;
   if (loadFlags().pretendAllMastered) return stored;
-  const session = loadSession();
+  const session = await loadSession();
   if (session === null) return stored;
   const settings = loadSettings();
   if (isFavouriteEarned(stored, session.cards, settings.masteryRepetitions)) {
@@ -65,10 +65,11 @@ export function FavouriteThemeProvider({
   };
 
   useEffect(() => {
-    const stored = resolveFavourite();
-    setFavourite(stored);
-    applyTheme(stored?.colors ?? null);
-    applyIntensity(loadSettings().themeIntensity);
+    void resolveFavourite().then((stored) => {
+      setFavourite(stored);
+      applyTheme(stored?.colors ?? null);
+      applyIntensity(loadSettings().themeIntensity);
+    });
 
     function handleStorage(e: StorageEvent) {
       // The favourite theme lives inside the settings blob (#307). Watch
@@ -77,19 +78,21 @@ export function FavouriteThemeProvider({
       if (e.key !== "poke-memory:settings:v1" && e.key !== "poke-memory:favourite:v1") {
         return;
       }
-      const updated = resolveFavourite();
-      setFavourite(updated);
-      applyTheme(updated?.colors ?? null);
-      applyIntensity(loadSettings().themeIntensity);
+      void resolveFavourite().then((updated) => {
+        setFavourite(updated);
+        applyTheme(updated?.colors ?? null);
+        applyIntensity(loadSettings().themeIntensity);
+      });
     }
 
     function handleSettingsSaved() {
       // Same-tab updates dispatched by saveSettings — cross-tab updates come
       // via the native StorageEvent above.
       applyIntensity(loadSettings().themeIntensity);
-      const updated = resolveFavourite();
-      setFavourite(updated);
-      applyTheme(updated?.colors ?? null);
+      void resolveFavourite().then((updated) => {
+        setFavourite(updated);
+        applyTheme(updated?.colors ?? null);
+      });
     }
 
     window.addEventListener("storage", handleStorage);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -24,6 +24,7 @@ import { isMastered } from "@/lib/stats/derive";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
+import type { ReviewState } from "@/lib/srs/scheduler";
 import { countOptimizableReviews } from "@/lib/srs/optimizer";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
 import { IntensityPicker } from "@/components/settings/IntensityPicker";
@@ -106,11 +107,15 @@ function FavouritePicker({
   onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
 }) {
   const { flags } = useSuperuser();
-  // Empty deps: session is loaded once at mount. Nothing on this page writes
-  // to the session, so a snapshot is safe and avoids re-reading on every render.
-  const cardStateById = useMemo(() => {
-    const session = loadSession();
-    return new Map((session?.cards ?? []).map((c) => [c.id, c.state]));
+  // Loaded once at mount. Nothing on this page writes to the session so a
+  // snapshot is safe and avoids re-reading on every render.
+  const [cardStateById, setCardStateById] = useState<Map<number, ReviewState>>(new Map());
+  useEffect(() => {
+    async function load() {
+      const session = await loadSession();
+      setCardStateById(new Map((session?.cards ?? []).map((c) => [c.id, c.state])));
+    }
+    void load();
   }, []);
 
   const unlockedEntries = CURATED_POKEMON.filter((entry) => {
@@ -304,8 +309,8 @@ export default function SettingsPage() {
     const loaded = loadSettings();
     setSettings(loaded);
     setFavouriteId(loadFavourite()?.id ?? null);
-    // Count optimizable reviews from local grade log
-    setOptimizableReviewCount(countOptimizableReviews(loadGradeLog()));
+    // Count optimizable reviews from local grade log (async now — IDB backed)
+    void loadGradeLog().then((log) => setOptimizableReviewCount(countOptimizableReviews(log)));
     return () => {
       if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
       if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
@@ -401,7 +406,7 @@ export default function SettingsPage() {
       "Replace your current progress with this backup?"
     );
     if (confirmed) {
-      applyBackup(result.data);
+      await applyBackup(result.data);
       window.location.reload();
     }
   }
@@ -430,20 +435,24 @@ export default function SettingsPage() {
       ...numericClamped,
     } as UserSettings;
     saveSettings(clamped);
-    const session = loadSession();
-    if (session !== null) {
-      const filtered = session.cards.filter((card) => {
-        if (card.cardType === "name" && !clamped.nameCardsEnabled) return false;
-        if (card.cardType === "evolution" && !clamped.evolutionCardsEnabled) return false;
-        if (card.cardType === "reverse-evolution" && !clamped.reverseEvolutionCardsEnabled) return false;
-        if (card.cardType === "reverse" && !clamped.reverseCardsEnabled) return false;
-        if (card.cardType === "cry" && !clamped.cryCardsEnabled) return false;
-        return true;
-      });
-      if (filtered.length !== session.cards.length) {
-        saveSession({ ...session, cards: filtered });
+    // Filter out disabled card types from the session. Fire-and-forget: the
+    // UI proceeds immediately; the async IDB write completes in the background.
+    void (async () => {
+      const session = await loadSession();
+      if (session !== null) {
+        const filtered = session.cards.filter((card) => {
+          if (card.cardType === "name" && !clamped.nameCardsEnabled) return false;
+          if (card.cardType === "evolution" && !clamped.evolutionCardsEnabled) return false;
+          if (card.cardType === "reverse-evolution" && !clamped.reverseEvolutionCardsEnabled) return false;
+          if (card.cardType === "reverse" && !clamped.reverseCardsEnabled) return false;
+          if (card.cardType === "cry" && !clamped.cryCardsEnabled) return false;
+          return true;
+        });
+        if (filtered.length !== session.cards.length) {
+          await saveSession({ ...session, cards: filtered });
+        }
       }
-    }
+    })();
     setSettings(clamped);
     setSaved(true);
     if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
@@ -1078,7 +1087,7 @@ export default function SettingsPage() {
                     </p>
                     <button
                       type="button"
-                      onClick={exportProgress}
+                      onClick={() => void exportProgress()}
                       className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
                       Export

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { seedSessionIdb } from "./helpers/seedIdb";
 
 // Smoke coverage for the FSRS scheduler swap (#263). Asserts structural
 // behaviour — queue movement and the relative shape of the per-button
@@ -62,40 +63,34 @@ test.describe("FSRS smoke", () => {
     // grading a brand-new card through the learning steps. Stability and
     // difficulty are chosen so FSRS produces a non-trivial scheduledDays
     // for both Good and Easy.
-    await page.addInitScript(() => {
-      const session = {
-        cards: [
-          {
-            id: 6,
-            name: "Charizard",
-            spriteUrl: "/sprites/pokemon/6.png",
-            cardType: "name",
-            state: {
-              stability: 7,
-              difficulty: 4,
-              elapsedDays: 0,
-              scheduledDays: 7,
-              reps: 3,
-              lapses: 0,
-              fsrsState: "review",
-              dueDate: "2024-01-01", // always due
-              lastReview: "2023-12-25",
-              firstSeen: "2023-12-01",
-              learningStep: null,
-              stepStartedAt: null,
-            },
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 6,
+          name: "Charizard",
+          spriteUrl: "/sprites/pokemon/6.png",
+          cardType: "name",
+          state: {
+            stability: 7,
+            difficulty: 4,
+            elapsedDays: 0,
+            scheduledDays: 7,
+            reps: 3,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2024-01-01", // always due
+            lastReview: "2023-12-25",
+            firstSeen: "2023-12-01",
+            learningStep: null,
+            stepStartedAt: null,
           },
-        ],
-        limits: {
-          name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-          reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
         },
-      };
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify(session),
-      );
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
     });
 
     await page.goto("/");

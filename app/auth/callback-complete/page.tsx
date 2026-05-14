@@ -46,7 +46,7 @@ export default function CallbackCompletePage() {
     setStatus({ kind: "loading" });
     async function resolve() {
       if (!supabase || !user) return;
-      const localSession = loadSession();
+      const localSession = await loadSession();
       const hasLocal = localSession !== null && localSession.cards.some((c) => c.state.lastReview !== null);
       let cloudRows: CloudRow[] | null = null;
       try {
@@ -105,7 +105,7 @@ export default function CallbackCompletePage() {
             : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, seedOptsFromSettings(settings));
         const limits = localSession?.limits ?? DEFAULT_LIMITS;
         const merged = mergeCloudIntoLocal(base, cloudRows!);
-        saveSession({ cards: merged, limits });
+        await saveSession({ cards: merged, limits });
         if (!cancelled) router.replace("/");
         return;
       }
@@ -140,12 +140,14 @@ export default function CallbackCompletePage() {
 
   function handleKeepCloud() {
     if (status.kind !== "conflict" || pending) return;
-    const local = loadSession();
-    if (local !== null) {
-      const merged = mergeCloudIntoLocal(local.cards, status.cloudRows);
-      saveSession({ cards: merged, limits: local.limits });
-    }
-    router.replace("/");
+    void (async () => {
+      const local = await loadSession();
+      if (local !== null) {
+        const merged = mergeCloudIntoLocal(local.cards, status.cloudRows);
+        await saveSession({ cards: merged, limits: local.limits });
+      }
+      router.replace("/");
+    })();
   }
 
   if (status.kind === "loading") {

@@ -74,11 +74,14 @@ export default function PasturePage() {
   const [session, setSession] = useState<SavedSession | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  // Load from localStorage on mount
+  // Load from IndexedDB on mount
   useEffect(() => {
-    const s = loadSession();
-    setSession(s);
-    setLoaded(true);
+    async function load() {
+      const s = await loadSession();
+      setSession(s);
+      setLoaded(true);
+    }
+    void load();
   }, []);
 
   const handleMarkSeen = useCallback(
@@ -89,7 +92,7 @@ export default function PasturePage() {
       const updated: SavedSession = { ...session, cards: partialUpdated.cards };
       // saveSession dispatches the synthetic StorageEvent for same-tab
       // subscribers (useSessionStorageKey).
-      saveSession(updated);
+      await saveSession(updated);
       setSession(updated);
 
       // Fire-and-forget cloud sync for authenticated users

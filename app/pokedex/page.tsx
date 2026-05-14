@@ -19,14 +19,17 @@ export default function PokedexPage() {
   const storageVersion = useSessionStorageKey();
 
   useEffect(() => {
-    const { masteryRepetitions: mr } = loadSettings();
-    setMasteryRepetitions(mr);
-    const saved = loadSession();
-    if (saved !== null) {
-      setCards(hydrateSession(saved.cards, SEED_POKEMON, []));
-    } else {
-      setCards(buildSession(SEED_POKEMON, []));
+    async function load() {
+      const { masteryRepetitions: mr } = loadSettings();
+      setMasteryRepetitions(mr);
+      const saved = await loadSession();
+      if (saved !== null) {
+        setCards(hydrateSession(saved.cards, SEED_POKEMON, []));
+      } else {
+        setCards(buildSession(SEED_POKEMON, []));
+      }
     }
+    void load();
   }, [storageVersion]);
 
   const cardClassById = new Map<number, CardClass>();

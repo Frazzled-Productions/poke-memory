@@ -410,7 +410,7 @@ export function ReviewSession() {
             cards.filter((c) => cardMatchesScope(c, next)).map((c) => c.id),
           );
       setEligibleCardIds(eligibleIds);
-      notifySaveResult(saveSession({ cards, limits }));
+      void saveSession({ cards, limits }).then(notifySaveResult);
     }
   }
 
@@ -445,117 +445,120 @@ export function ReviewSession() {
   );
 
   useEffect(() => {
-    const settings = loadSettings();
-    const saved = loadSession();
-    const now = new Date();
-    let sessionCards: ReviewableCard[];
-    let sessionLimits: DailyLimits;
+    async function load() {
+      const settings = loadSettings();
+      const saved = await loadSession();
+      const now = new Date();
+      let sessionCards: ReviewableCard[];
+      let sessionLimits: DailyLimits;
 
-    const enabled = settings.reverseCardsEnabled;
-    const nameEnabled = settings.nameCardsEnabled;
-    const evolutionEnabled = settings.evolutionCardsEnabled;
-    const reverseEvolutionEnabledLocal = settings.reverseEvolutionCardsEnabled;
-    const cryEnabled = settings.cryCardsEnabled;
+      const enabled = settings.reverseCardsEnabled;
+      const nameEnabled = settings.nameCardsEnabled;
+      const evolutionEnabled = settings.evolutionCardsEnabled;
+      const reverseEvolutionEnabledLocal = settings.reverseEvolutionCardsEnabled;
+      const cryEnabled = settings.cryCardsEnabled;
 
-    // poke-memory:settings:v1 is the source of truth for limits.
-    // saved.limits (from the session) is intentionally ignored — settings
-    // take effect on the next page load, which is the definition of "next session".
-    const settingsLimits = limitsFromSettings(settings);
+      // poke-memory:settings:v1 is the source of truth for limits.
+      // saved.limits (from the session) is intentionally ignored — settings
+      // take effect on the next page load, which is the definition of "next session".
+      const settingsLimits = limitsFromSettings(settings);
 
-    if (saved !== null) {
-      // Merge any seed cards added since the last save.
-      const hydrated = hydrateSession(
-        saved.cards,
-        SEED_POKEMON,
-        SEED_EVOLUTION_CARDS,
-        now,
-        {
+      if (saved !== null) {
+        // Merge any seed cards added since the last save.
+        const hydrated = hydrateSession(
+          saved.cards,
+          SEED_POKEMON,
+          SEED_EVOLUTION_CARDS,
+          now,
+          {
+            reverseEnabled: enabled,
+            nameEnabled,
+            evolutionEnabled,
+            reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
+            cryEnabled,
+          },
+        );
+        sessionLimits = settingsLimits;
+        if (hydrated.length !== saved.cards.length) {
+          notifySaveResult(await saveSession({ cards: hydrated, limits: sessionLimits }));
+        }
+        sessionCards = hydrated;
+      } else {
+        const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, {
           reverseEnabled: enabled,
           nameEnabled,
           evolutionEnabled,
           reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
           cryEnabled,
-        },
-      );
-      sessionLimits = settingsLimits;
-      if (hydrated.length !== saved.cards.length) {
-        notifySaveResult(saveSession({ cards: hydrated, limits: sessionLimits }));
+        });
+        notifySaveResult(await saveSession({ cards: fresh, limits: settingsLimits }));
+        sessionCards = fresh;
+        sessionLimits = settingsLimits;
       }
-      sessionCards = hydrated;
-    } else {
-      const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, {
-        reverseEnabled: enabled,
-        nameEnabled,
-        evolutionEnabled,
-        reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
-        cryEnabled,
+
+      // Stamp a concrete stepStartedAt for any in-learning card still missing one.
+      // Sessions saved before this field was tracked have stepStartedAt: null for
+      // learning cards. Persisting the stamp here ensures subsequent reloads compute
+      // the countdown from the same fixed anchor instead of a fresh window each time.
+      const stampNow = Date.now();
+      let stampedAny = false;
+      sessionCards = sessionCards.map((c) => {
+        if (c.state.learningStep !== null && c.state.stepStartedAt === null) {
+          stampedAny = true;
+          return { ...c, state: { ...c.state, stepStartedAt: stampNow } };
+        }
+        return c;
       });
-      notifySaveResult(saveSession({ cards: fresh, limits: settingsLimits }));
-      sessionCards = fresh;
-      sessionLimits = settingsLimits;
-    }
-
-    // Stamp a concrete stepStartedAt for any in-learning card still missing one.
-    // Sessions saved before this field was tracked have stepStartedAt: null for
-    // learning cards. Persisting the stamp here ensures subsequent reloads compute
-    // the countdown from the same fixed anchor instead of a fresh window each time.
-    const stampNow = Date.now();
-    let stampedAny = false;
-    sessionCards = sessionCards.map((c) => {
-      if (c.state.learningStep !== null && c.state.stepStartedAt === null) {
-        stampedAny = true;
-        return { ...c, state: { ...c.state, stepStartedAt: stampNow } };
+      if (stampedAny) {
+        notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
       }
-      return c;
-    });
-    if (stampedAny) {
-      notifySaveResult(saveSession({ cards: sessionCards, limits: sessionLimits }));
-    }
 
-    // --- Scope load + snooze reconciliation (#333) -------------------------
-    // Scope now persists in user settings (synced cross-device). Reconcile
-    // each card's hiddenSince/dueDate against the current scope before the
-    // queue builder sees it; persist any state changes (set/clear of
-    // hiddenSince and any forward-shift of dueDate on un-hide).
-    const persistedScope = settings.practiceScope;
-    const today = todayString(now);
-    reconcileHiddenState(sessionCards, persistedScope, today);
-    const eligibleIds = isScopeEmpty(persistedScope)
-      ? new Set(sessionCards.map((c) => c.id))
-      : new Set(
-          sessionCards.filter((c) => cardMatchesScope(c, persistedScope)).map((c) => c.id),
+      // --- Scope load + snooze reconciliation (#333) -------------------------
+      // Scope now persists in user settings (synced cross-device). Reconcile
+      // each card's hiddenSince/dueDate against the current scope before the
+      // queue builder sees it; persist any state changes (set/clear of
+      // hiddenSince and any forward-shift of dueDate on un-hide).
+      const persistedScope = settings.practiceScope;
+      const today = todayString(now);
+      reconcileHiddenState(sessionCards, persistedScope, today);
+      const eligibleIds = isScopeEmpty(persistedScope)
+        ? new Set(sessionCards.map((c) => c.id))
+        : new Set(
+            sessionCards.filter((c) => cardMatchesScope(c, persistedScope)).map((c) => c.id),
+          );
+      // Persist whenever scope is active so reconciliation results survive a
+      // reload. When scope is empty, the only thing reconcileHiddenState can do
+      // is clear stale hiddenSince — still worth persisting if any cleared.
+      notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
+
+      setCards(sessionCards);
+      setLimits(sessionLimits);
+      setReverseEnabled(enabled);
+      setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
+      setNameCardsEnabled(nameEnabled);
+      setEvolutionCardsEnabled(evolutionEnabled);
+      setScope(persistedScope);
+      setEligibleCardIds(eligibleIds);
+
+      // Initialize the learning queue from persisted learning-step cards.
+      // Use stepStartedAt from persisted state so the countdown resumes correctly
+      // after navigation instead of resetting to the full step duration.
+      const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today);
+
+      const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
+        const card = sessionCards.find((c) => c.id === cardId)!;
+        const stepMs = stepDurationMs(
+          card.state.lastReview,
+          card.state.learningStep ?? 0,
+          card.state.difficulty,
         );
-    // Persist whenever scope is active so reconciliation results survive a
-    // reload. When scope is empty, the only thing reconcileHiddenState can do
-    // is clear stale hiddenSince — still worth persisting if any cleared.
-    notifySaveResult(saveSession({ cards: sessionCards, limits: sessionLimits }));
+        const stepStartedAt = card.state.stepStartedAt ?? Date.now();
+        return { cardId, dueAt: stepStartedAt + stepMs };
+      });
 
-    setCards(sessionCards);
-    setLimits(sessionLimits);
-    setReverseEnabled(enabled);
-    setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
-    setNameCardsEnabled(nameEnabled);
-    setEvolutionCardsEnabled(evolutionEnabled);
-    setScope(persistedScope);
-    setEligibleCardIds(eligibleIds);
-
-    // Initialize the learning queue from persisted learning-step cards.
-    // Use stepStartedAt from persisted state so the countdown resumes correctly
-    // after navigation instead of resetting to the full step duration.
-    const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today);
-
-    const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
-      const card = sessionCards.find((c) => c.id === cardId)!;
-      const stepMs = stepDurationMs(
-        card.state.lastReview,
-        card.state.learningStep ?? 0,
-        card.state.difficulty,
-      );
-      const stepStartedAt = card.state.stepStartedAt ?? Date.now();
-      return { cardId, dueAt: stepStartedAt + stepMs };
-    });
-
-    setLearningQueue(initialLearning);
+      setLearningQueue(initialLearning);
+    }
+    void load();
   // notifySaveResult is stable (useCallback with no deps). The dep is listed to
   // satisfy the linter, but this effect is intentionally one-shot (mount only).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -646,21 +649,24 @@ export function ReviewSession() {
         !e.shiftKey
       ) {
         e.preventDefault();
-        // Inline so the effect can be declared above all the function
-        // definitions later in the component.
-        setCards(undoSnapshot.cards);
-        setSessionGrades(undoSnapshot.sessionGrades);
-        setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
-        setNewCardsThisSession(undoSnapshot.newCardsThisSession);
-        setMasteredThisSession(undoSnapshot.masteredThisSession);
-        setLearningQueue(undoSnapshot.learningQueue);
-        notifySaveResult(saveSession({ cards: undoSnapshot.cards, limits }));
-        if (undoSnapshot.gradeLogOccurredAt !== null) {
-          removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
-        }
-        revealedCardId.current = undoSnapshot.cardId;
-        setRevealed(true);
-        setUndoSnapshot(null);
+        // Inline async undo: mirrors handleUndo below. The keyboard handler
+        // cannot be async itself, so we call void on an immediately-invoked
+        // async arrow that awaits saveSession and removeGradeEntry.
+        void (async () => {
+          setCards(undoSnapshot.cards);
+          setSessionGrades(undoSnapshot.sessionGrades);
+          setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
+          setNewCardsThisSession(undoSnapshot.newCardsThisSession);
+          setMasteredThisSession(undoSnapshot.masteredThisSession);
+          setLearningQueue(undoSnapshot.learningQueue);
+          notifySaveResult(await saveSession({ cards: undoSnapshot.cards, limits }));
+          if (undoSnapshot.gradeLogOccurredAt !== null) {
+            await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
+          }
+          revealedCardId.current = undoSnapshot.cardId;
+          setRevealed(true);
+          setUndoSnapshot(null);
+        })();
       }
     }
     window.addEventListener("keydown", onKey);
@@ -1026,7 +1032,7 @@ export function ReviewSession() {
     }
   }
 
-  function handleGrade(grade: Grade) {
+  async function handleGrade(grade: Grade) {
     if (effectiveCard === null || grading) return;
     // Re-narrow cards inside the closure — TS doesn't carry the outer
     // null-check through a function that captures a useState variable.
@@ -1056,9 +1062,10 @@ export function ReviewSession() {
       card.id === effectiveCard.id ? { ...card, state: nextState } : card,
     );
 
-    notifySaveResult(saveSession({ cards: newCards, limits }));
+    notifySaveResult(await saveSession({ cards: newCards, limits }));
     const today = todayString(now);
-    const gradedToday = loadGradeLog().filter((e) => e.date === today).length + 1;
+    const gradeLog = await loadGradeLog();
+    const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
     const dueQueueEmpty = !newCards.some(
       (c) =>
         c.state.learningStep === null &&
@@ -1067,7 +1074,7 @@ export function ReviewSession() {
         c.state.lastReview !== today,
     );
     recordReview(today, gradedToday, dueQueueEmpty);
-    const appended = appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, subjectKey: effectiveCard.subjectKey });
+    const appended = await appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, subjectKey: effectiveCard.subjectKey });
     snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
     setUndoSnapshot(snapshot);
     enqueueGrade({ ...effectiveCard, state: nextState });
@@ -1154,7 +1161,7 @@ export function ReviewSession() {
     setGrading(false);
   }
 
-  function handleUndo() {
+  async function handleUndo() {
     if (undoSnapshot === null || grading) return;
     // Revert local state to the pre-grade snapshot.
     setCards(undoSnapshot.cards);
@@ -1163,9 +1170,9 @@ export function ReviewSession() {
     setNewCardsThisSession(undoSnapshot.newCardsThisSession);
     setMasteredThisSession(undoSnapshot.masteredThisSession);
     setLearningQueue(undoSnapshot.learningQueue);
-    notifySaveResult(saveSession({ cards: undoSnapshot.cards, limits }));
+    notifySaveResult(await saveSession({ cards: undoSnapshot.cards, limits }));
     if (undoSnapshot.gradeLogOccurredAt !== null) {
-      removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
+      await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
     }
     // Make the undone card the current revealed card so the user lands
     // back on the prompt they just graded.

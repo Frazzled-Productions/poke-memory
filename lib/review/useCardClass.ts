@@ -12,14 +12,17 @@ export function useCardClass(id: number): CardClassOrPending {
   const [cardClass, setCardClass] = useState<CardClassOrPending>("pending");
 
   useEffect(() => {
-    const session = loadSession();
-    if (session === null) {
-      setCardClass("locked");
-      return;
+    async function load() {
+      const session = await loadSession();
+      if (session === null) {
+        setCardClass("locked");
+        return;
+      }
+      const { masteryRepetitions } = loadSettings();
+      const card = session.cards.find((c) => c.id === id && c.cardType === "name");
+      setCardClass(card !== undefined ? classifyCard(card, masteryRepetitions) : "locked");
     }
-    const { masteryRepetitions } = loadSettings();
-    const card = session.cards.find((c) => c.id === id && c.cardType === "name");
-    setCardClass(card !== undefined ? classifyCard(card, masteryRepetitions) : "locked");
+    void load();
   }, [id]);
 
   return cardClass;

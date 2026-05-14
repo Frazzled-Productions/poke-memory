@@ -29,10 +29,13 @@ export function NavLinks() {
   const sessionVersion = useSessionStorageKey();
 
   useEffect(() => {
-    const session = loadSession();
-    setHasMastered(
-      session !== null && filterMastered(session.cards).length > 0,
-    );
+    async function load() {
+      const session = await loadSession();
+      setHasMastered(
+        session !== null && filterMastered(session.cards).length > 0,
+      );
+    }
+    void load();
   }, [sessionVersion]);
 
   const showPasture = hasMastered || flags.pretendAllMastered;

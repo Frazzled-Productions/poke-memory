@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { seedSessionIdb } from "./helpers/seedIdb";
 import seedData from "../lib/pokemon/generated.json";
 
 // ---------------------------------------------------------------------------
@@ -53,7 +54,7 @@ const EVOLUTION_CARD_IDS: number[] = (() => {
 // validation (see isReviewCardShaped in lib/review/persistence.ts).
 // ---------------------------------------------------------------------------
 
-function seedCompletedSession(args: {
+function buildCompletedSession(args: {
   nameCardCount: number;
   evolutionCardIds: number[];
 }) {
@@ -110,7 +111,7 @@ function seedCompletedSession(args: {
     });
   }
 
-  const session = {
+  return {
     cards,
     limits: {
       name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
@@ -119,11 +120,6 @@ function seedCompletedSession(args: {
       cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
     },
   };
-
-  localStorage.setItem(
-    "poke-memory:review-session:v1",
-    JSON.stringify(session),
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +138,7 @@ function seedCompletedSession(args: {
 // false, so we don't need to seed those types.
 // ---------------------------------------------------------------------------
 
-function seedNewCardsLockedSession(args: {
+function buildNewCardsLockedSession(args: {
   nameCardCount: number;
   evolutionCardIds: number[];
 }) {
@@ -214,7 +210,7 @@ function seedNewCardsLockedSession(args: {
     });
   }
 
-  const session = {
+  return {
     cards,
     limits: {
       name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
@@ -223,19 +219,14 @@ function seedNewCardsLockedSession(args: {
       cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
     },
   };
-
-  localStorage.setItem(
-    "poke-memory:review-session:v1",
-    JSON.stringify(session),
-  );
 }
 
 test.describe("Higher-or-Lower mini-game", () => {
   test("mini-game section appears on SESSION_COMPLETE", async ({ page }) => {
-    await page.addInitScript(seedCompletedSession, {
+    await seedSessionIdb(page, buildCompletedSession({
       nameCardCount: NAME_CARD_COUNT,
       evolutionCardIds: EVOLUTION_CARD_IDS,
-    });
+    }));
     await page.goto("/");
 
     // Confirm the session-complete end-state is reached
@@ -256,10 +247,10 @@ test.describe("Higher-or-Lower mini-game", () => {
   });
 
   test("clicking a Pokémon tile reveals a result banner", async ({ page }) => {
-    await page.addInitScript(seedCompletedSession, {
+    await seedSessionIdb(page, buildCompletedSession({
       nameCardCount: NAME_CARD_COUNT,
       evolutionCardIds: EVOLUTION_CARD_IDS,
-    });
+    }));
     await page.goto("/");
 
     await expect(page.getByText("All caught up!")).toBeVisible();
@@ -280,10 +271,10 @@ test.describe("Higher-or-Lower mini-game", () => {
   });
 
   test("mini-game section appears on NEW_CARDS_LOCKED", async ({ page }) => {
-    await page.addInitScript(seedNewCardsLockedSession, {
+    await seedSessionIdb(page, buildNewCardsLockedSession({
       nameCardCount: NAME_CARD_COUNT,
       evolutionCardIds: EVOLUTION_CARD_IDS,
-    });
+    }));
     await page.goto("/");
 
     await expect(

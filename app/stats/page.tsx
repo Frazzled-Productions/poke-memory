@@ -411,12 +411,13 @@ export default function StatsPage() {
   const [accuracyPoints, setAccuracyPoints] = useState<AccuracyPoint[]>([]);
   const [rolling7d, setRolling7d] = useState<number | null>(null);
   const [streakDates, setStreakDates] = useState<string[]>([]);
-  const [gradeLog, setGradeLog] = useState<ReturnType<typeof loadGradeLog>>([]);
+  const [gradeLog, setGradeLog] = useState<Awaited<ReturnType<typeof loadGradeLog>>>([]);
   const [earnedBadgeIds, setEarnedBadgeIds] = useState<readonly string[]>([]);
 
   useEffect(() => {
+    async function load() {
     const settings = loadSettings();
-    const saved = loadSession();
+    const saved = await loadSession();
     const sessionCards = saved !== null
       ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled })
       : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled });
@@ -427,7 +428,7 @@ export default function StatsPage() {
     setStreakDates(dates);
     const today = todayString(new Date());
     setCurrentStreak(computeStreak(dates, today));
-    const log = loadGradeLog();
+    const log = await loadGradeLog();
     setGradeLog(log);
     setGradeTotals(computeGradeTotals(log));
     setAccuracyPoints(computeAccuracySparkline(log, today, 30));
@@ -461,6 +462,8 @@ export default function StatsPage() {
     } else {
       setEarnedBadgeIds(settings.earnedBadges.map((e) => e.id));
     }
+    }
+    void load();
   }, [storageVersion, anyFlagOn]);
 
   const nameCards =

@@ -114,11 +114,20 @@ vi.mock("@/lib/pokemon/seed", () => ({
   CRY_ID_OFFSET: 3_000_000,
 }));
 
-// loadSession is a vi.fn() so individual tests can override it with
-// mockReturnValueOnce; default returns null so buildSession rebuilds state.
+// loadSession / saveSession are vi.fn() so individual tests can override them
+// with mockResolvedValueOnce; defaults simulate an empty session.
 vi.mock("@/lib/review/persistence", () => ({
-  loadSession: vi.fn().mockReturnValue(null),
-  saveSession: vi.fn().mockReturnValue({ ok: true }),
+  loadSession: vi.fn().mockResolvedValue(null),
+  saveSession: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
+// Grade log operations are async (IDB-backed). Mock them so tests that use
+// fake timers don't stall waiting for IDB microtasks to settle.
+vi.mock("@/lib/gradelog/persistence", () => ({
+  loadGradeLog: vi.fn().mockResolvedValue([]),
+  appendGradeEntry: vi.fn().mockResolvedValue({ occurredAt: Date.now() }),
+  removeGradeEntry: vi.fn().mockResolvedValue(undefined),
+  GRADE_LOG_APPENDED_EVENT: "poke-memory:grade-log-appended",
 }));
 
 vi.mock("@/lib/settings/persistence", () => ({
@@ -178,7 +187,7 @@ beforeEach(() => {
     practiceScope: { gens: [], types: [], presets: [] },
     earnedBadges: [],
   });
-  vi.mocked(loadSession).mockReturnValue(null);
+  vi.mocked(loadSession).mockResolvedValue(null);
 });
 
 
@@ -390,7 +399,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-11T12:00:00Z"));
 
-    vi.mocked(loadSession).mockReturnValueOnce({
+    vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [MIGRATION_CARD],
       limits: DEFAULT_LIMITS,
     });
@@ -410,7 +419,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-11T12:00:00Z"));
 
-    vi.mocked(loadSession).mockReturnValueOnce({
+    vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [MIGRATION_CARD],
       limits: DEFAULT_LIMITS,
     });
@@ -460,7 +469,7 @@ describe("Baseline: due review card reveal → grade cycle", () => {
     };
 
     mockSeedPokemon.mockReturnValue([reviewCard]);
-    vi.mocked(loadSession).mockReturnValueOnce({ cards: [reviewCard], limits: DEFAULT_LIMITS });
+    vi.mocked(loadSession).mockResolvedValueOnce({ cards: [reviewCard], limits: DEFAULT_LIMITS });
 
     const user = userEvent.setup();
     render(<ReviewSession />);
@@ -543,15 +552,15 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
     };
 
     mockSeedPokemon.mockReturnValue([reviewCard, learningCard]);
-    vi.mocked(loadSession).mockReturnValueOnce({
+    vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [reviewCard, learningCard],
       limits: DEFAULT_LIMITS,
     });
 
-    render(<ReviewSession />);
+    // Flush async effects (loadSession is now async) while still in fake-timer mode.
+    await act(async () => { render(<ReviewSession />); });
 
-    // render() wraps in act, so useEffects (session load) are flushed synchronously.
-    // Use a sync query — findByRole/waitFor poll via setTimeout, which is faked here.
+    // loadSession resolved — component is out of the loading skeleton.
     const revealBtn = screen.getByRole("button", { name: /reveal/i });
 
     // Click Reveal on the review card.
@@ -628,7 +637,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
       },
     };
 
-    vi.mocked(loadSession).mockReturnValueOnce({
+    vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [learningCard],
       limits: DEFAULT_LIMITS,
     });
@@ -671,7 +680,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
       },
     };
 
-    vi.mocked(loadSession).mockReturnValueOnce({
+    vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [learningCard],
       limits: DEFAULT_LIMITS,
     });
@@ -737,7 +746,7 @@ describe("QueueCounterRow: live queue counters", () => {
     // Seed only needs the cards that are in the session (id 1 and 2 are not
     // both in the default mock; override to include both).
     mockSeedPokemon.mockReturnValue([newCard, learningCard]);
-    vi.mocked(loadSession).mockReturnValueOnce({
+    vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [newCard, learningCard],
       limits: DEFAULT_LIMITS,
     });
@@ -834,7 +843,7 @@ describe("Practice scope (#333)", () => {
     };
 
     mockSeedPokemon.mockReturnValue([graduatedCard]);
-    vi.mocked(loadSession).mockReturnValueOnce({
+    vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [graduatedCard],
       limits: DEFAULT_LIMITS,
     });
