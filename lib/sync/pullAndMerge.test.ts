@@ -202,7 +202,7 @@ describe("pullAndMerge", () => {
     );
   });
 
-  it("does not apply cloud settings when cloud updated_at <= lastSettingsPullAt", async () => {
+  it("does not apply cloud settings when cloud updated_at equals lastSettingsPullAt", async () => {
     mockHasStoredSettings.mockReturnValue(true);
     mockLoadSyncStatus.mockReturnValue({
       ...baseSyncStatus,
@@ -222,6 +222,24 @@ describe("pullAndMerge", () => {
     expect(mockSaveSyncStatus).toHaveBeenCalledWith(
       expect.objectContaining({ lastSettingsPullAt: "2026-05-13T12:00:00.000Z" }),
     );
+  });
+
+  // Guards the strict `>` semantic specifically — a `>=` regression would
+  // wrongly apply cloud here even though the cursor is ahead.
+  it("does not apply cloud settings when cloud updated_at is strictly older than lastSettingsPullAt", async () => {
+    mockHasStoredSettings.mockReturnValue(true);
+    mockLoadSyncStatus.mockReturnValue({
+      ...baseSyncStatus,
+      lastSettingsPullAt: "2026-05-13T12:00:00.000Z",
+    });
+    mockPullSettingsWithTimestamp.mockResolvedValue({
+      settings: { ...DEFAULT_SETTINGS } as ReturnType<typeof loadSettings>,
+      updatedAt: "2026-05-13T10:00:00.000Z",
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 
   // Legacy rows (pre-dating updated_at population) have updatedAt === null.

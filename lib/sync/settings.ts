@@ -151,7 +151,15 @@ export async function pullSettingsWithTimestamp(
       .eq("user_id", userId)
       .maybeSingle();
     if (error || !data) return null;
-    const row = data as { settings: unknown; updated_at: string | null };
+    // The schema declares user_settings.updated_at as NOT NULL DEFAULT now(),
+    // so the column itself is never null in practice. The cast widens the type
+    // to `string | undefined` to capture the *runtime* failure mode we actually
+    // guard against: schema drift / a missing key in the response (older
+    // generated types or a regenerated select that no longer includes the
+    // column). The `?? null` coercion below normalises that to `null` so the
+    // ISO-string comparison in `pullAndMerge` never sees `undefined > "…"`,
+    // which would coerce to NaN and lie about freshness.
+    const row = data as { settings: unknown; updated_at: string | undefined };
     if (typeof row.settings !== "object" || row.settings === null) return null;
     if (Object.keys(row.settings as Record<string, unknown>).length === 0) return null;
     return { settings: row.settings as UserSettings, updatedAt: row.updated_at ?? null };

@@ -49,9 +49,13 @@ export async function pullAndMerge(
           pulledSettings.updatedAt !== null &&
           (syncStatus.lastSettingsPullAt === null ||
             pulledSettings.updatedAt > syncStatus.lastSettingsPullAt);
-        // Legacy rows pre-date updated_at population. Apply once (when the
-        // cursor has never been set), then stamp a synthetic marker so
-        // subsequent pulls don't re-apply a blob we can't compare for freshness.
+        // `user_settings.updated_at` is `NOT NULL DEFAULT now()` so this
+        // branch is unreachable against real Supabase data. It exists for the
+        // schema-drift case `pullSettingsWithTimestamp` coerces with `?? null`
+        // (response missing the column entirely) — when that happens we still
+        // want to apply the blob once and then stamp the cursor so we don't
+        // re-apply on every cycle. Removing this guard would silently degrade
+        // to "blob applied once, cursor never advances, blob re-applied forever".
         const legacyNeverApplied =
           pulledSettings.updatedAt === null && syncStatus.lastSettingsPullAt === null;
         if (!localHadSettings || cloudIsNewer || legacyNeverApplied) {
