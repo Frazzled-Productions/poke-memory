@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { pullAndMerge } from "./pullAndMerge";
 import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
-import { pullSettingsWithTimestamp } from "@/lib/sync/settings";
+import { pullUserSettingsRow } from "@/lib/sync/settings";
 import { pullStreak } from "@/lib/sync/streak";
 import { pullGradeLog } from "@/lib/sync/gradeLog";
 import { saveSession, loadSession } from "@/lib/review/persistence";
@@ -10,6 +10,7 @@ import { buildSession } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings, DEFAULT_SETTINGS } from "@/lib/settings/persistence";
 import { loadStreakData, saveStreakData } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
+import { clearLocalProgress } from "@/lib/storage/reset";
 
 vi.mock("@/lib/sync/cloud", () => ({
   pullSession: vi.fn(),
@@ -18,8 +19,12 @@ vi.mock("@/lib/sync/cloud", () => ({
 }));
 
 vi.mock("@/lib/sync/settings", () => ({
-  pullSettingsWithTimestamp: vi.fn(),
+  pullUserSettingsRow: vi.fn(),
   pullRegionalPrefs: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/storage/reset", () => ({
+  clearLocalProgress: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({
@@ -92,7 +97,8 @@ vi.mock("@/lib/gradelog/persistence", () => ({
 }));
 
 const mockPullSession = vi.mocked(pullSession);
-const mockPullSettingsWithTimestamp = vi.mocked(pullSettingsWithTimestamp);
+const mockPullUserSettingsRow = vi.mocked(pullUserSettingsRow);
+const mockClearLocalProgress = vi.mocked(clearLocalProgress);
 const mockPullStreak = vi.mocked(pullStreak);
 const mockPullGradeLog = vi.mocked(pullGradeLog);
 const mockLoadGradeLog = vi.mocked(loadGradeLog);
@@ -119,12 +125,13 @@ const baseSyncStatus = {
   failedCardCount: null,
   lastPullAt: null,
   lastSettingsPullAt: null,
+    lastSeenResetAt: null,
 };
 
 describe("pullAndMerge", () => {
   beforeEach(() => {
     mockPullSession.mockResolvedValue([]);
-    mockPullSettingsWithTimestamp.mockResolvedValue(null);
+    mockPullUserSettingsRow.mockResolvedValue(null);
     mockPullStreak.mockResolvedValue(null);
     mockMerge.mockReturnValue([]);
     mockSaveSession.mockResolvedValue({ ok: true });
@@ -186,7 +193,7 @@ describe("pullAndMerge", () => {
   // — otherwise their cloud rows are silently dropped by the merge.
   it("pulls cloud settings before building base when local has no settings stored", async () => {
     mockHasStoredSettings.mockReturnValue(false);
-    mockPullSettingsWithTimestamp.mockResolvedValue({
+    mockPullUserSettingsRow.mockResolvedValue({
       settings: {
         nameCardsEnabled: true,
         evolutionCardsEnabled: true,
@@ -194,7 +201,7 @@ describe("pullAndMerge", () => {
         reverseEvolutionCardsEnabled: false,
         cryCardsEnabled: true,
       } as ReturnType<typeof loadSettings>,
-      updatedAt: "2026-05-13T11:00:00.000Z",
+      updatedAt: "2026-05-13T11:00:00.000Z", lastResetAt: null,
     });
     // After settings pull, loadSettings reflects the pulled values.
     mockLoadSettings.mockReturnValue({
@@ -208,7 +215,7 @@ describe("pullAndMerge", () => {
     const result = await pullAndMerge(fakeClient, fakeUserId);
 
     expect(result).toBe("ok");
-    expect(mockPullSettingsWithTimestamp).toHaveBeenCalledOnce();
+    expect(mockPullUserSettingsRow).toHaveBeenCalledOnce();
     expect(mockSaveSettings).toHaveBeenCalledOnce();
     // buildSession must receive the reverse/cry-enabled opts from cloud.
     expect(mockBuildSession).toHaveBeenCalledWith(
@@ -231,17 +238,17 @@ describe("pullAndMerge", () => {
       ...baseSyncStatus,
       lastSettingsPullAt: "2026-05-12T08:00:00.000Z",
     });
-    mockPullSettingsWithTimestamp.mockResolvedValue({
+    mockPullUserSettingsRow.mockResolvedValue({
       settings: {
         ...DEFAULT_SETTINGS,
         themeIntensity: "tinted",
       } as ReturnType<typeof loadSettings>,
-      updatedAt: "2026-05-13T12:00:00.000Z",
+      updatedAt: "2026-05-13T12:00:00.000Z", lastResetAt: null,
     });
 
     await pullAndMerge(fakeClient, fakeUserId);
 
-    expect(mockPullSettingsWithTimestamp).toHaveBeenCalledOnce();
+    expect(mockPullUserSettingsRow).toHaveBeenCalledOnce();
     expect(mockSaveSettings).toHaveBeenCalledOnce();
     expect(mockSaveSyncStatus).toHaveBeenCalledWith(
       expect.objectContaining({ lastSettingsPullAt: "2026-05-13T12:00:00.000Z" }),
@@ -254,14 +261,14 @@ describe("pullAndMerge", () => {
       ...baseSyncStatus,
       lastSettingsPullAt: "2026-05-13T12:00:00.000Z",
     });
-    mockPullSettingsWithTimestamp.mockResolvedValue({
+    mockPullUserSettingsRow.mockResolvedValue({
       settings: { ...DEFAULT_SETTINGS } as ReturnType<typeof loadSettings>,
-      updatedAt: "2026-05-13T12:00:00.000Z",
+      updatedAt: "2026-05-13T12:00:00.000Z", lastResetAt: null,
     });
 
     await pullAndMerge(fakeClient, fakeUserId);
 
-    expect(mockPullSettingsWithTimestamp).toHaveBeenCalledOnce();
+    expect(mockPullUserSettingsRow).toHaveBeenCalledOnce();
     expect(mockSaveSettings).not.toHaveBeenCalled();
     // The cursor is still advanced to the latest-seen timestamp so subsequent
     // pulls do not waste effort re-checking the same row.
@@ -278,9 +285,9 @@ describe("pullAndMerge", () => {
       ...baseSyncStatus,
       lastSettingsPullAt: "2026-05-13T12:00:00.000Z",
     });
-    mockPullSettingsWithTimestamp.mockResolvedValue({
+    mockPullUserSettingsRow.mockResolvedValue({
       settings: { ...DEFAULT_SETTINGS } as ReturnType<typeof loadSettings>,
-      updatedAt: "2026-05-13T10:00:00.000Z",
+      updatedAt: "2026-05-13T10:00:00.000Z", lastResetAt: null,
     });
 
     await pullAndMerge(fakeClient, fakeUserId);
@@ -294,9 +301,9 @@ describe("pullAndMerge", () => {
   it("applies legacy cloud settings (updatedAt null) when cursor has never been set", async () => {
     mockHasStoredSettings.mockReturnValue(true);
     mockLoadSyncStatus.mockReturnValue({ ...baseSyncStatus, lastSettingsPullAt: null });
-    mockPullSettingsWithTimestamp.mockResolvedValue({
+    mockPullUserSettingsRow.mockResolvedValue({
       settings: { ...DEFAULT_SETTINGS } as ReturnType<typeof loadSettings>,
-      updatedAt: null,
+      updatedAt: null, lastResetAt: null,
     });
 
     await pullAndMerge(fakeClient, fakeUserId);
@@ -316,9 +323,9 @@ describe("pullAndMerge", () => {
       ...baseSyncStatus,
       lastSettingsPullAt: "2026-05-10T00:00:00.000Z",
     });
-    mockPullSettingsWithTimestamp.mockResolvedValue({
+    mockPullUserSettingsRow.mockResolvedValue({
       settings: { ...DEFAULT_SETTINGS } as ReturnType<typeof loadSettings>,
-      updatedAt: null,
+      updatedAt: null, lastResetAt: null,
     });
 
     await pullAndMerge(fakeClient, fakeUserId);
@@ -332,7 +339,7 @@ describe("pullAndMerge", () => {
 
   it("does not throw when settings pull fails — sync stays 'ok'", async () => {
     mockHasStoredSettings.mockReturnValue(true);
-    mockPullSettingsWithTimestamp.mockRejectedValue(new Error("network blip"));
+    mockPullUserSettingsRow.mockRejectedValue(new Error("network blip"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const result = await pullAndMerge(fakeClient, fakeUserId);
@@ -463,5 +470,79 @@ describe("pullAndMerge", () => {
     await pullAndMerge(fakeClient, fakeUserId);
 
     expect(mockSaveGradeLog).not.toHaveBeenCalled();
+  });
+
+  // ─── tombstone / last_reset_at (#576) ─────────────────────────────────────
+  // Cloud advancing user_settings.last_reset_at past the local
+  // lastSeenResetAt cursor means another device called reset_all_progress.
+  // We wipe local before merging so stale local rows do not survive into
+  // the merged session and resurrect deleted rows.
+
+  it("clears local progress when cloud last_reset_at is newer than local cursor", async () => {
+    mockHasStoredSettings.mockReturnValue(true);
+    mockLoadSyncStatus.mockReturnValue({
+      ...baseSyncStatus,
+      lastSeenResetAt: "2026-05-12T10:00:00.000Z",
+    });
+    mockPullUserSettingsRow.mockResolvedValue({
+      settings: null,
+      updatedAt: null,
+      lastResetAt: "2026-05-13T15:00:00.000Z",
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockClearLocalProgress).toHaveBeenCalledOnce();
+    expect(mockSaveSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ lastSeenResetAt: "2026-05-13T15:00:00.000Z" }),
+    );
+  });
+
+  it("does NOT clear local when cloud last_reset_at equals local cursor", async () => {
+    mockHasStoredSettings.mockReturnValue(true);
+    mockLoadSyncStatus.mockReturnValue({
+      ...baseSyncStatus,
+      lastSeenResetAt: "2026-05-13T15:00:00.000Z",
+    });
+    mockPullUserSettingsRow.mockResolvedValue({
+      settings: null,
+      updatedAt: null,
+      lastResetAt: "2026-05-13T15:00:00.000Z",
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockClearLocalProgress).not.toHaveBeenCalled();
+  });
+
+  it("clears local on first-ever sight of a reset (local cursor null)", async () => {
+    mockHasStoredSettings.mockReturnValue(true);
+    mockLoadSyncStatus.mockReturnValue({
+      ...baseSyncStatus,
+      lastSeenResetAt: null,
+    });
+    mockPullUserSettingsRow.mockResolvedValue({
+      settings: null,
+      updatedAt: null,
+      lastResetAt: "2026-05-13T15:00:00.000Z",
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockClearLocalProgress).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT clear local when cloud has no reset on record (lastResetAt null)", async () => {
+    mockHasStoredSettings.mockReturnValue(true);
+    mockLoadSyncStatus.mockReturnValue({ ...baseSyncStatus });
+    mockPullUserSettingsRow.mockResolvedValue({
+      settings: null,
+      updatedAt: null,
+      lastResetAt: null,
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockClearLocalProgress).not.toHaveBeenCalled();
   });
 });

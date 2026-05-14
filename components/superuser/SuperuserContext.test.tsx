@@ -54,6 +54,7 @@ vi.mock("@/lib/sync/persistence", () => ({
     failedCardCount: null,
     lastPullAt: null,
     lastSettingsPullAt: null,
+    lastSeenResetAt: null,
   })),
   saveSyncStatus: vi.fn(),
 }));

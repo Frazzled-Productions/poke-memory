@@ -139,30 +139,69 @@ export type PulledSettings = {
  * Lets the background pull decide whether the cloud copy is newer than the
  * last copy this device applied. Without it, a device that has any local
  * settings can never receive remote updates (issue #572).
+ *
+ * Returns `null` when the row has no real settings — same semantics as
+ * `pullSettings`. Callers that *also* need the row's `last_reset_at` should
+ * use `pullUserSettingsRow` directly, because that flag is meaningful even
+ * when the JSONB blob is empty (reset_all_progress creates a row with only
+ * `last_reset_at` populated — see migration 022).
  */
 export async function pullSettingsWithTimestamp(
   client: SupabaseClient,
   userId: string,
 ): Promise<PulledSettings | null> {
+  const row = await pullUserSettingsRow(client, userId);
+  if (row === null || row.settings === null) return null;
+  return { settings: row.settings, updatedAt: row.updatedAt };
+}
+
+export type UserSettingsRow = {
+  /** JSONB settings blob, null when missing or empty `{}`. */
+  settings: UserSettings | null;
+  /** Server-side updated_at, null on legacy rows or schema drift. */
+  updatedAt: string | null;
+  /** ISO timestamp of the user's last `reset_all_progress` call. Null = no reset on record. See migration 022 / issue #576. */
+  lastResetAt: string | null;
+};
+
+/**
+ * Single-query helper that returns every column of the `user_settings` row the
+ * sync layer cares about. Callers that only want the JSONB blob should use
+ * `pullSettings` / `pullSettingsWithTimestamp`; the background pull uses this
+ * directly so it can read `last_reset_at` (the tombstone marker — issue #576)
+ * even when the JSONB column is empty.
+ *
+ * Returns `null` only when the row doesn't exist or the fetch failed.
+ */
+export async function pullUserSettingsRow(
+  client: SupabaseClient,
+  userId: string,
+): Promise<UserSettingsRow | null> {
   try {
     const { data, error } = await client
       .from("user_settings")
-      .select("settings, updated_at")
+      .select("settings, updated_at, last_reset_at")
       .eq("user_id", userId)
       .maybeSingle();
     if (error || !data) return null;
-    // The schema declares user_settings.updated_at as NOT NULL DEFAULT now(),
-    // so the column itself is never null in practice. The cast widens the type
-    // to `string | undefined` to capture the *runtime* failure mode we actually
-    // guard against: schema drift / a missing key in the response (older
-    // generated types or a regenerated select that no longer includes the
-    // column). The `?? null` coercion below normalises that to `null` so the
-    // ISO-string comparison in `pullAndMerge` never sees `undefined > "…"`,
-    // which would coerce to NaN and lie about freshness.
-    const row = data as { settings: unknown; updated_at: string | undefined };
-    if (typeof row.settings !== "object" || row.settings === null) return null;
-    if (Object.keys(row.settings as Record<string, unknown>).length === 0) return null;
-    return { settings: row.settings as UserSettings, updatedAt: row.updated_at ?? null };
+    // updated_at + last_reset_at are typed string | undefined because the
+    // actual failure mode this layer guards against is schema drift / missing
+    // keys in the response, not a NULL column value. The `?? null` coercion
+    // normalises to null for safe ISO-string comparisons downstream.
+    const row = data as {
+      settings: unknown;
+      updated_at: string | undefined;
+      last_reset_at: string | undefined;
+    };
+    const validSettings =
+      typeof row.settings === "object" &&
+      row.settings !== null &&
+      Object.keys(row.settings as Record<string, unknown>).length > 0;
+    return {
+      settings: validSettings ? (row.settings as UserSettings) : null,
+      updatedAt: row.updated_at ?? null,
+      lastResetAt: row.last_reset_at ?? null,
+    };
   } catch {
     return null;
   }
