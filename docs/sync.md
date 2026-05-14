@@ -21,8 +21,10 @@ A `BEFORE UPDATE` trigger on `card_reviews` raises `23514 check_violation` when:
 - `OLD.last_review IS NOT NULL AND NEW.last_review IS NULL` — un-reviewing a card.
 - `OLD.first_seen IS NOT NULL AND NEW.first_seen IS NULL` — un-seeing a card.
 - `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review` — review date moving backward.
+- `NEW.reps < OLD.reps` — reps counter decreasing (added in migration 015; FSRS only ever increments this).
+- `NEW.lapses < OLD.lapses` — lapses counter decreasing (added in migration 015; same invariant).
 
-`repetitions`, `interval`, `ease_factor` are intentionally **not** checked because SM-2 "Again" legitimately resets them. The trigger only catches lifecycle-timestamp regressions.
+Other FSRS columns (`stability`, `difficulty`, `scheduled_days`, etc.) are intentionally **not** checked because legitimate rescheduling operations (e.g. grading "Again") can lower them.
 
 **Do not work around the trigger.** A legitimate "reset progress" / "delete account" flow needs a `SECURITY DEFINER` RPC that explicitly bypasses it, plus user confirmation. No such flow exists today; do not invent one without an explicit feature requirement.
 
