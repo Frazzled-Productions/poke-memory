@@ -97,7 +97,7 @@ For card-shaped persistence — anything keyed by `(user_id, card_type, subject_
 
 Two things to remember at runtime without leaving AGENTS.md:
 
-- **Apply the migration BEFORE merging the PR.** `migration-check.yml` fails the required CI check until file-vs-applied parity holds. Call `mcp__supabase__apply_migration(name, query)` after opening the PR.
+- **Apply the migration BEFORE merging the PR** (typically right after opening it, but the deadline is merge, not open). `migration-check.yml` fails the required CI check until file-vs-applied parity holds, so the PR cannot merge until you've called `mcp__supabase__apply_migration(name, query)`.
 - **Wire cross-device sync** by adding `lib/sync/<feature>.ts` exporting `push` / `pull` (and a `merge` helper when applicable). Plumb the pull side into `pullAndMerge` as a best-effort leg, and the push side wherever the feature's data is written — typically a new handler in `AutoSyncOnChange` listening for that feature's local change event, or a direct call alongside the existing `saveX(...)` write. Auxiliary legs are best-effort — `console.warn` and continue, never flip the overall sync into the error state.
 
 ### Page params
