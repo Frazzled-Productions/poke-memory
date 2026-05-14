@@ -935,6 +935,28 @@ describe('countDueTomorrow', () => {
     expect(countDueTomorrow(cards, TOMORROW)).toBe(0);
   });
 
+  it('counts multiple graduated cards due on the same tomorrow', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 3,
+        scheduledDays: 1,
+        firstSeen: '2026-04-01',
+      }),
+      makeCard(makeSeedPokemon(2), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 2,
+        scheduledDays: 3,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(2);
+  });
+
   it('respects the eligibleCardIds filter', () => {
     const cards: ReviewableCard[] = [
       makeCard(makeSeedPokemon(1), {
@@ -960,7 +982,7 @@ describe('countDueTomorrow', () => {
     expect(countDueTomorrow(cards, TOMORROW, new Set([99]))).toBe(0);
   });
 
-  it('counts a mastered card due tomorrow (mastered = reps >= 3 && scheduledDays >= 21)', () => {
+  it('counts a mastered card due tomorrow (graduated, no learning step)', () => {
     const cards: ReviewableCard[] = [
       makeCard(makeSeedPokemon(1), {
         lastReview: TODAY,

@@ -384,6 +384,7 @@ export function ReviewSession() {
   // `buildSessionQueues` still see the full card set, so daily caps stay
   // stable when scope changes mid-day (#333).
   const [eligibleCardIds, setEligibleCardIds] = useState<Set<number>>(new Set());
+  const [timezone, setTimezone] = useState("UTC");
   // Queue of newly-earned badges awaiting their reveal toast (#420). One is
   // rendered at a time; dismiss shifts the head off. Persisting is handled
   // in handleGrade — this queue only drives the in-session UI.
@@ -553,6 +554,7 @@ export function ReviewSession() {
       setEvolutionCardsEnabled(evolutionEnabled);
       setScope(persistedScope);
       setEligibleCardIds(eligibleIds);
+      setTimezone(settings.timezone ?? "UTC");
 
       // Initialize the learning queue from persisted learning-step cards.
       // Use stepStartedAt from persisted state so the countdown resumes correctly
@@ -952,16 +954,15 @@ export function ReviewSession() {
       );
     }
 
-    // today is UTC (scheduler-internal — card dues, streak); tomorrow uses tz
-    // because it is a calendar label for a user-facing count. Derive tomorrow
-    // from the tz-aware calendar date rather than adding 86 400 s, which is
-    // wrong on DST-change nights (23 h or 25 h wall-clock days).
+    // today is UTC (scheduler-internal — card dues, streak); tomorrow uses the
+    // user's timezone (state var loaded from settings) because it is a calendar
+    // label for a user-facing count. Derive tomorrow from the tz-aware calendar
+    // date rather than adding 86 400 s, which is wrong on DST-change nights.
     const today = todayString(new Date());
-    const tz = loadSettings().timezone ?? "UTC";
-    const todayTz = todayString(new Date(), tz);
+    const todayTz = todayString(new Date(), timezone);
     const tomorrowDate = new Date(todayTz + "T12:00:00Z");
     tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
-    const tomorrow = todayString(tomorrowDate, tz);
+    const tomorrow = todayString(tomorrowDate, timezone);
     const dueTomorrow = countDueTomorrow(
       cards,
       tomorrow,
