@@ -110,7 +110,7 @@ describe("pullSettings", () => {
 });
 
 describe("pushRegionalPrefs", () => {
-  it("calls update with timezone, date_format, and updated_at filtered by user_id", async () => {
+  it("calls update with timezone and date_format only — no updated_at — filtered by user_id", async () => {
     const { client, update, eq } = makeClientWithUpdate();
     const ok = await pushRegionalPrefs(client, "user-1", {
       timezone: "America/New_York",
@@ -120,7 +120,9 @@ describe("pushRegionalPrefs", () => {
     const [row] = update.mock.calls[0] as [Record<string, unknown>];
     expect(row.timezone).toBe("America/New_York");
     expect(row.date_format).toBe("mdy");
-    expect(typeof row.updated_at).toBe("string");
+    // Must NOT include updated_at — bumping it would cause other devices to
+    // think the settings JSONB blob changed, triggering a spurious overwrite.
+    expect(row).not.toHaveProperty("updated_at");
     // UPDATE must not include user_id or settings — those belong to other columns/writes.
     expect(row).not.toHaveProperty("user_id");
     expect(row).not.toHaveProperty("settings");

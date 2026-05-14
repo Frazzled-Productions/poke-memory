@@ -74,7 +74,6 @@ export async function pushRegionalPrefs(
       .update({
         timezone: prefs.timezone,
         date_format: prefs.dateFormat,
-        updated_at: new Date().toISOString(),
       })
       .eq("user_id", userId);
     return !error;

@@ -49,11 +49,18 @@ export async function pullAndMerge(
           pulledSettings.updatedAt !== null &&
           (syncStatus.lastSettingsPullAt === null ||
             pulledSettings.updatedAt > syncStatus.lastSettingsPullAt);
-        if (!localHadSettings || cloudIsNewer) {
+        // Legacy rows pre-date updated_at population. Apply once (when the
+        // cursor has never been set), then stamp a synthetic marker so
+        // subsequent pulls don't re-apply a blob we can't compare for freshness.
+        const legacyNeverApplied =
+          pulledSettings.updatedAt === null && syncStatus.lastSettingsPullAt === null;
+        if (!localHadSettings || cloudIsNewer || legacyNeverApplied) {
           saveSettings(pulledSettings.settings);
         }
         if (pulledSettings.updatedAt !== null) {
           nextLastSettingsPullAt = pulledSettings.updatedAt;
+        } else if (legacyNeverApplied) {
+          nextLastSettingsPullAt = new Date().toISOString();
         }
       }
     } catch (e) {

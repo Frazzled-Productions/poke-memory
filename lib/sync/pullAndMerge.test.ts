@@ -14,7 +14,6 @@ vi.mock("@/lib/sync/cloud", () => ({
 }));
 
 vi.mock("@/lib/sync/settings", () => ({
-  pullSettings: vi.fn(),
   pullSettingsWithTimestamp: vi.fn(),
   pullRegionalPrefs: vi.fn().mockResolvedValue(null),
 }));
@@ -225,6 +224,48 @@ describe("pullAndMerge", () => {
     );
   });
 
+  // Legacy rows (pre-dating updated_at population) have updatedAt === null.
+  // The first pull must apply the cloud blob and stamp a synthetic cursor so
+  // subsequent pulls don't re-apply a blob they cannot compare for freshness.
+  it("applies legacy cloud settings (updatedAt null) when cursor has never been set", async () => {
+    mockHasStoredSettings.mockReturnValue(true);
+    mockLoadSyncStatus.mockReturnValue({ ...baseSyncStatus, lastSettingsPullAt: null });
+    mockPullSettingsWithTimestamp.mockResolvedValue({
+      settings: { ...DEFAULT_SETTINGS } as ReturnType<typeof loadSettings>,
+      updatedAt: null,
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockSaveSettings).toHaveBeenCalledOnce();
+    // Cursor must advance to a non-null synthetic timestamp.
+    expect(mockSaveSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ lastSettingsPullAt: expect.any(String) }),
+    );
+    const saved = mockSaveSyncStatus.mock.calls[0][0] as { lastSettingsPullAt: string | null };
+    expect(saved.lastSettingsPullAt).not.toBeNull();
+  });
+
+  it("does not re-apply legacy cloud settings when cursor already exists", async () => {
+    mockHasStoredSettings.mockReturnValue(true);
+    mockLoadSyncStatus.mockReturnValue({
+      ...baseSyncStatus,
+      lastSettingsPullAt: "2026-05-10T00:00:00.000Z",
+    });
+    mockPullSettingsWithTimestamp.mockResolvedValue({
+      settings: { ...DEFAULT_SETTINGS } as ReturnType<typeof loadSettings>,
+      updatedAt: null,
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+    // Cursor must not move — there is no real timestamp to advance to.
+    expect(mockSaveSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ lastSettingsPullAt: "2026-05-10T00:00:00.000Z" }),
+    );
+  });
+
   it("does not throw when settings pull fails — sync stays 'ok'", async () => {
     mockHasStoredSettings.mockReturnValue(true);
     mockPullSettingsWithTimestamp.mockRejectedValue(new Error("network blip"));
@@ -233,6 +274,7 @@ describe("pullAndMerge", () => {
     const result = await pullAndMerge(fakeClient, fakeUserId);
 
     expect(result).toBe("ok");
+    expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
 });
