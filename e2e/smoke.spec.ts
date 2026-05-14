@@ -383,11 +383,11 @@ test.describe("Pokédex page", () => {
 });
 
 test.describe("Settings page", () => {
-  // NOTE: We do NOT use addInitScript for localStorage.clear() here because
-  // addInitScript runs on every navigation including page.reload(), which would
-  // wipe settings the user just saved before the reload can read them back.
-  // Instead, each test clears localStorage once via page.evaluate() before
-  // its initial page.goto().
+  // NOTE: We do NOT use addInitScript for localStorage.clear() in a shared
+  // beforeEach because addInitScript runs on every navigation including
+  // page.reload(), which would wipe settings the user just saved before the
+  // reload can read them back. Each test that needs a clean slate calls its
+  // own addInitScript before the initial page.goto().
 
   test("loads with key sections", async ({ page }) => {
     await page.addInitScript(() => localStorage.clear());
@@ -433,6 +433,15 @@ test.describe("Settings page", () => {
   });
 
   test("numeric field accepts mid-edit value and persists on Save", async ({ page }) => {
+    // Use sessionStorage as a once-flag so localStorage is cleared on the
+    // initial load but NOT on page.reload() — the reload must read back what
+    // was just saved.
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem("_e2e_init")) {
+        sessionStorage.setItem("_e2e_init", "1");
+        localStorage.clear();
+      }
+    });
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 

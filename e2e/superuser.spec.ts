@@ -40,9 +40,9 @@ test.describe("Superuser mode", () => {
       name: /developer/i,
     });
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
-    // The switch button inside the Developer section has no aria-label so we
-    // find it by its position inside the section and confirm aria-checked.
-    const toggle = developerSection.getByRole("switch").first();
+    const toggle = developerSection.getByRole("switch", {
+      name: /pretend all/i,
+    });
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
   });

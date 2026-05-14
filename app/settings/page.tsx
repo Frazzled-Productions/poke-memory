@@ -1193,6 +1193,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       role="switch"
+                      aria-label="Pretend all Pokémon are mastered"
                       aria-checked={flags.pretendAllMastered}
                       onClick={() =>
                         void setFlag("pretendAllMastered", !flags.pretendAllMastered)
