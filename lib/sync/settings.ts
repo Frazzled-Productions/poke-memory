@@ -3,6 +3,10 @@ import type { UserSettings } from "@/lib/settings/persistence";
 import type { DateFormat } from "@/lib/utils/format-date";
 import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 
+type MergeUserSettingsArgsPatch = Omit<MergeUserSettingsArgs, "p_patch"> & {
+  p_patch: Partial<UserSettings>;
+};
+
 // Settings sync is best-effort. pushSettings routes through the
 // merge_user_settings RPC (migration 011/014), which atomically merges a JSONB
 // patch via INSERT … ON CONFLICT DO UPDATE SET settings = settings || patch.
@@ -17,18 +21,29 @@ import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 // to a local would strip `this` and SupabaseClient.rpc reads `this.rest`.
 type MergeUserSettingsRpc = (
   name: "merge_user_settings",
-  args: MergeUserSettingsArgs,
+  args: MergeUserSettingsArgsPatch,
 ) => Promise<{ error: PostgrestError | null }>;
 
+/**
+ * Push a JSONB patch to the user's settings row via merge_user_settings.
+ * Accepts `Partial<UserSettings>` so callers can send only the keys they
+ * intend to change — the RPC's `||` overlay only touches keys present in
+ * the patch, leaving the rest of cloud's blob alone (#583). Callers may
+ * still pass a full `UserSettings` object; it's a no-op widening.
+ *
+ * `AutoSyncOnChange.handleSettings` diffs against the last-pushed snapshot
+ * (`lib/settings/lastPushedSnapshot`) and sends only changed top-level keys.
+ * Other callers (sign-in, force-pull) intentionally push the full object.
+ */
 export async function pushSettings(
   client: SupabaseClient,
   userId: string,
-  settings: UserSettings,
+  patch: Partial<UserSettings>,
 ): Promise<boolean> {
   try {
     const { error } = await (client.rpc as unknown as MergeUserSettingsRpc)(
       "merge_user_settings",
-      { p_user_id: userId, p_patch: settings },
+      { p_user_id: userId, p_patch: patch },
     );
     return !error;
   } catch {

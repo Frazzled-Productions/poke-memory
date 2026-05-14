@@ -32,6 +32,22 @@ vi.mock("@/lib/streak/persistence", () => ({
   loadStreakData: vi.fn(() => ["2026-05-12"]),
 }));
 
+vi.mock("@/lib/settings/lastPushedSnapshot", () => ({
+  loadLastPushedSettings: vi.fn(() => null),
+  saveLastPushedSettings: vi.fn(),
+  // Real diff: snapshot null → return full object; otherwise top-level diff.
+  diffSettings: vi.fn((prev: Record<string, unknown> | null, next: Record<string, unknown>) => {
+    if (prev === null) return next;
+    const patch: Record<string, unknown> = {};
+    for (const key of Object.keys(next)) {
+      if (JSON.stringify(prev[key]) !== JSON.stringify(next[key])) {
+        patch[key] = next[key];
+      }
+    }
+    return patch;
+  }),
+}));
+
 import { useAuth } from "@/lib/auth/AuthContext";
 import { pushSettings } from "@/lib/sync/settings";
 import { pushStreak } from "@/lib/sync/streak";
@@ -150,7 +166,7 @@ describe("AutoSyncOnChange", () => {
 
     act(() => {
       window.dispatchEvent(
-        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: {} }),
+        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: { masteryRepetitions: 3 } }),
       );
     });
 
@@ -185,7 +201,7 @@ describe("AutoSyncOnChange", () => {
 
     act(() => {
       window.dispatchEvent(
-        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: {} }),
+        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: { masteryRepetitions: 3 } }),
       );
     });
 
@@ -193,6 +209,95 @@ describe("AutoSyncOnChange", () => {
     await Promise.resolve();
 
     expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+  });
+
+  // ─── settings diff push (#583) ────────────────────────────────────────────
+
+  it("pushes only the diff against the last-pushed snapshot", async () => {
+    const { loadLastPushedSettings, saveLastPushedSettings } = await import(
+      "@/lib/settings/lastPushedSnapshot"
+    );
+    vi.mocked(loadLastPushedSettings).mockReturnValue({
+      masteryRepetitions: 3,
+      themeIntensity: "accents",
+    } as never);
+    vi.mocked(pushSettings).mockResolvedValue(true);
+
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(SETTINGS_SAVED_EVENT, {
+          detail: {
+            masteryRepetitions: 3, // unchanged
+            themeIntensity: "tinted", // changed
+          },
+        }),
+      );
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Only the changed key is in the patch.
+    expect(pushSettings).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER.id, {
+      themeIntensity: "tinted",
+    });
+    // Snapshot stamped to the FULL detail (not the patch) so the next diff
+    // is computed against what cloud now holds.
+    expect(saveLastPushedSettings).toHaveBeenCalledWith({
+      masteryRepetitions: 3,
+      themeIntensity: "tinted",
+    });
+  });
+
+  it("skips the push entirely when the diff is empty", async () => {
+    const { loadLastPushedSettings } = await import(
+      "@/lib/settings/lastPushedSnapshot"
+    );
+    vi.mocked(loadLastPushedSettings).mockReturnValue({
+      masteryRepetitions: 3,
+    } as never);
+
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(SETTINGS_SAVED_EVENT, {
+          detail: { masteryRepetitions: 3 },
+        }),
+      );
+    });
+
+    await Promise.resolve();
+
+    expect(pushSettings).not.toHaveBeenCalled();
+  });
+
+  it("does not update the snapshot when the push fails", async () => {
+    const { loadLastPushedSettings, saveLastPushedSettings } = await import(
+      "@/lib/settings/lastPushedSnapshot"
+    );
+    vi.mocked(loadLastPushedSettings).mockReturnValue({
+      masteryRepetitions: 3,
+    } as never);
+    vi.mocked(pushSettings).mockResolvedValue(false);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(SETTINGS_SAVED_EVENT, {
+          detail: { masteryRepetitions: 5 },
+        }),
+      );
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(saveLastPushedSettings).not.toHaveBeenCalled();
   });
 
   it("calls markPushSucceeded when streak push succeeds", async () => {
