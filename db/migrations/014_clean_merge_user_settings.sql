@@ -4,6 +4,10 @@
 -- so the trailing `WHERE user_settings.user_id = p_user_id` clause in 011 was
 -- redundant. This migration re-creates the function without that clause.
 
+-- CREATE OR REPLACE is safe here: the function name, argument types, and return
+-- type are identical to migration 011. Postgres only requires DROP + recreate
+-- when the return type changes; since this migration only rewrites the body,
+-- OR REPLACE is sufficient.
 CREATE OR REPLACE FUNCTION merge_user_settings(p_user_id uuid, p_patch jsonb)
 RETURNS void
 LANGUAGE sql

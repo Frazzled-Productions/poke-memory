@@ -39,25 +39,19 @@ export function loadSyncStatus(): SyncStatus {
 }
 
 /**
- * Record a successful push. Clears lastPushFailed and stamps lastPushAt.
- * Call this inside the success branch of any push path so the Stats page
- * "Last synced" indicator stays current after auto-sync runs.
+ * Record a successful push. Clears lastPushFailed, resets failedCardCount to
+ * null, and stamps lastPushAt. Call this inside the success branch of any push
+ * path so the Stats page "Last synced" indicator stays current.
  *
- * Semantics notes (#473):
- * - `failedCardCount` is intentionally left as-is on success. `useRetryPush`
- *   reads `lastPushFailed` and `failedCardCount` jointly, so a stale
- *   `failedCardCount` value is shadowed by `lastPushFailed: false`. Any future
- *   UI that reads `failedCardCount` directly must also gate on
- *   `lastPushFailed` to avoid showing a phantom failure count.
- * - `usePerGradeSync` stamps `lastPushAt` on *any-success*
- *   (`results.some(r => r.ok)`), not all-success. The "any progress is
- *   progress" semantic is deliberate — a partial-success debounced push still
- *   moved the cloud forward — and differs from the unload path, which flags
- *   failure whenever `failedCardCount > 0`.
+ * Semantics note (#473): `usePerGradeSync` stamps `lastPushAt` on *any-success*
+ * (`results.some(r => r.ok)`), not all-success. The "any progress is progress"
+ * semantic is deliberate — a partial-success debounced push still moved the
+ * cloud forward — and differs from the unload path, which flags failure
+ * whenever `failedCardCount > 0`.
  */
 export function markPushSucceeded(at = new Date().toISOString()): void {
   const current = loadSyncStatus();
-  saveSyncStatus({ ...current, lastPushAt: at, lastPushFailed: false });
+  saveSyncStatus({ ...current, lastPushAt: at, lastPushFailed: false, failedCardCount: null });
 }
 
 export function saveSyncStatus(status: SyncStatus): void {

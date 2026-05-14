@@ -22,6 +22,9 @@ export default async function PokemonDetailPage({
   if (!/^\d+$/.test(idStr)) return notFound();
   const id = Number(idStr);
 
+  // SEED_POKEMON.find + notFound() is now the only out-of-range guard (the
+  // previous id > 1025 hard cap was removed in #495 to support future alt-form
+  // routes). dynamicParams defaults to true so those routes can render.
   const pokemon = SEED_POKEMON.find((p) => p.id === id);
   if (!pokemon) return notFound();
 
