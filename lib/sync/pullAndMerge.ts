@@ -4,7 +4,7 @@ import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/setting
 import { pullStreak, mergeStreak } from "@/lib/sync/streak";
 import { pullGradeLog, mergeGradeLog } from "@/lib/sync/gradeLog";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
-import { loadSession, saveSession } from "@/lib/review/persistence";
+import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import {
@@ -180,13 +180,10 @@ export async function pullAndMerge(
         // useless IDB round-trip and the synthetic event below.
         if (mergedLog.length !== localLog.length) {
           await saveGradeLog(mergedLog);
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new StorageEvent("storage", {
-                key: "poke-memory:review-session:v1",
-              }),
-            );
-          }
+          // Re-fire saveSession's notification channel so an open Stats mount
+          // re-runs its useSessionStorageKey effect and reads the freshly-
+          // written grade_log without waiting for the next pull cycle.
+          bumpSessionStorageKey();
         }
       }
     } catch (e) {

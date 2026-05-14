@@ -363,6 +363,16 @@ function saveSessionLS(session: SavedSession): SaveResult {
   return { ok: true };
 }
 
+/**
+ * Dispatches a synthetic StorageEvent against the session-storage key. Used by
+ * `saveSession` to wake same-tab `useSessionStorageKey` subscribers, and by
+ * `pullAndMerge` (auxiliary table merges) to surface non-session writes
+ * through the same notification channel without an extra subscription.
+ */
+export function bumpSessionStorageKey(): void {
+  dispatchStorageEvent();
+}
+
 function dispatchStorageEvent(): void {
   // Same-tab subscribers (useSessionStorageKey) require a synthetic StorageEvent
   // to re-render. The browser only fires the native event in *other* tabs.

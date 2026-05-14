@@ -30,6 +30,7 @@ vi.mock("@/lib/sync/persistence", () => ({
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: vi.fn(async () => null),
   saveSession: vi.fn(async () => ({ ok: true })),
+  bumpSessionStorageKey: vi.fn(),
 }));
 
 vi.mock("@/lib/review/session", () => ({
