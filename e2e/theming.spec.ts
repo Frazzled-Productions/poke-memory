@@ -58,14 +58,16 @@ test.describe("Theme intensity — data-intensity attribute", () => {
 });
 
 test.describe("Theme intensity — Settings page picker", () => {
-  test.beforeEach(async ({ page }) => {
-    // Clear localStorage so each test starts with the accents default.
-    await page.addInitScript(() => window.localStorage.clear());
-  });
+  // NOTE: We do NOT use addInitScript for localStorage.clear() in beforeEach
+  // because addInitScript runs on every navigation including page.reload(),
+  // which would wipe settings the user just saved before the reload can read
+  // them back (e.g. "Tinted selection persists" test). Each test that needs a
+  // clean slate sets it via addInitScript individually.
 
   test("Settings page exposes the Theme intensity radio group with three options", async ({
     page,
   }) => {
+    await page.addInitScript(() => window.localStorage.clear());
     await page.goto("/settings");
     // Wait for the skeleton to disappear (settings loaded).
     await expect(page.getByLabel("Loading settings")).toBeHidden();
@@ -90,6 +92,7 @@ test.describe("Theme intensity — Settings page picker", () => {
   test("default selection is 'Subtle accents only' on a fresh visit", async ({
     page,
   }) => {
+    await page.addInitScript(() => window.localStorage.clear());
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
@@ -107,6 +110,7 @@ test.describe("Theme intensity — Settings page picker", () => {
   test("choosing Tinted sets data-intensity='tinted' on <html>", async ({
     page,
   }) => {
+    await page.addInitScript(() => window.localStorage.clear());
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
@@ -143,12 +147,18 @@ test.describe("Theme intensity — Settings page picker", () => {
       .toBe("tinted");
 
     // Reload — the inline pre-paint script in layout.tsx should restore the
-    // attribute synchronously before React hydrates.
+    // attribute synchronously before React hydrates. Use poll so WebKit has
+    // time to settle after the reload event fires.
     await page.reload();
-    const attr = await page.evaluate(() =>
-      document.documentElement.getAttribute("data-intensity"),
-    );
-    expect(attr).toBe("tinted");
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            document.documentElement.getAttribute("data-intensity"),
+          ),
+        { timeout: 5_000 },
+      )
+      .toBe("tinted");
   });
 
   test("switching back to Accents removes data-intensity attribute", async ({

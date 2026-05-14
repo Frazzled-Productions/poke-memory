@@ -373,17 +373,24 @@ test.describe("Pokédex page", () => {
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();
 
-    // Intro counter: "X / Y introduced"
-    await expect(page.getByText(/\d+ \/ \d+ introduced/)).toBeVisible();
+    // The page loads session data from IndexedDB asynchronously before
+    // swapping the skeleton for the real counter. Use a generous timeout and
+    // a permissive pattern (toLocaleString() may insert commas, e.g. "1,174").
+    await expect(page.getByText(/[\d,]+ \/ [\d,]+ introduced/)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });
 
 test.describe("Settings page", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => localStorage.clear());
-  });
+  // NOTE: We do NOT use addInitScript for localStorage.clear() here because
+  // addInitScript runs on every navigation including page.reload(), which would
+  // wipe settings the user just saved before the reload can read them back.
+  // Instead, each test clears localStorage once via page.evaluate() before
+  // its initial page.goto().
 
   test("loads with key sections", async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
     await page.goto("/settings");
     await expect(
       page.getByRole("heading", { level: 1, name: "Settings" }),
@@ -393,7 +400,9 @@ test.describe("Settings page", () => {
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
     for (const heading of ["Audio", "Name cards", "About", "Backup", "Danger zone", "Personalize my schedule"]) {
-      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+      // exact: true is required for "Name cards" to avoid also matching
+      // "Cry → name cards" which was added in #481.
+      await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
     }
 
     // Save button present
@@ -403,6 +412,7 @@ test.describe("Settings page", () => {
   });
 
   test("FSRS optimizer section shows sign-in prompt for guests", async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
@@ -443,6 +453,7 @@ test.describe("Settings page", () => {
   });
 
   test("App Theme section hidden when no Pokémon mastered", async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
     await expect(page.getByRole("heading", { name: "App Theme" })).toBeHidden();
@@ -636,17 +647,19 @@ test.describe("Evolution edge card prompt (#262)", () => {
           postEvoName: "ivysaur",
           postEvoSpriteUrl: "/sprites/pokemon/2.png",
           triggerPhrase: "at level 16",
+          // Use review state (reps >= 1) so the card lands in the review queue,
+          // which is served before the new queue, making it the first card shown.
           state: {
-            stability: 0,
-            difficulty: 0,
-            elapsedDays: 0,
-            scheduledDays: 0,
-            reps: 0,
+            stability: 4,
+            difficulty: 5,
+            elapsedDays: 5,
+            scheduledDays: 5,
+            reps: 1,
             lapses: 0,
-            fsrsState: "new",
-            dueDate: "2026-05-09",
-            lastReview: null,
-            firstSeen: null,
+            fsrsState: "review",
+            dueDate: "2026-01-01",
+            lastReview: "2026-04-29",
+            firstSeen: "2026-04-24",
             learningStep: null,
             stepStartedAt: null,
           },
@@ -659,13 +672,36 @@ test.describe("Evolution edge card prompt (#262)", () => {
         cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
       },
     });
+    // The session limits in the IDB payload are overridden by settings. Disable
+    // name/reverse/cry cards in settings so only the seeded evolution card can
+    // appear — it's a review card so the review queue is served first.
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({
+          nameCardsEnabled: false,
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+          evolutionCardsEnabled: true,
+          maxNewEvolutionPerDay: 10,
+          maxReviewsEvolutionPerDay: 100,
+        }),
+      );
+    });
 
     await page.goto("/");
 
-    // The prompt is split across inline spans for case styling, so match the
-    // full normalised sentence.
+    // Wait for the session to load from IndexedDB (async post-#486) before
+    // asserting card content. The Reveal button appearing confirms hydration.
+    await expect(page.getByRole("button", { name: "Reveal" })).toBeVisible({
+      timeout: 10_000,
+    });
+
+    // The prompt `<p>` contains a speak-name button (🔊) between the preEvo
+    // name span and "evolve into", so the text nodes are split. Use a flexible
+    // pattern that tolerates arbitrary characters between the key phrases.
     await expect(
-      page.getByText(/What does\s+bulbasaur\s+evolve into\s+at level 16\?/i),
+      page.getByText(/What does.*bulbasaur.*evolve into.*at level 16\?/i),
     ).toBeVisible();
   });
 });
