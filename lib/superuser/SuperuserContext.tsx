@@ -15,7 +15,11 @@ import {
   type SuperuserFlagKey,
 } from "./persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { pullSession, applyCloudAuthoritative } from "@/lib/sync/cloud";
+import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
+import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
+import { pullStreak } from "@/lib/sync/streak";
+import { pullGradeLog } from "@/lib/sync/gradeLog";
+import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { idbDelete } from "@/lib/idb/db";
@@ -24,7 +28,9 @@ import {
   saveFavourite,
   isFavouriteEarned,
 } from "@/lib/theme/persistence";
-import { loadSettings } from "@/lib/settings/persistence";
+import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { saveStreakData } from "@/lib/streak/persistence";
+import { saveGradeLog } from "@/lib/gradelog/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 
@@ -92,14 +98,80 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
     let cardsTrusted = false;
     if (u && sb) {
       try {
-        const rows = await pullSession(sb, u.id);
+        // QA-repudiate path: pull every user-visible cloud-backed table and
+        // overwrite local. Cards are required (the historical contract); the
+        // other four are best-effort — a network blip on any of them leaves
+        // that table's local value untouched. Mirrors the recovery shape in
+        // #573's ForcePullSection so both repudiation paths converge.
+        // Each auxiliary pull logs on failure so a degraded cleanup is visible
+        // to QA — silent .catch(() => null) was the original pattern but masks
+        // partial-failure repudiation. Cards stay required: if pullSession
+        // throws, the outer catch keeps cardsTrusted=false.
+        const warn = (table: string) => (err: unknown) => {
+          console.warn(`[superuser] ${table} pull failed during exit cleanup`, err);
+          return null;
+        };
+        const [
+          rows,
+          pulledSettings,
+          cloudPrefs,
+          cloudStreak,
+          cloudGradeLog,
+        ] = await Promise.all([
+          pullSession(sb, u.id),
+          pullSettingsWithTimestamp(sb, u.id).catch(warn("settings")),
+          pullRegionalPrefs(sb, u.id).catch(warn("regional prefs")),
+          pullStreak(sb, u.id).catch(warn("streak")),
+          pullGradeLog(sb, u.id).catch(warn("grade log")),
+        ]);
         if (rows) {
+          // Apply settings first so the seed opts pick up cloud-side card-type
+          // flags (#391 lesson).
+          if (pulledSettings !== null) {
+            saveSettings(pulledSettings.settings);
+          }
+          // Regional prefs overlay runs ONLY if the JSONB pull succeeded —
+          // otherwise the loadSettings() base is the QA-dirty local snapshot,
+          // and overlaying timezone/dateFormat onto it would persist all the
+          // other QA-drifted fields. Degrade-together with the JSONB pull is
+          // the conservative choice.
+          if (pulledSettings !== null && cloudPrefs !== null) {
+            const local = loadSettings();
+            const next = {
+              ...local,
+              ...(cloudPrefs.timezone !== null ? { timezone: cloudPrefs.timezone } : {}),
+              ...(cloudPrefs.dateFormat !== null ? { dateFormat: cloudPrefs.dateFormat } : {}),
+            };
+            if (next.timezone !== local.timezone || next.dateFormat !== local.dateFormat) {
+              saveSettings(next);
+            }
+          }
           const local = await loadSession();
           const settings = loadSettings();
           const opts = seedOptsFromSettings(settings);
           const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, rows, opts);
           const limits = local?.limits ?? DEFAULT_LIMITS;
+          // Streak and grade-log: cloud truth replaces local outright. The
+          // repudiation contract is "whatever QA changed in local is wiped";
+          // a union merge here would let cheat-introduced dates / entries
+          // survive flag-off, defeating the whole point.
+          if (cloudStreak !== null) {
+            saveStreakData([...cloudStreak].sort());
+          }
+          if (cloudGradeLog !== null) {
+            await saveGradeLog(cloudGradeLog);
+          }
           await saveSession({ cards: rebuilt, limits });
+          // Advance the sync cursors so the next background pullAndMerge
+          // starts from a non-null anchor (#293 lesson, repeated from #573).
+          const status = loadSyncStatus();
+          saveSyncStatus({
+            ...status,
+            lastPullAt: maxCloudUpdatedAt(rows),
+            ...(pulledSettings !== null && pulledSettings.updatedAt !== null
+              ? { lastSettingsPullAt: pulledSettings.updatedAt }
+              : {}),
+          });
           // Synthetic StorageEvent: same-tab subscribers (useSessionStorageKey)
           // only re-render on this event. Dispatch ONLY when we actually wrote
           // fresh data — pullSession returns null on error (not "no rows"; an
