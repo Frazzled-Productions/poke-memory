@@ -952,9 +952,16 @@ export function ReviewSession() {
       );
     }
 
+    // today is UTC (scheduler-internal — card dues, streak); tomorrow uses tz
+    // because it is a calendar label for a user-facing count. Derive tomorrow
+    // from the tz-aware calendar date rather than adding 86 400 s, which is
+    // wrong on DST-change nights (23 h or 25 h wall-clock days).
     const today = todayString(new Date());
     const tz = loadSettings().timezone ?? "UTC";
-    const tomorrow = todayString(new Date(Date.now() + 24 * 60 * 60 * 1000), tz);
+    const todayTz = todayString(new Date(), tz);
+    const tomorrowDate = new Date(todayTz + "T12:00:00Z");
+    tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
+    const tomorrow = todayString(tomorrowDate, tz);
     const dueTomorrow = countDueTomorrow(
       cards,
       tomorrow,

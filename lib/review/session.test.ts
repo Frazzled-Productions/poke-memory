@@ -959,6 +959,20 @@ describe('countDueTomorrow', () => {
     // Neither in scope.
     expect(countDueTomorrow(cards, TOMORROW, new Set([99]))).toBe(0);
   });
+
+  it('counts a mastered card due tomorrow (mastered = reps >= 3 && scheduledDays >= 21)', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 5,
+        scheduledDays: 21,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(1);
+  });
 });
 
 // ─── Alternate-form cards (#447) ─────────────────────────────────────────────

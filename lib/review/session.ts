@@ -565,13 +565,20 @@ export function buildQueueCounters(
 
 /**
  * Counts graduated, non-learning review cards whose dueDate falls exactly on
- * `tomorrow` and that have not already been reviewed on `tomorrow`. Used by
- * the SESSION_COMPLETE screen to render the "N cards due tomorrow" teaser.
+ * `tomorrow`. Used by the SESSION_COMPLETE screen to render the "N cards due
+ * tomorrow" teaser.
  *
  * New cards (lastReview === null) and learning-step cards are deliberately
  * excluded — only graduated review cards form a concrete commitment users can
- * anticipate. If `eligibleCardIds` is provided, only cards in that set count
- * (matches the practice-scope gate inside buildSessionQueues).
+ * anticipate. Cards reviewed today and scheduled back for tomorrow are counted:
+ * the user will genuinely need to review them tomorrow.
+ *
+ * If `eligibleCardIds` is provided, only cards in that set count (matches the
+ * practice-scope gate inside buildSessionQueues).
+ *
+ * Note: the count is uncapped — it does not apply `maxReviewsPerDay`, so it
+ * may exceed the cap the user will actually encounter. This is intentional: the
+ * teaser is a rough signal, not a commitment.
  */
 export function countDueTomorrow(
   cards: readonly ReviewableCard[],
@@ -585,8 +592,7 @@ export function countDueTomorrow(
     if (
       s.learningStep === null &&
       s.lastReview !== null &&
-      s.dueDate === tomorrow &&
-      s.lastReview !== tomorrow
+      s.dueDate === tomorrow
     ) {
       count += 1;
     }
