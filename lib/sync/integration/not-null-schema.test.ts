@@ -97,3 +97,43 @@ describe("NOT NULL schema constraints (integration)", () => {
     expect(error).toBeNull();
   });
 });
+
+describe("stability / difficulty CHECK constraints (integration)", () => {
+  it("rejects INSERT with difficulty < 0", async () => {
+    const row = validRow({ difficulty: -1, subject_key: "910" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await branch.serviceClient.from("card_reviews").insert(row as any);
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("23514"); // check_violation
+  });
+
+  it("rejects INSERT with difficulty > 10", async () => {
+    const row = validRow({ difficulty: 11, subject_key: "911" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await branch.serviceClient.from("card_reviews").insert(row as any);
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("23514");
+  });
+
+  it("rejects INSERT with stability < 0", async () => {
+    const row = validRow({ stability: -0.1, subject_key: "912" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await branch.serviceClient.from("card_reviews").insert(row as any);
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("23514");
+  });
+
+  it("accepts INSERT with difficulty = 0 (new-card sentinel)", async () => {
+    const row = validRow({ difficulty: 0, stability: 0, subject_key: "913" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await branch.serviceClient.from("card_reviews").insert(row as any);
+    expect(error).toBeNull();
+  });
+
+  it("accepts INSERT with difficulty = 10 (upper bound)", async () => {
+    const row = validRow({ difficulty: 10, subject_key: "914" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await branch.serviceClient.from("card_reviews").insert(row as any);
+    expect(error).toBeNull();
+  });
+});
