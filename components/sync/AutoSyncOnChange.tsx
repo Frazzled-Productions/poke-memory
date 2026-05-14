@@ -12,6 +12,11 @@ import {
   type UserSettings,
 } from "@/lib/settings/persistence";
 import {
+  diffSettings,
+  loadLastPushedSettings,
+  saveLastPushedSettings,
+} from "@/lib/settings/lastPushedSnapshot";
+import {
   STREAK_UPDATED_EVENT,
   loadStreakData,
 } from "@/lib/streak/persistence";
@@ -48,8 +53,23 @@ export function AutoSyncOnChange() {
     function handleSettings(e: Event) {
       const detail = (e as CustomEvent<UserSettings>).detail;
       if (!detail) return;
-      void pushSettings(client!, userId!, detail).then((ok) => {
+      // Diff against the last successful push so we send only changed
+      // top-level keys (#583). Two devices changing disjoint settings now
+      // both stick — the merge_user_settings `||` overlay only touches
+      // keys present in the patch. First push from this device sends
+      // everything (snapshot null) and is identical to the pre-#583
+      // behaviour.
+      const prev = loadLastPushedSettings();
+      const patch = diffSettings(prev, detail);
+      if (Object.keys(patch).length === 0) return;
+      void pushSettings(client!, userId!, patch).then((ok) => {
         if (ok) {
+          // Stamp the snapshot to the full detail (not the patch) so the
+          // next diff is computed against what cloud now holds, not the
+          // shrunk patch. If the push failed we leave the snapshot
+          // unchanged — the next save will resend the same keys plus any
+          // new ones.
+          saveLastPushedSettings(detail);
           markPushSucceeded();
         } else {
           console.warn("[auto-sync] settings push failed; will retry on next save");
