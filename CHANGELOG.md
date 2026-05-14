@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.55] — 2026-05-14
+
+### Fixed
+
+- Tinted/full theme intensity is now restored within the first frame after page load, eliminating a ~2-second delay before the mascot palette was applied on return visits (#506).
+
 ## [0.9.54] — 2026-05-14
 
 ### Fixed
@@ -868,7 +874,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.54...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.55...HEAD
+[0.9.55]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.55
 [0.9.54]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.54
 [0.9.53]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.53
 [0.9.52]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.52
