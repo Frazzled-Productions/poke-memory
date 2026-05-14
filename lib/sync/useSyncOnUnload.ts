@@ -16,8 +16,16 @@ import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
  *
  * Pass null for client or userId to disable sync (e.g. guest mode).
  *
- * Fire-and-forget: does not block navigation. Uses navigator.sendBeacon so the
- * request survives page hide and tab discard on mobile browsers.
+ * Two transport paths (#581):
+ *   - visibilitychange: page still alive, `fetch` with `keepalive: true`. The
+ *     response is observable, so a non-2xx is treated as a sync failure and
+ *     the unsynced queue stays intact for the next retry.
+ *   - pagehide: page being torn down, no time to await. Falls back to
+ *     `navigator.sendBeacon` — fire-and-forget, response code invisible to
+ *     the sender. Best-effort.
+ *
+ * Both paths are fire-and-forget from the caller's perspective: navigation
+ * is never blocked.
  */
 export function useSyncOnUnload(
   client: SupabaseClient | null,
@@ -50,26 +58,58 @@ export function useSyncOnUnload(
       if (unsynced.length === 0) return;
 
       pushingRef.current = true;
-
       const now = new Date().toISOString();
       const prev = loadSyncStatus();
-      const queued = navigator.sendBeacon("/api/sync", buildBeaconPayload(unsynced));
-      // Set lastPushAt when the beacon is accepted so the UI shows a timestamp
-      // rather than "Not synced yet." for users who only sync via the unload
-      // path. Reflects browser acceptance, not server confirmation (which is
-      // unobservable from sendBeacon).
-      saveSyncStatus({
-        ...prev,
-        lastPushAttemptAt: now,
-        lastPushFailed: !queued,
-        // sendBeacon's return value reports browser acceptance, not server
-        // success. When the browser rejects the queue, every card stays
-        // unsynced; when it accepts, we optimistically clear the residual
-        // count since we cannot observe the server response.
-        failedCardCount: queued ? 0 : unsynced.length,
-        ...(queued && { lastPushAt: now }),
-      });
-      pushingRef.current = false;
+      const payload = buildBeaconPayload(unsynced);
+
+      if (event.type === "pagehide") {
+        // Final shutdown: only sendBeacon survives. We can't observe the
+        // server's response, so the client trusts the browser's "queued"
+        // boolean. A 502 from the server is invisible here — that is the
+        // documented limitation of this path; the visibilitychange route is
+        // the one that closes the loop on partial failures.
+        const queued = navigator.sendBeacon("/api/sync", payload);
+        saveSyncStatus({
+          ...prev,
+          lastPushAttemptAt: now,
+          lastPushFailed: !queued,
+          failedCardCount: queued ? 0 : unsynced.length,
+          ...(queued && { lastPushAt: now }),
+        });
+        pushingRef.current = false;
+        return;
+      }
+
+      // visibilitychange path: page is still alive, use fetch+keepalive so
+      // the response status is observable.
+      void (async () => {
+        try {
+          const res = await fetch("/api/sync", {
+            method: "POST",
+            body: payload,
+            keepalive: true,
+          });
+          const ok = res.ok;
+          saveSyncStatus({
+            ...prev,
+            lastPushAttemptAt: now,
+            lastPushFailed: !ok,
+            failedCardCount: ok ? 0 : unsynced.length,
+            ...(ok && { lastPushAt: now }),
+          });
+        } catch {
+          // Network blip, abort, or page torn down before fetch resolved.
+          // Treat as failure so the next page mount retries.
+          saveSyncStatus({
+            ...prev,
+            lastPushAttemptAt: now,
+            lastPushFailed: true,
+            failedCardCount: unsynced.length,
+          });
+        } finally {
+          pushingRef.current = false;
+        }
+      })();
     }
 
     window.addEventListener("visibilitychange", handleUnload);
