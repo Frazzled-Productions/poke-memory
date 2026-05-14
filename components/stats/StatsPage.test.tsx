@@ -160,6 +160,8 @@ vi.mock("@/lib/settings/persistence", () => ({
     nameCardsEnabled: true,
     evolutionCardsEnabled: true,
     cryCardsEnabled: false,
+    maxNewCryPerDay: 10,
+    maxReviewsCryPerDay: 100,
     reverseEvolutionCardsEnabled: false,
     playCryOnReveal: false,
     practiceScope: { gens: [], types: [], presets: [] },
@@ -458,11 +460,15 @@ describe("ForcePullSection — handleForcePull", () => {
       .mockResolvedValueOnce([makeCloudRow(1)]); // handleForcePull
 
     render(<StatsPage />);
+    // Wait for load() to finish so the button is visible before fake timers
+    // are active (findByRole polls with real timers).
     const button = await screen.findByRole("button", { name: /force pull from cloud/i });
 
+    // Switch to fake timers before the click so the setTimeout inside
+    // handleForcePull is captured as a fake timer and controllable below.
     vi.useFakeTimers();
     act(() => { fireEvent.click(button); });
-    // Flush pending Promise microtasks (pullSession + saveSession awaits).
+    // Flush handleForcePull's async chain (pullSession await, then saveSession await).
     await act(async () => { await Promise.resolve(); });
     await act(async () => { await Promise.resolve(); });
 

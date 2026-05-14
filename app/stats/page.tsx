@@ -599,6 +599,7 @@ export default function StatsPage() {
           console.warn("[stats] cloud hydration failed, falling back to local", err);
         }
       }
+      if (ignore) return;
 
       // Retroactive badge award (#420). Runs after cloud overlay so it uses
       // the authoritative card set (cloud if available, local fallback). We
