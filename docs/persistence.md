@@ -45,7 +45,7 @@ CREATE POLICY "<name>_insert" ON <name>
 
 Four named policies (one per verb) beat a single `FOR ALL` — easier to audit and to drop selectively. `ON DELETE CASCADE` ensures rows die with their user. Always combine `CREATE TABLE` + `ENABLE RLS` + policies in the same migration; an enabled-RLS-without-policies state silently blocks the client.
 
-For append-only tables (logs, daily markers, audit trails), omit the UPDATE and DELETE policies — `grade_log` and `streak_days` both had theirs **removed** in migration 018 as defence against client-side wipe bugs. The only path that removes rows from those tables today is the `reset_all_progress` SECURITY DEFINER RPC (migration 018), which deletes the caller's rows in `card_reviews`, `grade_log`, and `streak_days` atomically and explicitly checks `auth.uid()`.
+For append-only tables (logs, daily markers, audit trails), omit the UPDATE and DELETE policies — `grade_log` and `streak_days` both had theirs **removed** in migration 018 as defence against client-side wipe bugs. See "Invariants on existing data" below for the designated escape hatch.
 
 Reference shapes: `streak_days` (migration 001 plus the 018 lockdown) for an append-only monotonic table, `grade_log` (migration 006 plus 018) for an indexed event log.
 
