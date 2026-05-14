@@ -147,6 +147,9 @@ export default function CallbackCompletePage() {
         const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, status.cloudRows, opts);
         await saveSession({ cards: rebuilt, limits });
         router.replace("/");
+      } catch (err) {
+        console.warn("[callback-complete] handleKeepCloud failed:", err);
+        setStatus({ kind: "error" });
       } finally {
         setPending(false);
       }
