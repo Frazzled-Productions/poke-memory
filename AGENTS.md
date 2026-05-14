@@ -67,7 +67,7 @@ If a feature genuinely should not be affected (e.g. the all-caught-up Higher-or-
 **Sync write-guard.** While any superuser flag is on, all cloud writes are suppressed:
 - `usePerGradeSync.enqueueGrade` and `useSyncOnUnload` short-circuit because `ReviewSession.tsx` passes `null` client/userId.
 - `AutoSyncOnChange` short-circuits the same way.
-- The FSRS optimizer button on the Settings page (`FsrsOptimizerSection`) renders disabled with a "Sync paused (superuser)" label — it's the only user-visible cloud-write surface gated by this guard.
+- The FSRS optimizer button on the Settings page (`FsrsOptimizerSection`) renders disabled with a "Sync paused (superuser)" label, and the Retry link inside `SyncStatusLine` (Stats page) is disabled with a hover title explaining the pause. Both are visible cloud-write surfaces gated by this guard; any future write-triggering button must take the same `superuserPaused` prop and disable itself when it is true.
 - Background pulls (`SyncOnVisible`, `SignInPull`) stay enabled — reads can't corrupt the cloud.
 
 Do not work around this guard. The whole point is that a QA session with cheats on can never leak fake state into Supabase, regardless of which flag is active.

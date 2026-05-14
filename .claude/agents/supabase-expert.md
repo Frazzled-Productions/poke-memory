@@ -76,7 +76,7 @@ Before recommending a new table or column, confirm:
 2. **Is it monotonic / per-event?** A new table is the right answer (model: `streak_days`, `grade_log`).
 3. **Is it per-card state?** Add a column to `card_reviews`; check whether the regression trigger needs extending (only if the new column has a "moves forward only" invariant).
 
-For a new table, see the **"Adding a feature that needs to persist data"** runbook section in `AGENTS.md` — that's the canonical template (RLS-on, four named policies, FK cascade, dedup-friendly UNIQUE constraint, indexed user_id-hot column, applied via `mcp__supabase__apply_migration` after merge). Don't reinvent it.
+For a new table, see the **"Adding a feature that needs to persist data"** runbook section in `AGENTS.md` and `docs/persistence.md` — that's the canonical template (RLS-on with SELECT + INSERT as the append-only baseline and UPDATE / DELETE only when explicitly justified, FK cascade, dedup-friendly UNIQUE constraint, indexed user_id-hot column, applied via `mcp__supabase__apply_migration` **before merge** so `migration-check.yml` passes). Don't reinvent it.
 
 ### Privacy constraints
 
@@ -88,16 +88,18 @@ For a new table, see the **"Adding a feature that needs to persist data"** runbo
 
 ### Sync model (locked — do not propose alternatives)
 
-Four paths as defined in AGENTS.md (see the "Sync: invariants and destructive-write protection" section there):
+Active sync paths as defined in `docs/sync.md` (which AGENTS.md "Sync" section points to):
 
 1. **Per-grade debounced upsert (primary)** — `usePerGradeSync` debounced 200 ms, one upsert per card via `pushSingleCard`.
 2. **Unload safety-net** — `useSyncOnUnload` flushes pending cards via `navigator.sendBeacon` to `app/api/sync/route.ts`.
-3. **Background pull on visibility** — `useVisibilityPull` calls `pullAndMerge` after a tab is hidden ≥ 30s. Per-card conflict rule based on `lastPullAt`.
-4. **Manual sync** — `useManualSync` is wired to the Stats-page Sync button. **Order: pull → merge → save → push.** Pushing first lets stale/empty local clobber cloud (this is what caused #293). Streak and settings sync happen at the end of `useManualSync` and are best-effort: their failures `console.warn` but do not flip the overall sync into the error state.
+3. **Background pull on visibility / sign-in** — `useVisibilityPull` and `useSignInPull` both call `pullAndMerge`, which pulls cards via `pullSession`, applies the `lastPullAt`-based per-card conflict rule, then runs a best-effort `pullRegionalPrefs` leg for the `user_settings.timezone` / `date_format` scalars.
+4. **Side-channel auto-syncs** — `AutoSyncOnChange` listens for local change events and fires `pushSettings` / `pushStreak` / `pushGradeLog`. Best-effort: each leg `console.warn`s and continues. The settings-page write-back of auto-detected regional prefs (`pushRegionalPrefs`) follows the same shape but lives on the page.
+5. **Failed-beacon retry** — `useRetryPush` re-pushes cards that the unload beacon failed to deliver. Push-only by design; pulling here would race a real cloud row against the still-pending local one.
+6. **Force pull from cloud** — Stats-page "Force pull from cloud" button calls `pullSession` then `applyCloudAuthoritative`, destructively replacing local with cloud. Guarded by `window.confirm`. No inverse "force push" exists because that is the #293 failure mode.
 
-`pushSession` (batched) is retained as the cards-push step inside `useManualSync` and as the escape hatch.
+`pushSession` (batched) is the escape hatch — currently called from `app/auth/callback-complete/page.tsx` on first sign-in and the "Keep local" branch of the conflict picker.
 
-Streak sync: `streak_days` rows are union-merged (monotonic). Settings sync: `user_settings.settings` is last-write-wins on the whole jsonb object; cloud overlays local only when `hasStoredSettings()` is false.
+Streak sync: `streak_days` rows are union-merged (monotonic) and append-only at the DB layer after migration 018. Settings sync: `user_settings.settings` is last-write-wins on the whole jsonb object; cloud overlays local only when `hasStoredSettings()` is false. Regional-prefs scalars (`timezone`, `date_format`) live as separate columns and bypass the LWW race on the JSONB blob.
 
 ### Hand-offs
 
