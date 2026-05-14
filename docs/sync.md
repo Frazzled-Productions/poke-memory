@@ -36,7 +36,7 @@ Cards are the primary contract. Streak (`streak_days`) and settings (`user_setti
 ### Per-table conflict policy
 
 - `card_reviews` — per-card rule in `mergeCloudIntoLocalSilent` (see [Background pull on visibility](#background-pull-on-visibility) for the exact rule).
-- `streak_days` — union-merge (`mergeStreak`). Streak data is monotonic; nothing is ever removed by sync.
+- `streak_days` — union-merge (`mergeStreak`). Streak data is monotonic; nothing is ever removed by sync. `grade_log` and `streak_days` are **append-only at the DB layer** (migration 018 dropped the UPDATE and DELETE RLS policies on both tables). The only path that removes rows from either table is the `reset_all_progress` SECURITY DEFINER RPC, which also deletes from `card_reviews` atomically and requires an authenticated session. `user_settings` is intentionally **not** touched by this RPC — user preferences survive a progress reset by design.
 - `user_settings` — last-write-wins on the whole `settings` JSONB column. The pull-overlay path runs **only** when `hasStoredSettings()` is `false` (i.e. the user has never written settings on this device). Once local has a stored copy, local is authoritative on that device; we still push local up so other devices can pick it up.
 
 ### Schema notes

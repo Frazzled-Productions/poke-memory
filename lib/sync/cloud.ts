@@ -189,25 +189,6 @@ export async function pushSingleCard(
 }
 
 /**
- * Deletes all card_review rows for the user from the cloud.
- * Returns true on success, false on any error.
- */
-export async function deleteAllCloudProgress(
-  client: SupabaseClient,
-  userId: string,
-): Promise<boolean> {
-  try {
-    const { error } = await client
-      .from("card_reviews")
-      .delete()
-      .eq("user_id", userId);
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Pulls all card_review rows for the user from the cloud.
  * Returns null on error so the caller can fall back to local-only mode.
  * learningStep and stepStartedAt are not stored in the cloud; the caller

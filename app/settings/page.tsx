@@ -15,7 +15,7 @@ import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
-import { deleteAllCloudProgress } from "@/lib/sync/cloud";
+import { resetAllProgress } from "@/lib/sync/reset";
 import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
 import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
 import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
@@ -472,8 +472,9 @@ export default function SettingsPage() {
 
 
   async function handleReset() {
+    if (anyFlagOn) return;
     if (user && supabase) {
-      const ok = await deleteAllCloudProgress(supabase, user.id);
+      const ok = await resetAllProgress(supabase);
       if (!ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     }
     saveFavourite(null);
@@ -1481,7 +1482,8 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setResetOpen(true)}
-                  className="min-h-[44px] shrink-0 rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-950"
+                  disabled={anyFlagOn}
+                  className="min-h-[44px] shrink-0 rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-950"
                 >
                   Reset all progress
                 </button>
