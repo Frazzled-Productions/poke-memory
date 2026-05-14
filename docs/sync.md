@@ -23,7 +23,7 @@ A `BEFORE UPDATE` trigger on `card_reviews` raises `23514 check_violation` when:
 - `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review` — review date moving backward.
 - `NEW.reps < OLD.reps` — reps counter decreasing (added in migration 015; FSRS only ever increments this).
 - `NEW.lapses < OLD.lapses` — lapses counter decreasing (added in migration 015; same invariant).
-- `NEW.last_review = OLD.last_review AND NEW.scheduled_days < OLD.scheduled_days` — `scheduled_days` dropping without `last_review` advancing (added in migration 016; see below).
+- `OLD.last_review IS NOT NULL AND NEW.last_review IS NOT NULL AND NEW.last_review = OLD.last_review AND NEW.scheduled_days < OLD.scheduled_days` — `scheduled_days` dropping without `last_review` advancing (added in migration 016; see below).
 
 `scheduled_days` is intentionally not guarded for absolute non-decrease because legitimate Again grades (FSRS reset) lower it — but Again always advances `last_review` to today. Migration 016 encodes this tighter invariant: a same-date drop in `scheduled_days` is always a stale-state clobber. **Known limitation:** a Hard or Good re-grade of a card already reviewed earlier the same calendar day also produces `NEW.last_review = OLD.last_review` with a potentially lower `scheduled_days`, which the trigger would reject. The session design prevents this in practice (each card appears at most once per session), but the trigger has no visibility into session semantics — it is a last-resort DB guardrail, not a complete model of valid FSRS transitions.
 

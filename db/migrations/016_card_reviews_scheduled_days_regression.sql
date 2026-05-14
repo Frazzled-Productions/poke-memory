@@ -47,10 +47,7 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  -- reps and lapses are NOT NULL columns (enforced by schema), so a NULL comparison
-  -- like NULL < OLD.reps produces a NULL-valued expression; an IF whose condition
-  -- evaluates to NULL is treated as false and the body is skipped. The column
-  -- constraint is the defence against NULL here, matching the pattern of the guards above.
+  -- reps and lapses are NOT NULL columns; no NULL guard is needed.
   IF NEW.reps < OLD.reps THEN
     RAISE EXCEPTION
       'card_reviews regression: reps cannot decrease from % to % (user_id=%, card_type=%, subject_key=%)',
@@ -67,8 +64,7 @@ BEGIN
 
   -- scheduled_days is allowed to drop on a real Again grade (which advances
   -- last_review to today), but a same-date drop is always a stale-state
-  -- clobber. scheduled_days is also NOT NULL, so the NULL-handling reasoning
-  -- above applies here too.
+  -- clobber. scheduled_days is also NOT NULL; no NULL guard needed.
   IF OLD.last_review IS NOT NULL
      AND NEW.last_review IS NOT NULL
      AND NEW.last_review = OLD.last_review
