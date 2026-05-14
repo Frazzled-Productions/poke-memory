@@ -6,8 +6,10 @@ export type SyncStatus = {
   lastPushAttemptAt: string | null;
   /** Number of cards that failed the unload safety-net push. null = full-session failure or legacy record. */
   failedCardCount: number | null;
-  /** ISO timestamp of the last successful background pull from cloud. Stored from server updated_at to avoid clock-skew. */
+  /** ISO timestamp of the last successful background pull of card_reviews. Stored from server updated_at to avoid clock-skew. */
   lastPullAt: string | null;
+  /** ISO timestamp of the last user_settings row this device applied (server updated_at). Tracked separately because settings live in a different table from cards and have an independent write cadence (#572). */
+  lastSettingsPullAt: string | null;
 };
 
 const ZERO: SyncStatus = {
@@ -16,6 +18,7 @@ const ZERO: SyncStatus = {
   lastPushAttemptAt: null,
   failedCardCount: null,
   lastPullAt: null,
+  lastSettingsPullAt: null,
 };
 
 export function loadSyncStatus(): SyncStatus {
@@ -32,6 +35,7 @@ export function loadSyncStatus(): SyncStatus {
       lastPushAttemptAt: typeof obj.lastPushAttemptAt === "string" ? obj.lastPushAttemptAt : null,
       failedCardCount: Number.isInteger(obj.failedCardCount) && (obj.failedCardCount as number) >= 0 ? obj.failedCardCount as number : null,
       lastPullAt: typeof obj.lastPullAt === "string" ? obj.lastPullAt : null,
+      lastSettingsPullAt: typeof obj.lastSettingsPullAt === "string" ? obj.lastSettingsPullAt : null,
     };
   } catch {
     return ZERO;

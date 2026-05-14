@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pullSettings, pushSettings, pushRegionalPrefs, pullRegionalPrefs } from "./settings";
+import { pullSettings, pullSettingsWithTimestamp, pushSettings, pushRegionalPrefs, pullRegionalPrefs } from "./settings";
 import type { UserSettings } from "@/lib/settings/persistence";
 import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 
@@ -109,8 +109,46 @@ describe("pullSettings", () => {
   });
 });
 
+describe("pullSettingsWithTimestamp", () => {
+  it("returns settings and updatedAt when the row has a timestamp", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      settings: SAMPLE,
+      updated_at: "2026-05-13T12:00:00.000Z",
+    });
+    const result = await pullSettingsWithTimestamp(client, "user-1");
+    expect(result).not.toBeNull();
+    expect(result!.settings).toEqual(SAMPLE);
+    expect(result!.updatedAt).toBe("2026-05-13T12:00:00.000Z");
+  });
+
+  it("returns updatedAt: null for a legacy row with no updated_at column value", async () => {
+    // Legacy rows pre-date updated_at population; the column is null in the DB.
+    // The response key is present but null — and any undefined (omitted key) is
+    // coerced to null so the null-comparison in pullAndMerge stays correct.
+    const { client } = makeClientWithMaybeSingle({ settings: SAMPLE, updated_at: null });
+    const result = await pullSettingsWithTimestamp(client, "user-1");
+    expect(result).not.toBeNull();
+    expect(result!.updatedAt).toBeNull();
+  });
+
+  it("coerces a missing updated_at key to null rather than propagating undefined", async () => {
+    // If Supabase ever omits the key (e.g. schema drift), undefined must not
+    // leak into pullAndMerge where `undefined !== null` would be mistaken for
+    // a real newer timestamp, causing the cursor to stall and re-apply forever.
+    const { client } = makeClientWithMaybeSingle({ settings: SAMPLE });
+    const result = await pullSettingsWithTimestamp(client, "user-1");
+    expect(result).not.toBeNull();
+    expect(result!.updatedAt).toBeNull();
+  });
+
+  it("returns null when settings column is empty object", async () => {
+    const { client } = makeClientWithMaybeSingle({ settings: {}, updated_at: "2026-05-13T12:00:00.000Z" });
+    expect(await pullSettingsWithTimestamp(client, "user-1")).toBeNull();
+  });
+});
+
 describe("pushRegionalPrefs", () => {
-  it("calls update with timezone, date_format, and updated_at filtered by user_id", async () => {
+  it("calls update with timezone and date_format only — no updated_at — filtered by user_id", async () => {
     const { client, update, eq } = makeClientWithUpdate();
     const ok = await pushRegionalPrefs(client, "user-1", {
       timezone: "America/New_York",
@@ -120,7 +158,9 @@ describe("pushRegionalPrefs", () => {
     const [row] = update.mock.calls[0] as [Record<string, unknown>];
     expect(row.timezone).toBe("America/New_York");
     expect(row.date_format).toBe("mdy");
-    expect(typeof row.updated_at).toBe("string");
+    // Must NOT include updated_at — bumping it would cause other devices to
+    // think the settings JSONB blob changed, triggering a spurious overwrite.
+    expect(row).not.toHaveProperty("updated_at");
     // UPDATE must not include user_id or settings — those belong to other columns/writes.
     expect(row).not.toHaveProperty("user_id");
     expect(row).not.toHaveProperty("settings");

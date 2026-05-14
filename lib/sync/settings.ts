@@ -74,7 +74,6 @@ export async function pushRegionalPrefs(
       .update({
         timezone: prefs.timezone,
         date_format: prefs.dateFormat,
-        updated_at: new Date().toISOString(),
       })
       .eq("user_id", userId);
     return !error;
@@ -125,21 +124,45 @@ export async function pullSettings(
   client: SupabaseClient,
   userId: string,
 ): Promise<UserSettings | null> {
+  const result = await pullSettingsWithTimestamp(client, userId);
+  return result === null ? null : result.settings;
+}
+
+export type PulledSettings = {
+  settings: UserSettings;
+  /** Server-side updated_at — the cross-device anchor for "is cloud newer than what this device last saw". Null if the row has no timestamp (legacy). */
+  updatedAt: string | null;
+};
+
+/**
+ * Same shape as `pullSettings` but also returns `user_settings.updated_at`.
+ * Lets the background pull decide whether the cloud copy is newer than the
+ * last copy this device applied. Without it, a device that has any local
+ * settings can never receive remote updates (issue #572).
+ */
+export async function pullSettingsWithTimestamp(
+  client: SupabaseClient,
+  userId: string,
+): Promise<PulledSettings | null> {
   try {
     const { data, error } = await client
       .from("user_settings")
-      .select("settings")
+      .select("settings, updated_at")
       .eq("user_id", userId)
       .maybeSingle();
     if (error || !data) return null;
-    const s = (data as { settings: unknown }).settings;
-    // Treat both null and {} as "no real cloud settings". A row with
-    // settings = NULL can be created by pushRegionalPrefs before pushSettings
-    // has run; {} is the default from migration scaffolding. Neither should
-    // overwrite real local choices on a new device.
-    if (typeof s !== "object" || s === null) return null;
-    if (Object.keys(s as Record<string, unknown>).length === 0) return null;
-    return s as UserSettings;
+    // The schema declares user_settings.updated_at as NOT NULL DEFAULT now(),
+    // so the column itself is never null in practice. The cast widens the type
+    // to `string | undefined` to capture the *runtime* failure mode we actually
+    // guard against: schema drift / a missing key in the response (older
+    // generated types or a regenerated select that no longer includes the
+    // column). The `?? null` coercion below normalises that to `null` so the
+    // ISO-string comparison in `pullAndMerge` never sees `undefined > "…"`,
+    // which would coerce to NaN and lie about freshness.
+    const row = data as { settings: unknown; updated_at: string | undefined };
+    if (typeof row.settings !== "object" || row.settings === null) return null;
+    if (Object.keys(row.settings as Record<string, unknown>).length === 0) return null;
+    return { settings: row.settings as UserSettings, updatedAt: row.updated_at ?? null };
   } catch {
     return null;
   }

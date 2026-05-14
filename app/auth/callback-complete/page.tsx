@@ -89,6 +89,12 @@ export default function CallbackCompletePage() {
         // Pull cloud settings FIRST when local has no stored settings — otherwise
         // the base is built with DEFAULT_SETTINGS (reverse/cry disabled) and cloud
         // rows for those types are silently dropped by the merge (see #391).
+        //
+        // This path uses the timestamp-less `pullSettings` wrapper and does not
+        // advance `lastSettingsPullAt`. As a result the first background
+        // `pullAndMerge` cycle after sign-in will re-apply the same blob once
+        // (idempotent). Sound but a contract gap — the cursor-aware fix lives
+        // in #578 (conflict-picker overhaul, which rewrites this entire branch).
         if (!hasStoredSettings()) {
           try {
             const cloudSettings = await pullSettings(supabase, user.id);
