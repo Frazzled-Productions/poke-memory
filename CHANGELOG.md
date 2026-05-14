@@ -6,6 +6,20 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.57] — 2026-05-14
+
+### Added
+
+- The all-caught-up completion screen now shows how many cards are due tomorrow, giving a concrete reason to return.
+
+### Fixed
+
+- DB now rejects out-of-range `stability` or `difficulty` values on `card_reviews` with a constraint violation rather than silently storing them.
+- `streak_days` now rejects inserts with `review_date` more than one calendar day ahead of UTC today at the database layer, preventing a buggy client from inflating the streak. The `+1` grace window accommodates UTC+14 clients whose local "today" can be ahead of UTC.
+- Pasture page now reacts to the `clearLocalProgress` synthetic storage event and re-renders immediately when local progress is cleared, matching the pattern used by Stats and Pokédex.
+- Persistence validator now accepts reverse-evolution cards. Previously every saved session containing a rev-evo card failed schema validation on load, causing the practice page to silently rebuild fresh state on every reload — local progress would re-appear as "new" cards even though the cloud was correctly storing it.
+- Defensive fallback in `saveSession`: a silent IndexedDB write failure no longer reports success and loses the write — falls back to localStorage instead.
+
 ## [0.9.56] — 2026-05-14
 
 ### Added
@@ -900,7 +914,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.56...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.57...HEAD
+[0.9.57]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.57
 [0.9.56]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.56
 [0.9.55]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.55
 [0.9.54]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.54
