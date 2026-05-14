@@ -6,6 +6,32 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.56] — 2026-05-14
+
+### Added
+
+- New "What's new" page at `/whats-new` lists recent releases with their changes. A small pill in the nav surfaces an unseen-release indicator and disappears once the page is visited; the footer also gains a permanent "What's new" link and a version chip. First-time users have their last-seen marker silently seeded so they don't get bombarded with retroactive release notes (#502).
+- Day boundaries (today / streak / daily review limit) now roll at the user's local midnight instead of UTC. A new timezone setting on the Settings page is auto-detected on first sign-in and editable.
+- Added a date format setting (DMY / MDY / ISO) on the Settings page with live preview, defaulting from browser locale detection. The UI no longer leaks French/German/etc. month and weekday names — all date rendering is English (en-GB locale).
+- Add `applyCloudAuthoritative` helper so cloud state is the sole source of truth during superuser exit cleanup and the "Keep cloud" conflict-picker path — cards absent from the cloud now return to initial state instead of retaining local progress.
+
+### Changed
+
+- Auto-review CI now surfaces divergent verdicts: if the review sub-agent posts two `<!-- auto-review:N -->` comments for the same cycle and one of them is missing the SHA marker, the workflow fails the check with the orphan URLs so the inconsistency is forced into the open instead of silently shipping conflicting reviews.
+- Updated `docs/sync.md`, `docs/persistence.md`, `AGENTS.md`, `.claude/agents/supabase-expert.md`, `.claude/agents/data-coder.md`, and `lib/sync/cloud.ts` JSDoc to cover migrations 012-019 accurately. Headline corrections: removed the long-standing references to a `useManualSync` hook that never existed (replaced with the real `pullAndMerge` + `AutoSyncOnChange` + `useRetryPush` paths); corrected `seen_in_pasture` semantics (Pasture-page tap clears the new-arrival sparkle, not a Higher-or-Lower scout action); shifted the new-table RLS template to an append-only SELECT + INSERT baseline with opt-in UPDATE/DELETE to match migration 018; named the `reset_all_progress` SECURITY DEFINER RPC as the sole destructive path for append-only tables; corrected the `CloudRow` JSDoc anchor from migration 010 to migration 012; documented the new `timezone` + `date_format` scalar columns on `user_settings` (migration 019) and the `seen_in_pasture` one-way trigger guard (migration 017); clarified the date-handling note (FSRS scheduling stays UTC; user-facing day boundaries are timezone-aware).
+
+### Fixed
+
+- DB regression trigger now rejects `card_reviews` updates that decrease `reps` or `lapses`, blocking a class of sync-bug clobbers that would degrade FSRS scheduling state.
+- DB regression trigger now rejects `card_reviews` updates that drop `scheduled_days` when `last_review` didn't advance, blocking same-day stale-state clobbers without breaking real Again grades.
+- DB regression trigger now rejects `card_reviews` updates that flip `seen_in_pasture` from `true` to `false` — there's no legitimate "un-acknowledge" path, so this transition was always a sync bug.
+- The Stats page now hydrates from the cloud when you're signed in, so a corrupted local session no longer renders misleading stats. Also adds a "Force pull from cloud" recovery button that replaces local with cloud truth.
+- "Reset all progress" now clears the IndexedDB review session and grade log too — after the #486 storage migration, IDB state survived a reset and Stats / Pasture / Pokédex continued to render pre-reset progress. Fixed by making `clearLocalProgress` async and deleting the IDB keys before dispatching a synthetic storage event so same-tab listeners re-read empty state.
+
+### Security
+
+- Lock down `grade_log` and `streak_days` to append-only at the DB layer (drop UPDATE/DELETE RLS policies). The "Reset all progress" Settings button now routes through a single `reset_all_progress` SECURITY DEFINER RPC that wipes the user's own rows in `card_reviews`, `grade_log`, and `streak_days` atomically. Previous behaviour only deleted `card_reviews` rows.
+
 ## [0.9.55] — 2026-05-14
 
 ### Fixed
@@ -874,7 +900,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.55...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.56...HEAD
+[0.9.56]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.56
 [0.9.55]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.55
 [0.9.54]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.54
 [0.9.53]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.53
