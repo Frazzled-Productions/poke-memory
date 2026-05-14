@@ -414,6 +414,11 @@ export function ReviewSession() {
     }
   }
 
+  // Monotonically-incrementing counter for each card presentation. Used to
+  // force SpritePicker to remount (fresh shuffle) when the same reverse card
+  // reappears via a learning-step replay or within-session review (#496).
+  const [cardPresentationCount, setCardPresentationCount] = useState(0);
+
   // Single-step undo: snapshot of pre-grade state. Captured in handleGrade
   // and consumed by handleUndo. Cleared when the next grade fires.
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
@@ -665,6 +670,9 @@ export function ReviewSession() {
           }
           revealedCardId.current = undoSnapshot.cardId;
           setRevealed(true);
+          // Bump presentation counter so SpritePicker remounts with fresh
+          // shuffle if the user re-grades this reverse card (#496).
+          setCardPresentationCount((n) => n + 1);
           setUndoSnapshot(null);
         })();
       }
@@ -1158,6 +1166,10 @@ export function ReviewSession() {
     setCurrentFact(null);
     setRevealed(false);
     revealedCardId.current = null;
+    // Advance the presentation counter so the next card (or a replay of this
+    // same card) gets a fresh SpritePicker mount with a re-shuffled option
+    // grid (#496).
+    setCardPresentationCount((n) => n + 1);
     setGrading(false);
   }
 
@@ -1178,6 +1190,9 @@ export function ReviewSession() {
     // back on the prompt they just graded.
     revealedCardId.current = undoSnapshot.cardId;
     setRevealed(true);
+    // Bump the presentation counter so SpritePicker remounts with a fresh
+    // shuffle if the user re-grades this reverse card (#496).
+    setCardPresentationCount((n) => n + 1);
     setUndoSnapshot(null);
   }
 
@@ -1286,7 +1301,7 @@ export function ReviewSession() {
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
         <ScopeControl scope={scope} onChange={handleScopeChange} />
         <SpritePicker
-          key={effectiveCard.id}
+          key={`${effectiveCard.id}-${cardPresentationCount}`}
           targetPokemon={reverseTarget}
           distractors={reverseDistractors}
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}

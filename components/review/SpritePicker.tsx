@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
-import { FNV_PRIME, fnv1a } from "@/lib/utils/fnv1a";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { speakName } from "@/lib/audio/tts";
 
@@ -14,22 +13,26 @@ const INCORRECT_FEEDBACK_MS = 1200;
 
 type Tile = SeedPokemon & { isCorrect: boolean };
 
-function shuffleTiles(target: SeedPokemon, distractors: readonly SeedPokemon[]): Tile[] {
+/**
+ * Fisher-Yates shuffle. Returns a new array; does not mutate the input.
+ * Uses Math.random() so the order differs every time the function is called —
+ * the caller is responsible for calling it once per card presentation.
+ */
+export function fisherYatesShuffle<T>(items: readonly T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildTiles(target: SeedPokemon, distractors: readonly SeedPokemon[]): Tile[] {
   const all: Tile[] = [
     { ...target, isCorrect: true },
     ...distractors.map((d) => ({ ...d, isCorrect: false })),
   ];
-  const seed = fnv1a(String(target.id));
-  const keyed = all.map((tile) => {
-    let hash = seed;
-    hash ^= tile.id & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (tile.id >>> 8) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    return { tile, key: hash };
-  });
-  keyed.sort((a, b) => a.key - b.key || a.tile.id - b.tile.id);
-  return keyed.map((k) => k.tile);
+  return fisherYatesShuffle(all);
 }
 
 type Props = {
@@ -43,12 +46,10 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Stable tile order keyed on targetPokemon.id so distractors don't shuffle mid-card.
-  const tiles = useMemo(
-    () => shuffleTiles(targetPokemon, distractors),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [targetPokemon.id],
-  );
+  // Shuffle once at mount. The parent must remount this component (via a
+  // changing `key`) on each card presentation so the order is fresh every time
+  // the same card reappears as a learning-step replay or within-session review.
+  const [tiles] = useState<Tile[]>(() => buildTiles(targetPokemon, distractors));
 
   useEffect(() => {
     return () => {
