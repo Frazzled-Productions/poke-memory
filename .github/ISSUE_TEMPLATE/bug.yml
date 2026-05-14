@@ -69,6 +69,7 @@ body:
       options:
         - Guest (no sign-in)
         - Signed in (GitHub)
+        - Superuser mode active
         - Not applicable
     validations:
       required: true
@@ -108,9 +109,9 @@ body:
       label: Suggested priority
       description: Captured in the body; the repo owner applies the actual `priority:*` label.
       options:
-        - now — blocks normal use or recent regression
-        - next — should be fixed soon
-        - later — nice to fix eventually
+        - "priority:now — blocks normal use or recent regression"
+        - "priority:next — should be fixed soon"
+        - "priority:later — nice to fix eventually"
         - no opinion
     validations:
       required: false

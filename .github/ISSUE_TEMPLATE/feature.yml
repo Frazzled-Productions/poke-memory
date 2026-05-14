@@ -29,7 +29,7 @@ body:
     validations:
       required: true
 
-  - type: input
+  - type: textarea
     id: surface
     attributes:
       label: Surface
@@ -81,7 +81,7 @@ body:
         - Not applicable (no mastery / collection state involved)
         - Not sure
     validations:
-      required: true
+      required: false
 
   - type: dropdown
     id: suggested_priority
@@ -89,9 +89,9 @@ body:
       label: Suggested priority
       description: Captured in the body; the repo owner applies the actual `priority:*` label.
       options:
-        - now — pick this up next
-        - next — queued, second priority
-        - later — parking lot
+        - "priority:now — implement next"
+        - "priority:next — queued, not immediate"
+        - "priority:later — backlog / parking lot"
         - no opinion
     validations:
       required: false
