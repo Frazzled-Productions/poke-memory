@@ -14,7 +14,7 @@ Please include:
 - Steps to reproduce, or a proof-of-concept.
 - Any affected versions or commits you can identify.
 
-I'll acknowledge reports as time allows — this is a personal project, so there's no formal SLA, but credible reports against the authenticated sync surface (Supabase auth, RLS, `app/api/sync/**`, `lib/sync/**`) get priority.
+I'll acknowledge reports as time allows — this is a personal project, so there's no formal SLA, but credible reports against the authenticated sync surface (Supabase auth, RLS, `app/api/sync/**`, `app/api/srs/**`, `app/api/auth/**`, `lib/sync/**`, `lib/auth/**`) get priority.
 
 ## Scope
 
