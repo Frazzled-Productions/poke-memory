@@ -83,7 +83,7 @@ Both branches assume the user understands they're exiting a QA mode. Do not sile
 The canonical reference is **[docs/sync.md](docs/sync.md)** — read it before touching anything that pushes to Supabase. Headline rules:
 
 - **Pull before push.** Manual sync pulls and merges before pushing; if `pullSession` fails, do not push. Pushing on stale local state is the exact failure mode that wiped 2497 of 2513 cloud rows (#293).
-- **`card_reviews_reject_regression_trigger` (migration 002)** blocks lifecycle-timestamp regressions on `card_reviews` at the DB layer. Do not work around it.
+- **`card_reviews_reject_regression_trigger` (migration 002, extended in 015/016/017)** blocks regressions on `card_reviews` at the DB layer — lifecycle timestamps, monotonic `reps`/`lapses` counters, same-date `scheduled_days` drops, and the one-way `seen_in_pasture` flag. Do not work around it. The only destructive path that bypasses the per-column guards is `reset_all_progress` (migration 018, SECURITY DEFINER RPC).
 - **Cards drive success/error state.** Streak and settings sync legs are best-effort — they `console.warn` and continue rather than flip the overall sync into the error state.
 - **No PITR yet** (#298). Treat any production sync change as one-way until PITR is enabled.
 
@@ -122,7 +122,7 @@ Headline facts to keep top of mind:
 
 - **Grading**: `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). The 1/2/4/5 convention maps to FSRS's `Rating` enum at the boundary in `lib/srs/scheduler.ts`.
 - **Mastery**: `reps >= masteryRepetitions && scheduledDays >= 21`.
-- **Dates**: `"YYYY-MM-DD"` strings; string-comparable, no timezone math.
+- **Dates**: scheduling-internal dates (`due_date`, `last_review`, `first_seen`, `scheduled_days` arithmetic in `lib/srs/scheduler.ts`) are `"YYYY-MM-DD"` strings in UTC — string-comparable, no timezone math, DST-safe via millisecond arithmetic. User-facing day boundaries (today / streak / daily review cap) are timezone-aware via `lib/utils/format-date.ts::todayInTimezone(tz)` and `user_settings.timezone` (migration 019). When working on display or daily-cap code, pass the user's tz through; when working inside the FSRS scheduler, stay UTC.
 - **Scheduler is pure** and lives in `lib/srs/`. `nextReview(state, grade, now, options?)` is the single chokepoint that reads `retentionTarget`.
 
 ### Testing
