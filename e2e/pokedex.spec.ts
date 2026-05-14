@@ -105,6 +105,105 @@ test.describe("Pokédex type filter — intersection", () => {
   });
 });
 
+test.describe("Pokédex detail — cry button (#476)", () => {
+  test("Play cry button appears on a non-locked Pokédex entry that has a cryUrl", async ({
+    page,
+  }) => {
+    // Seed Bulbasaur (id=1) as reviewed so it is "learning" not "locked".
+    // Bulbasaur has cryUrl=/cries/1.ogg in generated.json.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-13",
+            firstSeen: "2026-05-13",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+
+    // Wait for the page to fully render the name heading (not locked).
+    await expect(page.getByText("Bulbasaur")).toBeVisible();
+
+    // CryButton renders with aria-label="Play {displayName} cry".
+    // Bulbasaur's displayName is "Bulbasaur" in generated.json.
+    await expect(
+      page.getByRole("button", { name: "Play Bulbasaur cry" }),
+    ).toBeVisible();
+  });
+
+  test("Play cry button is absent on a locked Pokédex entry", async ({
+    page,
+  }) => {
+    // Fresh IDB — no cards seeded, so all species are locked.
+    await seedSessionIdb(page, { cards: [], limits: { name: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 }, reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 } } });
+
+    await page.goto("/pokedex/1");
+
+    // Locked species shows "???" heading and hides the cry button.
+    await expect(
+      page.getByRole("heading", { level: 1, name: "???" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Play.*cry/i }),
+    ).not.toBeVisible();
+  });
+});
+
+test.describe("Pokédex detail — Forms section hidden when locked (#495)", () => {
+  test("Forms section is absent when species is locked (empty IDB)", async ({
+    page,
+  }) => {
+    // Seed an empty session — all species are locked, so isLocked=true for
+    // Raichu (id=26). PokemonDetailDisclosure only renders the Forms section
+    // when !isLocked && forms.length > 0, so it must be absent here.
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/26");
+
+    // Locked species shows "???" — verify the page loaded correctly.
+    await expect(
+      page.getByRole("heading", { level: 1, name: "???" }),
+    ).toBeVisible();
+
+    // The Forms h2 heading must not be visible regardless of whether the seed
+    // contains Alolan Raichu — locking gates the whole section.
+    await expect(
+      page.getByRole("heading", { name: "Forms", level: 2 }),
+    ).not.toBeVisible();
+  });
+});
+
 test.describe("Pokédex — alternate-form surfaces (#450)", () => {
   test("searching 'alolan' shows at least 1 result when seed has forms, or shows 0 gracefully", async ({
     page,
@@ -150,8 +249,12 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();
 
-    // Count tiles before toggling the chip.
+    // The Pokédex page is client-rendered: it shows a skeleton while it loads
+    // the session from IndexedDB, then replaces it with the grid. Wait for the
+    // first list to appear before counting — without this wait, count() races
+    // the IDB load and returns 0 (skeleton has no list items).
     const allLists = page.getByRole("list", { name: /Pokémon/ });
+    await expect(allLists.first()).toBeVisible();
     const tilesBefore = allLists.getByRole("listitem");
     const countBefore = await tilesBefore.count();
     expect(countBefore).toBeGreaterThan(0);
