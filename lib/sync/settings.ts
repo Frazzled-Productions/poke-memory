@@ -110,9 +110,10 @@ function validateDateFormat(value: string | null): DateFormat | null {
 // ---------------------------------------------------------------------------
 
 // Returns the cloud settings object, or null if the user has no row yet, the
-// row's settings column is empty ({}), or the fetch failed. An empty {} is
-// treated as "no cloud settings" so a default-only row from a previous
-// scaffolding write does not overwrite real local choices.
+// row's settings column is null or empty ({}), or the fetch failed. Both null
+// and {} are treated as "no cloud settings" so a sparse row created by
+// pushRegionalPrefs (which does not write to the settings column) or a
+// default-only scaffolding row does not overwrite real local choices.
 export async function pullSettings(
   client: SupabaseClient,
   userId: string,
@@ -125,6 +126,10 @@ export async function pullSettings(
       .maybeSingle();
     if (error || !data) return null;
     const s = (data as { settings: unknown }).settings;
+    // Treat both null and {} as "no real cloud settings". A row with
+    // settings = NULL can be created by pushRegionalPrefs before pushSettings
+    // has run; {} is the default from migration scaffolding. Neither should
+    // overwrite real local choices on a new device.
     if (typeof s !== "object" || s === null) return null;
     if (Object.keys(s as Record<string, unknown>).length === 0) return null;
     return s as UserSettings;

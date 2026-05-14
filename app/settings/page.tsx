@@ -1137,15 +1137,16 @@ export default function SettingsPage() {
                   </p>
                   <fieldset className="mt-3 flex flex-col gap-2">
                     <legend className="sr-only">Date format</legend>
-                    {(
-                      [
-                        { value: "dmy" as DateFormat, label: "Day / Month / Year" },
-                        { value: "mdy" as DateFormat, label: "Month / Day / Year" },
-                        { value: "iso" as DateFormat, label: "ISO (Year-Month-Day)" },
-                      ] as const
-                    ).map(({ value, label }) => {
-                      const today = new Date().toISOString().slice(0, 10);
+                    {(() => {
+                      // Hoist outside the per-option map so it is computed once.
+                      const todayIso = new Date().toISOString().slice(0, 10);
                       return (
+                        [
+                          { value: "dmy" as DateFormat, label: "Day / Month / Year" },
+                          { value: "mdy" as DateFormat, label: "Month / Day / Year" },
+                          { value: "iso" as DateFormat, label: "ISO (Year-Month-Day)" },
+                        ] as const
+                      ).map(({ value, label }) => (
                         <label
                           key={value}
                           className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-700"
@@ -1170,11 +1171,11 @@ export default function SettingsPage() {
                           />
                           <span className="flex-1 text-foreground">{label}</span>
                           <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                            {formatShortDate(today, value)}
+                            {formatShortDate(todayIso, value)}
                           </span>
                         </label>
-                      );
-                    })}
+                      ));
+                    })()}
                   </fieldset>
                 </div>
               </section>

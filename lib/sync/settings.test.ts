@@ -93,6 +93,13 @@ describe("pullSettings", () => {
     expect(await pullSettings(client, "user-1")).toBeNull();
   });
 
+  it("returns null when the settings column is null (sparse row from pushRegionalPrefs)", async () => {
+    // A row created by pushRegionalPrefs has settings = NULL; treat as "no real
+    // cloud settings" so it cannot overlay real local choices.
+    const { client } = makeClientWithMaybeSingle({ settings: null });
+    expect(await pullSettings(client, "user-1")).toBeNull();
+  });
+
   it("returns null when the settings column is the default empty object", async () => {
     // Default row written by the migration has settings = '{}'; we treat that
     // as "no real cloud settings" so it cannot overlay real local choices.
@@ -118,6 +125,7 @@ describe("pushRegionalPrefs", () => {
     expect(row.timezone).toBe("America/New_York");
     expect(row.date_format).toBe("mdy");
     expect(typeof row.updated_at).toBe("string");
+    // UPDATE must not include user_id or settings — those belong to other columns/writes.
     expect(row).not.toHaveProperty("user_id");
     expect(row).not.toHaveProperty("settings");
     expect(eq).toHaveBeenCalledWith("user_id", "user-1");
@@ -168,6 +176,14 @@ describe("pullRegionalPrefs", () => {
       timezone: "UTC",
       dateFormat: null,
     });
+  });
+
+  it("returns null when timezone is also null and date_format is invalid", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      timezone: null,
+      date_format: "bad-value",
+    });
+    expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
   });
 
   it("returns null on supabase error", async () => {

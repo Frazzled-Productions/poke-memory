@@ -86,8 +86,9 @@ export async function pullAndMerge(
           saveSettings(next);
         }
       }
-    } catch {
+    } catch (e) {
       // Best-effort — regional prefs failure must not flip sync into error.
+      console.warn("[pullAndMerge] regional prefs pull failed (non-fatal)", e);
     }
 
     return "ok";
