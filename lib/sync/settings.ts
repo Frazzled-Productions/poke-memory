@@ -1,6 +1,7 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import type { UserSettings } from "@/lib/settings/persistence";
 import type { DateFormat } from "@/lib/utils/format-date";
+import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 
 // Settings sync is best-effort. pushSettings routes through the
 // merge_user_settings RPC (migration 011/014), which atomically merges a JSONB
@@ -9,7 +10,12 @@ import type { DateFormat } from "@/lib/utils/format-date";
 // otherwise open by overwriting the whole settings column. pushRegionalPrefs
 // remains a separate scalar-column write path (see comment below).
 
-type MergeUserSettingsArgs = { p_user_id: string; p_patch: UserSettings };
+// Generated Supabase types do not yet include merge_user_settings. One-time
+// cast through `unknown` to a narrow signature so the name + args stay typed.
+type MergeUserSettingsRpc = (
+  name: "merge_user_settings",
+  args: MergeUserSettingsArgs,
+) => Promise<{ error: PostgrestError | null }>;
 
 export async function pushSettings(
   client: SupabaseClient,
@@ -17,13 +23,7 @@ export async function pushSettings(
   settings: UserSettings,
 ): Promise<boolean> {
   try {
-    // Generated Supabase types do not yet include merge_user_settings. Cast
-    // through `unknown` to a narrow signature so the name + args stay typed at
-    // the call site. Same pattern as app/api/srs/optimize/route.ts.
-    const rpc = client.rpc as unknown as (
-      name: "merge_user_settings",
-      args: MergeUserSettingsArgs,
-    ) => Promise<{ error: PostgrestError | null }>;
+    const rpc = client.rpc as unknown as MergeUserSettingsRpc;
     const { error } = await rpc("merge_user_settings", {
       p_user_id: userId,
       p_patch: settings,

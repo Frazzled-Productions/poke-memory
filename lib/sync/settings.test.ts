@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSettings, pushSettings, pushRegionalPrefs, pullRegionalPrefs } from "./settings";
 import type { UserSettings } from "@/lib/settings/persistence";
+import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 
 function makeClientWithRpc(error: null | object = null) {
   const rpc = vi.fn().mockResolvedValue({ error });
@@ -65,7 +66,7 @@ describe("pushSettings", () => {
     const { client, rpc } = makeClientWithRpc();
     const ok = await pushSettings(client, "user-1", SAMPLE);
     expect(ok).toBe(true);
-    const [name, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    const [name, args] = rpc.mock.calls[0] as [string, MergeUserSettingsArgs];
     expect(name).toBe("merge_user_settings");
     expect(args.p_user_id).toBe("user-1");
     expect(args.p_patch).toEqual(SAMPLE);
