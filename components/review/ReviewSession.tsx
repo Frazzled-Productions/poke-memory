@@ -976,6 +976,10 @@ export function ReviewSession() {
 
   function handleReveal() {
     if (currentCard === null) return;
+    // Warm up speechSynthesis on the first reveal gesture so that
+    // speakNameOnReveal fires on this very card. Must run synchronously here —
+    // after any `await` the gesture context is lost (#479).
+    warmupTts();
     if (currentCard.cardType === "name") {
       const facts = getPokemonFacts(currentCard);
       setCurrentFact(selectFact(facts));
@@ -1045,13 +1049,6 @@ export function ReviewSession() {
     // Re-narrow cards inside the closure — TS doesn't carry the outer
     // null-check through a function that captures a useState variable.
     if (cards === null) return;
-
-    // Warm up speechSynthesis on the first grade gesture. This satisfies the
-    // browser's autoplay policy (Chromium / WebKit) so that speakNameOnReveal
-    // fires on the very next card without requiring the user to manually tap
-    // the speaker icon first. Must run synchronously here — after any `await`
-    // the gesture context is lost and the warm-up would not count (#479).
-    warmupTts();
 
     setGrading(true);
 

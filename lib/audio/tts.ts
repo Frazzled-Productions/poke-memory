@@ -25,7 +25,7 @@ export function warmupTts(): void {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   if (_warmedUp) return;
   _warmedUp = true;
-  const u = new SpeechSynthesisUtterance(" ");
+  const u = new SpeechSynthesisUtterance(".");
   u.volume = 0;
   u.rate = 10; // finish as quickly as possible
   window.speechSynthesis.speak(u);

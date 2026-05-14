@@ -898,34 +898,33 @@ describe("Practice scope (#333)", () => {
 });
 
 describe("ReviewSession TTS warm-up (#479)", () => {
-  it("calls warmupTts on the first grade button click", async () => {
+  it("calls warmupTts on the first reveal button click", async () => {
     const user = userEvent.setup();
     render(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
-
-    const easyBtn = screen.getByRole("button", { name: /easy/i });
-    await user.click(easyBtn);
 
     expect(mockWarmupTts).toHaveBeenCalledOnce();
   });
 
-  it("warmupTts is called before the grade's saveSession call (synchronous in click handler)", async () => {
+  it("warmupTts is called before the grade's saveSession call (synchronous in reveal handler)", async () => {
     const user = userEvent.setup();
 
     render(<ReviewSession />);
 
-    // Wait for mount-time saveSession calls to settle, then start tracking.
-    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
-    await user.click(revealBtn);
-
+    // Set up call-order tracking before reveal so warmupTts is captured.
     const callOrder: string[] = [];
-    mockWarmupTts.mockImplementation(() => { callOrder.push("warmupTts"); });
+    mockWarmupTts.mockImplementation(() => {
+      callOrder.push("warmupTts");
+    });
     vi.mocked(saveSession).mockImplementation(async () => {
       callOrder.push("saveSession");
       return { ok: true };
     });
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
 
     const easyBtn = screen.getByRole("button", { name: /easy/i });
     await user.click(easyBtn);
@@ -933,7 +932,7 @@ describe("ReviewSession TTS warm-up (#479)", () => {
     await waitFor(() => expect(callOrder).toContain("saveSession"));
 
     // warmupTts must have been recorded before saveSession is called —
-    // it runs synchronously before the first await inside handleGrade.
+    // it runs synchronously inside handleReveal, before the grade's await.
     expect(callOrder.indexOf("warmupTts")).toBeLessThan(callOrder.indexOf("saveSession"));
   });
 });

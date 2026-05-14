@@ -438,8 +438,9 @@ describe("warmupTts", () => {
     warmupTts();
 
     expect(synth.speak).toHaveBeenCalledOnce();
-    const utterance = synth.speak.mock.calls[0][0] as MockUtterance & { volume: number };
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance & { volume: number; rate: number };
     expect(utterance.volume).toBe(0);
+    expect(utterance.rate).toBe(10);
   });
 
   it("is idempotent — second call is a no-op", async () => {
