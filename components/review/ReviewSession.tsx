@@ -15,6 +15,7 @@ import { pickDistractors } from "@/lib/pokemon/distractors";
 import {
   buildSession,
   buildSessionQueues,
+  countDueTomorrow,
   getNextCardId,
   hydrateSession,
   limitBucket,
@@ -209,6 +210,7 @@ function SessionCompleteScreen({
   evolutionEnabled,
   reverseEnabled,
   shareText,
+  dueTomorrow,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
@@ -216,6 +218,8 @@ function SessionCompleteScreen({
   reverseEnabled: boolean;
   /** Pre-formatted share summary; null when the user hasn't graded anything yet. */
   shareText: string | null;
+  /** Count of graduated cards whose dueDate falls exactly on tomorrow. 0 hides the teaser. */
+  dueTomorrow: number;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
@@ -223,6 +227,11 @@ function SessionCompleteScreen({
       <p className="text-zinc-500 dark:text-zinc-400">
         No more cards due today. Come back tomorrow to keep going.
       </p>
+      {dueTomorrow > 0 && (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {dueTomorrow === 1 ? "1 card" : `${dueTomorrow} cards`} due tomorrow
+        </p>
+      )}
       <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
       {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
     </div>
@@ -375,6 +384,7 @@ export function ReviewSession() {
   // `buildSessionQueues` still see the full card set, so daily caps stay
   // stable when scope changes mid-day (#333).
   const [eligibleCardIds, setEligibleCardIds] = useState<Set<number>>(new Set());
+  const [timezone, setTimezone] = useState("UTC");
   // Queue of newly-earned badges awaiting their reveal toast (#420). One is
   // rendered at a time; dismiss shifts the head off. Persisting is handled
   // in handleGrade — this queue only drives the in-session UI.
@@ -544,6 +554,7 @@ export function ReviewSession() {
       setEvolutionCardsEnabled(evolutionEnabled);
       setScope(persistedScope);
       setEligibleCardIds(eligibleIds);
+      setTimezone(settings.timezone ?? "UTC");
 
       // Initialize the learning queue from persisted learning-step cards.
       // Use stepStartedAt from persisted state so the countdown resumes correctly
@@ -943,7 +954,20 @@ export function ReviewSession() {
       );
     }
 
+    // today is UTC (scheduler-internal — card dues, streak); tomorrow uses the
+    // user's timezone (state var loaded from settings) because it is a calendar
+    // label for a user-facing count. Derive tomorrow from the tz-aware calendar
+    // date rather than adding 86 400 s, which is wrong on DST-change nights.
     const today = todayString(new Date());
+    const todayTz = todayString(new Date(), timezone);
+    const tomorrowDate = new Date(todayTz + "T12:00:00Z");
+    tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
+    const tomorrow = todayString(tomorrowDate, timezone);
+    const dueTomorrow = countDueTomorrow(
+      cards,
+      tomorrow,
+      isScopeEmpty(scope) ? undefined : eligibleCardIds,
+    );
     const shareText =
       sessionGradeSeq.length > 0
         ? formatDailySummary({
@@ -963,6 +987,7 @@ export function ReviewSession() {
           evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
           shareText={shareText}
+          dueTomorrow={dueTomorrow}
         />
         {seenPokemon.length >= 2 && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />

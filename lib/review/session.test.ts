@@ -4,6 +4,7 @@ import {
   buildSession,
   buildSessionQueues,
   buildQueueCounters,
+  countDueTomorrow,
   limitBucket,
   type DailyLimits,
   type EvolutionReviewCard,
@@ -859,6 +860,140 @@ describe('buildQueueCounters', () => {
     expect(result.newCount).toBe(0);
     expect(result.learningCount).toBe(0);
     expect(result.reviewCount).toBe(0);
+  });
+});
+
+describe('countDueTomorrow', () => {
+  const TODAY = '2026-05-09';
+  const TOMORROW = '2026-05-10';
+  const DAY_AFTER = '2026-05-11';
+
+  it('returns 0 for an empty card list', () => {
+    expect(countDueTomorrow([], TOMORROW)).toBe(0);
+  });
+
+  it('counts a graduated card due exactly tomorrow', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 3,
+        scheduledDays: 1,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(1);
+  });
+
+  it('ignores cards due today', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: '2026-05-01',
+        dueDate: TODAY,
+        learningStep: null,
+        reps: 2,
+        scheduledDays: 8,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(0);
+  });
+
+  it('ignores cards due day-after-tomorrow', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: DAY_AFTER,
+        learningStep: null,
+        reps: 3,
+        scheduledDays: 2,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(0);
+  });
+
+  it('ignores learning-step cards even if dueDate equals tomorrow', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: 0,
+        reps: 1,
+        scheduledDays: 1,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(0);
+  });
+
+  it('ignores new cards (lastReview === null)', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1)), // brand-new: lastReview null
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(0);
+  });
+
+  it('counts multiple graduated cards due on the same tomorrow', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 3,
+        scheduledDays: 1,
+        firstSeen: '2026-04-01',
+      }),
+      makeCard(makeSeedPokemon(2), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 2,
+        scheduledDays: 3,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(2);
+  });
+
+  it('respects the eligibleCardIds filter', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 3,
+        scheduledDays: 1,
+        firstSeen: '2026-04-01',
+      }),
+      makeCard(makeSeedPokemon(2), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 3,
+        scheduledDays: 1,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    // Only card id=1 is in scope.
+    expect(countDueTomorrow(cards, TOMORROW, new Set([1]))).toBe(1);
+    // Neither in scope.
+    expect(countDueTomorrow(cards, TOMORROW, new Set([99]))).toBe(0);
+  });
+
+  it('counts a mastered card due tomorrow (graduated, no learning step)', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), {
+        lastReview: TODAY,
+        dueDate: TOMORROW,
+        learningStep: null,
+        reps: 5,
+        scheduledDays: 21,
+        firstSeen: '2026-04-01',
+      }),
+    ];
+    expect(countDueTomorrow(cards, TOMORROW)).toBe(1);
   });
 });
 
