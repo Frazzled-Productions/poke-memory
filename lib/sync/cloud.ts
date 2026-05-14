@@ -55,7 +55,7 @@ export type CloudRow = {
    * Cleared on un-hide once dueDate has been shifted forward.
    */
   hidden_since: string | null;
-  /** Pasture feature (#350). True once the user has acknowledged the card in the pasture. */
+  /** Pasture feature (#350). True once the user has tapped this card on the Pasture page (clears the new-arrival sparkle). One-way: migration 017 trigger rejects true→false. */
   seen_in_pasture: boolean;
   /** Present on pull responses. Absent on locally-constructed push rows (added in the upsert batch). */
   updated_at?: string;
