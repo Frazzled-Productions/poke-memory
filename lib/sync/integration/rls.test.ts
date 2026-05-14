@@ -152,7 +152,11 @@ describe("RLS policies (integration)", () => {
       .eq("user_id", userB.id)
       .eq("card_type", "name")
       .eq("subject_key", "202");
-    expect(data?.[0]?.reps).not.toBe(99);
+    // The row must exist (not just undefined) and retain the seeded reps=1.
+    // Without this positive assertion, data?.[0] === undefined would make
+    // the .not.toBe(99) check above pass vacuously on a silent RLS zero-row match.
+    expect(data).toHaveLength(1);
+    expect(data?.[0]?.reps).toBe(1);
   });
 
   it("user A can read their own rows and not user B's", async () => {

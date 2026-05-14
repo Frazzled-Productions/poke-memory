@@ -125,7 +125,10 @@ export async function setupTestBranch(): Promise<TestBranch> {
 
   const branchId = created.id;
   // The branch ref is used to build the Supabase project URL.
-  const branchRef = created.ref ?? branchId;
+  if (!created.ref) {
+    throw new Error("Supabase branch creation response missing 'ref'");
+  }
+  const branchRef = created.ref;
 
   // Wait until the branch is accepting connections.
   const details = await waitForBranchReady(branchId);

@@ -18,11 +18,8 @@ export interface TestUser {
   client: SupabaseClient;
 }
 
-let _counter = 0;
-
 function uniqueEmail(): string {
-  _counter += 1;
-  return `test-user-${Date.now()}-${_counter}@integration.test`;
+  return `test-user-${Date.now()}@integration.test`;
 }
 
 /**

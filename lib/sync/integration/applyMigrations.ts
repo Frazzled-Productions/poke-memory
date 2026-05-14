@@ -41,23 +41,72 @@ async function executeSql(projectRef: string, sql: string): Promise<void> {
 }
 
 /**
- * Returns migration filenames sorted in strict ascending numeric order.
+ * Extracts the leading numeric prefix from a migration filename, e.g.:
+ *   "009_drop_legacy.sql" → 9
+ *   "010_card_reviews.sql" → 10
+ *
+ * Returns NaN when no numeric prefix is found.
+ */
+export function numericPrefix(filename: string): number {
+  const match = /^(\d+)_/.exec(filename);
+  return match ? parseInt(match[1], 10) : NaN;
+}
+
+/**
+ * Pure helper: sorts an array of migration filenames in strict ascending
+ * numeric-prefix order and throws if any two files share the same prefix.
+ *
+ * Accepting the list as a parameter makes this testable without filesystem
+ * mocking.
+ *
+ * Throws if two files share the same numeric prefix, which would make the
+ * apply order ambiguous and risk silent schema divergence.
+ */
+export function sortAndValidateMigrationFiles(filenames: string[]): string[] {
+  const files = [...filenames].sort((a, b) => {
+    const na = numericPrefix(a);
+    const nb = numericPrefix(b);
+    if (na !== nb) return na - nb;
+    // Same numeric prefix: fall back to full filename so the sort is
+    // deterministic, but we throw below to surface the collision.
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+
+  // Guard: duplicate numeric prefixes make apply order ambiguous.
+  const seen = new Map<number, string>();
+  for (const f of files) {
+    const n = numericPrefix(f);
+    if (!isNaN(n)) {
+      if (seen.has(n)) {
+        throw new Error(
+          `Duplicate migration prefix ${n}: "${seen.get(n)}" and "${f}". ` +
+            `Rename one to use a unique numeric prefix.`,
+        );
+      }
+      seen.set(n, f);
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Returns migration filenames from the migrations directory, sorted in strict
+ * ascending numeric order.
+ *
  * Files must be named with a zero-padded numeric prefix, e.g.:
  *   001_initial_sync_schema.sql
  *   010_card_reviews_string_keys.sql
  *
  * Node's readdirSync returns entries in filesystem (typically alphabetical)
- * order; for zero-padded prefixes that is numerically correct, but we sort
- * explicitly to be safe.
+ * order; we sort explicitly by numeric prefix so the order is stable
+ * regardless of filename alphabetical ordering.
  */
 export function listMigrationFiles(): string[] {
-  // NOTE: two files currently share the 009_ prefix. The sort is still safe
-  // because their full names (alphabetically) happen to be in the intended
-  // apply order, but new migrations MUST use unique numeric prefixes to avoid
-  // silent reordering.
-  return readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
-    .sort(); // alphabetical = numeric for zero-padded names with unique prefixes
+  const rawFiles = readdirSync(MIGRATIONS_DIR).filter((f) =>
+    (f as string).endsWith(".sql"),
+  ) as string[];
+  return sortAndValidateMigrationFiles(rawFiles);
 }
 
 /**

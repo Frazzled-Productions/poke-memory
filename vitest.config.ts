@@ -44,6 +44,10 @@ export default defineConfig({
                 name: "integration",
                 include: ["lib/sync/integration/**/*.test.ts"],
                 environment: "node" as const,
+                // Run test files serially so each file gets its own branch rather
+                // than all 5 files spinning up branches in parallel and exhausting
+                // the project's branch quota simultaneously.
+                fileParallelism: false,
                 // Branch operations (create, migrate, teardown) can take up to
                 // 2 minutes; individual test assertions are fast once the branch
                 // is ready.
