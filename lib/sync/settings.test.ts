@@ -3,10 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSettings, pushSettings, pushRegionalPrefs, pullRegionalPrefs } from "./settings";
 import type { UserSettings } from "@/lib/settings/persistence";
 
-function makeClientWithUpsert(error: null | object = null) {
-  const upsert = vi.fn().mockResolvedValue({ error });
-  const from = vi.fn().mockReturnValue({ upsert });
-  return { client: { from } as unknown as SupabaseClient, upsert };
+function makeClientWithRpc(error: null | object = null) {
+  const rpc = vi.fn().mockResolvedValue({ error });
+  return { client: { rpc } as unknown as SupabaseClient, rpc };
 }
 
 function makeClientWithUpdate(error: null | object = null) {
@@ -62,22 +61,18 @@ const SAMPLE: UserSettings = {
 };
 
 describe("pushSettings", () => {
-  it("upserts the user_id row with the settings object and a fresh updated_at", async () => {
-    const { client, upsert } = makeClientWithUpsert();
+  it("calls merge_user_settings RPC with p_user_id and p_patch", async () => {
+    const { client, rpc } = makeClientWithRpc();
     const ok = await pushSettings(client, "user-1", SAMPLE);
     expect(ok).toBe(true);
-    const [row, options] = upsert.mock.calls[0] as [
-      Record<string, unknown>,
-      Record<string, unknown>,
-    ];
-    expect(row.user_id).toBe("user-1");
-    expect(row.settings).toEqual(SAMPLE);
-    expect(typeof row.updated_at).toBe("string");
-    expect(options).toEqual({ onConflict: "user_id" });
+    const [name, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(name).toBe("merge_user_settings");
+    expect(args.p_user_id).toBe("user-1");
+    expect(args.p_patch).toEqual(SAMPLE);
   });
 
   it("returns false on supabase error", async () => {
-    const { client } = makeClientWithUpsert({ message: "boom" });
+    const { client } = makeClientWithRpc({ message: "boom" });
     expect(await pushSettings(client, "user-1", SAMPLE)).toBe(false);
   });
 });
