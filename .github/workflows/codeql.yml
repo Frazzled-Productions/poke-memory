@@ -1,0 +1,41 @@
+name: CodeQL
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly scan: catches newly-published CVEs and dependency drift that
+    # would not be triggered by any push (the rest of the year the on-push
+    # runs cover code-change risk). Monday 09:00 UTC is off-peak for runners.
+    - cron: '0 9 * * 1'
+
+# Schedule runs get their own concurrency group keyed by run_id so a push to
+# main during the weekly window can never cancel the scheduled scan. Push and
+# PR runs share a per-event-type+ref group and may cancel stale siblings.
+concurrency:
+  group: codeql-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'schedule' && github.run_id || '' }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      # No `autobuild` step: CodeQL v3 traces JS/TS without a build, and we
+      # deliberately skip `next build` here to keep the scan fast — generated
+      # `.next/` output is not in scope. Add `autobuild` only if a future
+      # query needs to see compiled JS that the source-trace path misses.
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: 'language:javascript-typescript'
