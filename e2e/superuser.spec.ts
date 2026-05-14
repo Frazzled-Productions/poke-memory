@@ -33,12 +33,16 @@ test.describe("Superuser mode", () => {
   }) => {
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: false });
     await page.goto("/settings");
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Developer" }),
-    ).toBeVisible();
-    const toggle = page.getByRole("switch", {
-      name: /pretend all pokémon are mastered/i,
+    // Wait for settings to hydrate — the Developer panel only renders once
+    // `settings !== null` (useEffect) AND `unlocked` (SuperuserContext useEffect)
+    // are both resolved. Waiting for the heading is the right gate.
+    const developerSection = page.getByRole("region", {
+      name: /developer/i,
     });
+    await expect(developerSection).toBeVisible({ timeout: 10_000 });
+    // The switch button inside the Developer section has no aria-label so we
+    // find it by its position inside the section and confirm aria-checked.
+    const toggle = developerSection.getByRole("switch").first();
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
   });
