@@ -176,8 +176,15 @@ export async function pullAndMerge(
         if (changed) {
           saveStreakData(mergedDates);
           if (typeof window !== "undefined") {
+            // StreakBadge listens to this event directly.
             window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
           }
+          // Stats reads streakDates inside its useSessionStorageKey-gated
+          // effect, which does NOT listen to STREAK_UPDATED_EVENT. Bump the
+          // session-key so an open Stats mount re-runs and picks up the new
+          // dates this cycle, mirroring the grade-log path in #575. Without
+          // this Stats lags by one full pull cycle on streak updates (#592).
+          bumpSessionStorageKey();
         }
       }
     } catch (e) {
