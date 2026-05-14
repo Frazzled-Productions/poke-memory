@@ -6,6 +6,27 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.58] — 2026-05-14
+
+### Changed
+
+- Internal: signed-in destructive reset goes through a new `resetAllProgressEverywhere` orchestrator that wipes cloud first, then local, atomically. `clearLocalProgress` is now flagged in code as the guest-only path; signed-in callers using it directly would let the next sync push resurrect the cloud rows.
+
+### Fixed
+
+- Sync: background pull (`pullAndMerge`) now refreshes the JSONB settings blob on every cycle, not just on brand-new devices, using a per-device `lastSettingsPullAt` cursor compared against `user_settings.updated_at`. Theme intensity, mastery threshold, daily caps, practice scope, badges, FSRS weights and TTS prefs now propagate across devices the same way card progress does.
+- "Force pull from cloud" on the Stats page now refreshes settings, regional prefs (timezone + date format), streak, and grade-log alongside card progress. Previously the button only pulled card_reviews, so theme intensity, mastery threshold, daily caps, badges, accuracy sparkline, heatmap, and current-streak number kept their local stale values.
+- Sync: background pull (`pullAndMerge`) now pulls `streak_days` from cloud and union-merges with local. Streak data was previously push-only, so a second device with stale local always saw the wrong current-streak number until that device itself reviewed.
+- Sync: background pull (`pullAndMerge`) now pulls `grade_log` from cloud and union-merges with local. Previously the accuracy sparkline, grade-breakdown bar, heatmap, and rolling-7-day on Stats were local-only — grades on another device never appeared until that other device itself opened Stats.
+- Sync: stale-local resurrection-on-reset is now caught at the app layer too. `pullAndMerge` reads `user_settings.last_reset_at` (the schema marker added in #582) on every cycle and calls `clearLocalProgress` before merging when the cloud marker has advanced past what this device last reconciled. So when you reset progress on one device, the others now wipe their local state on the next sync — they no longer push pre-reset cards/streak/grades back into cloud, even before the DB-layer triggers would reject them.
+- Sign-in conflict picker: "Keep cloud" now stamps `lastPullAt` after applying cloud data. Previously the cursor stayed null, so subsequent background pulls treated every local-with-progress card as authoritative and silently dropped cloud updates indefinitely.
+- Superuser: turning the last flag off (or re-locking the chord while flags were on) now pulls and applies settings, regional prefs, streak, and grade-log from the cloud alongside cards. Previously a QA session that locally changed any of those four left them dirty after exit; only cards were repudiated.
+- Sync: partial-failure unload pushes are no longer silently reported as success. The `visibilitychange` handler now uses `fetch` with `keepalive: true` so the server's response code is observable, and the route retries each batch up to three times before declaring failure. `pagehide` still uses `sendBeacon` (page is tearing down — response code unobservable by definition) and remains best-effort.
+
+### Security
+
+- Sync: schema-level guard against the delete-resurrection class. `user_settings.last_reset_at` is stamped atomically by `reset_all_progress`, and BEFORE INSERT triggers on `card_reviews`, `streak_days`, and `grade_log` reject any row dated before that timestamp. A stale device pushing data from before a reset can no longer silently resurrect rows in cloud — the relevant insert will fail with a check_violation that the client surfaces as a sync failure rather than treating as success.
+
 ## [0.9.57] — 2026-05-14
 
 ### Added
@@ -914,7 +935,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.57...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.58...HEAD
+[0.9.58]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.58
 [0.9.57]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.57
 [0.9.56]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.56
 [0.9.55]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.55
