@@ -33,6 +33,50 @@ import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
 import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
 import { TtsControls } from "@/components/settings/TtsControls";
+import {
+  detectTimezone,
+  detectDateFormat,
+  formatShortDate,
+  type DateFormat,
+} from "@/lib/utils/format-date";
+import { pushRegionalPrefs } from "@/lib/sync/settings";
+
+/**
+ * Curated fallback list for browsers that don't support
+ * `Intl.supportedValuesOf("timeZone")` (pre-2022 engines). Covers the most
+ * common IANA zones across all inhabited UTC offsets.
+ */
+const FALLBACK_TIMEZONES: string[] = [
+  "Pacific/Midway",
+  "Pacific/Honolulu",
+  "America/Anchorage",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "America/Caracas",
+  "America/Halifax",
+  "America/St_Johns",
+  "America/Sao_Paulo",
+  "America/Argentina/Buenos_Aires",
+  "America/Noronha",
+  "Atlantic/Azores",
+  "UTC",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Helsinki",
+  "Europe/Moscow",
+  "Asia/Dubai",
+  "Asia/Karachi",
+  "Asia/Kolkata",
+  "Asia/Dhaka",
+  "Asia/Bangkok",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+  "Pacific/Apia",
+];
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -308,6 +352,36 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const loaded = loadSettings();
+
+    // Auto-detect regional prefs on first load when not yet set.
+    // These live in LOCAL settings (which syncs to the scalar columns on
+    // user_settings via pushRegionalPrefs — NOT through merge_user_settings,
+    // which would put them inside the JSONB blob and expose them to the LWW
+    // race documented in the #517 audit).
+    let needsSave = false;
+    if (loaded.timezone === null) {
+      loaded.timezone = detectTimezone();
+      needsSave = true;
+    }
+    if (loaded.dateFormat === null) {
+      loaded.dateFormat = detectDateFormat();
+      needsSave = true;
+    }
+    if (needsSave) {
+      saveSettings(loaded);
+      // Best-effort push to the scalar columns if signed in. This runs
+      // asynchronously; failure is silent — the values are persisted locally
+      // and will sync on the next manual sync cycle.
+      if (user && supabase) {
+        void pushRegionalPrefs(supabase, user.id, {
+          timezone: loaded.timezone,
+          dateFormat: loaded.dateFormat,
+        }).catch(() => {
+          // Best-effort — sync will pick this up later.
+        });
+      }
+    }
+
     setSettings(loaded);
     setFavouriteId(loadFavourite()?.id ?? null);
     // Count optimizable reviews from local grade log (async now — IDB backed)
@@ -316,6 +390,7 @@ export default function SettingsPage() {
       if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
       if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleChange(key: keyof UserSettings, raw: string) {
@@ -991,6 +1066,105 @@ export default function SettingsPage() {
                   saveSettings(updated);
                 }}
               />
+
+              {/* Regional section — timezone + date format pickers */}
+              <section className="flex flex-col gap-4" aria-labelledby="regional-heading">
+                <h2
+                  id="regional-heading"
+                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                >
+                  Regional
+                </h2>
+
+                {/* Timezone picker */}
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <label
+                    htmlFor="timezone"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    Timezone
+                  </label>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Used for daily review limits and streak roll-overs. Auto-detected on first load.
+                  </p>
+                  <select
+                    id="timezone"
+                    value={settings.timezone ?? ""}
+                    onChange={(e) => {
+                      const next = { ...settings, timezone: e.target.value };
+                      setSettings(next);
+                      saveSettings(next);
+                      if (user && supabase) {
+                        void pushRegionalPrefs(supabase, user.id, {
+                          timezone: e.target.value,
+                          dateFormat: next.dateFormat,
+                        }).catch(() => {});
+                      }
+                    }}
+                    className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                  >
+                    {(typeof Intl !== "undefined" && "supportedValuesOf" in Intl
+                      ? (Intl as { supportedValuesOf: (key: string) => string[] }).supportedValuesOf("timeZone")
+                      : FALLBACK_TIMEZONES
+                    ).map((tz) => (
+                      <option key={tz} value={tz}>
+                        {tz}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date format picker */}
+                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <p className="text-sm font-medium text-foreground">
+                    Date format
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Controls how dates are shown throughout the app. Live preview updates below.
+                  </p>
+                  <fieldset className="mt-3 flex flex-col gap-2">
+                    <legend className="sr-only">Date format</legend>
+                    {(
+                      [
+                        { value: "dmy" as DateFormat, label: "Day / Month / Year" },
+                        { value: "mdy" as DateFormat, label: "Month / Day / Year" },
+                        { value: "iso" as DateFormat, label: "ISO (Year-Month-Day)" },
+                      ] as const
+                    ).map(({ value, label }) => {
+                      const today = new Date().toISOString().slice(0, 10);
+                      return (
+                        <label
+                          key={value}
+                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-700"
+                        >
+                          <input
+                            type="radio"
+                            name="dateFormat"
+                            value={value}
+                            checked={(settings.dateFormat ?? "dmy") === value}
+                            onChange={() => {
+                              const next = { ...settings, dateFormat: value };
+                              setSettings(next);
+                              saveSettings(next);
+                              if (user && supabase) {
+                                void pushRegionalPrefs(supabase, user.id, {
+                                  timezone: next.timezone,
+                                  dateFormat: value,
+                                }).catch(() => {});
+                              }
+                            }}
+                            className="shrink-0 accent-foreground"
+                          />
+                          <span className="flex-1 text-foreground">{label}</span>
+                          <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+                            {formatShortDate(today, value)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </fieldset>
+                </div>
+              </section>
 
               <section className="flex flex-col gap-4" aria-labelledby="onboarding-heading">
                 <h2

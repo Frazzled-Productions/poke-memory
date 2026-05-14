@@ -146,8 +146,11 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
   // Anchor the parse mid-day so timezones west of UTC don't shift the display
   // back a calendar day (firstSeen is a "YYYY-MM-DD" string, which Date parses
   // as UTC midnight by default).
+  // en-GB locale gives English month names on all browser locales.
+  // Parse mid-day so timezones west of UTC don't shift the display back a
+  // calendar day (firstSeen is "YYYY-MM-DD", parsed as UTC midnight by default).
   const firstSeenLabel = card.state.firstSeen
-    ? new Date(card.state.firstSeen + "T12:00:00").toLocaleDateString(undefined, {
+    ? new Date(card.state.firstSeen + "T12:00:00").toLocaleDateString("en-GB", {
         year: "numeric",
         month: "short",
         day: "numeric",

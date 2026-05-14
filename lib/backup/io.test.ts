@@ -78,6 +78,8 @@ const VALID_SETTINGS: UserSettings = {
   ttsVoice: null,
   ttsRate: 1,
   ttsVolume: 1,
+  timezone: null,
+  dateFormat: null,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

@@ -67,7 +67,7 @@ export default function PokedexPage() {
             <span className="inline-block h-4 w-36 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
           ) : (
             <>
-              {introduced.toLocaleString()} / {defaultFormPokemon.length.toLocaleString()}{" "}
+              {introduced.toLocaleString('en-GB')} / {defaultFormPokemon.length.toLocaleString('en-GB')}{" "}
               introduced
             </>
           )}

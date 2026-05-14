@@ -22,12 +22,14 @@ const INTENSITY_FILLS = [
 ] as const;
 
 function formatTooltip(cell: HeatmapCell): string {
+  // en-GB locale gives English month/weekday names on all browser locales.
   const d = new Date(cell.date + "T00:00:00Z");
-  const human = d.toLocaleDateString(undefined, {
+  const human = d.toLocaleDateString("en-GB", {
     weekday: "short",
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   });
   return `${human} · ${cell.count} review${cell.count === 1 ? "" : "s"}`;
 }
@@ -47,7 +49,7 @@ export function ReviewHeatmap({ columns }: Props) {
       </h2>
       <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-          {total.toLocaleString()} review{total === 1 ? "" : "s"} in the last year
+          {total.toLocaleString('en-GB')} review{total === 1 ? "" : "s"} in the last year
         </p>
         <svg
           viewBox={`0 0 ${width} ${height}`}

@@ -45,6 +45,7 @@ import {
   GRAD_INTERVAL_GOOD,
   GRAD_INTERVAL_EASY,
 } from "@/lib/srs/constants";
+import { todayInTimezone } from "@/lib/utils/format-date";
 
 export type FsrsStateLabel = "new" | "learning" | "review" | "relearning";
 
@@ -119,13 +120,21 @@ function getScheduler(
   return fresh;
 }
 
+/**
+ * Format a Date as "YYYY-MM-DD" in UTC. Used for scheduled due-dates which
+ * are stored as UTC-midnight ISO strings; keeping this UTC-based ensures
+ * interval arithmetic (e.g. +1 day, +21 days) lands on the right calendar
+ * day regardless of the user's timezone.
+ *
+ * "Today" for the purpose of queuing and streak tracking is computed
+ * separately via todayInTimezone(), which accepts a user timezone.
+ */
 function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return todayInTimezone("UTC", date);
 }
 
 function addDays(date: Date, days: number): string {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
+  const result = new Date(date.getTime() + days * 86_400_000);
   return isoDate(result);
 }
 

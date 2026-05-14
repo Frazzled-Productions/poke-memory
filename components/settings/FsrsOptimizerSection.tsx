@@ -172,7 +172,7 @@ export function FsrsOptimizerSection({
               className="text-xs text-zinc-500 dark:text-zinc-400"
             >
               Last optimized:{" "}
-              {new Date(cooldown.optimizedAt).toLocaleDateString(undefined, {
+              {new Date(cooldown.optimizedAt).toLocaleDateString("en-GB", {
                 year: "numeric",
                 month: "short",
                 day: "numeric",
@@ -225,7 +225,7 @@ export function FsrsOptimizerSection({
                   className="text-xs text-zinc-500 dark:text-zinc-400"
                 >
                   Last optimized:{" "}
-                  {new Date(fsrsWeightsOptimizedAt).toLocaleDateString(undefined, {
+                  {new Date(fsrsWeightsOptimizedAt).toLocaleDateString("en-GB", {
                     year: "numeric",
                     month: "short",
                     day: "numeric",

@@ -8,6 +8,7 @@ import {
   clearLegacyScope,
   parseFormCategoryFilter,
 } from "@/lib/review/scope";
+import type { DateFormat } from "@/lib/utils/format-date";
 
 // localStorage key for all user-configurable settings
 export const STORAGE_KEY = "poke-memory:settings:v1";
@@ -130,6 +131,18 @@ export type UserSettings = {
    * Valid range 0–1; default 1.0 preserves current behaviour.
    */
   ttsVolume: number;
+  /**
+   * User's IANA timezone (#508). Null means "not yet detected" — the
+   * Settings page auto-detects via Intl on first load and writes it back.
+   * Stored as a scalar column in user_settings (NOT inside the JSONB blob)
+   * so it doesn't get clobbered by the LWW JSONB sync. See lib/sync/settings.ts.
+   */
+  timezone: string | null;
+  /**
+   * User's preferred date format (#509). Null means "not yet detected".
+   * Same storage rationale as `timezone` above.
+   */
+  dateFormat: DateFormat | null;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -160,6 +173,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   ttsVoice: null,
   ttsRate: 1,
   ttsVolume: 1,
+  timezone: null,
+  dateFormat: null,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -342,6 +357,12 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.ttsVolume === "number" && Number.isFinite(obj.ttsVolume)
         ? Math.max(0, Math.min(1, obj.ttsVolume))
         : DEFAULT_SETTINGS.ttsVolume,
+    timezone:
+      typeof obj.timezone === "string" ? obj.timezone : DEFAULT_SETTINGS.timezone,
+    dateFormat:
+      obj.dateFormat === "iso" || obj.dateFormat === "dmy" || obj.dateFormat === "mdy"
+        ? obj.dateFormat
+        : DEFAULT_SETTINGS.dateFormat,
   };
 }
 

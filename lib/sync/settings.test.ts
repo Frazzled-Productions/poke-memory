@@ -50,6 +50,8 @@ const SAMPLE: UserSettings = {
   ttsVoice: null,
   ttsRate: 1,
   ttsVolume: 1,
+  timezone: null,
+  dateFormat: null,
 };
 
 describe("pushSettings", () => {
