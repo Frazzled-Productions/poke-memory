@@ -3,9 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { buildSession, hydrateSession, todayString, type ReviewableCard } from "@/lib/review/session";
+import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
-import { loadSession } from "@/lib/review/persistence";
+import { loadSession, saveSession } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
@@ -31,6 +31,8 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { pullSession, applyCloudAuthoritative } from "@/lib/sync/cloud";
+import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -402,6 +404,109 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 }
 
 // ---------------------------------------------------------------------------
+// ForcePullSection — recovery button visible only when signed in
+// ---------------------------------------------------------------------------
+
+type ForcePullStatus = "idle" | "pulling" | "success" | "error";
+
+function ForcePullSection({
+  supabase,
+  userId,
+  onSuccess,
+}: {
+  supabase: import("@supabase/supabase-js").SupabaseClient;
+  userId: string;
+  onSuccess: (cards: ReviewableCard[]) => void;
+}) {
+  const [status, setStatus] = useState<ForcePullStatus>("idle");
+
+  async function handleForcePull() {
+    const confirmed = window.confirm(
+      "This will replace your local progress with what's currently in the cloud. Continue?",
+    );
+    if (!confirmed) return;
+
+    setStatus("pulling");
+    try {
+      const cloudRows = await pullSession(supabase, userId);
+      if (cloudRows === null) {
+        setStatus("error");
+        return;
+      }
+
+      const settings = loadSettings();
+      const opts = seedOptsFromSettings(settings);
+      const cards = applyCloudAuthoritative(
+        SEED_POKEMON,
+        SEED_EVOLUTION_CARDS,
+        cloudRows,
+        opts,
+      );
+
+      const saved = await loadSession();
+      const limits = saved?.limits ?? DEFAULT_LIMITS;
+      const result = await saveSession({ cards, limits });
+
+      if (!result.ok) {
+        setStatus("error");
+        return;
+      }
+
+      // saveSession dispatches a synthetic StorageEvent so same-tab
+      // subscribers (useSessionStorageKey) re-read automatically.
+
+      onSuccess(cards);
+      setStatus("success");
+      // Reset to idle after a short display window.
+      setTimeout(() => setStatus("idle"), 4000);
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  return (
+    <section aria-labelledby="force-pull-heading">
+      <h2
+        id="force-pull-heading"
+        className="mb-1 text-base font-semibold text-foreground"
+      >
+        Data
+      </h2>
+      <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+        Use this if your stats look wrong — it pulls authoritative data from the cloud.
+      </p>
+      <button
+        type="button"
+        onClick={() => void handleForcePull()}
+        disabled={status === "pulling"}
+        aria-busy={status === "pulling"}
+        className="rounded-lg border border-zinc-200 bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
+      >
+        {status === "pulling" ? "Pulling from cloud…" : "Force pull from cloud"}
+      </button>
+      {status === "success" && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-2 text-sm text-emerald-600 dark:text-emerald-400"
+        >
+          Done — stats updated from cloud.
+        </p>
+      )}
+      {status === "error" && (
+        <p
+          role="alert"
+          aria-live="assertive"
+          className="mt-2 text-sm text-rose-600 dark:text-rose-400"
+        >
+          Pull failed. Check your connection and try again.
+        </p>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -427,60 +532,84 @@ export default function StatsPage() {
 
   useEffect(() => {
     async function load() {
-    const settings = loadSettings();
-    // Load regional prefs — these are in the local settings blob (not cloud-only)
-    // so they're available immediately without a Supabase round trip.
-    if (settings.timezone) setUserTimezone(settings.timezone);
-    if (settings.dateFormat) setUserDateFormat(settings.dateFormat);
-    const saved = await loadSession();
-    const sessionCards = saved !== null
-      ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled })
-      : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled });
-    setCards(sessionCards);
-    setMasteryRepetitions(settings.masteryRepetitions);
-    setNameCardsEnabled(settings.nameCardsEnabled);
-    const dates = loadStreakData();
-    setStreakDates(dates);
-    const tz = settings.timezone ?? "UTC";
-    const today = todayString(new Date(), tz);
-    setCurrentStreak(computeStreak(dates, today));
-    const log = await loadGradeLog();
-    setGradeLog(log);
-    setGradeTotals(computeGradeTotals(log));
-    setAccuracyPoints(computeAccuracySparkline(log, today, 30));
-    setRolling7d(computeRollingAccuracy(log, today, 7));
+      const settings = loadSettings();
+      // Load regional prefs — these are in the local settings blob (not cloud-only)
+      // so they're available immediately without a Supabase round trip.
+      if (settings.timezone) setUserTimezone(settings.timezone);
+      if (settings.dateFormat) setUserDateFormat(settings.dateFormat);
+      const saved = await loadSession();
+      const sessionCards = saved !== null
+        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled })
+        : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled });
+      // Render local first for a fast first paint, then overlay cloud below.
+      setCards(sessionCards);
+      setMasteryRepetitions(settings.masteryRepetitions);
+      setNameCardsEnabled(settings.nameCardsEnabled);
+      const dates = loadStreakData();
+      setStreakDates(dates);
+      const tz = settings.timezone ?? "UTC";
+      const today = todayString(new Date(), tz);
+      setCurrentStreak(computeStreak(dates, today));
+      const log = await loadGradeLog();
+      setGradeLog(log);
+      setGradeTotals(computeGradeTotals(log));
+      setAccuracyPoints(computeAccuracySparkline(log, today, 30));
+      setRolling7d(computeRollingAccuracy(log, today, 7));
 
-    // Retroactive badge award (#420). If a user already meets a badge's
-    // criterion when the feature ships (or after a sync pull), award it
-    // silently — no toast. The reveal toast only fires on the grade event
-    // that crosses the threshold (`ReviewSession.handleGrade`). We never
-    // award retroactively while a superuser flag is on; the catalog-wide
-    // overlay below covers that QA case without touching persisted state.
-    if (!anyFlagOn) {
-      const masteredIds = masteredSpeciesIds(
-        sessionCards,
-        settings.masteryRepetitions,
-        false,
-      );
-      const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
-      const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIdSet);
-      if (newlyEarned.length > 0) {
-        const nowIso = new Date().toISOString();
-        const nextEntries = [
-          ...settings.earnedBadges,
-          ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
-        ];
-        saveSettings({ ...settings, earnedBadges: nextEntries });
-        setEarnedBadgeIds(nextEntries.map((e) => e.id));
+      // Retroactive badge award (#420). If a user already meets a badge's
+      // criterion when the feature ships (or after a sync pull), award it
+      // silently — no toast. The reveal toast only fires on the grade event
+      // that crosses the threshold (`ReviewSession.handleGrade`). We never
+      // award retroactively while a superuser flag is on; the catalog-wide
+      // overlay below covers that QA case without touching persisted state.
+      if (!anyFlagOn) {
+        const masteredIds = masteredSpeciesIds(
+          sessionCards,
+          settings.masteryRepetitions,
+          false,
+        );
+        const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
+        const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIdSet);
+        if (newlyEarned.length > 0) {
+          const nowIso = new Date().toISOString();
+          const nextEntries = [
+            ...settings.earnedBadges,
+            ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
+          ];
+          saveSettings({ ...settings, earnedBadges: nextEntries });
+          setEarnedBadgeIds(nextEntries.map((e) => e.id));
+        } else {
+          setEarnedBadgeIds(settings.earnedBadges.map((e) => e.id));
+        }
       } else {
         setEarnedBadgeIds(settings.earnedBadges.map((e) => e.id));
       }
-    } else {
-      setEarnedBadgeIds(settings.earnedBadges.map((e) => e.id));
-    }
+
+      // If signed in (and superuser flags are off), overlay the cloud data
+      // on top of the local render. This ensures stats reflect cloud truth
+      // even when local IDB is stale or corrupted.
+      if (supabase !== null && user !== null && !anyFlagOn) {
+        try {
+          const cloudRows = await pullSession(supabase, user.id);
+          if (cloudRows !== null) {
+            const opts = seedOptsFromSettings(settings);
+            const cloudCards = applyCloudAuthoritative(
+              SEED_POKEMON,
+              SEED_EVOLUTION_CARDS,
+              cloudRows,
+              opts,
+            );
+            setCards(cloudCards);
+          }
+        } catch (err) {
+          // Network failure — stay on local render, do not break the page.
+          console.warn("[stats] cloud hydration failed, falling back to local", err);
+        }
+      }
     }
     void load();
-  }, [storageVersion, anyFlagOn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageVersion, anyFlagOn, supabase, user]);
 
   const nameCards =
     cards !== null
@@ -597,6 +726,13 @@ export default function StatsPage() {
             <GenerationBreakdown stats={stats} />
             <TypeBreakdown perType={stats.perType} />
             <StrugglingCards stats={stats} />
+            {user !== null && supabase !== null && !anyFlagOn && (
+              <ForcePullSection
+                supabase={supabase}
+                userId={user.id}
+                onSuccess={setCards}
+              />
+            )}
           </div>
         )}
       </div>
