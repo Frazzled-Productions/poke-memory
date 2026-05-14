@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   loadSettings,
@@ -1067,6 +1068,21 @@ export default function SettingsPage() {
                         ? `v${process.env.NEXT_PUBLIC_APP_VERSION}`
                         : "dev"}
                     </p>
+                  </div>
+
+                  <hr className="border-zinc-200 dark:border-zinc-800" />
+
+                  <div>
+                    <p className="text-sm font-medium text-foreground">What&apos;s new</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      See what shipped in recent releases.
+                    </p>
+                    <Link
+                      href="/whats-new"
+                      className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      View changelog
+                    </Link>
                   </div>
                 </div>
               </section>

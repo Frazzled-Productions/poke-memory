@@ -24,6 +24,13 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? "dev",
   },
+  // /whats-new reads CHANGELOG.md via fs at render time. The path is dynamic
+  // (process.cwd() + filename), which @vercel/nft may not statically trace —
+  // include it explicitly so the file ships with the deployment in any
+  // output mode.
+  outputFileTracingIncludes: {
+    "/whats-new": ["./CHANGELOG.md"],
+  },
   images: {
     remotePatterns: [
       {
