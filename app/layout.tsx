@@ -53,6 +53,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         {/* Inline script applies saved theme before first paint to avoid flash of default palette */}
