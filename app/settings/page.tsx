@@ -15,7 +15,7 @@ import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
-import { deleteAllCloudProgress } from "@/lib/sync/cloud";
+import { resetAllProgress } from "@/lib/sync/reset";
 import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
 import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
 import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
@@ -382,7 +382,7 @@ export default function SettingsPage() {
 
   async function handleReset() {
     if (user && supabase) {
-      const ok = await deleteAllCloudProgress(supabase, user.id);
+      const ok = await resetAllProgress(supabase);
       if (!ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     }
     saveFavourite(null);
