@@ -381,7 +381,7 @@ export default function SettingsPage() {
 
 
   async function handleReset() {
-    if (user && supabase) {
+    if (user && supabase && !anyFlagOn) {
       const ok = await resetAllProgress(supabase);
       if (!ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     }

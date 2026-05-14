@@ -50,7 +50,9 @@ describe("resetAllProgress", () => {
   it("returns false and logs when the RPC throws", async () => {
     const client = {
       rpc: vi.fn().mockRejectedValue(new Error("network error")),
-    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    } as unknown as import("@supabase/supabase-js").SupabaseClient & {
+      rpc: ReturnType<typeof vi.fn>;
+    };
     const result = await resetAllProgress(client);
     expect(result).toBe(false);
     expect(console.error).toHaveBeenCalledWith(
