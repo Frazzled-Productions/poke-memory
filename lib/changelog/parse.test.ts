@@ -223,6 +223,25 @@ describe("parseChangelog", () => {
     ]);
   });
 
+  it("flushes the pending bullet when a non-indented prose line interrupts", () => {
+    const md = [
+      "## [1.0.0] — 2026-05-14",
+      "",
+      "### Added",
+      "",
+      "- First bullet.",
+      "Stray prose with no indent.",
+      "- Second bullet.",
+    ].join("\n");
+    const [release] = parseChangelog(md);
+    // The non-indented prose line terminates the continuation window, so
+    // "Stray prose..." is silently dropped rather than merged into either
+    // bullet.
+    expect(release.sections).toEqual([
+      { kind: "Added", bullets: ["First bullet.", "Second bullet."] },
+    ]);
+  });
+
   it("merges bullets when the same section kind appears twice in one release", () => {
     const md = [
       "## [1.0.0] — 2026-05-14",

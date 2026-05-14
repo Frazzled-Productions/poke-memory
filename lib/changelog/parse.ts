@@ -26,7 +26,7 @@ const SECTION_ORDER: ChangelogSectionKind[] = [
 
 const SECTION_SET = new Set<string>(SECTION_ORDER);
 
-const VERSION_HEADING_RE = /^##\s+\[(\d+\.\d+\.\d+)\]\s+[—-]\s+(\d{4}-\d{2}-\d{2})\s*$/;
+const VERSION_HEADING_RE = /^##\s+\[(\d+\.\d+\.\d+)\]\s+(?:—|-)\s+(\d{4}-\d{2}-\d{2})\s*$/;
 const SECTION_HEADING_RE = /^###\s+(\S.*?)\s*$/;
 const BULLET_RE = /^-\s+(\S.+)$/;
 const CONTINUATION_RE = /^  \S/;
@@ -107,10 +107,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
           pendingBullet += " " + line.trim();
           continue;
         }
-        if (line.trim() === "") {
-          flushBullet();
-          continue;
-        }
+        flushBullet();
       }
     }
   }
