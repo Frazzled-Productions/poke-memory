@@ -5,7 +5,8 @@ import { PokemonDetailDisclosure } from "@/components/pokedex/PokemonDetailDiscl
 
 export function generateStaticParams() {
   // One route per species — use only default forms (or all entries when the
-  // seed hasn't been re-run with #445 fields yet).
+  // seed hasn't been re-run with #445 fields yet). Alt-form ids (10001+) are
+  // still resolvable via a post-lookup null check in the page component.
   const defaultForms = SEED_POKEMON.filter(
     (p) => p.isDefaultForm === undefined || p.isDefaultForm,
   );
@@ -20,7 +21,6 @@ export default async function PokemonDetailPage({
   const { id: idStr } = await params;
   if (!/^\d+$/.test(idStr)) return notFound();
   const id = Number(idStr);
-  if (id < 1 || id > 1025) return notFound();
 
   const pokemon = SEED_POKEMON.find((p) => p.id === id);
   if (!pokemon) return notFound();

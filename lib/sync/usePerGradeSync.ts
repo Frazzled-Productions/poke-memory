@@ -67,6 +67,12 @@ export function usePerGradeSync(
     // Update lastPushAt once per debounce flush if at least one card succeeded.
     // Called here (not per-card) so concurrent drains produce at most one write
     // per flush rather than N writes for N cards.
+    //
+    // Any-success (not all-success) is deliberate (#473): a partial-success
+    // debounced push still moved the cloud forward, so the "Last synced"
+    // indicator should advance. This differs from the unload path, which
+    // flags failure whenever any card failed. See lib/sync/persistence.ts
+    // `markPushSucceeded` JSDoc for the full semantics rationale.
     const anySucceeded = results.some((r) => r.ok);
     if (anySucceeded) {
       markPushSucceeded();

@@ -16,7 +16,7 @@
  */
 
 import { NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 // Native optimizer can take tens of seconds on large datasets. Default
@@ -104,6 +104,8 @@ async function fetchGradeLog(
  * This eliminates the read-merge-write race window that the previous
  * optimistic-locking approach had (#392).
  */
+type MergeUserSettingsArgs = { p_user_id: string; p_patch: Record<string, unknown> };
+
 async function persistWeights(
   client: SupabaseClient,
   userId: string,
@@ -111,13 +113,18 @@ async function persistWeights(
   optimizedAt: string,
 ): Promise<boolean> {
   try {
-    // TODO(#392): cast args through `any` until `supabase gen types` is re-run
-    // and the new merge_user_settings RPC appears in the generated database types.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await client.rpc("merge_user_settings" as any, {
+    // The generated Supabase types don't yet know about `merge_user_settings`
+    // (migration 011/014). Cast through `unknown` to a narrow signature that
+    // keeps the args typed at the call site without losing safety on the
+    // name + arg shape.
+    const rpc = client.rpc as unknown as (
+      name: "merge_user_settings",
+      args: MergeUserSettingsArgs,
+    ) => Promise<{ error: PostgrestError | null }>;
+    const { error } = await rpc("merge_user_settings", {
       p_user_id: userId,
       p_patch: { fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt },
-    } as any);
+    });
     return !error;
   } catch {
     return false;

@@ -87,7 +87,6 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
           value={ttsRate}
           onChange={(e) => onChange({ ttsRate: Number(e.target.value) })}
           className="mt-3 w-full"
-          aria-label="Speech rate"
         />
         <div className="mt-1 flex justify-between text-xs text-zinc-400 dark:text-zinc-500">
           <span>0.5× slow</span>
@@ -112,7 +111,6 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
           value={ttsVolume}
           onChange={(e) => onChange({ ttsVolume: Number(e.target.value) })}
           className="mt-3 w-full"
-          aria-label="Speech volume"
         />
         <div className="mt-1 flex justify-between text-xs text-zinc-400 dark:text-zinc-500">
           <span>0% mute</span>
