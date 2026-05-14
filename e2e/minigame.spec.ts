@@ -9,26 +9,51 @@ import seedData from "../lib/pokemon/generated.json";
 
 const EDGE_ID_BASE = 1_500_000;
 const REVERSE_ID_OFFSET = 2_000_000;
-
-/** Number of name-card IDs (1 … nameCardCount). */
-const NAME_CARD_COUNT: number = seedData.length;
+const MAX_SPECIES_ID = 999_999; // alternate-form IDs (10001+) are above this
 
 /**
- * Compute the evolution edge IDs using the same logic as SEED_EVOLUTION_CARDS
- * in lib/pokemon/seed.ts. Each (pre-evo → post-evo) pair in the chain gets one
- * sequential ID starting at EDGE_ID_BASE + 1.
+ * All species IDs present in the seed data, including alternate forms.
+ * Used to build name-card entries that exactly match SEED_POKEMON, so
+ * hydrateSession finds them all in savedIds and adds no new cards.
+ */
+const SEED_POKEMON_IDS: number[] = seedData.map(
+  (p) => (p as unknown as { id: number }).id,
+);
+
+/**
+ * Two seen IDs for getSeenPokemon (Bulbasaur=1, Charmander=4) so the
+ * Higher-or-Lower mini-game has enough entries to render its tiles.
+ */
+const SEEN_SPECIES_IDS = new Set([1, 4]);
+
+/**
+ * Compute the evolution edge IDs matching SEED_EVOLUTION_CARDS in
+ * lib/pokemon/seed.ts. Rules (mirror seed.ts exactly):
+ *   - Skip alternate-form pokemon (id > MAX_SPECIES_ID).
+ *   - For each species, emit the edge only when node.evolvesFromId === pokemon.id
+ *     (one edge per parent species, not one per chain member).
+ *   - Use node.edgeId from the JSON (stable, assigned at seed time).
+ *   - Deduplicate with a Set in case the seed has defensive duplicates.
+ *   - Skip IDs outside [EDGE_ID_BASE+1, REVERSE_ID_OFFSET-1].
  */
 const EVOLUTION_CARD_IDS: number[] = (() => {
+  type ChainNode = { evolvesFromId: number | null; edgeId?: number };
+  type SeedEntry = { id: number; evolutionChain?: ChainNode[] };
+
+  const seen = new Set<number>();
   const ids: number[] = [];
-  let edgeId = EDGE_ID_BASE;
-  for (const pokemon of seedData) {
-    const chain = (pokemon as { evolutionChain?: Array<{ evolvesFromId: number | null }> })
-      .evolutionChain;
-    if (!chain) continue;
-    for (const node of chain) {
-      if (node.evolvesFromId === null) continue;
-      edgeId++;
-      if (edgeId >= REVERSE_ID_OFFSET) break;
+
+  for (const rawPokemon of seedData) {
+    const pokemon = rawPokemon as unknown as SeedEntry;
+    if (pokemon.id > MAX_SPECIES_ID) continue; // skip alternate forms
+    if (!pokemon.evolutionChain) continue;
+    for (const node of pokemon.evolutionChain) {
+      if (node.evolvesFromId !== pokemon.id) continue; // parent-only edge
+      const edgeId = node.edgeId;
+      if (typeof edgeId !== "number") continue;
+      if (edgeId <= EDGE_ID_BASE || edgeId >= REVERSE_ID_OFFSET) continue;
+      if (seen.has(edgeId)) continue;
+      seen.add(edgeId);
       ids.push(edgeId);
     }
   }
@@ -55,11 +80,10 @@ const EVOLUTION_CARD_IDS: number[] = (() => {
 // ---------------------------------------------------------------------------
 
 function buildCompletedSession(args: {
-  nameCardCount: number;
+  pokemonIds: number[];
   evolutionCardIds: number[];
 }) {
-  const { nameCardCount, evolutionCardIds } = args;
-  const SEEN_IDS = new Set([1, 4]);
+  const { pokemonIds, evolutionCardIds } = args;
   const PAST_DATE = "2026-01-01";
   const FUTURE_DATE = "2099-12-31";
 
@@ -80,8 +104,11 @@ function buildCompletedSession(args: {
 
   const cards: object[] = [];
 
-  // Name cards (1 … nameCardCount)
-  for (let id = 1; id <= nameCardCount; id++) {
+  // Name cards — one per actual species ID in SEED_POKEMON (including
+  // alternate forms with IDs like 10001+). Using the real IDs ensures
+  // hydrateSession finds every card in savedIds and adds no new entries,
+  // which is the necessary condition for SESSION_COMPLETE.
+  for (const id of pokemonIds) {
     cards.push({
       id,
       name: "pokemon-" + id,
@@ -89,12 +116,13 @@ function buildCompletedSession(args: {
       cardType: "name",
       state: {
         ...reviewedState,
-        firstSeen: SEEN_IDS.has(id) ? PAST_DATE : null,
+        firstSeen: SEEN_SPECIES_IDS.has(id) ? PAST_DATE : null,
       },
     });
   }
 
-  // Evolution edge cards
+  // Evolution edge cards — use the deduplicated edgeIds from EVOLUTION_CARD_IDS
+  // which mirrors SEED_EVOLUTION_CARDS exactly (parent-only, in-range, unique).
   for (const id of evolutionCardIds) {
     cards.push({
       id,
@@ -124,25 +152,24 @@ function buildCompletedSession(args: {
 
 // ---------------------------------------------------------------------------
 // Pre-seed a NEW_CARDS_LOCKED state for the `name` card type:
-//   - IDs 1..10 are "introduced today" (firstSeen === today, lastReview === today,
-//     dueDate far future) so name.newIntroducedToday === maxNewPerDay (10).
-//   - The last name-card ID is a fresh new card (lastReview === null) so
+//   - The first 10 IDs in pokemonIds are "introduced today" (firstSeen ===
+//     today, lastReview === today, dueDate far future) so
+//     name.newIntroducedToday === maxNewPerDay (10).
+//   - The last ID in pokemonIds is a fresh new card (lastReview === null) so
 //     hasMoreNewCardsOf(name) is true → the new-cards wall fires.
-//   - IDs 11..(nameCardCount-1) are already-reviewed, not-due-today (no
-//     contribution to either counter) so they don't accidentally trigger the
-//     review soft-wall.
-//   - Evolution cards are seeded as the existing helper does — already reviewed,
-//     not due — so no evolution-type queues populate.
+//   - All other IDs are already-reviewed, not-due-today (no contribution to
+//     either counter) so they don't accidentally trigger the review soft-wall.
+//   - Evolution cards are seeded as reviewed, not-due — no evo queues populate.
 //
 // Default settings have reverseCardsEnabled === false and cryCardsEnabled ===
 // false, so we don't need to seed those types.
 // ---------------------------------------------------------------------------
 
 function buildNewCardsLockedSession(args: {
-  nameCardCount: number;
+  pokemonIds: number[];
   evolutionCardIds: number[];
 }) {
-  const { nameCardCount, evolutionCardIds } = args;
+  const { pokemonIds, evolutionCardIds } = args;
   const TODAY = new Date().toISOString().slice(0, 10);
   const PAST_DATE = "2026-01-01";
   const FUTURE_DATE = "2099-12-31";
@@ -164,9 +191,11 @@ function buildNewCardsLockedSession(args: {
 
   const cards: object[] = [];
 
-  // IDs 1..(nameCardCount-1): already reviewed
-  for (let id = 1; id <= nameCardCount - 1; id++) {
-    const introducedToday = id <= 10;
+  // All species except the last one: already reviewed.
+  // The first 10 are "introduced today" to hit the new-card daily cap.
+  for (let i = 0; i < pokemonIds.length - 1; i++) {
+    const id = pokemonIds[i];
+    const introducedToday = i < 10;
     cards.push({
       id,
       name: "pokemon-" + id,
@@ -180,12 +209,13 @@ function buildNewCardsLockedSession(args: {
     });
   }
 
-  // Last name card: fresh new card — satisfies hasMoreNewCardsOf("name") so
-  // the new-cards wall fires.
+  // Last species ID: fresh new card — satisfies hasMoreNewCardsOf("name") so
+  // the new-cards wall fires even though daily caps are already hit.
+  const lastId = pokemonIds[pokemonIds.length - 1];
   cards.push({
-    id: nameCardCount,
-    name: "pokemon-" + nameCardCount,
-    spriteUrl: "/sprites/pokemon/" + nameCardCount + ".png",
+    id: lastId,
+    name: "pokemon-" + lastId,
+    spriteUrl: "/sprites/pokemon/" + lastId + ".png",
     cardType: "name",
     state: {
       ...baseState,
@@ -224,7 +254,7 @@ function buildNewCardsLockedSession(args: {
 test.describe("Higher-or-Lower mini-game", () => {
   test("mini-game section appears on SESSION_COMPLETE", async ({ page }) => {
     await seedSessionIdb(page, buildCompletedSession({
-      nameCardCount: NAME_CARD_COUNT,
+      pokemonIds: SEED_POKEMON_IDS,
       evolutionCardIds: EVOLUTION_CARD_IDS,
     }));
     await page.goto("/");
@@ -248,7 +278,7 @@ test.describe("Higher-or-Lower mini-game", () => {
 
   test("clicking a Pokémon tile reveals a result banner", async ({ page }) => {
     await seedSessionIdb(page, buildCompletedSession({
-      nameCardCount: NAME_CARD_COUNT,
+      pokemonIds: SEED_POKEMON_IDS,
       evolutionCardIds: EVOLUTION_CARD_IDS,
     }));
     await page.goto("/");
@@ -272,7 +302,7 @@ test.describe("Higher-or-Lower mini-game", () => {
 
   test("mini-game section appears on NEW_CARDS_LOCKED", async ({ page }) => {
     await seedSessionIdb(page, buildNewCardsLockedSession({
-      nameCardCount: NAME_CARD_COUNT,
+      pokemonIds: SEED_POKEMON_IDS,
       evolutionCardIds: EVOLUTION_CARD_IDS,
     }));
     await page.goto("/");

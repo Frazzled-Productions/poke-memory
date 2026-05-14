@@ -51,7 +51,10 @@ test.describe("Practice scope (#333)", () => {
 
     // Scope to the expanded panel so "Generation I" doesn't clash with
     // any other surfaces that mention generations (e.g. trainer card).
-    const genI = scopePanel.getByRole("button", { name: "Generation I" });
+    // `exact: true` is required because "Generation I" is a substring of
+    // "Generation II", "Generation III", etc., causing a strict-mode violation
+    // without it (Playwright matches 5 buttons instead of 1).
+    const genI = scopePanel.getByRole("button", { name: "Generation I", exact: true });
     await expect(genI).toHaveAttribute("aria-pressed", "false");
     await genI.click();
     await expect(genI).toHaveAttribute("aria-pressed", "true");
@@ -73,11 +76,15 @@ test.describe("Practice scope (#333)", () => {
   test("no-match scope renders empty state with Clear scope CTA", async ({
     page,
   }) => {
-    // Pick a scope with zero matching species:
-    //   - gens: [1] (Gen I, ids 1..151)
-    //   - types: ["dark"]
-    // Dark-type was introduced in Gen II, so no Gen-I Pokémon has it.
-    // Verified by inspecting lib/pokemon/generated.json (Gen I × dark = 0).
+    // Pick a scope with zero matching species.
+    //
+    // Scope axes (gens, types, presets) are OR'd, so { gens:[1], types:["dark"] }
+    // matches ALL Gen-I cards PLUS all dark-type cards across every gen — not
+    // their intersection. To guarantee zero matches we use a fictitious type
+    // string that no Pokémon in the seed carries. The settings validator accepts
+    // any string value for types (only gens are range-validated to 1..9), so
+    // "nonexistent-type" passes through intact. With gens:[] and presets:[] the
+    // only active axis is types, and no card has type "nonexistent-type".
     await page.addInitScript(
       ({ key }) => {
         const settings = {
@@ -97,7 +104,7 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsCryPerDay: 100,
           favouriteTheme: null,
           retentionTarget: 0.9,
-          practiceScope: { gens: [1], types: ["dark"], presets: [] },
+          practiceScope: { gens: [], types: ["nonexistent-type"], presets: [] },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },

@@ -136,7 +136,7 @@ test.describe("Pasture page — with mastered cards", () => {
 });
 
 test.describe("Pasture page — sparkle clears on tap", () => {
-  test("tapping a new-arrival sprite clears its sparkle and persists across reload", async ({
+  test("tapping a new-arrival sprite clears its sparkle and persists to IndexedDB", async ({
     page,
   }) => {
     // Seed exactly one mastered card with seenInPasture = false (new arrival).
@@ -149,27 +149,50 @@ test.describe("Pasture page — sparkle clears on tap", () => {
     await expect(spriteBtn).toBeVisible();
 
     // Tap the sprite. This calls onMarkSeen → markSeenInPasture → saveSession,
-    // so the updated flag persists in localStorage.
-    await spriteBtn.click();
+    // so the updated flag persists in IndexedDB.
+    // `force: true` bypasses Playwright's actionability "stability" check, which
+    // can time out when the CSS bob animation continuously moves the img child —
+    // the button element itself is stable but Playwright's heuristic sees motion.
+    await spriteBtn.click({ force: true });
 
     // After the click the aria-label should drop the "(new arrival)" suffix.
+    // Use exact: true so "Caterpie" does not match "Caterpie (new arrival)".
     await expect(
-      page.getByRole("button", { name: "Caterpie" }),
-    ).toBeVisible();
+      page.getByRole("button", { name: "Caterpie", exact: true }),
+    ).toBeVisible({ timeout: 10_000 });
     // The "(new arrival)" variant must be gone.
     await expect(
       page.getByRole("button", { name: "Caterpie (new arrival)" }),
-    ).not.toBeVisible();
+    ).not.toBeVisible({ timeout: 10_000 });
 
-    // Reload to confirm the flag was persisted in localStorage.
-    await page.reload();
+    // Confirm the flag was persisted to IndexedDB by reading IDB directly.
+    // NOTE: We do NOT use page.reload() here because addInitScript re-runs on
+    // every navigation (including reloads), which would overwrite IDB with the
+    // original seed data (seenInPasture: false), producing a false failure.
+    // Reading IDB directly is the correct way to verify persistence in tests
+    // that use addInitScript-based seeding.
+    const idbValue = await page.evaluate(async (): Promise<string | null> => {
+      return new Promise((resolve) => {
+        const req = indexedDB.open("poke-memory", 1);
+        req.onsuccess = () => {
+          const tx = req.result.transaction("kv", "readonly");
+          const getReq = tx.objectStore("kv").get("poke-memory:review-session:v1");
+          getReq.onsuccess = () =>
+            resolve(typeof getReq.result === "string" ? getReq.result : null);
+          getReq.onerror = () => resolve(null);
+        };
+        req.onerror = () => resolve(null);
+      });
+    });
 
-    await expect(
-      page.getByRole("button", { name: "Caterpie" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Caterpie (new arrival)" }),
-    ).not.toBeVisible();
+    // The saved session must have seenInPasture: true for Caterpie (id=10).
+    expect(idbValue).not.toBeNull();
+    const saved = JSON.parse(idbValue!);
+    const caterpieCard = saved.cards.find(
+      (c: { id: number }) => c.id === 10,
+    );
+    expect(caterpieCard).toBeDefined();
+    expect(caterpieCard.state.seenInPasture).toBe(true);
   });
 });
 
