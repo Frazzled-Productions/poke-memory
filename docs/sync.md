@@ -54,6 +54,22 @@ Cards are the primary contract — they flow through `usePerGradeSync` (per-grad
 
 There is no Point-in-Time Recovery on the free tier. Issue #298 tracks the upgrade as a launch blocker. Until PITR is enabled, the trigger and the SQL audit you can run via `mcp__supabase__execute_sql` are the only defenses against an unforeseen sync bug. Treat any production sync change as one-way until PITR is in place.
 
+## Client-cannot-regress checklist
+
+Run through these questions whenever you add a new write path (a new sync leg, a new Server Action that upserts to Supabase) or a new column on a synced table. Each item names the canonical defence and the migration that established it — copy that pattern when adding new state.
+
+1. **Monotonic columns (timestamps and counters).** Does the column only move forward (e.g. `last_review`, `first_seen`, `reps`, `lapses`)? If yes: is movement-backward blocked by `card_reviews_reject_regression_trigger` (migrations 002 / 015 / 016 / 017), or an equivalent `BEFORE UPDATE` trigger on the new table? The trigger raises `check_violation`; copy the structure from `db/migrations/017_card_reviews_pasture_one_way.sql`.
+
+2. **Bounded columns (range or enum CHECK constraints).** Does the column have a known valid range or value set (e.g. numeric bounds like `difficulty ∈ [0, 10]` or `stability ≥ 0`, or a fixed enum like `date_format ∈ {'iso','dmy','mdy'}` or `fsrs_state ∈ {'new','learning','review','relearning'}`)? If yes: is the range or enum enforced by a DB-level `CHECK` constraint? `NOT NULL` alone is not enough — `difficulty` and `stability`, for instance, are `NOT NULL` but have no range `CHECK` yet. Reference implementations to copy: `card_reviews_fsrs_state_check` (migration 004), the `date_format` CHECK (migration 019).
+
+3. **Append-only tables.** Is the table an audit or history ledger where rows should never be mutated or deleted by clients (e.g. `grade_log`, `streak_days`)? If yes: are `UPDATE` and `DELETE` RLS policies absent? Migration 018 dropped `grade_log_update`, `grade_log_delete`, `streak_days_update`, and `streak_days_delete` for exactly this reason. The only legitimate destructive path on these tables is the `reset_all_progress` SECURITY DEFINER RPC in migration 018. New append-only tables must follow the same pattern: add `SELECT` and `INSERT` policies only at creation time, and omit `UPDATE`/`DELETE` entirely — see `db/migrations/006_grade_log.sql` for the policy syntax and `db/migrations/018_reset_all_progress_rpc.sql` for why the UPDATE/DELETE policies that 006 initially created were subsequently dropped.
+
+4. **Future-date columns.** Does the column store a date that must not be in the future (e.g. `streak_days.review_date`, which currently has no such guard)? If yes: add a `CHECK (col <= current_date)` constraint, with `+1` grace day if UTC+14 clients can legitimately stamp tomorrow-in-UTC. See migration 019 for the `ADD CONSTRAINT … CHECK` syntax.
+
+5. **Whole-row overwrite vs. merge.** Does the write path overwrite a JSONB column or multi-field row that another sync leg may also be writing concurrently (e.g. `user_settings.settings`)? If yes: route the write through a merge RPC. The canonical example is `merge_user_settings(p_user_id, p_patch)` (migrations 011 / 014), which uses `INSERT … ON CONFLICT DO UPDATE SET settings = settings || p_patch` to atomically apply a JSONB patch. Any new multi-writer JSONB column needs the same pattern. Scalar columns written by exactly one sync leg (e.g. `user_settings.timezone`, `user_settings.date_format`) are exempt — they use a targeted `UPDATE` (`pushRegionalPrefs`) and are never overwritten by the settings blob path (`pushSettings`).
+
+6. **SECURITY DEFINER scope.** If a new function uses `SECURITY DEFINER`, it must (a) capture `auth.uid()` into a local variable in the `DECLARE` block (e.g. `uid uuid := auth.uid()`) and filter `WHERE user_id = uid` — never rely on the caller to filter, (b) check `uid IS NULL` and raise an exception if not authenticated, (c) set `SET search_path = ''` to avoid search-path injection, and (d) be backed by RLS or a CHECK as the first line of defence — `SECURITY DEFINER` is a bypass, not a replacement. Today the only `SECURITY DEFINER` function is `reset_all_progress`; copy the structure from `db/migrations/018_reset_all_progress_rpc.sql` before writing a new one.
+
 ## Sync paths (authenticated users)
 
 Sync paths to Supabase, in order of how data normally flows:
