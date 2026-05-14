@@ -59,6 +59,12 @@ function isReviewCardShaped(value: unknown): boolean {
     }
     return false;
   }
+  if (v.cardType === "reverse-evolution") {
+    // Edge card derived 1:1 from a forward EvolutionCard (#343). Shares the
+    // postEvoId-keyed shape and is refreshed from seed on hydrate — no
+    // name/spriteUrl is ever serialised for edge cards.
+    return typeof v.preEvoId === "number" && typeof v.postEvoId === "number";
+  }
   // Non-evolution cards still need name + spriteUrl present so the legacy
   // migration path can backfill cardType="name" safely.
   if (typeof v.name !== "string") return false;
@@ -392,10 +398,12 @@ export async function saveSession(session: SavedSession): Promise<SaveResult> {
     return result;
   }
 
-  try {
-    await idbSet(STORAGE_KEY, json);
-  } catch {
-    // idbSet already marks idbAvailable=false internally; fall back.
+  await idbSet(STORAGE_KEY, json);
+
+  // idbSet swallows internal errors without throwing — it just flips
+  // idbAvailable to false. Check after the await so a silently-failed write
+  // falls back to localStorage instead of returning a false-positive ok.
+  if (!isIdbAvailable()) {
     const result = saveSessionLS(session);
     if (result.ok) {
       dispatchStorageEvent();

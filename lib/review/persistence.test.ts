@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { loadSession, saveSession } from "./persistence";
 import { __resetForTests } from "@/lib/idb/db";
-import type { ReverseReviewCard, NameReviewCard, DailyLimits } from "./session";
+import * as idbModule from "@/lib/idb/db";
+import type { ReverseReviewCard, NameReviewCard, ReverseEvolutionReviewCard, DailyLimits } from "./session";
 import { DEFAULT_LIMITS } from "./session";
 import { initialReviewState } from "@/lib/srs/scheduler";
-import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+import { REVERSE_ID_OFFSET, REVERSE_EDGE_ID_BASE } from "@/lib/pokemon/seed";
 
 // fake-indexeddb/auto is installed by vitest.setup.node.ts and polyfills
 // globalThis.indexedDB. Reset the database between test suites to avoid
@@ -87,6 +88,28 @@ function makeReverseCard(): ReverseReviewCard {
     cryUrl: null,
     state: initialReviewState(NOW),
   };
+}
+
+function makeReverseEvolutionCard(): ReverseEvolutionReviewCard {
+  // Mirrors the shape produced by buildSession for reverse-evolution cards:
+  // spread of EvolutionCard (preEvo*/postEvo* fields, triggerPhrase) + the
+  // reverse-edge id, subjectKey, and state. NO `name`/`spriteUrl` — those
+  // live on `preEvoName`/`postEvoName` etc. Regression test for the
+  // persistence validator falling through to the non-evolution branch and
+  // wiping every saved session that contained a rev-evo card (#343 follow-up).
+  return {
+    cardType: "reverse-evolution",
+    id: REVERSE_EDGE_ID_BASE + 1,
+    preEvoId: 1,
+    preEvoName: "bulbasaur",
+    preEvoSpriteUrl: "https://example.com/1.png",
+    postEvoId: 2,
+    postEvoName: "ivysaur",
+    postEvoSpriteUrl: "https://example.com/2.png",
+    triggerPhrase: "at level 16",
+    subjectKey: "1>>>2",
+    state: initialReviewState(NOW),
+  } as ReverseEvolutionReviewCard;
 }
 
 // Reset the IDB database between tests to avoid state leaking.
@@ -182,6 +205,64 @@ describe("saveSession / loadSession (IDB-backed)", () => {
     expect(loaded).not.toBeNull();
     const storedCard = loaded!.cards[0] as Record<string, unknown>;
     expect(storedCard.flavorText).toBe("A strange seed was planted on its back at birth.");
+  });
+
+  // Regression: rev-evo cards (introduced in #343) inherit the EvolutionCard
+  // shape — no top-level `name`/`spriteUrl`. The validator used to fall
+  // through to the "non-evolution" branch and reject them, so parseSession
+  // returned null for any session that included one and every reload silently
+  // wiped the user's progress to a fresh-seed state. Force-pull-from-cloud
+  // didn't "fix" it because the next reload re-parsed the freshly-written IDB
+  // and threw it out again.
+  it("round-trips a reverse-evolution card through IDB", async () => {
+    const card = makeReverseEvolutionCard();
+    await saveSession({ cards: [card], limits: defaultLimits });
+
+    const loaded = await loadSession();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.cards).toHaveLength(1);
+    expect(loaded!.cards[0].cardType).toBe("reverse-evolution");
+    expect(loaded!.cards[0].id).toBe(card.id);
+  });
+
+  it("keeps the session valid when a name card and a rev-evo card are saved together", async () => {
+    await saveSession({
+      cards: [makeNameCard(), makeReverseEvolutionCard()],
+      limits: defaultLimits,
+    });
+
+    const loaded = await loadSession();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.cards).toHaveLength(2);
+    expect(loaded!.cards.map((c) => c.cardType).sort()).toEqual([
+      "name",
+      "reverse-evolution",
+    ]);
+  });
+
+  it("falls back to localStorage when idbSet silently fails (isIdbAvailable returns false post-write)", async () => {
+    const lsData: Record<string, string> = {};
+    vi.stubGlobal("window", {
+      indexedDB: globalThis.indexedDB,
+      localStorage: {
+        getItem: () => null,
+        setItem: (k: string, v: string) => { lsData[k] = v; },
+        removeItem: () => {},
+      },
+      dispatchEvent: () => true,
+    });
+
+    // Simulate idbSet silently failing: isIdbAvailable returns true on the
+    // pre-write guard (so we enter the IDB path) but false after the write
+    // (as if idbSet caught an internal error and flipped the flag).
+    vi.spyOn(idbModule, "isIdbAvailable")
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+
+    const result = await saveSession({ cards: [makeReverseCard()], limits: defaultLimits });
+
+    expect(result.ok).toBe(true);
+    expect(lsData["poke-memory:review-session:v1"]).toBeDefined();
   });
 });
 
