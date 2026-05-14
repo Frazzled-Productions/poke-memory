@@ -1,0 +1,105 @@
+name: Feature / enhancement
+description: A new user-facing feature, an improvement to an existing one, or a CI/workflow change.
+title: "<area>: <one-line summary>"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fields mirror existing enhancement issues (What → Why → Surface → Acceptance). Filing through this form gets the issue ready for the planner stage without back-and-forth.
+
+        - Don't add the `auto` label — only the repo owner dispatches the auto-implement pipeline.
+        - Don't apply a `priority:*` label yourself; suggest one below and the owner will set it.
+        - If this introduces a new vendor, paid service, auth provider, database, or persistence layer, call it out under "Additional context" — it needs an explicit user decision before implementation.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: Concise description of the change. One short paragraph.
+      placeholder: "e.g. Add a 'mastery by type' filter to the Pokédex grid."
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: User value or motivation. Why does this matter now?
+    validations:
+      required: true
+
+  - type: input
+    id: surface
+    attributes:
+      label: Surface
+      description: Affected page, route, file, or component. Be specific.
+      placeholder: "e.g. app/pokedex/page.tsx + components/pokedex/Filters.tsx"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: A checklist of conditions that mean this is done. The planner will use this verbatim.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - app — review / practice
+        - app — Pokédex
+        - app — Pasture
+        - app — Stats
+        - app — Settings / superuser
+        - sync / persistence
+        - SRS scheduler
+        - PokéAPI / sprites
+        - Supabase schema or RLS
+        - workflow / CI / repo automation
+        - docs
+        - other / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: superuser
+    attributes:
+      label: Superuser flag interaction
+      description: If this displays mastery state, completion counts, or per-Pokémon collection state, it must honour `pretendAllMastered`. See AGENTS.md › Superuser mode.
+      options:
+        - Honours pretendAllMastered (or another existing flag)
+        - Genuinely unaffected — will be called out in the PR
+        - Not applicable (no mastery / collection state involved)
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: suggested_priority
+    attributes:
+      label: Suggested priority
+      description: Captured in the body; the repo owner applies the actual `priority:*` label.
+      options:
+        - now — pick this up next
+        - next — queued, second priority
+        - later — parking lot
+        - no opinion
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Related issues/PRs, design notes, screenshots, vendor/service decisions that need user sign-off.
+    validations:
+      required: false

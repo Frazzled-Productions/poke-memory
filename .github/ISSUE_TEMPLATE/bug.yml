@@ -1,0 +1,124 @@
+name: Bug report
+description: A user-facing or system bug — something that does not behave as intended.
+title: "<area>: <one-line symptom>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing. The fields below mirror the structure existing bug issues use (Symptom → Steps → Expected/Actual → Environment), so this issue can drop straight into the `priority:*` triage flow.
+
+        - Don't add the `auto` label — only the repo owner dispatches the auto-implement pipeline.
+        - Don't apply a `priority:*` label yourself; suggest one below and the owner will set it.
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Symptom
+      description: What goes wrong, in one or two sentences. Screenshots welcome.
+      placeholder: "e.g. After grading a reverse-evolution card, the practice page reloads as if no cards have been seen today."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal numbered steps from a clean state. Include the URL/page and any localStorage prep.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      placeholder: What you thought would happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include any error messages, console output, or stack traces verbatim.
+      placeholder: What actually happened.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Where did you see this?
+      options:
+        - Production (pokememory.com)
+        - Preview deployment (vercel.app)
+        - Local dev (next dev)
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Auth state
+      options:
+        - Guest (no sign-in)
+        - Signed in (GitHub)
+        - Not applicable
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / OS / device
+      description: e.g. "Chrome 142 / macOS 26.0" or "Mobile Safari / iOS 19 / iPhone 15".
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Best-guess; reviewer will adjust the label.
+      options:
+        - app — review / practice
+        - app — Pokédex
+        - app — Pasture
+        - app — Stats
+        - app — Settings / superuser
+        - sync / persistence
+        - SRS scheduler
+        - PokéAPI / sprites
+        - Supabase schema or RLS
+        - workflow / CI / repo automation
+        - docs
+        - other / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: suggested_priority
+    attributes:
+      label: Suggested priority
+      description: Captured in the body; the repo owner applies the actual `priority:*` label.
+      options:
+        - now — blocks normal use or recent regression
+        - next — should be fixed soon
+        - later — nice to fix eventually
+        - no opinion
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Logs, related issues/PRs, hypotheses about root cause.
+    validations:
+      required: false
