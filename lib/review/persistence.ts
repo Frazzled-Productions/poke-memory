@@ -1,6 +1,7 @@
 import type { ReviewableCard, DailyLimits, PerTypeLimits } from "@/lib/review/session";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { Subject } from "@/lib/cards/subjectKey";
+import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
 
 export type { DailyLimits };
 
@@ -246,12 +247,7 @@ export function migrateReviewCard(card: unknown): void {
   migrateReviewState(c.state);
 }
 
-export function loadSession(): SavedSession | null {
-  if (typeof window === "undefined") return null;
-
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (raw === null) return null;
-
+function parseSession(raw: string): SavedSession | null {
   try {
     const parsed: unknown = JSON.parse(raw);
 
@@ -295,6 +291,38 @@ export function loadSession(): SavedSession | null {
   }
 }
 
+// Synchronous localStorage fallback used when IndexedDB is unavailable.
+function loadSessionLS(): SavedSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (raw === null) return null;
+    return parseSession(raw);
+  } catch {
+    return null;
+  }
+}
+
+export async function loadSession(): Promise<SavedSession | null> {
+  if (typeof window === "undefined") return null;
+
+  if (!isIdbAvailable()) {
+    return loadSessionLS();
+  }
+
+  try {
+    const raw = await idbGet(STORAGE_KEY);
+    if (raw === null) {
+      // IDB had nothing — check localStorage as a last resort (covers the
+      // window between migration running and a fresh install).
+      return loadSessionLS();
+    }
+    return parseSession(raw);
+  } catch {
+    return loadSessionLS();
+  }
+}
+
 // Strips large seed-derived arrays from name and reverse cards before
 // serialization. hydrateSession re-injects them from the seed on every mount,
 // so persisting them wastes quota and can fill localStorage on mobile.
@@ -309,9 +337,9 @@ function serializeCard(card: ReviewableCard): unknown {
 
 export type SaveResult = { ok: true } | { ok: false; reason: "quota" | "unknown" };
 
-export function saveSession(session: SavedSession): SaveResult {
+// Synchronous localStorage fallback used when IndexedDB is unavailable.
+function saveSessionLS(session: SavedSession): SaveResult {
   if (typeof window === "undefined") return { ok: true };
-
   const payload = { cards: session.cards.map(serializeCard), limits: session.limits };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -326,24 +354,55 @@ export function saveSession(session: SavedSession): SaveResult {
     console.warn("[poke-memory] saveSession: localStorage write failed", err);
     return { ok: false, reason: "unknown" };
   }
+  return { ok: true };
+}
 
-  // Same-tab subscribers (useSessionStorageKey) require a synthetic
-  // StorageEvent — the browser only fires the native event in *other* tabs.
-  // Centralising the dispatch here means every writer satisfies the invariant
-  // without remembering it explicitly.
+function dispatchStorageEvent(): void {
+  // Same-tab subscribers (useSessionStorageKey) require a synthetic StorageEvent
+  // to re-render. The browser only fires the native event in *other* tabs.
+  // Even though data now lives in IndexedDB rather than localStorage, browsers
+  // don't validate storageArea when you construct a StorageEvent yourself, so
+  // the dispatch still reaches all window.addEventListener("storage", …) handlers
+  // on the same tab. Centralising the dispatch here means every writer satisfies
+  // the invariant without remembering it explicitly.
   try {
     window.dispatchEvent(
       new StorageEvent("storage", {
         key: STORAGE_KEY,
         storageArea: window.localStorage,
-        newValue: window.localStorage.getItem(STORAGE_KEY),
+        newValue: null,
       }),
     );
   } catch {
     // Older browsers / non-standard envs without a StorageEvent constructor.
-    // The native cross-tab event still fires, and same-tab callers can fall
-    // back to manual dispatch if they need to.
+  }
+}
+
+export async function saveSession(session: SavedSession): Promise<SaveResult> {
+  if (typeof window === "undefined") return { ok: true };
+
+  const payload = { cards: session.cards.map(serializeCard), limits: session.limits };
+  const json = JSON.stringify(payload);
+
+  if (!isIdbAvailable()) {
+    const result = saveSessionLS(session);
+    if (result.ok) {
+      dispatchStorageEvent();
+    }
+    return result;
   }
 
+  try {
+    await idbSet(STORAGE_KEY, json);
+  } catch {
+    // idbSet already marks idbAvailable=false internally; fall back.
+    const result = saveSessionLS(session);
+    if (result.ok) {
+      dispatchStorageEvent();
+    }
+    return result;
+  }
+
+  dispatchStorageEvent();
   return { ok: true };
 }

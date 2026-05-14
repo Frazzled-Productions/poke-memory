@@ -9,7 +9,7 @@ import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
 /**
- * Pulls all cloud rows for the user, merges them into localStorage using the
+ * Pulls all cloud rows for the user, merges them into IndexedDB using the
  * lastPullAt-based conflict rule, then updates lastPullAt from the server
  * timestamp so subsequent pulls can distinguish new cloud writes from stale ones.
  *
@@ -32,13 +32,13 @@ export async function pullAndMerge(
     if (cloudRows === null) return "error";
 
     const syncStatus = loadSyncStatus();
-    const localSession = loadSession();
+    const localSession = await loadSession();
 
     let merged: ReturnType<typeof buildSession>;
     let saveResult;
     if (localSession !== null) {
       merged = mergeCloudIntoLocalSilent(localSession.cards, cloudRows, syncStatus.lastPullAt);
-      saveResult = saveSession({ cards: merged, limits: localSession.limits });
+      saveResult = await saveSession({ cards: merged, limits: localSession.limits });
     } else {
       // Brand-new device: pull cloud settings FIRST when local has none —
       // otherwise the base is built with DEFAULT_SETTINGS (reverse/cry
@@ -60,7 +60,7 @@ export async function pullAndMerge(
         seedOptsFromSettings(settings),
       );
       merged = mergeCloudIntoLocalSilent(base, cloudRows, syncStatus.lastPullAt);
-      saveResult = saveSession({ cards: merged, limits: DEFAULT_LIMITS });
+      saveResult = await saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
 
     // If the write failed (e.g. storage quota exceeded), bail out — same-tab

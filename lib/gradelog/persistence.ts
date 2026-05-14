@@ -1,4 +1,5 @@
 import type { Grade } from "@/lib/srs/scheduler";
+import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
 
 export type GradeLogEntry = {
   date: string;
@@ -71,11 +72,8 @@ function synthesizeOccurredAt(date: string, indexWithinDay: number): number {
   return Date.UTC(y, m - 1, d, 12, 0, 0) + indexWithinDay;
 }
 
-export function loadGradeLog(): GradeLog {
-  if (typeof window === "undefined") return [];
+function parseGradeLog(raw: string): GradeLog {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed) || !parsed.every(isStoredEntryShape)) return [];
 
@@ -107,9 +105,56 @@ export function loadGradeLog(): GradeLog {
   }
 }
 
-export function appendGradeEntry(
+// Synchronous localStorage fallback used when IndexedDB is unavailable.
+function loadGradeLogLS(): GradeLog {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (raw === null) return [];
+    return parseGradeLog(raw);
+  } catch {
+    return [];
+  }
+}
+
+export async function loadGradeLog(): Promise<GradeLog> {
+  if (typeof window === "undefined") return [];
+
+  if (!isIdbAvailable()) {
+    return loadGradeLogLS();
+  }
+
+  try {
+    const raw = await idbGet(STORAGE_KEY);
+    if (raw === null) {
+      // IDB had nothing — fall back to localStorage as last resort.
+      return loadGradeLogLS();
+    }
+    return parseGradeLog(raw);
+  } catch {
+    return loadGradeLogLS();
+  }
+}
+
+// Synchronous localStorage fallback for appendGradeEntry.
+function saveGradeLogLS(log: GradeLog): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+    return true;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "QuotaExceededError") {
+      console.warn("poke-memory: grade log write failed — localStorage quota exceeded");
+    } else {
+      console.error("poke-memory: grade log write failed", err);
+    }
+    return false;
+  }
+}
+
+export async function appendGradeEntry(
   entry: Omit<GradeLogEntry, "occurredAt">,
-): GradeLogEntry | null {
+): Promise<GradeLogEntry | null> {
   if (typeof window === "undefined") return null;
   try {
     const stamped: GradeLogEntry = {
@@ -119,9 +164,18 @@ export function appendGradeEntry(
       occurredAt: Date.now(),
       ...(typeof entry.subjectKey === "string" ? { subjectKey: entry.subjectKey } : {}),
     };
-    const pruned = pruneGradeLog(loadGradeLog(), 365, entry.date);
+    const existing = await loadGradeLog();
+    const pruned = pruneGradeLog(existing, 365, entry.date);
     pruned.push(stamped);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+    const json = JSON.stringify(pruned);
+
+    if (isIdbAvailable()) {
+      await idbSet(STORAGE_KEY, json);
+    } else {
+      const ok = saveGradeLogLS(pruned);
+      if (!ok) return null;
+    }
+
     window.dispatchEvent(
       new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: stamped }),
     );
@@ -142,11 +196,16 @@ export function appendGradeEntry(
  * roll back the most recent grade — keyed on `occurredAt` rather than
  * by position so it survives parallel writes from sync.
  */
-export function removeGradeEntry(occurredAt: number): void {
+export async function removeGradeEntry(occurredAt: number): Promise<void> {
   if (typeof window === "undefined") return;
   try {
-    const log = loadGradeLog().filter((e) => e.occurredAt !== occurredAt);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+    const log = (await loadGradeLog()).filter((e) => e.occurredAt !== occurredAt);
+    const json = JSON.stringify(log);
+    if (isIdbAvailable()) {
+      await idbSet(STORAGE_KEY, json);
+    } else {
+      saveGradeLogLS(log);
+    }
   } catch (err) {
     console.error("poke-memory: grade log remove failed", err);
   }
@@ -167,11 +226,16 @@ export function computeGradeTotals(log: GradeLog): GradeTotals {
   return totals;
 }
 
-/** Overwrites localStorage with the given log. Used by sync after merging. */
-export function saveGradeLog(log: GradeLog): void {
+/** Overwrites the grade log store with the given log. Used by sync after merging. */
+export async function saveGradeLog(log: GradeLog): Promise<void> {
   if (typeof window === "undefined") return;
+  const json = JSON.stringify(log);
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+    if (isIdbAvailable()) {
+      await idbSet(STORAGE_KEY, json);
+    } else {
+      saveGradeLogLS(log);
+    }
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
       console.warn("poke-memory: grade log write failed — localStorage quota exceeded");

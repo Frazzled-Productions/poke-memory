@@ -117,7 +117,7 @@ export function useRetryPush(
     const capturedUserId = userId;
 
     async function run() {
-      const session = loadSession();
+      const session = await loadSession();
       const today = todayString(new Date());
       const allReviewed = (session?.cards ?? []).filter(
         (card) => card.state.lastReview !== null,

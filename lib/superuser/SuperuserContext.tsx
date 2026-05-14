@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/lib/auth/AuthContext";
 import { pullSession, mergeCloudIntoLocal } from "@/lib/sync/cloud";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { idbDelete } from "@/lib/idb/db";
 import {
   loadFavourite,
   saveFavourite,
@@ -90,10 +91,10 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
       try {
         const rows = await pullSession(sb, u.id);
         if (rows) {
-          const local = loadSession();
+          const local = await loadSession();
           if (local) {
             const merged = mergeCloudIntoLocal(local.cards, rows);
-            saveSession({ ...local, cards: merged });
+            await saveSession({ ...local, cards: merged });
             // Synthetic StorageEvent invariant: same-tab subscribers
             // (useSessionStorageKey) only re-render on this event.
             window.dispatchEvent(
@@ -110,7 +111,9 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
         "Reset local progress?\n\nSuperuser mode may have altered your local card state. Press OK to clear it (you'll start fresh), or Cancel to keep what you have now.",
       );
       if (confirmed) {
-        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+        // Data now lives in IndexedDB; delete it there. The localStorage key
+        // is left alone (it was already removed during the initial migration).
+        await idbDelete(SESSION_STORAGE_KEY);
         window.dispatchEvent(
           new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
         );
@@ -122,7 +125,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
     const favourite = loadFavourite();
     if (favourite === null) return;
     const settings = loadSettings();
-    const cards = loadSession()?.cards ?? [];
+    const cards = (await loadSession())?.cards ?? [];
     if (!isFavouriteEarned(favourite, cards, settings.masteryRepetitions)) {
       // `saveFavourite` → `saveSettings` already fires `SETTINGS_SAVED_EVENT`,
       // which `FavouriteThemeProvider` listens for — no synthetic StorageEvent

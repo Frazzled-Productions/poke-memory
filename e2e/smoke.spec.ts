@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { seedSessionIdb } from "./helpers/seedIdb";
 
 test.describe("Navigation", () => {
   test("nav links are visible and navigate between pages", async ({
@@ -63,38 +64,35 @@ test.describe("Practice page", () => {
 
   test("Hear name button appears after revealing a name card", async ({ page }) => {
     // Seed a session with a single name card due for review so we control the card type.
-    await page.addInitScript(() => {
-      const session = {
-        cards: [
-          {
-            id: 1,
-            name: "Bulbasaur",
-            spriteUrl: "/sprites/pokemon/1.png",
-            cardType: "name",
-            state: {
-              stability: 0,
-              difficulty: 0,
-              elapsedDays: 0,
-              scheduledDays: 0,
-              reps: 0,
-              lapses: 0,
-              fsrsState: "new",
-              dueDate: "2026-01-01",
-              lastReview: null,
-              firstSeen: null,
-              learningStep: null,
-              stepStartedAt: null,
-            },
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
           },
-        ],
-        limits: {
-          name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
         },
-      };
-      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
     });
 
     await page.goto("/");
@@ -113,43 +111,40 @@ test.describe("Practice page", () => {
     // Seed an evolution card (Bulbasaur → Ivysaur, edgeId 1500001). hydrateSession
     // refreshes the per-side names/sprites from the seed; we only need cardType,
     // id, postEvoId, and state for the saved card to validate and hydrate.
-    await page.addInitScript(() => {
-      const session = {
-        cards: [
-          {
-            cardType: "evolution",
-            id: 1500001,
-            preEvoId: 1,
-            preEvoName: "bulbasaur",
-            preEvoSpriteUrl: "/sprites/pokemon/1.png",
-            postEvoId: 2,
-            postEvoName: "ivysaur",
-            postEvoSpriteUrl: "/sprites/pokemon/2.png",
-            triggerPhrase: null,
-            state: {
-              stability: 0,
-              difficulty: 0,
-              elapsedDays: 0,
-              scheduledDays: 0,
-              reps: 0,
-              lapses: 0,
-              fsrsState: "new",
-              dueDate: "2026-01-01",
-              lastReview: null,
-              firstSeen: null,
-              learningStep: null,
-              stepStartedAt: null,
-            },
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          cardType: "evolution",
+          id: 1500001,
+          preEvoId: 1,
+          preEvoName: "bulbasaur",
+          preEvoSpriteUrl: "/sprites/pokemon/1.png",
+          postEvoId: 2,
+          postEvoName: "ivysaur",
+          postEvoSpriteUrl: "/sprites/pokemon/2.png",
+          triggerPhrase: null,
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
           },
-        ],
-        limits: {
-          name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
         },
-      };
-      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+      ],
+      limits: {
+        name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
     });
 
     await page.goto("/");
@@ -172,47 +167,46 @@ test.describe("Practice page", () => {
 
   test("Hear name buttons appear on a reverse-evolution card (prompt + answer)", async ({ page }) => {
     // Reverse-evolution edge ID for 1500001 is 2500001 (#262 namespace).
-    await page.addInitScript(() => {
-      const session = {
-        cards: [
-          {
-            cardType: "reverse-evolution",
-            id: 2500001,
-            name: "ivysaur",
-            spriteUrl: "/sprites/pokemon/2.png",
-            preEvoId: 1,
-            preEvoName: "bulbasaur",
-            preEvoSpriteUrl: "/sprites/pokemon/1.png",
-            postEvoId: 2,
-            postEvoName: "ivysaur",
-            postEvoSpriteUrl: "/sprites/pokemon/2.png",
-            triggerPhrase: null,
-            state: {
-              stability: 0,
-              difficulty: 0,
-              elapsedDays: 0,
-              scheduledDays: 0,
-              reps: 0,
-              lapses: 0,
-              fsrsState: "new",
-              dueDate: "2026-01-01",
-              lastReview: null,
-              firstSeen: null,
-              learningStep: null,
-              stepStartedAt: null,
-            },
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          cardType: "reverse-evolution",
+          id: 2500001,
+          name: "ivysaur",
+          spriteUrl: "/sprites/pokemon/2.png",
+          preEvoId: 1,
+          preEvoName: "bulbasaur",
+          preEvoSpriteUrl: "/sprites/pokemon/1.png",
+          postEvoId: 2,
+          postEvoName: "ivysaur",
+          postEvoSpriteUrl: "/sprites/pokemon/2.png",
+          triggerPhrase: null,
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
           },
-        ],
-        limits: {
-          name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          "reverse-evolution": { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
         },
-      };
-      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
-      // Reverse-evolution cards are gated by a settings toggle (default off).
+      ],
+      limits: {
+        name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        "reverse-evolution": { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+    // Reverse-evolution cards are gated by a settings toggle (default off).
+    await page.addInitScript(() => {
       localStorage.setItem(
         "poke-memory:user-settings:v1",
         JSON.stringify({ reverseEvolutionCardsEnabled: true }),
@@ -236,39 +230,38 @@ test.describe("Practice page", () => {
   });
 
   test("Hear name button appears on a reverse (sprite-picker) card", async ({ page }) => {
-    await page.addInitScript(() => {
-      const session = {
-        cards: [
-          {
-            id: 2_000_001,
-            pokemonId: 1,
-            name: "Bulbasaur",
-            spriteUrl: "/sprites/pokemon/1.png",
-            cardType: "reverse",
-            state: {
-              stability: 0,
-              difficulty: 0,
-              elapsedDays: 0,
-              scheduledDays: 0,
-              reps: 0,
-              lapses: 0,
-              fsrsState: "new",
-              dueDate: "2026-01-01",
-              lastReview: null,
-              firstSeen: null,
-              learningStep: null,
-              stepStartedAt: null,
-            },
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 2_000_001,
+          pokemonId: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "reverse",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
           },
-        ],
-        limits: {
-          name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
         },
-      };
-      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+      ],
+      limits: {
+        name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+    await page.addInitScript(() => {
       localStorage.setItem(
         "poke-memory:user-settings:v1",
         JSON.stringify({ reverseCardsEnabled: true }),
@@ -459,34 +452,28 @@ test.describe("Settings page", () => {
     page,
   }) => {
     // Seed a mastered Charizard (id=6: repetitions >= 3 AND interval >= 21)
-    await page.addInitScript(() => {
-      const session = {
-        cards: [
-          {
-            id: 6,
-            name: "Charizard",
-            spriteUrl: "/sprites/pokemon/6.png",
-            cardType: "name",
-            state: {
-              repetitions: 3,
-              interval: 21,
-              easeFactor: 2.5,
-              dueDate: "2026-05-20",
-              lastReview: "2026-04-29",
-              firstSeen: "2026-03-01",
-            },
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 6,
+          name: "Charizard",
+          spriteUrl: "/sprites/pokemon/6.png",
+          cardType: "name",
+          state: {
+            repetitions: 3,
+            interval: 21,
+            easeFactor: 2.5,
+            dueDate: "2026-05-20",
+            lastReview: "2026-04-29",
+            firstSeen: "2026-03-01",
           },
-        ],
-        limits: {
-          name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-          reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
         },
-      };
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify(session),
-      );
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
     });
 
     await page.goto("/settings");
@@ -637,46 +624,40 @@ test.describe("Evolution edge card prompt (#262)", () => {
     // Seed a deterministic session containing exactly one evolution edge card
     // (Bulbasaur → Ivysaur, "at level 16") so the assertion isn't sensitive
     // to which card the queue happens to surface first.
-    await page.addInitScript(() => {
-      const session = {
-        cards: [
-          {
-            id: 1_500_001,
-            cardType: "evolution",
-            preEvoId: 1,
-            preEvoName: "bulbasaur",
-            preEvoSpriteUrl: "/sprites/pokemon/1.png",
-            postEvoId: 2,
-            postEvoName: "ivysaur",
-            postEvoSpriteUrl: "/sprites/pokemon/2.png",
-            triggerPhrase: "at level 16",
-            state: {
-              stability: 0,
-              difficulty: 0,
-              elapsedDays: 0,
-              scheduledDays: 0,
-              reps: 0,
-              lapses: 0,
-              fsrsState: "new",
-              dueDate: "2026-05-09",
-              lastReview: null,
-              firstSeen: null,
-              learningStep: null,
-              stepStartedAt: null,
-            },
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1_500_001,
+          cardType: "evolution",
+          preEvoId: 1,
+          preEvoName: "bulbasaur",
+          preEvoSpriteUrl: "/sprites/pokemon/1.png",
+          postEvoId: 2,
+          postEvoName: "ivysaur",
+          postEvoSpriteUrl: "/sprites/pokemon/2.png",
+          triggerPhrase: "at level 16",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-05-09",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
           },
-        ],
-        limits: {
-          name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
         },
-      };
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify(session),
-      );
+      ],
+      limits: {
+        name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
     });
 
     await page.goto("/");

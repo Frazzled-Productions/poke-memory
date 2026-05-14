@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { seedSessionIdb } from "./helpers/seedIdb";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,12 +65,7 @@ function buildSession(cards: ReturnType<typeof masteredCard>[]) {
 test.describe("Pasture nav guard", () => {
   test("Pasture link is absent when no mastered cards", async ({ page }) => {
     // Fresh session — no cards at all.
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify({ cards: [], limits: { name: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 }, reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 } } }),
-      );
-    });
+    await seedSessionIdb(page, { cards: [], limits: { name: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 }, reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 } } });
 
     await page.goto("/");
 
@@ -82,12 +78,7 @@ test.describe("Pasture nav guard", () => {
     page,
   }) => {
     // Caterpie is in the Forest habitat. reps=4, scheduledDays=28 → mastered.
-    await page.addInitScript((session) => {
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify(session),
-      );
-    }, buildSession([masteredCard(10, "Caterpie", "forest")]));
+    await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
 
     await page.goto("/");
 
@@ -105,12 +96,7 @@ test.describe("Pasture page — with mastered cards", () => {
     // Seed two mastered cards from different habitats so at least two zones render.
     // Caterpie: forest → "Forest" zone
     // Tentacool: sea   → "Open Sea" zone
-    await page.addInitScript((session) => {
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify(session),
-      );
-    }, buildSession([
+    await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
       masteredCard(72, "Tentacool", "sea"),
     ]));
@@ -154,12 +140,7 @@ test.describe("Pasture page — sparkle clears on tap", () => {
     page,
   }) => {
     // Seed exactly one mastered card with seenInPasture = false (new arrival).
-    await page.addInitScript((session) => {
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify(session),
-      );
-    }, buildSession([masteredCard(10, "Caterpie", "forest", false)]));
+    await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest", false)]));
 
     await page.goto("/pasture");
 
@@ -194,12 +175,7 @@ test.describe("Pasture page — sparkle clears on tap", () => {
 
 test.describe("Pasture page — idle behaviour", () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript((session) => {
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify(session),
-      );
-    }, buildSession([
+    await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
       masteredCard(72, "Tentacool", "sea"),
     ]));
@@ -234,12 +210,7 @@ test.describe("Pasture page — idle behaviour", () => {
     const ctx = await browser.newContext({ reducedMotion: "reduce" });
     const page = await ctx.newPage();
 
-    await page.addInitScript((session) => {
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify(session),
-      );
-    }, buildSession([masteredCard(10, "Caterpie", "forest")]));
+    await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
 
     await page.goto("/pasture");
 
@@ -256,19 +227,14 @@ test.describe("Pasture page — empty state", () => {
   test("visiting /pasture directly with no mastered cards shows friendly empty state", async ({
     page,
   }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify({
-          cards: [],
-          limits: {
-            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-            cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-          },
-        }),
-      );
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
     });
 
     await page.goto("/pasture");

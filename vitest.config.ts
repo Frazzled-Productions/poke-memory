@@ -15,6 +15,7 @@ export default defineConfig({
           // jsdom project below instead.
           include: ["lib/**/*.test.ts", "lib/**/*.test.tsx"],
           environment: "node",
+          setupFiles: ["./vitest.setup.node.ts"],
         },
       },
       {

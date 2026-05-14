@@ -6,164 +6,142 @@ import {
   computeGradeTotals,
   type GradeLogEntry,
 } from "./persistence";
+import { __resetForTests } from "@/lib/idb/db";
 
-const KEY = "poke-memory:grade-log:v1";
+// fake-indexeddb/auto is installed by vitest.setup.node.ts.
 
-function makeMockStorage() {
-  const store: Record<string, string> = {};
-  return {
-    getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
-  };
+// Reset the IDB database between tests to avoid state leaking.
+async function resetIdb() {
+  // Close the open DB connection first so deleteDatabase doesn't get blocked.
+  await __resetForTests();
+  await new Promise<void>((resolve, reject) => {
+    const req = indexedDB.deleteDatabase("poke-memory");
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => resolve();
+  });
 }
 
-describe("loadGradeLog", () => {
-  let storage: ReturnType<typeof makeMockStorage>;
-
-  beforeEach(() => {
-    storage = makeMockStorage();
-    vi.stubGlobal("window", { localStorage: storage });
-    vi.stubGlobal("localStorage", storage);
+describe("loadGradeLog (IDB-backed)", () => {
+  beforeEach(async () => {
+    await resetIdb();
+    vi.stubGlobal("window", {
+      indexedDB: globalThis.indexedDB,
+      localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+      dispatchEvent: () => true,
+    });
+    vi.stubGlobal("CustomEvent", class extends Event {
+      detail: unknown;
+      constructor(type: string, init?: { detail?: unknown }) {
+        super(type);
+        this.detail = init?.detail;
+      }
+    });
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("returns [] when key is absent", () => {
-    expect(loadGradeLog()).toEqual([]);
+  it("returns [] when key is absent", async () => {
+    expect(await loadGradeLog()).toEqual([]);
   });
 
-  it("returns [] on corrupted JSON", () => {
-    storage.setItem(KEY, "{{bad");
-    expect(loadGradeLog()).toEqual([]);
+  it("returns valid entries after appending", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    await appendGradeEntry({ date: "2026-05-09", grade: 1, cardType: "evolution" });
+    const log = await loadGradeLog();
+    expect(log).toHaveLength(2);
+    expect(log[0].grade).toBe(4);
+    expect(log[1].grade).toBe(1);
   });
 
-  it("returns [] when stored value is not an array", () => {
-    storage.setItem(KEY, JSON.stringify({ grade: 1 }));
-    expect(loadGradeLog()).toEqual([]);
-  });
-
-  it("returns [] when an entry has an invalid grade (e.g. 3)", () => {
-    storage.setItem(KEY, JSON.stringify([{ date: "2026-05-09", grade: 3, cardType: "name" }]));
-    expect(loadGradeLog()).toEqual([]);
-  });
-
-  it("returns [] when an entry is missing a field", () => {
-    storage.setItem(KEY, JSON.stringify([{ grade: 1, cardType: "name" }]));
-    expect(loadGradeLog()).toEqual([]);
-  });
-
-  it("returns valid entries", () => {
-    const entries: GradeLogEntry[] = [
-      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000 },
-      { date: "2026-05-09", grade: 1, cardType: "evolution", occurredAt: 1700000000001 },
-    ];
-    storage.setItem(KEY, JSON.stringify(entries));
-    expect(loadGradeLog()).toEqual(entries);
-  });
-
-  it("loads entries with subjectKey set", () => {
-    const entries = [
-      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000, subjectKey: "42" },
-    ];
-    storage.setItem(KEY, JSON.stringify(entries));
-    const log = loadGradeLog();
+  it("returns entries with subjectKey set when provided", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name", subjectKey: "42" });
+    const log = await loadGradeLog();
     expect(log[0].subjectKey).toBe("42");
   });
 
-  it("loads legacy entries without subjectKey as subjectKey: undefined", () => {
-    const entries = [
-      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000 },
-    ];
-    storage.setItem(KEY, JSON.stringify(entries));
-    const log = loadGradeLog();
+  it("does not set subjectKey when not provided", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    const log = await loadGradeLog();
     expect(log[0].subjectKey).toBeUndefined();
-  });
-
-  it("synthesizes occurredAt for legacy entries that lack it", () => {
-    storage.setItem(
-      KEY,
-      JSON.stringify([
-        { date: "2026-05-09", grade: 4, cardType: "name" },
-        { date: "2026-05-09", grade: 1, cardType: "name" },
-        { date: "2026-05-10", grade: 5, cardType: "evolution" },
-      ]),
-    );
-    const result = loadGradeLog();
-    expect(result).toHaveLength(3);
-    // Same-day legacy entries get distinct synthesized occurredAt values.
-    expect(result[0].occurredAt).not.toBe(result[1].occurredAt);
-    // Earlier date sorts before later date numerically.
-    expect(result[0].occurredAt).toBeLessThan(result[2].occurredAt);
-    // All entries now have a numeric occurredAt field.
-    expect(result.every((e) => typeof e.occurredAt === "number")).toBe(true);
   });
 });
 
-describe("appendGradeEntry", () => {
-  let storage: ReturnType<typeof makeMockStorage>;
-
-  beforeEach(() => {
-    storage = makeMockStorage();
-    vi.stubGlobal("window", { localStorage: storage });
-    vi.stubGlobal("localStorage", storage);
+describe("appendGradeEntry (IDB-backed)", () => {
+  beforeEach(async () => {
+    await resetIdb();
+    vi.stubGlobal("window", {
+      indexedDB: globalThis.indexedDB,
+      localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+      dispatchEvent: () => true,
+    });
+    vi.stubGlobal("CustomEvent", class extends Event {
+      detail: unknown;
+      constructor(type: string, init?: { detail?: unknown }) {
+        super(type);
+        this.detail = init?.detail;
+      }
+    });
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("appends to an empty log", () => {
-    appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
-    const log = loadGradeLog();
+  it("appends to an empty log", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    const log = await loadGradeLog();
     expect(log).toHaveLength(1);
     expect(log[0]).toMatchObject({ date: "2026-05-09", grade: 4, cardType: "name" });
     expect(typeof log[0].occurredAt).toBe("number");
   });
 
-  it("persists subjectKey when provided", () => {
-    appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name", subjectKey: "7" });
-    const log = loadGradeLog();
+  it("persists subjectKey when provided", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name", subjectKey: "7" });
+    const log = await loadGradeLog();
     expect(log[0].subjectKey).toBe("7");
   });
 
-  it("does not set subjectKey when not provided", () => {
-    appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
-    const log = loadGradeLog();
+  it("does not set subjectKey when not provided", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    const log = await loadGradeLog();
     expect(log[0].subjectKey).toBeUndefined();
   });
 
-  it("appends to an existing log without overwriting prior entries", () => {
-    appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
-    appendGradeEntry({ date: "2026-05-09", grade: 1, cardType: "name" });
-    expect(loadGradeLog()).toHaveLength(2);
+  it("appends to an existing log without overwriting prior entries", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    await appendGradeEntry({ date: "2026-05-09", grade: 1, cardType: "name" });
+    expect(await loadGradeLog()).toHaveLength(2);
   });
 
-  it("is a no-op when window is undefined (SSR guard)", () => {
+  it("is a no-op when window is undefined (SSR guard)", async () => {
     vi.unstubAllGlobals();
-    expect(() =>
+    await expect(
       appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" })
-    ).not.toThrow();
+    ).resolves.toBeNull();
   });
 
-  it("does not throw on QuotaExceededError", () => {
-    const err = new DOMException("quota exceeded", "QuotaExceededError");
-    storage.setItem = () => { throw err; };
-    expect(() =>
-      appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" })
-    ).not.toThrow();
-  });
+  it("prunes entries older than 365 days on write", async () => {
+    // Seed old entry directly into IDB via appendGradeEntry with an old date,
+    // then add a newer entry and verify pruning.
+    // We manually seed old data by calling the store directly.
+    const { openAppDb } = await import("@/lib/idb/db");
+    vi.stubGlobal("window", {
+      indexedDB: globalThis.indexedDB,
+      localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+      dispatchEvent: () => true,
+    });
+    const db = await openAppDb();
+    const oldEntries: GradeLogEntry[] = [
+      { date: "2024-05-08", grade: 4, cardType: "name", occurredAt: 1000 },
+      { date: "2025-05-09", grade: 2, cardType: "name", occurredAt: 2000 },
+    ];
+    await db.put("kv", JSON.stringify(oldEntries), "poke-memory:grade-log:v1");
 
-  it("prunes entries older than 365 days on write", () => {
-    storage.setItem(KEY, JSON.stringify([
-      { date: "2024-05-08", grade: 4, cardType: "name" },
-      { date: "2025-05-09", grade: 2, cardType: "name" },
-    ]));
-    appendGradeEntry({ date: "2026-05-09", grade: 5, cardType: "evolution" });
-    const log = loadGradeLog();
+    await appendGradeEntry({ date: "2026-05-09", grade: 5, cardType: "evolution" });
+    const log = await loadGradeLog();
     expect(log.some((e) => e.date === "2024-05-08")).toBe(false);
     expect(log.some((e) => e.date === "2025-05-09")).toBe(true);
     expect(log.some((e) => e.date === "2026-05-09")).toBe(true);

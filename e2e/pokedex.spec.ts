@@ -1,40 +1,38 @@
 import { test, expect } from "@playwright/test";
+import { seedSessionIdb } from "./helpers/seedIdb";
 
 test.describe("Pokédex detail — Hear name button", () => {
   test("Hear name button appears on a non-locked Pokédex entry", async ({ page }) => {
     // Seed Bulbasaur (id=1) as reviewed (lastReview set) so it is "learning" not "locked".
-    await page.addInitScript(() => {
-      const session = {
-        cards: [
-          {
-            id: 1,
-            name: "Bulbasaur",
-            spriteUrl: "/sprites/pokemon/1.png",
-            cardType: "name",
-            state: {
-              stability: 1,
-              difficulty: 5,
-              elapsedDays: 1,
-              scheduledDays: 1,
-              reps: 1,
-              lapses: 0,
-              fsrsState: "learning",
-              dueDate: "2099-01-01",
-              lastReview: "2026-05-13",
-              firstSeen: "2026-05-13",
-              learningStep: null,
-              stepStartedAt: null,
-            },
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-13",
+            firstSeen: "2026-05-13",
+            learningStep: null,
+            stepStartedAt: null,
           },
-        ],
-        limits: {
-          name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-          reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
         },
-      };
-      localStorage.setItem("poke-memory:review-session:v1", JSON.stringify(session));
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
     });
 
     await page.goto("/pokedex/1");

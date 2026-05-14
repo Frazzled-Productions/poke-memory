@@ -270,7 +270,7 @@ describe("exportProgress", () => {
     mockAnchor.download = "";
     mockAnchor.click.mockReset();
 
-    vi.mocked(loadSession).mockReturnValue({
+    vi.mocked(loadSession).mockResolvedValue({
       cards: [makeMinimalCard(SEED_POKEMON[0].id) as BackupFile["cards"][number]],
       limits: VALID_LIMITS,
     });
@@ -293,14 +293,14 @@ describe("exportProgress", () => {
     vi.unstubAllGlobals();
   });
 
-  it("is a no-op when window is undefined (SSR guard)", () => {
+  it("is a no-op when window is undefined (SSR guard)", async () => {
     vi.stubGlobal("window", undefined);
-    expect(() => exportProgress()).not.toThrow();
+    await expect(exportProgress()).resolves.toBeUndefined();
     expect(capturedBlob).toBeUndefined();
   });
 
   it("produces a Blob that deserialises to a valid BackupFile", async () => {
-    exportProgress();
+    await exportProgress();
     expect(capturedBlob).toBeDefined();
     const text = await capturedBlob!.text();
     const parsed = JSON.parse(text);
@@ -308,22 +308,22 @@ describe("exportProgress", () => {
   });
 
   it("uses an empty card array when loadSession returns null", async () => {
-    vi.mocked(loadSession).mockReturnValue(null);
-    exportProgress();
+    vi.mocked(loadSession).mockResolvedValue(null);
+    await exportProgress();
     const text = await capturedBlob!.text();
     const parsed = JSON.parse(text) as BackupFile;
     expect(parsed.cards).toEqual([]);
   });
 
-  it("filename contains today's ISO date", () => {
-    exportProgress();
+  it("filename contains today's ISO date", async () => {
+    await exportProgress();
     capturedFilename = mockAnchor.download;
     const today = new Date().toISOString().slice(0, 10);
     expect(capturedFilename).toContain(today);
     expect(capturedFilename).toMatch(/\.json$/);
   });
 
-  it("calls URL.revokeObjectURL after creating the download", () => {
+  it("calls URL.revokeObjectURL after creating the download", async () => {
     vi.useFakeTimers();
     const mockRevoke = vi.fn();
     vi.stubGlobal("URL", {
@@ -333,7 +333,7 @@ describe("exportProgress", () => {
       },
       revokeObjectURL: mockRevoke,
     });
-    exportProgress();
+    await exportProgress();
     vi.runAllTimers();
     expect(mockRevoke).toHaveBeenCalledWith("blob:mock");
     vi.useRealTimers();
@@ -369,7 +369,7 @@ describe("validateBackup + applyBackup", () => {
     expect(result.data.cards[0].state.stepStartedAt).toBeNull();
     expect(result.data.settings).toEqual(VALID_SETTINGS);
     // applyBackup commits the validated data
-    applyBackup(result.data);
+    await applyBackup(result.data);
     expect(vi.mocked(saveSession)).toHaveBeenCalledOnce();
     const savedSession = vi.mocked(saveSession).mock.calls[0][0];
     expect(savedSession.cards[0].state.stepStartedAt).toBeNull();

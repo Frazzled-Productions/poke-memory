@@ -19,10 +19,10 @@ export type ValidatedBackup = {
   settings: UserSettings;
 };
 
-export function exportProgress(): void {
+export async function exportProgress(): Promise<void> {
   if (typeof window === "undefined") return;
 
-  const session = loadSession() ?? { cards: [], limits: DEFAULT_LIMITS };
+  const session = (await loadSession()) ?? { cards: [], limits: DEFAULT_LIMITS };
   const settings = loadSettings();
 
   const now = new Date();
@@ -98,7 +98,7 @@ export async function validateBackup(
   return { ok: true, data: { cards, limits: parsed.limits, settings: parsed.settings } };
 }
 
-export function applyBackup(data: ValidatedBackup): void {
-  saveSession({ cards: data.cards, limits: data.limits });
+export async function applyBackup(data: ValidatedBackup): Promise<void> {
+  await saveSession({ cards: data.cards, limits: data.limits });
   saveSettings(data.settings);
 }
