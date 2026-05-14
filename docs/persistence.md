@@ -7,7 +7,7 @@ Tables today: `card_reviews`, `streak_days`, `user_settings`, `grade_log`. All R
 ## Decide where the data lives
 
 1. **Per-user setting / toggle / preference** → add a field to `user_settings.settings` (jsonb). No schema migration needed. Extend the `UserSettings` type in `lib/settings/persistence.ts`; the existing settings sync flow carries the new field automatically (see #307 favourite-theme for the canonical example).
-2. **Per-card scheduling state** → add a column to `card_reviews` via a migration. The regression trigger from migration 002 currently guards only the lifecycle timestamps (`last_review`, `first_seen`) — if your new column has its own "only moves forward" invariant, extend the trigger; otherwise leave it alone.
+2. **Per-card scheduling state** → add a column to `card_reviews` via a migration. The regression trigger (migrations 002 and 015) guards lifecycle timestamps (`last_review`, `first_seen`) and monotonic counters (`reps`, `lapses`) — if your new column has its own "only moves forward" invariant, extend the trigger in a new migration; otherwise leave it alone.
 3. **Monotonic / per-event data** (logs, daily markers, audit trails) → new table. See checklist below.
 
 ## New table checklist
