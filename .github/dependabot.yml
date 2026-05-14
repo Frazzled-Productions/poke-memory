@@ -15,6 +15,17 @@ updates:
         patterns: ["tailwindcss", "@tailwindcss/*"]
       vitest:
         patterns: ["vitest", "@vitest/*", "@testing-library/*"]
+      supabase:
+        patterns: ["@supabase/*"]
+      vercel:
+        patterns: ["@vercel/*"]
+      tooling:
+        patterns: ["typescript", "@types/node"]
+      # Keep this group last — its "*" pattern matches any security PR not
+      # already claimed by a named group above.
+      npm-security-other:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
