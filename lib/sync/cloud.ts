@@ -22,7 +22,7 @@ export function isSyncSafe(card: ReviewableCard): boolean {
 }
 
 /**
- * Cloud row shape after migration 010.
+ * Cloud row shape after migration 012.
  *
  * Primary identity: (card_type, subject_key).
  *   card_type   — DB discriminator (e.g. "name", "evolution-edge"). Note: the

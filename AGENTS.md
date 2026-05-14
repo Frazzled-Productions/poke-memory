@@ -91,7 +91,7 @@ The canonical reference is **[docs/sync.md](docs/sync.md)** — read it before t
 
 ### Adding a feature that needs to persist data
 
-The full decision tree — JSONB field on `user_settings` vs. column on `card_reviews` vs. new table, plus the new-table checklist (uuid PK, FK to `auth.users` with `ON DELETE CASCADE`, four named RLS policies, indexes, regression-trigger pattern) — lives in **[docs/persistence.md](docs/persistence.md)**. Tables today are `card_reviews`, `streak_days`, `user_settings`, `grade_log`.
+The full decision tree — JSONB field on `user_settings` vs. column on `card_reviews` vs. new table, plus the new-table checklist (uuid PK, FK to `auth.users` with `ON DELETE CASCADE`, SELECT + INSERT RLS policies as the append-only baseline with opt-in UPDATE/DELETE, indexes, regression-trigger pattern) — lives in **[docs/persistence.md](docs/persistence.md)**. Tables today are `card_reviews`, `streak_days`, `user_settings`, `grade_log`.
 
 For card-shaped persistence — anything keyed by `(user_id, card_type, subject_key)` — the decision record (why one table with a discriminator over per-card-type tables, when to add a new `card_type` vs. a sidecar table, subject-key encoding conventions) lives in **[docs/card-identity.md](docs/card-identity.md)**. Read it before adding a new card type or extending the `card_reviews` schema.
 

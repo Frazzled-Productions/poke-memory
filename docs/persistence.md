@@ -43,7 +43,7 @@ CREATE POLICY "<name>_insert" ON <name>
 --   FOR DELETE USING (auth.uid() = user_id);
 ```
 
-Four named policies (one per verb) beat a single `FOR ALL` — easier to audit and to drop selectively. `ON DELETE CASCADE` ensures rows die with their user. Always combine `CREATE TABLE` + `ENABLE RLS` + policies in the same migration; an enabled-RLS-without-policies state silently blocks the client.
+Named per-verb policies (SELECT, INSERT, and optionally UPDATE/DELETE) beat a single `FOR ALL` — easier to audit and to drop selectively. The template above defaults to SELECT + INSERT as the safe baseline for append-only tables; add UPDATE/DELETE only if the table is genuinely mutable from the client. `ON DELETE CASCADE` ensures rows die with their user. Always combine `CREATE TABLE` + `ENABLE RLS` + policies in the same migration; an enabled-RLS-without-policies state silently blocks the client.
 
 For append-only tables (logs, daily markers, audit trails), omit the UPDATE and DELETE policies — `grade_log` and `streak_days` both had theirs **removed** in migration 018 as defence against client-side wipe bugs. See "Invariants on existing data" below for the designated escape hatch.
 
