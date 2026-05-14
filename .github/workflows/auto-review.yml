@@ -1,29 +1,38 @@
 name: Auto Review
 
-# Triggered when a PR opens, reopens, or has the `auto-review` label added.
-# Runs the `code-reviewer` sub-agent against the PR diff and posts an
-# `<!-- auto-review:N -->` comment (N computed from existing review markers
-# on the PR) so the existing `/fix` loop in auto-pr.yml works unchanged.
+# Fires by default on every PR against `main` and runs the `code-reviewer`
+# sub-agent against the diff, posting an `<!-- auto-review:N -->` comment
+# (N computed from existing review markers on the PR) so the existing `/fix`
+# loop in auto-pr.yml works unchanged.
 #
-# Gate: PRs whose head branch starts with `auto/` (bot-opened PRs) OR which
-# carry an `auto-review` label (manually-opened opt-in). Drafts are skipped
-# so a draft opt-in doesn't burn a 30-minute Claude run before the PR is
-# ready for review. Fork PRs are explicitly excluded (head.repo.fork == false)
-# — this is a deliberate guard, not a side-effect of GitHub's default
-# secret-isolation policy. The condition uses == false rather than != true:
-# a null fork value yields (null == false) → false, keeping the guard closed;
-# != true would yield (null != true) → true, bypassing it.
-# For `labeled` events only the newly-added `auto-review` label fires a run,
-# so unrelated labels are ignored.
+# Gate (skip-list, inverted from the earlier allow-list — see #469):
+#   - Drafts are skipped so a draft PR doesn't burn a 30-minute Claude run
+#     before it's ready for review.
+#   - Fork PRs are excluded (head.repo.fork == false). This is a deliberate
+#     guard, not a side-effect of GitHub's default secret-isolation policy.
+#     The condition uses == false rather than != true: a null fork value
+#     yields (null == false) → false, keeping the guard closed; != true
+#     would yield (null != true) → true, bypassing it.
+#   - PRs with `[skip ci]` in the title or body are skipped (matches the
+#     repo-wide convention used by auto-release commits).
+#   - PRs whose title starts with `chore(release):` are skipped — these are
+#     the auto-release workflow's own commits and never want a review.
+#   - Dependabot PRs are skipped (`github.actor == 'dependabot[bot]'`).
+#   - PRs targeting non-`main` branches are skipped — out of scope.
+#
+# The previous allow-list gated on head-branch prefix `auto/` or an
+# `auto-review` label. Both are dropped: the inverted gate makes the label
+# unnecessary, and the branch prefix only matched bot-opened PRs in
+# practice (real human branches were `worktree-*`, `phase*/*`, etc., and
+# the gate was silently skipping them).
 #
 # Idempotency: the body of the auto-review comment includes a hidden
 # `<!-- auto-review-sha:<head-sha> -->` line on row 2. Re-triggers at the
-# same head SHA (e.g. close + reopen, or removing and re-adding the label)
-# are skipped.
+# same head SHA (e.g. close + reopen) are skipped.
 
 on:
   pull_request:
-    types: [opened, reopened, labeled]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: auto-review-${{ github.event.pull_request.number }}
@@ -32,16 +41,14 @@ concurrency:
 jobs:
   review:
     name: Review
-    if: |
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.fork == false &&
-      (
-        (github.event.action != 'labeled' &&
-          (startsWith(github.head_ref, 'auto/') ||
-           contains(github.event.pull_request.labels.*.name, 'auto-review')))
-        ||
-        (github.event.action == 'labeled' && github.event.label.name == 'auto-review')
-      )
+    if: >-
+      github.event.pull_request.draft == false
+      && github.event.pull_request.head.repo.fork == false
+      && github.event.pull_request.base.ref == 'main'
+      && github.actor != 'dependabot[bot]'
+      && !startsWith(github.event.pull_request.title, 'chore(release):')
+      && !contains(github.event.pull_request.title, '[skip ci]')
+      && !contains(github.event.pull_request.body, '[skip ci]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
