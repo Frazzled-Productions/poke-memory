@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { hasCloudData, applyCloudAuthoritative, pullSession, pushSession } from "@/lib/sync/cloud";
+import { hasCloudData, applyCloudAuthoritative, maxCloudUpdatedAt, pullSession, pushSession } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
@@ -150,8 +150,17 @@ export default function CallbackCompletePage() {
         const settings = loadSettings();
         const opts = seedOptsFromSettings(settings);
         const limits = local?.limits ?? DEFAULT_LIMITS;
-        const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, status.cloudRows, opts);
+        const cloudRows = status.kind === "conflict" ? status.cloudRows : [];
+        const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, cloudRows, opts);
         await saveSession({ cards: rebuilt, limits });
+        // Stamp lastPullAt from the cloud rows just applied. Without this the
+        // next background pullAndMerge runs with lastPullAt === null, and
+        // mergeCloudIntoLocalSilent's null-anchor rule treats every
+        // local-with-progress card as authoritative — silently dropping any
+        // cloud update that arrives after the user picks "Keep cloud". #293
+        // lesson applied to the conflict-picker recovery path.
+        const prev = loadSyncStatus();
+        saveSyncStatus({ ...prev, lastPullAt: maxCloudUpdatedAt(cloudRows) });
         router.replace("/");
       } catch (err) {
         console.warn("[callback-complete] handleKeepCloud failed:", err);
