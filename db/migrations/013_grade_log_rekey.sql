@@ -2,14 +2,17 @@
 --
 -- Pre-flight (verified before applying):
 --   Total grade_log rows: 368
---   Rows with card_id >= 1_500_000 (edge IDs, unbackfillable): 100 → DROP
+--   Forward-edge rows (card_id 1_500_000..1_999_999, unbackfillable): 25 → DROP
+--   Reverse-evo-edge rows (card_id 2_500_000..2_999_999, unbackfillable): 7 → DROP
 --   Rows with card_id IS NULL (pre-migration-009, unbackfillable): 182 → DROP
---   Rows remaining after drops: 86 (all in name/reverse/cry ranges)
+--   Total dropped: 214. Remaining: 154 (in name 1..999_999, reverse-species
+--   2_000_001..2_499_999, cry 3_000_001+).
 --
--- Backfill direction uses the same offset scheme as the card_reviews migration 010:
---   name:    card_id 1..999_999      → subject_key = card_id::text
---   reverse: card_id 2_000_001..2_999_999 → subject_key = (card_id - 2_000_000)::text
---   cry:     card_id 3_000_001..3_999_999 → subject_key = (card_id - 3_000_000)::text
+-- Backfill direction uses the same offset scheme as the card_reviews migration 010,
+-- but the reverse range is capped at < 2_500_000 to exclude the reverse-evo-edge band:
+--   name:            card_id 1..999_999         → subject_key = card_id::text
+--   reverse-species: card_id 2_000_001..2_499_999 → subject_key = (card_id - 2_000_000)::text
+--   cry:             card_id 3_000_001..3_999_999 → subject_key = (card_id - 3_000_000)::text
 
 -- 1. Add subject_key (nullable for now; backfilled below, then NOT NULL).
 ALTER TABLE grade_log ADD COLUMN subject_key text;
@@ -21,19 +24,22 @@ UPDATE grade_log
 SET subject_key = card_id::text
 WHERE card_id BETWEEN 1 AND 999999;
 
--- reverse cards: card_id 2_000_001..2_999_999
+-- reverse-species cards: card_id 2_000_001..2_499_999 (capped below the
+-- reverse-evo-edge band 2_500_000+ which is dropped in step 3, not backfilled).
 UPDATE grade_log
 SET subject_key = (card_id - 2000000)::text
-WHERE card_id BETWEEN 2000001 AND 2999999;
+WHERE card_id BETWEEN 2000001 AND 2499999;
 
 -- cry cards: card_id 3_000_001..3_999_999
 UPDATE grade_log
 SET subject_key = (card_id - 3000000)::text
 WHERE card_id BETWEEN 3000001 AND 3999999;
 
--- 3. Drop edge rows (card_id in the 1_500_000..1_999_999 and 2_500_000..2_999_999 ranges
---    that encoded evolution-edge / reverse-evolution-edge cards). Per pre-flight: 100 rows.
+-- 3. Drop edge rows in both encoded ranges:
+--    forward evolution-edge: card_id 1_500_000..1_999_999  (pre-flight: 25 rows)
+--    reverse evolution-edge: card_id 2_500_000..2_999_999  (pre-flight: 7 rows)
 DELETE FROM grade_log WHERE card_id >= 1500000 AND card_id < 2000000;
+DELETE FROM grade_log WHERE card_id >= 2500000 AND card_id < 3000000;
 
 -- 4. Drop rows where card_id IS NULL — pre-migration-009 entries with no card identity.
 --    Per pre-flight: 182 rows.
