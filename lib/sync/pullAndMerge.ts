@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
-import { pullSettings, pullRegionalPrefs } from "@/lib/sync/settings";
+import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
@@ -34,24 +34,43 @@ export async function pullAndMerge(
     const syncStatus = loadSyncStatus();
     const localSession = await loadSession();
 
+    // Pull the JSONB settings blob on every cycle (#572). The brand-new-device
+    // path (hasStoredSettings === false) keeps its existing semantics: cloud
+    // wins so the base session below is built with the right card-type opts
+    // (#391). For devices with stored settings, cloud wins only when its
+    // server-side updated_at is strictly newer than the timestamp this device
+    // last applied — otherwise the local copy is the freshest view.
+    let nextLastSettingsPullAt = syncStatus.lastSettingsPullAt;
+    try {
+      const pulledSettings = await pullSettingsWithTimestamp(client, userId);
+      if (pulledSettings !== null) {
+        const localHadSettings = hasStoredSettings();
+        const cloudIsNewer =
+          pulledSettings.updatedAt !== null &&
+          (syncStatus.lastSettingsPullAt === null ||
+            pulledSettings.updatedAt > syncStatus.lastSettingsPullAt);
+        if (!localHadSettings || cloudIsNewer) {
+          saveSettings(pulledSettings.settings);
+        }
+        if (pulledSettings.updatedAt !== null) {
+          nextLastSettingsPullAt = pulledSettings.updatedAt;
+        }
+      }
+    } catch (e) {
+      // Best-effort — settings pull failure must not flip sync into error.
+      console.warn("[pullAndMerge] settings pull failed (non-fatal)", e);
+    }
+
     let merged: ReturnType<typeof buildSession>;
     let saveResult;
     if (localSession !== null) {
       merged = mergeCloudIntoLocalSilent(localSession.cards, cloudRows, syncStatus.lastPullAt);
       saveResult = await saveSession({ cards: merged, limits: localSession.limits });
     } else {
-      // Brand-new device: pull cloud settings FIRST when local has none —
-      // otherwise the base is built with DEFAULT_SETTINGS (reverse/cry
-      // disabled) and cloud rows for those types are silently dropped by the
-      // merge (#391).
-      if (!hasStoredSettings()) {
-        try {
-          const cloudSettings = await pullSettings(client, userId);
-          if (cloudSettings !== null) saveSettings(cloudSettings);
-        } catch {
-          // Best-effort: fall through to default settings.
-        }
-      }
+      // Brand-new device: settings have already been applied above (if cloud
+      // had any) so the base session picks up the cloud-side reverse/cry/etc.
+      // opts. Without this, cloud rows for disabled card types are silently
+      // dropped by the merge (#391).
       const settings = loadSettings();
       const base = buildSession(
         SEED_POKEMON,
@@ -67,8 +86,6 @@ export async function pullAndMerge(
     // subscribers will not have received a synthetic StorageEvent because
     // saveSession only dispatches on success.
     if (!saveResult.ok) return "error";
-
-    saveSyncStatus({ ...syncStatus, lastPullAt: maxCloudUpdatedAt(cloudRows) });
 
     // Pull regional prefs (timezone + date_format scalar columns) — best-effort,
     // runs on every pull so device B picks up choices made on device A.
@@ -90,6 +107,12 @@ export async function pullAndMerge(
       // Best-effort — regional prefs failure must not flip sync into error.
       console.warn("[pullAndMerge] regional prefs pull failed (non-fatal)", e);
     }
+
+    saveSyncStatus({
+      ...syncStatus,
+      lastPullAt: maxCloudUpdatedAt(cloudRows),
+      lastSettingsPullAt: nextLastSettingsPullAt,
+    });
 
     return "ok";
   } catch {

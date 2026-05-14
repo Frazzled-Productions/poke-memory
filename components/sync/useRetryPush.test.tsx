@@ -94,6 +94,7 @@ const FAILED_STATUS: SyncStatus = {
   lastPushAttemptAt: "2026-05-13T10:00:00.000Z",
   failedCardCount: 2,
   lastPullAt: null,
+  lastSettingsPullAt: null,
 };
 
 const OK_STATUS: SyncStatus = {
@@ -102,6 +103,7 @@ const OK_STATUS: SyncStatus = {
   lastPushAttemptAt: "2026-05-13T10:00:00.000Z",
   failedCardCount: 0,
   lastPullAt: null,
+  lastSettingsPullAt: null,
 };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

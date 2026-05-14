@@ -125,21 +125,37 @@ export async function pullSettings(
   client: SupabaseClient,
   userId: string,
 ): Promise<UserSettings | null> {
+  const result = await pullSettingsWithTimestamp(client, userId);
+  return result === null ? null : result.settings;
+}
+
+export type PulledSettings = {
+  settings: UserSettings;
+  /** Server-side updated_at — the cross-device anchor for "is cloud newer than what this device last saw". Null if the row has no timestamp (legacy). */
+  updatedAt: string | null;
+};
+
+/**
+ * Same shape as `pullSettings` but also returns `user_settings.updated_at`.
+ * Lets the background pull decide whether the cloud copy is newer than the
+ * last copy this device applied. Without it, a device that has any local
+ * settings can never receive remote updates (issue #572).
+ */
+export async function pullSettingsWithTimestamp(
+  client: SupabaseClient,
+  userId: string,
+): Promise<PulledSettings | null> {
   try {
     const { data, error } = await client
       .from("user_settings")
-      .select("settings")
+      .select("settings, updated_at")
       .eq("user_id", userId)
       .maybeSingle();
     if (error || !data) return null;
-    const s = (data as { settings: unknown }).settings;
-    // Treat both null and {} as "no real cloud settings". A row with
-    // settings = NULL can be created by pushRegionalPrefs before pushSettings
-    // has run; {} is the default from migration scaffolding. Neither should
-    // overwrite real local choices on a new device.
-    if (typeof s !== "object" || s === null) return null;
-    if (Object.keys(s as Record<string, unknown>).length === 0) return null;
-    return s as UserSettings;
+    const row = data as { settings: unknown; updated_at: string | null };
+    if (typeof row.settings !== "object" || row.settings === null) return null;
+    if (Object.keys(row.settings as Record<string, unknown>).length === 0) return null;
+    return { settings: row.settings as UserSettings, updatedAt: row.updated_at };
   } catch {
     return null;
   }
