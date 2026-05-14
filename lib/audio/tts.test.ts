@@ -408,6 +408,53 @@ describe("speakName with TTS settings (#429)", () => {
   });
 });
 
+describe("warmupTts", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("no-ops when window is undefined", async () => {
+    const { warmupTts } = await import("./tts");
+    expect(() => warmupTts()).not.toThrow();
+  });
+
+  it("no-ops when speechSynthesis is missing from window", async () => {
+    vi.stubGlobal("window", {});
+    const { warmupTts } = await import("./tts");
+    expect(() => warmupTts()).not.toThrow();
+  });
+
+  it("calls speechSynthesis.speak with volume=0", async () => {
+    const synth = makeSynthesis([voice("en-GB", true, "Daniel")]);
+    stubSpeechAPIs(synth);
+    const { warmupTts } = await import("./tts");
+
+    warmupTts();
+
+    expect(synth.speak).toHaveBeenCalledOnce();
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance & { volume: number };
+    expect(utterance.volume).toBe(0);
+  });
+
+  it("is idempotent — second call is a no-op", async () => {
+    const synth = makeSynthesis([voice("en-GB", true, "Daniel")]);
+    stubSpeechAPIs(synth);
+    const { warmupTts } = await import("./tts");
+
+    warmupTts();
+    warmupTts();
+    warmupTts();
+
+    expect(synth.speak).toHaveBeenCalledOnce();
+  });
+});
+
 describe("voiceTier", () => {
   it("classifies voices by name keyword", async () => {
     const { voiceTier } = await import("./tts");

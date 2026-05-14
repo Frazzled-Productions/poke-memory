@@ -33,7 +33,7 @@ import { nextReview } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
-import { speakName } from "@/lib/audio/tts";
+import { speakName, warmupTts } from "@/lib/audio/tts";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
@@ -1045,6 +1045,14 @@ export function ReviewSession() {
     // Re-narrow cards inside the closure — TS doesn't carry the outer
     // null-check through a function that captures a useState variable.
     if (cards === null) return;
+
+    // Warm up speechSynthesis on the first grade gesture. This satisfies the
+    // browser's autoplay policy (Chromium / WebKit) so that speakNameOnReveal
+    // fires on the very next card without requiring the user to manually tap
+    // the speaker icon first. Must run synchronously here — after any `await`
+    // the gesture context is lost and the warm-up would not count (#479).
+    warmupTts();
+
     setGrading(true);
 
     // Snapshot the pre-grade state for single-step undo. The previous
