@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
-import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
+import {
+  pullUserSettingsRow,
+  pullRegionalPrefs,
+  type UserSettingsRow,
+} from "@/lib/sync/settings";
 import { pullStreak, mergeStreak } from "@/lib/sync/streak";
 import { pullGradeLog, mergeGradeLog } from "@/lib/sync/gradeLog";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
@@ -13,6 +17,7 @@ import {
   STREAK_UPDATED_EVENT,
 } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
+import { clearLocalProgress } from "@/lib/storage/reset";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
@@ -39,45 +44,69 @@ export async function pullAndMerge(
     const cloudRows = await pullSession(client, userId);
     if (cloudRows === null) return "error";
 
-    const syncStatus = loadSyncStatus();
-    const localSession = await loadSession();
+    let syncStatus = loadSyncStatus();
+    let localSession = await loadSession();
 
-    // Pull the JSONB settings blob on every cycle (#572). The brand-new-device
-    // path (hasStoredSettings === false) keeps its existing semantics: cloud
-    // wins so the base session below is built with the right card-type opts
-    // (#391). For devices with stored settings, cloud wins only when its
-    // server-side updated_at is strictly newer than the timestamp this device
-    // last applied — otherwise the local copy is the freshest view.
-    let nextLastSettingsPullAt = syncStatus.lastSettingsPullAt;
+    // Pull the full user_settings row up front: we need the JSONB blob, the
+    // server-side updated_at (#572 cursor), AND last_reset_at (the #576
+    // tombstone marker). One query covers all three.
+    let pulledRow: UserSettingsRow | null = null;
     try {
-      const pulledSettings = await pullSettingsWithTimestamp(client, userId);
-      if (pulledSettings !== null) {
-        const localHadSettings = hasStoredSettings();
-        const cloudIsNewer =
-          pulledSettings.updatedAt !== null &&
-          (syncStatus.lastSettingsPullAt === null ||
-            pulledSettings.updatedAt > syncStatus.lastSettingsPullAt);
-        // `user_settings.updated_at` is `NOT NULL DEFAULT now()` so this
-        // branch is unreachable against real Supabase data. It exists for the
-        // schema-drift case `pullSettingsWithTimestamp` coerces with `?? null`
-        // (response missing the column entirely) — when that happens we still
-        // want to apply the blob once and then stamp the cursor so we don't
-        // re-apply on every cycle. Removing this guard would silently degrade
-        // to "blob applied once, cursor never advances, blob re-applied forever".
-        const legacyNeverApplied =
-          pulledSettings.updatedAt === null && syncStatus.lastSettingsPullAt === null;
-        if (!localHadSettings || cloudIsNewer || legacyNeverApplied) {
-          saveSettings(pulledSettings.settings);
-        }
-        if (pulledSettings.updatedAt !== null) {
-          nextLastSettingsPullAt = pulledSettings.updatedAt;
-        } else if (legacyNeverApplied) {
-          nextLastSettingsPullAt = new Date().toISOString();
-        }
-      }
+      pulledRow = await pullUserSettingsRow(client, userId);
     } catch (e) {
-      // Best-effort — settings pull failure must not flip sync into error.
       console.warn("[pullAndMerge] settings pull failed (non-fatal)", e);
+    }
+
+    // Tombstone check (#576). If cloud's `last_reset_at` has advanced past
+    // what this device has reconciled, the user has called
+    // reset_all_progress somewhere — wipe local before any merge runs, so
+    // stale local rows do not survive into the merged session and get pushed
+    // back on the next sync. The schema-level triggers (migration 022) catch
+    // the resurrection if this app-layer check misses, but doing the wipe
+    // here means the user's local state matches cloud immediately.
+    if (
+      pulledRow?.lastResetAt &&
+      (syncStatus.lastSeenResetAt === null ||
+        pulledRow.lastResetAt > syncStatus.lastSeenResetAt)
+    ) {
+      await clearLocalProgress();
+      // clearLocalProgress wiped sync-status:v1 under the poke-memory:*
+      // sweep. Reload so the rest of this cycle sees ZERO cursors and
+      // freshly applies cloud truth across the board.
+      syncStatus = loadSyncStatus();
+      localSession = null;
+    }
+
+    // Apply the JSONB settings blob on every cycle (#572). The brand-new-
+    // device path (hasStoredSettings === false) keeps its existing
+    // semantics: cloud wins so the base session below is built with the
+    // right card-type opts (#391). For devices with stored settings, cloud
+    // wins only when its server-side updated_at is strictly newer than the
+    // timestamp this device last applied — otherwise the local copy is the
+    // freshest view.
+    let nextLastSettingsPullAt = syncStatus.lastSettingsPullAt;
+    if (pulledRow !== null && pulledRow.settings !== null) {
+      const localHadSettings = hasStoredSettings();
+      const cloudIsNewer =
+        pulledRow.updatedAt !== null &&
+        (syncStatus.lastSettingsPullAt === null ||
+          pulledRow.updatedAt > syncStatus.lastSettingsPullAt);
+      // `user_settings.updated_at` is `NOT NULL DEFAULT now()` so this
+      // branch is unreachable against real Supabase data. It exists for the
+      // schema-drift case `pullUserSettingsRow` coerces with `?? null`
+      // (response missing the column entirely) — when that happens we still
+      // want to apply the blob once and then stamp the cursor so we don't
+      // re-apply on every cycle.
+      const legacyNeverApplied =
+        pulledRow.updatedAt === null && syncStatus.lastSettingsPullAt === null;
+      if (!localHadSettings || cloudIsNewer || legacyNeverApplied) {
+        saveSettings(pulledRow.settings);
+      }
+      if (pulledRow.updatedAt !== null) {
+        nextLastSettingsPullAt = pulledRow.updatedAt;
+      } else if (legacyNeverApplied) {
+        nextLastSettingsPullAt = new Date().toISOString();
+      }
     }
 
     let merged: ReturnType<typeof buildSession>;
@@ -86,10 +115,11 @@ export async function pullAndMerge(
       merged = mergeCloudIntoLocalSilent(localSession.cards, cloudRows, syncStatus.lastPullAt);
       saveResult = await saveSession({ cards: merged, limits: localSession.limits });
     } else {
-      // Brand-new device: settings have already been applied above (if cloud
-      // had any) so the base session picks up the cloud-side reverse/cry/etc.
-      // opts. Without this, cloud rows for disabled card types are silently
-      // dropped by the merge (#391).
+      // Brand-new device (or just-cleared by the tombstone path above):
+      // settings have already been applied if cloud had any, so the base
+      // session picks up the cloud-side reverse/cry/etc. opts. Without this,
+      // cloud rows for disabled card types are silently dropped by the
+      // merge (#391).
       const settings = loadSettings();
       const base = buildSession(
         SEED_POKEMON,
@@ -195,6 +225,7 @@ export async function pullAndMerge(
       ...syncStatus,
       lastPullAt: maxCloudUpdatedAt(cloudRows),
       lastSettingsPullAt: nextLastSettingsPullAt,
+      lastSeenResetAt: pulledRow?.lastResetAt ?? syncStatus.lastSeenResetAt,
     });
 
     return "ok";

@@ -10,6 +10,8 @@ export type SyncStatus = {
   lastPullAt: string | null;
   /** ISO timestamp of the last user_settings row this device applied (server updated_at). Tracked separately because settings live in a different table from cards and have an independent write cadence (#572). */
   lastSettingsPullAt: string | null;
+  /** ISO timestamp of the `user_settings.last_reset_at` this device has already reconciled. When cloud advances this past the local value, `pullAndMerge` calls `clearLocalProgress` before merging — that's how stale local stops resurrecting deleted rows (#576). Null = never seen a reset on this device. */
+  lastSeenResetAt: string | null;
 };
 
 const ZERO: SyncStatus = {
@@ -19,6 +21,7 @@ const ZERO: SyncStatus = {
   failedCardCount: null,
   lastPullAt: null,
   lastSettingsPullAt: null,
+  lastSeenResetAt: null,
 };
 
 export function loadSyncStatus(): SyncStatus {
@@ -36,6 +39,7 @@ export function loadSyncStatus(): SyncStatus {
       failedCardCount: Number.isInteger(obj.failedCardCount) && (obj.failedCardCount as number) >= 0 ? obj.failedCardCount as number : null,
       lastPullAt: typeof obj.lastPullAt === "string" ? obj.lastPullAt : null,
       lastSettingsPullAt: typeof obj.lastSettingsPullAt === "string" ? obj.lastSettingsPullAt : null,
+      lastSeenResetAt: typeof obj.lastSeenResetAt === "string" ? obj.lastSeenResetAt : null,
     };
   } catch {
     return ZERO;

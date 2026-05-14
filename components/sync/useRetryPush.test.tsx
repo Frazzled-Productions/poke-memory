@@ -95,6 +95,7 @@ const FAILED_STATUS: SyncStatus = {
   failedCardCount: 2,
   lastPullAt: null,
   lastSettingsPullAt: null,
+    lastSeenResetAt: null,
 };
 
 const OK_STATUS: SyncStatus = {
@@ -104,6 +105,7 @@ const OK_STATUS: SyncStatus = {
   failedCardCount: 0,
   lastPullAt: null,
   lastSettingsPullAt: null,
+    lastSeenResetAt: null,
 };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
