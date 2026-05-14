@@ -173,7 +173,7 @@ test.describe("Pasture page — sparkle clears on tap", () => {
     // that use addInitScript-based seeding.
     const idbValue = await page.evaluate(async (): Promise<string | null> => {
       return new Promise((resolve) => {
-        const req = indexedDB.open("poke-memory", 1);
+        const req = indexedDB.open("poke-memory");
         req.onsuccess = () => {
           const tx = req.result.transaction("kv", "readonly");
           const getReq = tx.objectStore("kv").get("poke-memory:review-session:v1");
@@ -291,7 +291,7 @@ test.describe("Pasture page — reacts to clearLocalProgress storage event", () 
     // the synthetic StorageEvent the helper fires for same-tab subscribers.
     await page.evaluate(async () => {
       await new Promise<void>((resolve) => {
-        const req = indexedDB.open("poke-memory", 1);
+        const req = indexedDB.open("poke-memory");
         req.onsuccess = () => {
           const tx = req.result.transaction("kv", "readwrite");
           tx.objectStore("kv").delete("poke-memory:review-session:v1");
