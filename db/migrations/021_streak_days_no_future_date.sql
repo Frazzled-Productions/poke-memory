@@ -13,12 +13,10 @@
 -- migration 018 (closing #515). This migration adds the remaining client-side
 -- regression gap surfaced in #524.
 --
--- IMPORTANT: current_date is STABLE (not IMMUTABLE) in PostgreSQL. This
--- CHECK constraint is enforced at INSERT/UPDATE time only — it evaluates
--- current_date at the moment of each write. Do NOT run
--- ALTER TABLE streak_days VALIDATE CONSTRAINT streak_days_no_future_date
--- after the fact: validation evaluates current_date at that instant and
--- would incorrectly flag every historical row as a violation.
+-- NOTE: current_date is STABLE (not IMMUTABLE) in PostgreSQL — it evaluates
+-- to the date at the moment of each INSERT/UPDATE, not a stored constant. All
+-- existing rows were validated immediately when this constraint was applied
+-- (no NOT VALID flag was used), so no separate VALIDATE CONSTRAINT step exists.
 --
 -- Pre-flight audit ran before applying:
 --   SELECT COUNT(*) FROM streak_days WHERE review_date > current_date + 1;
