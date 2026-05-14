@@ -78,6 +78,13 @@ const FALLBACK_TIMEZONES: string[] = [
   "Pacific/Apia",
 ];
 
+// Evaluated once at module load — list is stable, no point computing it
+// on every render of the Settings page.
+const TIMEZONE_OPTIONS: string[] =
+  typeof Intl !== "undefined" && "supportedValuesOf" in Intl
+    ? (Intl as { supportedValuesOf: (key: string) => string[] }).supportedValuesOf("timeZone")
+    : FALLBACK_TIMEZONES;
+
 function SkeletonBlock({ className }: { className: string }) {
   return (
     <div
@@ -347,6 +354,9 @@ export default function SettingsPage() {
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Tracks whether auto-detection ran on this mount so the push effect below
+  // only fires when prefs were freshly detected, not on every auth change.
+  const autoDetectedPrefsRef = useRef<{ timezone: string; dateFormat: DateFormat } | null>(null);
 
   const [optimizableReviewCount, setOptimizableReviewCount] = useState<number>(0);
 
@@ -369,17 +379,10 @@ export default function SettingsPage() {
     }
     if (needsSave) {
       saveSettings(loaded);
-      // Best-effort push to the scalar columns if signed in. This runs
-      // asynchronously; failure is silent — the values are persisted locally
-      // and will sync on the next manual sync cycle.
-      if (user && supabase) {
-        void pushRegionalPrefs(supabase, user.id, {
-          timezone: loaded.timezone,
-          dateFormat: loaded.dateFormat,
-        }).catch(() => {
-          // Best-effort — sync will pick this up later.
-        });
-      }
+      autoDetectedPrefsRef.current = {
+        timezone: loaded.timezone!,
+        dateFormat: loaded.dateFormat!,
+      };
     }
 
     setSettings(loaded);
@@ -390,8 +393,21 @@ export default function SettingsPage() {
       if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
       if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Best-effort push of auto-detected regional prefs once auth is available.
+  // Runs when user/supabase resolve (async after mount) so the push is not
+  // silently skipped when useAuth hasn't resolved yet at mount time.
+  // Only fires if auto-detection ran on this mount (ref guard).
+  useEffect(() => {
+    if (!user || !supabase || !autoDetectedPrefsRef.current) return;
+    const prefs = autoDetectedPrefsRef.current;
+    autoDetectedPrefsRef.current = null;
+    void pushRegionalPrefs(supabase, user.id, {
+      timezone: prefs.timezone,
+      dateFormat: prefs.dateFormat,
+    }).catch(() => {});
+  }, [user, supabase]);
 
   function handleChange(key: keyof UserSettings, raw: string) {
     setDraftValues((prev) => ({ ...prev, [key]: raw }));
@@ -1103,10 +1119,7 @@ export default function SettingsPage() {
                     }}
                     className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                   >
-                    {(typeof Intl !== "undefined" && "supportedValuesOf" in Intl
-                      ? (Intl as { supportedValuesOf: (key: string) => string[] }).supportedValuesOf("timeZone")
-                      : FALLBACK_TIMEZONES
-                    ).map((tz) => (
+                    {TIMEZONE_OPTIONS.map((tz) => (
                       <option key={tz} value={tz}>
                         {tz}
                       </option>

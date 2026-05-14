@@ -58,17 +58,18 @@ export async function pushRegionalPrefs(
   prefs: RegionalPrefs,
 ): Promise<boolean> {
   try {
+    // UPDATE rather than upsert — avoids creating a sparse row (settings=NULL)
+    // for a user whose pushSettings hasn't run yet. A no-op update (row doesn't
+    // exist) is safe: the row will be created by pushSettings and the next
+    // explicit timezone/date_format change will update the scalar columns.
     const { error } = await client
       .from("user_settings")
-      .upsert(
-        {
-          user_id: userId,
-          timezone: prefs.timezone,
-          date_format: prefs.dateFormat,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" },
-      );
+      .update({
+        timezone: prefs.timezone,
+        date_format: prefs.dateFormat,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
     return !error;
   } catch {
     return false;

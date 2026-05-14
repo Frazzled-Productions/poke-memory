@@ -1,4 +1,4 @@
--- Migration 015: add timezone and date_format columns to user_settings.
+-- Migration 019: add timezone and date_format columns to user_settings.
 --
 -- Both columns are nullable. NULL means "client hasn't set this yet — auto-detect
 -- and write back". This avoids overwriting a user's deliberate choice with a

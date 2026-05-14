@@ -15,6 +15,7 @@ vi.mock("@/lib/sync/cloud", () => ({
 
 vi.mock("@/lib/sync/settings", () => ({
   pullSettings: vi.fn(),
+  pullRegionalPrefs: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({

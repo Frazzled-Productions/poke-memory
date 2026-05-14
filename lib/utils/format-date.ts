@@ -41,7 +41,7 @@ export function todayInTimezone(tz: string, now: Date = new Date()): string {
  */
 export function formatDate(iso: string, fmt: DateFormat, tz: string): string {
   try {
-    const d = new Date(iso + "T12:00:00");
+    const d = new Date(iso + "T12:00:00Z");
     if (fmt === "iso") {
       // Weekday + ISO string is the clearest representation for this format.
       const weekday = new Intl.DateTimeFormat("en-GB", {
