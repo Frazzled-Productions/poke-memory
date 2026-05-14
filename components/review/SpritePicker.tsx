@@ -41,14 +41,16 @@ type Props = {
   onGrade: (correct: boolean) => void;
 };
 
+/**
+ * Must be remounted (via a changing `key` prop) on each card presentation so
+ * the tile order reshuffles for learning-step replays and within-session reviews.
+ */
 export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
   const [answered, setAnswered] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Shuffle once at mount. The parent must remount this component (via a
-  // changing `key`) on each card presentation so the order is fresh every time
-  // the same card reappears as a learning-step replay or within-session review.
+  // Lazy initializer shuffles once at mount — order is stable for the component's lifetime.
   const [tiles] = useState<Tile[]>(() => buildTiles(targetPokemon, distractors));
 
   useEffect(() => {

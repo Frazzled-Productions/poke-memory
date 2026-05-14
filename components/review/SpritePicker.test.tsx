@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SpritePicker, fisherYatesShuffle } from "@/components/review/SpritePicker";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
@@ -73,7 +73,7 @@ describe("fisherYatesShuffle", () => {
   it("contains all the same elements as the input", () => {
     const input = [1, 2, 3, 4];
     const result = fisherYatesShuffle(input);
-    expect(result.sort()).toEqual([...input].sort());
+    expect([...result].sort((a, b) => a - b)).toEqual([...input].sort((a, b) => a - b));
   });
 
   it("does not mutate the original array", () => {
@@ -135,10 +135,59 @@ describe("SpritePicker", () => {
     expect(matches.length).toBeGreaterThan(0);
   });
 
+  it("calls onGrade(true) when the correct tile is clicked, after the feedback delay", () => {
+    vi.useFakeTimers();
+    try {
+      const onGrade = vi.fn();
+      render(
+        <SpritePicker
+          targetPokemon={TARGET}
+          distractors={DISTRACTORS}
+          onGrade={onGrade}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Bulbasaur" }));
+      expect(onGrade).not.toHaveBeenCalled();
+
+      act(() => vi.runAllTimers());
+      expect(onGrade).toHaveBeenCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("calls onGrade(false) when a wrong tile is clicked, after the feedback delay", () => {
+    vi.useFakeTimers();
+    try {
+      const onGrade = vi.fn();
+      render(
+        <SpritePicker
+          targetPokemon={TARGET}
+          distractors={DISTRACTORS}
+          onGrade={onGrade}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Ivysaur" }));
+      expect(onGrade).not.toHaveBeenCalled();
+
+      act(() => vi.runAllTimers());
+      expect(onGrade).toHaveBeenCalledWith(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("produces different option orderings across multiple mounts with the same props", () => {
     // Run 20 mounts and record the rendered button order each time.
     // At least one must differ, proving the shuffle is not deterministic (#496).
     // Each mount is wrapped in its own container to avoid DOM conflicts.
+    //
+    // NOTE: this test relies on real Math.random. If a future test setup mocks or
+    // seeds Math.random globally (e.g. vi.spyOn(Math, "random") or faker.seed()),
+    // every mount will produce the same ordering and this assertion will silently
+    // become a no-op.
     const orders: string[] = [];
 
     for (let i = 0; i < 20; i++) {
