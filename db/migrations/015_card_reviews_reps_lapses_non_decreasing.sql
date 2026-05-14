@@ -8,7 +8,10 @@
 -- the user re-graded).
 --
 -- The function is re-declared in full so the migration is self-contained
--- and re-running it on a database already at 002 (or 015) is idempotent.
+-- and re-running it on a database already at 002, 012, or 015 is idempotent.
+-- The DROP TRIGGER + CREATE TRIGGER pair at the bottom executes inside the
+-- single implicit transaction Postgres uses for migration files, so there
+-- is no observable window where the trigger is unbound.
 
 CREATE OR REPLACE FUNCTION card_reviews_reject_regression()
 RETURNS trigger
@@ -38,9 +41,8 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  -- reps and lapses are NOT NULL columns (enforced by schema), so NULL < OLD.reps
-  -- evaluates to NULL in PL/pgSQL and the guard never fires — the column constraint
-  -- is the defence against NULL here, matching the pattern of the guards above.
+  -- reps and lapses are NOT NULL by schema constraint, so the comparison is a
+  -- straightforward integer comparison; no explicit NULL guard is needed.
   IF NEW.reps < OLD.reps THEN
     RAISE EXCEPTION
       'card_reviews regression: reps cannot decrease from % to % (user_id=%, card_type=%, subject_key=%)',

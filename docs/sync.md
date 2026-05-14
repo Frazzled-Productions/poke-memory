@@ -14,7 +14,7 @@ The rules below exist because of incidents that have already happened (#293 wipe
 - **Brand-new device (`loadSession()` returned `null`) must not push back the merged result.** The merged state is entirely cloud-sourced; pushing it back is wasted bandwidth and widens the window for a future regression.
 - **If `pullSession` fails, do not push.** Pushing without knowing cloud state is the exact failure mode of #293. The same rule applies to anywhere else you sync: cards, streak, settings, future tables. Pull first, decide, then push.
 
-### Database trigger (`card_reviews_reject_regression_trigger`, migration 002)
+### Database trigger (`card_reviews_reject_regression_trigger`, migration 002, extended in 015)
 
 A `BEFORE UPDATE` trigger on `card_reviews` raises `23514 check_violation` when:
 
