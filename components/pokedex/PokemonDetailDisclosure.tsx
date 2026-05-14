@@ -361,7 +361,7 @@ export function PokemonDetailDisclosure({
         </section>
       )}
 
-      {forms.length > 0 && (
+      {!isLocked && forms.length > 0 && (
         <section aria-labelledby="forms-heading" className="mt-10">
           <h2
             id="forms-heading"

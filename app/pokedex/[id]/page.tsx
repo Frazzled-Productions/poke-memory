@@ -25,10 +25,11 @@ export default async function PokemonDetailPage({
   const pokemon = SEED_POKEMON.find((p) => p.id === id);
   if (!pokemon) return notFound();
 
-  // Collect all non-default forms for this species. The speciesId field exists
-  // after the seed is re-run with #445 changes; until then this returns [].
+  // Collect all non-default forms for this species, excluding the current
+  // pokemon itself (so a page for an alt-form won't list itself).
+  // speciesId was added in #445; until the seed is re-run this returns [].
   const forms = SEED_POKEMON.filter(
-    (p) => p.speciesId === id && !p.isDefaultForm,
+    (p) => p.speciesId === pokemon.speciesId && !p.isDefaultForm && p.id !== pokemon.id,
   );
 
   return (
