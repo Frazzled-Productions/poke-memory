@@ -30,16 +30,21 @@ function renderInline(text: string): ReactNode[] {
       const labelEnd = match[2].indexOf("]");
       const label = match[2].slice(1, labelEnd);
       const url = match[2].slice(labelEnd + 2, -1);
-      out.push(
-        <a
-          key={key++}
-          href={url}
-          className="text-theme-primary underline underline-offset-2 hover:no-underline"
-          rel="noreferrer"
-        >
-          {label}
-        </a>,
-      );
+      if (!/^https?:\/\//i.test(url)) {
+        out.push(label);
+      } else {
+        out.push(
+          <a
+            key={key++}
+            href={url}
+            className="text-theme-primary underline underline-offset-2 hover:no-underline"
+            rel="noreferrer"
+            target="_blank"
+          >
+            {label}
+          </a>,
+        );
+      }
     } else if (match[3]) {
       const num = match[4];
       out.push(

@@ -34,7 +34,7 @@ export function WhatsNewIndicator() {
   useEffect(() => {
     function handleStorage(event: StorageEvent) {
       if (event.key !== LAST_SEEN_VERSION_KEY) return;
-      const lastSeen = event.newValue ?? readLastSeenVersion();
+      const lastSeen = event.newValue;
       if (lastSeen === null) {
         setHasUnseen(false);
         return;

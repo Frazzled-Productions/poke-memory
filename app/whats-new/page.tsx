@@ -33,7 +33,7 @@ export default function WhatsNewPage() {
           No release notes available.
         </p>
       ) : (
-        <ol className="space-y-8" role="list">
+        <ol className="space-y-8">
           {releases.map((release) => (
             <li key={release.version}>
               <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-zinc-200 pb-2 dark:border-zinc-800">

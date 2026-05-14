@@ -1,5 +1,4 @@
 export const LAST_SEEN_VERSION_KEY = "poke-memory:last-seen-version:v1";
-export const LAST_SEEN_VERSION_EVENT = "poke-memory:last-seen-version-changed";
 
 export function readLastSeenVersion(): string | null {
   if (typeof window === "undefined") return null;

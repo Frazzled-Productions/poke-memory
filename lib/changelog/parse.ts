@@ -104,7 +104,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
 let cached: ChangelogRelease[] | null = null;
 
 export function getChangelog(): ChangelogRelease[] {
-  if (cached) return cached;
+  if (cached && process.env.NODE_ENV !== "development") return cached;
   const filePath = path.join(process.cwd(), "CHANGELOG.md");
   const markdown = fs.readFileSync(filePath, "utf8");
   cached = parseChangelog(markdown);

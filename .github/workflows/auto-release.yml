@@ -10,9 +10,9 @@ name: Auto Release
 #   - any other non-empty set of fragments → patch bump (0.N.M → 0.N.M+1)
 #
 # Each cron tick (or manual dispatch) → at most one commit, one tag, one
-# GitHub Release. The release commit carries `[skip ci]` for defence in depth;
-# the `chore(release):` if-guard below is the primary safeguard against
-# self-triggering loops.
+# GitHub Release. The release commit carries `[skip ci]` as defence in depth
+# against self-triggering loops; the schedule/workflow_dispatch trigger (not
+# push) means a release commit landing on main cannot re-fire this workflow.
 #
 # One-time bootstrap: if no `v0.1.0` tag exists when this workflow first runs,
 # the bootstrap step creates the tag at SHA cddb3a8 (the last commit whose
