@@ -562,3 +562,34 @@ export function buildQueueCounters(
 
   return { newCount, learningCount, reviewCount };
 }
+
+/**
+ * Counts graduated, non-learning review cards whose dueDate falls exactly on
+ * `tomorrow` and that have not already been reviewed on `tomorrow`. Used by
+ * the SESSION_COMPLETE screen to render the "N cards due tomorrow" teaser.
+ *
+ * New cards (lastReview === null) and learning-step cards are deliberately
+ * excluded — only graduated review cards form a concrete commitment users can
+ * anticipate. If `eligibleCardIds` is provided, only cards in that set count
+ * (matches the practice-scope gate inside buildSessionQueues).
+ */
+export function countDueTomorrow(
+  cards: readonly ReviewableCard[],
+  tomorrow: string,
+  eligibleCardIds?: ReadonlySet<number>,
+): number {
+  let count = 0;
+  for (const card of cards) {
+    if (eligibleCardIds !== undefined && !eligibleCardIds.has(card.id)) continue;
+    const s = card.state;
+    if (
+      s.learningStep === null &&
+      s.lastReview !== null &&
+      s.dueDate === tomorrow &&
+      s.lastReview !== tomorrow
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}

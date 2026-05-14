@@ -15,6 +15,7 @@ import { pickDistractors } from "@/lib/pokemon/distractors";
 import {
   buildSession,
   buildSessionQueues,
+  countDueTomorrow,
   getNextCardId,
   hydrateSession,
   limitBucket,
@@ -209,6 +210,7 @@ function SessionCompleteScreen({
   evolutionEnabled,
   reverseEnabled,
   shareText,
+  dueTomorrow,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
@@ -216,6 +218,8 @@ function SessionCompleteScreen({
   reverseEnabled: boolean;
   /** Pre-formatted share summary; null when the user hasn't graded anything yet. */
   shareText: string | null;
+  /** Count of graduated cards whose dueDate falls exactly on tomorrow. 0 hides the teaser. */
+  dueTomorrow: number;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
@@ -223,6 +227,11 @@ function SessionCompleteScreen({
       <p className="text-zinc-500 dark:text-zinc-400">
         No more cards due today. Come back tomorrow to keep going.
       </p>
+      {dueTomorrow > 0 && (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {dueTomorrow === 1 ? "1 card" : `${dueTomorrow} cards`} due tomorrow
+        </p>
+      )}
       <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
       {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
     </div>
@@ -944,6 +953,13 @@ export function ReviewSession() {
     }
 
     const today = todayString(new Date());
+    const tz = loadSettings().timezone ?? "UTC";
+    const tomorrow = todayString(new Date(Date.now() + 24 * 60 * 60 * 1000), tz);
+    const dueTomorrow = countDueTomorrow(
+      cards,
+      tomorrow,
+      isScopeEmpty(scope) ? undefined : eligibleCardIds,
+    );
     const shareText =
       sessionGradeSeq.length > 0
         ? formatDailySummary({
@@ -963,6 +979,7 @@ export function ReviewSession() {
           evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
           shareText={shareText}
+          dueTomorrow={dueTomorrow}
         />
         {seenPokemon.length >= 2 && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />
