@@ -100,13 +100,20 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, rows, opts);
           const limits = local?.limits ?? DEFAULT_LIMITS;
           await saveSession({ cards: rebuilt, limits });
-          // Synthetic StorageEvent invariant: same-tab subscribers
-          // (useSessionStorageKey) only re-render on this event.
-          window.dispatchEvent(
-            new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
-          );
           cardsTrusted = true;
+        } else {
+          // pullSession returned null: network reached Supabase but returned no
+          // rows (e.g. the user has no cloud data). Dispatch the event anyway so
+          // same-tab subscribers re-read local state and flush any QA drift.
+          console.warn("[superuser] pullSession returned null during exit cleanup; dispatching StorageEvent to re-read local state");
         }
+        // Synthetic StorageEvent invariant: same-tab subscribers
+        // (useSessionStorageKey) only re-render on this event. Dispatch whether
+        // rows were found or not so stale superuser-tainted cards are never left
+        // in memory.
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
+        );
       } catch (err) {
         console.warn("[superuser] cloud→local overwrite failed:", err);
       }

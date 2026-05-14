@@ -137,14 +137,19 @@ export default function CallbackCompletePage() {
 
   function handleKeepCloud() {
     if (status.kind !== "conflict" || pending) return;
+    setPending(true);
     void (async () => {
-      const local = await loadSession();
-      const settings = loadSettings();
-      const opts = seedOptsFromSettings(settings);
-      const limits = local?.limits ?? DEFAULT_LIMITS;
-      const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, status.cloudRows, opts);
-      await saveSession({ cards: rebuilt, limits });
-      router.replace("/");
+      try {
+        const local = await loadSession();
+        const settings = loadSettings();
+        const opts = seedOptsFromSettings(settings);
+        const limits = local?.limits ?? DEFAULT_LIMITS;
+        const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, status.cloudRows, opts);
+        await saveSession({ cards: rebuilt, limits });
+        router.replace("/");
+      } finally {
+        setPending(false);
+      }
     })();
   }
 

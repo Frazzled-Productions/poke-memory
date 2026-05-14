@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   isSyncSafe,
   pushSession,
@@ -625,6 +625,10 @@ describe("applyCloudAuthoritative", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   const defaultOpts: SeedOpts = { nameEnabled: true, evolutionEnabled: false };
 
   it("local-only card with prior reps is reset to new when cloud has no matching row", () => {
@@ -680,5 +684,14 @@ describe("applyCloudAuthoritative", () => {
     expect(result).toHaveLength(3);
     const evoCard = result.find((c) => c.cardType === "evolution");
     expect(evoCard).toBeDefined();
+  });
+
+  it("two calls with the same now produce identical card sets (deterministic)", () => {
+    const seed = [makeSeedPokemon(20), makeSeedPokemon(21)];
+    const cloud: CloudRow[] = [];
+    const now = new Date("2026-05-14T10:00:00.000Z");
+    const first = applyCloudAuthoritative(seed, [], cloud, defaultOpts, now);
+    const second = applyCloudAuthoritative(seed, [], cloud, defaultOpts, now);
+    expect(first).toEqual(second);
   });
 });

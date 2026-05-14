@@ -1,17 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ReviewableCard } from "@/lib/review/session";
+import type { ReviewableCard, BuildSessionOpts } from "@/lib/review/session";
 import { buildSession } from "@/lib/review/session";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
 import { appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
 
 /** Options forwarded to `buildSession` when rebuilding a card set from seed. */
-export type SeedOpts = {
-  reverseEnabled?: boolean;
-  nameEnabled?: boolean;
-  evolutionEnabled?: boolean;
-  reverseEvolutionEnabled?: boolean;
-  cryEnabled?: boolean;
-};
+export type SeedOpts = BuildSessionOpts;
 
 // Sync is best-effort: all errors are swallowed so a network hiccup never
 // breaks the local-first review flow.
@@ -436,8 +430,9 @@ export function applyCloudAuthoritative(
   evoSeed: readonly EvolutionCard[],
   cloud: CloudRow[],
   opts: SeedOpts,
+  now: Date = new Date(),
 ): ReviewableCard[] {
-  const base = buildSession(seed, evoSeed, undefined, opts);
+  const base = buildSession(seed, evoSeed, now, opts);
   const byKey = new Map(cloud.map((r) => [cloudRowKey(r), r]));
   return base.map((card) => {
     const row = byKey.get(cardKey(card));
