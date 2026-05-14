@@ -14,17 +14,18 @@ The rules below exist because of incidents that have already happened (#293 wipe
 - **Brand-new device (`loadSession()` returned `null`) must not push back the merged result.** The merged state is entirely cloud-sourced; pushing it back is wasted bandwidth and widens the window for a future regression.
 - **If `pullSession` fails, do not push.** Pushing without knowing cloud state is the exact failure mode of #293. The same rule applies to anywhere else you sync: cards, streak, settings, future tables. Pull first, decide, then push.
 
-### Database trigger (`card_reviews_reject_regression_trigger`, migration 002, extended in 015)
+### Database trigger (`card_reviews_reject_regression_trigger`, migration 002, extended in 015 and 016)
 
 A `BEFORE UPDATE` trigger on `card_reviews` raises `23514 check_violation` when:
 
 - `OLD.last_review IS NOT NULL AND NEW.last_review IS NULL` — un-reviewing a card.
 - `OLD.first_seen IS NOT NULL AND NEW.first_seen IS NULL` — un-seeing a card.
-- `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review` — review date moving backward.
+- `OLD.last_review IS NOT NULL AND NEW.last_review IS NOT NULL AND NEW.last_review < OLD.last_review` — review date moving backward. (The `NEW.last_review IS NOT NULL` predicate was added to the bullet here to mirror the migration 002 SQL; it was always present in the trigger function but had been omitted from the docs bullet — earlier docs were inaccurate.)
 - `NEW.reps < OLD.reps` — reps counter decreasing (added in migration 015; FSRS only ever increments this).
 - `NEW.lapses < OLD.lapses` — lapses counter decreasing (added in migration 015; same invariant).
+- `OLD.last_review IS NOT NULL AND NEW.last_review IS NOT NULL AND NEW.last_review = OLD.last_review AND NEW.scheduled_days < OLD.scheduled_days` — `scheduled_days` dropping without `last_review` advancing (added in migration 016; see below).
 
-Other FSRS columns (`stability`, `difficulty`, `scheduled_days`, etc.) are intentionally **not** checked because legitimate rescheduling operations (e.g. grading "Again") can lower them.
+`scheduled_days` is intentionally not guarded for absolute non-decrease because legitimate Again grades (FSRS reset) lower it — but Again always advances `last_review` to today. Migration 016 encodes this tighter invariant: a same-date drop in `scheduled_days` is always a stale-state clobber. **Known limitation:** any non-Again re-grade (Hard, Good, or Easy) of a card already reviewed earlier the same calendar day also produces `NEW.last_review = OLD.last_review` with a potentially lower `scheduled_days`, which the trigger would reject. The session design prevents this in practice (each card appears at most once per session), but the trigger has no visibility into session semantics — it is a last-resort DB guardrail, not a complete model of valid FSRS transitions.
 
 **Do not work around the trigger.** A legitimate "reset progress" / "delete account" flow needs a `SECURITY DEFINER` RPC that explicitly bypasses it, plus user confirmation. No such flow exists today; do not invent one without an explicit feature requirement.
 
@@ -41,9 +42,9 @@ Cards are the primary contract. Streak (`streak_days`) and settings (`user_setti
 ### Schema notes
 
 - `user_settings.settings` (jsonb) is the source of truth for per-user settings. The schema is `(user_id, settings, updated_at)` after migration 005 dropped the original flat columns from migration 001.
-- `card_reviews` is on FSRS columns (`stability`, `difficulty`, `elapsed_days`, `scheduled_days`, `reps`, `lapses`, `fsrs_state`) after migration 004. The lifecycle-timestamp guards from migration 002 were unaffected by the swap; migration 015 added guards for `reps` and `lapses` decreasing.
+- `card_reviews` is on FSRS columns (`stability`, `difficulty`, `elapsed_days`, `scheduled_days`, `reps`, `lapses`, `fsrs_state`) after migration 004. The lifecycle-timestamp guards from migration 002 were unaffected by the swap; migration 015 added guards for `reps` and `lapses` decreasing; migration 016 added a same-date `scheduled_days` drop guard.
 - `card_reviews` PRIMARY KEY is `(user_id, card_type, subject_key)` after migration 012. The legacy `pokemon_id` integer column was dropped in the same migration.
-- `card_reviews.hidden_since` (migration 007, nullable date) is set when a card becomes ineligible under the user's learning filter (#333) and cleared when it becomes eligible again. The session-load reconciliation shifts `due_date` forward by the hidden duration so paused cards don't accumulate overdue debt. The regression trigger does not guard `hidden_since` or `due_date` — both are allowed to move in either direction by design. (The trigger guards lifecycle timestamps from migration 002, and `reps`/`lapses` from migration 015.)
+- `card_reviews.hidden_since` (migration 007, nullable date) is set when a card becomes ineligible under the user's learning filter (#333) and cleared when it becomes eligible again. The session-load reconciliation shifts `due_date` forward by the hidden duration so paused cards don't accumulate overdue debt. The regression trigger does not guard `hidden_since` or `due_date` — both are allowed to move in either direction by design. (The trigger guards lifecycle timestamps from migration 002, `reps`/`lapses` from migration 015, and same-date `scheduled_days` drops from migration 016.)
 - `card_reviews.seen_in_pasture` (migration 008, boolean default `false`) tracks whether a card has been scouted in the Higher-or-Lower minigame on the all-caught-up screen.
 - `grade_log` carries `(card_type, subject_key)` after migration 013. The legacy `card_id` integer column was dropped and the `grade_log_card_type_check` constraint was removed; `card_type` is now validated at the app boundary only. All card directions (name, evolution, reverse, reverse-evolution, cry) are synced.
 

@@ -10,6 +10,7 @@
     "seed": "node scripts/seed-pokemon.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "test": "vitest run",
+    "test:integration": "VITEST_INTEGRATION=1 vitest run --project integration",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
