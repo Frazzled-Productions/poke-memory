@@ -37,6 +37,7 @@ import {
   OPTIMIZER_COOLDOWN_MS,
 } from "@/lib/srs/optimizer";
 import type { UserSettings } from "@/lib/settings/persistence";
+import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 
 type GradeLogCloudRow = {
   occurred_at: number;
@@ -104,8 +105,6 @@ async function fetchGradeLog(
  * This eliminates the read-merge-write race window that the previous
  * optimistic-locking approach had (#392).
  */
-type MergeUserSettingsArgs = { p_user_id: string; p_patch: Record<string, unknown> };
-
 async function persistWeights(
   client: SupabaseClient,
   userId: string,

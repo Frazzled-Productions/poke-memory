@@ -1,12 +1,24 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import type { UserSettings } from "@/lib/settings/persistence";
 import type { DateFormat } from "@/lib/utils/format-date";
+import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 
-// Settings sync is best-effort and uses a simple last-write-wins policy on
-// the whole UserSettings object. We do not attempt per-field merge — single
-// user, light cross-device churn, the round trips are not worth the
-// complexity. See issue #294 for the motivating use case (restore settings
-// after logout/login on the same device).
+// Settings sync is best-effort. pushSettings routes through the
+// merge_user_settings RPC (migration 011/014), which atomically merges a JSONB
+// patch via INSERT … ON CONFLICT DO UPDATE SET settings = settings || patch.
+// That eliminates the last-write-wins race window two concurrent devices could
+// otherwise open by overwriting the whole settings column. pushRegionalPrefs
+// remains a separate scalar-column write path (see comment below).
+
+// Generated Supabase types do not yet include merge_user_settings. Cast the
+// call site through `unknown` to a narrow signature so name + args stay typed.
+// Keep the cast on the *call expression* (not a separate const) so the JS
+// member-access reference is preserved and `this` binds to `client` — extracting
+// to a local would strip `this` and SupabaseClient.rpc reads `this.rest`.
+type MergeUserSettingsRpc = (
+  name: "merge_user_settings",
+  args: MergeUserSettingsArgs,
+) => Promise<{ error: PostgrestError | null }>;
 
 export async function pushSettings(
   client: SupabaseClient,
@@ -14,16 +26,10 @@ export async function pushSettings(
   settings: UserSettings,
 ): Promise<boolean> {
   try {
-    const { error } = await client
-      .from("user_settings")
-      .upsert(
-        {
-          user_id: userId,
-          settings,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" },
-      );
+    const { error } = await (client.rpc as unknown as MergeUserSettingsRpc)(
+      "merge_user_settings",
+      { p_user_id: userId, p_patch: settings },
+    );
     return !error;
   } catch {
     return false;
@@ -35,11 +41,12 @@ export async function pushSettings(
 // ---------------------------------------------------------------------------
 //
 // These live in dedicated scalar columns on user_settings, NOT inside the
-// JSONB `settings` blob. Reason: pushSettings() rewrites the whole JSONB
-// column via a last-write-wins upsert. If timezone/date_format were fields
-// in that blob, a sync push from another device that hasn't detected the user's
-// preferences yet could clobber them. The separate scalar columns are written
-// through a different UPDATE path, which is safe to do alongside any JSONB push.
+// JSONB `settings` blob. Reason: keep two independent write paths cleanly
+// separated. pushSettings() routes through merge_user_settings, which patches
+// the JSONB blob; pushRegionalPrefs() targets only these scalar columns. No
+// merge ambiguity, no cross-path row creation risk. Even with the atomic merge
+// in place, splitting them keeps the regional-prefs write narrow and means a
+// device whose pushSettings has not yet run cannot accidentally null these.
 
 export type RegionalPrefs = {
   timezone: string | null;
@@ -48,9 +55,9 @@ export type RegionalPrefs = {
 
 /**
  * Write timezone + date_format scalar columns to user_settings.
- * This is intentionally NOT merged into pushSettings() to avoid the JSONB LWW
- * race described in the #517 audit. The two write paths are independent and
- * safe to execute concurrently.
+ * Kept separate from pushSettings() so the two write paths target disjoint
+ * columns and never compete for the same row. The two are safe to execute
+ * concurrently.
  */
 export async function pushRegionalPrefs(
   client: SupabaseClient,
