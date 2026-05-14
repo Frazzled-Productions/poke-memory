@@ -1,6 +1,7 @@
 -- Migration 021: block future-date streak rows. Issue #524.
+-- (Migration 020 is assigned to the in-flight card_reviews bounds PR #521.)
 --
--- Grace window +1 day accommodates UTC+14 clients (e.g. Sydney, Line Islands)
+-- Grace window +1 day accommodates UTC+14 clients (e.g. Line Islands, Kiribati)
 -- who may legitimately insert a review_date that is "tomorrow" in UTC while
 -- their local clock is still on today. A strict <= current_date would reject
 -- legitimate streak rows from those timezones in the late-evening window.
