@@ -129,6 +129,9 @@ export async function migrateFromLocalStorage(): Promise<void> {
     const flagInTx: unknown = await store.get(MIGRATION_FLAG_KEY);
     if (flagInTx === true) {
       tx.abort();
+      // Consuming the rejection from tx.done prevents an unhandled-promise
+      // warning — aborting always causes tx.done to reject with AbortError.
+      await tx.done.catch(() => {});
       return;
     }
 
@@ -149,7 +152,9 @@ export async function migrateFromLocalStorage(): Promise<void> {
       window.localStorage.removeItem(GRADE_LOG_LS_KEY);
     }
   } catch (err) {
+    // A migration failure (malformed JSON, missing key, etc.) does NOT mean
+    // IDB itself is broken — log and continue. Only openAppDb flips
+    // idbAvailable to false, when the DB itself fails to open.
     console.warn("[poke-memory] migrateFromLocalStorage failed:", err);
-    idbAvailable = false;
   }
 }

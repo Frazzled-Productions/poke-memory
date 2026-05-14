@@ -1039,146 +1039,154 @@ export function ReviewSession() {
     if (cards === null) return;
     setGrading(true);
 
-    // Snapshot the pre-grade state for single-step undo. The previous
-    // snapshot (if any) is replaced — undo is one-deep, not a stack.
-    const snapshot: UndoSnapshot = {
-      cards,
-      sessionGrades,
-      sessionGradeSeq,
-      newCardsThisSession,
-      masteredThisSession,
-      learningQueue,
-      cardId: effectiveCard.id,
-      gradeLogOccurredAt: null,
-    };
+    try {
+      // Snapshot the pre-grade state for single-step undo. The previous
+      // snapshot (if any) is replaced — undo is one-deep, not a stack.
+      const snapshot: UndoSnapshot = {
+        cards,
+        sessionGrades,
+        sessionGradeSeq,
+        newCardsThisSession,
+        masteredThisSession,
+        learningQueue,
+        cardId: effectiveCard.id,
+        gradeLogOccurredAt: null,
+      };
 
-    const now = new Date();
-    const settings = loadSettings();
-    const nextState = nextReview(effectiveCard.state, grade, now, {
-      retentionTarget: settings.retentionTarget,
-      weights: settings.fsrsWeights,
-    });
-    const newCards = cards.map((card) =>
-      card.id === effectiveCard.id ? { ...card, state: nextState } : card,
-    );
+      const now = new Date();
+      const settings = loadSettings();
+      const nextState = nextReview(effectiveCard.state, grade, now, {
+        retentionTarget: settings.retentionTarget,
+        weights: settings.fsrsWeights,
+      });
+      const newCards = cards.map((card) =>
+        card.id === effectiveCard.id ? { ...card, state: nextState } : card,
+      );
 
-    notifySaveResult(await saveSession({ cards: newCards, limits }));
-    const today = todayString(now);
-    const gradeLog = await loadGradeLog();
-    const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
-    const dueQueueEmpty = !newCards.some(
-      (c) =>
-        c.state.learningStep === null &&
-        c.state.lastReview !== null &&
-        c.state.dueDate <= today &&
-        c.state.lastReview !== today,
-    );
-    recordReview(today, gradedToday, dueQueueEmpty);
-    const appended = await appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, subjectKey: effectiveCard.subjectKey });
-    snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
-    setUndoSnapshot(snapshot);
-    enqueueGrade({ ...effectiveCard, state: nextState });
-    setCards(newCards);
-    setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
-    setSessionGradeSeq((prev) => [...prev, grade]);
-    // Track new / mastered transitions for the daily share card. Uses
-    // `isMastered` against the current mastery threshold.
-    const wasNew = effectiveCard.state.firstSeen === null;
-    if (wasNew && nextState.firstSeen !== null) {
-      setNewCardsThisSession((n) => n + 1);
-    }
-    const wasMastered = isMastered(effectiveCard.state, loadSettings().masteryRepetitions);
-    const nowMastered = isMastered(nextState, loadSettings().masteryRepetitions);
-    if (!wasMastered && nowMastered) {
-      setMasteredThisSession((n) => n + 1);
-      // Badge award (#420). Only fires when a card just crossed the mastery
-      // threshold — `checkBadges` is then O(catalog × ids-per-badge) against a
-      // Set, which is cheap. Non-name directions never contribute to badge
-      // criteria, so a `cry`/`reverse`/`evolution` mastery cannot earn one.
-      //
-      // Superuser guard: with `pretendAllMastered` on, every species is
-      // already "mastered" — the first grade would award every badge and
-      // persist that to localStorage. `AutoSyncOnChange` suppresses the
-      // cloud write, but exit cleanup does not restore `user_settings`, so
-      // the fake earned-set would survive the QA session. Skip the award
-      // path entirely while any flag is on. The catalog overlay on Stats
-      // continues to show all badges read-only.
-      if (effectiveCard.cardType === "name" && !superuserGuarded) {
-        const masteredIds = masteredSpeciesIds(
-          newCards,
-          settings.masteryRepetitions,
-          false,
-        );
-        const earnedIds = new Set(settings.earnedBadges.map((b) => b.id));
-        const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIds);
-        if (newlyEarned.length > 0) {
-          const nowIso = now.toISOString();
-          const nextSettings: UserSettings = {
-            ...settings,
-            earnedBadges: [
-              ...settings.earnedBadges,
-              ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
-            ],
-          };
-          saveSettings(nextSettings);
-          setPendingBadgeToasts((prev) => [...prev, ...newlyEarned]);
-        }
+      notifySaveResult(await saveSession({ cards: newCards, limits }));
+      const today = todayString(now);
+      const gradeLog = await loadGradeLog();
+      const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
+      const dueQueueEmpty = !newCards.some(
+        (c) =>
+          c.state.learningStep === null &&
+          c.state.lastReview !== null &&
+          c.state.dueDate <= today &&
+          c.state.lastReview !== today,
+      );
+      recordReview(today, gradedToday, dueQueueEmpty);
+      const appended = await appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, subjectKey: effectiveCard.subjectKey });
+      snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
+      setUndoSnapshot(snapshot);
+      enqueueGrade({ ...effectiveCard, state: nextState });
+      setCards(newCards);
+      setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
+      setSessionGradeSeq((prev) => [...prev, grade]);
+      // Track new / mastered transitions for the daily share card. Uses
+      // `isMastered` against the current mastery threshold.
+      const wasNew = effectiveCard.state.firstSeen === null;
+      if (wasNew && nextState.firstSeen !== null) {
+        setNewCardsThisSession((n) => n + 1);
       }
-    }
-
-    // Update the learning queue based on the new state.
-    setLearningQueue((prev) => {
-      if (nextState.learningStep !== null) {
-        // Card is in (or remains in) a learning/relearning step.
-        // Distinction: new-card learning has lastReview === null after grading.
-        const stepMs = stepDurationMs(
-          nextState.lastReview,
-          nextState.learningStep,
-          nextState.difficulty,
-        );
-        const newEntry: LearningQueueEntry = {
-          cardId: effectiveCard.id,
-          dueAt: nextState.stepStartedAt! + stepMs,
-        };
-
-        // Replace existing entry or add new one.
-        const exists = prev.some((e) => e.cardId === effectiveCard.id);
-        if (exists) {
-          return prev.map((e) =>
-            e.cardId === effectiveCard.id ? newEntry : e,
+      const wasMastered = isMastered(effectiveCard.state, loadSettings().masteryRepetitions);
+      const nowMastered = isMastered(nextState, loadSettings().masteryRepetitions);
+      if (!wasMastered && nowMastered) {
+        setMasteredThisSession((n) => n + 1);
+        // Badge award (#420). Only fires when a card just crossed the mastery
+        // threshold — `checkBadges` is then O(catalog × ids-per-badge) against a
+        // Set, which is cheap. Non-name directions never contribute to badge
+        // criteria, so a `cry`/`reverse`/`evolution` mastery cannot earn one.
+        //
+        // Superuser guard: with `pretendAllMastered` on, every species is
+        // already "mastered" — the first grade would award every badge and
+        // persist that to localStorage. `AutoSyncOnChange` suppresses the
+        // cloud write, but exit cleanup does not restore `user_settings`, so
+        // the fake earned-set would survive the QA session. Skip the award
+        // path entirely while any flag is on. The catalog overlay on Stats
+        // continues to show all badges read-only.
+        if (effectiveCard.cardType === "name" && !superuserGuarded) {
+          const masteredIds = masteredSpeciesIds(
+            newCards,
+            settings.masteryRepetitions,
+            false,
           );
+          const earnedIds = new Set(settings.earnedBadges.map((b) => b.id));
+          const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIds);
+          if (newlyEarned.length > 0) {
+            const nowIso = now.toISOString();
+            const nextSettings: UserSettings = {
+              ...settings,
+              earnedBadges: [
+                ...settings.earnedBadges,
+                ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
+              ],
+            };
+            saveSettings(nextSettings);
+            setPendingBadgeToasts((prev) => [...prev, ...newlyEarned]);
+          }
         }
-        return [...prev, newEntry];
-      } else {
-        // Card has graduated or is in a non-learning state — remove from queue.
-        return prev.filter((e) => e.cardId !== effectiveCard.id);
       }
-    });
 
-    setCurrentFact(null);
-    setRevealed(false);
-    revealedCardId.current = null;
-    setGrading(false);
+      // Update the learning queue based on the new state.
+      setLearningQueue((prev) => {
+        if (nextState.learningStep !== null) {
+          // Card is in (or remains in) a learning/relearning step.
+          // Distinction: new-card learning has lastReview === null after grading.
+          const stepMs = stepDurationMs(
+            nextState.lastReview,
+            nextState.learningStep,
+            nextState.difficulty,
+          );
+          const newEntry: LearningQueueEntry = {
+            cardId: effectiveCard.id,
+            dueAt: nextState.stepStartedAt! + stepMs,
+          };
+
+          // Replace existing entry or add new one.
+          const exists = prev.some((e) => e.cardId === effectiveCard.id);
+          if (exists) {
+            return prev.map((e) =>
+              e.cardId === effectiveCard.id ? newEntry : e,
+            );
+          }
+          return [...prev, newEntry];
+        } else {
+          // Card has graduated or is in a non-learning state — remove from queue.
+          return prev.filter((e) => e.cardId !== effectiveCard.id);
+        }
+      });
+
+      setCurrentFact(null);
+      setRevealed(false);
+      revealedCardId.current = null;
+    } finally {
+      setGrading(false);
+    }
   }
 
   async function handleUndo() {
     if (undoSnapshot === null || grading) return;
-    // Revert local state to the pre-grade snapshot.
-    setCards(undoSnapshot.cards);
-    setSessionGrades(undoSnapshot.sessionGrades);
-    setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
-    setNewCardsThisSession(undoSnapshot.newCardsThisSession);
-    setMasteredThisSession(undoSnapshot.masteredThisSession);
-    setLearningQueue(undoSnapshot.learningQueue);
-    notifySaveResult(await saveSession({ cards: undoSnapshot.cards, limits }));
-    if (undoSnapshot.gradeLogOccurredAt !== null) {
-      await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
+    setGrading(true);
+    try {
+      // Revert local state to the pre-grade snapshot.
+      setCards(undoSnapshot.cards);
+      setSessionGrades(undoSnapshot.sessionGrades);
+      setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
+      setNewCardsThisSession(undoSnapshot.newCardsThisSession);
+      setMasteredThisSession(undoSnapshot.masteredThisSession);
+      setLearningQueue(undoSnapshot.learningQueue);
+      notifySaveResult(await saveSession({ cards: undoSnapshot.cards, limits }));
+      if (undoSnapshot.gradeLogOccurredAt !== null) {
+        await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
+      }
+      // Make the undone card the current revealed card so the user lands
+      // back on the prompt they just graded.
+      revealedCardId.current = undoSnapshot.cardId;
+      setRevealed(true);
+      setUndoSnapshot(null);
+    } finally {
+      setGrading(false);
     }
-    // Make the undone card the current revealed card so the user lands
-    // back on the prompt they just graded.
-    revealedCardId.current = undoSnapshot.cardId;
-    setRevealed(true);
-    setUndoSnapshot(null);
   }
 
   // --- Active review UI ---
