@@ -25,8 +25,8 @@ vi.mock("@/lib/settings/persistence", () => ({
   saveSettings: (...args: unknown[]) => mockSaveSettings(...args),
 }));
 
-// pickPair is mocked to return a deterministic pair so tests don't depend on
-// Math.random. We fix left=Bulbasaur, right=Ivysaur, stat="attack".
+// pickPair and shufflePair are mocked to return deterministic pairs so tests
+// don't depend on Math.random. We fix left=Bulbasaur, right=Ivysaur, stat="attack".
 // Bulbasaur attack=49, Ivysaur attack=100 → right is higher.
 const { mockPickPair } = vi.hoisted(() => ({ mockPickPair: vi.fn() }));
 
@@ -35,6 +35,9 @@ vi.mock("@/lib/minigame/higherOrLower", async (importOriginal) => {
   return {
     ...actual,
     pickPair: (...args: Parameters<typeof actual.pickPair>) => mockPickPair(...args),
+    // shufflePair is a passthrough in tests — position randomisation is covered
+    // by unit tests in lib/minigame/higherOrLower.test.ts.
+    shufflePair: (pair: ReturnType<typeof actual.pickPair>) => pair,
   };
 });
 

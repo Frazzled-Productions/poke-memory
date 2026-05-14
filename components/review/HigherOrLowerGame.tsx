@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import {
   pickPair,
+  shufflePair,
   scoreGuess,
   BASE_STATS,
   type StatKey,
@@ -92,7 +93,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   useEffect(() => {
     if (!canPlay) return;
     setBestScore(loadSettings().miniGameBestScore);
-    setPair(pickPair(seenPokemon));
+    setPair(shufflePair(pickPair(seenPokemon)));
     // Mount-only: seenPokemon is a memoised prop from the parent and is stable
     // for the component's lifetime. Re-running this effect on identity change
     // would reset the game mid-play.
@@ -118,7 +119,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   );
 
   const handleNext = useCallback(() => {
-    setPair(pickPair(seenPokemon));
+    setPair(shufflePair(pickPair(seenPokemon)));
     setPhase("picking");
     setLastResult(null);
   }, [seenPokemon]);
@@ -129,7 +130,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
       setBestScore(streak);
     }
     setStreak(0);
-    setPair(pickPair(seenPokemon));
+    setPair(shufflePair(pickPair(seenPokemon)));
     setPhase("picking");
     setLastResult(null);
   }, [seenPokemon, bestScore, streak]);

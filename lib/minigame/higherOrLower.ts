@@ -52,6 +52,21 @@ export function pickPair(
 }
 
 /**
+ * Randomly swaps the left/right positions in a pair so the correct answer
+ * cannot be memorised by position. Uses the injected `rng` (default
+ * `Math.random`) so tests can drive deterministic outcomes.
+ */
+export function shufflePair(
+  pair: { left: SeedPokemon; right: SeedPokemon; stat: StatKey },
+  rng: () => number = Math.random,
+): { left: SeedPokemon; right: SeedPokemon; stat: StatKey } {
+  if (rng() < 0.5) {
+    return { left: pair.right, right: pair.left, stat: pair.stat };
+  }
+  return pair;
+}
+
+/**
  * Returns whether the guess is correct. Ties are always correct — there
  * is no wrong answer when the values are equal.
  */

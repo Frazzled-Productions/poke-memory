@@ -3,6 +3,7 @@ import {
   scoreGuess,
   getSeenPokemon,
   pickPair,
+  shufflePair,
   BASE_STATS,
   type StatKey,
 } from "./higherOrLower";
@@ -316,5 +317,47 @@ describe("pickPair", () => {
   it("throws when the pool has fewer than 2 entries", () => {
     expect(() => pickPair([pool[0]])).toThrow();
     expect(() => pickPair([])).toThrow();
+  });
+});
+
+// ── shufflePair ──────────────────────────────────────────────────────────────
+
+describe("shufflePair", () => {
+  const a = makePokemon(1);
+  const b = makePokemon(2);
+  const input = { left: a, right: b, stat: "attack" as StatKey };
+
+  it("preserves the stat key", () => {
+    const result = shufflePair(input, () => 0.1);
+    expect(result.stat).toBe("attack");
+  });
+
+  it("swaps left/right when rng < 0.5", () => {
+    const result = shufflePair(input, () => 0.1);
+    expect(result.left.id).toBe(b.id);
+    expect(result.right.id).toBe(a.id);
+  });
+
+  it("keeps left/right when rng >= 0.5", () => {
+    const result = shufflePair(input, () => 0.5);
+    expect(result.left.id).toBe(a.id);
+    expect(result.right.id).toBe(b.id);
+  });
+
+  it("produces at least one swapped outcome across multiple calls with real Math.random", () => {
+    // Run 20 trials; the probability all 20 keep the original order is (0.5)^20 ≈ 1 in a million.
+    const swapped = Array.from({ length: 20 }, () => {
+      const r = shufflePair(input);
+      return r.left.id !== a.id;
+    });
+    expect(swapped.some(Boolean)).toBe(true);
+  });
+
+  it("produces at least one un-swapped outcome across multiple calls with real Math.random", () => {
+    const kept = Array.from({ length: 20 }, () => {
+      const r = shufflePair(input);
+      return r.left.id === a.id;
+    });
+    expect(kept.some(Boolean)).toBe(true);
   });
 });
