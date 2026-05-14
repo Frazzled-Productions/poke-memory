@@ -7,8 +7,8 @@
  *   2. When signed out, only local data is used (no pullSession call).
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -34,11 +34,12 @@ vi.mock("next/link", () => ({
 import type { NameReviewCard } from "@/lib/review/session";
 import type { CloudRow } from "@/lib/sync/cloud";
 
-const { mockLoadSession, mockPullSession, mockSuiteUser } = vi.hoisted(() => {
+const { mockLoadSession, mockPullSession, mockSaveSession, mockSuiteUser } = vi.hoisted(() => {
   const mockLoadSession = vi.fn();
   const mockPullSession = vi.fn();
+  const mockSaveSession = vi.fn();
   const mockSuiteUser = { id: "user-123", user_metadata: {} };
-  return { mockLoadSession, mockPullSession, mockSuiteUser };
+  return { mockLoadSession, mockPullSession, mockSaveSession, mockSuiteUser };
 });
 
 // ---------------------------------------------------------------------------
@@ -121,7 +122,7 @@ function makeCloudRow(id: number): CloudRow {
 
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: mockLoadSession,
-  saveSession: vi.fn().mockResolvedValue({ ok: true }),
+  saveSession: mockSaveSession,
 }));
 
 vi.mock("@/lib/sync/cloud", () => ({
@@ -321,6 +322,8 @@ beforeEach(() => {
   mockLoadSession.mockResolvedValue(null);
   // Default: no cloud rows
   mockPullSession.mockResolvedValue([]);
+  // Default: save succeeds
+  mockSaveSession.mockResolvedValue({ ok: true });
   // Default: guest
   mockAuthValue.user = null;
   mockAuthValue.supabase = null;
@@ -432,6 +435,73 @@ describe("StatsPage — Force pull from cloud button", () => {
       expect(
         screen.getByRole("button", { name: /force pull from cloud/i }),
       ).toBeInTheDocument();
+    });
+  });
+});
+
+describe("ForcePullSection — handleForcePull", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockAuthValue.user = mockSuiteUser;
+    mockAuthValue.supabase = { auth: {} };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("success path: shows Done then resets to idle after timeout", async () => {
+    // load() consumes the first call; handleForcePull gets the second.
+    mockPullSession
+      .mockResolvedValueOnce([])               // initial load() cloud overlay
+      .mockResolvedValueOnce([makeCloudRow(1)]); // handleForcePull
+
+    render(<StatsPage />);
+    const button = await screen.findByRole("button", { name: /force pull from cloud/i });
+
+    vi.useFakeTimers();
+    act(() => { fireEvent.click(button); });
+    // Flush pending Promise microtasks (pullSession + saveSession awaits).
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(screen.getByText(/done — stats updated from cloud/i)).toBeInTheDocument();
+    expect(mockSaveSession).toHaveBeenCalledTimes(1);
+
+    // Advance past the 4 s reset and verify the status returns to idle.
+    await act(async () => { vi.advanceTimersByTime(4001); });
+    expect(screen.queryByText(/done — stats updated from cloud/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /force pull from cloud/i })).not.toBeDisabled();
+  });
+
+  it("error path: pullSession returns null → shows error message", async () => {
+    mockPullSession
+      .mockResolvedValueOnce([])   // initial load()
+      .mockResolvedValueOnce(null); // handleForcePull
+
+    render(<StatsPage />);
+    const button = await screen.findByRole("button", { name: /force pull from cloud/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText(/pull failed/i)).toBeInTheDocument();
+    });
+    expect(mockSaveSession).not.toHaveBeenCalled();
+  });
+
+  it("error path: saveSession fails → shows error message", async () => {
+    mockPullSession
+      .mockResolvedValueOnce([])                // initial load()
+      .mockResolvedValueOnce([makeCloudRow(1)]); // handleForcePull
+    mockSaveSession.mockResolvedValueOnce({ ok: false });
+
+    render(<StatsPage />);
+    const button = await screen.findByRole("button", { name: /force pull from cloud/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText(/pull failed/i)).toBeInTheDocument();
     });
   });
 });
