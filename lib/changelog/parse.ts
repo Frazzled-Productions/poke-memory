@@ -118,15 +118,19 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
   closeSection();
   if (current) releases.push(current);
 
-  // Sort each release's sections into the canonical order (Added → Security)
-  // and drop releases that ended up with zero user-facing bullets after
-  // filtering internal/empty entries.
+  // Sort each release's sections into the canonical order (Added → Security),
+  // concatenating bullets when the same kind appears more than once in a
+  // release block, then drop releases that ended up with zero user-facing
+  // bullets after filtering internal/empty entries.
   return releases
     .map((release) => ({
       ...release,
-      sections: SECTION_ORDER
-        .map((kind) => release.sections.find((s) => s.kind === kind))
-        .filter((s): s is { kind: ChangelogSectionKind; bullets: string[] } => Boolean(s)),
+      sections: SECTION_ORDER.flatMap((kind) => {
+        const bullets = release.sections
+          .filter((s) => s.kind === kind)
+          .flatMap((s) => s.bullets);
+        return bullets.length > 0 ? [{ kind, bullets }] : [];
+      }),
     }))
     .filter((release) => release.sections.some((s) => s.bullets.length > 0));
 }
@@ -136,7 +140,16 @@ let cached: ChangelogRelease[] | null = null;
 export function getChangelog(): ChangelogRelease[] {
   if (cached && process.env.NODE_ENV !== "development") return cached;
   const filePath = path.join(process.cwd(), "CHANGELOG.md");
-  const markdown = fs.readFileSync(filePath, "utf8");
+  let markdown: string;
+  try {
+    markdown = fs.readFileSync(filePath, "utf8");
+  } catch {
+    // CHANGELOG.md may be absent in some build/test environments. Fall back
+    // to an empty list so the page renders its graceful empty state instead
+    // of surfacing a 500.
+    cached = [];
+    return cached;
+  }
   cached = parseChangelog(markdown);
   return cached;
 }

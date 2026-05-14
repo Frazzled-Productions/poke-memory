@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseChangelog } from "./parse";
 
 describe("parseChangelog", () => {
@@ -220,5 +221,49 @@ describe("parseChangelog", () => {
     expect(release.sections).toEqual([
       { kind: "Added", bullets: ["First bullet."] },
     ]);
+  });
+
+  it("merges bullets when the same section kind appears twice in one release", () => {
+    const md = [
+      "## [1.0.0] — 2026-05-14",
+      "",
+      "### Fixed",
+      "",
+      "- Earlier fix.",
+      "",
+      "### Added",
+      "",
+      "- Some addition.",
+      "",
+      "### Fixed",
+      "",
+      "- Later fix.",
+    ].join("\n");
+    const [release] = parseChangelog(md);
+    expect(release.sections).toEqual([
+      { kind: "Added", bullets: ["Some addition."] },
+      { kind: "Fixed", bullets: ["Earlier fix.", "Later fix."] },
+    ]);
+  });
+});
+
+describe("getChangelog", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns an empty list when CHANGELOG.md is absent rather than throwing", async () => {
+    // Bust the module-level cache so the readFileSync mock takes effect.
+    vi.resetModules();
+    const spy = vi.spyOn(fs, "readFileSync").mockImplementation(() => {
+      const err = new Error("ENOENT: no such file or directory") as Error & {
+        code: string;
+      };
+      err.code = "ENOENT";
+      throw err;
+    });
+    const mod = await import("./parse");
+    expect(mod.getChangelog()).toEqual([]);
+    expect(spy).toHaveBeenCalled();
   });
 });

@@ -1,8 +1,9 @@
 import { Fragment, type ReactNode } from "react";
 
 // Minimal inline renderer for changelog bullets. Handles backtick code spans,
-// Markdown links `[label](url)`, and bare `#NNN` GitHub issue/PR references.
-// Anything outside those three forms renders as plain text.
+// Markdown links `[label](url)`, and parenthesised `(#NNN)` GitHub issue/PR
+// references (the form `cut-release.mjs` ends bullets with). Anything outside
+// those three forms renders as plain text.
 export function BulletText({ text }: { text: string }) {
   return <>{renderInline(text)}</>;
 }
