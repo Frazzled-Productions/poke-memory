@@ -48,7 +48,6 @@ type GradeLogCloudRow = {
 
 type UserSettingsRow = {
   settings: Partial<UserSettings>;
-  updatedAt: string;
 };
 
 async function fetchUserSettings(
@@ -57,17 +56,17 @@ async function fetchUserSettings(
 ): Promise<UserSettingsRow | null> {
   const { data, error } = await client
     .from("user_settings")
-    .select("settings, updated_at")
+    .select("settings")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  const row = data as { settings: unknown; updated_at: string };
+  const row = data as { settings: unknown };
   const settings =
     row.settings && typeof row.settings === "object"
       ? (row.settings as Partial<UserSettings>)
       : {};
-  return { settings, updatedAt: row.updated_at };
+  return { settings };
 }
 
 async function fetchGradeLog(
@@ -99,84 +98,26 @@ async function fetchGradeLog(
 }
 
 /**
- * Persist the new weights into `user_settings.settings` using optimistic
- * locking on `updated_at`.
- *
- * The read-merge-write window is small in practice (the user is staring at
- * a spinner while this request is in flight, and no other surface auto-pushes
- * settings), but AutoSyncOnChange.pushSettings could in theory interleave. The
- * `.eq("updated_at", current.updated_at)` predicate makes the UPDATE no-op
- * under concurrent writes; we retry once with a fresh read on conflict, then
- * give up. A future atomic-merge RPC (jsonb `settings || patch`) would remove
- * the retry path entirely.
- *
- * `prefetched` lets the caller pass the row already fetched for the cooldown
- * check, so the first attempt avoids a second SELECT on `user_settings`. On
- * conflict-retry we always re-read fresh.
+ * Persist the new weights into `user_settings.settings` using the
+ * `merge_user_settings` RPC (migration 011), which atomically merges a JSONB
+ * patch via INSERT … ON CONFLICT DO UPDATE SET settings = settings || patch.
+ * This eliminates the read-merge-write race window that the previous
+ * optimistic-locking approach had (#392).
  */
 async function persistWeights(
   client: SupabaseClient,
   userId: string,
   weights: number[],
   optimizedAt: string,
-  prefetched: UserSettingsRow | null,
-  attempt = 0,
 ): Promise<boolean> {
   try {
-    let current: UserSettingsRow | null;
-    if (attempt === 0) {
-      current = prefetched;
-    } else {
-      const { data } = await client
-        .from("user_settings")
-        .select("settings, updated_at")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (data) {
-        const row = data as { settings: unknown; updated_at: string };
-        const settings =
-          row.settings && typeof row.settings === "object"
-            ? (row.settings as Partial<UserSettings>)
-            : {};
-        current = { settings, updatedAt: row.updated_at };
-      } else {
-        current = null;
-      }
-    }
-
-    const merged: Partial<UserSettings> = {
-      ...(current?.settings ?? {}),
-      fsrsWeights: weights,
-      fsrsWeightsOptimizedAt: optimizedAt,
-    };
-
-    if (current) {
-      const { data: updated, error } = await client
-        .from("user_settings")
-        .update({ settings: merged, updated_at: optimizedAt })
-        .eq("user_id", userId)
-        .eq("updated_at", current.updatedAt)
-        .select("user_id")
-        .maybeSingle();
-      if (error) return false;
-      if (!updated) {
-        // Concurrent write — retry once with a fresh read.
-        if (attempt >= 1) return false;
-        return persistWeights(
-          client,
-          userId,
-          weights,
-          new Date().toISOString(),
-          null,
-          attempt + 1,
-        );
-      }
-      return true;
-    }
-
-    const { error } = await client
-      .from("user_settings")
-      .insert({ user_id: userId, settings: merged, updated_at: optimizedAt });
+    // TODO(#392): cast args through `any` until `supabase gen types` is re-run
+    // and the new merge_user_settings RPC appears in the generated database types.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await client.rpc("merge_user_settings" as any, {
+      p_user_id: userId,
+      p_patch: { fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt },
+    } as any);
     return !error;
   } catch {
     return false;
@@ -194,8 +135,7 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  // Enforce 7-day cooldown before running the CPU-bound optimizer. The row
-  // we read here is reused by `persistWeights` below to avoid a second SELECT.
+  // Enforce 7-day cooldown before running the CPU-bound optimizer.
   let currentSettings: UserSettingsRow | null;
   try {
     currentSettings = await fetchUserSettings(supabase, user.id);
@@ -248,14 +188,13 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ error: "optimization_failed" }, { status: 500 });
   }
 
-  // Persist the new weights, reusing the row fetched for the cooldown check.
+  // Persist the new weights atomically via the merge_user_settings RPC.
   const optimizedAt = new Date().toISOString();
   const persisted = await persistWeights(
     supabase,
     user.id,
     weights,
     optimizedAt,
-    currentSettings,
   );
   if (!persisted) {
     console.error("[/api/srs/optimize] failed to persist weights for user", user.id);
