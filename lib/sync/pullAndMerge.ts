@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
-import { pullSettings } from "@/lib/sync/settings";
+import { pullSettings, pullRegionalPrefs } from "@/lib/sync/settings";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
@@ -69,6 +69,27 @@ export async function pullAndMerge(
     if (!saveResult.ok) return "error";
 
     saveSyncStatus({ ...syncStatus, lastPullAt: maxCloudUpdatedAt(cloudRows) });
+
+    // Pull regional prefs (timezone + date_format scalar columns) — best-effort,
+    // runs on every pull so device B picks up choices made on device A.
+    // Cloud non-null values win; null cloud values leave local values untouched.
+    try {
+      const cloudPrefs = await pullRegionalPrefs(client, userId);
+      if (cloudPrefs !== null) {
+        const local = loadSettings();
+        const next = {
+          ...local,
+          ...(cloudPrefs.timezone !== null ? { timezone: cloudPrefs.timezone } : {}),
+          ...(cloudPrefs.dateFormat !== null ? { dateFormat: cloudPrefs.dateFormat } : {}),
+        };
+        if (next.timezone !== local.timezone || next.dateFormat !== local.dateFormat) {
+          saveSettings(next);
+        }
+      }
+    } catch (e) {
+      // Best-effort — regional prefs failure must not flip sync into error.
+      console.warn("[pullAndMerge] regional prefs pull failed (non-fatal)", e);
+    }
 
     return "ok";
   } catch {

@@ -135,6 +135,8 @@ describe('loadSettings migration', () => {
       ttsVoice: 'Daniel:en-GB',
       ttsRate: 1.5,
       ttsVolume: 0.75,
+      timezone: 'Europe/London',
+      dateFormat: 'dmy' as const,
     };
     saveSettings(custom);
     const loaded = loadSettings();

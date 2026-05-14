@@ -2,6 +2,7 @@ import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { POKEMON_TYPES } from "@/lib/pokemon/types";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { addDaysToIsoDate as sharedAddDaysToIsoDate } from "@/lib/utils/dates";
 
 // ---------------------------------------------------------------------------
 // Mastery classification
@@ -166,25 +167,11 @@ export type StatsResult = {
 
 /**
  * Compute tomorrow's ISO date string from today's "YYYY-MM-DD" string.
- * Mirrors the `addDays` pattern in lib/srs/scheduler.ts exactly: parse to
- * Date, increment via local-time `setDate`, format via UTC `toISOString`.
- * The two halves of the codebase must use the same date arithmetic to
- * avoid divergent results in negative-UTC offset timezones.
+ * Delegates to the canonical helper in lib/utils/dates so the two halves
+ * of the codebase stay in sync.
  */
 function tomorrowString(today: string): string {
-  return addDaysToIsoDate(today, 1);
-}
-
-/**
- * Add `days` to an ISO `YYYY-MM-DD` string. Same convention as
- * `tomorrowString`: parse via local-time, increment via `setDate`,
- * format via UTC `toISOString` — matches the scheduler so forecasts
- * align with queue date math.
- */
-function addDaysToIsoDate(date: string, days: number): string {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result.toISOString().slice(0, 10);
+  return sharedAddDaysToIsoDate(today, 1);
 }
 
 /**
@@ -223,7 +210,7 @@ export function computeStats(
   // single Map lookup per card instead of a 14-way comparison chain.
   const forecastDates: string[] = [];
   for (let i = 0; i < DUE_FORECAST_DAYS; i++) {
-    forecastDates.push(i === 0 ? today : addDaysToIsoDate(today, i));
+    forecastDates.push(i === 0 ? today : sharedAddDaysToIsoDate(today, i));
   }
   const forecastIndex = new Map<string, number>();
   forecastDates.forEach((d, i) => forecastIndex.set(d, i));

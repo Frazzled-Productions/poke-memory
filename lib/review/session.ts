@@ -9,6 +9,7 @@ import {
 } from "@/lib/pokemon/seed";
 import { FNV_PRIME, FNV_OFFSET, fnv1a } from "@/lib/utils/fnv1a";
 import { Subject, appTypeToDbType } from "@/lib/cards/subjectKey";
+import { todayInTimezone } from "@/lib/utils/format-date";
 
 // Re-export so callers that need the DB card_type value can get it without
 // importing subjectKey.ts separately.
@@ -348,8 +349,14 @@ export function hydrateSession(
   return [...refreshed, ...additions];
 }
 
-export function todayString(now: Date): string {
-  return now.toISOString().slice(0, 10);
+/**
+ * Returns today's date as "YYYY-MM-DD" in the given IANA timezone.
+ * Defaults to "UTC" for backward compatibility with call sites that don't
+ * yet pass a timezone — pass the user's `timezone` setting to get local
+ * midnight behaviour.
+ */
+export function todayString(now: Date, tz = "UTC"): string {
+  return todayInTimezone(tz, now);
 }
 
 export function stableShuffleForDay(
