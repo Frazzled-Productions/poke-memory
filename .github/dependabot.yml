@@ -15,18 +15,14 @@ updates:
         patterns: ["tailwindcss", "@tailwindcss/*"]
       vitest:
         patterns: ["vitest", "@vitest/*", "@testing-library/*"]
-      next-security:
-        applies-to: security-updates
-        patterns: ["next", "eslint-config-next"]
-      react-security:
-        applies-to: security-updates
-        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
-      tailwind-security:
-        applies-to: security-updates
-        patterns: ["tailwindcss", "@tailwindcss/*"]
-      vitest-security:
-        applies-to: security-updates
-        patterns: ["vitest", "@vitest/*", "@testing-library/*"]
+      supabase:
+        patterns: ["@supabase/*"]
+      vercel:
+        patterns: ["@vercel/*"]
+      tooling:
+        patterns: ["typescript", "@types/node"]
+      # Keep this group last — its "*" pattern matches any security PR not
+      # already claimed by a named group above.
       npm-security-other:
         applies-to: security-updates
         patterns: ["*"]
