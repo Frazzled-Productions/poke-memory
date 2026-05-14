@@ -386,7 +386,7 @@ export default function SettingsPage() {
       if (!ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     }
     saveFavourite(null);
-    clearLocalProgress();
+    await clearLocalProgress();
     setFavouriteId(null);
     updateFavourite(null);
     router.replace("/");
