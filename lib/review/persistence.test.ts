@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { loadSession, saveSession } from "./persistence";
 import { __resetForTests } from "@/lib/idb/db";
+import * as idbModule from "@/lib/idb/db";
 import type { ReverseReviewCard, NameReviewCard, ReverseEvolutionReviewCard, DailyLimits } from "./session";
 import { DEFAULT_LIMITS } from "./session";
 import { initialReviewState } from "@/lib/srs/scheduler";
@@ -237,6 +238,31 @@ describe("saveSession / loadSession (IDB-backed)", () => {
       "name",
       "reverse-evolution",
     ]);
+  });
+
+  it("falls back to localStorage when idbSet silently fails (isIdbAvailable returns false post-write)", async () => {
+    const lsData: Record<string, string> = {};
+    vi.stubGlobal("window", {
+      indexedDB: globalThis.indexedDB,
+      localStorage: {
+        getItem: () => null,
+        setItem: (k: string, v: string) => { lsData[k] = v; },
+        removeItem: () => {},
+      },
+      dispatchEvent: () => true,
+    });
+
+    // Simulate idbSet silently failing: isIdbAvailable returns true on the
+    // pre-write guard (so we enter the IDB path) but false after the write
+    // (as if idbSet caught an internal error and flipped the flag).
+    vi.spyOn(idbModule, "isIdbAvailable")
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+
+    const result = await saveSession({ cards: [makeReverseCard()], limits: defaultLimits });
+
+    expect(result.ok).toBe(true);
+    expect(lsData["poke-memory:review-session:v1"]).toBeDefined();
   });
 });
 
