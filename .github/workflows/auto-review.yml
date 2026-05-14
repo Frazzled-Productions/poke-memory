@@ -320,6 +320,11 @@ jobs:
         # marker-less comment can be silently visible to a human reader. Fail
         # the check with the orphan URLs so the inconsistency is forced into
         # the open instead of shipping conflicting reviews.
+        #
+        # `always()` keeps this step active even when "Fail check" (above) exits 1 —
+        # exactly the scenario being detected. When `cycles` is skipped or fails,
+        # NEXT falls back to '0', which matches no real review comment, so the
+        # step exits 0 cleanly via the TOTAL == 0 path.
         if: always() && steps.idem.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -327,9 +332,9 @@ jobs:
           set -euo pipefail
           PR="${{ github.event.pull_request.number }}"
           SHA="${{ github.event.pull_request.head.sha }}"
-          NEXT="${{ steps.cycles.outputs.next }}"
+          NEXT="${{ steps.cycles.outputs.next || '0' }}"
           COMMENTS=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
-            --jq "[.[] | select(.body | contains(\"<!-- auto-review:$NEXT -->\"))]")
+            | jq -s --arg pat "<!-- auto-review:${NEXT} -->" '[.[][] | select(.body | contains($pat))]')
           TOTAL=$(printf '%s' "$COMMENTS" | jq 'length')
           if [[ "$TOTAL" -le 1 ]]; then
             echo "Cycle $NEXT has $TOTAL comment(s) — no double-post."
