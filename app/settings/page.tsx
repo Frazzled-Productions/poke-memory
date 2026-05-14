@@ -15,7 +15,7 @@ import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
-import { resetAllProgress } from "@/lib/sync/reset";
+import { resetAllProgressEverywhere } from "@/lib/sync/reset";
 import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
 import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
 import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
@@ -474,11 +474,18 @@ export default function SettingsPage() {
   async function handleReset() {
     if (anyFlagOn) return;
     if (user && supabase) {
-      const ok = await resetAllProgress(supabase);
-      if (!ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
+      const result = await resetAllProgressEverywhere(supabase);
+      if (!result.ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
+    } else {
+      // Guest: no cloud to wipe — the orchestrator's local clear is invoked
+      // directly here. The two paths must not converge into one orchestrator
+      // call: passing a null client would force the orchestrator to skip the
+      // cloud step (silently OK for guests, but a future signed-out-but-stale
+      // user could miss a cloud wipe). Keeping the call sites split makes
+      // the "are we authenticated?" decision explicit.
+      await clearLocalProgress();
     }
     saveFavourite(null);
-    await clearLocalProgress();
     setFavouriteId(null);
     updateFavourite(null);
     router.replace("/");
