@@ -100,20 +100,24 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, rows, opts);
           const limits = local?.limits ?? DEFAULT_LIMITS;
           await saveSession({ cards: rebuilt, limits });
+          // Synthetic StorageEvent: same-tab subscribers (useSessionStorageKey)
+          // only re-render on this event. Dispatch ONLY when we actually wrote
+          // fresh data — pullSession returns null on error (not "no rows"; an
+          // empty dataset returns []), so dispatching in the null branch would
+          // falsely signal freshness to subscribers while local QA-tainted
+          // state is still in place.
+          window.dispatchEvent(
+            new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
+          );
           cardsTrusted = true;
         } else {
-          // pullSession returned null: network reached Supabase but returned no
-          // rows (e.g. the user has no cloud data). Dispatch the event anyway so
-          // same-tab subscribers re-read local state and flush any QA drift.
-          console.warn("[superuser] pullSession returned null during exit cleanup; dispatching StorageEvent to re-read local state");
+          // pullSession returned null: the pull failed (network error / Supabase
+          // unreachable). Leave local state as-is — overwriting with no cloud
+          // data would be worse — and warn so QA can see the cleanup degraded.
+          // cardsTrusted stays false so the favourite-theme re-validation below
+          // skips, matching the catch branch's conservative posture.
+          console.warn("[superuser] pullSession returned null during exit cleanup; local state preserved (cleanup degraded)");
         }
-        // Synthetic StorageEvent invariant: same-tab subscribers
-        // (useSessionStorageKey) only re-render on this event. Dispatch whether
-        // rows were found or not so stale superuser-tainted cards are never left
-        // in memory.
-        window.dispatchEvent(
-          new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
-        );
       } catch (err) {
         console.warn("[superuser] cloud→local overwrite failed:", err);
       }
