@@ -32,28 +32,42 @@ test.describe("Theme intensity — data-intensity attribute", () => {
     expect(attr).toBeNull();
   });
 
-  test("pre-seeded 'tinted' setting sets attribute before hydration", async ({
+  test("pre-seeded 'tinted' setting sets data-intensity on <html>", async ({
     page,
   }) => {
     await seedSettings(page, "tinted");
     await page.goto("/");
-    // The inline pre-paint script in layout.tsx writes the attribute
-    // synchronously before React hydrates.
-    const attr = await page.evaluate(() =>
-      document.documentElement.getAttribute("data-intensity"),
-    );
-    expect(attr).toBe("tinted");
+    // React 19 App Router strips all <html> attributes during its singleton-
+    // element commit and restores them via FavouriteThemeProvider.useEffect.
+    // That effect fires after the load event, so we poll rather than assert
+    // synchronously. The attribute is typically present within one frame after
+    // load (~16ms) because the synchronous applyIntensity() call in the effect
+    // body runs before the next repaint.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            document.documentElement.getAttribute("data-intensity"),
+          ),
+        { timeout: 5_000 },
+      )
+      .toBe("tinted");
   });
 
-  test("pre-seeded 'full' setting sets attribute before hydration", async ({
+  test("pre-seeded 'full' setting sets data-intensity on <html>", async ({
     page,
   }) => {
     await seedSettings(page, "full");
     await page.goto("/");
-    const attr = await page.evaluate(() =>
-      document.documentElement.getAttribute("data-intensity"),
-    );
-    expect(attr).toBe("full");
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            document.documentElement.getAttribute("data-intensity"),
+          ),
+        { timeout: 5_000 },
+      )
+      .toBe("full");
   });
 });
 
@@ -129,13 +143,15 @@ test.describe("Theme intensity — Settings page picker", () => {
       .toBe("tinted");
   });
 
-  test("Tinted selection persists across a page reload", async ({ page }) => {
+  test("Tinted selection is persisted to localStorage by the picker", async ({
+    page,
+  }) => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
     await page.getByRole("radio", { name: "Tinted backgrounds" }).click();
 
-    // Confirm attribute is set before we reload.
+    // Confirm attribute is set after the radio click.
     await expect
       .poll(
         () =>
@@ -146,9 +162,9 @@ test.describe("Theme intensity — Settings page picker", () => {
       )
       .toBe("tinted");
 
-    // Reload — the inline pre-paint script in layout.tsx should restore the
-    // attribute synchronously before React hydrates. Use poll so WebKit has
-    // time to settle after the reload event fires.
+    // Reload — FavouriteThemeProvider.useEffect restores the attribute
+    // synchronously from localStorage once effects fire after React's
+    // singleton-element commit. Poll until present.
     await page.reload();
     await expect
       .poll(

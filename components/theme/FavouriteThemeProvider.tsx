@@ -65,6 +65,12 @@ export function FavouriteThemeProvider({
   };
 
   useEffect(() => {
+    // Apply intensity synchronously from localStorage so the DOM attribute is
+    // restored immediately after React's singleton-element acquisition removes
+    // all <html> attributes during the commit phase. The async chain below
+    // re-applies it once the IDB favourite lookup resolves.
+    applyIntensity(loadSettings().themeIntensity);
+
     void resolveFavourite().then((stored) => {
       setFavourite(stored);
       applyTheme(stored?.colors ?? null);
