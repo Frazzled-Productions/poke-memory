@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
-import { loadSession, saveSession } from "@/lib/review/persistence";
+import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
@@ -14,7 +14,12 @@ import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { computeStreak, loadStreakData } from "@/lib/streak";
-import { loadGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
+import { saveStreakData } from "@/lib/streak/persistence";
+import { loadGradeLog, saveGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
+import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
+import { pullStreak } from "@/lib/sync/streak";
+import { pullGradeLog } from "@/lib/sync/gradeLog";
+import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { computeAccuracySparkline, computeRollingAccuracy } from "@/lib/stats/accuracy";
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
@@ -31,7 +36,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { pullSession, applyCloudAuthoritative } from "@/lib/sync/cloud";
+import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 
 // ---------------------------------------------------------------------------
@@ -422,16 +427,60 @@ function ForcePullSection({
 
   async function handleForcePull() {
     const confirmed = window.confirm(
-      "This will replace your local progress with what's currently in the cloud. Continue?",
+      "This will replace your local progress, settings, and display preferences with what's currently in the cloud. Continue?",
     );
     if (!confirmed) return;
 
     setStatus("pulling");
     try {
-      const cloudRows = await pullSession(supabase, userId);
+      // Pull every user-visible cloud-backed table in parallel. Only cards are
+      // "required" — if the card pull fails the recovery is meaningless. The
+      // other four are best-effort: a null result leaves that table's local
+      // value untouched. This matches the per-table policy in pullAndMerge.
+      const [
+        cloudRows,
+        pulledSettings,
+        cloudPrefs,
+        cloudStreak,
+        cloudGradeLog,
+      ] = await Promise.all([
+        pullSession(supabase, userId),
+        pullSettingsWithTimestamp(supabase, userId).catch(() => null),
+        pullRegionalPrefs(supabase, userId).catch(() => null),
+        pullStreak(supabase, userId).catch(() => null),
+        pullGradeLog(supabase, userId).catch(() => null),
+      ]);
+
       if (cloudRows === null) {
         setStatus("error");
         return;
+      }
+
+      // Apply settings first so the seed opts below pick up the cloud-side
+      // reverse/cry/etc. flags, otherwise applyCloudAuthoritative would drop
+      // cloud rows for disabled card types (#391 lesson applied to recovery).
+      //
+      // Known small cost: `saveSettings` dispatches SETTINGS_SAVED_EVENT,
+      // which AutoSyncOnChange responds to by pushing the (cloud-origin)
+      // settings right back via merge_user_settings. The RPC is idempotent at
+      // the JSONB-content level, so the round-trip is just one wasted write
+      // per force-pull. Not worth a fromCloud flag for now.
+      if (pulledSettings !== null) {
+        saveSettings(pulledSettings.settings);
+      }
+
+      // Overlay regional prefs onto whatever settings are now in local. Cloud
+      // null values leave the local field untouched (regional-prefs convention).
+      if (cloudPrefs !== null) {
+        const local = loadSettings();
+        const next = {
+          ...local,
+          ...(cloudPrefs.timezone !== null ? { timezone: cloudPrefs.timezone } : {}),
+          ...(cloudPrefs.dateFormat !== null ? { dateFormat: cloudPrefs.dateFormat } : {}),
+        };
+        if (next.timezone !== local.timezone || next.dateFormat !== local.dateFormat) {
+          saveSettings(next);
+        }
       }
 
       const settings = loadSettings();
@@ -443,6 +492,16 @@ function ForcePullSection({
         opts,
       );
 
+      // The recovery contract is "cloud truth replaces local" — streak and
+      // grade_log get the cloud copy verbatim, not a union. The button's
+      // confirm dialog already warns the user that local progress is replaced.
+      if (cloudStreak !== null) {
+        saveStreakData([...cloudStreak].sort());
+      }
+      if (cloudGradeLog !== null) {
+        await saveGradeLog(cloudGradeLog);
+      }
+
       const saved = await loadSession();
       const limits = saved?.limits ?? DEFAULT_LIMITS;
       const result = await saveSession({ cards, limits });
@@ -452,8 +511,30 @@ function ForcePullSection({
         return;
       }
 
+      // Advance the sync cursors. Without `lastPullAt` and `lastSettingsPullAt`
+      // being stamped, the next background `pullAndMerge` runs with a null
+      // anchor → `mergeCloudIntoLocalSilent` treats every local-with-progress
+      // card as authoritative, silently dropping any cloud change that arrives
+      // between now and the next user interaction. This is the #293 lesson
+      // applied to the recovery path: mirror what `pullAndMerge` does at the
+      // end of its own cycle.
+      const status = loadSyncStatus();
+      saveSyncStatus({
+        ...status,
+        lastPullAt: maxCloudUpdatedAt(cloudRows),
+        ...(pulledSettings?.updatedAt !== undefined &&
+        pulledSettings.updatedAt !== null
+          ? { lastSettingsPullAt: pulledSettings.updatedAt }
+          : {}),
+      });
+
       // saveSession dispatches a synthetic StorageEvent so same-tab
-      // subscribers (useSessionStorageKey) re-read automatically.
+      // subscribers (useSessionStorageKey) re-read automatically. Stats
+      // re-reads streakDates and gradeLog inside that same effect, so the
+      // cloud-applied values for those auxiliary tables surface in the same
+      // tick. bumpSessionStorageKey is redundant here but cheap insurance if
+      // saveSession is ever refactored to skip its dispatch.
+      bumpSessionStorageKey();
 
       onSuccess(cards);
       setStatus("success");

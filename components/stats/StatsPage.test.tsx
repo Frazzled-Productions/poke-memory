@@ -122,6 +122,36 @@ function makeCloudRow(id: number): CloudRow {
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: mockLoadSession,
   saveSession: vi.fn().mockResolvedValue({ ok: true }),
+  bumpSessionStorageKey: vi.fn(),
+}));
+
+vi.mock("@/lib/sync/settings", () => ({
+  pullSettingsWithTimestamp: vi.fn().mockResolvedValue(null),
+  pullRegionalPrefs: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/sync/streak", () => ({
+  pullStreak: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/sync/gradeLog", () => ({
+  pullGradeLog: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/sync/persistence", () => ({
+  loadSyncStatus: vi.fn(() => ({
+    lastPushAt: null,
+    lastPushFailed: false,
+    lastPushAttemptAt: null,
+    failedCardCount: null,
+    lastPullAt: null,
+    lastSettingsPullAt: null,
+  })),
+  saveSyncStatus: vi.fn(),
+}));
+
+vi.mock("@/lib/streak/persistence", () => ({
+  saveStreakData: vi.fn(),
 }));
 
 vi.mock("@/lib/sync/cloud", () => ({
@@ -177,6 +207,7 @@ vi.mock("@/lib/streak", () => ({
 
 vi.mock("@/lib/gradelog/persistence", () => ({
   loadGradeLog: vi.fn().mockResolvedValue([]),
+  saveGradeLog: vi.fn().mockResolvedValue(undefined),
   appendGradeEntry: vi.fn().mockResolvedValue({ occurredAt: Date.now() }),
   computeGradeTotals: vi.fn(() => ({ 1: 0, 2: 0, 4: 0, 5: 0 })),
   GRADE_LOG_APPENDED_EVENT: "poke-memory:grade-log-appended",
@@ -433,5 +464,59 @@ describe("StatsPage — Force pull from cloud button", () => {
         screen.getByRole("button", { name: /force pull from cloud/i }),
       ).toBeInTheDocument();
     });
+  });
+
+  it("clicking the button pulls all five tables and persists each cloud-authoritative", async () => {
+    // Pulls run in parallel via Promise.all; assert each was called and that
+    // the destructured results were applied to the right local sink. Catches
+    // a future regression where the parallel array order is transposed.
+    const { pullSettingsWithTimestamp, pullRegionalPrefs } = await import(
+      "@/lib/sync/settings"
+    );
+    const { pullStreak } = await import("@/lib/sync/streak");
+    const { pullGradeLog } = await import("@/lib/sync/gradeLog");
+    const { saveStreakData } = await import("@/lib/streak/persistence");
+    const { saveGradeLog } = await import("@/lib/gradelog/persistence");
+    const settingsMod = await import("@/lib/settings/persistence");
+
+    mockLoadSession.mockResolvedValue(null);
+    mockPullSession.mockResolvedValue([makeCloudRow(1)]);
+    vi.mocked(pullSettingsWithTimestamp).mockResolvedValueOnce({
+      settings: { masteryRepetitions: 3 } as never,
+      updatedAt: "2026-05-14T10:00:00.000Z",
+    });
+    vi.mocked(pullRegionalPrefs).mockResolvedValueOnce({
+      timezone: "Europe/London",
+      dateFormat: "dmy",
+    });
+    vi.mocked(pullStreak).mockResolvedValueOnce(["2026-05-13", "2026-05-14"]);
+    vi.mocked(pullGradeLog).mockResolvedValueOnce([
+      { occurredAt: 1, date: "2026-05-14", cardType: "name", grade: 4 },
+    ]);
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockAuthValue.user = mockSuiteUser;
+    mockAuthValue.supabase = { auth: {} };
+
+    render(<StatsPage />);
+
+    const button = await screen.findByRole("button", {
+      name: /force pull from cloud/i,
+    });
+    button.click();
+
+    await waitFor(() => {
+      expect(pullSettingsWithTimestamp).toHaveBeenCalled();
+      expect(pullRegionalPrefs).toHaveBeenCalled();
+      expect(pullStreak).toHaveBeenCalled();
+      expect(pullGradeLog).toHaveBeenCalled();
+      expect(saveStreakData).toHaveBeenCalledWith(["2026-05-13", "2026-05-14"]);
+      expect(saveGradeLog).toHaveBeenCalledWith([
+        { occurredAt: 1, date: "2026-05-14", cardType: "name", grade: 4 },
+      ]);
+      expect(settingsMod.saveSettings).toHaveBeenCalled();
+    });
+
+    confirmSpy.mockRestore();
   });
 });
