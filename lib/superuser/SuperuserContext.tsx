@@ -15,8 +15,9 @@ import {
   type SuperuserFlagKey,
 } from "./persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { pullSession, mergeCloudIntoLocal } from "@/lib/sync/cloud";
+import { pullSession, applyCloudAuthoritative } from "@/lib/sync/cloud";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { idbDelete } from "@/lib/idb/db";
 import {
   loadFavourite,
@@ -24,6 +25,8 @@ import {
   isFavouriteEarned,
 } from "@/lib/theme/persistence";
 import { loadSettings } from "@/lib/settings/persistence";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 
 // Typing "super" anywhere (when not focused on an input) toggles unlocked state.
 const CHORD_SEQUENCE = ["s", "u", "p", "e", "r"];
@@ -92,15 +95,16 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
         const rows = await pullSession(sb, u.id);
         if (rows) {
           const local = await loadSession();
-          if (local) {
-            const merged = mergeCloudIntoLocal(local.cards, rows);
-            await saveSession({ ...local, cards: merged });
-            // Synthetic StorageEvent invariant: same-tab subscribers
-            // (useSessionStorageKey) only re-render on this event.
-            window.dispatchEvent(
-              new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
-            );
-          }
+          const settings = loadSettings();
+          const opts = seedOptsFromSettings(settings);
+          const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, rows, opts);
+          const limits = local?.limits ?? DEFAULT_LIMITS;
+          await saveSession({ cards: rebuilt, limits });
+          // Synthetic StorageEvent invariant: same-tab subscribers
+          // (useSessionStorageKey) only re-render on this event.
+          window.dispatchEvent(
+            new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
+          );
           cardsTrusted = true;
         }
       } catch (err) {

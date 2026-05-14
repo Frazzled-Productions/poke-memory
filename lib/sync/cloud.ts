@@ -1,6 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
+import { buildSession } from "@/lib/review/session";
+import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
 import { appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
+
+/** Options forwarded to `buildSession` when rebuilding a card set from seed. */
+export type SeedOpts = {
+  reverseEnabled?: boolean;
+  nameEnabled?: boolean;
+  evolutionEnabled?: boolean;
+  reverseEvolutionEnabled?: boolean;
+  cryEnabled?: boolean;
+};
 
 // Sync is best-effort: all errors are swallowed so a network hiccup never
 // breaks the local-first review flow.
@@ -403,6 +414,32 @@ export function mergeCloudIntoLocal(
 ): ReviewableCard[] {
   const byKey = new Map(cloud.map((r) => [cloudRowKey(r), r]));
   return local.map((card) => {
+    const row = byKey.get(cardKey(card));
+    if (!row) return card;
+    return applyCloudRow(card, row);
+  });
+}
+
+/**
+ * Rebuilds the full card set from seed at initial state, then overlays every
+ * cloud row that matches a card via `applyCloudRow`. Cards present in cloud
+ * get cloud state; cards absent from cloud are returned at initial ("new")
+ * state. This is a cloud-authoritative pull: local progress that has no
+ * counterpart in the cloud is discarded.
+ *
+ * Use this instead of `mergeCloudIntoLocal` when the intent is "cloud is the
+ * source of truth" — e.g. superuser exit cleanup (wiping QA drift) or the
+ * "Keep cloud" branch of the conflict picker on a new device.
+ */
+export function applyCloudAuthoritative(
+  seed: readonly SeedPokemon[],
+  evoSeed: readonly EvolutionCard[],
+  cloud: CloudRow[],
+  opts: SeedOpts,
+): ReviewableCard[] {
+  const base = buildSession(seed, evoSeed, undefined, opts);
+  const byKey = new Map(cloud.map((r) => [cloudRowKey(r), r]));
+  return base.map((card) => {
     const row = byKey.get(cardKey(card));
     if (!row) return card;
     return applyCloudRow(card, row);
