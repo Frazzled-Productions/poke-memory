@@ -154,7 +154,7 @@ export async function pullSettingsWithTimestamp(
     const row = data as { settings: unknown; updated_at: string | null };
     if (typeof row.settings !== "object" || row.settings === null) return null;
     if (Object.keys(row.settings as Record<string, unknown>).length === 0) return null;
-    return { settings: row.settings as UserSettings, updatedAt: row.updated_at };
+    return { settings: row.settings as UserSettings, updatedAt: row.updated_at ?? null };
   } catch {
     return null;
   }
