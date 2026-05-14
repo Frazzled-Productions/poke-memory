@@ -22,7 +22,7 @@ export function isSyncSafe(card: ReviewableCard): boolean {
 }
 
 /**
- * Cloud row shape after migration 010.
+ * Cloud row shape after migration 012.
  *
  * Primary identity: (card_type, subject_key).
  *   card_type   — DB discriminator (e.g. "name", "evolution-edge"). Note: the
@@ -31,10 +31,9 @@ export function isSyncSafe(card: ReviewableCard): boolean {
  *   subject_key — type-specific opaque key: species ID string for species cards,
  *                 "fromId>>>toId" for edge cards.
  *
- * The legacy pokemon_id column is kept in the DB for one release and is still
- * written by push during the transition window so that a rollback to the
- * old schema does not lose data. It is NOT included here — the server upserts
- * via (user_id, card_type, subject_key).
+ * The legacy `pokemon_id` integer column was dropped by migration 012. Push
+ * paths upsert via `(user_id, card_type, subject_key)` and never write
+ * `pokemon_id` — it does not exist on the table.
  */
 export type CloudRow = {
   /** DB card_type discriminator. Use appTypeToDbType / dbTypeToAppType to convert to/from app types. */
@@ -56,7 +55,7 @@ export type CloudRow = {
    * Cleared on un-hide once dueDate has been shifted forward.
    */
   hidden_since: string | null;
-  /** Pasture feature (#350). True once the user has acknowledged the card in the pasture. */
+  /** Pasture feature (#350). True once the user has tapped this card on the Pasture page (clears the new-arrival sparkle). One-way: migration 017 trigger rejects true→false. */
   seen_in_pasture: boolean;
   /** Present on pull responses. Absent on locally-constructed push rows (added in the upsert batch). */
   updated_at?: string;
@@ -374,9 +373,9 @@ export function mergeCloudIntoLocalSilent(
 
 /**
  * Merges cloud rows into a local card array. For each card, if a matching
- * cloud row exists (keyed by pokemon_id / card.id), its SM-2 state fields
- * overwrite the local state. Cards without a cloud counterpart are returned
- * unchanged. The merge is non-destructive: in-memory-only fields
+ * cloud row exists (keyed by `(card_type, subject_key)`), its FSRS state
+ * fields overwrite the local state. Cards without a cloud counterpart are
+ * returned unchanged. The merge is non-destructive: in-memory-only fields
  * (learningStep, stepStartedAt) are preserved from the local card.
  *
  * Cloud rows that violate the firstSeen/lastReview invariant are normalized on
