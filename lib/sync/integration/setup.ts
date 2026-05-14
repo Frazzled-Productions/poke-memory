@@ -7,8 +7,9 @@
  *
  * Creates an ephemeral branch, returns a configured client pair, and tears
  * the branch down when you are done.  The branch is named:
- *   test-<GITHUB_RUN_ID>-<timestamp>
- * so concurrent runs on different PRs don't collide.
+ *   test-<GITHUB_RUN_ID|"local">-<Date.now()>
+ * so concurrent files within the same CI run (and separate local runs) each
+ * get a unique name.
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -64,6 +65,8 @@ async function managementFetch(
   return res.json();
 }
 
+const TERMINAL_FAILURE_STATES = new Set(["failed", "error", "removed"]);
+
 /** Wait for the branch to reach "running" status, polling every POLL_INTERVAL_MS. */
 async function waitForBranchReady(branchId: string): Promise<BranchDetails> {
   const deadline = Date.now() + BRANCH_READY_TIMEOUT_MS;
@@ -72,6 +75,11 @@ async function waitForBranchReady(branchId: string): Promise<BranchDetails> {
       `/v1/branches/${branchId}`,
     )) as BranchDetails;
     if (details.status === "running") return details;
+    if (TERMINAL_FAILURE_STATES.has(details.status)) {
+      throw new Error(
+        `Branch ${branchId} entered terminal state '${details.status}' — cannot proceed`,
+      );
+    }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
   throw new Error(
@@ -104,7 +112,7 @@ export async function setupTestBranch(): Promise<TestBranch> {
   if (!ACCESS_TOKEN) throw new Error("SUPABASE_ACCESS_TOKEN is not set");
   if (!PROJECT_REF) throw new Error("SUPABASE_PROJECT_REF is not set");
 
-  const branchName = `test-${process.env.GITHUB_RUN_ID ?? Date.now()}`;
+  const branchName = `test-${process.env.GITHUB_RUN_ID ?? "local"}-${Date.now()}`;
 
   // Create the branch.
   const created = (await managementFetch(
@@ -127,17 +135,17 @@ export async function setupTestBranch(): Promise<TestBranch> {
   const branchUrl = `https://${branchRef}.supabase.co`;
 
   // Keys may be returned on the branch details or must be fetched separately.
-  // Fall back to a second GET if not present in the create response.
-  const anonKey =
-    details.anon_key ??
-    ((
-      await managementFetch(`/v1/branches/${branchId}`)
-    ) as BranchDetails).anon_key;
-  const serviceKey =
-    details.service_role_key ??
-    ((
-      await managementFetch(`/v1/branches/${branchId}`)
-    ) as BranchDetails).service_role_key;
+  // A single refetch is used for both keys to avoid inconsistency between two
+  // separate GETs if branch state changes between calls.
+  let anonKey = details.anon_key;
+  let serviceKey = details.service_role_key;
+  if (!anonKey || !serviceKey) {
+    const refetched = (await managementFetch(
+      `/v1/branches/${branchId}`,
+    )) as BranchDetails;
+    anonKey = refetched.anon_key;
+    serviceKey = refetched.service_role_key;
+  }
 
   if (!anonKey || !serviceKey) {
     throw new Error(

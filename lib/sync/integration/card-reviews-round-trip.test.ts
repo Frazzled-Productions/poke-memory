@@ -97,30 +97,30 @@ function makeCard(overrides: Partial<ReviewableCard> = {}): ReviewableCard {
 
 describe("card-reviews round-trip (integration)", () => {
   it("pushSession then pullSession returns the same FSRS fields", async () => {
-    const card = makeCard();
+    const card = makeCard({ subjectKey: "1-rt" });
     const ok = await pushSession(user.client, user.id, [card]);
     expect(ok).toBe(true);
 
     const rows = await pullSession(user.client, user.id);
     expect(rows).not.toBeNull();
-    expect(rows).toHaveLength(1);
 
-    const row = rows![0];
-    expect(row.card_type).toBe("name");
-    expect(row.subject_key).toBe("1");
-    expect(row.stability).toBe(card.state.stability);
-    expect(row.difficulty).toBe(card.state.difficulty);
-    expect(row.scheduled_days).toBe(card.state.scheduledDays);
-    expect(row.reps).toBe(card.state.reps);
-    expect(row.lapses).toBe(card.state.lapses);
-    expect(row.fsrs_state).toBe(card.state.fsrsState);
-    expect(row.due_date).toBe(card.state.dueDate);
-    expect(row.last_review).toBe(card.state.lastReview);
-    expect(row.first_seen).toBe(card.state.firstSeen);
-    expect(row.seen_in_pasture).toBe(false);
-    expect(row.hidden_since).toBeNull();
+    const row = rows?.find((r) => r.subject_key === "1-rt");
+    expect(row).toBeDefined();
+    expect(row!.card_type).toBe("name");
+    expect(row!.subject_key).toBe("1-rt");
+    expect(row!.stability).toBe(card.state.stability);
+    expect(row!.difficulty).toBe(card.state.difficulty);
+    expect(row!.scheduled_days).toBe(card.state.scheduledDays);
+    expect(row!.reps).toBe(card.state.reps);
+    expect(row!.lapses).toBe(card.state.lapses);
+    expect(row!.fsrs_state).toBe(card.state.fsrsState);
+    expect(row!.due_date).toBe(card.state.dueDate);
+    expect(row!.last_review).toBe(card.state.lastReview);
+    expect(row!.first_seen).toBe(card.state.firstSeen);
+    expect(row!.seen_in_pasture).toBe(false);
+    expect(row!.hidden_since).toBeNull();
     // updated_at should be set by the DB trigger / default.
-    expect(typeof row.updated_at).toBe("string");
+    expect(typeof row!.updated_at).toBe("string");
   });
 
   it("upserts update in place without creating duplicate rows", async () => {

@@ -146,18 +146,13 @@ describe("RLS policies (integration)", () => {
 
     // Either error is returned, or RLS silently matches zero rows.
     // Either way, the row must not have been modified.
-    if (error) {
-      expect(error).not.toBeNull();
-    } else {
-      // No error — verify the row was not changed.
-      const { data } = await userB.client
-        .from("card_reviews")
-        .select("reps")
-        .eq("user_id", userB.id)
-        .eq("card_type", "name")
-        .eq("subject_key", "202");
-      expect(data?.[0]?.reps).not.toBe(99);
-    }
+    const { data } = await userB.client
+      .from("card_reviews")
+      .select("reps")
+      .eq("user_id", userB.id)
+      .eq("card_type", "name")
+      .eq("subject_key", "202");
+    expect(data?.[0]?.reps).not.toBe(99);
   });
 
   it("user A can read their own rows and not user B's", async () => {

@@ -108,7 +108,7 @@ describe("regression trigger (integration)", () => {
       .eq("subject_key", "101");
 
     expect(error).not.toBeNull();
-    expect(error?.message ?? error?.code).toMatch(/check_violation|regression/i);
+    expect(error?.code).toBe("23514");
   });
 
   it("blocks UPDATE that sets first_seen to NULL", async () => {
@@ -123,7 +123,7 @@ describe("regression trigger (integration)", () => {
       .eq("subject_key", "102");
 
     expect(error).not.toBeNull();
-    expect(error?.message ?? error?.code).toMatch(/check_violation|regression/i);
+    expect(error?.code).toBe("23514");
   });
 
   it("blocks UPDATE that moves last_review backward", async () => {
@@ -139,7 +139,7 @@ describe("regression trigger (integration)", () => {
       .eq("subject_key", "103");
 
     expect(error).not.toBeNull();
-    expect(error?.message ?? error?.code).toMatch(/check_violation|regression/i);
+    expect(error?.code).toBe("23514");
   });
 
   it("allows UPDATE that moves last_review forward", async () => {

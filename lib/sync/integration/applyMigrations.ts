@@ -51,9 +51,13 @@ async function executeSql(projectRef: string, sql: string): Promise<void> {
  * explicitly to be safe.
  */
 export function listMigrationFiles(): string[] {
+  // NOTE: two files currently share the 009_ prefix. The sort is still safe
+  // because their full names (alphabetically) happen to be in the intended
+  // apply order, but new migrations MUST use unique numeric prefixes to avoid
+  // silent reordering.
   return readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith(".sql"))
-    .sort(); // alphabetical = numeric for zero-padded names
+    .sort(); // alphabetical = numeric for zero-padded names with unique prefixes
 }
 
 /**
