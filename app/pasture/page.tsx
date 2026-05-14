@@ -107,6 +107,7 @@ export default function PasturePage() {
         }
       }
     },
+    // saveSession is a stable module-level export — omitted intentionally.
     [session, supabase, user?.id],
   );
 

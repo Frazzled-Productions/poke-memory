@@ -452,7 +452,7 @@ export default function SettingsPage() {
           await saveSession({ ...session, cards: filtered });
         }
       }
-    })();
+    })().catch((err) => console.error("[settings] card-type filter saveSession failed:", err));
     setSettings(clamped);
     setSaved(true);
     if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);

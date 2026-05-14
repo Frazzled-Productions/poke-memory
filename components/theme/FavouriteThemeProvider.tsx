@@ -65,11 +65,13 @@ export function FavouriteThemeProvider({
   };
 
   useEffect(() => {
-    void resolveFavourite().then((stored) => {
-      setFavourite(stored);
-      applyTheme(stored?.colors ?? null);
-      applyIntensity(loadSettings().themeIntensity);
-    });
+    void resolveFavourite()
+      .then((stored) => {
+        setFavourite(stored);
+        applyTheme(stored?.colors ?? null);
+        applyIntensity(loadSettings().themeIntensity);
+      })
+      .catch((err) => console.warn("[poke-memory] resolveFavourite failed:", err));
 
     function handleStorage(e: StorageEvent) {
       // The favourite theme lives inside the settings blob (#307). Watch
@@ -78,21 +80,25 @@ export function FavouriteThemeProvider({
       if (e.key !== "poke-memory:settings:v1" && e.key !== "poke-memory:favourite:v1") {
         return;
       }
-      void resolveFavourite().then((updated) => {
-        setFavourite(updated);
-        applyTheme(updated?.colors ?? null);
-        applyIntensity(loadSettings().themeIntensity);
-      });
+      void resolveFavourite()
+        .then((updated) => {
+          setFavourite(updated);
+          applyTheme(updated?.colors ?? null);
+          applyIntensity(loadSettings().themeIntensity);
+        })
+        .catch((err) => console.warn("[poke-memory] resolveFavourite failed:", err));
     }
 
     function handleSettingsSaved() {
       // Same-tab updates dispatched by saveSettings — cross-tab updates come
       // via the native StorageEvent above.
       applyIntensity(loadSettings().themeIntensity);
-      void resolveFavourite().then((updated) => {
-        setFavourite(updated);
-        applyTheme(updated?.colors ?? null);
-      });
+      void resolveFavourite()
+        .then((updated) => {
+          setFavourite(updated);
+          applyTheme(updated?.colors ?? null);
+        })
+        .catch((err) => console.warn("[poke-memory] resolveFavourite failed:", err));
     }
 
     window.addEventListener("storage", handleStorage);

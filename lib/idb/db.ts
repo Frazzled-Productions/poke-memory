@@ -12,8 +12,8 @@ const STORE_NAME = "kv";
 /** Opens the poke-memory database at version 1 with a `kv` object store. */
 export function openAppDb(): Promise<IDBPDatabase> {
   if (typeof window === "undefined") {
-    // Server-side: return a promise that never resolves to keep the caller
-    // waiting, but never executed because all callers guard on idbAvailable.
+    // Server-side: return a promise that never resolves — all callers guard on
+    // `typeof window === "undefined"` before calling, so this is never awaited.
     return new Promise(() => {});
   }
   if (!dbPromise) {
@@ -47,7 +47,6 @@ export async function idbGet(key: string): Promise<string | null> {
     return typeof val === "string" ? val : null;
   } catch (err) {
     console.warn("[poke-memory] idbGet failed:", err);
-    idbAvailable = false;
     return null;
   }
 }
@@ -60,7 +59,6 @@ export async function idbSet(key: string, value: string): Promise<void> {
     await db.put(STORE_NAME, value, key);
   } catch (err) {
     console.warn("[poke-memory] idbSet failed:", err);
-    idbAvailable = false;
   }
 }
 
@@ -72,7 +70,29 @@ export async function idbDelete(key: string): Promise<void> {
     await db.delete(STORE_NAME, key);
   } catch (err) {
     console.warn("[poke-memory] idbDelete failed:", err);
-    idbAvailable = false;
+  }
+}
+
+/**
+ * Atomically reads, transforms, and writes a single key in the kv store.
+ * Prevents lost-write races when concurrent callers modify the same key
+ * (e.g. rapid grade double-taps or background-sync overlapping a grade).
+ * No-ops when IDB is unavailable.
+ */
+export async function idbReadModifyWrite(
+  key: string,
+  transform: (current: string | null) => string,
+): Promise<void> {
+  if (typeof window === "undefined" || !idbAvailable) return;
+  try {
+    const db = await openAppDb();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const val: unknown = await tx.store.get(key);
+    const current = typeof val === "string" ? val : null;
+    await tx.store.put(transform(current), key);
+    await tx.done;
+  } catch (err) {
+    console.warn("[poke-memory] idbReadModifyWrite failed:", err);
   }
 }
 

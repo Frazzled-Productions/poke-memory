@@ -140,13 +140,21 @@ export default function CallbackCompletePage() {
 
   function handleKeepCloud() {
     if (status.kind !== "conflict" || pending) return;
+    setPending(true);
     void (async () => {
-      const local = await loadSession();
-      if (local !== null) {
-        const merged = mergeCloudIntoLocal(local.cards, status.cloudRows);
-        await saveSession({ cards: merged, limits: local.limits });
+      try {
+        const local = await loadSession();
+        if (local !== null) {
+          const merged = mergeCloudIntoLocal(local.cards, status.cloudRows);
+          await saveSession({ cards: merged, limits: local.limits });
+        }
+        router.replace("/");
+      } catch (err) {
+        console.error("[callback-complete] handleKeepCloud failed:", err);
+        setStatus({ kind: "error" });
+      } finally {
+        setPending(false);
       }
-      router.replace("/");
     })();
   }
 

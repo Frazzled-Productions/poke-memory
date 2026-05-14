@@ -1,5 +1,5 @@
 import type { Grade } from "@/lib/srs/scheduler";
-import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
+import { idbGet, idbSet, idbReadModifyWrite, isIdbAvailable } from "@/lib/idb/db";
 
 export type GradeLogEntry = {
   date: string;
@@ -164,14 +164,20 @@ export async function appendGradeEntry(
       occurredAt: Date.now(),
       ...(typeof entry.subjectKey === "string" ? { subjectKey: entry.subjectKey } : {}),
     };
-    const existing = await loadGradeLog();
-    const pruned = pruneGradeLog(existing, 365, entry.date);
-    pruned.push(stamped);
-    const json = JSON.stringify(pruned);
-
     if (isIdbAvailable()) {
-      await idbSet(STORAGE_KEY, json);
+      // Use an atomic readwrite transaction so concurrent calls (double-tap,
+      // background sync) cannot overwrite each other's appended entry.
+      // Falls back to localStorage when the IDB key is absent (migration window).
+      await idbReadModifyWrite(STORAGE_KEY, (raw) => {
+        const existing = raw !== null ? parseGradeLog(raw) : loadGradeLogLS();
+        const pruned = pruneGradeLog(existing, 365, entry.date);
+        pruned.push(stamped);
+        return JSON.stringify(pruned);
+      });
     } else {
+      const existing = loadGradeLogLS();
+      const pruned = pruneGradeLog(existing, 365, entry.date);
+      pruned.push(stamped);
       const ok = saveGradeLogLS(pruned);
       if (!ok) return null;
     }
