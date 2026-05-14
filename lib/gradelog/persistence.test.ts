@@ -65,22 +65,22 @@ describe("loadGradeLog", () => {
     expect(loadGradeLog()).toEqual(entries);
   });
 
-  it("loads entries with cardId set", () => {
+  it("loads entries with subjectKey set", () => {
     const entries = [
-      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000, cardId: 42 },
+      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000, subjectKey: "42" },
     ];
     storage.setItem(KEY, JSON.stringify(entries));
     const log = loadGradeLog();
-    expect(log[0].cardId).toBe(42);
+    expect(log[0].subjectKey).toBe("42");
   });
 
-  it("loads legacy entries without cardId as cardId: undefined", () => {
+  it("loads legacy entries without subjectKey as subjectKey: undefined", () => {
     const entries = [
       { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1700000000000 },
     ];
     storage.setItem(KEY, JSON.stringify(entries));
     const log = loadGradeLog();
-    expect(log[0].cardId).toBeUndefined();
+    expect(log[0].subjectKey).toBeUndefined();
   });
 
   it("synthesizes occurredAt for legacy entries that lack it", () => {
@@ -124,16 +124,16 @@ describe("appendGradeEntry", () => {
     expect(typeof log[0].occurredAt).toBe("number");
   });
 
-  it("persists cardId when provided", () => {
-    appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name", cardId: 7 });
+  it("persists subjectKey when provided", () => {
+    appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name", subjectKey: "7" });
     const log = loadGradeLog();
-    expect(log[0].cardId).toBe(7);
+    expect(log[0].subjectKey).toBe("7");
   });
 
-  it("does not set cardId when not provided", () => {
+  it("does not set subjectKey when not provided", () => {
     appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
     const log = loadGradeLog();
-    expect(log[0].cardId).toBeUndefined();
+    expect(log[0].subjectKey).toBeUndefined();
   });
 
   it("appends to an existing log without overwriting prior entries", () => {

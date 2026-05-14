@@ -52,7 +52,7 @@ function makeLargeGradeLog(count = 210) {
     entry_date: `2026-01-${String((i % 28) + 1).padStart(2, "0")}`,
     card_type: "name",
     grade: 4,
-    card_id: (i % 10) + 1, // ten distinct cards — cardId required to count
+    subject_key: String((i % 10) + 1), // ten distinct cards — subjectKey required to count
   }));
 }
 
@@ -175,7 +175,7 @@ describe("POST /api/srs/optimize — persistWeights via RPC", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("returns 422 when grade log has fewer than MIN_REVIEWS_FOR_OPTIMIZATION entries with a cardId", async () => {
+  it("returns 422 when grade log has fewer than MIN_REVIEWS_FOR_OPTIMIZATION entries with a subjectKey", async () => {
     const { rpcMock } = makeSupabaseMock({ gradeLogData: makeLargeGradeLog(5) });
 
     const response = await POST();

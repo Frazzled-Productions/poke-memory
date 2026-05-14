@@ -1067,7 +1067,7 @@ export function ReviewSession() {
         c.state.lastReview !== today,
     );
     recordReview(today, gradedToday, dueQueueEmpty);
-    const appended = appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, cardId: effectiveCard.id });
+    const appended = appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, subjectKey: effectiveCard.subjectKey });
     snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
     setUndoSnapshot(snapshot);
     enqueueGrade({ ...effectiveCard, state: nextState });

@@ -9,14 +9,14 @@ import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 function makeEntry(
   occurredAt: number,
   grade: GradeLogEntry["grade"],
-  cardId?: number,
+  subjectKey?: string,
 ): GradeLogEntry {
   return {
     occurredAt,
     date: new Date(occurredAt).toISOString().slice(0, 10),
     grade,
     cardType: "name",
-    ...(cardId !== undefined ? { cardId } : {}),
+    ...(subjectKey !== undefined ? { subjectKey } : {}),
   };
 }
 
@@ -31,16 +31,16 @@ describe("countOptimizableReviews", () => {
     expect(countOptimizableReviews([])).toBe(0);
   });
 
-  it("counts only entries with a numeric cardId", () => {
+  it("counts only entries with a subjectKey", () => {
     const entries: GradeLogEntry[] = [
-      makeEntry(1000, 4, 1),
-      makeEntry(2000, 4),         // no cardId — not counted
-      makeEntry(3000, 5, 2),
+      makeEntry(1000, 4, "1"),
+      makeEntry(2000, 4),         // no subjectKey — not counted
+      makeEntry(3000, 5, "2"),
     ];
     expect(countOptimizableReviews(entries)).toBe(2);
   });
 
-  it("returns 0 when no entries have a cardId", () => {
+  it("returns 0 when no entries have a subjectKey", () => {
     const entries = [makeEntry(1000, 4), makeEntry(2000, 1)];
     expect(countOptimizableReviews(entries)).toBe(0);
   });
@@ -51,10 +51,10 @@ describe("gradeLogToOptimizerItems", () => {
     expect(gradeLogToOptimizerItems([])).toEqual([]);
   });
 
-  it("drops entries without a cardId", () => {
+  it("drops entries without a subjectKey", () => {
     const entries: GradeLogEntry[] = [
-      makeEntry(1000, 4),         // no cardId
-      makeEntry(2000, 5),         // no cardId
+      makeEntry(1000, 4),         // no subjectKey
+      makeEntry(2000, 5),         // no subjectKey
     ];
     expect(gradeLogToOptimizerItems(entries)).toEqual([]);
   });
@@ -67,9 +67,9 @@ describe("gradeLogToOptimizerItems", () => {
     const t2 = t1 + 2 * DAY;                         // 2026-01-04
 
     const entries: GradeLogEntry[] = [
-      makeEntry(t0, 4, 42),
-      makeEntry(t1, 5, 42),
-      makeEntry(t2, 1, 42),
+      makeEntry(t0, 4, "42"),
+      makeEntry(t1, 5, "42"),
+      makeEntry(t2, 1, "42"),
     ];
 
     const items = gradeLogToOptimizerItems(entries);
@@ -92,10 +92,10 @@ describe("gradeLogToOptimizerItems", () => {
     const t = Date.UTC(2026, 0, 1, 12, 0, 0);
 
     const entries: GradeLogEntry[] = [
-      makeEntry(t,           1, 10),
-      makeEntry(t + DAY,     2, 10),
-      makeEntry(t + 2 * DAY, 4, 10),
-      makeEntry(t + 3 * DAY, 5, 10),
+      makeEntry(t,           1, "10"),
+      makeEntry(t + DAY,     2, "10"),
+      makeEntry(t + 2 * DAY, 4, "10"),
+      makeEntry(t + 3 * DAY, 5, "10"),
     ];
 
     const items = gradeLogToOptimizerItems(entries);
@@ -108,9 +108,9 @@ describe("gradeLogToOptimizerItems", () => {
     const t = Date.UTC(2026, 0, 1, 12, 0, 0);
 
     const entries: GradeLogEntry[] = [
-      makeEntry(t, 4, 1),
-      makeEntry(t + DAY, 5, 2),
-      makeEntry(t + 2 * DAY, 1, 1),
+      makeEntry(t, 4, "1"),
+      makeEntry(t + DAY, 5, "2"),
+      makeEntry(t + 2 * DAY, 1, "1"),
     ];
 
     const items = gradeLogToOptimizerItems(entries);
@@ -127,8 +127,8 @@ describe("gradeLogToOptimizerItems", () => {
 
     // Provide entries in reverse chronological order.
     const entries: GradeLogEntry[] = [
-      makeEntry(t1, 5, 7),
-      makeEntry(t0, 4, 7),
+      makeEntry(t1, 5, "7"),
+      makeEntry(t0, 4, "7"),
     ];
 
     const items = gradeLogToOptimizerItems(entries);
@@ -142,8 +142,8 @@ describe("gradeLogToOptimizerItems", () => {
     const t1 = t0 + 1.5 * 86_400_000;
 
     const entries: GradeLogEntry[] = [
-      makeEntry(t0, 4, 99),
-      makeEntry(t1, 4, 99),
+      makeEntry(t0, 4, "99"),
+      makeEntry(t1, 4, "99"),
     ];
 
     const items = gradeLogToOptimizerItems(entries);

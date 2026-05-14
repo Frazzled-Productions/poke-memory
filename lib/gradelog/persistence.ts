@@ -13,11 +13,12 @@ export type GradeLogEntry = {
    */
   occurredAt: number;
   /**
-   * The card's numeric ID (e.g. species ID for name cards, offset ID for
-   * evolution/reverse/cry). Added in #268 so the FSRS optimizer can group
-   * reviews per card. Legacy entries (written before #268) lack this field.
+   * The card's subject key (e.g. "25" for Pikachu name/reverse/cry, "1>>>2"
+   * for a Bulbasaur→Ivysaur evolution edge). Added as part of #462 so the
+   * FSRS optimizer can group reviews per card. Legacy entries (written before
+   * #462) lack this field.
    */
-  cardId?: number;
+  subjectKey?: string;
 };
 
 export type GradeLog = GradeLogEntry[];
@@ -41,7 +42,7 @@ function isGrade(v: unknown): v is Grade {
 }
 
 // Validate a stored entry shape. Legacy entries are allowed to lack
-// `occurredAt` and `cardId`; the caller (loadGradeLog) backfills occurredAt.
+// `occurredAt` and `subjectKey`; the caller (loadGradeLog) backfills occurredAt.
 function isStoredEntryShape(v: unknown): v is Omit<GradeLogEntry, "occurredAt"> & {
   occurredAt?: number;
 } {
@@ -56,7 +57,7 @@ function isStoredEntryShape(v: unknown): v is Omit<GradeLogEntry, "occurredAt"> 
       e.cardType === "reverse" ||
       e.cardType === "cry") &&
     (e.occurredAt === undefined || typeof e.occurredAt === "number") &&
-    (e.cardId === undefined || typeof e.cardId === "number")
+    (e.subjectKey === undefined || typeof e.subjectKey === "string")
   );
 }
 
@@ -95,8 +96,8 @@ export function loadGradeLog(): GradeLog {
           cardType: entry.cardType,
           occurredAt: synthesizeOccurredAt(entry.date, index),
         };
-        if (typeof entry.cardId === "number") {
-          backfilled.cardId = entry.cardId;
+        if (typeof entry.subjectKey === "string") {
+          backfilled.subjectKey = entry.subjectKey;
         }
         return backfilled;
       },
@@ -116,7 +117,7 @@ export function appendGradeEntry(
       grade: entry.grade,
       cardType: entry.cardType,
       occurredAt: Date.now(),
-      ...(typeof entry.cardId === "number" ? { cardId: entry.cardId } : {}),
+      ...(typeof entry.subjectKey === "string" ? { subjectKey: entry.subjectKey } : {}),
     };
     const pruned = pruneGradeLog(loadGradeLog(), 365, entry.date);
     pruned.push(stamped);
