@@ -10,8 +10,11 @@ import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 // otherwise open by overwriting the whole settings column. pushRegionalPrefs
 // remains a separate scalar-column write path (see comment below).
 
-// Generated Supabase types do not yet include merge_user_settings. One-time
-// cast through `unknown` to a narrow signature so the name + args stay typed.
+// Generated Supabase types do not yet include merge_user_settings. Cast the
+// call site through `unknown` to a narrow signature so name + args stay typed.
+// Keep the cast on the *call expression* (not a separate const) so the JS
+// member-access reference is preserved and `this` binds to `client` — extracting
+// to a local would strip `this` and SupabaseClient.rpc reads `this.rest`.
 type MergeUserSettingsRpc = (
   name: "merge_user_settings",
   args: MergeUserSettingsArgs,
@@ -23,11 +26,10 @@ export async function pushSettings(
   settings: UserSettings,
 ): Promise<boolean> {
   try {
-    const rpc = client.rpc as unknown as MergeUserSettingsRpc;
-    const { error } = await rpc("merge_user_settings", {
-      p_user_id: userId,
-      p_patch: settings,
-    });
+    const { error } = await (client.rpc as unknown as MergeUserSettingsRpc)(
+      "merge_user_settings",
+      { p_user_id: userId, p_patch: settings },
+    );
     return !error;
   } catch {
     return false;
