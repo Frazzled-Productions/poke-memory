@@ -1,15 +1,18 @@
 name: Auto Release
 
-# Cuts a SemVer release on every push to `main` when changelog fragments exist
-# under changelog.d/unreleased/. Otherwise the run no-ops.
+# Cuts a SemVer release on a daily schedule (and on manual dispatch) when
+# changelog fragments exist under changelog.d/unreleased/. Otherwise the run
+# no-ops. Batching releases on a cron — rather than firing on every push to
+# `main` — keeps Vercel production deploys infrequent and predictable.
 #
 # Per AGENTS.md "Versioning":
 #   - kind: minor-bump fragment present  → minor bump (0.N.0 → 0.N+1.0)
 #   - any other non-empty set of fragments → patch bump (0.N.M → 0.N.M+1)
 #
-# Per merge → one commit, one tag, one GitHub Release. The release commit
-# carries `[skip ci]` so subsequent workflow runs (including this one) do not
-# fire on it, breaking the loop.
+# Each cron tick (or manual dispatch) → at most one commit, one tag, one
+# GitHub Release. The release commit carries `[skip ci]` for defence in depth;
+# the `chore(release):` if-guard below is the primary safeguard against
+# self-triggering loops.
 #
 # One-time bootstrap: if no `v0.1.0` tag exists when this workflow first runs,
 # the bootstrap step creates the tag at SHA cddb3a8 (the last commit whose
@@ -22,8 +25,11 @@ name: Auto Release
 # fix.
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    # 09:00 UTC daily. Cuts a release containing everything merged in the
+    # previous 24 hours (or no-ops if no fragments exist).
+    - cron: "0 9 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: auto-release
@@ -32,7 +38,6 @@ concurrency:
 jobs:
   release:
     name: Cut release
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

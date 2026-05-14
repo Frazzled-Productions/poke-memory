@@ -8,6 +8,7 @@ import { loadSession } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 
 const NAV_LINKS = [
   { href: "/", label: "Practice" },
@@ -79,6 +80,7 @@ export function NavLinks() {
           </li>
         )}
       </ul>
+      <WhatsNewIndicator />
       <AuthButton />
     </>
   );
