@@ -1,13 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   isSyncSafe,
   pushSession,
   pushSingleCard,
   mergeCloudIntoLocal,
   mergeCloudIntoLocalSilent,
+  applyCloudAuthoritative,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
-import type { CloudRow } from "./cloud";
+import type { CloudRow, SeedOpts } from "./cloud";
+import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
 
 // Minimal ReviewableCard factory for sync tests.
 // Only the fields relevant to isSyncSafe and sync are set.
@@ -568,5 +570,128 @@ describe("mergeCloudIntoLocalSilent", () => {
     const [merged] = mergeCloudIntoLocalSilent([local], [unmigrated], null);
     // name card should be unaffected by unmigrated edge row
     expect(merged).toBe(local);
+  });
+});
+
+// ─── applyCloudAuthoritative ──────────────────────────────────────────────────
+
+function makeSeedPokemon(id: number): SeedPokemon {
+  return {
+    id,
+    speciesId: id,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `Pokemon ${id}`,
+    name: `pokemon-${id}`,
+    spriteUrl: `https://example.com/${id}.png`,
+    types: ["normal"],
+    stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
+    flavorText: "A test pokemon.",
+    flavorTexts: ["A test pokemon."],
+    evolutionChain: [],
+    height: 7,
+    weight: 69,
+    baseExperience: 64,
+    genus: "Test Pokemon",
+    generation: "generation-i",
+    captureRate: null,
+    baseHappiness: null,
+    growthRate: null,
+    habitat: null,
+    genderRate: null,
+    isLegendary: false,
+    isMythical: false,
+    cryUrl: null,
+  };
+}
+
+function makeEvoSeed(id: number, preEvoId: number, postEvoId: number): EvolutionCard {
+  return {
+    cardType: "evolution",
+    id,
+    preEvoId,
+    preEvoName: `Pokemon ${preEvoId}`,
+    preEvoSpriteUrl: `https://example.com/${preEvoId}.png`,
+    postEvoId,
+    postEvoName: `Pokemon ${postEvoId}`,
+    postEvoSpriteUrl: `https://example.com/${postEvoId}.png`,
+    triggerPhrase: null,
+  };
+}
+
+describe("applyCloudAuthoritative", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const defaultOpts: SeedOpts = { nameEnabled: true, evolutionEnabled: false };
+
+  it("local-only card with prior reps is reset to new when cloud has no matching row", () => {
+    const seed = [makeSeedPokemon(1)];
+    // Cloud has no row for species 1.
+    const cloud: CloudRow[] = [];
+    const result = applyCloudAuthoritative(seed, [], cloud, defaultOpts);
+    expect(result).toHaveLength(1);
+    expect(result[0].state.lastReview).toBeNull();
+    expect(result[0].state.reps).toBe(0);
+    expect(result[0].state.fsrsState).toBe("new");
+  });
+
+  it("cloud-only card appears at cloud state when seed contains it", () => {
+    const seed = [makeSeedPokemon(2)];
+    const cloudRow = makeCloudRow(2, "2026-05-01", "2026-05-10");
+    const result = applyCloudAuthoritative(seed, [], [cloudRow], defaultOpts);
+    expect(result).toHaveLength(1);
+    expect(result[0].state.lastReview).toBe("2026-05-10");
+    expect(result[0].state.firstSeen).toBe("2026-05-01");
+    expect(result[0].state.reps).toBe(1);
+  });
+
+  it("card present in both local context and cloud adopts cloud state", () => {
+    // Seed the function with a species that has prior local progress, but because
+    // applyCloudAuthoritative rebuilds from seed, the cloud row wins.
+    const seed = [makeSeedPokemon(3)];
+    const cloudRow = makeCloudRow(3, "2026-05-05", "2026-05-12");
+    const result = applyCloudAuthoritative(seed, [], [cloudRow], defaultOpts);
+    expect(result).toHaveLength(1);
+    expect(result[0].state.lastReview).toBe("2026-05-12");
+    expect(result[0].state.firstSeen).toBe("2026-05-05");
+  });
+
+  it("returns cards for all seed species regardless of cloud coverage", () => {
+    const seed = [makeSeedPokemon(10), makeSeedPokemon(11), makeSeedPokemon(12)];
+    // Cloud only has species 11.
+    const cloudRow = makeCloudRow(11, "2026-05-01", "2026-05-10");
+    const result = applyCloudAuthoritative(seed, [], [cloudRow], defaultOpts);
+    expect(result).toHaveLength(3);
+    const ids = result.map((c) => c.subjectKey);
+    expect(ids).toContain("10");
+    expect(ids).toContain("11");
+    expect(ids).toContain("12");
+  });
+
+  it("evolution cards are included when evolutionEnabled is true", () => {
+    const seed = [makeSeedPokemon(4), makeSeedPokemon(5)];
+    const evoSeed = [makeEvoSeed(1500001, 4, 5)];
+    const opts: SeedOpts = { nameEnabled: true, evolutionEnabled: true };
+    const result = applyCloudAuthoritative(seed, evoSeed, [], opts);
+    // 2 name cards + 1 evo card = 3 total
+    expect(result).toHaveLength(3);
+    const evoCard = result.find((c) => c.cardType === "evolution");
+    expect(evoCard).toBeDefined();
+  });
+
+  it("two calls with the same now produce identical card sets (deterministic)", () => {
+    const seed = [makeSeedPokemon(20), makeSeedPokemon(21)];
+    const cloud: CloudRow[] = [];
+    const now = new Date("2026-05-14T10:00:00.000Z");
+    const first = applyCloudAuthoritative(seed, [], cloud, defaultOpts, now);
+    const second = applyCloudAuthoritative(seed, [], cloud, defaultOpts, now);
+    expect(first).toEqual(second);
   });
 });

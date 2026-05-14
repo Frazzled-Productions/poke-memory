@@ -104,17 +104,19 @@ export const DEFAULT_LIMITS: DailyLimits = {
   cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
+export type BuildSessionOpts = {
+  reverseEnabled?: boolean;
+  nameEnabled?: boolean;
+  evolutionEnabled?: boolean;
+  reverseEvolutionEnabled?: boolean;
+  cryEnabled?: boolean;
+};
+
 export function buildSession(
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: {
-    reverseEnabled?: boolean;
-    nameEnabled?: boolean;
-    evolutionEnabled?: boolean;
-    reverseEvolutionEnabled?: boolean;
-    cryEnabled?: boolean;
-  } = {},
+  opts: BuildSessionOpts = {},
 ): ReviewableCard[] {
   const { nameEnabled = true, evolutionEnabled = true } = opts;
   const nameCards: NameReviewCard[] = nameEnabled

@@ -2,10 +2,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { hasCloudData, mergeCloudIntoLocal, pullSession, pushSession } from "@/lib/sync/cloud";
+import { hasCloudData, applyCloudAuthoritative, pullSession, pushSession } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
-import { DEFAULT_LIMITS, buildSession } from "@/lib/review/session";
+import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { pullSettings } from "@/lib/sync/settings";
@@ -99,12 +99,9 @@ export default function CallbackCompletePage() {
         }
         if (cancelled) return;
         const settings = loadSettings();
-        const base =
-          localSession !== null
-            ? localSession.cards
-            : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, seedOptsFromSettings(settings));
+        const opts = seedOptsFromSettings(settings);
         const limits = localSession?.limits ?? DEFAULT_LIMITS;
-        const merged = mergeCloudIntoLocal(base, cloudRows!);
+        const merged = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, cloudRows!, opts);
         await saveSession({ cards: merged, limits });
         if (!cancelled) router.replace("/");
         return;
@@ -140,13 +137,22 @@ export default function CallbackCompletePage() {
 
   function handleKeepCloud() {
     if (status.kind !== "conflict" || pending) return;
+    setPending(true);
     void (async () => {
-      const local = await loadSession();
-      if (local !== null) {
-        const merged = mergeCloudIntoLocal(local.cards, status.cloudRows);
-        await saveSession({ cards: merged, limits: local.limits });
+      try {
+        const local = await loadSession();
+        const settings = loadSettings();
+        const opts = seedOptsFromSettings(settings);
+        const limits = local?.limits ?? DEFAULT_LIMITS;
+        const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, status.cloudRows, opts);
+        await saveSession({ cards: rebuilt, limits });
+        router.replace("/");
+      } catch (err) {
+        console.warn("[callback-complete] handleKeepCloud failed:", err);
+        setStatus({ kind: "error" });
+      } finally {
+        setPending(false);
       }
-      router.replace("/");
     })();
   }
 
