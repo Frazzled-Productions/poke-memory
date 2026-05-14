@@ -124,24 +124,33 @@ describe("clearLocalProgress", () => {
     expect(stubLocalStorage.getItem("unrelated:key")).toBe("kept");
   });
 
-  it("deletes the IDB review-session and grade-log keys", async () => {
+  it("deletes the IDB review-session, grade-log, and migration-flag keys", async () => {
     await idbSet("poke-memory:review-session:v1", '{"cards":[]}');
     await idbSet("poke-memory:grade-log:v1", '[{"grade":4}]');
+    // The real migrateFromLocalStorage stores the flag as a native boolean via
+    // a transaction in lib/idb/db.ts, but idbSet/idbGet only handle strings —
+    // idbGet returns null for non-string values. We seed a string here so idbGet
+    // can verify presence; the production delete path doesn't care about the
+    // stored type, so this test exercises the right code path.
+    await idbSet("migration_done_v1", "true");
     expect(await idbGet("poke-memory:review-session:v1")).not.toBeNull();
     expect(await idbGet("poke-memory:grade-log:v1")).not.toBeNull();
+    expect(await idbGet("migration_done_v1")).not.toBeNull();
 
     await clearLocalProgress();
 
     expect(await idbGet("poke-memory:review-session:v1")).toBeNull();
     expect(await idbGet("poke-memory:grade-log:v1")).toBeNull();
+    expect(await idbGet("migration_done_v1")).toBeNull();
   });
 
-  it("dispatches a synthetic StorageEvent keyed to the review session", async () => {
+  it("dispatches synthetic StorageEvents for both the session and grade-log keys", async () => {
     await clearLocalProgress();
     const keys = events.map((e) => e.key);
     expect(keys).toContain("poke-memory:review-session:v1");
-    // Grade-log subscribers use the GRADE_LOG_APPENDED_EVENT custom event, not
-    // StorageEvent, so no second dispatch is expected here.
-    expect(keys).not.toContain("poke-memory:grade-log:v1");
+    // The grade-log dispatch is the explicit delete signal — without it, same-
+    // tab subscribers that read grade-log independently of the session would
+    // not pick up the reset.
+    expect(keys).toContain("poke-memory:grade-log:v1");
   });
 });

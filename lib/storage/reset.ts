@@ -10,6 +10,11 @@ import { idbDelete } from "@/lib/idb/db";
 // indirectly via shared utilities.
 const SESSION_IDB_KEY = "poke-memory:review-session:v1";
 const GRADE_LOG_IDB_KEY = "poke-memory:grade-log:v1";
+// IDB-internal flag set by migrateFromLocalStorage to mark the localStorage→IDB
+// copy as completed. Reset clears it so a future restore-from-backup-into-
+// localStorage path can re-run the migration. Defined in lib/idb/db.ts as
+// MIGRATION_FLAG_KEY = "migration_done_v1".
+const MIGRATION_FLAG_KEY = "migration_done_v1";
 
 export async function clearLocalProgress(): Promise<void> {
   if (typeof window === "undefined") return;
@@ -21,12 +26,17 @@ export async function clearLocalProgress(): Promise<void> {
   // cleared those keys (they start with "poke-memory:" but not "poke-memory:settings:").
   await idbDelete(SESSION_IDB_KEY);
   await idbDelete(GRADE_LOG_IDB_KEY);
+  await idbDelete(MIGRATION_FLAG_KEY);
   // Same-tab subscribers (Stats / Pasture / Pokédex) re-read on storage events;
-  // dispatch a synthetic one keyed to the session so they pick up the empty
+  // dispatch synthetic ones keyed to both stores so they pick up the empty
   // state without a full reload. Cross-tab listeners receive a real
-  // StorageEvent from localStorage.removeItem above.
+  // StorageEvent from localStorage.removeItem above. The grade-log dispatch
+  // is the explicit delete-signal — GRADE_LOG_APPENDED_EVENT only announces
+  // appends, so without this dispatch a future decoupling of the Stats grade-
+  // log read from its session read would silently stop reacting to resets.
   try {
     window.dispatchEvent(new StorageEvent("storage", { key: SESSION_IDB_KEY }));
+    window.dispatchEvent(new StorageEvent("storage", { key: GRADE_LOG_IDB_KEY }));
   } catch {
     // Older browsers / non-standard envs without a StorageEvent constructor.
   }
