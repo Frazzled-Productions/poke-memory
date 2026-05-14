@@ -37,12 +37,8 @@ test.describe("Theme intensity — data-intensity attribute", () => {
   }) => {
     await seedSettings(page, "tinted");
     await page.goto("/");
-    // React 19 App Router strips all <html> attributes during its singleton-
-    // element commit and restores them via FavouriteThemeProvider.useEffect.
-    // That effect fires after the load event, so we poll rather than assert
-    // synchronously. The attribute is typically present within one frame after
-    // load (~16ms) because the synchronous applyIntensity() call in the effect
-    // body runs before the next repaint.
+    // React's singleton-element commit strips <html> attributes; the effect
+    // restores them after load, so poll rather than assert synchronously.
     await expect
       .poll(
         () =>
@@ -143,7 +139,7 @@ test.describe("Theme intensity — Settings page picker", () => {
       .toBe("tinted");
   });
 
-  test("Tinted selection is persisted to localStorage by the picker", async ({
+  test("Tinted selection is persisted to localStorage and survives a page reload", async ({
     page,
   }) => {
     await page.goto("/settings");
