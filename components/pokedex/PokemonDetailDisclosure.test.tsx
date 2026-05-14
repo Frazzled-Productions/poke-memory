@@ -18,12 +18,17 @@ vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
 // Mocks for hooks PokemonDetailDisclosure depends on
 // ---------------------------------------------------------------------------
 
+const { mockCardClass, mockPretendAllMastered } = vi.hoisted(() => ({
+  mockCardClass: { value: "mastered" as string },
+  mockPretendAllMastered: { value: false },
+}));
+
 vi.mock("@/lib/review/useCardClass", () => ({
-  useCardClass: () => "mastered",
+  useCardClass: () => mockCardClass.value,
 }));
 
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
-  useSuperuser: () => ({ flags: { pretendAllMastered: false } }),
+  useSuperuser: () => ({ flags: { pretendAllMastered: mockPretendAllMastered.value } }),
 }));
 
 // SEED_POKEMON used for evolution sprite lookup — empty array is fine for these tests
@@ -73,6 +78,20 @@ function makePokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
   };
 }
 
+function makeAltForm(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
+  return makePokemon({
+    id: 10100,
+    speciesId: 37,
+    isDefaultForm: false,
+    formCategory: "regional",
+    formSlug: "alola",
+    displayName: "Alolan Vulpix",
+    name: "vulpix-alola",
+    cryUrl: null,
+    ...overrides,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Import the component under test after mocks are set up
 // ---------------------------------------------------------------------------
@@ -80,13 +99,15 @@ function makePokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
 import { PokemonDetailDisclosure } from "@/components/pokedex/PokemonDetailDisclosure";
 
 // ---------------------------------------------------------------------------
-// Tests
+// Tests — audio buttons
 // ---------------------------------------------------------------------------
 
 describe("PokemonDetailDisclosure — audio buttons", () => {
   beforeEach(() => {
     mockSpeakName.mockClear();
     mockPlayCry.mockClear();
+    mockCardClass.value = "mastered";
+    mockPretendAllMastered.value = false;
   });
 
   it("main pokemon row renders both TTS and cry buttons with disambiguated aria-labels", () => {
@@ -140,5 +161,90 @@ describe("PokemonDetailDisclosure — audio buttons", () => {
 
     await user.click(screen.getByRole("button", { name: "Play Bulbasaur cry" }));
     expect(mockPlayCry).toHaveBeenCalledWith(cryUrl);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — Bug #484: alt-form visibility gated on parent being unlocked
+// ---------------------------------------------------------------------------
+
+describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => {
+  beforeEach(() => {
+    mockSpeakName.mockClear();
+    mockPlayCry.mockClear();
+    mockPretendAllMastered.value = false;
+  });
+
+  it("locked species: Forms section is NOT rendered", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon({ id: 37, speciesId: 37, displayName: "Vulpix", name: "Vulpix" });
+    const form = makeAltForm();
+    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+
+    expect(screen.queryByRole("heading", { name: "Forms", level: 2 })).not.toBeInTheDocument();
+    expect(screen.queryByText("Alolan Vulpix")).not.toBeInTheDocument();
+  });
+
+  it("locked species + pretendAllMastered on: Forms section IS rendered", () => {
+    // pretendAllMastered overrides the locked state in the component
+    mockCardClass.value = "locked";
+    mockPretendAllMastered.value = true;
+    const pokemon = makePokemon({ id: 37, speciesId: 37, displayName: "Vulpix", name: "Vulpix" });
+    const form = makeAltForm();
+    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+
+    expect(screen.getByRole("heading", { name: "Forms", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText("Alolan Vulpix")).toBeInTheDocument();
+  });
+
+  it("unlocked (learning) species: Forms section IS rendered", () => {
+    mockCardClass.value = "learning";
+    const pokemon = makePokemon({ id: 37, speciesId: 37, displayName: "Vulpix", name: "Vulpix" });
+    const form = makeAltForm();
+    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+
+    expect(screen.getByRole("heading", { name: "Forms", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText("Alolan Vulpix")).toBeInTheDocument();
+  });
+
+  it("unlocked (mastered) species: Forms section IS rendered", () => {
+    mockCardClass.value = "mastered";
+    const pokemon = makePokemon({ id: 37, speciesId: 37, displayName: "Vulpix", name: "Vulpix" });
+    const form = makeAltForm();
+    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+
+    expect(screen.getByRole("heading", { name: "Forms", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText("Alolan Vulpix")).toBeInTheDocument();
+  });
+
+  it("dropdown excludes current form when current pokemon is an alt form", () => {
+    // This simulates a hypothetical alt-form page: the current pokemon IS an
+    // alt form (Alolan Vulpix), so forms list should NOT include it.
+    // The page-level filter handles this; here we verify the component only
+    // renders the forms it is given (sibling forms, not self).
+    mockCardClass.value = "learning";
+    const alolanVulpix = makeAltForm({ displayName: "Alolan Vulpix" });
+    // The page would filter out Alolan Vulpix from forms; only sibling forms passed.
+    const siblingForm = makeAltForm({
+      id: 10200,
+      displayName: "Some Other Form",
+      formSlug: "other",
+    });
+    render(<PokemonDetailDisclosure pokemon={alolanVulpix} forms={[siblingForm]} />);
+
+    expect(screen.getByText("Some Other Form")).toBeInTheDocument();
+    // The current form (Alolan Vulpix as primary pokemon name) appears in heading
+    // but NOT as a FormBlock item
+    const formHeadings = screen.queryAllByText("Alolan Vulpix");
+    // Only the main header h1 contains the name, not a FormBlock summary
+    // The FormBlock would render it as an img alt + summary text
+    const formsSection = screen.getByRole("heading", { name: "Forms", level: 2 });
+    expect(formsSection).toBeInTheDocument();
+    // No FormBlock for Alolan Vulpix itself
+    const summaries = screen.queryAllByText("Alolan Vulpix");
+    // The only "Alolan Vulpix" text should be from the main h1, not inside a FormBlock
+    // We check it's at most 1 occurrence (the main heading)
+    expect(formHeadings.length).toBeLessThanOrEqual(1);
+    expect(summaries.length).toBeLessThanOrEqual(1);
   });
 });
