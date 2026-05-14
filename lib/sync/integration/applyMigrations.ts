@@ -53,34 +53,46 @@ export function numericPrefix(filename: string): number {
 }
 
 /**
+ * Pre-existing duplicate prefixes that pre-date the collision guard. The two
+ * 009_ files were intentionally landed in that order historically; renaming
+ * them now would break migration-drift parity against applied state. The
+ * alphabetical fallback below sorts them in the order Supabase actually
+ * applied them (verified against `list_migrations`: drop_legacy_per_pre_evo
+ * before grade_log_card_id), so the apply sequence stays correct.
+ *
+ * New duplicate prefixes are still a collision — see the guard below.
+ */
+const KNOWN_PREFIX_DUPLICATES = new Set<number>([9]);
+
+/**
  * Pure helper: sorts an array of migration filenames in strict ascending
- * numeric-prefix order and throws if any two files share the same prefix.
+ * numeric-prefix order, falling back to lexicographic order within the same
+ * prefix. Throws if any two files share a numeric prefix that is NOT on the
+ * `KNOWN_PREFIX_DUPLICATES` allow-list.
  *
  * Accepting the list as a parameter makes this testable without filesystem
  * mocking.
- *
- * Throws if two files share the same numeric prefix, which would make the
- * apply order ambiguous and risk silent schema divergence.
  */
 export function sortAndValidateMigrationFiles(filenames: string[]): string[] {
   const files = [...filenames].sort((a, b) => {
     const na = numericPrefix(a);
     const nb = numericPrefix(b);
     if (na !== nb) return na - nb;
-    // Same numeric prefix: fall back to full filename so the sort is
-    // deterministic, but we throw below to surface the collision.
     return a < b ? -1 : a > b ? 1 : 0;
   });
 
-  // Guard: duplicate numeric prefixes make apply order ambiguous.
+  // Guard: a new duplicate prefix is a real collision — apply order would be
+  // ambiguous and a future migration in between would silently reorder.
   const seen = new Map<number, string>();
   for (const f of files) {
     const n = numericPrefix(f);
     if (!isNaN(n)) {
-      if (seen.has(n)) {
+      if (seen.has(n) && !KNOWN_PREFIX_DUPLICATES.has(n)) {
         throw new Error(
           `Duplicate migration prefix ${n}: "${seen.get(n)}" and "${f}". ` +
-            `Rename one to use a unique numeric prefix.`,
+            `Rename one to use a unique numeric prefix, or add ${n} to ` +
+            `KNOWN_PREFIX_DUPLICATES with a comment explaining why the ` +
+            `alphabetical fallback matches applied order.`,
         );
       }
       seen.set(n, f);

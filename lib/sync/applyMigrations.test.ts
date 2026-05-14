@@ -36,15 +36,29 @@ describe("numericPrefix", () => {
 // ---------------------------------------------------------------------------
 
 describe("sortAndValidateMigrationFiles", () => {
-  it("throws when two migration files share the same numeric prefix", () => {
+  it("throws on a new duplicate numeric prefix (not on the allow-list)", () => {
     expect(() =>
       sortAndValidateMigrationFiles([
         "001_initial.sql",
-        "009_drop_legacy.sql",
-        "009_grade_log_card_id.sql", // duplicate 009_ prefix
+        "020_first.sql",
+        "020_second.sql", // duplicate 020_ prefix — not allow-listed
+        "021_later.sql",
+      ]),
+    ).toThrowError(/Duplicate migration prefix 20/);
+  });
+
+  it("allows the pre-existing 009_ duplicate (on the allow-list)", () => {
+    // The two real 009_ files landed historically in alphabetical order; the
+    // alphabetical fallback in the sort matches Supabase's applied sequence
+    // (drop_legacy_per_pre_evo_evolution_rows before grade_log_card_id_and_card_types).
+    expect(() =>
+      sortAndValidateMigrationFiles([
+        "001_initial.sql",
+        "009_drop_legacy_per_pre_evo_evolution_rows.sql",
+        "009_grade_log_card_id_and_card_types.sql",
         "010_card_reviews.sql",
       ]),
-    ).toThrowError(/Duplicate migration prefix 9/);
+    ).not.toThrow();
   });
 
   it("does not throw when all numeric prefixes are unique", () => {
@@ -64,5 +78,16 @@ describe("sortAndValidateMigrationFiles", () => {
       "001_first.sql",
     ]);
     expect(result).toEqual(["001_first.sql", "002_early.sql", "010_late.sql"]);
+  });
+
+  it("sorts the allow-listed 009_ duplicates by lexicographic order (matches applied sequence)", () => {
+    const result = sortAndValidateMigrationFiles([
+      "009_grade_log_card_id_and_card_types.sql",
+      "009_drop_legacy_per_pre_evo_evolution_rows.sql",
+    ]);
+    expect(result).toEqual([
+      "009_drop_legacy_per_pre_evo_evolution_rows.sql",
+      "009_grade_log_card_id_and_card_types.sql",
+    ]);
   });
 });

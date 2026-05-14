@@ -18,8 +18,14 @@ export interface TestUser {
   client: SupabaseClient;
 }
 
+// Module-level counter guards against same-millisecond collisions when two
+// users are created back-to-back in the same beforeAll (e.g. userA/userB in
+// rls.test.ts). Date.now() alone resolves to the same millisecond on fast
+// CI hosts and would cause admin.createUser to throw on the second call.
+let emailSequence = 0;
 function uniqueEmail(): string {
-  return `test-user-${Date.now()}@integration.test`;
+  emailSequence += 1;
+  return `test-user-${Date.now()}-${emailSequence}@integration.test`;
 }
 
 /**
