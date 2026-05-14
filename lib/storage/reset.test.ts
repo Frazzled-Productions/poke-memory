@@ -138,6 +138,10 @@ describe("clearLocalProgress", () => {
 
   it("dispatches a synthetic StorageEvent keyed to the review session", async () => {
     await clearLocalProgress();
-    expect(events.map((e) => e.key)).toContain("poke-memory:review-session:v1");
+    const keys = events.map((e) => e.key);
+    expect(keys).toContain("poke-memory:review-session:v1");
+    // Grade-log subscribers use the GRADE_LOG_APPENDED_EVENT custom event, not
+    // StorageEvent, so no second dispatch is expected here.
+    expect(keys).not.toContain("poke-memory:grade-log:v1");
   });
 });
