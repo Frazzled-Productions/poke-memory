@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { resetAllProgress } from "./reset";
+import { resetAllProgress, resetAllProgressEverywhere } from "./reset";
+import { clearLocalProgress } from "@/lib/storage/reset";
+
+vi.mock("@/lib/storage/reset", () => ({
+  clearLocalProgress: vi.fn(async () => {}),
+}));
 
 function makeRpcClient(rpcError: null | object = null) {
   const rpcSpy = vi.fn().mockResolvedValue({ error: rpcError, data: null });
@@ -59,5 +64,41 @@ describe("resetAllProgress", () => {
       expect.stringContaining("reset_all_progress"),
       expect.any(Error),
     );
+  });
+});
+
+describe("resetAllProgressEverywhere", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(clearLocalProgress).mockClear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("wipes cloud first, then local, on the happy path", async () => {
+    const calls: string[] = [];
+    vi.mocked(clearLocalProgress).mockImplementation(async () => {
+      calls.push("local");
+    });
+    const client = {
+      rpc: vi.fn().mockImplementation(async () => {
+        calls.push("cloud");
+        return { error: null, data: null };
+      }),
+    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+
+    const result = await resetAllProgressEverywhere(client);
+
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual(["cloud", "local"]);
+  });
+
+  it("does not clear local when the cloud reset fails", async () => {
+    const client = makeRpcClient({ message: "boom" });
+    const result = await resetAllProgressEverywhere(client);
+    expect(result).toEqual({ ok: false, reason: "cloud-reset-failed" });
+    expect(clearLocalProgress).not.toHaveBeenCalled();
   });
 });

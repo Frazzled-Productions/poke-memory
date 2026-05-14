@@ -12,6 +12,14 @@ import { idbDelete, MIGRATION_FLAG_KEY } from "@/lib/idb/db";
 const SESSION_IDB_KEY = "poke-memory:review-session:v1";
 const GRADE_LOG_IDB_KEY = "poke-memory:grade-log:v1";
 
+/**
+ * Wipes localStorage + IDB stores for a guest reset. **Local-only** — does
+ * not touch cloud. Signed-in callers should use
+ * `resetAllProgressEverywhere` from `lib/sync/reset` instead; calling this
+ * directly when authenticated leaves cloud populated and the next background
+ * push from local will re-introduce stale rows (the #293 + #576
+ * delete-resurrection class).
+ */
 export async function clearLocalProgress(): Promise<void> {
   // localStorage and IDB are independent subsystems. Wrap localStorage
   // in its own try/catch so that a thrown error (e.g. Safari ITP) does
