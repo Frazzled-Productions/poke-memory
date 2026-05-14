@@ -150,6 +150,18 @@ vi.mock("@/lib/sync/useSyncOnUnload", () => ({
   useSyncOnUnload: vi.fn(),
 }));
 
+const { mockWarmupTts, mockSpeakName } = vi.hoisted(() => ({
+  mockWarmupTts: vi.fn(),
+  mockSpeakName: vi.fn(),
+}));
+
+vi.mock("@/lib/audio/tts", () => ({
+  warmupTts: mockWarmupTts,
+  speakName: mockSpeakName,
+  getPreferredVoice: vi.fn(() => null),
+  voiceTier: vi.fn(() => "compact"),
+}));
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -882,5 +894,46 @@ describe("Practice scope (#333)", () => {
         }),
       );
     });
+  });
+});
+
+describe("ReviewSession TTS warm-up (#479)", () => {
+  it("calls warmupTts on the first grade button click", async () => {
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    const easyBtn = screen.getByRole("button", { name: /easy/i });
+    await user.click(easyBtn);
+
+    expect(mockWarmupTts).toHaveBeenCalledOnce();
+  });
+
+  it("warmupTts is called before the grade's saveSession call (synchronous in click handler)", async () => {
+    const user = userEvent.setup();
+
+    render(<ReviewSession />);
+
+    // Wait for mount-time saveSession calls to settle, then start tracking.
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    const callOrder: string[] = [];
+    mockWarmupTts.mockImplementation(() => { callOrder.push("warmupTts"); });
+    vi.mocked(saveSession).mockImplementation(async () => {
+      callOrder.push("saveSession");
+      return { ok: true };
+    });
+
+    const easyBtn = screen.getByRole("button", { name: /easy/i });
+    await user.click(easyBtn);
+
+    await waitFor(() => expect(callOrder).toContain("saveSession"));
+
+    // warmupTts must have been recorded before saveSession is called —
+    // it runs synchronously before the first await inside handleGrade.
+    expect(callOrder.indexOf("warmupTts")).toBeLessThan(callOrder.indexOf("saveSession"));
   });
 });

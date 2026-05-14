@@ -3,6 +3,34 @@ import { loadSettings } from "@/lib/settings/persistence";
 
 export type VoiceTier = "premium" | "enhanced" | "compact";
 
+// ---------------------------------------------------------------------------
+// TTS warm-up
+// ---------------------------------------------------------------------------
+
+// Tracks whether we have already fired a warm-up utterance this session.
+// Module-scoped so it survives re-renders without a React ref.
+let _warmedUp = false;
+
+/**
+ * Fire a near-silent, near-instant utterance to satisfy the browser's
+ * autoplay/user-gesture requirement for `speechSynthesis.speak()`.
+ *
+ * Must be called synchronously inside a user-gesture handler (e.g. a click
+ * handler) — calling it after an `await` loses the gesture context in
+ * Chromium and WebKit.
+ *
+ * Idempotent: the second and subsequent calls are no-ops.
+ */
+export function warmupTts(): void {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  if (_warmedUp) return;
+  _warmedUp = true;
+  const u = new SpeechSynthesisUtterance(" ");
+  u.volume = 0;
+  u.rate = 10; // finish as quickly as possible
+  window.speechSynthesis.speak(u);
+}
+
 // Apple's iOS/macOS voices include the tier in their `name` field —
 // "Daniel" (Compact), "Daniel (Enhanced)", "Daniel (Premium)", "Siri Voice 1".
 // Google's Chrome voices use "Neural" / "Standard". We detect these so a user
