@@ -9,7 +9,7 @@ import { pullStreak, mergeStreak } from "@/lib/sync/streak";
 import { pullGradeLog, mergeGradeLog } from "@/lib/sync/gradeLog";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
-import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
+import { buildSession, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import {
   loadStreakData,
@@ -20,6 +20,43 @@ import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+
+/**
+ * Fires after `pullAndMerge` successfully saves a merge that actually
+ * transitioned at least one card's progress markers (`lastReview` or
+ * `firstSeen`). Surfaces in `ReviewSession` so the practice UI can refresh
+ * when a sign-in or visibility pull arrives after the page has already
+ * mounted with empty/stale local state — without this, cold-loading a PWA
+ * (or any tab whose local storage is empty but whose user has cloud data)
+ * leaves the practice page stuck on "all cards new" until the user
+ * navigates away and back (#608). Same-tab `useSessionStorageKey`
+ * subscribers (Stats, Pasture, Pokédex, NavLinks) already react to
+ * `saveSession`'s synthetic StorageEvent — this event is the targeted
+ * notification for the one surface that can't subscribe to that channel
+ * without re-firing on every grade.
+ */
+export const SYNC_PULL_APPLIED_EVENT = "poke-memory:sync-pull-applied";
+
+/**
+ * True when at least one card's progress markers (`lastReview` or
+ * `firstSeen`) transitioned between `before` and `after`. Both arrays come
+ * from the same seed and have matching `id`s in the same order, so a
+ * positional comparison is safe and cheap.
+ */
+function mergeAffectsProgress(
+  before: readonly ReviewableCard[],
+  after: readonly ReviewableCard[],
+): boolean {
+  if (before.length !== after.length) return true;
+  for (let i = 0; i < after.length; i++) {
+    const a = after[i];
+    const b = before[i];
+    if (a.id !== b.id) return true;
+    if (a.state.lastReview !== b.state.lastReview) return true;
+    if (a.state.firstSeen !== b.state.firstSeen) return true;
+  }
+  return false;
+}
 
 /**
  * Pulls all cloud rows for the user, merges them into IndexedDB using the
@@ -111,8 +148,10 @@ export async function pullAndMerge(
 
     let merged: ReturnType<typeof buildSession>;
     let saveResult;
+    let preMergeCards: ReviewableCard[];
     if (localSession !== null) {
-      merged = mergeCloudIntoLocalSilent(localSession.cards, cloudRows, syncStatus.lastPullAt);
+      preMergeCards = localSession.cards;
+      merged = mergeCloudIntoLocalSilent(preMergeCards, cloudRows, syncStatus.lastPullAt);
       saveResult = await saveSession({ cards: merged, limits: localSession.limits });
     } else {
       // Brand-new device (or just-cleared by the tombstone path above):
@@ -121,13 +160,13 @@ export async function pullAndMerge(
       // cloud rows for disabled card types are silently dropped by the
       // merge (#391).
       const settings = loadSettings();
-      const base = buildSession(
+      preMergeCards = buildSession(
         SEED_POKEMON,
         SEED_EVOLUTION_CARDS,
         undefined,
         seedOptsFromSettings(settings),
       );
-      merged = mergeCloudIntoLocalSilent(base, cloudRows, syncStatus.lastPullAt);
+      merged = mergeCloudIntoLocalSilent(preMergeCards, cloudRows, syncStatus.lastPullAt);
       saveResult = await saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
 
@@ -135,6 +174,20 @@ export async function pullAndMerge(
     // subscribers will not have received a synthetic StorageEvent because
     // saveSession only dispatches on success.
     if (!saveResult.ok) return "error";
+
+    // Wake `ReviewSession` if the merge actually moved any card's progress
+    // markers (#608). Cold load with empty local + signed-in user is the
+    // canonical case: the practice page renders pristine seed cards before
+    // the pull lands, and without this notification it stays stuck on
+    // "all cards new" until the user navigates away. A no-op merge (cloud
+    // already matches local) leaves the markers equal and we stay silent,
+    // so a follow-up pull triggered by the resulting reload cannot loop.
+    if (
+      typeof window !== "undefined" &&
+      mergeAffectsProgress(preMergeCards, merged)
+    ) {
+      window.dispatchEvent(new CustomEvent(SYNC_PULL_APPLIED_EVENT));
+    }
 
     // Pull regional prefs (timezone + date_format scalar columns) — best-effort,
     // runs on every pull so device B picks up choices made on device A.

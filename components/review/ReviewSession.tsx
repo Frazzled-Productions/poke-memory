@@ -39,6 +39,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
+import { SYNC_PULL_APPLIED_EVENT } from "@/lib/sync/pullAndMerge";
 import { appendGradeEntry, loadGradeLog, removeGradeEntry } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
@@ -589,6 +590,21 @@ export function ReviewSession() {
     }
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  // Reload when a sign-in or visibility pull applied cloud progress that
+  // wasn't on this device yet (#608). The practice page can't subscribe to
+  // `saveSession`'s synthetic StorageEvent the way Stats/Pasture/Pokédex do
+  // — it would re-fire on every grade — so `pullAndMerge` dispatches this
+  // targeted event only when the merge actually moved a card's progress
+  // markers. A pull that finds local already matches cloud stays silent,
+  // so the reload triggered here cannot loop on the next mount's pull.
+  useEffect(() => {
+    function handlePullApplied() {
+      window.location.reload();
+    }
+    window.addEventListener(SYNC_PULL_APPLIED_EVENT, handlePullApplied);
+    return () => window.removeEventListener(SYNC_PULL_APPLIED_EVENT, handlePullApplied);
   }, []);
 
   // Schedule a timeout to re-render when the earliest pending learning card is due.
