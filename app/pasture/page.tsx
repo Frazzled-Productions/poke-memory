@@ -208,6 +208,7 @@ export default function PasturePage() {
               zone={HABITAT_ZONES.find((z) => z.habitat === zone.habitat)!}
               placements={zone.placements}
               onMarkSeen={handleMarkSeen}
+              biomeHref={`/pasture/${zone.habitat}`}
             />
           ))}
         </div>

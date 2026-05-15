@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Link from "next/link";
 import type { HabitatZone } from "@/lib/pasture/zones";
 import { PasturePokemon } from "./PasturePokemon";
 import { GrasslandsBiome } from "./biomes/GrasslandsBiome";
@@ -39,6 +40,8 @@ type Props = {
   zone: HabitatZone;
   placements: Placement[];
   onMarkSeen: (cardId: number) => void;
+  /** When provided, the zone heading becomes a link to open the biome landscape view. */
+  biomeHref?: string;
 };
 
 /**
@@ -71,7 +74,7 @@ const LABEL_COLOURS: Record<string, string> = {
   unknown:        "text-zinc-700 dark:text-zinc-400",
 };
 
-export function PastureZone({ zone, placements, onMarkSeen }: Props) {
+export function PastureZone({ zone, placements, onMarkSeen, biomeHref }: Props) {
   const biomeRenderer = BIOME_RENDERERS[zone.habitat];
   const tint = HABITAT_TINTS[zone.habitat] ?? HABITAT_TINTS.unknown;
   const labelColour = LABEL_COLOURS[zone.habitat] ?? LABEL_COLOURS.unknown;
@@ -81,12 +84,47 @@ export function PastureZone({ zone, placements, onMarkSeen }: Props) {
 
   return (
     <section aria-label={`${zone.label} zone`}>
-      <h2 className={`mb-1.5 text-sm font-semibold ${labelColour}`}>
-        {zone.label}
-        <span className="ml-1.5 font-normal opacity-60">
-          ({placements.length})
-        </span>
-      </h2>
+      <div className="mb-1.5 flex items-center gap-2">
+        <h2 className={`text-sm font-semibold ${labelColour}`}>
+          {zone.label}
+          <span className="ml-1.5 font-normal opacity-60">
+            ({placements.length})
+          </span>
+        </h2>
+        {biomeHref && (
+          <Link
+            href={biomeHref}
+            aria-label={`Open ${zone.label} in landscape view`}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              className="h-3.5 w-3.5"
+              aria-hidden="true"
+            >
+              {/* Landscape / expand icon: rectangle rotated 90° with an arrow */}
+              <rect
+                x="2"
+                y="5"
+                width="12"
+                height="6"
+                rx="1"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+              <path
+                d="M8 7.5 L10 5.5 L12 7.5"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Landscape
+          </Link>
+        )}
+      </div>
       <div
         ref={zoneRef}
         className={[styles.zoneContainer, biomeRenderer ? "" : tint].join(" ")}

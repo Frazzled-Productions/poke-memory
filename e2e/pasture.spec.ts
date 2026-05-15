@@ -290,6 +290,76 @@ test.describe("Pasture page — name search", () => {
   });
 });
 
+test.describe("Pasture page — biome landscape view", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredCard(72, "Tentacool", "sea"),
+    ]));
+  });
+
+  test("Landscape link is present for each rendered biome", async ({ page }) => {
+    await page.goto("/pasture");
+
+    // The Forest zone should have a "Landscape" link.
+    const forestSection = page.getByRole("region", { name: "Forest zone" });
+    await expect(
+      forestSection.getByRole("link", { name: /Open Forest in landscape view/i }),
+    ).toBeVisible();
+
+    // The Open Sea zone should also have a "Landscape" link.
+    const seaSection = page.getByRole("region", { name: "Open Sea zone" });
+    await expect(
+      seaSection.getByRole("link", { name: /Open Open Sea in landscape view/i }),
+    ).toBeVisible();
+  });
+
+  test("tapping the Landscape link opens /pasture/[biome] and shows the zone heading", async ({
+    page,
+  }) => {
+    await page.goto("/pasture");
+
+    // Click the landscape link for the Forest biome.
+    const forestSection = page.getByRole("region", { name: "Forest zone" });
+    await forestSection
+      .getByRole("link", { name: /Open Forest in landscape view/i })
+      .click();
+
+    await expect(page).toHaveURL("/pasture/forest");
+
+    // The landscape page shows the biome label in the heading.
+    await expect(page.getByRole("heading", { level: 1, name: /Forest/ })).toBeVisible();
+  });
+
+  test("biome landscape page shows the Pokémon sprite for that biome", async ({
+    page,
+  }) => {
+    await page.goto("/pasture/forest");
+
+    // Caterpie is in the forest habitat — its sprite button should be visible.
+    await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
+  });
+
+  test("back button on landscape page returns to /pasture", async ({ page }) => {
+    await page.goto("/pasture");
+    const forestSection = page.getByRole("region", { name: "Forest zone" });
+    await forestSection
+      .getByRole("link", { name: /Open Forest in landscape view/i })
+      .click();
+    await expect(page).toHaveURL("/pasture/forest");
+
+    // The "Pasture" back link should be visible and navigable.
+    await page.getByRole("button", { name: "Back to Pasture" }).click();
+    await expect(page).toHaveURL("/pasture");
+  });
+
+  test("unknown biome slug returns 404", async ({ page }) => {
+    const response = await page.goto("/pasture/not-a-real-biome");
+    // Next.js App Router returns 404 for notFound() pages.
+    expect(response?.status()).toBe(404);
+  });
+});
+
 test.describe("Pasture page — empty state", () => {
   test("visiting /pasture directly with no mastered cards shows friendly empty state", async ({
     page,
