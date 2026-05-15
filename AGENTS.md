@@ -152,6 +152,7 @@ Playwright smoke tests live in `e2e/` and run against Vercel preview deployments
 - **Projects**: `chromium` and `mobile-safari` (Webkit with iPhone 14 viewport) — both run in CI.
 - **Base URL**: set via `PLAYWRIGHT_BASE_URL` env var (preview URL in CI, `http://localhost:3000` locally).
 - **Run locally**: `npm run test:e2e` (requires `npx playwright install` first).
+- **Node version**: CI runs inside `mcr.microsoft.com/playwright:v1.60.0-noble`, which ships **Node 24**. Run `nvm use` (or `nvm install 24`) locally before running the e2e suite — the repo ships an `.nvmrc` pinned to `24`. Running under Node 26 is a known source of local-only failures (see issue #657).
 - **Selectors**: prefer `getByRole`, `getByText`, and `getByLabel` over CSS selectors or test IDs. Match the accessible names already in the markup (ARIA labels, headings, button text).
 - **When to add E2E tests**: any change that adds a new page, a new interactive flow, or modifies an existing user-facing flow should include or update an E2E test in `e2e/`. The bar is smoke-level coverage — verify the happy path loads and key interactions work, not exhaustive edge cases.
 - **File naming**: one spec file per feature area (e.g. `e2e/smoke.spec.ts` for cross-cutting smoke tests, `e2e/pokedex.spec.ts` for Pokédex-specific flows).
@@ -159,6 +160,10 @@ Playwright smoke tests live in `e2e/` and run against Vercel preview deployments
 ### Local development gotchas
 
 `localhost:3000` and `pokememory.com` are different origins → independent `localStorage`. State (practice scope, review session, settings, superuser flags) does not flow between them. When a behaviour differs between local `next dev` and the deployed app, suspect localStorage drift before suspecting framework code — clear the `poke-memory:*` keys on the dev origin and reload, or QA against the latest preview URL from `vercel-preview-on-ready.yml`.
+
+**E2E suite fails locally but passes in CI.** The most common cause is a Node version mismatch. CI uses Node 24 (baked into `mcr.microsoft.com/playwright:v1.60.0-noble`). Running `npm run test:e2e` under Node 26 triggers failures that do not appear in CI — the same root cause as the ESLint 10 crash (#614). Fix: `nvm use` (picks up `.nvmrc`), then `npx playwright install` once, then rerun. Also verify that your local browser binaries match the pinned `@playwright/test` version in `package-lock.json` — a version mismatch after `npm ci` will produce a "browser is not installed" or silent timing difference.
+
+A secondary, lower-frequency failure mode is an IDB seeding timing race: `e2e/helpers/seedIdb.ts` fires an IndexedDB `open` + write inside `addInitScript`, but the `onsuccess`/`tx.oncomplete` callbacks are asynchronous, so there is a window where the app's React hydration can read IDB before the seed transaction commits. CI's specific browser build and V8 task-scheduling happen to win this race consistently; a different build may not. If you see intermittent "empty pasture / missing mastered cards" failures after fixing the Node version, this is the likely culprit.
 
 Two card-mix shapes specifically look "broken" on a fresh dev session but aren't:
 
