@@ -60,8 +60,10 @@ export function biomeStats(
   if (forceAllMastered) {
     // In QA mode every species counts as mastered.
     // Surface the most recently firstSeen card as latest addition.
+    // Guard to isDefaultForm so the denominator (BIOME_TOTALS) and numerator
+    // use the same species population.
     const biomeCards = allMasteredCards.filter(
-      (c) => (c.habitat ?? "unknown") === habitatKey,
+      (c) => (c.habitat ?? "unknown") === habitatKey && c.isDefaultForm,
     );
     const latest = latestCard(biomeCards);
     return {
@@ -72,8 +74,14 @@ export function biomeStats(
     };
   }
 
+  // Guard to isDefaultForm so the numerator matches BIOME_TOTALS' denominator,
+  // which only counts default-form species. Without this guard, alternate formes
+  // and regional variants would inflate masteredCount above totalCount.
   const biomeCards = allMasteredCards.filter(
-    (c) => (c.habitat ?? "unknown") === habitatKey && isMastered(c.state),
+    (c) =>
+      (c.habitat ?? "unknown") === habitatKey &&
+      c.isDefaultForm &&
+      isMastered(c.state),
   );
 
   const masteredCount = biomeCards.length;
@@ -102,6 +110,9 @@ function latestCard(cards: NameReviewCard[]): NameReviewCard | null {
       best = card;
     }
   }
-  // If every firstSeen is null, fall back to the last card in array order.
+  // If every firstSeen is null (common for synthesised superuser cards, which
+  // have no real review history), fall back to the last card in array order.
+  // In QA mode this produces an arbitrary "Latest addition" display; that is
+  // acceptable because the superuser flag is for testing only.
   return best ?? cards[cards.length - 1];
 }

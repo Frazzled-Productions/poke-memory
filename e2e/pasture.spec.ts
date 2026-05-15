@@ -452,8 +452,12 @@ test.describe("Pasture page — biome stats (#623)", () => {
   }) => {
     await page.goto("/pasture/forest");
 
-    // The detail page renders "X% captured" as a visible stat.
-    await expect(page.getByText(/captured/i)).toBeVisible();
+    // The detail page renders "X% captured" in a <dd> inside the stats <dl>.
+    // Scope to the <dl aria-label="Biome statistics"> and target the <dd>
+    // whose text matches the numeric-percent shape to avoid the sr-only <dt>
+    // "Captured" that also contains "captured".
+    const statsPanel = page.locator('[aria-label="Biome statistics"]');
+    await expect(statsPanel.locator("dd").filter({ hasText: /\d+% captured/ })).toBeVisible();
   });
 
   test("per-biome detail page stats panel shows species count", async ({
@@ -461,8 +465,11 @@ test.describe("Pasture page — biome stats (#623)", () => {
   }) => {
     await page.goto("/pasture/forest");
 
-    // "X / Y species" is rendered in the stats panel.
-    await expect(page.getByText(/species/i)).toBeVisible();
+    // "X / Y species" is rendered in a <dd> inside the stats <dl>.
+    // Scope to the <dl aria-label="Biome statistics"> and target the <dd>
+    // to avoid matching the sr-only <dt> "Species mastered".
+    const statsPanel = page.locator('[aria-label="Biome statistics"]');
+    await expect(statsPanel.locator("dd").filter({ hasText: /\d+ \/ \d+ species/ })).toBeVisible();
   });
 });
 

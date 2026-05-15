@@ -154,6 +154,22 @@ describe("biomeStats", () => {
     expect(stats.capturedPercent).toBeGreaterThanOrEqual(0);
     expect(stats.capturedPercent).toBeLessThanOrEqual(100);
   });
+
+  it("non-default-form cards are not counted toward masteredCount or capturedPercent", () => {
+    // A mastered alternate forme (isDefaultForm: false) in the forest habitat
+    // must not inflate masteredCount above the default-form denominator.
+    const nonDefaultCard: NameReviewCard = {
+      ...makeCard(10001, "Wormadam-Sandy", "forest"),
+      isDefaultForm: false,
+    };
+    // Mix in a real default-form mastered card so the count is non-zero.
+    const defaultCard = makeCard(10, "Caterpie", "forest");
+    const stats = biomeStats("forest", [nonDefaultCard, defaultCard]);
+    // Only the default-form Caterpie should be counted.
+    expect(stats.masteredCount).toBe(1);
+    // capturedPercent must stay ≤ 100.
+    expect(stats.capturedPercent).toBeLessThanOrEqual(100);
+  });
 });
 
 // ---------------------------------------------------------------------------

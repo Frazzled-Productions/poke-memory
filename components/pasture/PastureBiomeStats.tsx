@@ -36,9 +36,7 @@ export function PastureBiomeStats({ stats, className = "" }: Props) {
         </dd>
       </div>
 
-      <span aria-hidden="true" className="opacity-40">
-        ·
-      </span>
+      <div aria-hidden="true" className="opacity-40">·</div>
 
       <div className="flex items-center gap-1">
         <dt className="sr-only">Captured</dt>
@@ -47,9 +45,7 @@ export function PastureBiomeStats({ stats, className = "" }: Props) {
 
       {latestAddition !== null && (
         <>
-          <span aria-hidden="true" className="opacity-40">
-            ·
-          </span>
+          <div aria-hidden="true" className="opacity-40">·</div>
           <div className="flex items-center gap-1">
             <dt className="sr-only">Latest addition</dt>
             <dd className="truncate max-w-[12ch]">{latestAddition}</dd>
