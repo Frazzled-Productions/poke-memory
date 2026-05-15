@@ -618,5 +618,35 @@ describe("pullAndMerge", () => {
       // to return false on incidentally empty arrays.
       expect(mockBuildSession).not.toHaveBeenCalled();
     });
+
+    // Real-world cold-load race (#608): ReviewSession's mount-time load() writes
+    // a fresh pristine session via IDB (fast) before pullAndMerge's network
+    // pullSession returns, so loadSession() inside pullAndMerge sees a non-null
+    // but pristine localSession rather than null. Without treating pristine as
+    // a cold load, the dispatch never fires for the canonical PWA bug.
+    it("fires when local session is non-null but pristine (race with ReviewSession.load)", async () => {
+      mockLoadSession.mockResolvedValue({
+        cards: [card("pikachu", null, null)] as any,
+        limits: {} as any,
+      });
+      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-10")] as any);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockDispatch).toHaveBeenCalledOnce();
+      expect(mockDispatch.mock.calls[0][0]).toMatchObject({ type: SYNC_PULL_APPLIED_EVENT });
+    });
+
+    it("stays silent when local session is pristine but merge is a no-op", async () => {
+      mockLoadSession.mockResolvedValue({
+        cards: [card("pikachu", null, null)] as any,
+        limits: {} as any,
+      });
+      mockMerge.mockReturnValue([card("pikachu", null, null)] as any);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
   });
 });

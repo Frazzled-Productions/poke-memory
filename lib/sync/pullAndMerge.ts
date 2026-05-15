@@ -23,19 +23,21 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
 /**
  * Fires when `pullAndMerge` completes a cold-load merge that transitioned at
- * least one card's `lastReview` or `firstSeen`. "Cold load" means
- * `localSession` was null at the start of the merge branch — either because
- * the device had no prior local session, or because the tombstone path
- * (`clearLocalProgress`) just wiped it. Surfaces in `ReviewSession` so the
- * practice UI can refresh when the initial sign-in pull arrives after the
- * page has already mounted with pristine seed cards — without this,
- * cold-loading a PWA (or any tab whose local storage is empty but whose user
- * has cloud data) leaves the practice page stuck on "all cards new" until the
- * user navigates away and back (#608).
+ * least one card's `lastReview` or `firstSeen`. "Cold load" means the device
+ * had no user progress when the merge ran — either `localSession` was null
+ * (brand-new device, or the tombstone path just wiped it), or it held only
+ * pristine seed cards (the practice page raced ahead and saved a fresh
+ * empty session before the network pull returned). Surfaces in
+ * `ReviewSession` so the practice UI can refresh when the initial sign-in
+ * pull arrives after the page has already mounted with pristine seed cards
+ * — without this, cold-loading a PWA (or any tab whose local storage is
+ * empty but whose user has cloud data) leaves the practice page stuck on
+ * "all cards new" until the user navigates away and back (#608).
  *
- * Dispatched only on cold loads so a mid-review sign-in — where local
- * session state already exists — does not trigger an unwanted reload that
- * would discard in-flight grades.
+ * Dispatched only when the pre-merge local state had no user progress, so
+ * a mid-review pull — where any card carries `lastReview` or `firstSeen`
+ * — does not trigger an unwanted reload that would discard in-flight
+ * grades or interrupt a card the user is currently looking at.
  *
  * Same-tab `useSessionStorageKey` subscribers (Stats, Pasture, Pokédex,
  * NavLinks) already react to `saveSession`'s synthetic StorageEvent — this
@@ -43,6 +45,19 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
  * to that channel without re-firing on every grade.
  */
 export const SYNC_PULL_APPLIED_EVENT = "poke-memory:sync-pull-applied";
+
+/**
+ * True when no card in `cards` has been graded yet — every entry has both
+ * `lastReview` and `firstSeen` still null. A freshly-built `buildSession`
+ * result satisfies this; a session with even one user grade does not.
+ */
+function isPristineSession(cards: readonly ReviewableCard[]): boolean {
+  for (const c of cards) {
+    if (c.state.lastReview !== null) return false;
+    if (c.state.firstSeen !== null) return false;
+  }
+  return true;
+}
 
 /**
  * True when at least one card's `lastReview` or `firstSeen` changed between
@@ -155,8 +170,15 @@ export async function pullAndMerge(
       }
     }
 
-    // Capture before the branches so both paths see the same value.
-    const wasColdLoad = localSession === null;
+    // Capture before the branches so both paths see the same value. Treat a
+    // pristine saved session the same as a null session: ReviewSession's
+    // mount-time `load()` writes a fresh empty session via IDB (fast) before
+    // pullSession's network round-trip returns, so `localSession` here is
+    // typically the just-saved pristine cards rather than null even on a
+    // genuine cold load. Without the pristine check the dispatch never
+    // fires for the canonical PWA-cold-load bug.
+    const wasColdLoad =
+      localSession === null || isPristineSession(localSession.cards);
 
     let merged: ReturnType<typeof buildSession>;
     let saveResult;
