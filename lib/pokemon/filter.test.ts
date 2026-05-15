@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { filterPokemon, parseFilters } from './filter';
 import type { PokemonCellData, PokedexFilters } from './filter';
+import { generationOf } from '@/lib/stats/derive';
 
 function basePokemon(overrides: Partial<PokemonCellData> = {}): PokemonCellData {
   return {
@@ -213,7 +214,6 @@ function filterWithForms(
     }
 
     if (filters.gen !== null) {
-      const { generationOf } = require('@/lib/stats/derive');
       if (generationOf(p.id) !== filters.gen) return false;
     }
 
