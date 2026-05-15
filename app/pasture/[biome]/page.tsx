@@ -35,6 +35,9 @@ function useIsLandscape(): boolean {
 
   useEffect(() => {
     const mq = window.matchMedia("(orientation: landscape)");
+    // Re-sync in case orientation changed between the lazy useState initialiser
+    // (render time) and this effect running (after paint).
+    setIsLandscape(mq.matches);
     function handleChange(e: MediaQueryListEvent) {
       setIsLandscape(e.matches);
     }
