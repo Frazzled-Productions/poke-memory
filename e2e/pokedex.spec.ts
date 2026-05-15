@@ -276,7 +276,7 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
     // The "Mastered" chip should be pressed.
     const masteryGroup = page.getByRole("group", { name: "Filter by mastery" });
     await expect(
-      masteryGroup.getByRole("button", { name: "Mastered" }),
+      masteryGroup.getByRole("button", { name: "Mastered", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
   });
 });
