@@ -62,16 +62,38 @@ jobs:
             echo "e2e_relevant=${{ steps.filter.outputs.e2e_relevant }}" >> "$GITHUB_OUTPUT"
           fi
 
-  test:
+  typecheck:
     needs: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
       - name: Skip notice (docs-only change)
         if: needs.changes.outputs.code != 'true'
-        run: echo "No code changes detected — skipping typecheck/build/vitest."
+        run: echo "No code changes detected — skipping typecheck."
+      - uses: actions/checkout@v6
+        if: needs.changes.outputs.code == 'true'
+      - uses: actions/setup-node@v6
+        if: needs.changes.outputs.code == 'true'
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+        if: needs.changes.outputs.code == 'true'
+      - run: npm run typecheck
+        if: needs.changes.outputs.code == 'true'
+
+  vitest:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Skip notice (docs-only change)
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changes detected — skipping vitest."
       - uses: actions/checkout@v6
         if: needs.changes.outputs.code == 'true'
         with:
@@ -84,10 +106,6 @@ jobs:
           cache: 'npm'
       - run: npm ci
         if: needs.changes.outputs.code == 'true'
-      - run: npm run typecheck
-        if: needs.changes.outputs.code == 'true'
-      - run: npm run build
-        if: needs.changes.outputs.code == 'true'
       - name: Run vitest (changed only on PR, full on push)
         if: needs.changes.outputs.code == 'true'
         run: |
@@ -97,6 +115,28 @@ jobs:
           else
             npm test
           fi
+
+  build:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Skip notice (docs-only change)
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changes detected — skipping build."
+      - uses: actions/checkout@v6
+        if: needs.changes.outputs.code == 'true'
+      - uses: actions/setup-node@v6
+        if: needs.changes.outputs.code == 'true'
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+        if: needs.changes.outputs.code == 'true'
+      - run: npm run build
+        if: needs.changes.outputs.code == 'true'
       - name: Upload .next build for e2e
         if: needs.changes.outputs.code == 'true' && needs.changes.outputs.e2e_relevant == 'true'
         uses: actions/upload-artifact@v7
@@ -111,7 +151,7 @@ jobs:
     # deployment_status-triggered e2e.yml remains as a redundant preview-mode
     # signal, but this job is the one to mark required in the main-protection
     # ruleset.
-    needs: [changes, test]
+    needs: [changes, build]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
