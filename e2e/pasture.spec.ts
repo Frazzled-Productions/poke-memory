@@ -290,6 +290,131 @@ test.describe("Pasture page — name search", () => {
   });
 });
 
+test.describe("Pasture page — biome landscape view", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredCard(72, "Tentacool", "sea"),
+    ]));
+  });
+
+  test("Landscape link is present for each rendered biome", async ({ page }) => {
+    await page.goto("/pasture");
+
+    // The Forest zone should have a "Landscape" link.
+    const forestSection = page.getByRole("region", { name: "Forest zone" });
+    await expect(
+      forestSection.getByRole("link", { name: /View Forest in landscape/i }),
+    ).toBeVisible();
+
+    // The Open Sea zone should also have a "Landscape" link — the aria-label
+    // uses "View … in landscape" to avoid the double-word "Open Open Sea".
+    const seaSection = page.getByRole("region", { name: "Open Sea zone" });
+    await expect(
+      seaSection.getByRole("link", { name: /View Open Sea in landscape/i }),
+    ).toBeVisible();
+  });
+
+  test("tapping the Landscape link opens /pasture/[biome] and shows the zone heading", async ({
+    page,
+  }) => {
+    await page.goto("/pasture");
+
+    // Click the landscape link for the Forest biome.
+    const forestSection = page.getByRole("region", { name: "Forest zone" });
+    await forestSection
+      .getByRole("link", { name: /View Forest in landscape/i })
+      .click();
+
+    await expect(page).toHaveURL("/pasture/forest");
+
+    // The landscape page shows the biome label in the heading.
+    await expect(page.getByRole("heading", { level: 1, name: /Forest/ })).toBeVisible();
+  });
+
+  test("biome landscape page shows the Pokémon sprite for that biome", async ({
+    page,
+  }) => {
+    await page.goto("/pasture/forest");
+
+    // Caterpie is in the forest habitat — its sprite button should be visible.
+    await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
+  });
+
+  test("back button on landscape page returns to /pasture", async ({ page }) => {
+    await page.goto("/pasture");
+    const forestSection = page.getByRole("region", { name: "Forest zone" });
+    await forestSection
+      .getByRole("link", { name: /View Forest in landscape/i })
+      .click();
+    await expect(page).toHaveURL("/pasture/forest");
+
+    // The "Pasture" back link should be visible and navigable.
+    await page.getByRole("button", { name: "Back to Pasture" }).click();
+    await expect(page).toHaveURL("/pasture");
+  });
+
+  test("unknown biome slug shows the not-found page", async ({ page }) => {
+    // With cacheComponents: true the /pasture/[biome] route is a Partial
+    // Prerender (PPR) — the static shell is streamed with HTTP 200 before the
+    // dynamic segment runs notFound(). The HTTP status will therefore always be
+    // 200, so we assert on the rendered UI instead of the status code.
+    await page.goto("/pasture/not-a-real-biome");
+
+    // Next.js's default not-found page renders an <h1>404</h1> and an
+    // <h2>This page could not be found.</h2>. Assert on both to confirm the
+    // not-found UI is actually rendered in the browser.
+    await expect(page.getByRole("heading", { level: 1, name: "404" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "This page could not be found." }),
+    ).toBeVisible();
+  });
+});
+
+test.describe("Pasture — biome landscape view with pretendAllMastered", () => {
+  /**
+   * Seeds localStorage so SuperuserContext boots with the pretendAllMastered
+   * flag active. Mirrors the approach used in e2e/superuser.spec.ts.
+   */
+  async function seedSuperuserAllMastered(
+    page: import("@playwright/test").Page,
+  ): Promise<void> {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("poke-memory:superuser", "true");
+      window.localStorage.setItem(
+        "poke-memory:superuser:flags:v1",
+        JSON.stringify({ pretendAllMastered: true }),
+      );
+    });
+  }
+
+  test("landscape biome view renders synthesised collection under pretendAllMastered", async ({
+    page,
+  }) => {
+    await seedSuperuserAllMastered(page);
+
+    // Navigate directly to a known biome — the synthesised collection includes
+    // every species, so the forest biome should be populated.
+    await page.goto("/pasture/forest");
+
+    // The page heading should show the biome label.
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Forest/i }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // At least one Pokémon sprite should be present (Caterpie is a forest
+    // habitat species that appears in the synthesised collection).
+    await expect(
+      page.getByRole("button", { name: /Caterpie/i }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // The "no mastered Pokémon" empty-state message must NOT appear.
+    await expect(
+      page.getByText(/No mastered Pokémon in this biome yet/i),
+    ).toHaveCount(0);
+  });
+});
+
 test.describe("Pasture page — empty state", () => {
   test("visiting /pasture directly with no mastered cards shows friendly empty state", async ({
     page,
