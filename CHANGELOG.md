@@ -6,6 +6,21 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.61] — 2026-05-15
+
+### Added
+
+- Pasture: tap the "Landscape" link on any biome to open a full-screen view of that biome rotated 90° — gives a wide landscape look regardless of how the phone is held.
+- Pasture: each biome now shows a compact stats line (mastered count, % captured, latest addition) on the main page and a richer stats panel on the per-biome landscape view.
+
+### Changed
+
+- Practice sessions with an active scope now show a subtle "Finishing an in-progress card" hint when a mid-learning-step card from outside the scope appears, explaining the intentional behaviour rather than reading as a broken filter.
+
+### Fixed
+
+- Higher-or-Lower best streak now persists immediately when a new best is reached, so closing the tab or navigating away before clicking "Play again" no longer resets it to zero.
+
 ## [0.9.60] — 2026-05-15
 
 ### Added
@@ -971,7 +986,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.60...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.61...HEAD
+[0.9.61]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.61
 [0.9.60]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.60
 [0.9.59]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.59
 [0.9.58]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.58
