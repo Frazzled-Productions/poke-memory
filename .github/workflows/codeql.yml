@@ -31,7 +31,7 @@ jobs:
       - uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
-          queries: security-and-quality
+          queries: security-extended
       # No `autobuild` step: CodeQL v3 traces JS/TS without a build, and we
       # deliberately skip `next build` here to keep the scan fast — generated
       # `.next/` output is not in scope. Add `autobuild` only if a future
