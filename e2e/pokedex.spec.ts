@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { seedSessionIdb } from "./helpers/seedIdb";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 
 test.describe("Pokédex detail — Hear name button", () => {
   test("Hear name button appears on a non-locked Pokédex entry", async ({ page }) => {
@@ -36,6 +36,7 @@ test.describe("Pokédex detail — Hear name button", () => {
     });
 
     await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
     await expect(page.getByText("Bulbasaur")).toBeVisible();
     await expect(page.getByRole("button", { name: "Hear Bulbasaur" })).toBeVisible();
   });
@@ -143,6 +144,7 @@ test.describe("Pokédex detail — cry button (#476)", () => {
     });
 
     await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
 
     // Wait for the page to fully render the name heading (not locked).
     await expect(page.getByText("Bulbasaur")).toBeVisible();
@@ -161,6 +163,7 @@ test.describe("Pokédex detail — cry button (#476)", () => {
     await seedSessionIdb(page, { cards: [], limits: { name: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 }, reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 } } });
 
     await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
 
     // Locked species shows "???" heading and hides the cry button.
     await expect(
@@ -190,6 +193,7 @@ test.describe("Pokédex detail — Forms section hidden when locked (#495)", () 
     });
 
     await page.goto("/pokedex/26");
+    await awaitSeedIdb(page);
 
     // Locked species shows "???" — verify the page loaded correctly.
     await expect(
@@ -240,6 +244,7 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
     });
 
     await page.goto("/pokedex");
+    await awaitSeedIdb(page);
     await expect(
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { seedSessionIdb } from "./helpers/seedIdb";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import { getPrimaryNavContainer } from "./helpers/navHelpers";
 
 // ---------------------------------------------------------------------------
@@ -69,6 +69,7 @@ test.describe("Pasture nav guard", () => {
     await seedSessionIdb(page, { cards: [], limits: { name: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 }, reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 } } });
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     await expect(nav).toBeVisible();
@@ -82,6 +83,7 @@ test.describe("Pasture nav guard", () => {
     await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // On mobile the Pasture link is in the bottom tab bar (the new default for
     // fresh users). On desktop it lives in the main navigation header row.
@@ -109,6 +111,7 @@ test.describe("Pasture page — with mastered cards", () => {
     page,
   }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // Page heading
     await expect(
@@ -126,6 +129,7 @@ test.describe("Pasture page — with mastered cards", () => {
 
   test("sprite buttons are accessible by Pokémon name", async ({ page }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // PasturePokemon renders a <button aria-label="{name} (new arrival)"> when
     // seenInPasture is false (the default in our seeded data).
@@ -146,6 +150,7 @@ test.describe("Pasture page — sparkle clears on tap", () => {
     await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest", false)]));
 
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // The sprite button for a new arrival has "(new arrival)" in its aria-label.
     const spriteBtn = page.getByRole("button", { name: "Caterpie (new arrival)" });
@@ -209,6 +214,7 @@ test.describe("Pasture page — idle behaviour", () => {
 
   test("zone container renders with expected class", async ({ page }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // The zone container gets the .zoneContainer CSS module class (mangled in
     // production, but we can locate it via the aria region).
@@ -221,6 +227,7 @@ test.describe("Pasture page — idle behaviour", () => {
 
   test("sprites have data-sprite-id attribute", async ({ page }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // useIdleBehaviour queries [data-sprite-id] elements — verify they exist.
     const spriteWrappers = page.locator("[data-sprite-id]");
@@ -239,6 +246,7 @@ test.describe("Pasture page — idle behaviour", () => {
     await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
 
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // Sprites must still be visible — just static (no motion).
     await expect(
@@ -259,6 +267,7 @@ test.describe("Pasture page — name search", () => {
 
   test("typing a matching name filters to that Pokémon only", async ({ page }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
     await expect(searchInput).toBeVisible();
@@ -273,6 +282,7 @@ test.describe("Pasture page — name search", () => {
 
   test("clearing the search restores all Pokémon", async ({ page }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
     await searchInput.fill("Caterpie");
@@ -285,6 +295,7 @@ test.describe("Pasture page — name search", () => {
 
   test("a query with no matches shows a no-results message", async ({ page }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
     await searchInput.fill("zzznomatch");
@@ -303,6 +314,7 @@ test.describe("Pasture page — biome landscape view", () => {
 
   test("Landscape link is present for each rendered biome", async ({ page }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // The Forest zone should have a "Landscape" link.
     const forestSection = page.getByRole("region", { name: "Forest zone" });
@@ -322,6 +334,7 @@ test.describe("Pasture page — biome landscape view", () => {
     page,
   }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // Click the landscape link for the Forest biome.
     const forestSection = page.getByRole("region", { name: "Forest zone" });
@@ -339,6 +352,7 @@ test.describe("Pasture page — biome landscape view", () => {
     page,
   }) => {
     await page.goto("/pasture/forest");
+    await awaitSeedIdb(page);
 
     // Caterpie is in the forest habitat — its sprite button should be visible.
     await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
@@ -346,6 +360,7 @@ test.describe("Pasture page — biome landscape view", () => {
 
   test("back button on landscape page returns to /pasture", async ({ page }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
     const forestSection = page.getByRole("region", { name: "Forest zone" });
     await forestSection
       .getByRole("link", { name: /View Forest in landscape/i })
@@ -363,6 +378,7 @@ test.describe("Pasture page — biome landscape view", () => {
     // dynamic segment runs notFound(). The HTTP status will therefore always be
     // 200, so we assert on the rendered UI instead of the status code.
     await page.goto("/pasture/not-a-real-biome");
+    await awaitSeedIdb(page);
 
     // Next.js's default not-found page renders an <h1>404</h1> and an
     // <h2>This page could not be found.</h2>. Assert on both to confirm the
@@ -431,6 +447,7 @@ test.describe("Pasture page — biome stats (#623)", () => {
     page,
   }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     const forestZone = page.getByRole("region", { name: "Forest zone" });
     await expect(forestZone).toBeVisible();
@@ -443,6 +460,7 @@ test.describe("Pasture page — biome stats (#623)", () => {
     page,
   }) => {
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     const forestZone = page.getByRole("region", { name: "Forest zone" });
     // 2 mastered out of 71 total forest species → "2" and "2%" (rounded).
@@ -454,6 +472,7 @@ test.describe("Pasture page — biome stats (#623)", () => {
     page,
   }) => {
     await page.goto("/pasture/forest");
+    await awaitSeedIdb(page);
 
     // The detail page renders "X% captured" in a <dd> inside the stats <dl>.
     // Scope to the <dl aria-label="Biome statistics"> and target the <dd>
@@ -467,6 +486,7 @@ test.describe("Pasture page — biome stats (#623)", () => {
     page,
   }) => {
     await page.goto("/pasture/forest");
+    await awaitSeedIdb(page);
 
     // "X / Y species" is rendered in a <dd> inside the stats <dl>.
     // Scope to the <dl aria-label="Biome statistics"> and target the <dd>
@@ -491,6 +511,7 @@ test.describe("Pasture page — empty state", () => {
     });
 
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     // Page heading is still rendered
     await expect(
@@ -512,6 +533,7 @@ test.describe("Pasture page — reacts to clearLocalProgress storage event", () 
     await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
 
     await page.goto("/pasture");
+    await awaitSeedIdb(page);
 
     await expect(
       page.getByRole("button", { name: /Caterpie/ }),
