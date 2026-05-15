@@ -1,11 +1,7 @@
-import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UserSettings } from "@/lib/settings/persistence";
 import type { DateFormat } from "@/lib/utils/format-date";
-import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
-
-type MergeUserSettingsArgsPatch = Omit<MergeUserSettingsArgs, "p_patch"> & {
-  p_patch: Partial<UserSettings>;
-};
+import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
 
 // Settings sync is best-effort. pushSettings routes through the
 // merge_user_settings RPC (migration 011/014), which atomically merges a JSONB
@@ -13,16 +9,6 @@ type MergeUserSettingsArgsPatch = Omit<MergeUserSettingsArgs, "p_patch"> & {
 // That eliminates the last-write-wins race window two concurrent devices could
 // otherwise open by overwriting the whole settings column. pushRegionalPrefs
 // remains a separate scalar-column write path (see comment below).
-
-// Generated Supabase types do not yet include merge_user_settings. Cast the
-// call site through `unknown` to a narrow signature so name + args stay typed.
-// Keep the cast on the *call expression* (not a separate const) so the JS
-// member-access reference is preserved and `this` binds to `client` — extracting
-// to a local would strip `this` and SupabaseClient.rpc reads `this.rest`.
-type MergeUserSettingsRpc = (
-  name: "merge_user_settings",
-  args: MergeUserSettingsArgsPatch,
-) => Promise<{ error: PostgrestError | null }>;
 
 /**
  * Push a JSONB patch to the user's settings row via merge_user_settings.

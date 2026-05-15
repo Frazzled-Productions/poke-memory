@@ -16,7 +16,7 @@
  */
 
 import { NextResponse } from "next/server";
-import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 // Native optimizer can take tens of seconds on large datasets. Default
@@ -37,7 +37,7 @@ import {
   OPTIMIZER_COOLDOWN_MS,
 } from "@/lib/srs/optimizer";
 import type { UserSettings } from "@/lib/settings/persistence";
-import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
+import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
 
 type GradeLogCloudRow = {
   occurred_at: number;
@@ -113,17 +113,17 @@ async function persistWeights(
 ): Promise<boolean> {
   try {
     // The generated Supabase types don't yet know about `merge_user_settings`
-    // (migration 011/014). Cast through `unknown` to a narrow signature that
-    // keeps the args typed at the call site without losing safety on the
-    // name + arg shape.
-    const rpc = client.rpc as unknown as (
-      name: "merge_user_settings",
-      args: MergeUserSettingsArgs,
-    ) => Promise<{ error: PostgrestError | null }>;
-    const { error } = await rpc("merge_user_settings", {
-      p_user_id: userId,
-      p_patch: { fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt },
-    });
+    // (migration 011/014). Cast through `unknown` to the narrow MergeUserSettingsRpc
+    // signature from rpc-types. The cast is kept on the *call expression* (not a
+    // separate const) so `this` stays bound to `client` — extracting client.rpc to
+    // a local const would strip the binding and SupabaseClient.rpc reads `this.rest`.
+    const { error } = await (client.rpc as unknown as MergeUserSettingsRpc)(
+      "merge_user_settings",
+      {
+        p_user_id: userId,
+        p_patch: { fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt },
+      },
+    );
     return !error;
   } catch {
     return false;
