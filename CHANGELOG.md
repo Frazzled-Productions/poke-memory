@@ -6,6 +6,18 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.62] — 2026-05-15
+
+### Added
+
+- Settings page: search/filter input at the top lets you jump straight to a setting by name or keyword; matching sections auto-expand and non-matching sections are hidden; clearing the input restores the default collapsed view.
+
+### Changed
+
+- Alternate forms (regional variants, Megas, and other non-default forms) are now opt-in via a new Settings toggle ("Include alternate forms in practice"), defaulting to off. Existing users will no longer see form cards in practice until they re-enable this setting.
+- On narrow viewports (below `md` breakpoint), the top nav now collapses into a hamburger button that opens an accessible slide-in drawer, keeping the header to a single line on mobile.
+- Settings page reorganised into collapsible, categorised sections (Appearance, Practice, Audio, Account & Data, Advanced) that persist their open/closed state across page reloads. Hash deep-links (e.g. `/settings#onboarding-heading`) auto-expand the relevant category.
+
 ## [0.9.61] — 2026-05-15
 
 ### Added
@@ -986,7 +998,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.61...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.62...HEAD
+[0.9.62]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.62
 [0.9.61]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.61
 [0.9.60]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.60
 [0.9.59]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.59
