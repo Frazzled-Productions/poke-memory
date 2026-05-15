@@ -151,34 +151,74 @@ describe("HigherOrLowerGame", () => {
     expect(screen.getByText(/which has higher/i)).toBeInTheDocument();
   });
 
-  it("persists new high score via saveSettings when a wrong answer ends a non-zero streak", async () => {
+  it("persists new best immediately on the correct guess that sets it — not deferred to Play again", async () => {
     const user = userEvent.setup();
     render(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-    // Build a streak of 1 by picking correctly first.
+    // Correct pick: streak becomes 1, which beats bestScore of 0.
     await user.click(screen.getByRole("button", { name: "Ivysaur" }));
-    await user.click(screen.getByRole("button", { name: /next pair/i }));
 
-    // Now pick wrong to end the streak.
-    await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
-    await user.click(screen.getByRole("button", { name: /play again/i }));
-
+    // saveSettings must have fired already — before the user clicks anything else.
     expect(mockSaveSettings).toHaveBeenCalledWith(
       expect.objectContaining({ miniGameBestScore: 1 }),
     );
-    // Best score counter reflects the persisted value.
+    // Best counter updates immediately in the UI.
     expect(
       screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Best: 1"),
     ).toBeInTheDocument();
   });
 
-  it("does not call saveSettings when streak at wrong answer is not a new high", async () => {
+  it("persists new best on correct guess and preserves it after Play again resets streak", async () => {
+    const user = userEvent.setup();
+    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+    // Build a streak of 1.
+    await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+    await user.click(screen.getByRole("button", { name: /next pair/i }));
+
+    // Pick wrong to trigger game-over.
+    await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
+
+    // saveSettings was called when the correct guess was made, not now.
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ miniGameBestScore: 1 }),
+    );
+
+    // Play again resets the streak but must not call saveSettings a second time.
+    const callCount = mockSaveSettings.mock.calls.length;
+    await user.click(screen.getByRole("button", { name: /play again/i }));
+    expect(mockSaveSettings.mock.calls.length).toBe(callCount);
+
+    // Streak resets but best is preserved in the UI.
+    expect(
+      screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Streak: 0"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Best: 1"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not call saveSettings when a correct guess does not beat the existing best", async () => {
     mockLoadSettings.mockReturnValue({ miniGameBestScore: 5 });
     const user = userEvent.setup();
     render(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-    // Immediately pick wrong — streak of 0 < bestScore of 5.
+    // Correct pick: streak becomes 1, which is less than bestScore of 5.
+    await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it("does not call saveSettings on a wrong answer that does not surpass the best", async () => {
+    mockLoadSettings.mockReturnValue({ miniGameBestScore: 5 });
+    const user = userEvent.setup();
+    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+    // Immediately pick wrong — streak of 0 never beats bestScore of 5.
     await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
+
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+
     await user.click(screen.getByRole("button", { name: /play again/i }));
 
     expect(mockSaveSettings).not.toHaveBeenCalled();

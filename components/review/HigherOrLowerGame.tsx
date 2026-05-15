@@ -110,12 +110,19 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
         setPhase("revealed");
         setLastResult("wrong");
       } else {
+        const newStreak = streak + 1;
+        setStreak(newStreak);
+        // Persist the new best immediately so a tab-close or navigation away
+        // before "Play again" is clicked does not lose the achievement.
+        if (newStreak > bestScore) {
+          saveSettings({ ...loadSettings(), miniGameBestScore: newStreak });
+          setBestScore(newStreak);
+        }
         setPhase("revealed");
         setLastResult(tie ? "tie" : "correct");
-        setStreak((s) => s + 1);
       }
     },
-    [pair, phase],
+    [pair, phase, streak, bestScore],
   );
 
   const handleNext = useCallback(() => {
@@ -125,15 +132,11 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   }, [seenPokemon]);
 
   const handlePlayAgain = useCallback(() => {
-    if (streak > bestScore) {
-      saveSettings({ ...loadSettings(), miniGameBestScore: streak });
-      setBestScore(streak);
-    }
     setStreak(0);
     setPair(shufflePair(pickPair(seenPokemon)));
     setPhase("picking");
     setLastResult(null);
-  }, [seenPokemon, bestScore, streak]);
+  }, [seenPokemon]);
 
   if (!canPlay || !pair) return null;
 
