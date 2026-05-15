@@ -3,10 +3,11 @@
 // lib/pokemon/generated.json.  Run with: node scripts/seed-pokemon.mjs
 // Node 20+ — uses global fetch, node:fs/promises, node:path, node:url.
 
-import { writeFile, mkdir, readFile } from "node:fs/promises";
+import { writeFile, mkdir, readFile, rename } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomBytes } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -28,6 +29,30 @@ const FLAVOR_TEXTS_MAX = 12;
 /** Sleep for `ms` milliseconds. */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Write `buffer` to `destPath` atomically: write to a unique sibling temp file
+ * first, then rename it into place. `rename` on the same filesystem is atomic,
+ * so a concurrent reader sees either the old file or the fully-written new one
+ * — never a partial write. This also closes the check-then-write race between
+ * the `existsSync` skip-guard and the write itself.
+ */
+async function writeFileAtomic(destPath, buffer) {
+  const tmpPath = `${destPath}.${randomBytes(6).toString("hex")}.tmp`;
+  try {
+    await writeFile(tmpPath, buffer);
+    await rename(tmpPath, destPath);
+  } catch (err) {
+    // Best-effort cleanup of the temp file if the rename never happened.
+    try {
+      const { unlink } = await import("node:fs/promises");
+      await unlink(tmpPath);
+    } catch {
+      // ignore — temp file may not exist
+    }
+    throw err;
+  }
 }
 
 /**
@@ -150,7 +175,7 @@ async function downloadSprite(url, destPath) {
 
     try {
       const buffer = Buffer.from(await res.arrayBuffer());
-      await writeFile(destPath, buffer);
+      await writeFileAtomic(destPath, buffer);
       return { ok: true, skipped: false };
     } catch (err) {
       return { ok: false, skipped: false, reason: err.message };
@@ -208,7 +233,7 @@ async function downloadCry(url, destPath) {
 
     try {
       const buffer = Buffer.from(await res.arrayBuffer());
-      await writeFile(destPath, buffer);
+      await writeFileAtomic(destPath, buffer);
       return { ok: true, skipped: false };
     } catch (err) {
       return { ok: false, skipped: false, reason: err.message };
