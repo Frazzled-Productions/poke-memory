@@ -107,11 +107,12 @@ jobs:
           retention-days: 1
           include-hidden-files: true
 
-  e2e:
-    # Canonical pre-merge gate for Playwright E2E (#463). The legacy
-    # deployment_status-triggered e2e.yml remains as a redundant preview-mode
-    # signal, but this job is the one to mark required in the main-protection
-    # ruleset.
+  e2e-browser:
+    # Playwright E2E, split by browser project (#643): `chromium` and
+    # `mobile-safari` run as parallel matrix legs to cut wall-clock time. The
+    # `e2e` aggregator job below collapses both legs into a single status, so
+    # the required-check name in the main-protection ruleset stays `e2e`
+    # regardless of how this matrix changes.
     #
     # Runs inside the official Playwright container: browsers and their system
     # deps are baked in, so there is no `playwright install --with-deps` step
@@ -126,6 +127,12 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    strategy:
+      # Both legs always report so a failure in one is not masked by a
+      # cancelled sibling.
+      fail-fast: false
+      matrix:
+        project: [chromium, mobile-safari]
     steps:
       - name: Skip notice (no app/lib/components/public/e2e change)
         if: needs.changes.outputs.e2e_relevant != 'true'
@@ -156,7 +163,7 @@ jobs:
           npm start &
           echo $! > /tmp/next.pid
           npx wait-on http://localhost:3000 --timeout 60000
-          npm run test:e2e
+          npm run test:e2e -- --project=${{ matrix.project }}
       - name: Stop Next.js
         if: always() && needs.changes.outputs.e2e_relevant == 'true'
         run: |
@@ -167,6 +174,29 @@ jobs:
         if: failure() && needs.changes.outputs.e2e_relevant == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          # Per-project name: two matrix legs uploading the same artifact name
+          # would collide.
+          name: playwright-report-${{ matrix.project }}
           path: playwright-report/
           retention-days: 14
+
+  e2e:
+    # Aggregator: the single required status check that gates on every
+    # `e2e-browser` matrix leg. Keeping a stable job named `e2e` means the
+    # required-check entry in the main-protection ruleset never has to change
+    # when matrix legs are added, removed, or renamed.
+    needs: [e2e-browser]
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Verify all e2e matrix legs passed
+        run: |
+          result="${{ needs.e2e-browser.result }}"
+          echo "e2e-browser matrix result: $result"
+          # A skipped matrix (docs-only change) is a pass. Anything other than
+          # success or skipped — failure, cancelled — fails the gate.
+          if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+            echo "::error::One or more e2e matrix legs did not pass (result: $result)."
+            exit 1
+          fi

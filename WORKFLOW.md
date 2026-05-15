@@ -87,9 +87,9 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | | |
 |---|---|
 | **Trigger** | `pull_request` (any), push to `main` |
-| **Job** | `test` |
-| **What it does** | `npm ci && npm run typecheck && npm run build && npm test` |
-| **Required check** | The `test` job is the required status check for `main` (not the workflow name `CI`). Branch protection enforces strict-up-to-date; the bot app bypasses for auto-merges. |
+| **Jobs** | `changes` (path classification), `test` (`typecheck && build && test`), `e2e-browser` (Playwright matrix — `chromium` + `mobile-safari` legs run in parallel inside the official Playwright container), `e2e` (aggregator over the matrix legs) |
+| **What it does** | `test` runs `npm ci && npm run typecheck && npm run build && npm test`. `e2e-browser` runs the Playwright smoke suite split by browser project so the two projects run as parallel matrix legs (#643). The `changes` job classifies the PR so `test`/`e2e` inner steps no-op on docs-only changes. |
+| **Required checks** | `test` and `e2e` are the required status checks for `main` (not the workflow name `CI`). `e2e` is a thin aggregator over the `e2e-browser` matrix, so the required-check name stays stable when matrix legs are added or renamed. Branch protection enforces strict-up-to-date; the bot app bypasses for auto-merges. |
 | **Concurrency** | Cancels concurrent runs on the same ref — only the latest push on a branch completes. |
 
 ---
@@ -430,7 +430,7 @@ Runs before opening a PR: `npm run typecheck && npm run build && npm test`
 
 Runs on every `pull_request` event and every push to `main`: the same `typecheck && build && test` triple.
 
-- Named check: `test` (the job ID). Branch protection requires this check by name.
+- Named checks: `test` and `e2e` (job IDs). `e2e` aggregates the parallel `e2e-browser` matrix legs into one status so the required-check name is stable. Branch protection requires both by name.
 - Concurrent runs on the same ref are cancelled — only the latest push completes.
 
 ---
