@@ -54,6 +54,18 @@ export type UserSettings = {
   evolutionCardsEnabled: boolean;    // show sprite; identify evolution chain
   reverseEvolutionCardsEnabled: boolean; // reverse-direction evolution edge cards (#343)
   reverseCardsEnabled: boolean;      // show name as prompt; reveal sprite
+  /**
+   * Master gate for alternate-form cards (#658). When false, form cards
+   * (regional variants, Megas, formes, etc.) are excluded from practice
+   * entirely and the "Alternate forms" section of ScopeControl is hidden.
+   * When true, form cards are eligible and the per-category filter in
+   * `practiceScope.formCategories` applies as normal.
+   *
+   * Defaults to false — the base Pokédex is already a large deck and forms
+   * are opt-in. Missing/non-boolean values in persisted JSON default to
+   * false (existing users lose forms from practice until they re-enable).
+   */
+  alternateFormsEnabled: boolean;
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
   playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
@@ -155,6 +167,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
   reverseCardsEnabled: false,
+  alternateFormsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
@@ -293,6 +306,12 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.reverseCardsEnabled === "boolean"
         ? obj.reverseCardsEnabled
         : DEFAULT_SETTINGS.reverseCardsEnabled,
+    // Defensive default: missing/non-boolean → false. Existing users lose form
+    // cards from practice until they opt in via the Settings toggle (#658).
+    alternateFormsEnabled:
+      typeof obj.alternateFormsEnabled === "boolean"
+        ? obj.alternateFormsEnabled
+        : DEFAULT_SETTINGS.alternateFormsEnabled,
     maxNewReversePerDay:
       typeof obj.maxNewReversePerDay === "number"
         ? obj.maxNewReversePerDay

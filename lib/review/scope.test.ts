@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  cardIsEligible,
   cardMatchesScope,
   isScopeEmpty,
   EMPTY_SCOPE,
@@ -633,5 +634,81 @@ describe("formCategories: mode:'all' (passthrough)", () => {
     // Alolan Raichu: speciesId=26 → Gen I → passes gens:[1]
     const alolan = formCard(10100, 26, "regional");
     expect(cardMatchesScope(alolan, scope)).toBe(true);
+  });
+});
+
+// ─── cardIsEligible — alternateFormsEnabled gate (#658) ─────────────────────
+
+describe("cardIsEligible: alternateFormsEnabled gate", () => {
+  const defaultCard = nameCard(26); // Raichu — default form
+  const formCardAlolan = formCard(10100, 26, "regional"); // Alolan Raichu
+
+  describe("gate OFF (alternateFormsEnabled: false)", () => {
+    it("default-form card is eligible even when gate is off", () => {
+      expect(cardIsEligible(defaultCard, EMPTY_SCOPE, false)).toBe(true);
+    });
+
+    it("form card is ineligible when gate is off, regardless of scope", () => {
+      // Empty scope — normally passes everything.
+      expect(cardIsEligible(formCardAlolan, EMPTY_SCOPE, false)).toBe(false);
+    });
+
+    it("form card is ineligible when gate is off even if scope formCategories is all", () => {
+      const scope = {
+        gens: [1],
+        types: [] as string[],
+        presets: [] as PracticeScopePreset[],
+        formCategories: { mode: "all" as const },
+      };
+      expect(cardIsEligible(formCardAlolan, scope, false)).toBe(false);
+    });
+
+    it("evolution card is eligible when gate is off (evolution cards are never forms)", () => {
+      const evo = evoCard(1500011, 4, 5); // Charmander → Charmeleon
+      expect(cardIsEligible(evo, EMPTY_SCOPE, false)).toBe(true);
+    });
+
+    it("reverse-evolution card is eligible when gate is off", () => {
+      const rev = reverseEvoCard(2500011, 4, 5);
+      expect(cardIsEligible(rev, EMPTY_SCOPE, false)).toBe(true);
+    });
+  });
+
+  describe("gate ON (alternateFormsEnabled: true)", () => {
+    it("form card is eligible when gate is on and scope is empty", () => {
+      expect(cardIsEligible(formCardAlolan, EMPTY_SCOPE, true)).toBe(true);
+    });
+
+    it("form card passes through to scope filter when gate is on", () => {
+      // Alolan Raichu (speciesId=26, Gen I) with gens:[1] scope → passes
+      const scope = {
+        gens: [1],
+        types: [] as string[],
+        presets: [] as PracticeScopePreset[],
+        formCategories: { mode: "all" as const },
+      };
+      expect(cardIsEligible(formCardAlolan, scope, true)).toBe(true);
+    });
+
+    it("form card is excluded by scope filter when gate is on but scope excludes it", () => {
+      // Alolan Raichu (Gen I) — excluded by gens:[2]
+      const scope = {
+        gens: [2],
+        types: [] as string[],
+        presets: [] as PracticeScopePreset[],
+        formCategories: { mode: "all" as const },
+      };
+      expect(cardIsEligible(formCardAlolan, scope, true)).toBe(false);
+    });
+
+    it("form card excluded by formCategories filter when gate is on and mode is default-only", () => {
+      const scope = {
+        gens: [] as number[],
+        types: [] as string[],
+        presets: [] as PracticeScopePreset[],
+        formCategories: { mode: "default-only" as const },
+      };
+      expect(cardIsEligible(formCardAlolan, scope, true)).toBe(false);
+    });
   });
 });

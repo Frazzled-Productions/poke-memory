@@ -132,6 +132,7 @@ describe('loadSettings migration', () => {
       seenStreakMilestones: [3, 7],
       earnedBadges: [{ id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' }],
       onboarding: { ...DEFAULT_ONBOARDING },
+      alternateFormsEnabled: true,
       ttsVoice: 'Daniel:en-GB',
       ttsRate: 1.5,
       ttsVolume: 0.75,
@@ -530,5 +531,38 @@ describe('themeIntensity setting (#411)', () => {
         settingsHintDismissed: true,
       });
     });
+  });
+});
+
+// ─── alternateFormsEnabled (#658) ───────────────────────────────────────────
+
+describe('alternateFormsEnabled (#658)', () => {
+  it('defaults to false on a fresh load (no localStorage)', () => {
+    expect(loadSettings().alternateFormsEnabled).toBe(false);
+  });
+
+  it('stored object missing alternateFormsEnabled defaults to false', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    expect(loadSettings().alternateFormsEnabled).toBe(false);
+  });
+
+  it('non-boolean alternateFormsEnabled falls back to false', () => {
+    for (const bad of [1, 'true', null, undefined, {}]) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, alternateFormsEnabled: bad }),
+      );
+      expect(loadSettings().alternateFormsEnabled).toBe(false);
+    }
+  });
+
+  it('round-trips true via saveSettings', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, alternateFormsEnabled: true });
+    expect(loadSettings().alternateFormsEnabled).toBe(true);
+  });
+
+  it('round-trips false via saveSettings', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, alternateFormsEnabled: false });
+    expect(loadSettings().alternateFormsEnabled).toBe(false);
   });
 });

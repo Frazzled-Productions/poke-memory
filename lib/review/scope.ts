@@ -214,6 +214,43 @@ export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): bo
 }
 
 /**
+ * Two-tier eligibility check (#658). Returns true when the card should surface
+ * in a practice session, applying the master `alternateFormsEnabled` gate
+ * **before** the `practiceScope` filter.
+ *
+ * Gate semantics:
+ *   - `alternateFormsEnabled: false` → any form card (`isDefaultForm === false`)
+ *     is excluded immediately, regardless of `practiceScope.formCategories`.
+ *   - `alternateFormsEnabled: true`  → form cards are eligible; the scope
+ *     filter (`cardMatchesScope`) applies as normal.
+ *
+ * Evolution and reverse-evolution cards are never treated as alternate forms
+ * by this gate — they represent the default-form pre-evo identity.
+ *
+ * Use this function as the single eligibility chokepoint in the session
+ * builder / scope-change handler instead of calling `cardMatchesScope` directly
+ * when the forms gate setting is available.
+ */
+export function cardIsEligible(
+  card: ReviewableCard,
+  scope: PracticeScope,
+  alternateFormsEnabled: boolean,
+): boolean {
+  // Gate: exclude all form cards when the master toggle is off.
+  if (!alternateFormsEnabled) {
+    if (
+      card.cardType !== "evolution" &&
+      card.cardType !== "reverse-evolution" &&
+      (card as { isDefaultForm?: boolean }).isDefaultForm === false
+    ) {
+      return false;
+    }
+  }
+  if (isScopeEmpty(scope)) return true;
+  return cardMatchesScope(card, scope);
+}
+
+/**
  * Count species in the seed pool that match the active scope. Returns
  * `seed.length` for the empty scope (the practice page's default).
  *

@@ -17,6 +17,12 @@ import {
 type Props = {
   scope: PracticeScope;
   onChange: (next: PracticeScope) => void;
+  /**
+   * When false (the default), the "Alternate forms" section is hidden entirely
+   * — the gate in Settings is the master switch. When true, the per-category
+   * filter is rendered as normal (#658).
+   */
+  alternateFormsEnabled?: boolean;
 };
 
 const GENS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -68,7 +74,7 @@ const SELECTED_ACCENT = "border-rose-500 bg-rose-500 text-white";
 const PILL_BASE =
   "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors";
 
-export function ScopeControl({ scope, onChange }: Props) {
+export function ScopeControl({ scope, onChange, alternateFormsEnabled = false }: Props) {
   const [open, setOpen] = useState(false);
   const active = !isScopeEmpty(scope);
   const matchCount = countMatchingSpecies(SEED_POKEMON, scope);
@@ -205,74 +211,79 @@ export function ScopeControl({ scope, onChange }: Props) {
             </div>
           </fieldset>
 
-          <fieldset>
-            <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Alternate forms
-            </legend>
-            <div className="mt-2 flex flex-col gap-2">
-              {(
-                [
-                  { value: "all", label: "Include all" },
-                  { value: "default-only", label: "Default form only" },
-                  { value: "include", label: "Choose categories…" },
-                ] as const
-              ).map(({ value, label }) => (
-                <label key={value} className="flex cursor-pointer items-center gap-2 text-xs">
-                  <input
-                    type="radio"
-                    name="form-filter-mode"
-                    value={value}
-                    checked={formFilter.mode === value}
-                    onChange={() => {
-                      if (value === "include") {
-                        setFormFilter({ mode: "include", categories: [] });
-                      } else {
-                        setFormFilter({ mode: value });
-                      }
-                    }}
-                    className="accent-rose-500"
-                  />
-                  <span className="text-zinc-700 dark:text-zinc-300">{label}</span>
-                </label>
-              ))}
-              {formFilter.mode === "include" && availableFormCategories.length > 0 ? (
-                <div className="ml-5 mt-1 flex flex-col gap-1.5">
-                  {availableFormCategories.map((cat) => {
-                    const checked =
-                      formFilter.mode === "include" && formFilter.categories.includes(cat);
-                    return (
-                      <label
-                        key={cat}
-                        className="flex cursor-pointer items-center gap-2 text-xs"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            if (formFilter.mode === "include") {
-                              setFormFilter({
-                                mode: "include",
-                                categories: toggleCategory(formFilter.categories, cat),
-                              });
-                            }
-                          }}
-                          className="accent-rose-500"
-                        />
-                        <span className="text-zinc-700 dark:text-zinc-300">
-                          {FORM_CATEGORY_LABELS[cat] ?? cat}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              ) : null}
-              {formFilter.mode === "include" && availableFormCategories.length === 0 ? (
-                <p className="ml-5 text-xs text-zinc-400 dark:text-zinc-500">
-                  No alternate forms in the current seed.
-                </p>
-              ) : null}
-            </div>
-          </fieldset>
+          {/* "Alternate forms" category filter — only shown when the master
+              gate in Settings is on. When it is off, the section is hidden
+              entirely because no form cards surface in practice (#658). */}
+          {alternateFormsEnabled ? (
+            <fieldset>
+              <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Alternate forms
+              </legend>
+              <div className="mt-2 flex flex-col gap-2">
+                {(
+                  [
+                    { value: "all", label: "Include all" },
+                    { value: "default-only", label: "Default form only" },
+                    { value: "include", label: "Choose categories…" },
+                  ] as const
+                ).map(({ value, label }) => (
+                  <label key={value} className="flex cursor-pointer items-center gap-2 text-xs">
+                    <input
+                      type="radio"
+                      name="form-filter-mode"
+                      value={value}
+                      checked={formFilter.mode === value}
+                      onChange={() => {
+                        if (value === "include") {
+                          setFormFilter({ mode: "include", categories: [] });
+                        } else {
+                          setFormFilter({ mode: value });
+                        }
+                      }}
+                      className="accent-rose-500"
+                    />
+                    <span className="text-zinc-700 dark:text-zinc-300">{label}</span>
+                  </label>
+                ))}
+                {formFilter.mode === "include" && availableFormCategories.length > 0 ? (
+                  <div className="ml-5 mt-1 flex flex-col gap-1.5">
+                    {availableFormCategories.map((cat) => {
+                      const checked =
+                        formFilter.mode === "include" && formFilter.categories.includes(cat);
+                      return (
+                        <label
+                          key={cat}
+                          className="flex cursor-pointer items-center gap-2 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              if (formFilter.mode === "include") {
+                                setFormFilter({
+                                  mode: "include",
+                                  categories: toggleCategory(formFilter.categories, cat),
+                                });
+                              }
+                            }}
+                            className="accent-rose-500"
+                          />
+                          <span className="text-zinc-700 dark:text-zinc-300">
+                            {FORM_CATEGORY_LABELS[cat] ?? cat}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : null}
+                {formFilter.mode === "include" && availableFormCategories.length === 0 ? (
+                  <p className="ml-5 text-xs text-zinc-400 dark:text-zinc-500">
+                    No alternate forms in the current seed.
+                  </p>
+                ) : null}
+              </div>
+            </fieldset>
+          ) : null}
 
           <div className="flex flex-col gap-1 border-t border-zinc-200 pt-3 dark:border-zinc-800">
             <p

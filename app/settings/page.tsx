@@ -356,6 +356,7 @@ const ALL_ANCHOR_IDS = [
   "name-cards-heading",
   "evolution-cards-heading",
   "reverse-evolution-heading",
+  "alternate-forms-heading",
   "reverse-heading",
   "cry-heading",
   "onboarding-heading",
@@ -380,6 +381,7 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "name-cards-heading": "practice-heading",
   "evolution-cards-heading": "practice-heading",
   "reverse-evolution-heading": "practice-heading",
+  "alternate-forms-heading": "practice-heading",
   "reverse-heading": "practice-heading",
   "cry-heading": "audio-heading",
   "onboarding-heading": "account-data-heading",
@@ -949,6 +951,43 @@ export default function SettingsPage() {
                         <span
                           className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
                             settings.reverseEvolutionCardsEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Alternate forms (#658) */}
+                <div id="alternate-forms-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Alternate forms
+                  </p>
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Include alternate forms in practice
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Regional forms, Megas and other variants. Off by default — the base Pokédex is already a large deck.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-label="Include alternate forms in practice"
+                        aria-checked={settings.alternateFormsEnabled}
+                        onClick={() => handleToggle("alternateFormsEnabled")}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                          settings.alternateFormsEnabled
+                            ? "bg-foreground"
+                            : "bg-zinc-300 dark:bg-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                            settings.alternateFormsEnabled ? "translate-x-5" : "translate-x-0"
                           }`}
                         />
                       </button>

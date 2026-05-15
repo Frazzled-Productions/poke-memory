@@ -63,3 +63,38 @@ test.describe("Settings page — collapsible sections (#660)", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Settings page — alternate forms toggle (#658)", () => {
+  test("alternate forms toggle is present and off by default in Practice section", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    // Expand "Practice".
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    // The toggle must be visible.
+    const toggle = page.getByRole("switch", {
+      name: /include alternate forms in practice/i,
+    });
+    await expect(toggle).toBeVisible();
+
+    // Default state is off (aria-checked="false").
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("toggling alternate forms on causes it to report as checked", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    const toggle = page.getByRole("switch", {
+      name: /include alternate forms in practice/i,
+    });
+
+    // Click to enable.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+  });
+});

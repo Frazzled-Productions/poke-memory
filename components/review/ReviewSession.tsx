@@ -54,6 +54,7 @@ import { formatDailySummary } from "@/lib/review/share";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import {
   EMPTY_SCOPE,
+  cardIsEligible,
   cardMatchesScope,
   isScopeEmpty,
   type PracticeScope,
@@ -69,6 +70,7 @@ const LEARN_AHEAD_MS = 20 * 60_000;
 // Module-scoped seed lookup map. Built once at module load — the 1025-entry
 // Map would be wasteful to rebuild on every render of ReviewSession.
 const SEED_BY_ID = new Map(SEED_POKEMON.map((p) => [p.id, p]));
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -376,6 +378,7 @@ export function ReviewSession() {
   const [reverseEvolutionEnabled, setReverseEvolutionEnabled] = useState(false);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
+  const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [grading, setGrading] = useState(false);
   // Transient flag: user chose "Keep reviewing" at the soft wall.
@@ -433,11 +436,14 @@ export function ReviewSession() {
     if (cards !== null) {
       const today = todayString(new Date());
       reconcileHiddenState(cards, next, today);
-      const eligibleIds = isScopeEmpty(next)
-        ? new Set(cards.map((c) => c.id))
-        : new Set(
-            cards.filter((c) => cardMatchesScope(c, next)).map((c) => c.id),
-          );
+      // `alternateFormsEnabled` is captured from component state set at mount.
+      // The Settings page triggers a full page reload when toggling card-type
+      // gates, so the state is always current here.
+      const eligibleIds = new Set(
+        cards
+          .filter((c) => cardIsEligible(c, next, alternateFormsEnabled))
+          .map((c) => c.id),
+      );
       setEligibleCardIds(eligibleIds);
       void saveSession({ cards, limits }).then(notifySaveResult);
     }
@@ -553,13 +559,16 @@ export function ReviewSession() {
       // queue builder sees it; persist any state changes (set/clear of
       // hiddenSince and any forward-shift of dueDate on un-hide).
       const persistedScope = settings.practiceScope;
+      const formsEnabled = settings.alternateFormsEnabled;
       const today = todayString(now);
       reconcileHiddenState(sessionCards, persistedScope, today);
-      const eligibleIds = isScopeEmpty(persistedScope)
-        ? new Set(sessionCards.map((c) => c.id))
-        : new Set(
-            sessionCards.filter((c) => cardMatchesScope(c, persistedScope)).map((c) => c.id),
-          );
+      // Two-tier eligibility: `alternateFormsEnabled` gate first, then scope
+      // filter (#658). `cardIsEligible` encapsulates both checks.
+      const eligibleIds = new Set(
+        sessionCards
+          .filter((c) => cardIsEligible(c, persistedScope, formsEnabled))
+          .map((c) => c.id),
+      );
       // Persist whenever scope is active so reconciliation results survive a
       // reload. When scope is empty, the only thing reconcileHiddenState can do
       // is clear stale hiddenSince — still worth persisting if any cleared.
@@ -571,6 +580,7 @@ export function ReviewSession() {
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
       setNameCardsEnabled(nameEnabled);
       setEvolutionCardsEnabled(evolutionEnabled);
+      setAlternateFormsEnabled(formsEnabled);
       setScope(persistedScope);
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
@@ -1278,7 +1288,7 @@ export function ReviewSession() {
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
         <div className="flex w-full max-w-xl flex-col gap-2">
-          <ScopeControl scope={scope} onChange={handleScopeChange} />
+          <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
         </div>
         {revealed ? (
           <PokemonCard
@@ -1373,7 +1383,7 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-        <ScopeControl scope={scope} onChange={handleScopeChange} />
+        <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
         <SpritePicker
           key={`${effectiveCard.id}-${cardPresentationCount}`}
           targetPokemon={reverseTarget}
@@ -1409,7 +1419,7 @@ export function ReviewSession() {
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-8">
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-      <ScopeControl scope={scope} onChange={handleScopeChange} />
+      <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
       {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard
           preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
