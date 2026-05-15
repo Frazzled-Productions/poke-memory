@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { NavLinks, NavLinksFallback } from "./NavLinks";
-import { NavDrawer, NavDrawerFallback } from "./NavDrawer";
 import { FavouriteMascot } from "./theme/FavouriteMascot";
+import { MobileNavSlot } from "@/components/MobileNavSlot";
 
 export function Nav() {
   return (
@@ -30,10 +30,8 @@ export function Nav() {
           </Suspense>
         </div>
 
-        {/* Mobile hamburger + drawer — hidden at md and above */}
-        <Suspense fallback={<NavDrawerFallback />}>
-          <NavDrawer />
-        </Suspense>
+        {/* Mobile slot — hamburger or auth cluster depending on mobileNav setting */}
+        <MobileNavSlot />
       </nav>
     </header>
   );

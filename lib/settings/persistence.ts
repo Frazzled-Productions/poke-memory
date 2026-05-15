@@ -44,6 +44,16 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   settingsHintDismissed: false,
 };
 
+/**
+ * Mobile navigation style (#661). Controls which mobile nav surface is shown
+ * below the `md` breakpoint.
+ * - `'bottom'` — fixed bottom tab bar (new default for new users).
+ * - `'hamburger'` — slide-in drawer triggered by a hamburger button in the header
+ *   (the classic style; kept as the default for existing users who already have
+ *   a settings record without this field).
+ */
+export type MobileNav = "bottom" | "hamburger";
+
 export type UserSettings = {
   masteryRepetitions: number;        // cards with this many consecutive correct reviews = mastered
   maxNewPerDay: number;              // hard daily cap for new name cards
@@ -127,6 +137,12 @@ export type UserSettings = {
   /** ISO timestamp of the last successful weight optimization run (#268). */
   fsrsWeightsOptimizedAt?: string;
   /**
+   * Mobile navigation style (#661). `'bottom'` = fixed tab bar (new-user
+   * default); `'hamburger'` = slide-in drawer (existing-user default for
+   * records that pre-date this field). See `MobileNav` type.
+   */
+  mobileNav: MobileNav;
+  /**
    * TTS voice URI (#429). When non-null, `speakName` looks up the voice by
    * `SpeechSynthesisVoice.voiceURI` and pins the utterance to it. Falls back
    * to the auto-picked preferred voice if the URI is not found (voice list
@@ -183,6 +199,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   seenStreakMilestones: [],
   earnedBadges: [],
   onboarding: DEFAULT_ONBOARDING,
+  // New users get the bottom tab bar; existing users who have a settings record
+  // without this field are migrated to 'hamburger' in parseStoredSettings.
+  mobileNav: "bottom" as MobileNav,
   ttsVoice: null,
   ttsRate: 1,
   ttsVolume: 1,
@@ -382,6 +401,14 @@ function parseStoredSettings(raw: string | null): UserSettings {
       obj.dateFormat === "iso" || obj.dateFormat === "dmy" || obj.dateFormat === "mdy"
         ? obj.dateFormat
         : DEFAULT_SETTINGS.dateFormat,
+    // Existing-user migration (#661): a record that pre-dates this field will
+    // have no `mobileNav` key. To preserve their experience, default to
+    // 'hamburger' (what they had before). A brand-new user (raw === null) never
+    // reaches this branch — they get DEFAULT_SETTINGS which is 'bottom'.
+    mobileNav:
+      obj.mobileNav === "bottom" || obj.mobileNav === "hamburger"
+        ? obj.mobileNav
+        : "hamburger",
   };
 }
 

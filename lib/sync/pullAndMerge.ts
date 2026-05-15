@@ -10,7 +10,7 @@ import { pullGradeLog, mergeGradeLog } from "@/lib/sync/gradeLog";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
-import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { DEFAULT_SETTINGS, hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import {
   loadStreakData,
   saveStreakData,
@@ -161,7 +161,11 @@ export async function pullAndMerge(
       const legacyNeverApplied =
         pulledRow.updatedAt === null && syncStatus.lastSettingsPullAt === null;
       if (!localHadSettings || cloudIsNewer || legacyNeverApplied) {
-        saveSettings(pulledRow.settings);
+        // Normalise before writing: a cloud row that pre-dates a field (e.g.
+        // mobileNav) would store an incomplete object and trigger a two-load
+        // inconsistency until the next loadSettings() call. Spreading over
+        // DEFAULT_SETTINGS ensures the stored blob is always complete.
+        saveSettings({ ...DEFAULT_SETTINGS, ...pulledRow.settings });
       }
       if (pulledRow.updatedAt !== null) {
         nextLastSettingsPullAt = pulledRow.updatedAt;

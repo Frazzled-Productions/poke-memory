@@ -28,7 +28,7 @@ import {
   saveFavourite,
   isFavouriteEarned,
 } from "@/lib/theme/persistence";
-import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { saveStreakData } from "@/lib/streak/persistence";
 import { saveGradeLog } from "@/lib/gradelog/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
@@ -128,7 +128,11 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           // Apply settings first so the seed opts pick up cloud-side card-type
           // flags (#391 lesson).
           if (pulledSettings !== null) {
-            saveSettings(pulledSettings.settings);
+            // Normalise before writing: a cloud row that pre-dates a field (e.g.
+            // mobileNav) would store an incomplete object and trigger a two-load
+            // inconsistency until the next loadSettings() call. Spreading over
+            // DEFAULT_SETTINGS ensures the stored blob is always complete.
+            saveSettings({ ...DEFAULT_SETTINGS, ...pulledSettings.settings });
           }
           // Regional prefs overlay runs ONLY if the JSONB pull succeeded —
           // otherwise the loadSettings() base is the QA-dirty local snapshot,

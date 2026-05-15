@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb } from "./helpers/seedIdb";
+import { getPrimaryNavContainer } from "./helpers/navHelpers";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -82,22 +83,12 @@ test.describe("Pasture nav guard", () => {
 
     await page.goto("/");
 
-    // On mobile the Pasture link is inside the hamburger drawer; open it first.
-    const hamburger = page.locator('[aria-controls="mobile-nav-drawer"]');
-    const isMobile = testInfo.project.name === "mobile-safari";
-    if (isMobile) {
-      await hamburger.click();
-      const drawer = page.getByRole("dialog", { name: "Navigation menu" });
-      await expect(drawer).toBeVisible();
-      const pastureLink = drawer.getByRole("link", { name: "Pasture" });
-      await expect(pastureLink).toBeVisible();
-      await pastureLink.click();
-    } else {
-      const nav = page.getByRole("navigation", { name: "Main navigation" });
-      const pastureLink = nav.getByRole("link", { name: "Pasture" });
-      await expect(pastureLink).toBeVisible();
-      await pastureLink.click();
-    }
+    // On mobile the Pasture link is in the bottom tab bar (the new default for
+    // fresh users). On desktop it lives in the main navigation header row.
+    const nav = getPrimaryNavContainer(page, testInfo);
+    const pastureLink = nav.getByRole("link", { name: "Pasture" });
+    await expect(pastureLink).toBeVisible();
+    await pastureLink.click();
 
     await expect(page).toHaveURL("/pasture");
   });

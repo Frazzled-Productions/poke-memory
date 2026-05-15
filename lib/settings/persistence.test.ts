@@ -100,10 +100,13 @@ describe('loadSettings migration', () => {
     expect(settings.evolutionCardsEnabled).toBe(true);
   });
 
-  it('empty stored object (non-null but no fields) returns all DEFAULT_SETTINGS values', () => {
+  it('empty stored object (non-null but no fields) returns DEFAULT_SETTINGS values, except mobileNav which defaults to hamburger for existing users', () => {
     mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
     const settings = loadSettings();
-    expect(settings).toEqual(DEFAULT_SETTINGS);
+    // mobileNav defaults to 'hamburger' for existing records without the field
+    // (preserving the pre-#661 experience for existing users). All other fields
+    // match DEFAULT_SETTINGS.
+    expect(settings).toEqual({ ...DEFAULT_SETTINGS, mobileNav: 'hamburger' });
   });
 
   it('saveSettings + loadSettings round-trips all settings correctly', () => {
@@ -138,6 +141,7 @@ describe('loadSettings migration', () => {
       ttsVolume: 0.75,
       timezone: 'Europe/London',
       dateFormat: 'dmy' as const,
+      mobileNav: 'bottom' as const,
     };
     saveSettings(custom);
     const loaded = loadSettings();

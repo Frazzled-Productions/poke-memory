@@ -4,39 +4,19 @@ import { seedSessionIdb } from "./helpers/seedIdb";
 test.describe("Navigation", () => {
   test("nav links are visible and navigate between pages", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     await expect(nav).toBeVisible();
 
-    // On mobile the links are behind a hamburger menu; open it first if present.
-    const hamburger = page.getByRole("button", { name: "Open navigation menu" });
-    const isHamburgerVisible = await hamburger.isVisible().catch(() => false);
-
     /**
      * Helper: resolve the link container. On desktop the links live directly
-     * in the main nav; on mobile they are inside the drawer dialog.
-     *
-     * After clicking the hamburger the drawer animates in (200 ms CSS
-     * transition). We wait for it to be visible in the accessibility tree
-     * before returning so the caller can `.click()` links immediately.
+     * in the main nav header row. On mobile they live in the fixed bottom tab
+     * bar (aria-label "Mobile tab navigation").
      */
-    async function getNavLinkContainer() {
-      if (isHamburgerVisible) {
-        const dialog = page.getByRole("dialog", { name: "Navigation menu" });
-        // Open the drawer if it isn't already open.
-        const drawerHidden = await dialog.isHidden().catch(() => true);
-        if (drawerHidden) {
-          await hamburger.click();
-          // Wait for the drawer panel to become accessible (aria-hidden cleared)
-          // before returning the locator. Using the raw DOM id avoids the
-          // chicken-and-egg problem of getByRole ignoring aria-hidden elements.
-          await expect(page.locator("#mobile-nav-drawer")).not.toHaveAttribute(
-            "aria-hidden",
-            "true",
-          );
-        }
-        return dialog;
+    function getNavLinkContainer() {
+      if (testInfo.project.name === "mobile-safari") {
+        return page.getByRole("navigation", { name: "Mobile tab navigation" });
       }
       return nav;
     }
@@ -46,7 +26,7 @@ test.describe("Navigation", () => {
       { label: "Pokédex", path: "/pokedex" },
       { label: "Settings", path: "/settings" },
     ]) {
-      const container = await getNavLinkContainer();
+      const container = getNavLinkContainer();
       await container.getByRole("link", { name: label }).click();
       await expect(page).toHaveURL(path);
       await expect(
@@ -55,7 +35,7 @@ test.describe("Navigation", () => {
     }
 
     // Navigate back to practice
-    const container = await getNavLinkContainer();
+    const container = getNavLinkContainer();
     await container.getByRole("link", { name: "Practice" }).click();
     await expect(page).toHaveURL("/");
   });

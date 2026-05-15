@@ -81,6 +81,7 @@ const VALID_SETTINGS: UserSettings = {
   ttsVolume: 1,
   timezone: null,
   dateFormat: null,
+  mobileNav: "bottom" as const,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

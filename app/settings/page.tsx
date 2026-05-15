@@ -357,6 +357,7 @@ const TOP_LEVEL_SECTION_IDS = [
 const ALL_ANCHOR_IDS = [
   ...TOP_LEVEL_SECTION_IDS,
   "theme-heading",
+  "mobile-nav-heading",
   "scheduler-heading",
   "name-cards-heading",
   "evolution-cards-heading",
@@ -382,6 +383,7 @@ type TopLevelId = typeof TOP_LEVEL_SECTION_IDS[number];
  */
 const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "theme-heading": "appearance-heading",
+  "mobile-nav-heading": "appearance-heading",
   "scheduler-heading": "practice-heading",
   "name-cards-heading": "practice-heading",
   "evolution-cards-heading": "practice-heading",
@@ -717,6 +719,48 @@ export default function SettingsPage() {
                     saveSettings(updated);
                   }}
                 />
+
+                {/* Mobile navigation style (#661) — bottom tab bar vs hamburger */}
+                <div id="mobile-nav-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Mobile navigation
+                  </p>
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Bottom tab bar
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Show a fixed tab bar at the bottom of the screen on mobile. Turn off to use the classic hamburger menu instead. Has no effect on wide screens.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-label="Bottom tab bar"
+                        aria-checked={settings.mobileNav === "bottom"}
+                        onClick={() => {
+                          const next = settings.mobileNav === "bottom" ? "hamburger" as const : "bottom" as const;
+                          const updated: UserSettings = { ...settings, mobileNav: next };
+                          setSettings(updated);
+                          saveSettings(updated);
+                        }}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                          settings.mobileNav === "bottom"
+                            ? "bg-foreground"
+                            : "bg-zinc-300 dark:bg-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                            settings.mobileNav === "bottom" ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </CollapsibleSection>
               )}
 

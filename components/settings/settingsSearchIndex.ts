@@ -31,6 +31,12 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "app theme",
       "intensity",
       "accent",
+      "mobile navigation",
+      "bottom tab bar",
+      "hamburger menu",
+      "hamburger",
+      "tab bar",
+      "nav style",
     ],
   },
   {
