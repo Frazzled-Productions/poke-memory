@@ -90,6 +90,30 @@ export default function PasturePage() {
     void load();
   }, [storageVersion]);
 
+  // Derive mastered count so the reset-on-empty effect below can read it
+  // without duplicating the full derivation logic.
+  const masteredCount = !loaded
+    ? null
+    : flags.pretendAllMastered
+      ? SEED_POKEMON.length
+      : session
+        ? filterMastered(session.cards, false).length
+        : 0;
+
+  // Reset the search query whenever the mastered set transitions to empty
+  // (e.g. storage clear, sign-out triggering a reload). Guard on `loaded` so
+  // we never clear a query on the initial render before data arrives, and
+  // guard on `searchQuery` so we skip the effect when there is nothing to
+  // clear (avoids unnecessary state updates).
+  useEffect(() => {
+    if (loaded && masteredCount === 0 && searchQuery !== "") {
+      setSearchQuery("");
+    }
+    // masteredCount and loaded are the meaningful signals; searchQuery is read
+    // for the guard but should not re-trigger the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, masteredCount]);
+
   const handleMarkSeen = useCallback(
     async (cardId: number) => {
       if (!session) return;

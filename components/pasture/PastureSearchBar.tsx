@@ -17,7 +17,7 @@ export function PastureSearchBar({ query, onChange }: Props) {
       </label>
       <input
         id="pasture-search"
-        type="search"
+        type="text"
         value={query}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search Pokémon…"
