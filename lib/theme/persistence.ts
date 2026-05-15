@@ -18,6 +18,20 @@ const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]
 
 export type StoredFavourite = StoredFavouriteTheme;
 
+// True when `value` is an absolute https URL whose host is exactly
+// raw.githubusercontent.com. Used to detect legacy remote sprite URLs that
+// predate self-hosting; an exact host match avoids treating a look-alike host
+// (e.g. `raw.githubusercontent.com.evil.example`) as a GitHub URL.
+function isRawGithubUserContentUrl(value: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === "https:" && parsed.hostname === "raw.githubusercontent.com";
+}
+
 // Validate a raw shape against the StoredFavourite schema. Returns the
 // validated object (with the canonical name from CURATED_POKEMON) or null if
 // validation fails. Pure — takes a value, returns a value. Used for both
@@ -50,8 +64,10 @@ function validateRawFavourite(value: unknown): StoredFavourite | null {
   const rawSpriteUrl = typeof obj.spriteUrl === "string" ? obj.spriteUrl : null;
   // Migrate legacy remote sprite URLs stored before sprites were self-hosted.
   // raw.githubusercontent.com is no longer in next.config.ts remotePatterns.
+  // Parse and match the host exactly — a substring check would also match a
+  // look-alike host like `raw.githubusercontent.com.evil.example`.
   const needsRemoteMigration =
-    rawSpriteUrl !== null && rawSpriteUrl.startsWith("https://raw.githubusercontent.com");
+    rawSpriteUrl !== null && isRawGithubUserContentUrl(rawSpriteUrl);
   const spriteUrl = needsRemoteMigration ? `/sprites/pokemon/${obj.id}.png` : rawSpriteUrl;
   return {
     id: obj.id,
