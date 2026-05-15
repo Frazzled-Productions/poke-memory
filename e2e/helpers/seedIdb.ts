@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+// Co-located here intentionally: there is no single E2E setup file, so placing
+// this in a .d.ts would risk it being silently dropped. Keep it with the helper.
 declare global {
   interface Window {
     __seedIdbReady?: Promise<void>;
@@ -48,6 +50,7 @@ export async function seedIdb(
         }
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(new Error("IDB transaction aborted"));
       };
     });
   }, { entries });
@@ -60,12 +63,18 @@ export async function seedIdb(
  * `seedIdb`/`seedSessionIdb`. This eliminates the race window between the IDB
  * write and React hydration reading IndexedDB.
  *
- * Safe to call on an unseeded page — resolves immediately if the init script
- * was never registered.
+ * Must be called after `seedIdb` has been registered via `page.addInitScript`.
+ * If called before `seedIdb` (or on an unseeded page), it logs a warning and
+ * resolves immediately — giving a false green on any race it was meant to catch.
  */
 export async function awaitSeedIdb(page: Page): Promise<void> {
   await page.evaluate(() => {
-    if (!window.__seedIdbReady) return;
+    if (!window.__seedIdbReady) {
+      console.warn(
+        "awaitSeedIdb: __seedIdbReady is not set — seedIdb must be called before page.goto",
+      );
+      return Promise.resolve();
+    }
     return window.__seedIdbReady;
   });
 }
