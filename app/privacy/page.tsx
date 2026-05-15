@@ -115,19 +115,54 @@ export default function PrivacyPage() {
           </h3>
           <p>
             If you sign in, your application preferences (daily review limits,
-            practice scope, theme, etc.) are also synchronised so they persist
-            across devices.
+            practice scope, theme, timezone, etc.) are also synchronised so
+            they persist across devices.
+          </p>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            Daily review activity (authenticated users)
+          </h3>
+          <p>
+            We record which calendar dates you completed at least one review.
+            This is stored in a <code>streak_days</code> table and used to
+            calculate your review streak. It is an append-only log — dates are
+            never removed except by a full progress reset.
+          </p>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            Grade event log (authenticated users)
+          </h3>
+          <p>
+            Each time you grade a card we append a row to a{" "}
+            <code>grade_log</code> table recording the card type, subject
+            identifier, the grade you chose, the entry date, and the precise
+            timestamp it occurred (<code>occurred_at</code>). This log is used
+            to compute per-user FSRS optimiser weights and review statistics. It
+            is append-only — individual entries are never mutated or deleted
+            except by a full progress reset.
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
             Aggregate analytics (all users)
           </h3>
           <p>
-            Vercel Analytics and Speed Insights collect anonymous, cookieless,
-            aggregate metrics: page path, referrer, country, device type, and
-            Core Web Vitals. This data does not include card progress, review
-            history, or any personally identifying information. It goes to
-            Vercel&rsquo;s infrastructure, not ours.
+            Vercel Analytics and Speed Insights collect anonymous, aggregate
+            metrics: page path, referrer, country, device type, and Core Web
+            Vitals. This data does not include card progress, review history, or
+            any personally identifying information. It goes to Vercel&rsquo;s
+            infrastructure, not ours.
+          </p>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            Authentication cookie (signed-in users only)
+          </h3>
+          <p>
+            When you sign in, Supabase Auth sets an HTTP-only session cookie
+            containing a signed JWT that keeps you authenticated across requests.
+            This cookie is strictly necessary for the signed-in service to
+            function — it is not used for tracking or advertising, and it is not
+            set in guest mode. No consent banner is required for a
+            strictly-necessary cookie, but we disclose it here for transparency.
           </p>
         </section>
 
@@ -228,16 +263,18 @@ export default function PrivacyPage() {
                     Postgres database for authenticated users
                   </td>
                   <td className="py-2">
-                    Per-card review state and settings (authenticated users
-                    only)
+                    Per-card review state, daily activity dates, grade event
+                    log, settings, and auth session (authenticated users only)
                   </td>
                 </tr>
                 <tr>
                   <td className="py-2 pr-4 font-medium">GitHub (OAuth)</td>
                   <td className="py-2 pr-4">Sign-in provider</td>
                   <td className="py-2">
-                    Opaque user identifier returned after OAuth — we do not
-                    store your GitHub username or email
+                    The OAuth token exchange is handled server-side by Supabase
+                    Auth — the app itself never sees the OAuth token. We receive
+                    only the opaque user identifier; we do not store your GitHub
+                    username or email
                   </td>
                 </tr>
               </tbody>
@@ -275,8 +312,9 @@ export default function PrivacyPage() {
             7. How long do we keep your data?
           </h2>
           <p>
-            Your review history is retained for as long as your account is
-            active. If you delete your account or request erasure (see{" "}
+            Your review history, daily activity log, grade event log, and
+            settings are retained for as long as your account is active. If you
+            delete your account or request erasure (see{" "}
             <a
               href="#section-rights"
               className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
@@ -284,9 +322,9 @@ export default function PrivacyPage() {
               Your rights
             </a>
             ), all rows associated with your user identifier are permanently
-            deleted from Supabase via a cascading delete. We do not keep
-            backups beyond Supabase&rsquo;s own retention window, which is
-            subject to your Supabase-tier plan.
+            deleted from Supabase via a cascading delete. There is currently no
+            separate point-in-time backup retained for this project, so deletion
+            is effectively immediate and permanent.
           </p>
         </section>
 
@@ -319,9 +357,20 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Data portability</strong> — receive your data in a
-              structured, machine-readable format. Use the{" "}
-              <em>Export progress</em> option on the Settings page to download
-              your review history as JSON at any time.
+              structured, machine-readable format. The{" "}
+              <em>Export progress</em> option on the Settings page downloads
+              your locally-cached review history as JSON. Note that this export
+              reflects the data held in your browser&rsquo;s local storage, not
+              necessarily the full authoritative copy in the cloud. If you are
+              signed in and require a complete copy of the data we hold for you
+              in Supabase, please contact us at{" "}
+              <a
+                href="mailto:fbrookhouse@gmail.com"
+                className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              >
+                fbrookhouse@gmail.com
+              </a>{" "}
+              and we will provide a full export.
             </li>
             <li>
               <strong>Objection</strong> — object to processing carried out
