@@ -51,6 +51,7 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - 'next.config.ts'
+              - '.github/workflows/ci.yml'
       - name: Decide outputs (force true on push to main)
         id: decide
         run: |
@@ -111,8 +112,17 @@ jobs:
     # deployment_status-triggered e2e.yml remains as a redundant preview-mode
     # signal, but this job is the one to mark required in the main-protection
     # ruleset.
+    #
+    # Runs inside the official Playwright container: browsers and their system
+    # deps are baked in, so there is no `playwright install --with-deps` step
+    # and therefore no `apt-get` against the flaky azure.archive.ubuntu.com
+    # mirror (#644). The image tag MUST track the @playwright/test version
+    # resolved in package-lock.json — the image ships Node 24, matching the
+    # test job.
     needs: [changes, test]
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
     timeout-minutes: 20
     permissions:
       contents: read
@@ -122,11 +132,14 @@ jobs:
         run: echo "No e2e-relevant changes detected — skipping Playwright suite."
       - uses: actions/checkout@v6
         if: needs.changes.outputs.e2e_relevant == 'true'
-      - uses: actions/setup-node@v6
+      - name: Cache npm
         if: needs.changes.outputs.e2e_relevant == 'true'
+        uses: actions/cache@v4
         with:
-          node-version: '24'
-          cache: 'npm'
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
       - run: npm ci
         if: needs.changes.outputs.e2e_relevant == 'true'
       - name: Download .next build from test job
@@ -135,9 +148,6 @@ jobs:
         with:
           name: next-build
           path: .next/
-      - name: Install Playwright browsers
-        if: needs.changes.outputs.e2e_relevant == 'true'
-        run: npx playwright install --with-deps chromium webkit
       - name: Start Next.js and run Playwright
         if: needs.changes.outputs.e2e_relevant == 'true'
         env:
