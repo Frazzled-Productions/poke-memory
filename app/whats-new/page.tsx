@@ -4,8 +4,9 @@ import { BulletText } from "@/components/whats-new/BulletText";
 import { MarkVisited } from "@/components/whats-new/MarkVisited";
 
 export const metadata: Metadata = {
-  title: "What's new — Poké Memory",
-  description: "Recent updates to poke-memory.",
+  title: "What's New — Poké Memory",
+  description:
+    "Recent updates to Poké Memory: new features, improvements, and bug fixes.",
 };
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";

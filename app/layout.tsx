@@ -28,8 +28,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://pokememory.com"),
   title: "Poké Memory",
-  description: "Spaced-repetition Pokémon flashcards",
+  description:
+    "Learn every Pokémon's name and evolutions with spaced repetition. Free, no sign-up required.",
   appleWebApp: {
     title: "Poké Memory",
     statusBarStyle: "black-translucent",
