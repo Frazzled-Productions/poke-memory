@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import {
   loadDailySummary,
   saveDailySummary,
-  mergeDailySummary,
   type DailySummaryRecord,
 } from "./dailySummaryPersistence";
 
@@ -71,6 +70,12 @@ describe("loadDailySummary", () => {
     localStorageMock.setItem(STORAGE_KEY, JSON.stringify({ date: TODAY }));
     expect(loadDailySummary("UTC")).toBeNull();
   });
+
+  it("returns null when gradeSequence contains invalid grade values", () => {
+    const corrupted = { ...freshRecord, gradeSequence: [4, 3, 5] };
+    localStorageMock.setItem(STORAGE_KEY, JSON.stringify(corrupted));
+    expect(loadDailySummary("UTC")).toBeNull();
+  });
 });
 
 describe("saveDailySummary", () => {
@@ -80,60 +85,3 @@ describe("saveDailySummary", () => {
   });
 });
 
-describe("mergeDailySummary", () => {
-  it("creates a fresh record when existing is null", () => {
-    const result = mergeDailySummary(null, {
-      gradeSequence: [4, 5],
-      newCards: 2,
-      mastered: 1,
-      date: TODAY,
-    });
-    expect(result).toEqual({
-      date: TODAY,
-      gradeSequence: [4, 5],
-      reviewed: 2,
-      newCards: 2,
-      mastered: 1,
-    });
-  });
-
-  it("appends grade sequence and sums counters when existing is non-null", () => {
-    const existing: DailySummaryRecord = {
-      date: TODAY,
-      gradeSequence: [4, 5],
-      reviewed: 2,
-      newCards: 1,
-      mastered: 0,
-    };
-    const result = mergeDailySummary(existing, {
-      gradeSequence: [1, 2],
-      newCards: 2,
-      mastered: 1,
-      date: TODAY,
-    });
-    expect(result).toEqual({
-      date: TODAY,
-      gradeSequence: [4, 5, 1, 2],
-      reviewed: 4,
-      newCards: 3,
-      mastered: 1,
-    });
-  });
-
-  it("uses the existing date, not the session date, when merging", () => {
-    const existing: DailySummaryRecord = {
-      date: TODAY,
-      gradeSequence: [4],
-      reviewed: 1,
-      newCards: 1,
-      mastered: 0,
-    };
-    const result = mergeDailySummary(existing, {
-      gradeSequence: [5],
-      newCards: 0,
-      mastered: 0,
-      date: "2026-05-14",
-    });
-    expect(result.date).toBe(TODAY);
-  });
-});

@@ -17,14 +17,18 @@ export function loadDailySummary(timezone: string): DailySummaryRecord | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw === null) return null;
     const parsed = JSON.parse(raw) as unknown;
+    const p = parsed as Record<string, unknown>;
     if (
       typeof parsed !== "object" ||
       parsed === null ||
-      typeof (parsed as Record<string, unknown>).date !== "string" ||
-      !Array.isArray((parsed as Record<string, unknown>).gradeSequence) ||
-      typeof (parsed as Record<string, unknown>).reviewed !== "number" ||
-      typeof (parsed as Record<string, unknown>).newCards !== "number" ||
-      typeof (parsed as Record<string, unknown>).mastered !== "number"
+      typeof p.date !== "string" ||
+      !Array.isArray(p.gradeSequence) ||
+      !(p.gradeSequence as unknown[]).every(
+        (v) => v === 1 || v === 2 || v === 4 || v === 5,
+      ) ||
+      typeof p.reviewed !== "number" ||
+      typeof p.newCards !== "number" ||
+      typeof p.mastered !== "number"
     ) {
       return null;
     }
@@ -44,32 +48,4 @@ export function saveDailySummary(record: DailySummaryRecord): void {
     // QuotaExceededError — non-fatal, share button just won't survive a reload.
     console.warn("poke-memory: failed to persist daily summary", e);
   }
-}
-
-export function mergeDailySummary(
-  existing: DailySummaryRecord | null,
-  session: {
-    gradeSequence: Grade[];
-    newCards: number;
-    mastered: number;
-    date: string;
-  },
-): DailySummaryRecord {
-  if (existing === null) {
-    return {
-      date: session.date,
-      gradeSequence: session.gradeSequence,
-      reviewed: session.gradeSequence.length,
-      newCards: session.newCards,
-      mastered: session.mastered,
-    };
-  }
-  const merged = [...existing.gradeSequence, ...session.gradeSequence];
-  return {
-    date: existing.date,
-    gradeSequence: merged,
-    reviewed: merged.length,
-    newCards: existing.newCards + session.newCards,
-    mastered: existing.mastered + session.mastered,
-  };
 }

@@ -54,7 +54,6 @@ import { formatDailySummary } from "@/lib/review/share";
 import {
   loadDailySummary,
   saveDailySummary,
-  mergeDailySummary,
 } from "@/lib/review/dailySummaryPersistence";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import {
@@ -757,7 +756,9 @@ export function ReviewSession() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // notifySaveResult and limits are stable inside the same render;
-    // timezone is included so the persist call sees the current value.
+    // timezone starts as "UTC" and is set once on mount, so including it
+    // causes exactly one extra registration (UTC → real tz) and is otherwise
+    // stable — the dep is needed so the persist call sees the real timezone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undoSnapshot, grading, limits, timezone]);
 
@@ -1253,7 +1254,7 @@ export function ReviewSession() {
       const nextMastered =
         snapshot.masteredThisSession + (!wasMastered && nowMastered ? 1 : 0);
       saveDailySummary({
-        date: today,
+        date: todayString(now, timezone),
         gradeSequence: nextGradeSeq,
         reviewed: nextGradeSeq.length,
         newCards: nextNewCards,
