@@ -477,14 +477,14 @@ export default function PrivacyPage() {
           <p className="mb-3">
             Poké Memory is an unofficial, non-commercial fan project. It is not
             affiliated with, endorsed by, or in any way connected to Nintendo,
-            Game Freak, or The Pokémon Company International.
+            Game Freak, or The Pokémon Company.
           </p>
           <p className="mb-3">
             Pokémon and all related names, characters, sprites, cries, and
             other creative assets are trademarks and/or copyrights of Nintendo
             / Creatures Inc. / GAME FREAK inc. All rights remain with their
             respective owners. These assets are reproduced here solely for
-            non-commercial, educational fan purposes.
+            non-commercial fan purposes.
           </p>
           <p>
             Pokémon species data and sprites are sourced from{" "}
