@@ -568,7 +568,7 @@ describe("pullAndMerge", () => {
         "CustomEvent",
         class {
           type: string;
-          constructor(type: string) {
+          constructor(type: string, _init?: unknown) {
             this.type = type;
           }
         },
@@ -606,12 +606,17 @@ describe("pullAndMerge", () => {
         cards: [card("pikachu", "2026-05-13", "2026-05-01")] as any,
         limits: {} as any,
       });
-      // Cloud brings newer lastReview — would fire on cold load, must not fire here
+      // Cloud brings newer lastReview — mergeAffectsProgress would return true,
+      // so suppression must come from wasColdLoad, not from the no-op check.
       mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-01")] as any);
 
       await pullAndMerge(fakeClient, fakeUserId);
 
       expect(mockDispatch).not.toHaveBeenCalled();
+      // buildSession is only called on the cold-load path; asserting it was not
+      // called proves wasColdLoad was false, not that mergeAffectsProgress happened
+      // to return false on incidentally empty arrays.
+      expect(mockBuildSession).not.toHaveBeenCalled();
     });
   });
 });

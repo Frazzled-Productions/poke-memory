@@ -22,14 +22,16 @@ import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 
 /**
- * Fires when `pullAndMerge` completes a cold-load merge (device had no prior
- * local session) that transitioned at least one card's `lastReview` or
- * `firstSeen`. Surfaces in `ReviewSession` so the practice UI can refresh
- * when the initial sign-in pull arrives after the page has already mounted
- * with pristine seed cards — without this, cold-loading a PWA (or any tab
- * whose local storage is empty but whose user has cloud data) leaves the
- * practice page stuck on "all cards new" until the user navigates away and
- * back (#608).
+ * Fires when `pullAndMerge` completes a cold-load merge that transitioned at
+ * least one card's `lastReview` or `firstSeen`. "Cold load" means
+ * `localSession` was null at the start of the merge branch — either because
+ * the device had no prior local session, or because the tombstone path
+ * (`clearLocalProgress`) just wiped it. Surfaces in `ReviewSession` so the
+ * practice UI can refresh when the initial sign-in pull arrives after the
+ * page has already mounted with pristine seed cards — without this,
+ * cold-loading a PWA (or any tab whose local storage is empty but whose user
+ * has cloud data) leaves the practice page stuck on "all cards new" until the
+ * user navigates away and back (#608).
  *
  * Dispatched only on cold loads so a mid-review sign-in — where local
  * session state already exists — does not trigger an unwanted reload that
