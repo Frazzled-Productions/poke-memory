@@ -68,6 +68,24 @@ export function markPushSucceeded(at = new Date().toISOString()): void {
   saveSyncStatus({ ...current, lastPushAt: at, lastPushFailed: false });
 }
 
+/**
+ * Record a persistent push failure. Sets lastPushFailed and stamps
+ * lastPushAttemptAt so the Stats page banner renders. Called by the per-grade
+ * path after N consecutive all-failure drains (#606).
+ *
+ * Intentionally does not clear lastPushAt — the last successful sync timestamp
+ * should remain visible until the user retries.
+ */
+export function markPushFailed(failedCardCount: number, at = new Date().toISOString()): void {
+  const current = loadSyncStatus();
+  saveSyncStatus({
+    ...current,
+    lastPushAttemptAt: at,
+    lastPushFailed: true,
+    failedCardCount,
+  });
+}
+
 export function saveSyncStatus(status: SyncStatus): void {
   if (typeof window === "undefined") return;
   try {

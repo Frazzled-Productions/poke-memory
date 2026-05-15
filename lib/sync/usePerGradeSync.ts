@@ -3,7 +3,10 @@ import { useCallback, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
-import { markPushSucceeded } from "@/lib/sync/persistence";
+import { markPushSucceeded, markPushFailed } from "@/lib/sync/persistence";
+
+/** Number of consecutive all-failure drains before the banner is shown. */
+const FAILURE_THRESHOLD = 3;
 
 /**
  * Debounced per-grade sync hook. Returns { enqueueGrade, flushPending }.
@@ -32,6 +35,10 @@ export function usePerGradeSync(
   const userIdRef = useRef(userId);
   clientRef.current = client;
   userIdRef.current = userId;
+  // Counts consecutive all-failure drains. Reset to 0 on any partial success.
+  // When it reaches FAILURE_THRESHOLD, markPushFailed is called so the banner
+  // appears (#606).
+  const consecutiveFailuresRef = useRef(0);
 
   const drainQueue = useCallback(async () => {
     const c = clientRef.current;
@@ -75,7 +82,17 @@ export function usePerGradeSync(
     // `markPushSucceeded` JSDoc for the full semantics rationale.
     const anySucceeded = results.some((r) => r.ok);
     if (anySucceeded) {
+      consecutiveFailuresRef.current = 0;
       markPushSucceeded();
+    } else {
+      // All cards failed this drain. Increment the consecutive-failure counter
+      // and surface the banner after FAILURE_THRESHOLD attempts (#606). A single
+      // network blip should not show the banner; three consecutive all-failure
+      // drains strongly suggests the push channel is broken.
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= FAILURE_THRESHOLD) {
+        markPushFailed(pendingQueueRef.current.length);
+      }
     }
   }, []);
 
