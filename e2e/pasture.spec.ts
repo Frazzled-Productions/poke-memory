@@ -246,6 +246,50 @@ test.describe("Pasture page — idle behaviour", () => {
   });
 });
 
+test.describe("Pasture page — name search", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredCard(72, "Tentacool", "sea"),
+    ]));
+  });
+
+  test("typing a matching name filters to that Pokémon only", async ({ page }) => {
+    await page.goto("/pasture");
+
+    const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
+    await expect(searchInput).toBeVisible();
+
+    await searchInput.fill("Caterpie");
+
+    // Caterpie should remain visible
+    await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
+    // Tentacool should not be visible
+    await expect(page.getByRole("button", { name: /Tentacool/ })).not.toBeVisible();
+  });
+
+  test("clearing the search restores all Pokémon", async ({ page }) => {
+    await page.goto("/pasture");
+
+    const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
+    await searchInput.fill("Caterpie");
+    await expect(page.getByRole("button", { name: /Tentacool/ })).not.toBeVisible();
+
+    await searchInput.clear();
+    await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Tentacool/ })).toBeVisible();
+  });
+
+  test("a query with no matches shows a no-results message", async ({ page }) => {
+    await page.goto("/pasture");
+
+    const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
+    await searchInput.fill("zzznomatch");
+
+    await expect(page.getByText(/No Pokémon match/i)).toBeVisible();
+  });
+});
+
 test.describe("Pasture page — empty state", () => {
   test("visiting /pasture directly with no mastered cards shows friendly empty state", async ({
     page,

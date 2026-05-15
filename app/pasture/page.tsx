@@ -7,6 +7,7 @@ import { filterMastered, markSeenInPasture } from "@/lib/pasture/arrivals";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
 import { assignAnchors } from "@/lib/pasture/assign";
 import { PastureZone } from "@/components/pasture/PastureZone";
+import { PastureSearchBar } from "@/components/pasture/PastureSearchBar";
 import { pushSingleCard } from "@/lib/sync/cloud";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
@@ -74,6 +75,7 @@ export default function PasturePage() {
   const { flags } = useSuperuser();
   const [session, setSession] = useState<SavedSession | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   // Re-load when the session localStorage key changes (post-grade sync, post-reset
   // via clearLocalProgress). Matches the pattern used by Stats and Pokédex; without
   // this, a reset that does not navigate away from /pasture would leave stale state.
@@ -87,6 +89,30 @@ export default function PasturePage() {
     }
     void load();
   }, [storageVersion]);
+
+  // Derive mastered count so the reset-on-empty effect below can read it
+  // without duplicating the full derivation logic.
+  const masteredCount = !loaded
+    ? null
+    : flags.pretendAllMastered
+      ? SEED_POKEMON.length
+      : session
+        ? filterMastered(session.cards, false).length
+        : 0;
+
+  // Reset the search query whenever the mastered set transitions to empty
+  // (e.g. storage clear, sign-out triggering a reload). Guard on `loaded` so
+  // we never clear a query on the initial render before data arrives, and
+  // guard on `searchQuery` so we skip the effect when there is nothing to
+  // clear (avoids unnecessary state updates).
+  useEffect(() => {
+    if (loaded && masteredCount === 0 && searchQuery !== "") {
+      setSearchQuery("");
+    }
+    // masteredCount and loaded are the meaningful signals; searchQuery is read
+    // for the guard but should not re-trigger the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, masteredCount]);
 
   const handleMarkSeen = useCallback(
     async (cardId: number) => {
@@ -150,7 +176,14 @@ export default function PasturePage() {
     );
   }
 
-  const zones = buildZoneData(masteredCards);
+  // Filter by search query — case-insensitive substring match on display name.
+  const trimmed = searchQuery.trim().toLowerCase();
+  const visibleCards =
+    trimmed === ""
+      ? masteredCards
+      : masteredCards.filter((c) => c.name.toLowerCase().includes(trimmed));
+
+  const zones = buildZoneData(visibleCards);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
@@ -161,16 +194,24 @@ export default function PasturePage() {
         </span>
       </h1>
 
-      <div className="flex flex-col gap-8">
-        {zones.map((zone) => (
-          <PastureZone
-            key={zone.habitat}
-            zone={HABITAT_ZONES.find((z) => z.habitat === zone.habitat)!}
-            placements={zone.placements}
-            onMarkSeen={handleMarkSeen}
-          />
-        ))}
-      </div>
+      <PastureSearchBar query={searchQuery} onChange={setSearchQuery} />
+
+      {zones.length === 0 && trimmed !== "" ? (
+        <p className="mt-4 text-zinc-500 dark:text-zinc-400">
+          No Pokémon match &ldquo;{searchQuery.trim()}&rdquo;.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-8">
+          {zones.map((zone) => (
+            <PastureZone
+              key={zone.habitat}
+              zone={HABITAT_ZONES.find((z) => z.habitat === zone.habitat)!}
+              placements={zone.placements}
+              onMarkSeen={handleMarkSeen}
+            />
+          ))}
+        </div>
+      )}
     </main>
   );
 }
