@@ -774,6 +774,60 @@ describe('buildSessionQueues (per-type budgets)', () => {
     expect(queues.learningCardIds).toEqual([1]);
   });
 
+  // ─── outOfScopeLearningIds (#654) ────────────────────────────────────────
+  it('outOfScopeLearningIds is empty when no eligibleCardIds is provided', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1, { learningStep: 0, stepStartedAt: NOW.getTime() }),
+    ];
+    const queues = buildSessionQueues(cards, baseLimits, TODAY);
+    expect(queues.outOfScopeLearningIds).toEqual([]);
+  });
+
+  it('outOfScopeLearningIds contains mid-learning cards excluded from eligibleCardIds', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1, { learningStep: 0, stepStartedAt: NOW.getTime() }), // mid-step, out of scope
+      nameCard(2, { learningStep: 1, stepStartedAt: NOW.getTime() }), // mid-step, in scope
+      nameCard(3), // fresh, in scope
+    ];
+    const eligible = new Set([2, 3]);
+    const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
+    expect(queues.outOfScopeLearningIds).toEqual([1]);
+    // Both mid-step cards still appear in learningCardIds regardless of scope
+    expect(queues.learningCardIds).toContain(1);
+    expect(queues.learningCardIds).toContain(2);
+  });
+
+  it('outOfScopeLearningIds is empty when all learning cards are in scope', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1, { learningStep: 0, stepStartedAt: NOW.getTime() }),
+      nameCard(2, { learningStep: 1, stepStartedAt: NOW.getTime() }),
+    ];
+    const eligible = new Set([1, 2]);
+    const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
+    expect(queues.outOfScopeLearningIds).toEqual([]);
+  });
+
+  it('outOfScopeLearningIds is empty when there are no learning cards', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1), // fresh new card, not mid-step
+      nameCard(2),
+    ];
+    const eligible = new Set([1]);
+    const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
+    expect(queues.outOfScopeLearningIds).toEqual([]);
+    expect(queues.learningCardIds).toEqual([]);
+  });
+
+  it('outOfScopeLearningIds contains all learning cards when eligibleCardIds excludes them all', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1, { learningStep: 0, stepStartedAt: NOW.getTime() }),
+      nameCard(2, { learningStep: 0, stepStartedAt: NOW.getTime() }),
+    ];
+    const eligible = new Set<number>(); // empty scope — no eligible cards
+    const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
+    expect(queues.outOfScopeLearningIds.sort()).toEqual([1, 2]);
+  });
+
   it('empty eligibleCardIds yields empty review and new queues but preserves counters', () => {
     const cards: ReviewableCard[] = [
       nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }), // counter-eligible

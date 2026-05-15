@@ -425,6 +425,10 @@ export function buildSessionQueues(
   eligibleCardIds?: ReadonlySet<number>,
 ): {
   learningCardIds: number[];
+  /** Subset of `learningCardIds` whose cards fall outside the active scope.
+   * Empty when no `eligibleCardIds` set is provided (i.e. scope is empty).
+   * Used by the UI to surface a "finishing an in-progress card" hint. */
+  outOfScopeLearningIds: number[];
   reviewQueue: number[];
   newQueue: number[];
   newIntroducedToday: number;
@@ -434,6 +438,16 @@ export function buildSessionQueues(
   const learningCardIds = cards
     .filter((c) => c.state.learningStep !== null)
     .map((c) => c.id);
+
+  // Identify learning cards that are outside the active scope. Only meaningful
+  // when a scope is active (eligibleCardIds is provided). A card is
+  // "out-of-scope but still learning" when it is mid-step yet not in the
+  // eligible set — the queue must finish it to avoid corrupting FSRS state,
+  // but the UI should explain why it is appearing despite the active filter.
+  const outOfScopeLearningIds: number[] =
+    eligibleCardIds !== undefined
+      ? learningCardIds.filter((id) => !eligibleCardIds.has(id))
+      : [];
 
   const perType: Record<CardTypeKey, PerTypeCounters> = {
     name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
@@ -512,6 +526,7 @@ export function buildSessionQueues(
 
   return {
     learningCardIds,
+    outOfScopeLearningIds,
     reviewQueue: shuffledReviewQueue,
     newQueue: shuffledNewQueue,
     newIntroducedToday,

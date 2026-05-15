@@ -140,6 +140,24 @@ function formatCountdown(ms: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Sub-components: out-of-scope hint
+// ---------------------------------------------------------------------------
+
+/**
+ * Subtle caption shown when a card is mid-learning-step but falls outside the
+ * active practice scope. The scheduling behaviour is intentional — abandoning a
+ * card mid-step would corrupt FSRS state — but to the user it can look like a
+ * broken filter. This hint explains what is happening.
+ */
+function OutOfScopeHint() {
+  return (
+    <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center italic">
+      Finishing an in-progress card
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sub-components: end states
 // ---------------------------------------------------------------------------
 
@@ -787,12 +805,18 @@ export function ReviewSession() {
   // changing scope mid-day cannot reset daily caps (#333). Out-of-scope cards
   // are snoozed by `reconcileHiddenState` at session-load time, so their
   // dueDate doesn't drift while they're hidden.
-  const { reviewQueue, newQueue, perType, learningCardIds } = buildSessionQueues(
+  const { reviewQueue, newQueue, perType, learningCardIds, outOfScopeLearningIds } = buildSessionQueues(
     cards,
     effectiveLimits,
     today,
     isScopeEmpty(scope) ? undefined : eligibleCardIds,
   );
+
+  // Cards that are mid-learning-step but fall outside the active scope.
+  // Shown to the user as a subtle hint so the behaviour reads as intentional
+  // rather than a broken filter. Built inline (not a useMemo) because
+  // buildSessionQueues is already called every render.
+  const outOfScopeLearningSet = new Set(outOfScopeLearningIds);
 
   // --- Learning-queue priority (with learn-ahead) ---
   const now = Date.now();
@@ -1307,6 +1331,7 @@ export function ReviewSession() {
           </button>
         )}
 
+        {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
         <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
         {undoSnapshot !== null && (
           <button
@@ -1355,6 +1380,7 @@ export function ReviewSession() {
           distractors={reverseDistractors}
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}
         />
+        {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
         <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
         {undoSnapshot !== null && (
           <button
@@ -1439,6 +1465,7 @@ export function ReviewSession() {
         </button>
       )}
 
+      {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
       <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
       <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
       <GradeBreakdownBar
