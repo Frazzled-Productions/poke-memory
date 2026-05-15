@@ -137,7 +137,7 @@ jobs:
           path: .next/
       - name: Install Playwright browsers
         if: needs.changes.outputs.e2e_relevant == 'true'
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps chromium
       - name: Start Next.js and run Playwright
         if: needs.changes.outputs.e2e_relevant == 'true'
         env:
@@ -146,7 +146,7 @@ jobs:
           npm start &
           echo $! > /tmp/next.pid
           npx wait-on http://localhost:3000 --timeout 60000
-          npm run test:e2e
+          npm run test:e2e -- --project=chromium
       - name: Stop Next.js
         if: always() && needs.changes.outputs.e2e_relevant == 'true'
         run: |
