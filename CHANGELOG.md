@@ -6,6 +6,25 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.63] — 2026-05-15
+
+### Added
+
+- Privacy notice page at `/privacy` covering data categories, lawful basis, sub-processors, data-subject rights, ICO complaint route, and children's data; linked from the footer on every page.
+- OpenGraph and Twitter/X social-preview image — link unfurls on Reddit, Discord, and social media now show the Poké Memory brand card.
+- Non-affiliation disclaimer added to the site footer, README, and Privacy Notice: Poké Memory is an unofficial fan project not affiliated with Nintendo, Game Freak, or The Pokémon Company; sprite and species data sourced from PokéAPI.
+- Privacy page: dedicated "Cookies and similar technologies" section (§4) documenting the PECR strictly-necessary position and confirming no consent banner is required.
+- Added a `LICENSE` file (MIT) and a licence section in the README; bundled Pokémon assets are excluded and remain the property of their owners.
+- Added `robots.txt` and `sitemap.xml` so search engines can correctly crawl and index the site. Added or improved page titles and descriptions for all seven routes (Practice, Pokédex, Pasture, Stats, Settings, What's New, Privacy). Set the canonical `metadataBase` to `https://pokememory.com`.
+
+### Changed
+
+- Mobile navigation now offers a fixed bottom tab bar (Practice / Stats / Pokédex / Pasture / Settings) as the default for new users. A toggle in Settings → Appearance lets you switch back to the classic hamburger menu at any time. Existing users who already had a settings record keep the hamburger menu unless they change the setting.
+
+### Fixed
+
+- Biome landscape view no longer double-rotates when the device is physically held in landscape — orientation is now detected live and the CSS rotation is skipped when the viewport is already landscape.
+
 ## [0.9.62] — 2026-05-15
 
 ### Added
@@ -998,7 +1017,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.62...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.63...HEAD
+[0.9.63]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.63
 [0.9.62]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.62
 [0.9.61]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.61
 [0.9.60]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.60
