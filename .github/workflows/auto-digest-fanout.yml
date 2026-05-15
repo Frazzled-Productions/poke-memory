@@ -140,15 +140,16 @@ jobs:
               if is_app_suggest:
                   labels += ['--label', 'enhancement']
 
-              # Use --json number for stable machine-readable output.
+              # `gh issue create` does not support --json; it prints the new
+              # issue URL on stdout. Parse the trailing number out of that.
               r = subprocess.run(
                   ['gh', 'issue', 'create',
                    '--title', title,
                    '--body-file', '/tmp/child-body.txt',
-                   '--repo', repo] + labels + ['--json', 'number'],
+                   '--repo', repo] + labels,
                   capture_output=True, text=True, check=True
               )
-              new_number = str(json.loads(r.stdout)['number'])
+              new_number = r.stdout.strip().rsplit('/', 1)[-1]
               print(f'Filed proposal {n} as #{new_number}: {title}')
               filed_count += 1
               filed_numbers.append(new_number)
