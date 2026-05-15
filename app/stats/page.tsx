@@ -26,6 +26,7 @@ import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
 import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
 import { RecordsCard } from "@/components/stats/RecordsCard";
+import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { computeRecords, type Records } from "@/lib/stats/records";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
@@ -382,24 +383,28 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
       ) : (
         <ul className="flex flex-col gap-2" role="list">
           {stats.struggling.map((card) => (
-            <li
-              key={card.id}
-              className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-background px-4 py-2 dark:border-zinc-800"
-            >
-              <Image
-                src={card.spriteUrl}
-                alt={card.name}
-                width={48}
-                height={48}
-                className="shrink-0 object-contain"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-foreground">{card.name}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                  Ease factor: {card.easeFactor.toFixed(2)} · Reps:{" "}
-                  {card.repetitions}
-                </p>
-              </div>
+            <li key={card.id}>
+              <Link
+                href={`/pokedex/${card.id}`}
+                aria-label={`View ${card.name} in Pokédex`}
+                className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-background px-4 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-zinc-800 dark:hover:bg-zinc-900"
+              >
+                <Image
+                  src={card.spriteUrl}
+                  alt={card.name}
+                  width={48}
+                  height={48}
+                  className="shrink-0 object-contain"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground">{card.name}</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+                    Ease factor: {card.easeFactor.toFixed(2)} · Reps:{" "}
+                    {card.repetitions}
+                  </p>
+                </div>
+                <DirectionBadge direction="name" />
+              </Link>
             </li>
           ))}
         </ul>
