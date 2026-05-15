@@ -33,6 +33,7 @@ import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
 import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
 import { TtsControls } from "@/components/settings/TtsControls";
+import { CollapsibleSection } from "@/components/settings/CollapsibleSection";
 import {
   detectTimezone,
   detectDateFormat,
@@ -115,7 +116,7 @@ function ResetEarnedBadgesRow() {
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+    <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-foreground">
@@ -181,13 +182,7 @@ function FavouritePicker({
   if (unlockedEntries.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="theme-heading">
-      <h2
-        id="theme-heading"
-        className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-      >
-        App Theme
-      </h2>
+    <>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         Master a Pokémon to unlock it as an app colour theme.
       </p>
@@ -246,7 +241,7 @@ function FavouritePicker({
           );
         })}
       </div>
-    </section>
+    </>
   );
 }
 
@@ -338,6 +333,57 @@ const REVERSE_NUMERIC_FIELDS: FieldConfig[] = [
   },
 ];
 
+/** All top-level section ids used on this page — drives hash deep-link detection. */
+const TOP_LEVEL_SECTION_IDS = [
+  "appearance-heading",
+  "practice-heading",
+  "audio-heading",
+  "account-data-heading",
+  "advanced-heading",
+] as const;
+
+/** All known anchor ids (top-level + sub-section) for deep-link resolution. */
+const ALL_ANCHOR_IDS = [
+  ...TOP_LEVEL_SECTION_IDS,
+  "theme-heading",
+  "scheduler-heading",
+  "name-cards-heading",
+  "evolution-cards-heading",
+  "reverse-evolution-heading",
+  "reverse-heading",
+  "cry-heading",
+  "onboarding-heading",
+  "backup-heading",
+  "regional-heading",
+  "about-heading",
+  "developer-heading",
+  "danger-zone-heading",
+] as const;
+
+type AnchorId = typeof ALL_ANCHOR_IDS[number];
+type TopLevelId = typeof TOP_LEVEL_SECTION_IDS[number];
+
+/**
+ * Map from a sub-section anchor to the top-level CollapsibleSection that
+ * contains it. Used so navigating to e.g. #onboarding-heading also expands
+ * the "Account & Data" category.
+ */
+const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
+  "theme-heading": "appearance-heading",
+  "scheduler-heading": "practice-heading",
+  "name-cards-heading": "practice-heading",
+  "evolution-cards-heading": "practice-heading",
+  "reverse-evolution-heading": "practice-heading",
+  "reverse-heading": "practice-heading",
+  "cry-heading": "audio-heading",
+  "onboarding-heading": "account-data-heading",
+  "backup-heading": "account-data-heading",
+  "regional-heading": "account-data-heading",
+  "about-heading": "account-data-heading",
+  "developer-heading": "advanced-heading",
+  "danger-zone-heading": "advanced-heading",
+};
+
 export default function SettingsPage() {
   const router = useRouter();
   const { user, supabase } = useAuth();
@@ -359,6 +405,10 @@ export default function SettingsPage() {
   const autoDetectedPrefsRef = useRef<{ timezone: string; dateFormat: DateFormat } | null>(null);
 
   const [optimizableReviewCount, setOptimizableReviewCount] = useState<number>(0);
+
+  // Hash deep-link: the top-level CollapsibleSection id that should be
+  // force-expanded on load, derived from window.location.hash.
+  const [targetCategoryId, setTargetCategoryId] = useState<TopLevelId | null>(null);
 
   useEffect(() => {
     const loaded = loadSettings();
@@ -389,6 +439,17 @@ export default function SettingsPage() {
     setFavouriteId(loadFavourite()?.id ?? null);
     // Count optimizable reviews from local grade log (async now — IDB backed)
     void loadGradeLog().then((log) => setOptimizableReviewCount(countOptimizableReviews(log)));
+
+    // Resolve hash deep-link → find the top-level category to force-expand.
+    const hash = window.location.hash.replace("#", "") as AnchorId;
+    if ((ALL_ANCHOR_IDS as ReadonlyArray<string>).includes(hash)) {
+      // Sub-section anchor → use the map. Top-level anchor → use it directly.
+      const fromMap = ANCHOR_TO_CATEGORY[hash];
+      const isTopLevel = (TOP_LEVEL_SECTION_IDS as ReadonlyArray<string>).includes(hash);
+      const category: TopLevelId | null = fromMap ?? (isTopLevel ? (hash as TopLevelId) : null);
+      setTargetCategoryId(category);
+    }
+
     return () => {
       if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
       if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
@@ -496,7 +557,6 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     e.target.value = ""; // reset so the same file can be re-selected
     if (!file) return;
-
     const result = await validateBackup(file);
     if (!result.ok) {
       setImportError(result.error);
@@ -573,432 +633,460 @@ export default function SettingsPage() {
           <LoadingSkeleton />
         ) : (
           <>
-            <div className="flex flex-col gap-6">
-              {GROUPS.map((group, groupIdx) => (
-                <section
-                  key={group.heading ?? `group-${groupIdx}`}
-                  className="flex flex-col gap-4"
-                  aria-labelledby={
-                    group.heading ? `group-heading-${groupIdx}` : undefined
-                  }
-                >
-                  {group.heading !== null && (
-                    <h2
-                      id={`group-heading-${groupIdx}`}
-                      className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                    >
-                      {group.heading}
-                    </h2>
-                  )}
-                  {group.fields.map(({ key, label, helper, min, max }) => (
-                    <div
-                      key={key}
-                      className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
-                    >
-                      <label
-                        htmlFor={key}
-                        className="block text-sm font-medium text-foreground"
-                      >
-                        {label}
-                      </label>
-                      <input
-                        id={key}
-                        type="number"
-                        min={min}
-                        max={max}
-                        step={1}
-                        value={draftValues[key] ?? String(settings[key])}
-                        onChange={(e) => handleChange(key, e.target.value)}
-                        onBlur={() => handleBlur(key, min)}
-                        className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                      />
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        {helper}
-                      </p>
-                    </div>
-                  ))}
-                </section>
-              ))}
+            <div className="flex flex-col gap-3">
 
-              {/* Scheduler section — FSRS knobs */}
-              <section className="flex flex-col gap-4" aria-labelledby="scheduler-heading">
-                <h2
-                  id="scheduler-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Scheduler
-                </h2>
-                <OnboardingHint id="settingsHintDismissed" title="What recall target does">
-                  <p>
-                    The scheduler aims to show each card just before
-                    you&apos;d forget it. A higher recall target means more
-                    reviews and stronger retention; a lower target means
-                    fewer reviews and a bit more forgetting. Most people
-                    leave this at 90%.
-                  </p>
-                </OnboardingHint>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <label
-                    htmlFor="retentionTarget"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Recall target ({Math.round(settings.retentionTarget * 100)}%)
-                  </label>
-                  <input
-                    id="retentionTarget"
-                    type="range"
-                    min={Math.round(RETENTION_TARGET_MIN * 100)}
-                    max={Math.round(RETENTION_TARGET_MAX * 100)}
-                    step={1}
-                    value={Math.round(settings.retentionTarget * 100)}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        retentionTarget: Number(e.target.value) / 100,
-                      })
-                    }
-                    className="mt-3 w-full"
-                    aria-describedby="retentionTarget-helper"
+              {/* ── Appearance ─────────────────────────────────────────────── */}
+              <CollapsibleSection
+                sectionId="appearance-heading"
+                heading="Appearance"
+                forceOpen={targetCategoryId === "appearance-heading"}
+              >
+                {/* App Theme (mascot picker) — only shown when unlocked entries exist */}
+                <div id="theme-heading">
+                  <FavouritePicker
+                    settings={settings}
+                    favouriteId={favouriteId}
+                    onSelect={(entry, spriteUrl) => {
+                      saveFavourite(entry, spriteUrl);
+                      setFavouriteId(entry?.id ?? null);
+                      updateFavourite(
+                        entry
+                          ? { id: entry.id, name: entry.name, colors: entry.colors, spriteUrl: spriteUrl ?? null }
+                          : null
+                      );
+                    }}
                   />
-                  <p
-                    id="retentionTarget-helper"
-                    className="mt-2 text-xs text-zinc-500 dark:text-zinc-400"
+                </div>
+
+                <IntensityPicker
+                  value={settings.themeIntensity}
+                  onChange={(next) => {
+                    const updated = { ...settings, themeIntensity: next };
+                    setSettings(updated);
+                    saveSettings(updated);
+                  }}
+                />
+              </CollapsibleSection>
+
+              {/* ── Practice ───────────────────────────────────────────────── */}
+              <CollapsibleSection
+                sectionId="practice-heading"
+                heading="Practice"
+                forceOpen={targetCategoryId === "practice-heading"}
+              >
+                {/* Scheduler knobs */}
+                <div id="scheduler-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Scheduler
+                  </p>
+                  <OnboardingHint id="settingsHintDismissed" title="What recall target does">
+                    <p>
+                      The scheduler aims to show each card just before
+                      you&apos;d forget it. A higher recall target means more
+                      reviews and stronger retention; a lower target means
+                      fewer reviews and a bit more forgetting. Most people
+                      leave this at 90%.
+                    </p>
+                  </OnboardingHint>
+                  {/* Mastery threshold */}
+                  {GROUPS.flatMap((g) =>
+                    g.fields.map(({ key, label, helper, min, max }) => (
+                      <div
+                        key={key}
+                        className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                      >
+                        <label
+                          htmlFor={key}
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {label}
+                        </label>
+                        <input
+                          id={key}
+                          type="number"
+                          min={min}
+                          max={max}
+                          step={1}
+                          value={draftValues[key] ?? String(settings[key])}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          onBlur={() => handleBlur(key, min)}
+                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                        />
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          {helper}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                  {/* Recall target slider */}
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <label
+                      htmlFor="retentionTarget"
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      Recall target ({Math.round(settings.retentionTarget * 100)}%)
+                    </label>
+                    <input
+                      id="retentionTarget"
+                      type="range"
+                      min={Math.round(RETENTION_TARGET_MIN * 100)}
+                      max={Math.round(RETENTION_TARGET_MAX * 100)}
+                      step={1}
+                      value={Math.round(settings.retentionTarget * 100)}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          retentionTarget: Number(e.target.value) / 100,
+                        })
+                      }
+                      className="mt-3 w-full"
+                      aria-describedby="retentionTarget-helper"
+                    />
+                    <p
+                      id="retentionTarget-helper"
+                      className="mt-2 text-xs text-zinc-500 dark:text-zinc-400"
+                    >
+                      Lower means fewer reviews but you&apos;ll forget more cards. Higher means more reviews but better retention. Default 90%.
+                    </p>
+                  </div>
+                </div>
+
+                {/* FSRS per-user weight optimizer (#268) */}
+                <FsrsOptimizerSection
+                  fsrsWeightsOptimizedAt={settings.fsrsWeightsOptimizedAt}
+                  optimizableReviewCount={optimizableReviewCount}
+                  isSignedIn={user !== null}
+                  superuserPaused={anyFlagOn}
+                  onOptimized={(optimizedAt, weights) => {
+                    setSettings((prev) =>
+                      prev !== null
+                        ? { ...prev, fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt }
+                        : prev,
+                    );
+                  }}
+                />
+
+                {/* Name cards */}
+                <div id="name-cards-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Name cards
+                  </p>
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Enable name cards
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Show sprite as prompt; type the name. Re-enabling after disabling will reset name-card progress.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.nameCardsEnabled}
+                        onClick={() => handleToggle("nameCardsEnabled")}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                          settings.nameCardsEnabled
+                            ? "bg-foreground"
+                            : "bg-zinc-300 dark:bg-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                            settings.nameCardsEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                  {toggleError !== null && toggleErrorKey === "nameCardsEnabled" && (
+                    <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                      {toggleError}
+                    </p>
+                  )}
+                  <div className={settings.nameCardsEnabled ? undefined : "opacity-50"}>
+                    <div className="flex flex-col gap-4">
+                      {NAME_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                        <div
+                          key={key}
+                          className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                        >
+                          <label
+                            htmlFor={key}
+                            className="block text-sm font-medium text-foreground"
+                          >
+                            {label}
+                          </label>
+                          <input
+                            id={key}
+                            type="number"
+                            min={min}
+                            max={max}
+                            step={1}
+                            value={draftValues[key] ?? String(settings[key])}
+                            onChange={(e) => handleChange(key, e.target.value)}
+                            onBlur={() => handleBlur(key, min)}
+                            disabled={!settings.nameCardsEnabled}
+                            className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                          />
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            {helper}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Evolution cards */}
+                <div id="evolution-cards-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Evolution cards
+                  </p>
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Enable evolution cards
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Show sprite; identify the evolution chain. Re-enabling after disabling will reset evolution-card progress.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.evolutionCardsEnabled}
+                        onClick={() => handleToggle("evolutionCardsEnabled")}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                          settings.evolutionCardsEnabled
+                            ? "bg-foreground"
+                            : "bg-zinc-300 dark:bg-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                            settings.evolutionCardsEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                  {toggleError !== null && toggleErrorKey === "evolutionCardsEnabled" && (
+                    <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                      {toggleError}
+                    </p>
+                  )}
+                  <div className={settings.evolutionCardsEnabled ? undefined : "opacity-50"}>
+                    <div className="flex flex-col gap-4">
+                      {EVOLUTION_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                        <div
+                          key={key}
+                          className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                        >
+                          <label
+                            htmlFor={key}
+                            className="block text-sm font-medium text-foreground"
+                          >
+                            {label}
+                          </label>
+                          <input
+                            id={key}
+                            type="number"
+                            min={min}
+                            max={max}
+                            step={1}
+                            value={draftValues[key] ?? String(settings[key])}
+                            onChange={(e) => handleChange(key, e.target.value)}
+                            onBlur={() => handleBlur(key, min)}
+                            disabled={!settings.evolutionCardsEnabled}
+                            className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                          />
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            {helper}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reverse-evolution cards */}
+                <div id="reverse-evolution-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Reverse-evolution cards
+                  </p>
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Enable reverse-evolution cards
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Quiz the opposite direction of evolution edges (&quot;Which Pokémon evolves into X via Y?&quot;).
+                          Shares the same daily new/review budget as forward evolution cards.
+                          Re-enabling after disabling will reset reverse-evolution progress.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.reverseEvolutionCardsEnabled}
+                        onClick={() => handleToggle("reverseEvolutionCardsEnabled")}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                          settings.reverseEvolutionCardsEnabled
+                            ? "bg-foreground"
+                            : "bg-zinc-300 dark:bg-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                            settings.reverseEvolutionCardsEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reverse cards */}
+                <div id="reverse-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Reverse cards
+                  </p>
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Enable reverse cards
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Show the Pokémon&apos;s name as the prompt; identify the sprite on reveal.
+                          Re-enabling after disabling will reset reverse-card progress.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.reverseCardsEnabled}
+                        onClick={() => handleToggle("reverseCardsEnabled")}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                          settings.reverseCardsEnabled
+                            ? "bg-foreground"
+                            : "bg-zinc-300 dark:bg-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                            settings.reverseCardsEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                  {toggleError !== null && toggleErrorKey === "reverseCardsEnabled" && (
+                    <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                      {toggleError}
+                    </p>
+                  )}
+                  {settings.reverseCardsEnabled && (
+                    <>
+                      {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                        <div
+                          key={key}
+                          className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                        >
+                          <label
+                            htmlFor={key}
+                            className="block text-sm font-medium text-foreground"
+                          >
+                            {label}
+                          </label>
+                          <input
+                            id={key}
+                            type="number"
+                            min={min}
+                            max={max}
+                            step={1}
+                            value={draftValues[key] ?? String(settings[key])}
+                            onChange={(e) => handleChange(key, e.target.value)}
+                            onBlur={() => handleBlur(key, min)}
+                            className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                          />
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            {helper}
+                          </p>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {/* Save */}
+                <div className="flex items-center gap-4 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    className="min-h-[44px] rounded-lg bg-foreground px-8 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
                   >
-                    Lower means fewer reviews but you&apos;ll forget more cards. Higher means more reviews but better retention. Default 90%.
-                  </p>
-                </div>
-              </section>
-
-              {/* Personalize my schedule — FSRS per-user weight optimizer (#268) */}
-              <FsrsOptimizerSection
-                fsrsWeightsOptimizedAt={settings.fsrsWeightsOptimizedAt}
-                optimizableReviewCount={optimizableReviewCount}
-                isSignedIn={user !== null}
-                superuserPaused={anyFlagOn}
-                onOptimized={(optimizedAt, weights) => {
-                  setSettings((prev) =>
-                    prev !== null
-                      ? { ...prev, fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt }
-                      : prev,
-                  );
-                }}
-              />
-
-              {/* Name cards section */}
-              <section className="flex flex-col gap-4" aria-labelledby="name-cards-heading">
-                <h2
-                  id="name-cards-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Name cards
-                </h2>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Enable name cards
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Show sprite as prompt; type the name. Re-enabling after disabling will reset name-card progress.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={settings.nameCardsEnabled}
-                      onClick={() => handleToggle("nameCardsEnabled")}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                        settings.nameCardsEnabled
-                          ? "bg-foreground"
-                          : "bg-zinc-300 dark:bg-zinc-600"
-                      }`}
+                    Save
+                  </button>
+                  {saved && (
+                    <p
+                      className="text-sm font-medium text-emerald-600 dark:text-emerald-400"
+                      aria-live="polite"
                     >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                          settings.nameCardsEnabled ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
+                      Saved!
+                    </p>
+                  )}
                 </div>
-                {toggleError !== null && toggleErrorKey === "nameCardsEnabled" && (
-                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
-                    {toggleError}
+              </CollapsibleSection>
+
+              {/* ── Audio ──────────────────────────────────────────────────── */}
+              <CollapsibleSection
+                sectionId="audio-heading"
+                heading="Audio"
+                forceOpen={targetCategoryId === "audio-heading"}
+              >
+                {/* Cry cards */}
+                <div id="cry-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Cry → name cards
                   </p>
-                )}
-                <div className={settings.nameCardsEnabled ? undefined : "opacity-50"}>
-                  <div className="flex flex-col gap-4">
-                    {NAME_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
-                      <div
-                        key={key}
-                        className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
-                      >
-                        <label
-                          htmlFor={key}
-                          className="block text-sm font-medium text-foreground"
-                        >
-                          {label}
-                        </label>
-                        <input
-                          id={key}
-                          type="number"
-                          min={min}
-                          max={max}
-                          step={1}
-                          value={draftValues[key] ?? String(settings[key])}
-                          onChange={(e) => handleChange(key, e.target.value)}
-                          onBlur={() => handleBlur(key, min)}
-                          disabled={!settings.nameCardsEnabled}
-                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                        />
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Enable cry cards
+                        </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          {helper}
+                          Audio prompt — hear the cry and name the Pokémon. Species without a cry are skipped automatically.
+                          Re-enabling after disabling will reset cry-card progress.
                         </p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              {/* Evolution cards section */}
-              <section className="flex flex-col gap-4" aria-labelledby="evolution-cards-heading">
-                <h2
-                  id="evolution-cards-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Evolution cards
-                </h2>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Enable evolution cards
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Show sprite; identify the evolution chain. Re-enabling after disabling will reset evolution-card progress.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={settings.evolutionCardsEnabled}
-                      onClick={() => handleToggle("evolutionCardsEnabled")}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                        settings.evolutionCardsEnabled
-                          ? "bg-foreground"
-                          : "bg-zinc-300 dark:bg-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                          settings.evolutionCardsEnabled ? "translate-x-5" : "translate-x-0"
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.cryCardsEnabled}
+                        onClick={() => handleToggle("cryCardsEnabled")}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                          settings.cryCardsEnabled
+                            ? "bg-foreground"
+                            : "bg-zinc-300 dark:bg-zinc-600"
                         }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-                {toggleError !== null && toggleErrorKey === "evolutionCardsEnabled" && (
-                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
-                    {toggleError}
-                  </p>
-                )}
-                <div className={settings.evolutionCardsEnabled ? undefined : "opacity-50"}>
-                  <div className="flex flex-col gap-4">
-                    {EVOLUTION_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
-                      <div
-                        key={key}
-                        className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
                       >
-                        <label
-                          htmlFor={key}
-                          className="block text-sm font-medium text-foreground"
-                        >
-                          {label}
-                        </label>
-                        <input
-                          id={key}
-                          type="number"
-                          min={min}
-                          max={max}
-                          step={1}
-                          value={draftValues[key] ?? String(settings[key])}
-                          onChange={(e) => handleChange(key, e.target.value)}
-                          onBlur={() => handleBlur(key, min)}
-                          disabled={!settings.evolutionCardsEnabled}
-                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                            settings.cryCardsEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
                         />
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          {helper}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className="flex flex-col gap-4" aria-labelledby="reverse-evolution-heading">
-                <h2
-                  id="reverse-evolution-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Reverse-evolution cards
-                </h2>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Enable reverse-evolution cards
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Quiz the opposite direction of evolution edges (&quot;Which Pokémon evolves into X via Y?&quot;).
-                        Shares the same daily new/review budget as forward evolution cards.
-                        Re-enabling after disabling will reset reverse-evolution progress.
-                      </p>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={settings.reverseEvolutionCardsEnabled}
-                      onClick={() => handleToggle("reverseEvolutionCardsEnabled")}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                        settings.reverseEvolutionCardsEnabled
-                          ? "bg-foreground"
-                          : "bg-zinc-300 dark:bg-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                          settings.reverseEvolutionCardsEnabled ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
                   </div>
                 </div>
-              </section>
 
-              <section className="flex flex-col gap-4" aria-labelledby="reverse-heading">
-                <h2
-                  id="reverse-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Reverse cards
-                </h2>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Enable reverse cards
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Show the Pokémon&apos;s name as the prompt; identify the sprite on reveal.
-                        Re-enabling after disabling will reset reverse-card progress.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={settings.reverseCardsEnabled}
-                      onClick={() => handleToggle("reverseCardsEnabled")}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                        settings.reverseCardsEnabled
-                          ? "bg-foreground"
-                          : "bg-zinc-300 dark:bg-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                          settings.reverseCardsEnabled ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-                {toggleError !== null && toggleErrorKey === "reverseCardsEnabled" && (
-                  <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
-                    {toggleError}
-                  </p>
-                )}
-                {settings.reverseCardsEnabled && (
-                  <>
-                    {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
-                      <div
-                        key={key}
-                        className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
-                      >
-                        <label
-                          htmlFor={key}
-                          className="block text-sm font-medium text-foreground"
-                        >
-                          {label}
-                        </label>
-                        <input
-                          id={key}
-                          type="number"
-                          min={min}
-                          max={max}
-                          step={1}
-                          value={draftValues[key] ?? String(settings[key])}
-                          onChange={(e) => handleChange(key, e.target.value)}
-                          onBlur={() => handleBlur(key, min)}
-                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                        />
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          {helper}
-                        </p>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </section>
-
-              {/* Cry-direction cards */}
-              <section className="flex flex-col gap-4" aria-labelledby="cry-heading">
-                <h2
-                  id="cry-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Cry → name cards
-                </h2>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Enable cry cards
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Audio prompt — hear the cry and name the Pokémon. Species without a cry are skipped automatically.
-                        Re-enabling after disabling will reset cry-card progress.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={settings.cryCardsEnabled}
-                      onClick={() => handleToggle("cryCardsEnabled")}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                        settings.cryCardsEnabled
-                          ? "bg-foreground"
-                          : "bg-zinc-300 dark:bg-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                          settings.cryCardsEnabled ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              {/* Audio section */}
-              <section className="flex flex-col gap-4" aria-labelledby="audio-heading">
-                <h2
-                  id="audio-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Audio
-                </h2>
+                {/* Audio playback */}
                 <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -1066,136 +1154,19 @@ export default function SettingsPage() {
                   />
                 )}
                 <VoiceQualityHint />
-              </section>
+              </CollapsibleSection>
 
-              <FavouritePicker
-                settings={settings}
-                favouriteId={favouriteId}
-                onSelect={(entry, spriteUrl) => {
-                  saveFavourite(entry, spriteUrl);
-                  setFavouriteId(entry?.id ?? null);
-                  updateFavourite(
-                    entry
-                      ? { id: entry.id, name: entry.name, colors: entry.colors, spriteUrl: spriteUrl ?? null }
-                      : null
-                  );
-                }}
-              />
-
-              <IntensityPicker
-                value={settings.themeIntensity}
-                onChange={(next) => {
-                  const updated = { ...settings, themeIntensity: next };
-                  setSettings(updated);
-                  saveSettings(updated);
-                }}
-              />
-
-              {/* Regional section — timezone + date format pickers */}
-              <section className="flex flex-col gap-4" aria-labelledby="regional-heading">
-                <h2
-                  id="regional-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Regional
-                </h2>
-
-                {/* Timezone picker */}
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <label
-                    htmlFor="timezone"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Timezone
-                  </label>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    Used for daily review limits and streak roll-overs. Auto-detected on first load.
+              {/* ── Account & Data ─────────────────────────────────────────── */}
+              <CollapsibleSection
+                sectionId="account-data-heading"
+                heading="Account & Data"
+                forceOpen={targetCategoryId === "account-data-heading"}
+              >
+                {/* Onboarding explainer */}
+                <div id="onboarding-heading" className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    How this works
                   </p>
-                  <select
-                    id="timezone"
-                    value={settings.timezone ?? ""}
-                    onChange={(e) => {
-                      const next = { ...settings, timezone: e.target.value };
-                      setSettings(next);
-                      saveSettings(next);
-                      if (user && supabase) {
-                        void pushRegionalPrefs(supabase, user.id, {
-                          timezone: e.target.value,
-                          dateFormat: next.dateFormat,
-                        }).catch(() => {});
-                      }
-                    }}
-                    className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                  >
-                    {TIMEZONE_OPTIONS.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {tz}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Date format picker */}
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <p className="text-sm font-medium text-foreground">
-                    Date format
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    Controls how dates are shown throughout the app. Live preview updates below.
-                  </p>
-                  <fieldset className="mt-3 flex flex-col gap-2">
-                    <legend className="sr-only">Date format</legend>
-                    {(() => {
-                      // Hoist outside the per-option map so it is computed once.
-                      const todayIso = new Date().toISOString().slice(0, 10);
-                      return (
-                        [
-                          { value: "dmy" as DateFormat, label: "Day / Month / Year" },
-                          { value: "mdy" as DateFormat, label: "Month / Day / Year" },
-                          { value: "iso" as DateFormat, label: "ISO (Year-Month-Day)" },
-                        ] as const
-                      ).map(({ value, label }) => (
-                        <label
-                          key={value}
-                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-700"
-                        >
-                          <input
-                            type="radio"
-                            name="dateFormat"
-                            value={value}
-                            checked={(settings.dateFormat ?? "dmy") === value}
-                            onChange={() => {
-                              const next = { ...settings, dateFormat: value };
-                              setSettings(next);
-                              saveSettings(next);
-                              if (user && supabase) {
-                                void pushRegionalPrefs(supabase, user.id, {
-                                  timezone: next.timezone,
-                                  dateFormat: value,
-                                }).catch(() => {});
-                              }
-                            }}
-                            className="shrink-0 accent-foreground"
-                          />
-                          <span className="flex-1 text-foreground">{label}</span>
-                          <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                            {formatShortDate(todayIso, value)}
-                          </span>
-                        </label>
-                      ));
-                    })()}
-                  </fieldset>
-                </div>
-              </section>
-
-              <section className="flex flex-col gap-4" aria-labelledby="onboarding-heading">
-                <h2
-                  id="onboarding-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  How this works
-                </h2>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
                   <p className="text-sm text-foreground">
                     Poké Memory uses{" "}
                     <a
@@ -1247,51 +1218,12 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
-              </section>
 
-              <section className="flex flex-col gap-4" aria-labelledby="about-heading">
-                <h2
-                  id="about-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  About
-                </h2>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Version</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      {process.env.NEXT_PUBLIC_APP_VERSION
-                        ? `v${process.env.NEXT_PUBLIC_APP_VERSION}`
-                        : "dev"}
-                    </p>
-                  </div>
-
-                  <hr className="border-zinc-200 dark:border-zinc-800" />
-
-                  <div>
-                    <p className="text-sm font-medium text-foreground">What&apos;s new</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      See what shipped in recent releases.
-                    </p>
-                    <Link
-                      href="/whats-new"
-                      className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                    >
-                      View changelog
-                    </Link>
-                  </div>
-                </div>
-              </section>
-
-              <section className="flex flex-col gap-4" aria-labelledby="backup-heading">
-                <h2
-                  id="backup-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-                >
-                  Backup
-                </h2>
-
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
+                {/* Backup */}
+                <div id="backup-heading" className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Backup
+                  </p>
                   <div>
                     <p className="text-sm font-medium text-foreground">Export progress</p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -1338,164 +1270,276 @@ export default function SettingsPage() {
                     )}
                   </div>
                 </div>
-              </section>
 
-              <div className="flex items-center gap-4 pt-2">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="min-h-[44px] rounded-lg bg-foreground px-8 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-                >
-                  Save
-                </button>
-                {saved && (
-                  <p
-                    className="text-sm font-medium text-emerald-600 dark:text-emerald-400"
-                    aria-live="polite"
-                  >
-                    Saved!
+                {/* Regional */}
+                <div id="regional-heading" className="flex flex-col gap-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Regional
                   </p>
+
+                  {/* Timezone picker */}
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <label
+                      htmlFor="timezone"
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      Timezone
+                    </label>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Used for daily review limits and streak roll-overs. Auto-detected on first load.
+                    </p>
+                    <select
+                      id="timezone"
+                      value={settings.timezone ?? ""}
+                      onChange={(e) => {
+                        const next = { ...settings, timezone: e.target.value };
+                        setSettings(next);
+                        saveSettings(next);
+                        if (user && supabase) {
+                          void pushRegionalPrefs(supabase, user.id, {
+                            timezone: e.target.value,
+                            dateFormat: next.dateFormat,
+                          }).catch(() => {});
+                        }
+                      }}
+                      className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz} value={tz}>
+                          {tz}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Date format picker */}
+                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <p className="text-sm font-medium text-foreground">
+                      Date format
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Controls how dates are shown throughout the app. Live preview updates below.
+                    </p>
+                    <fieldset className="mt-3 flex flex-col gap-2">
+                      <legend className="sr-only">Date format</legend>
+                      {(() => {
+                        // Hoist outside the per-option map so it is computed once.
+                        const todayIso = new Date().toISOString().slice(0, 10);
+                        return (
+                          [
+                            { value: "dmy" as DateFormat, label: "Day / Month / Year" },
+                            { value: "mdy" as DateFormat, label: "Month / Day / Year" },
+                            { value: "iso" as DateFormat, label: "ISO (Year-Month-Day)" },
+                          ] as const
+                        ).map(({ value, label }) => (
+                          <label
+                            key={value}
+                            className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-700"
+                          >
+                            <input
+                              type="radio"
+                              name="dateFormat"
+                              value={value}
+                              checked={(settings.dateFormat ?? "dmy") === value}
+                              onChange={() => {
+                                const next = { ...settings, dateFormat: value };
+                                setSettings(next);
+                                saveSettings(next);
+                                if (user && supabase) {
+                                  void pushRegionalPrefs(supabase, user.id, {
+                                    timezone: next.timezone,
+                                    dateFormat: value,
+                                  }).catch(() => {});
+                                }
+                              }}
+                              className="shrink-0 accent-foreground"
+                            />
+                            <span className="flex-1 text-foreground">{label}</span>
+                            <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+                              {formatShortDate(todayIso, value)}
+                            </span>
+                          </label>
+                        ));
+                      })()}
+                    </fieldset>
+                  </div>
+                </div>
+
+                {/* About */}
+                <div id="about-heading" className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    About
+                  </p>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Version</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      {process.env.NEXT_PUBLIC_APP_VERSION
+                        ? `v${process.env.NEXT_PUBLIC_APP_VERSION}`
+                        : "dev"}
+                    </p>
+                  </div>
+
+                  <hr className="border-zinc-200 dark:border-zinc-800" />
+
+                  <div>
+                    <p className="text-sm font-medium text-foreground">What&apos;s new</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      See what shipped in recent releases.
+                    </p>
+                    <Link
+                      href="/whats-new"
+                      className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      View changelog
+                    </Link>
+                  </div>
+                </div>
+              </CollapsibleSection>
+
+              {/* ── Advanced ───────────────────────────────────────────────── */}
+              <CollapsibleSection
+                sectionId="advanced-heading"
+                heading="Advanced"
+                forceOpen={targetCategoryId === "advanced-heading"}
+              >
+                {/* Developer section — superuser gated */}
+                {unlocked && (
+                  <div
+                    id="developer-heading"
+                    className="rounded-xl border border-amber-300 p-5 dark:border-amber-700"
+                  >
+                    <p className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                      Developer
+                    </p>
+                    <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      QA shortcuts. While any flag here is on, sync to the cloud is
+                      paused so QA state can&apos;t leak into your real data.
+                      Turning off the last flag (or locking superuser mode) restores
+                      cloud state for signed-in users, or offers to reset local
+                      state for guests.
+                    </p>
+                    <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                      <a
+                        href="/audit-themes"
+                        className="block text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                      >
+                        Theme audit →
+                      </a>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        Side-by-side preview of every mascot × intensity × colour
+                        scheme. Use when tweaking <code className="font-mono">globals.css</code> to spot
+                        combos where the grade buttons blend into the surface.
+                      </p>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Pretend all Pokémon are mastered
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            Renders every species as mastered across the Pokédex,
+                            detail pages, Pasture, Stats, and the theme picker.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={flags.pretendAllMastered}
+                          onClick={() =>
+                            void setFlag("pretendAllMastered", !flags.pretendAllMastered)
+                          }
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            flags.pretendAllMastered
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              flags.pretendAllMastered ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Force next streak milestone
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            Fires the smallest un-seen streak celebration on the
+                            next visit to Practice, regardless of the real streak.
+                            Self-clears after one fire. Locking superuser overwrites
+                            local progress with cloud state for signed-in users.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={flags.forceNextStreakMilestone}
+                          onClick={() =>
+                            void setFlag(
+                              "forceNextStreakMilestone",
+                              !flags.forceNextStreakMilestone,
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            flags.forceNextStreakMilestone
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              flags.forceNextStreakMilestone
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <ResetEarnedBadgesRow />
+                    </div>
+                  </div>
                 )}
-              </div>
+
+                {/* Danger zone */}
+                <div
+                  id="danger-zone-heading"
+                  className="rounded-xl border border-red-200 p-5 dark:border-red-900"
+                >
+                  <p className="text-sm font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
+                    Danger zone
+                  </p>
+                  <div className="mt-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Reset all progress</p>
+                      <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                        Permanently deletes your review history
+                        {user ? " and cloud data" : ""}.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setResetOpen(true)}
+                      disabled={anyFlagOn}
+                      className="min-h-[44px] shrink-0 rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-950"
+                    >
+                      Reset all progress
+                    </button>
+                  </div>
+                </div>
+              </CollapsibleSection>
+
             </div>
-
-            {unlocked && (
-              <section
-                className="mt-10 rounded-xl border border-amber-300 p-5 dark:border-amber-700"
-                aria-labelledby="developer-heading"
-              >
-                <h2
-                  id="developer-heading"
-                  className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400"
-                >
-                  Developer
-                </h2>
-                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                  QA shortcuts. While any flag here is on, sync to the cloud is
-                  paused so QA state can&apos;t leak into your real data.
-                  Turning off the last flag (or locking superuser mode) restores
-                  cloud state for signed-in users, or offers to reset local
-                  state for guests.
-                </p>
-                <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <a
-                    href="/audit-themes"
-                    className="block text-sm font-medium text-foreground underline-offset-4 hover:underline"
-                  >
-                    Theme audit →
-                  </a>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    Side-by-side preview of every mascot × intensity × colour
-                    scheme. Use when tweaking <code className="font-mono">globals.css</code> to spot
-                    combos where the grade buttons blend into the surface.
-                  </p>
-                </div>
-
-                <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Pretend all Pokémon are mastered
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Renders every species as mastered across the Pokédex,
-                        detail pages, Pasture, Stats, and the theme picker.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={flags.pretendAllMastered}
-                      onClick={() =>
-                        void setFlag("pretendAllMastered", !flags.pretendAllMastered)
-                      }
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                        flags.pretendAllMastered
-                          ? "bg-foreground"
-                          : "bg-zinc-300 dark:bg-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                          flags.pretendAllMastered ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Force next streak milestone
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Fires the smallest un-seen streak celebration on the
-                        next visit to Practice, regardless of the real streak.
-                        Self-clears after one fire. Locking superuser overwrites
-                        local progress with cloud state for signed-in users.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={flags.forceNextStreakMilestone}
-                      onClick={() =>
-                        void setFlag(
-                          "forceNextStreakMilestone",
-                          !flags.forceNextStreakMilestone,
-                        )
-                      }
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                        flags.forceNextStreakMilestone
-                          ? "bg-foreground"
-                          : "bg-zinc-300 dark:bg-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                          flags.forceNextStreakMilestone
-                            ? "translate-x-5"
-                            : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <ResetEarnedBadgesRow />
-              </section>
-            )}
-
-            <section
-              className="mt-10 rounded-xl border border-red-200 p-5 dark:border-red-900"
-              aria-labelledby="danger-zone-heading"
-            >
-              <h2
-                id="danger-zone-heading"
-                className="text-sm font-semibold uppercase tracking-wide text-red-600 dark:text-red-400"
-              >
-                Danger zone
-              </h2>
-              <div className="mt-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Reset all progress</p>
-                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                    Permanently deletes your review history
-                    {user ? " and cloud data" : ""}.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setResetOpen(true)}
-                  disabled={anyFlagOn}
-                  className="min-h-[44px] shrink-0 rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-950"
-                >
-                  Reset all progress
-                </button>
-              </div>
-            </section>
 
             <ResetProgressDialog
               open={resetOpen}
