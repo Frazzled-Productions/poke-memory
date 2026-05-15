@@ -22,7 +22,8 @@ jobs:
     # Browsers + system deps are baked into the image, so there is no
     # `playwright install --with-deps` step and no apt-get against the flaky
     # azure.archive.ubuntu.com mirror (#644). The tag must track the
-    # @playwright/test version in package.json; the image ships Node 24.
+    # @playwright/test version resolved in package-lock.json; the image ships
+    # Node 24 (an upgrade from the previous Node 20 pin on this job).
     container:
       image: mcr.microsoft.com/playwright:v1.60.0-noble
     timeout-minutes: 10
@@ -35,6 +36,8 @@ jobs:
         with:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm ci

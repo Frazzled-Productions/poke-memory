@@ -116,8 +116,9 @@ jobs:
     # Runs inside the official Playwright container: browsers and their system
     # deps are baked in, so there is no `playwright install --with-deps` step
     # and therefore no `apt-get` against the flaky azure.archive.ubuntu.com
-    # mirror (#644). The image tag MUST track the @playwright/test version in
-    # package.json — the image ships Node 24, matching the test job.
+    # mirror (#644). The image tag MUST track the @playwright/test version
+    # resolved in package-lock.json — the image ships Node 24, matching the
+    # test job.
     needs: [changes, test]
     runs-on: ubuntu-latest
     container:
@@ -137,6 +138,8 @@ jobs:
         with:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
       - run: npm ci
         if: needs.changes.outputs.e2e_relevant == 'true'
       - name: Download .next build from test job
