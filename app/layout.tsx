@@ -36,6 +36,19 @@ export const metadata: Metadata = {
     title: "Poké Memory",
     statusBarStyle: "black-translucent",
   },
+  openGraph: {
+    title: "Poké Memory",
+    description:
+      "Learn every Pokémon's name and evolutions with spaced repetition. Free, no sign-up required.",
+    siteName: "Poké Memory",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Poké Memory",
+    description:
+      "Learn every Pokémon's name and evolutions with spaced repetition. Free, no sign-up required.",
+  },
 };
 
 export const viewport: Viewport = {
