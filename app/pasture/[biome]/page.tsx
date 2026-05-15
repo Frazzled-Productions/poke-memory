@@ -120,7 +120,16 @@ export default function BiomeLandscapePage({
         <div className="sticky top-0 z-20 flex items-center gap-2 bg-background/90 px-4 py-2 backdrop-blur-sm">
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={() => {
+              // If the user arrived via a direct link or bookmark (no in-app
+              // history), router.back() would leave the app or no-op. Fall back
+              // to an explicit push so there is always a safe escape route.
+              if (window.history.length <= 1) {
+                router.push("/pasture");
+              } else {
+                router.back();
+              }
+            }}
             aria-label="Back to Pasture"
             className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-zinc-500 transition-colors hover:text-foreground dark:text-zinc-400 dark:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >

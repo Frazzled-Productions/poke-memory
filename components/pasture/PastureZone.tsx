@@ -94,7 +94,7 @@ export function PastureZone({ zone, placements, onMarkSeen, biomeHref }: Props) 
         {biomeHref && (
           <Link
             href={biomeHref}
-            aria-label={`Open ${zone.label} in landscape view`}
+            aria-label={`View ${zone.label} in landscape`}
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1"
           >
             <svg
