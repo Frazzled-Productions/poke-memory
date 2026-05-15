@@ -133,12 +133,17 @@ function BottomTabBarInner() {
   const sessionVersion = useSessionStorageKey();
   // Track mobileNav setting so the bar disappears immediately when the user
   // switches to hamburger mode on the Settings page.
-  const [mobileNav, setMobileNav] = useState<"bottom" | "hamburger">(() => {
-    if (typeof window === "undefined") return "bottom";
-    return loadSettings().mobileNav;
-  });
+  //
+  // Initialise to null so the first client render matches the server render
+  // (both produce the "bottom" layout), avoiding a React hydration mismatch
+  // for users whose persisted setting is "hamburger". The real value is applied
+  // in useEffect after mount.
+  const [mobileNav, setMobileNav] = useState<"bottom" | "hamburger" | null>(null);
 
   useEffect(() => {
+    // Apply the persisted value now that we are safely past hydration.
+    setMobileNav(loadSettings().mobileNav);
+
     function onSaved() {
       setMobileNav(loadSettings().mobileNav);
     }
@@ -157,6 +162,8 @@ function BottomTabBarInner() {
   }, [sessionVersion]);
 
   // Hidden in hamburger mode — the NavDrawer handles navigation instead.
+  // While mobileNav is null (pre-mount), render the bottom bar to match the
+  // server render and avoid a hydration mismatch.
   if (mobileNav === "hamburger") return null;
 
   const showPasture = hasMastered || flags.pretendAllMastered;

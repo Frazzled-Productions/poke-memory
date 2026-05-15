@@ -732,7 +732,7 @@ export default function SettingsPage() {
                           Bottom tab bar
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Show a fixed tab bar at the bottom of the screen on mobile. Turn off to use the classic hamburger menu instead.
+                          Show a fixed tab bar at the bottom of the screen on mobile. Turn off to use the classic hamburger menu instead. Has no effect on wide screens.
                         </p>
                       </div>
                       <button

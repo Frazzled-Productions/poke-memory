@@ -20,13 +20,17 @@ import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
  * page, so the switch takes effect without a full reload.
  */
 export function MobileNavSlot() {
-  const [mobileNav, setMobileNav] = useState<MobileNav>(() => {
-    if (typeof window === "undefined") return "bottom";
-    return loadSettings().mobileNav;
-  });
+  // Initialise to null so the first client render matches the server render
+  // (both produce the "bottom" layout), avoiding a React hydration mismatch
+  // for users whose persisted setting is "hamburger". The real value is applied
+  // in useEffect after mount.
+  const [mobileNav, setMobileNav] = useState<MobileNav | null>(null);
 
-  // Keep in sync when the user changes the setting on the Settings page.
+  // Keep in sync when the user changes the setting on the Settings page, and
+  // apply the persisted value after hydration.
   useEffect(() => {
+    setMobileNav(loadSettings().mobileNav);
+
     function onSaved() {
       setMobileNav(loadSettings().mobileNav);
     }

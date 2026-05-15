@@ -13,12 +13,16 @@ import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
  * `md:pb-0` is always applied — desktop layout is unaffected by this setting.
  */
 export function MobileNavPaddingWrapper({ children }: { children: React.ReactNode }) {
-  const [mobileNav, setMobileNav] = useState<"bottom" | "hamburger">(() => {
-    if (typeof window === "undefined") return "bottom";
-    return loadSettings().mobileNav;
-  });
+  // Initialise to null so the first client render matches the server render
+  // (both produce the "bottom" padding), avoiding a React hydration mismatch
+  // for users whose persisted setting is "hamburger". The real value is applied
+  // in useEffect after mount.
+  const [mobileNav, setMobileNav] = useState<"bottom" | "hamburger" | null>(null);
 
   useEffect(() => {
+    // Apply the persisted value now that we are safely past hydration.
+    setMobileNav(loadSettings().mobileNav);
+
     function onSaved() {
       setMobileNav(loadSettings().mobileNav);
     }

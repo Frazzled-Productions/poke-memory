@@ -84,6 +84,10 @@ vi.mock("@/lib/review/seedOpts", () => ({
 }));
 
 vi.mock("@/lib/settings/persistence", () => ({
+  DEFAULT_SETTINGS: {
+    masteryRepetitions: 3,
+    mobileNav: "bottom",
+  },
   loadSettings: vi.fn(() => ({
     masteryRepetitions: 3,
     nameCardsEnabled: true,
