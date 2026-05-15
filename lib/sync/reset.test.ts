@@ -67,6 +67,62 @@ describe("resetAllProgress", () => {
   });
 });
 
+describe("resetAllProgress — cooldown error path", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns false when the RPC returns the cooldown SQLSTATE P0001", async () => {
+    // PostgreSQL RAISE EXCEPTION ... USING ERRCODE = 'P0001' surfaces through
+    // Supabase/PostgREST as a PostgrestError with code 'P0001'. The function
+    // must surface this as a failure without throwing.
+    const cooldownError = {
+      code: "P0001",
+      message: "reset_all_progress: cooldown active, retry shortly",
+      details: null,
+      hint: null,
+    };
+    const client = makeRpcClient(cooldownError);
+    const result = await resetAllProgress(client);
+    expect(result).toBe(false);
+  });
+
+  it("logs the cooldown error to console.error", async () => {
+    const cooldownError = {
+      code: "P0001",
+      message: "reset_all_progress: cooldown active, retry shortly",
+      details: null,
+      hint: null,
+    };
+    const client = makeRpcClient(cooldownError);
+    await resetAllProgress(client);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("reset_all_progress"),
+      expect.objectContaining({ code: "P0001" }),
+    );
+  });
+
+  it("resetAllProgressEverywhere returns cloud-reset-failed on cooldown", async () => {
+    // When the cooldown fires the cloud reset fails; local progress must NOT
+    // be cleared (otherwise the user loses local state without a successful
+    // cloud wipe).
+    const cooldownError = {
+      code: "P0001",
+      message: "reset_all_progress: cooldown active, retry shortly",
+      details: null,
+      hint: null,
+    };
+    const client = makeRpcClient(cooldownError);
+    const result = await resetAllProgressEverywhere(client);
+    expect(result).toEqual({ ok: false, reason: "cloud-reset-failed" });
+    expect(clearLocalProgress).not.toHaveBeenCalled();
+  });
+});
+
 describe("resetAllProgressEverywhere", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
