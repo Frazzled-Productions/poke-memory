@@ -23,12 +23,41 @@ type Placement = {
 };
 
 /**
- * Full-screen, CSS-rotated per-biome landscape view.
+ * Returns true when the viewport is already in landscape orientation.
+ * Listens for orientation changes live so the biome view re-renders
+ * whenever the user rotates the device.
+ */
+function useIsLandscape(): boolean {
+  const [isLandscape, setIsLandscape] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(orientation: landscape)").matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: landscape)");
+    function handleChange(e: MediaQueryListEvent) {
+      setIsLandscape(e.matches);
+    }
+    mq.addEventListener("change", handleChange);
+    return () => {
+      mq.removeEventListener("change", handleChange);
+    };
+  }, []);
+
+  return isLandscape;
+}
+
+/**
+ * Full-screen per-biome landscape view.
  *
- * The entire viewport is rotated 90° clockwise so the biome renders in
- * landscape regardless of how the phone is held. Users can either turn
- * their phone to read naturally, or enjoy the sideways view. The scrolling
- * axis flips (users scroll up/down to traverse what is visually left/right).
+ * When the device viewport is in portrait orientation the content is rotated
+ * 90° clockwise so the biome renders in landscape. When the device is already
+ * in landscape the rotation is omitted — applying it would compound the OS
+ * reflow and double-rotate the content, leaving it portrait-oriented inside
+ * a landscape frame.
+ *
+ * Orientation changes are detected live via a `matchMedia` listener so the
+ * layout updates without a page reload when the user rotates their device.
  *
  * Params are Promises in Next.js 16 — always await them.
  */
@@ -40,6 +69,7 @@ export default function BiomeLandscapePage({
   const { biome: biomeSlug } = use(params);
   const router = useRouter();
   const { flags } = useSuperuser();
+  const isLandscape = useIsLandscape();
   const [masteredCards, setMasteredCards] = useState<NameReviewCard[] | null>(
     null,
   );
@@ -99,28 +129,42 @@ export default function BiomeLandscapePage({
 
   return (
     /*
-     * Outer wrapper: fixed to the full viewport, clipped so the rotated
-     * content doesn't overflow and cause scrollbars outside the rotated axis.
+     * Outer wrapper: fixed to the full viewport, clipped so content doesn't
+     * overflow and cause scrollbars outside the intended scroll axis.
      */
     <div className="fixed inset-0 overflow-hidden bg-background">
       {/*
-       * Inner wrapper: rotated 90° clockwise and re-sized so the content fills
-       * the viewport in landscape orientation.
+       * Inner wrapper — two layout branches:
        *
-       * After a 90° CW rotation, the element's width maps to viewport height
-       * and vice-versa, so we set w = 100dvh and h = 100dvw. The translate
-       * centres the rotated box inside the viewport.
+       * Portrait device  → rotate 90° CW so the biome renders in landscape.
+       *   After rotation the element's width maps to viewport height and
+       *   vice-versa, so we set w = 100dvh and h = 100dvw. The translate
+       *   centres the rotated box inside the viewport.
+       *
+       * Landscape device → no rotation; use natural viewport dimensions.
+       *   Without this branch the OS reflow (which already puts the viewport
+       *   in landscape) and the CSS rotation compound, double-rotating the
+       *   content back to portrait inside the now-landscape frame.
        */}
       <div
         className="absolute overflow-y-auto"
-        style={{
-          width: "100dvh",
-          height: "100dvw",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%) rotate(90deg)",
-          transformOrigin: "center center",
-        }}
+        style={
+          isLandscape
+            ? {
+                width: "100dvw",
+                height: "100dvh",
+                top: 0,
+                left: 0,
+              }
+            : {
+                width: "100dvh",
+                height: "100dvw",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%) rotate(90deg)",
+                transformOrigin: "center center",
+              }
+        }
       >
         {/* Back button + biome heading — top-left in the rotated (landscape) frame */}
         <div className="sticky top-0 z-20 bg-background/90 px-4 py-2 backdrop-blur-sm">
