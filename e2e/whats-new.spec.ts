@@ -17,13 +17,15 @@ test.describe("What's new page", () => {
     page,
   }) => {
     // Simulate a first-time user with a stale last-seen marker so the
-    // indicator is guaranteed to render. Setting it before navigation avoids
-    // the initial-load auto-seed branch that hides the indicator.
-    await page.addInitScript(() => {
+    // indicator is guaranteed to render. We use evaluate() after the first
+    // goto() rather than addInitScript() — addInitScript registers a callback
+    // that fires on every navigation, so it would re-seed 0.0.1 on the final
+    // goto("/") and undo MarkVisited's write, causing a false failure.
+    await page.goto("/");
+    await page.evaluate(() => {
       window.localStorage.setItem("poke-memory:last-seen-version:v1", "0.0.1");
     });
-
-    await page.goto("/");
+    await page.reload();
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     const indicator = nav.getByRole("link", { name: "What's new" });
     await expect(indicator).toBeVisible();
