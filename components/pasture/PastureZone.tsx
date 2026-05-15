@@ -3,7 +3,9 @@
 import { useRef } from "react";
 import Link from "next/link";
 import type { HabitatZone } from "@/lib/pasture/zones";
+import type { BiomeStats } from "@/lib/pasture/stats";
 import { PasturePokemon } from "./PasturePokemon";
+import { PastureBiomeStats } from "./PastureBiomeStats";
 import { GrasslandsBiome } from "./biomes/GrasslandsBiome";
 import { ForestBiome } from "./biomes/ForestBiome";
 import { SeaBiome } from "./biomes/SeaBiome";
@@ -42,6 +44,8 @@ type Props = {
   onMarkSeen: (cardId: number) => void;
   /** When provided, the zone heading becomes a link to open the biome landscape view. */
   biomeHref?: string;
+  /** Per-biome statistics to display below the heading. Optional for backwards-compat. */
+  stats?: BiomeStats;
 };
 
 /**
@@ -74,7 +78,7 @@ const LABEL_COLOURS: Record<string, string> = {
   unknown:        "text-zinc-700 dark:text-zinc-400",
 };
 
-export function PastureZone({ zone, placements, onMarkSeen, biomeHref }: Props) {
+export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats }: Props) {
   const biomeRenderer = BIOME_RENDERERS[zone.habitat];
   const tint = HABITAT_TINTS[zone.habitat] ?? HABITAT_TINTS.unknown;
   const labelColour = LABEL_COLOURS[zone.habitat] ?? LABEL_COLOURS.unknown;
@@ -125,6 +129,9 @@ export function PastureZone({ zone, placements, onMarkSeen, biomeHref }: Props) 
           </Link>
         )}
       </div>
+      {stats && (
+        <PastureBiomeStats stats={stats} className={`mb-1.5 ${labelColour}`} />
+      )}
       <div
         ref={zoneRef}
         className={[styles.zoneContainer, biomeRenderer ? "" : tint].join(" ")}
