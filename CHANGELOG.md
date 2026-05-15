@@ -6,6 +6,25 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.60] — 2026-05-15
+
+### Added
+
+- Show all gym badges on the Stats page — earned in colour, locked as greyed silhouettes with a vague hint to keep the criteria a discoverable surprise.
+- Make struggling-card rows on the Stats page tap-through to the Pokédex detail page and tag each row with the card direction.
+- Add a name-search bar to the Pasture page for quickly locating mastered Pokémon.
+- Add a mastery-status filter to the Pokédex grid so users can isolate "type X, not yet mastered" combinations.
+
+### Fixed
+
+- Fix silent FSRS optimizer write-back failure caused by an unbound Supabase `rpc` reference.
+- Show the sync-failure banner when the per-grade upsert path fails repeatedly, not just the unload path.
+- Practice page now refreshes when a sign-in or visibility pull lands cloud progress that wasn't on this device yet. Previously cold-loading the PWA after completing cards on Safari would show "all cards new" until the user navigated away and back; the fix dispatches a targeted event from `pullAndMerge` only when the merge actually transitioned a card's `lastReview` or `firstSeen`, so no-op pulls stay silent and the reload cannot loop.
+
+### Security
+
+- Reject `reset_all_progress` calls that fire within 5 s of the previous one, blocking session-token replay attacks and accidental double-fires.
+
 ## [0.9.59] — 2026-05-15
 
 ### Changed
@@ -952,7 +971,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.59...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.60...HEAD
+[0.9.60]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.60
 [0.9.59]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.59
 [0.9.58]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.58
 [0.9.57]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.57
