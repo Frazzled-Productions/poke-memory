@@ -21,7 +21,9 @@ test.describe("Mobile nav — hamburger drawer", () => {
 
     await page.goto("/");
 
-    const hamburger = page.getByRole("button", { name: "Open navigation menu" });
+    // Locate the hamburger by its stable aria-controls attribute so the
+    // assertion below survives the label changing from "Open…" to "Close…".
+    const hamburger = page.locator('[aria-controls="mobile-nav-drawer"]');
     await expect(hamburger).toBeVisible();
 
     // Drawer starts closed
@@ -32,6 +34,8 @@ test.describe("Mobile nav — hamburger drawer", () => {
     await hamburger.click();
 
     await expect(drawer).toBeVisible();
+    // After opening the label changes to "Close navigation menu"; locate by
+    // aria-controls (stable) so the aria-expanded assertion always resolves.
     await expect(hamburger).toHaveAttribute("aria-expanded", "true");
 
     // All primary links are present inside the drawer

@@ -16,16 +16,27 @@ test.describe("Navigation", () => {
     /**
      * Helper: resolve the link container. On desktop the links live directly
      * in the main nav; on mobile they are inside the drawer dialog.
+     *
+     * After clicking the hamburger the drawer animates in (200 ms CSS
+     * transition). We wait for it to be visible in the accessibility tree
+     * before returning so the caller can `.click()` links immediately.
      */
     async function getNavLinkContainer() {
       if (isHamburgerVisible) {
+        const dialog = page.getByRole("dialog", { name: "Navigation menu" });
         // Open the drawer if it isn't already open.
-        const drawerHidden = await page
-          .getByRole("dialog", { name: "Navigation menu" })
-          .isHidden()
-          .catch(() => true);
-        if (drawerHidden) await hamburger.click();
-        return page.getByRole("dialog", { name: "Navigation menu" });
+        const drawerHidden = await dialog.isHidden().catch(() => true);
+        if (drawerHidden) {
+          await hamburger.click();
+          // Wait for the drawer panel to become accessible (aria-hidden cleared)
+          // before returning the locator. Using the raw DOM id avoids the
+          // chicken-and-egg problem of getByRole ignoring aria-hidden elements.
+          await expect(page.locator("#mobile-nav-drawer")).not.toHaveAttribute(
+            "aria-hidden",
+            "true",
+          );
+        }
+        return dialog;
       }
       return nav;
     }
