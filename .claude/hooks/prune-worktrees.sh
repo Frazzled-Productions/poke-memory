@@ -31,6 +31,7 @@ now=$(date +%s)
 cutoff=$((3 * 86400))   # 3 days
 removed=0
 
+shopt -s nullglob
 for d in "$wt"/*/; do
   d="${d%/}"
   [ -d "$d" ] || continue
@@ -44,13 +45,14 @@ for d in "$wt"/*/; do
   [ -n "$ts" ] || continue
   [ $((now - ts)) -ge "$cutoff" ] || continue
 
-  if git worktree remove --force "$d" 2>/dev/null; then
+  if git worktree remove --force --force "$d" 2>/dev/null; then
     removed=$((removed + 1))
   elif ! printf '%s\n' "$tracked" | grep -qxF "$d"; then
     # Pre-loop snapshot confirms git no longer tracks this dir — safe to remove.
     rm -rf "$d" && removed=$((removed + 1))
   fi
 done
+shopt -u nullglob
 
 git worktree prune 2>/dev/null
 [ "$removed" -gt 0 ] && echo "[prune-worktrees] removed $removed stale worktree(s)"
