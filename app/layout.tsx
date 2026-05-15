@@ -40,7 +40,6 @@ export const metadata: Metadata = {
     title: "Poké Memory",
     description:
       "Learn every Pokémon's name and evolutions with spaced repetition. Free, no sign-up required.",
-    url: "https://pokememory.com",
     siteName: "Poké Memory",
     type: "website",
   },
