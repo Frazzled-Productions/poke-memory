@@ -214,28 +214,88 @@ export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): bo
 }
 
 /**
- * Count species in the seed pool that match the active scope. Returns
- * `seed.length` for the empty scope (the practice page's default).
+ * Two-tier eligibility check (#658). Returns true when the card should surface
+ * in a practice session, applying the master `alternateFormsEnabled` gate
+ * **before** the `practiceScope` filter.
  *
- * Drives the UI's live "X of N match" count beneath `ScopeControl`.
+ * Gate semantics:
+ *   - `alternateFormsEnabled: false` → any form card (`isDefaultForm === false`)
+ *     is excluded immediately, regardless of `practiceScope.formCategories`.
+ *   - `alternateFormsEnabled: true`  → form cards are eligible; the scope
+ *     filter (`cardMatchesScope`) applies as normal.
+ *
+ * Evolution and reverse-evolution cards are never treated as alternate forms
+ * by this gate — they represent the default-form pre-evo identity.
+ *
+ * Use this function as the single eligibility chokepoint in the session
+ * builder / scope-change handler instead of calling `cardMatchesScope` directly
+ * when the forms gate setting is available.
+ */
+export function cardIsEligible(
+  card: ReviewableCard,
+  scope: PracticeScope,
+  alternateFormsEnabled: boolean,
+): boolean {
+  // Gate: exclude all form cards when the master toggle is off.
+  // A card is only gated OUT when it is *definitely* a non-default form —
+  // undefined (pre-#445 seed) is treated as default form via `?? true`, so
+  // old cards are never incorrectly excluded.
+  if (!alternateFormsEnabled) {
+    if (
+      card.cardType !== "evolution" &&
+      card.cardType !== "reverse-evolution" &&
+      ((card as { isDefaultForm?: boolean }).isDefaultForm ?? true) === false
+    ) {
+      return false;
+    }
+  }
+  if (isScopeEmpty(scope)) return true;
+  return cardMatchesScope(card, scope);
+}
+
+/**
+ * Count species in the seed pool that match the active scope, applying the
+ * same two-tier gate as `cardIsEligible`. Returns `seed.length` (minus
+ * alternate-form entries when gated off) for the empty scope.
+ *
+ * Drives the UI's live "X of N match" count beneath `ScopeControl`. When
+ * `alternateFormsEnabled` is false, alternate-form species are excluded from
+ * the count so the display is consistent with what actually surfaces in a
+ * session.
+ *
  * Distinct from `cardMatchesScope` because the caller has a `SeedPokemon`,
  * not a `ReviewableCard` — the underlying matching logic is shared via
  * the private `speciesMatchesScope` helper to keep them from drifting.
+ *
+ * @param alternateFormsEnabled  Mirror of `UserSettings.alternateFormsEnabled`.
+ *   Defaults to `true` so existing callers that do not yet pass the gate
+ *   (e.g. tests) see the previous behaviour — all species counted.
  */
 export function countMatchingSpecies(
   seed: readonly SeedPokemon[],
   scope: PracticeScope,
+  alternateFormsEnabled: boolean = true,
 ): number {
-  if (isScopeEmpty(scope)) return seed.length;
   let count = 0;
   for (const s of seed) {
+    // isDefaultForm may be absent in a pre-#445 seed; default to true so old
+    // seeds are never incorrectly excluded.
+    const isDefaultForm = (s as { isDefaultForm?: boolean }).isDefaultForm ?? true;
+
+    // Master gate: when the forms toggle is off, skip non-default-form entries
+    // so the count matches what the session will actually build.
+    if (!alternateFormsEnabled && !isDefaultForm) continue;
+
+    if (isScopeEmpty(scope)) {
+      count += 1;
+      continue;
+    }
+
     // For alternate-form entries, s.id is outside the 1-1025 gen range.
     // Use speciesId (the base species ID) so the gens axis resolves correctly.
     // Falls back to s.id for pre-#445 seeds where speciesId is absent.
     const resolvedId = (s as { speciesId?: number }).speciesId ?? s.id;
-    // isDefaultForm and formCategory may be absent in a pre-#445 seed; fall
-    // back to 'true' / 'default' so existing seeds always pass the form gate.
-    const isDefaultForm = (s as { isDefaultForm?: boolean }).isDefaultForm ?? true;
+    // formCategory may be absent in a pre-#445 seed; fall back to 'default'.
     const formCategory = (s as { formCategory?: FormCategory }).formCategory ?? "default";
     if (speciesMatchesScope(resolvedId, s.types, scope, isDefaultForm, formCategory)) count += 1;
   }

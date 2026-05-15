@@ -57,6 +57,7 @@ const VALID_SETTINGS: UserSettings = {
   nameCardsEnabled: true,
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
+  alternateFormsEnabled: false,
   playCryOnReveal: false,
   speakNameOnReveal: false,
   cryCardsEnabled: false,

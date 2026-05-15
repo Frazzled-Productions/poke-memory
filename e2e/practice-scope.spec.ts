@@ -136,6 +136,20 @@ test.describe("Practice scope (#333)", () => {
   test("Default form only radio is selectable and updates the live count", async ({
     page,
   }) => {
+    // The "Alternate forms" section in ScopeControl (which contains the
+    // "Default form only" radio) is gated behind alternateFormsEnabled. Seed
+    // the setting via localStorage so the section is rendered without needing
+    // to navigate through the Settings page UI.
+    await page.addInitScript(
+      ({ key }) => {
+        const stored = localStorage.getItem(key);
+        const settings = stored ? (JSON.parse(stored) as Record<string, unknown>) : {};
+        settings["alternateFormsEnabled"] = true;
+        localStorage.setItem(key, JSON.stringify(settings));
+      },
+      { key: SETTINGS_STORAGE_KEY },
+    );
+
     await page.goto("/");
 
     // Open the Scope panel.
@@ -192,6 +206,10 @@ test.describe("Practice scope (#333)", () => {
   }) => {
     // Seed the "Default form only" scope via settings so it is active when the
     // practice page loads, without needing UI interaction first.
+    // alternateFormsEnabled must be true so that form cards are eligible for
+    // the session and the formCategories filter is the active gate — otherwise
+    // the master alternateFormsEnabled=false gate excludes all form cards
+    // before the scope filter is consulted, making the test vacuous.
     await page.addInitScript(
       ({ key }) => {
         const settings = {
@@ -209,6 +227,7 @@ test.describe("Practice scope (#333)", () => {
           cryCardsEnabled: false,
           maxNewCryPerDay: 10,
           maxReviewsCryPerDay: 100,
+          alternateFormsEnabled: true,
           favouriteTheme: null,
           retentionTarget: 0.9,
           practiceScope: {

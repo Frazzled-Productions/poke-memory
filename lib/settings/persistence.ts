@@ -61,6 +61,18 @@ export type UserSettings = {
   cryCardsEnabled: boolean;          // enable third-direction cards: audio prompt → name
   maxNewCryPerDay: number;
   maxReviewsCryPerDay: number;
+  /**
+   * Master gate for alternate-form cards (#658). When false, form cards
+   * (regional variants, Megas, formes, etc.) are excluded from practice
+   * entirely and the "Alternate forms" section of ScopeControl is hidden.
+   * When true, form cards are eligible and the per-category filter in
+   * `practiceScope.formCategories` applies as normal.
+   *
+   * Defaults to false — the base Pokédex is already a large deck and forms
+   * are opt-in. Missing/non-boolean values in persisted JSON default to
+   * false (existing users lose forms from practice until they re-enable).
+   */
+  alternateFormsEnabled: boolean;
   favouriteTheme: StoredFavouriteTheme | null; // chosen mastery accent Pokémon
   /** How broadly the chosen palette is painted across the UI (#411). */
   themeIntensity: ThemeIntensity;
@@ -162,6 +174,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   cryCardsEnabled: false,
   maxNewCryPerDay: 10,
   maxReviewsCryPerDay: 100,
+  alternateFormsEnabled: false,
   favouriteTheme: null,
   themeIntensity: "accents",
   retentionTarget: 0.9,
@@ -321,6 +334,12 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.maxReviewsCryPerDay === "number"
         ? obj.maxReviewsCryPerDay
         : DEFAULT_SETTINGS.maxReviewsCryPerDay,
+    // Defensive default: missing/non-boolean → false. Existing users lose form
+    // cards from practice until they opt in via the Settings toggle (#658).
+    alternateFormsEnabled:
+      typeof obj.alternateFormsEnabled === "boolean"
+        ? obj.alternateFormsEnabled
+        : DEFAULT_SETTINGS.alternateFormsEnabled,
     // Shallow validation only — lib/theme/persistence.ts does the deep
     // validation (HEX_COLOR, known Pokémon id) on read.
     favouriteTheme:

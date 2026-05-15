@@ -34,6 +34,7 @@ const SAMPLE: UserSettings = {
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
   reverseCardsEnabled: false,
+  alternateFormsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,

@@ -63,3 +63,75 @@ test.describe("Settings page — collapsible sections (#660)", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Settings page — alternate forms toggle (#658)", () => {
+  test("alternate forms toggle is present and off by default in Practice section", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    // Expand "Practice".
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    // The toggle must be visible.
+    const toggle = page.getByRole("switch", {
+      name: /include alternate forms in practice/i,
+    });
+    await expect(toggle).toBeVisible();
+
+    // Default state is off (aria-checked="false").
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("toggling alternate forms on causes it to report as checked", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    const toggle = page.getByRole("switch", {
+      name: /include alternate forms in practice/i,
+    });
+
+    // Click to enable.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+test.describe("Alternate forms — ScopeControl visibility (#658)", () => {
+  test("Alternate forms section is absent in ScopeControl when toggle is off (default)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // Open the scope panel.
+    await page.locator("button[aria-controls='scope-panel']").click();
+
+    // The "Alternate forms" fieldset legend must NOT be present when the gate is off.
+    await expect(page.getByText("Alternate forms")).not.toBeVisible();
+  });
+
+  test("Alternate forms section appears in ScopeControl after enabling the toggle", async ({
+    page,
+  }) => {
+    // Enable the toggle on the Settings page and persist via Save.
+    // handleToggle only updates React state; saveSettings is only called from
+    // handleSave — so we must click Save before navigating away.
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("switch", { name: /include alternate forms in practice/i }).click();
+
+    // Click Save and wait for the "Saved!" confirmation so we know the
+    // setting has been written to localStorage before we navigate.
+    await page.getByRole("button", { name: /^save$/i }).click();
+    await expect(page.getByText("Saved!")).toBeVisible();
+
+    // Navigate to the practice page and open the scope panel.
+    await page.goto("/");
+    await page.locator("button[aria-controls='scope-panel']").click();
+
+    // The "Alternate forms" section heading must now be visible.
+    await expect(page.getByText("Alternate forms")).toBeVisible();
+  });
+});
