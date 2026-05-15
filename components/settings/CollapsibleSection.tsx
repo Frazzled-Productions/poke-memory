@@ -29,11 +29,18 @@ type Props = {
   /** Section content — rendered when expanded. */
   children: React.ReactNode;
   /**
-   * When true, force-expand this section regardless of persisted state.
-   * Used for hash-based deep-linking: when the URL hash targets this section's
-   * id the page passes `forceOpen` so it expands and scrolls into view.
+   * When true, force-expand this section AND persist the open state to
+   * localStorage. Used for hash-based deep-linking: when the URL hash targets
+   * this section's id the page passes `forceOpen` so it expands, scrolls into
+   * view, and stays open on the next visit.
    */
   forceOpen?: boolean;
+  /**
+   * When true, force-expand this section WITHOUT writing to localStorage.
+   * Used for search-driven expansion: sections are shown open while a query
+   * is active but revert to their persisted state once the query is cleared.
+   */
+  transientOpen?: boolean;
 };
 
 export function CollapsibleSection({
@@ -42,6 +49,7 @@ export function CollapsibleSection({
   className,
   children,
   forceOpen = false,
+  transientOpen = false,
 }: Props) {
   // Initialise from localStorage so there is no layout flash on re-mount.
   const [open, setOpen] = useState<boolean>(() => readOpenState(sectionId));
@@ -49,8 +57,9 @@ export function CollapsibleSection({
   // Stable id wires aria-controls on the button to the content region.
   const panelId = useId();
 
-  // Honour forceOpen (e.g. hash deep-link). Only run when forceOpen flips to
-  // true — do not collapse when it flips back to false.
+  // Honour forceOpen (e.g. hash deep-link). Persists to localStorage so the
+  // section stays open on the next visit. Only runs when forceOpen flips to
+  // true — does not collapse when it flips back to false.
   useEffect(() => {
     if (!forceOpen) return;
     setOpen(true);
@@ -63,6 +72,10 @@ export function CollapsibleSection({
     if (!forceOpen || !sectionRef.current) return;
     sectionRef.current.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }, [forceOpen]);
+
+  // Derive the effective open state: transientOpen overrides the persisted
+  // state for search-driven expansion without writing to localStorage.
+  const effectiveOpen = open || transientOpen;
 
   function toggle() {
     const next = !open;
@@ -92,7 +105,7 @@ export function CollapsibleSection({
       >
         <button
           type="button"
-          aria-expanded={open}
+          aria-expanded={effectiveOpen}
           aria-controls={panelId}
           onClick={toggle}
           className={[
@@ -103,7 +116,7 @@ export function CollapsibleSection({
           <span className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             {heading}
           </span>
-          <ChevronIcon open={open} />
+          <ChevronIcon open={effectiveOpen} />
         </button>
       </h2>
 
@@ -112,7 +125,7 @@ export function CollapsibleSection({
         id={panelId}
         role="region"
         aria-labelledby={`${sectionId}-heading`}
-        hidden={!open}
+        hidden={!effectiveOpen}
         className="mt-4 flex flex-col gap-4"
       >
         {children}
