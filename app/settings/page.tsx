@@ -425,16 +425,21 @@ export default function SettingsPage() {
   const normalisedQuery = searchQuery.trim().toLowerCase();
   const isFiltering = normalisedQuery.length > 0;
 
+  // Hash deep-link: the top-level CollapsibleSection id that should be
+  // force-expanded on load, derived from window.location.hash.
+  const [targetCategoryId, setTargetCategoryId] = useState<TopLevelId | null>(null);
+
   // Derive which top-level sections are visible under the current query.
+  // When a hash deep-link target is active, always include its section so the
+  // target is never filtered out by a coincident search query.
   const visibleSectionIds = new Set(
     SETTINGS_SEARCH_INDEX
       .filter((entry) => sectionMatchesQuery(entry, normalisedQuery))
       .map((entry) => entry.sectionId),
   );
-
-  // Hash deep-link: the top-level CollapsibleSection id that should be
-  // force-expanded on load, derived from window.location.hash.
-  const [targetCategoryId, setTargetCategoryId] = useState<TopLevelId | null>(null);
+  if (targetCategoryId !== null) {
+    visibleSectionIds.add(targetCategoryId);
+  }
 
   useEffect(() => {
     const loaded = loadSettings();
@@ -684,7 +689,8 @@ export default function SettingsPage() {
               <CollapsibleSection
                 sectionId="appearance-heading"
                 heading="Appearance"
-                forceOpen={targetCategoryId === "appearance-heading" || isFiltering}
+                forceOpen={targetCategoryId === "appearance-heading"}
+                transientOpen={isFiltering}
               >
                 {/* App Theme (mascot picker) — only shown when unlocked entries exist */}
                 <div>
@@ -719,7 +725,8 @@ export default function SettingsPage() {
               <CollapsibleSection
                 sectionId="practice-heading"
                 heading="Practice"
-                forceOpen={targetCategoryId === "practice-heading" || isFiltering}
+                forceOpen={targetCategoryId === "practice-heading"}
+                transientOpen={isFiltering}
               >
                 {/* Scheduler knobs */}
                 <div id="scheduler-heading" className="flex flex-col gap-4">
@@ -1133,7 +1140,8 @@ export default function SettingsPage() {
               <CollapsibleSection
                 sectionId="audio-heading"
                 heading="Audio"
-                forceOpen={targetCategoryId === "audio-heading" || isFiltering}
+                forceOpen={targetCategoryId === "audio-heading"}
+                transientOpen={isFiltering}
               >
                 {/* Cry cards */}
                 <div id="cry-heading" className="flex flex-col gap-4">
@@ -1249,7 +1257,8 @@ export default function SettingsPage() {
               <CollapsibleSection
                 sectionId="account-data-heading"
                 heading="Account & Data"
-                forceOpen={targetCategoryId === "account-data-heading" || isFiltering}
+                forceOpen={targetCategoryId === "account-data-heading"}
+                transientOpen={isFiltering}
               >
                 {/* Onboarding explainer */}
                 <div id="onboarding-heading" className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
@@ -1491,7 +1500,8 @@ export default function SettingsPage() {
               <CollapsibleSection
                 sectionId="advanced-heading"
                 heading="Advanced"
-                forceOpen={targetCategoryId === "advanced-heading" || isFiltering}
+                forceOpen={targetCategoryId === "advanced-heading"}
+                transientOpen={isFiltering}
               >
                 {/* Developer section — superuser gated */}
                 {unlocked && (

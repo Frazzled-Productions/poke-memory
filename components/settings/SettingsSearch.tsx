@@ -40,9 +40,7 @@ export function SettingsSearch({ value, onChange, matchCount }: Props) {
         <input
           id={inputId}
           type="search"
-          role="searchbox"
           aria-label="Search settings"
-          aria-controls={statusId}
           placeholder="Search settings…"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -83,7 +81,7 @@ export function SettingsSearch({ value, onChange, matchCount }: Props) {
         {isFiltering
           ? matchCount === 0
             ? "No settings match your search."
-            : `${matchCount} section${matchCount === 1 ? "" : "s"} match your search.`
+            : `${matchCount} section${matchCount === 1 ? "" : "s"} ${matchCount === 1 ? "matches" : "match"} your search.`
           : ""}
       </p>
     </div>

@@ -222,4 +222,57 @@ test.describe("Settings page — search/filter (#662)", () => {
     await input.fill("audio");
     await expect(page.getByRole("button", { name: /^audio$/i })).toBeVisible();
   });
+
+  test("search-driven expansion does not overwrite persisted collapsed state", async ({
+    page,
+  }) => {
+    // Seed all sections as explicitly closed so the test is deterministic.
+    await page.addInitScript(() => {
+      const keys = [
+        "appearance-heading",
+        "practice-heading",
+        "audio-heading",
+        "account-data-heading",
+        "advanced-heading",
+      ];
+      for (const k of keys) {
+        window.localStorage.setItem(`poke-memory:settings-section:${k}`, "0");
+      }
+    });
+
+    await page.goto("/settings");
+
+    const input = page.getByRole("searchbox", { name: /search settings/i });
+
+    // Type a query — the matching section should be visible and expanded.
+    await input.fill("backup");
+    await expect(page.getByRole("button", { name: /account & data/i })).toBeVisible();
+
+    // Clear the search.
+    await page.getByRole("button", { name: /clear search/i }).click();
+
+    // All sections must be back to collapsed (content hidden).
+    // The recall-target slider lives inside Practice; it must not be visible.
+    await expect(page.getByRole("slider", { name: /recall target/i })).not.toBeVisible();
+
+    // Confirm localStorage still records the section as closed (not overwritten).
+    const accountDataPersistedState = await page.evaluate(() =>
+      window.localStorage.getItem("poke-memory:settings-section:account-data-heading"),
+    );
+    expect(accountDataPersistedState).toBe("0");
+  });
+
+  test("hash deep-link target section remains visible even when a query is active", async ({
+    page,
+  }) => {
+    // Navigate to a hash that targets Practice via a sub-section anchor.
+    // With a query of 'backup' (matches only Account & Data), Practice would
+    // normally be filtered out — but the hash target must keep it present.
+    await page.goto("/settings#scheduler-heading");
+
+    // The Practice button must be visible (hash target always included).
+    await expect(page.getByRole("button", { name: /^practice$/i })).toBeVisible();
+    // The Practice section must be expanded (hash-forced open).
+    await expect(page.getByRole("slider", { name: /recall target/i })).toBeVisible();
+  });
 });

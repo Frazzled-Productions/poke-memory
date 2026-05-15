@@ -176,4 +176,79 @@ describe("CollapsibleSection", () => {
     // After forceOpen, a page reload should keep the section open.
     expect(window.localStorage.getItem(STORAGE_KEY)).toBe("1");
   });
+
+  // transientOpen — search-driven expansion that must NOT pollute localStorage
+  describe("transientOpen", () => {
+    it("expands the section when transientOpen is true", () => {
+      render(
+        <CollapsibleSection sectionId="test-section" heading="Test Section" transientOpen>
+          <p>Content</p>
+        </CollapsibleSection>,
+      );
+
+      expect(
+        screen.getByRole("button", { name: /test section/i }),
+      ).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("does NOT write to localStorage when transientOpen triggers expansion", () => {
+      render(
+        <CollapsibleSection sectionId="test-section" heading="Test Section" transientOpen>
+          <p>Content</p>
+        </CollapsibleSection>,
+      );
+
+      // localStorage must remain untouched — no entry should exist.
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+    });
+
+    it("does NOT overwrite a persisted closed state when transientOpen is true", () => {
+      // Persist section as closed.
+      window.localStorage.setItem(STORAGE_KEY, "0");
+
+      render(
+        <CollapsibleSection sectionId="test-section" heading="Test Section" transientOpen>
+          <p>Content</p>
+        </CollapsibleSection>,
+      );
+
+      // Section is visually expanded by transientOpen…
+      expect(
+        screen.getByRole("button", { name: /test section/i }),
+      ).toHaveAttribute("aria-expanded", "true");
+
+      // …but the persisted closed state is unchanged.
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe("0");
+    });
+
+    it("reverts to persisted collapsed state after transientOpen is cleared (remount)", () => {
+      // Simulate: section was collapsed by the user before a search began.
+      window.localStorage.setItem(STORAGE_KEY, "0");
+
+      const { unmount } = render(
+        <CollapsibleSection sectionId="test-section" heading="Test Section" transientOpen>
+          <p>Content</p>
+        </CollapsibleSection>,
+      );
+
+      // Confirm it is visually open while transientOpen is true.
+      expect(
+        screen.getByRole("button", { name: /test section/i }),
+      ).toHaveAttribute("aria-expanded", "true");
+
+      unmount();
+
+      // Re-mount without transientOpen (query cleared). Persisted state should
+      // restore the section to collapsed, as if the search never happened.
+      render(
+        <CollapsibleSection sectionId="test-section" heading="Test Section">
+          <p>Content</p>
+        </CollapsibleSection>,
+      );
+
+      expect(
+        screen.getByRole("button", { name: /test section/i }),
+      ).toHaveAttribute("aria-expanded", "false");
+    });
+  });
 });

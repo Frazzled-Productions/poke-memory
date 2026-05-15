@@ -59,7 +59,7 @@ describe("SettingsSearch", () => {
   it("announces singular match count correctly", () => {
     render(<SettingsSearch value="audio" onChange={vi.fn()} matchCount={1} />);
     const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("1 section match");
+    expect(status).toHaveTextContent("1 section matches your search.");
   });
 
   it("announces zero matches correctly", () => {
@@ -156,5 +156,81 @@ describe("SETTINGS_SEARCH_INDEX", () => {
   it("'danger zone' matches Advanced section", () => {
     const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "advanced-heading")!;
     expect(sectionMatchesQuery(entry, "danger zone")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Settings page filter logic (visible-section derivation)
+// Consolidates the tests that were previously in SettingsSearchFilter.test.tsx.
+// ---------------------------------------------------------------------------
+
+/** Simulates the visibleSectionIds derivation from the settings page. */
+function getVisibleSectionIds(query: string): Set<string> {
+  const normalised = query.trim().toLowerCase();
+  return new Set(
+    SETTINGS_SEARCH_INDEX
+      .filter((entry) => sectionMatchesQuery(entry, normalised))
+      .map((entry) => entry.sectionId),
+  );
+}
+
+describe("Settings page filter logic", () => {
+  it("returns all 5 sections when query is empty", () => {
+    const visible = getVisibleSectionIds("");
+    expect(visible.size).toBe(5);
+    for (const id of ["appearance-heading", "practice-heading", "audio-heading", "account-data-heading", "advanced-heading"]) {
+      expect(visible.has(id)).toBe(true);
+    }
+  });
+
+  it("returns all 5 sections when query is whitespace-only", () => {
+    expect(getVisibleSectionIds("   ").size).toBe(5);
+  });
+
+  it("filters to only Audio when query is 'cry'", () => {
+    const visible = getVisibleSectionIds("cry");
+    expect(visible.has("audio-heading")).toBe(true);
+    expect(visible.has("appearance-heading")).toBe(false);
+    expect(visible.has("practice-heading")).toBe(false);
+    expect(visible.has("account-data-heading")).toBe(false);
+    expect(visible.has("advanced-heading")).toBe(false);
+  });
+
+  it("filters to only Practice when query is 'recall'", () => {
+    const visible = getVisibleSectionIds("recall");
+    expect(visible.has("practice-heading")).toBe(true);
+    expect(visible.has("audio-heading")).toBe(false);
+  });
+
+  it("filters to only Account & Data when query is 'timezone'", () => {
+    const visible = getVisibleSectionIds("timezone");
+    expect(visible.has("account-data-heading")).toBe(true);
+    expect(visible.has("practice-heading")).toBe(false);
+  });
+
+  it("filters to only Advanced when query is 'danger'", () => {
+    const visible = getVisibleSectionIds("danger");
+    expect(visible.has("advanced-heading")).toBe(true);
+    expect(visible.has("appearance-heading")).toBe(false);
+    expect(visible.has("audio-heading")).toBe(false);
+  });
+
+  it("returns an empty set for a query that matches nothing", () => {
+    expect(getVisibleSectionIds("xyzzynosuchthing").size).toBe(0);
+  });
+
+  it("is case-insensitive — 'BACKUP' matches Account & Data", () => {
+    expect(getVisibleSectionIds("BACKUP").has("account-data-heading")).toBe(true);
+  });
+
+  it("clearing the query restores all 5 sections", () => {
+    expect(getVisibleSectionIds("cry").size).toBe(1);
+    expect(getVisibleSectionIds("").size).toBe(5);
+  });
+
+  it("'voice' matches only Audio", () => {
+    const visible = getVisibleSectionIds("voice");
+    expect(visible.has("audio-heading")).toBe(true);
+    expect(visible.size).toBe(1);
   });
 });
