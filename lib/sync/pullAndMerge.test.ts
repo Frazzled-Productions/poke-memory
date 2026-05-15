@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { pullAndMerge } from "./pullAndMerge";
+import { pullAndMerge, SYNC_PULL_APPLIED_EVENT } from "./pullAndMerge";
 import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
 import { pullUserSettingsRow } from "@/lib/sync/settings";
 import { pullStreak } from "@/lib/sync/streak";
@@ -544,5 +544,74 @@ describe("pullAndMerge", () => {
     await pullAndMerge(fakeClient, fakeUserId);
 
     expect(mockClearLocalProgress).not.toHaveBeenCalled();
+  });
+
+  // ─── SYNC_PULL_APPLIED_EVENT dispatch (#608) ──────────────────────────────
+  // The dispatch is gated on both `wasColdLoad` (localSession was null before
+  // the merge) and `mergeAffectsProgress`. These tests stub `window` so the
+  // node-environment guard (`typeof window !== "undefined"`) is satisfied.
+
+  describe("SYNC_PULL_APPLIED_EVENT", () => {
+    // Minimal card shape needed by mergeAffectsProgress
+    function card(id: string, lastReview: string | null, firstSeen: string | null) {
+      return { id, state: { lastReview, firstSeen } };
+    }
+
+    // Stub window + CustomEvent before each test in this block; unstub after.
+    let mockDispatch: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockDispatch = vi.fn();
+      vi.stubGlobal("window", { dispatchEvent: mockDispatch });
+      // CustomEvent may not be defined in the node test environment.
+      vi.stubGlobal(
+        "CustomEvent",
+        class {
+          type: string;
+          constructor(type: string) {
+            this.type = type;
+          }
+        },
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("fires when cold load + merge advances a card's lastReview", async () => {
+      mockLoadSession.mockResolvedValue(null);
+      mockBuildSession.mockReturnValue([card("pikachu", null, null)] as any);
+      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-10")] as any);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockDispatch).toHaveBeenCalledOnce();
+      expect(mockDispatch.mock.calls[0][0]).toMatchObject({ type: SYNC_PULL_APPLIED_EVENT });
+    });
+
+    it("stays silent on cold load when merge is a no-op (cloud matches seed)", async () => {
+      mockLoadSession.mockResolvedValue(null);
+      mockBuildSession.mockReturnValue([card("pikachu", null, null)] as any);
+      mockMerge.mockReturnValue([card("pikachu", null, null)] as any);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
+
+    it("stays silent when local session already exists (not a cold load)", async () => {
+      // Non-cold load: user already has local review state
+      mockLoadSession.mockResolvedValue({
+        cards: [card("pikachu", "2026-05-13", "2026-05-01")] as any,
+        limits: {} as any,
+      });
+      // Cloud brings newer lastReview — would fire on cold load, must not fire here
+      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-01")] as any);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
   });
 });
