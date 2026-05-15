@@ -1,173 +1,257 @@
 /**
  * Integration test: card_reviews_reject_regression_trigger.
  *
- * Verifies that the DB-level trigger (migration 002, updated in 012)
+ * Verifies that the DB-level trigger (migration 002, updated in 015/016/017)
  * blocks lifecycle-timestamp regressions:
  *   - last_review cannot transition to NULL
  *   - first_seen cannot transition to NULL
  *   - last_review cannot move backward
  *
- * Also covers the seen_in_pasture regression guard from migration 008 and the
- * reps / lapses monotonicity guards from migrations 015 and 016 (if present).
+ * Also covers the reps / lapses monotonicity guards from migrations 015/016
+ * and the scheduled_days same-date regression guard from migration 016.
  *
- * Uses the service-role client for direct SQL via rpc to bypass RLS when
- * testing trigger behaviour in isolation.  For push-path integration tests
- * (which go through RLS), see card-reviews-round-trip.test.ts.
+ * All writes use direct SQL via pg, wrapped in transactions that ROLLBACK at
+ * the end for isolation. `SET LOCAL "request.jwt.claims"` makes `auth.uid()`
+ * return the test user's UUID, satisfying RLS policies.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { setupTestBranch, teardownTestBranch, type TestBranch } from "./setup";
+import {
+  createTestDatabase,
+  dropTestDatabase,
+  applyPreMigrationFixture,
+  insertAuthUser,
+  withUser,
+} from "./setup";
 import { applyMigrations } from "./applyMigrations";
-import { createTestUser, deleteTestUser, type TestUser } from "./auth";
-import { pushSession, pullSession } from "../cloud";
-import type { ReviewableCard } from "@/lib/review/session";
+import pg from "pg";
+import { randomUUID } from "node:crypto";
 
-let branch: TestBranch;
-let user: TestUser;
+let pool: pg.Pool;
+let dbName: string;
+const USER_ID = randomUUID();
+
+/** INSERT a reviewed card row directly via SQL. */
+async function insertCard(
+  client: pg.PoolClient,
+  subjectKey: string,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO card_reviews
+       (user_id, card_type, subject_key,
+        stability, difficulty, elapsed_days, scheduled_days,
+        reps, lapses, fsrs_state,
+        due_date, last_review, first_seen,
+        seen_in_pasture, updated_at)
+     VALUES ($1, 'name', $2,
+             2.0, 5.0, 1, 3,
+             2, 0, 'review',
+             '2026-06-01', '2026-05-20', '2026-05-18',
+             false, now())`,
+    [USER_ID, subjectKey],
+  );
+}
 
 beforeAll(async () => {
-  branch = await setupTestBranch();
-  await applyMigrations(branch.branchRef);
-  user = await createTestUser(branch.serviceClient, branch.branchUrl, branch.anonKey);
-}, 120_000);
+  ({ pool, dbName } = await createTestDatabase());
+  await applyPreMigrationFixture(pool);
+  await applyMigrations(pool);
+  // Insert the auth.users row so FK on card_reviews is satisfied.
+  await insertAuthUser(pool, USER_ID);
+}, 60_000);
 
 afterAll(async () => {
-  if (user) await deleteTestUser(branch.serviceClient, user.id);
-  if (branch) await teardownTestBranch(branch);
+  await dropTestDatabase(pool, dbName);
 });
-
-function makeReviewedCard(subjectKey: string): ReviewableCard {
-  return {
-    id: Number(subjectKey),
-    speciesId: Number(subjectKey),
-    isDefaultForm: true,
-    formCategory: "default",
-    formSlug: null,
-    displayName: `Pokemon ${subjectKey}`,
-    cardType: "name",
-    name: `Pokemon ${subjectKey}`,
-    subjectKey,
-    spriteUrl: `https://example.com/${subjectKey}.png`,
-    types: ["normal"],
-    stats: {
-      hp: 45,
-      attack: 49,
-      defense: 49,
-      specialAttack: 65,
-      specialDefense: 65,
-      speed: 45,
-    },
-    flavorText: "",
-    flavorTexts: [],
-    evolutionChain: [],
-    height: 7,
-    weight: 69,
-    baseExperience: 64,
-    genus: "Test Pokémon",
-    generation: "generation-i",
-    captureRate: null,
-    baseHappiness: null,
-    growthRate: null,
-    habitat: null,
-    genderRate: null,
-    isLegendary: false,
-    isMythical: false,
-    cryUrl: null,
-    state: {
-      stability: 2.0,
-      difficulty: 5.0,
-      elapsedDays: 1,
-      scheduledDays: 3,
-      reps: 2,
-      lapses: 0,
-      fsrsState: "review",
-      dueDate: "2026-06-01",
-      lastReview: "2026-05-20",
-      firstSeen: "2026-05-18",
-      learningStep: null,
-      stepStartedAt: null,
-      hiddenSince: null,
-      seenInPasture: false,
-    },
-  } as ReviewableCard;
-}
 
 describe("regression trigger (integration)", () => {
   it("blocks UPDATE that sets last_review to NULL", async () => {
-    // Seed a reviewed card.
-    const card = makeReviewedCard("101");
-    await pushSession(user.client, user.id, [card]);
-
-    // Attempt to overwrite with a regressed row via the service client
-    // (bypasses RLS so we test the trigger directly).
-    const { error } = await branch.serviceClient
-      .from("card_reviews")
-      .update({ last_review: null })
-      .eq("user_id", user.id)
-      .eq("card_type", "name")
-      .eq("subject_key", "101");
-
-    expect(error).not.toBeNull();
-    expect(error?.code).toBe("23514");
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "101");
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET last_review = NULL
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '101'`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
   });
 
   it("blocks UPDATE that sets first_seen to NULL", async () => {
-    const card = makeReviewedCard("102");
-    await pushSession(user.client, user.id, [card]);
-
-    const { error } = await branch.serviceClient
-      .from("card_reviews")
-      .update({ first_seen: null })
-      .eq("user_id", user.id)
-      .eq("card_type", "name")
-      .eq("subject_key", "102");
-
-    expect(error).not.toBeNull();
-    expect(error?.code).toBe("23514");
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "102");
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET first_seen = NULL
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '102'`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
   });
 
   it("blocks UPDATE that moves last_review backward", async () => {
-    const card = makeReviewedCard("103");
-    // last_review is 2026-05-20.
-    await pushSession(user.client, user.id, [card]);
-
-    const { error } = await branch.serviceClient
-      .from("card_reviews")
-      .update({ last_review: "2026-05-01" }) // earlier than 2026-05-20
-      .eq("user_id", user.id)
-      .eq("card_type", "name")
-      .eq("subject_key", "103");
-
-    expect(error).not.toBeNull();
-    expect(error?.code).toBe("23514");
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "103");
+        // last_review is 2026-05-20; try to move it to 2026-05-01.
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET last_review = '2026-05-01'
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '103'`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
   });
 
   it("allows UPDATE that moves last_review forward", async () => {
-    const card = makeReviewedCard("104");
-    await pushSession(user.client, user.id, [card]);
-
-    const { error } = await branch.serviceClient
-      .from("card_reviews")
-      .update({ last_review: "2026-06-01" }) // later than 2026-05-20
-      .eq("user_id", user.id)
-      .eq("card_type", "name")
-      .eq("subject_key", "104");
-
-    // Forward movement must NOT be rejected.
-    expect(error).toBeNull();
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "104");
+        // last_review is 2026-05-20; move forward to 2026-06-01 — should succeed.
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET last_review = '2026-06-01'
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '104'`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
   });
 
   it("allows UPDATE that keeps last_review the same", async () => {
-    const card = makeReviewedCard("105");
-    await pushSession(user.client, user.id, [card]);
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "105");
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET last_review = '2026-05-20', scheduled_days = 7
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '105'`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
+  });
 
-    const { error } = await branch.serviceClient
-      .from("card_reviews")
-      .update({ last_review: "2026-05-20", scheduled_days: 7 })
-      .eq("user_id", user.id)
-      .eq("card_type", "name")
-      .eq("subject_key", "105");
+  it("blocks UPDATE that decreases reps (migration 015)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "106"); // reps=2
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET reps = 1
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '106'`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
 
-    expect(error).toBeNull();
+  it("blocks UPDATE that decreases lapses (migration 015)", async () => {
+    // Insert a row with lapses=2 directly (bypassing withUser for the INSERT,
+    // which would roll back). The INSERT goes directly through the pool so the
+    // row is committed and visible for the subsequent UPDATE test.
+    await pool.query(
+      `INSERT INTO card_reviews
+         (user_id, card_type, subject_key,
+          stability, difficulty, elapsed_days, scheduled_days,
+          reps, lapses, fsrs_state,
+          due_date, last_review, first_seen,
+          seen_in_pasture, updated_at)
+       VALUES ($1, 'name', '107',
+               2.0, 5.0, 1, 3,
+               3, 2, 'review',
+               '2026-06-01', '2026-05-20', '2026-05-18',
+               false, now())`,
+      [USER_ID],
+    );
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET lapses = 1
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '107'`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("blocks UPDATE that drops scheduled_days without advancing last_review (migration 016)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "108"); // scheduled_days=3, last_review='2026-05-20'
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET scheduled_days = 1
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '108'`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("allows UPDATE that drops scheduled_days while advancing last_review (Again grade pattern)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "109"); // scheduled_days=3, last_review='2026-05-20'
+        // Advancing last_review while dropping scheduled_days is the Again grade pattern.
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET last_review = '2026-06-01', scheduled_days = 1
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '109'`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
   });
 });

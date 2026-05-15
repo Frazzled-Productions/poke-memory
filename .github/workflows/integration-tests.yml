@@ -1,13 +1,12 @@
 name: Integration Tests
 
-# Runs real-DB-backed sync round-trip tests against an ephemeral Supabase
-# branch.  See lib/sync/integration/ for the test suite.
+# Runs DB-backed integration tests (migration apply, RLS isolation, regression
+# trigger) against a local Postgres service container.  No Supabase API calls,
+# no branch quota, $0 cost.  See lib/sync/integration/ for the test suite.
 #
-# Cost note: each run creates one Supabase branch, applies ~15 migrations,
-# runs the full integration suite, and tears the branch down.  Branch
-# creation/deletion counts against the project's branch quota.  The
-# `integration-tests` label gate below limits runs to PRs that explicitly
-# opt in, keeping costs predictable.
+# The `integration-tests` label gate limits runs to PRs that explicitly opt in,
+# keeping CI time predictable.  Issue #611 will add path-based auto-labelling
+# (lib/sync/**, db/migrations/**, app/api/sync/**) as a follow-up.
 #
 # To run on a PR: add the `integration-tests` label to the PR.
 # To run manually: use the workflow_dispatch trigger below.
@@ -24,7 +23,7 @@ concurrency:
 jobs:
   integration:
     # Only run when the PR has the `integration-tests` label, or on manual
-    # dispatch.  This prevents accidental branch quota usage on every PR.
+    # dispatch.  This prevents unnecessary CI usage on every PR.
     if: |
       github.event_name == 'workflow_dispatch' ||
       (
@@ -34,11 +33,24 @@ jobs:
       )
 
     runs-on: ubuntu-latest
-    # Branch create/migrate/test/delete can take 3–5 minutes.
     timeout-minutes: 15
 
     permissions:
       contents: read
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: poke_memory_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v6
@@ -52,7 +64,5 @@ jobs:
 
       - name: Run integration tests
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
+          DATABASE_URL: postgres://postgres:testpass@localhost:5432/poke_memory_test
         run: npm run test:integration
