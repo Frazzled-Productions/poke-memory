@@ -9,12 +9,34 @@ test.describe("Navigation", () => {
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     await expect(nav).toBeVisible();
 
+    // On mobile the links are behind a hamburger menu; open it first if present.
+    const hamburger = page.getByRole("button", { name: "Open navigation menu" });
+    const isHamburgerVisible = await hamburger.isVisible().catch(() => false);
+
+    /**
+     * Helper: resolve the link container. On desktop the links live directly
+     * in the main nav; on mobile they are inside the drawer dialog.
+     */
+    async function getNavLinkContainer() {
+      if (isHamburgerVisible) {
+        // Open the drawer if it isn't already open.
+        const drawerHidden = await page
+          .getByRole("dialog", { name: "Navigation menu" })
+          .isHidden()
+          .catch(() => true);
+        if (drawerHidden) await hamburger.click();
+        return page.getByRole("dialog", { name: "Navigation menu" });
+      }
+      return nav;
+    }
+
     for (const { label, path } of [
       { label: "Stats", path: "/stats" },
       { label: "Pokédex", path: "/pokedex" },
       { label: "Settings", path: "/settings" },
     ]) {
-      await nav.getByRole("link", { name: label }).click();
+      const container = await getNavLinkContainer();
+      await container.getByRole("link", { name: label }).click();
       await expect(page).toHaveURL(path);
       await expect(
         page.getByRole("heading", { level: 1, name: label }),
@@ -22,7 +44,8 @@ test.describe("Navigation", () => {
     }
 
     // Navigate back to practice
-    await nav.getByRole("link", { name: "Practice" }).click();
+    const container = await getNavLinkContainer();
+    await container.getByRole("link", { name: "Practice" }).click();
     await expect(page).toHaveURL("/");
   });
 });

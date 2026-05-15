@@ -1,15 +1,17 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { NavLinks, NavLinksFallback } from "./NavLinks";
+import { NavDrawer, NavDrawerFallback } from "./NavDrawer";
 import { FavouriteMascot } from "./theme/FavouriteMascot";
 
 export function Nav() {
   return (
     <header className="border-b border-theme-secondary bg-theme-primary">
       <nav
-        className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3"
+        className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3"
         aria-label="Main navigation"
       >
+        {/* Brand — always visible */}
         <Link
           href="/"
           className="flex items-center gap-2 text-sm font-bold tracking-tight text-theme-fg-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
@@ -21,8 +23,16 @@ export function Nav() {
           poke-memory
         </Link>
 
-        <Suspense fallback={<NavLinksFallback />}>
-          <NavLinks />
+        {/* Desktop horizontal link row — hidden below md */}
+        <div className="hidden md:flex md:items-center md:gap-1">
+          <Suspense fallback={<NavLinksFallback />}>
+            <NavLinks />
+          </Suspense>
+        </div>
+
+        {/* Mobile hamburger + drawer — hidden at md and above */}
+        <Suspense fallback={<NavDrawerFallback />}>
+          <NavDrawer />
         </Suspense>
       </nav>
     </header>
