@@ -11,7 +11,7 @@
  * and the scheduled_days same-date regression guard from migration 016.
  *
  * All writes use direct SQL via pg, wrapped in transactions that ROLLBACK at
- * the end for isolation. `SET LOCAL "request.jwt.claims"` makes `auth.uid()`
+ * the end for isolation. `set_config('request.jwt.claims', ...)` makes `auth.uid()`
  * return the test user's UUID, satisfying RLS policies.
  */
 

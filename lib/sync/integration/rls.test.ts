@@ -6,7 +6,7 @@
  *   INSERT  — user cannot insert a row with another user's user_id.
  *   UPDATE  — user cannot update another user's rows.
  *
- * All SQL is executed via direct `pg` queries with `SET LOCAL "request.jwt.claims"`
+ * All SQL is executed via direct `pg` queries with `set_config('request.jwt.claims', ...)`
  * inside transactions to simulate `auth.uid()`. Each test rolls back at the end.
  *
  * RLS on vanilla Postgres is enforced for non-superuser roles. The tests connect
@@ -39,7 +39,7 @@ const USER_B = randomUUID();
 let rlsPool: pg.Pool;
 
 /**
- * Helper: insert a card_reviews row as the given user using `SET LOCAL` to
+ * Helper: insert a card_reviews row as the given user using `set_config` to
  * simulate auth.uid(). Runs in its own transaction that commits so subsequent
  * selects can see the row.
  */
@@ -52,7 +52,7 @@ async function insertAsUser(
   try {
     await client.query("BEGIN");
     const claims = JSON.stringify({ sub: userId, role: "authenticated" });
-    await client.query(`SET LOCAL "request.jwt.claims" TO $1`, [claims]);
+    await client.query(`SELECT set_config('request.jwt.claims', $1, true)`, [claims]);
     await client.query(
       `INSERT INTO card_reviews
          (user_id, card_type, subject_key,
@@ -135,7 +135,7 @@ async function asUser<T>(
     // Drop to an unprivileged role so RLS policies are enforced.
     await client.query("SET LOCAL ROLE rls_test_user");
     const claims = JSON.stringify({ sub: userId, role: "authenticated" });
-    await client.query(`SET LOCAL "request.jwt.claims" TO $1`, [claims]);
+    await client.query(`SELECT set_config('request.jwt.claims', $1, true)`, [claims]);
     const result = await fn(client);
     await client.query("ROLLBACK");
     return result;

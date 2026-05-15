@@ -177,8 +177,9 @@ export async function applyPreMigrationFixture(pool: pg.Pool): Promise<void> {
  * Simulate an authenticated user by setting `request.jwt.claims` for the
  * duration of a callback.
  *
- * The setting is applied with `SET LOCAL` inside an explicit transaction so it
- * is automatically reverted when the transaction ends (ROLLBACK or COMMIT).
+ * The setting is applied transaction-locally via `set_config(..., true)` inside
+ * an explicit transaction so it is automatically reverted when the transaction
+ * ends (ROLLBACK or COMMIT).
  *
  * @param client  A pg.PoolClient from pool.connect().
  * @param userId  UUID string to expose as `auth.uid()`.
@@ -192,7 +193,9 @@ export async function withUser<T>(
   await client.query("BEGIN");
   try {
     const claims = JSON.stringify({ sub: userId, role: "authenticated" });
-    await client.query(`SET LOCAL "request.jwt.claims" TO $1`, [claims]);
+    // SET LOCAL does not accept bind parameters (Postgres syntax restriction).
+    // set_config('name', value, is_local) is the parameterised equivalent.
+    await client.query(`SELECT set_config('request.jwt.claims', $1, true)`, [claims]);
     const result = await fn(client);
     await client.query("ROLLBACK");
     return result;
