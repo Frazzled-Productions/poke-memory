@@ -34,6 +34,11 @@ import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
 import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
 import { TtsControls } from "@/components/settings/TtsControls";
 import { CollapsibleSection } from "@/components/settings/CollapsibleSection";
+import { SettingsSearch } from "@/components/settings/SettingsSearch";
+import {
+  SETTINGS_SEARCH_INDEX,
+  sectionMatchesQuery,
+} from "@/components/settings/settingsSearchIndex";
 import {
   detectTimezone,
   detectDateFormat,
@@ -414,6 +419,19 @@ export default function SettingsPage() {
 
   const [optimizableReviewCount, setOptimizableReviewCount] = useState<number>(0);
 
+  // Settings search/filter query.
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  // Normalised (trimmed, lower-cased) version used for matching.
+  const normalisedQuery = searchQuery.trim().toLowerCase();
+  const isFiltering = normalisedQuery.length > 0;
+
+  // Derive which top-level sections are visible under the current query.
+  const visibleSectionIds = new Set(
+    SETTINGS_SEARCH_INDEX
+      .filter((entry) => sectionMatchesQuery(entry, normalisedQuery))
+      .map((entry) => entry.sectionId),
+  );
+
   // Hash deep-link: the top-level CollapsibleSection id that should be
   // force-expanded on load, derived from window.location.hash.
   const [targetCategoryId, setTargetCategoryId] = useState<TopLevelId | null>(null);
@@ -641,13 +659,32 @@ export default function SettingsPage() {
           <LoadingSkeleton />
         ) : (
           <>
+            {/* ── Search ──────────────────────────────────────────────────── */}
+            <div className="mb-4">
+              <SettingsSearch
+                value={searchQuery}
+                onChange={setSearchQuery}
+                matchCount={visibleSectionIds.size}
+              />
+              {isFiltering && visibleSectionIds.size === 0 && (
+                <p
+                  role="status"
+                  className="mt-4 text-sm text-zinc-500 dark:text-zinc-400"
+                  aria-live="polite"
+                >
+                  No settings match &ldquo;{searchQuery}&rdquo;.
+                </p>
+              )}
+            </div>
+
             <div className="flex flex-col gap-3">
 
               {/* ── Appearance ─────────────────────────────────────────────── */}
+              {visibleSectionIds.has("appearance-heading") && (
               <CollapsibleSection
                 sectionId="appearance-heading"
                 heading="Appearance"
-                forceOpen={targetCategoryId === "appearance-heading"}
+                forceOpen={targetCategoryId === "appearance-heading" || isFiltering}
               >
                 {/* App Theme (mascot picker) — only shown when unlocked entries exist */}
                 <div>
@@ -675,12 +712,14 @@ export default function SettingsPage() {
                   }}
                 />
               </CollapsibleSection>
+              )}
 
               {/* ── Practice ───────────────────────────────────────────────── */}
+              {visibleSectionIds.has("practice-heading") && (
               <CollapsibleSection
                 sectionId="practice-heading"
                 heading="Practice"
-                forceOpen={targetCategoryId === "practice-heading"}
+                forceOpen={targetCategoryId === "practice-heading" || isFiltering}
               >
                 {/* Scheduler knobs */}
                 <div id="scheduler-heading" className="flex flex-col gap-4">
@@ -1087,12 +1126,14 @@ export default function SettingsPage() {
                   )}
                 </div>
               </CollapsibleSection>
+              )}
 
               {/* ── Audio ──────────────────────────────────────────────────── */}
+              {visibleSectionIds.has("audio-heading") && (
               <CollapsibleSection
                 sectionId="audio-heading"
                 heading="Audio"
-                forceOpen={targetCategoryId === "audio-heading"}
+                forceOpen={targetCategoryId === "audio-heading" || isFiltering}
               >
                 {/* Cry cards */}
                 <div id="cry-heading" className="flex flex-col gap-4">
@@ -1201,12 +1242,14 @@ export default function SettingsPage() {
                 )}
                 <VoiceQualityHint />
               </CollapsibleSection>
+              )}
 
               {/* ── Account & Data ─────────────────────────────────────────── */}
+              {visibleSectionIds.has("account-data-heading") && (
               <CollapsibleSection
                 sectionId="account-data-heading"
                 heading="Account & Data"
-                forceOpen={targetCategoryId === "account-data-heading"}
+                forceOpen={targetCategoryId === "account-data-heading" || isFiltering}
               >
                 {/* Onboarding explainer */}
                 <div id="onboarding-heading" className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
@@ -1441,12 +1484,14 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </CollapsibleSection>
+              )}
 
               {/* ── Advanced ───────────────────────────────────────────────── */}
+              {visibleSectionIds.has("advanced-heading") && (
               <CollapsibleSection
                 sectionId="advanced-heading"
                 heading="Advanced"
-                forceOpen={targetCategoryId === "advanced-heading"}
+                forceOpen={targetCategoryId === "advanced-heading" || isFiltering}
               >
                 {/* Developer section — superuser gated */}
                 {unlocked && (
@@ -1589,6 +1634,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </CollapsibleSection>
+              )}
 
             </div>
 

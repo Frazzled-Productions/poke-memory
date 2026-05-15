@@ -135,3 +135,91 @@ test.describe("Alternate forms — ScopeControl visibility (#658)", () => {
     await expect(page.getByText("Alternate forms")).toBeVisible();
   });
 });
+
+test.describe("Settings page — search/filter (#662)", () => {
+  test("search input is visible at the top of the settings page", async ({ page }) => {
+    await page.goto("/settings");
+
+    const input = page.getByRole("searchbox", { name: /search settings/i });
+    await expect(input).toBeVisible();
+  });
+
+  test("typing 'cry' filters to only the Audio section and auto-expands it", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    const input = page.getByRole("searchbox", { name: /search settings/i });
+    await input.fill("cry");
+
+    // Audio section must be visible and expanded (cry cards toggle is visible).
+    await expect(page.getByRole("switch", { name: /enable cry cards/i })).toBeVisible();
+
+    // The Practice section button must be absent — it is filtered out.
+    await expect(page.getByRole("button", { name: /^practice$/i })).not.toBeVisible();
+  });
+
+  test("typing a known setting name surfaces its section", async ({ page }) => {
+    await page.goto("/settings");
+
+    const input = page.getByRole("searchbox", { name: /search settings/i });
+    await input.fill("recall target");
+
+    // The Practice section (which contains the recall target slider) must be visible.
+    await expect(page.getByRole("slider", { name: /recall target/i })).toBeVisible();
+  });
+
+  test("clearing the search input restores all sections", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    const input = page.getByRole("searchbox", { name: /search settings/i });
+    await input.fill("backup");
+
+    // Only Account & Data should be visible while filtering.
+    await expect(page.getByRole("button", { name: /^practice$/i })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: /^audio$/i })).not.toBeVisible();
+
+    // Clear via the clear button.
+    await page.getByRole("button", { name: /clear search/i }).click();
+
+    // All five top-level sections must be visible again after clearing.
+    for (const label of ["Appearance", "Practice", "Audio", "Account & Data", "Advanced"]) {
+      await expect(
+        page.getByRole("button", { name: new RegExp(label, "i") }),
+      ).toBeVisible();
+    }
+
+    // The search input must be empty again.
+    await expect(input).toHaveValue("");
+  });
+
+  test("no-match query shows empty-result message", async ({ page }) => {
+    await page.goto("/settings");
+
+    const input = page.getByRole("searchbox", { name: /search settings/i });
+    await input.fill("xyzzynosuchthing");
+
+    // All section buttons must be gone.
+    for (const label of ["Appearance", "Practice", "Audio", "Account & Data", "Advanced"]) {
+      await expect(
+        page.getByRole("button", { name: new RegExp(label, "i") }),
+      ).not.toBeVisible();
+    }
+
+    // The no-match message must be visible.
+    await expect(page.getByText(/no settings match/i)).toBeVisible();
+  });
+
+  test("search input is keyboard-reachable via click and accepts input", async ({ page }) => {
+    await page.goto("/settings");
+    const input = page.getByRole("searchbox", { name: /search settings/i });
+    // Clicking gives focus — verifies the input is not disabled/inert.
+    await input.click();
+    await expect(input).toBeFocused();
+    // Typing filters the view.
+    await input.fill("audio");
+    await expect(page.getByRole("button", { name: /^audio$/i })).toBeVisible();
+  });
+});
