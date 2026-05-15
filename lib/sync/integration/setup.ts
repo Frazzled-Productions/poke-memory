@@ -192,7 +192,9 @@ export async function withUser<T>(
   await client.query("BEGIN");
   try {
     const claims = JSON.stringify({ sub: userId, role: "authenticated" });
-    await client.query(`SET LOCAL "request.jwt.claims" TO $1`, [claims]);
+    // SET LOCAL does not accept bind parameters (Postgres syntax restriction).
+    // set_config('name', value, is_local) is the parameterised equivalent.
+    await client.query(`SELECT set_config('request.jwt.claims', $1, true)`, [claims]);
     const result = await fn(client);
     await client.query("ROLLBACK");
     return result;
