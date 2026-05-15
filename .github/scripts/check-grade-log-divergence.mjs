@@ -57,7 +57,9 @@
 //   * Hard errors (auth, query failure): exit non-zero so the workflow run
 //     itself is marked failed and we get a "check is broken" signal.
 
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const DEFAULT_THRESHOLD = 5;
 const WINDOW_DAYS = 2;
@@ -211,7 +213,13 @@ async function main() {
   }
 
   // Write the markdown body to disk so the workflow can `--body-file` it.
-  const bodyPath = process.env.DIVERGENCE_BODY_PATH ?? "/tmp/divergence-body.md";
+  // Fall back to a freshly-created, unpredictably-named temp directory rather
+  // than a hardcoded path in the world-writable /tmp — a fixed name there is a
+  // symlink-clobber target (CodeQL js/insecure-temporary-file). mkdtempSync
+  // creates the dir mode 0700 with a random suffix.
+  const bodyPath =
+    process.env.DIVERGENCE_BODY_PATH ??
+    join(mkdtempSync(join(tmpdir(), "divergence-")), "body.md");
   writeFileSync(bodyPath, formatMarkdownReport(flagged, threshold), "utf8");
 
   // Log the masked summary to stdout — the workflow grep / wc -l doesn't
