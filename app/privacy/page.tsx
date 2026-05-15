@@ -466,6 +466,42 @@ export default function PrivacyPage() {
           </p>
         </section>
 
+        {/* 12. Third-party content */}
+        <section aria-labelledby="section-ip">
+          <h2
+            id="section-ip"
+            className="mb-3 text-base font-semibold"
+          >
+            12. Third-party content and intellectual property
+          </h2>
+          <p className="mb-3">
+            Poké Memory is an unofficial, non-commercial fan project. It is not
+            affiliated with, endorsed by, or in any way connected to Nintendo,
+            Game Freak, or The Pokémon Company.
+          </p>
+          <p className="mb-3">
+            Pokémon and all related names, characters, sprites, cries, and
+            other creative assets are trademarks and/or copyrights of Nintendo
+            / Creatures Inc. / GAME FREAK inc. All rights remain with their
+            respective owners. These assets are reproduced here solely for
+            non-commercial fan purposes.
+          </p>
+          <p>
+            Pokémon species data and sprites are sourced from{" "}
+            <a
+              href="https://pokeapi.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+            >
+              PokéAPI
+            </a>
+            {" "}(an open Pokémon data API). Sprites are self-hosted and served as
+            static files from the same infrastructure as the app — no runtime
+            requests are made to PokéAPI or any Nintendo-affiliated server.
+          </p>
+        </section>
+
       </div>
     </main>
   );
