@@ -22,7 +22,7 @@
           {
             "type": "command",
             "command": ".claude/hooks/prune-worktrees.sh",
-            "timeout": 120
+            "timeout": 30
           }
         ]
       }

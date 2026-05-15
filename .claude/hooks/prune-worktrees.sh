@@ -9,7 +9,7 @@
 # Runs at SessionStart. Removes a worktree only when it is BOTH:
 #   - not locked   — a locked worktree belongs to a running job; never touched.
 #   - stale        — its branch's last commit is > 3 days old (grace period to
-#                    inspect or /continue a finished job before reclaiming it).
+#                    inspect or continue a finished job before reclaiming it).
 # Branches and pushed PRs are untouched — only the on-disk worktree is removed.
 set -u
 
@@ -21,8 +21,10 @@ cd "$root" || exit 0
 git worktree prune 2>/dev/null
 
 # Absolute paths of locked worktrees (active background jobs).
+# sub(/^worktree /,"") captures the full remainder of the line so paths
+# containing spaces are not truncated.
 locked="$(git worktree list --porcelain 2>/dev/null \
-  | awk '/^worktree /{p=$2} /^locked/{print p}')"
+  | awk '/^worktree /{sub(/^worktree /,""); p=$0} /^locked/{print p}')"
 
 now=$(date +%s)
 cutoff=$((3 * 86400))   # 3 days
@@ -44,7 +46,10 @@ for d in "$wt"/*/; do
   if git worktree remove --force "$d" 2>/dev/null; then
     removed=$((removed + 1))
   else
-    rm -rf "$d" && removed=$((removed + 1))
+    if ! git worktree list --porcelain 2>/dev/null | grep -qxF "worktree $d"; then
+      # git no longer tracks this directory — safe to remove the orphaned dir.
+      rm -rf "$d" && removed=$((removed + 1))
+    fi
   fi
 done
 
