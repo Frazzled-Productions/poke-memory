@@ -4,16 +4,18 @@ name: Integration Tests
 # trigger) against a local Postgres service container.  No Supabase API calls,
 # no branch quota, $0 cost.  See lib/sync/integration/ for the test suite.
 #
-# The `integration-tests` label gate limits runs to PRs that explicitly opt in,
-# keeping CI time predictable.  Issue #611 will add path-based auto-labelling
-# (lib/sync/**, db/migrations/**, app/api/sync/**) as a follow-up.
+# Trigger (#611): the suite runs automatically on PRs that touch the
+# cloud-write surface — lib/sync/**, app/api/sync/**, db/migrations/**,
+# lib/gradelog/**, or this workflow file itself.  Path filtering keeps spend
+# bounded: only relevant PRs trigger a run.
 #
-# To run on a PR: add the `integration-tests` label to the PR.
-# To run manually: use the workflow_dispatch trigger below.
+# The `integration-tests` PR label remains an explicit opt-in escape hatch for
+# changes that fall outside the path filter but still need DB-level
+# verification.  Manual runs use the workflow_dispatch trigger below.
 
 on:
   pull_request:
-    types: [labeled, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 concurrency:
@@ -21,16 +23,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Gate job: decides whether the integration suite should run.  Runs on every
+  # PR (cheap), so the decision can combine "paths OR label" — a bare
+  # `on.pull_request.paths:` filter cannot, because it would also filter out
+  # `labeled` events on PRs that don't touch the paths, breaking the escape
+  # hatch.
+  decide:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.actor != 'dependabot[bot]'
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            cloud_write:
+              - 'lib/sync/**'
+              - 'app/api/sync/**'
+              - 'db/migrations/**'
+              - 'lib/gradelog/**'
+              - '.github/workflows/integration-tests.yml'
+
+      - name: Decide
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PATHS_MATCH: ${{ steps.filter.outputs.cloud_write }}
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'integration-tests') }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$PATHS_MATCH" = "true" ] || [ "$HAS_LABEL" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   integration:
-    # Only run when the PR has the `integration-tests` label, or on manual
-    # dispatch.  This prevents unnecessary CI usage on every PR.
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'pull_request' &&
-        contains(github.event.pull_request.labels.*.name, 'integration-tests') &&
-        github.actor != 'dependabot[bot]'
-      )
+    needs: decide
+    if: needs.decide.outputs.run == 'true'
 
     runs-on: ubuntu-latest
     timeout-minutes: 15
