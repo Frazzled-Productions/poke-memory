@@ -31,6 +31,7 @@ import { computeRecords, type Records } from "@/lib/stats/records";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
 import { TrainerCard } from "@/components/stats/TrainerCard";
+import { BadgeGallery } from "@/components/badges/BadgeGallery";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -767,6 +768,10 @@ export default function StatsPage() {
               totalMastered={stats.mastered}
               perGeneration={stats.perGeneration}
               earnedBadges={badgesToShow}
+            />
+            <BadgeGallery
+              earnedBadges={badgesToShow}
+              forceAllMastered={flags.pretendAllMastered}
             />
             <section aria-labelledby="streak-heading">
               <h2 id="streak-heading" className="mb-3 text-base font-semibold text-foreground">

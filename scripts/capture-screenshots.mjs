@@ -73,7 +73,19 @@ const SHOTS = {
     // deterministic static frame for the screenshot.
     initScript: () => { window.__PASTURE_FREEZE_IDLE = true; },
   },
-  stats: { url: "/stats", file: "stats.png", action: null },
+  stats: {
+    url: "/stats",
+    file: "stats.png",
+    // Wait for the Gym badges heading to confirm the page has hydrated past
+    // the loading skeleton before taking the screenshot.
+    action: async (page) => {
+      await page
+        .getByRole("heading", { name: "Gym badges" })
+        .waitFor({ state: "visible", timeout: 15_000 });
+      // Short pause so trailing layout animations settle.
+      await page.waitForTimeout(400);
+    },
+  },
 };
 
 async function captureSurface(page, name) {
@@ -88,7 +100,15 @@ async function captureSurface(page, name) {
   if (spec.initScript) {
     await page.addInitScript(spec.initScript);
   }
-  await page.goto(`${BASE_URL}${spec.url}`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE_URL}${spec.url}`, { waitUntil: "networkidle", timeout: 30_000 }).catch(async (err) => {
+    // networkidle can time out when background polling keeps the network busy.
+    // That is expected; ignore it. Any other navigation failure (e.g. the dev
+    // server is not running) should surface immediately.
+    if (!String(err).includes("Timeout")) {
+      process.stderr.write(`Navigation failed for ${spec.url}: ${err}\n`);
+      process.exit(1);
+    }
+  });
   await page.waitForTimeout(1200);
   if (spec.action) await spec.action(page);
   await page.waitForTimeout(600);
