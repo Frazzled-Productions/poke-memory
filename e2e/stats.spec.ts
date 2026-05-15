@@ -34,10 +34,10 @@ test.describe("Stats page — badge gallery", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
-    // A fresh guest session has no earned badges; at least one locked hint
-    // should be present. The Boulder Badge hint is the first entry.
+    // A fresh guest session has no earned badges; at least one locked tile
+    // should be present. The Boulder Badge is the first catalog entry.
     await expect(
-      page.getByLabel(/A Kanto gym leader.*Locked/i).first(),
+      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
     ).toBeVisible();
   });
 

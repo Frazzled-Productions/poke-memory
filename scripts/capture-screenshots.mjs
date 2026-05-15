@@ -100,9 +100,14 @@ async function captureSurface(page, name) {
   if (spec.initScript) {
     await page.addInitScript(spec.initScript);
   }
-  await page.goto(`${BASE_URL}${spec.url}`, { waitUntil: "networkidle", timeout: 30_000 }).catch(async () => {
-    // Fallback: networkidle timed out (e.g. background polling keeps the network busy).
-    // We already waited 30s; that is far more than needed for hydration.
+  await page.goto(`${BASE_URL}${spec.url}`, { waitUntil: "networkidle", timeout: 30_000 }).catch(async (err) => {
+    // networkidle can time out when background polling keeps the network busy.
+    // That is expected; ignore it. Any other navigation failure (e.g. the dev
+    // server is not running) should surface immediately.
+    if (!String(err).includes("Timeout")) {
+      process.stderr.write(`Navigation failed for ${spec.url}: ${err}\n`);
+      process.exit(1);
+    }
   });
   await page.waitForTimeout(1200);
   if (spec.action) await spec.action(page);
