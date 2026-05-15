@@ -22,6 +22,13 @@ export function Footer() {
           What&apos;s new
         </Link>
         <span aria-hidden="true">·</span>
+        <Link
+          href="/privacy"
+          className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+        >
+          Privacy
+        </Link>
+        <span aria-hidden="true">·</span>
         <span className="font-mono">v{APP_VERSION}</span>
       </div>
     </footer>
