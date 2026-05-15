@@ -73,7 +73,19 @@ const SHOTS = {
     // deterministic static frame for the screenshot.
     initScript: () => { window.__PASTURE_FREEZE_IDLE = true; },
   },
-  stats: { url: "/stats", file: "stats.png", action: null },
+  stats: {
+    url: "/stats",
+    file: "stats.png",
+    // Wait for the Gym badges heading to confirm the page has hydrated past
+    // the loading skeleton before taking the screenshot.
+    action: async (page) => {
+      await page
+        .getByRole("heading", { name: "Gym badges" })
+        .waitFor({ state: "visible", timeout: 15_000 });
+      // Short pause so trailing layout animations settle.
+      await page.waitForTimeout(400);
+    },
+  },
 };
 
 async function captureSurface(page, name) {
@@ -88,7 +100,10 @@ async function captureSurface(page, name) {
   if (spec.initScript) {
     await page.addInitScript(spec.initScript);
   }
-  await page.goto(`${BASE_URL}${spec.url}`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE_URL}${spec.url}`, { waitUntil: "networkidle", timeout: 30_000 }).catch(async () => {
+    // Fallback: networkidle timed out (e.g. background polling keeps the network busy).
+    // We already waited 30s; that is far more than needed for hydration.
+  });
   await page.waitForTimeout(1200);
   if (spec.action) await spec.action(page);
   await page.waitForTimeout(600);
