@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import {
+  SEED_POKEMON_IDS,
+  EVOLUTION_CARD_IDS,
+  buildCompletedSession,
+} from "./helpers/completedSession";
 
 test.describe("Navigation", () => {
   test("nav links are visible and navigate between pages", async ({
@@ -674,6 +679,58 @@ test.describe("Streak milestone celebration (#419)", () => {
     await expect(
       page.getByRole("status", { name: /streak reached/i }),
     ).toBeHidden();
+  });
+});
+
+test.describe("Daily summary persistence (#685)", () => {
+  // Pre-seed every known card ID as already-reviewed so hydrateSession adds no
+  // new cards and the practice page lands on the "All caught up!" complete
+  // screen immediately. Seeding only a single card is not enough — hydrateSession
+  // would append the full SEED_POKEMON list as new cards and queue them.
+  const completedSession = buildCompletedSession({
+    pokemonIds: SEED_POKEMON_IDS,
+    evolutionCardIds: EVOLUTION_CARD_IDS,
+  });
+
+  test("'Share today' button visible when today-dated summary is in localStorage", async ({ page }) => {
+    await seedSessionIdb(page, completedSession);
+
+    // Seed a valid today-dated daily summary in localStorage.
+    // The date expression deliberately re-implements todayInTimezone("UTC")
+    // inline — addInitScript runs in the browser before any app module loads,
+    // so the production helper cannot be imported here.
+    await page.addInitScript(() => {
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
+      localStorage.setItem("poke-memory:daily-summary:v1", JSON.stringify({
+        date: today,
+        gradeSequence: [4, 5, 4],
+        reviewed: 3,
+        newCards: 1,
+        mastered: 0,
+      }));
+    });
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // Wait for the complete screen to render.
+    await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
+
+    // Share today button should be visible because we seeded a valid summary.
+    await expect(page.getByRole("button", { name: "Share today" })).toBeVisible();
+  });
+
+  test("'Share today' button absent with no daily summary seeded", async ({ page }) => {
+    await seedSessionIdb(page, completedSession);
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // Wait for the complete screen to render.
+    await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
+
+    // No daily summary — share button must not be shown.
+    await expect(page.getByRole("button", { name: "Share today" })).toHaveCount(0);
   });
 });
 
