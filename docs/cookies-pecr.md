@@ -1,4 +1,4 @@
-# PECR / ePrivacy cookie position
+# PECR cookie position
 
 **Decision date:** May 2026  
 **Related issue:** #187 (research), #674 (formal record)
@@ -13,7 +13,7 @@ No consent banner is required. Every item of client-side storage used by Poké M
 |---|---|---|---|
 | `poke-memory:*` keys in `localStorage` | Guest + signed-in | SRS card state, settings, superuser QA flags, theme pre-paint | Strictly necessary — without this the app cannot function |
 | Supabase Auth session cookie (HTTP-only JWT) | Signed-in only | Keeps the user authenticated across requests | Strictly necessary — set by `@supabase/ssr`; not present in guest mode |
-| Vercel Analytics / Speed Insights | All users | Aggregate, anonymous page-view metrics and Core Web Vitals | **No cookie set, no `localStorage` write** — cookieless server-side telemetry |
+| Vercel Analytics / Speed Insights | All users | Aggregate, anonymous page-view metrics and Core Web Vitals | **No cookie set, no `localStorage` write** — client-side scripts that write nothing to terminal-equipment storage; PECR Regulation 6 not engaged |
 
 The inline `<script>` in the root layout reads `poke-memory:settings:v1` from `localStorage` before first paint solely to apply a saved colour theme without a visible flash. This is incidental to storage that is already strictly necessary (the settings entry itself); it does not constitute a separate storage act.
 
@@ -25,7 +25,7 @@ PECR Regulation 6 requires prior consent before storing or accessing information
 
 **Supabase Auth cookie:** The cookie is set only when a user explicitly signs in. An authentication session cookie is the textbook example of a strictly-necessary cookie; it does not persist after sign-out and carries no tracking payload.
 
-**Vercel Analytics / Speed Insights:** `@vercel/analytics` v2 and `@vercel/speed-insights` operate without setting any cookie or writing to `localStorage`. Aggregate metrics are collected server-side via request headers. PECR Regulation 6 is not engaged because no information is stored on or retrieved from the user's terminal equipment.
+**Vercel Analytics / Speed Insights:** `@vercel/analytics` v2 and `@vercel/speed-insights` inject a client-side `<script>` tag that runs in the browser. They set no cookie and write nothing to `localStorage` or any other terminal-equipment storage. PECR Regulation 6 is not engaged because no information is stored on or retrieved from the user's terminal equipment.
 
 ## Conclusion
 

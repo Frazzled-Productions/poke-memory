@@ -161,8 +161,7 @@ export default function PrivacyPage() {
             containing a signed JWT that keeps you authenticated across requests.
             This cookie is strictly necessary for the signed-in service to
             function — it is not used for tracking or advertising, and it is not
-            set in guest mode. No consent banner is required for a
-            strictly-necessary cookie, but we disclose it here for transparency.
+            set in guest mode. See §4 below for our PECR position on this cookie.
           </p>
         </section>
 
@@ -207,11 +206,12 @@ export default function PrivacyPage() {
           <p className="mb-3">
             We do not use tracking cookies, advertising cookies, or
             third-party profiling cookies of any kind. Vercel Analytics and
-            Speed Insights collect aggregate, anonymous metrics (page path,
-            referrer, country, device type, Core Web Vitals) without setting
-            any cookie or writing to <code>localStorage</code> — they operate
-            entirely via server-side telemetry and do not identify individual
-            users.
+            Speed Insights are client-side scripts that collect aggregate,
+            anonymous metrics (page path, referrer, country, device type, Core
+            Web Vitals). They set no cookie and write nothing to{" "}
+            <code>localStorage</code> or any other terminal-equipment storage,
+            so PECR Regulation 6 is not engaged, and they do not identify
+            individual users.
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
@@ -219,12 +219,13 @@ export default function PrivacyPage() {
           </h3>
           <p>
             Under PECR, consent is only required for cookies and similar
-            storage that are not strictly necessary. Because every item of
-            client-side storage used by this app is either strictly necessary
-            for the service to function (the auth cookie and SRS state in
-            local storage) or does not involve cookies or storage at all
-            (Vercel Analytics), no consent banner is required. We disclose
-            this position here for transparency.
+            storage that are not strictly necessary. Every item of client-side
+            storage used by this app is strictly necessary for the service to
+            function (the auth cookie and SRS state in local storage). Vercel
+            Analytics and Speed Insights are client-side scripts that set no
+            cookie and write nothing to terminal-equipment storage, so PECR
+            Regulation 6 is not engaged by them at all. No consent banner is
+            required. We disclose this position here for transparency.
           </p>
         </section>
 
