@@ -6,6 +6,8 @@ import type { SavedSession } from "@/lib/review/persistence";
 import { filterMastered, markSeenInPasture } from "@/lib/pasture/arrivals";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
 import { assignAnchors } from "@/lib/pasture/assign";
+import { biomeStats } from "@/lib/pasture/stats";
+import type { BiomeStats } from "@/lib/pasture/stats";
 import { PastureZone } from "@/components/pasture/PastureZone";
 import { PastureSearchBar } from "@/components/pasture/PastureSearchBar";
 import { pushSingleCard } from "@/lib/sync/cloud";
@@ -27,16 +29,25 @@ type ZoneData = {
   habitat: string;
   label: string;
   placements: Placement[];
+  stats: BiomeStats;
 };
 
 /**
  * Groups mastered name-cards by habitat and assigns anchor positions.
  * Zones with zero mastered cards are omitted.
+ *
+ * Stats are computed against `allMasteredCards` (the full mastered set, not
+ * the search-filtered subset) so that the % captured and latest-addition
+ * figures always reflect the user's true progress regardless of active search.
  */
-function buildZoneData(masteredCards: NameReviewCard[]): ZoneData[] {
+function buildZoneData(
+  visibleCards: NameReviewCard[],
+  allMasteredCards: NameReviewCard[],
+  forceAllMastered: boolean,
+): ZoneData[] {
   const byHabitat = new Map<string, NameReviewCard[]>();
 
-  for (const card of masteredCards) {
+  for (const card of visibleCards) {
     const habitat = card.habitat ?? "unknown";
     const bucket = byHabitat.get(habitat);
     if (bucket) {
@@ -64,6 +75,7 @@ function buildZoneData(masteredCards: NameReviewCard[]): ZoneData[] {
       habitat: zone.habitat,
       label: zone.label,
       placements,
+      stats: biomeStats(zone.habitat, allMasteredCards, forceAllMastered),
     });
   }
 
@@ -183,7 +195,7 @@ export default function PasturePage() {
       ? masteredCards
       : masteredCards.filter((c) => c.name.toLowerCase().includes(trimmed));
 
-  const zones = buildZoneData(visibleCards);
+  const zones = buildZoneData(visibleCards, masteredCards, flags.pretendAllMastered);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
@@ -209,6 +221,7 @@ export default function PasturePage() {
               placements={zone.placements}
               onMarkSeen={handleMarkSeen}
               biomeHref={`/pasture/${zone.habitat}`}
+              stats={zone.stats}
             />
           ))}
         </div>

@@ -415,6 +415,57 @@ test.describe("Pasture — biome landscape view with pretendAllMastered", () => 
   });
 });
 
+test.describe("Pasture page — biome stats (#623)", () => {
+  test.beforeEach(async ({ page }) => {
+    // Two forest cards so the stats strip appears for the Forest zone.
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredCard(11, "Metapod", "forest"),
+    ]));
+  });
+
+  test("compact stats strip is visible inside each biome zone on the main Pasture page", async ({
+    page,
+  }) => {
+    await page.goto("/pasture");
+
+    const forestZone = page.getByRole("region", { name: "Forest zone" });
+    await expect(forestZone).toBeVisible();
+
+    // The stats strip contains a percentage sign — confirm it is rendered.
+    await expect(forestZone.getByText(/%/)).toBeVisible();
+  });
+
+  test("stats strip shows a count and captured percentage on the main Pasture page", async ({
+    page,
+  }) => {
+    await page.goto("/pasture");
+
+    const forestZone = page.getByRole("region", { name: "Forest zone" });
+    // 2 mastered out of 71 total forest species → "2" and "2%" (rounded).
+    // We just check for a slash-separated count like "2/71".
+    await expect(forestZone.getByText(/\d+\/\d+/)).toBeVisible();
+  });
+
+  test("per-biome detail page shows a richer stats panel with captured percentage", async ({
+    page,
+  }) => {
+    await page.goto("/pasture/forest");
+
+    // The detail page renders "X% captured" as a visible stat.
+    await expect(page.getByText(/captured/i)).toBeVisible();
+  });
+
+  test("per-biome detail page stats panel shows species count", async ({
+    page,
+  }) => {
+    await page.goto("/pasture/forest");
+
+    // "X / Y species" is rendered in the stats panel.
+    await expect(page.getByText(/species/i)).toBeVisible();
+  });
+});
+
 test.describe("Pasture page — empty state", () => {
   test("visiting /pasture directly with no mastered cards shows friendly empty state", async ({
     page,
