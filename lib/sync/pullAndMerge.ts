@@ -9,7 +9,7 @@ import { pullStreak, mergeStreak } from "@/lib/sync/streak";
 import { pullGradeLog, mergeGradeLog } from "@/lib/sync/gradeLog";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
-import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
+import { buildSession, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import {
   loadStreakData,
@@ -20,6 +20,67 @@ import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+
+/**
+ * Fires when `pullAndMerge` completes a cold-load merge that transitioned at
+ * least one card's `lastReview` or `firstSeen`. "Cold load" means the device
+ * had no user progress when the merge ran — either `localSession` was null
+ * (brand-new device, or the tombstone path just wiped it), or it held only
+ * pristine seed cards (the practice page raced ahead and saved a fresh
+ * empty session before the network pull returned). Surfaces in
+ * `ReviewSession` so the practice UI can refresh when the initial sign-in
+ * pull arrives after the page has already mounted with pristine seed cards
+ * — without this, cold-loading a PWA (or any tab whose local storage is
+ * empty but whose user has cloud data) leaves the practice page stuck on
+ * "all cards new" until the user navigates away and back (#608).
+ *
+ * Dispatched only when the pre-merge local state had no user progress, so
+ * a mid-review pull — where any card carries `lastReview` or `firstSeen`
+ * — does not trigger an unwanted reload that would discard in-flight
+ * grades or interrupt a card the user is currently looking at.
+ *
+ * Same-tab `useSessionStorageKey` subscribers (Stats, Pasture, Pokédex,
+ * NavLinks) already react to `saveSession`'s synthetic StorageEvent — this
+ * event is the targeted notification for the one surface that can't subscribe
+ * to that channel without re-firing on every grade.
+ */
+export const SYNC_PULL_APPLIED_EVENT = "poke-memory:sync-pull-applied";
+
+/**
+ * True when no card in `cards` has been graded yet — every entry has both
+ * `lastReview` and `firstSeen` still null. A freshly-built `buildSession`
+ * result satisfies this; a session with even one user grade does not.
+ */
+function isPristineSession(cards: readonly ReviewableCard[]): boolean {
+  for (const c of cards) {
+    if (c.state.lastReview !== null) return false;
+    if (c.state.firstSeen !== null) return false;
+  }
+  return true;
+}
+
+/**
+ * True when at least one card's `lastReview` or `firstSeen` changed between
+ * `before` and `after`. Only these two date markers are compared — other FSRS
+ * fields (`scheduledDays`, `reps`, `fsrsState`, `dueDate`) are intentionally
+ * excluded because the caller only needs to know whether cloud data populated
+ * a previously-empty seed card. Both arrays come from the same seed and have
+ * matching `id`s in the same order, so a positional comparison is safe.
+ */
+function mergeAffectsProgress(
+  before: readonly ReviewableCard[],
+  after: readonly ReviewableCard[],
+): boolean {
+  if (before.length !== after.length) return true;
+  for (let i = 0; i < after.length; i++) {
+    const a = after[i];
+    const b = before[i];
+    if (a.id !== b.id) return true;
+    if (a.state.lastReview !== b.state.lastReview) return true;
+    if (a.state.firstSeen !== b.state.firstSeen) return true;
+  }
+  return false;
+}
 
 /**
  * Pulls all cloud rows for the user, merges them into IndexedDB using the
@@ -109,10 +170,22 @@ export async function pullAndMerge(
       }
     }
 
+    // Capture before the branches so both paths see the same value. Treat a
+    // pristine saved session the same as a null session: ReviewSession's
+    // mount-time `load()` writes a fresh empty session via IDB (fast) before
+    // pullSession's network round-trip returns, so `localSession` here is
+    // typically the just-saved pristine cards rather than null even on a
+    // genuine cold load. Without the pristine check the dispatch never
+    // fires for the canonical PWA-cold-load bug.
+    const wasColdLoad =
+      localSession === null || isPristineSession(localSession.cards);
+
     let merged: ReturnType<typeof buildSession>;
     let saveResult;
+    let preMergeCards: ReviewableCard[];
     if (localSession !== null) {
-      merged = mergeCloudIntoLocalSilent(localSession.cards, cloudRows, syncStatus.lastPullAt);
+      preMergeCards = localSession.cards;
+      merged = mergeCloudIntoLocalSilent(preMergeCards, cloudRows, syncStatus.lastPullAt);
       saveResult = await saveSession({ cards: merged, limits: localSession.limits });
     } else {
       // Brand-new device (or just-cleared by the tombstone path above):
@@ -121,13 +194,13 @@ export async function pullAndMerge(
       // cloud rows for disabled card types are silently dropped by the
       // merge (#391).
       const settings = loadSettings();
-      const base = buildSession(
+      preMergeCards = buildSession(
         SEED_POKEMON,
         SEED_EVOLUTION_CARDS,
         undefined,
         seedOptsFromSettings(settings),
       );
-      merged = mergeCloudIntoLocalSilent(base, cloudRows, syncStatus.lastPullAt);
+      merged = mergeCloudIntoLocalSilent(preMergeCards, cloudRows, syncStatus.lastPullAt);
       saveResult = await saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
 
@@ -135,6 +208,21 @@ export async function pullAndMerge(
     // subscribers will not have received a synthetic StorageEvent because
     // saveSession only dispatches on success.
     if (!saveResult.ok) return "error";
+
+    // Wake `ReviewSession` only on cold loads (#608). Cold load with empty
+    // local + signed-in user is the canonical case: the practice page renders
+    // pristine seed cards before the pull lands. Restricting to cold loads
+    // means a mid-review sign-in (where localSession was non-null) cannot
+    // trigger an unwanted reload that discards in-flight grades. A no-op
+    // merge (cloud already matches local seed) stays silent, so a follow-up
+    // pull from the resulting reload cannot loop.
+    if (
+      wasColdLoad &&
+      typeof window !== "undefined" &&
+      mergeAffectsProgress(preMergeCards, merged)
+    ) {
+      window.dispatchEvent(new CustomEvent(SYNC_PULL_APPLIED_EVENT));
+    }
 
     // Pull regional prefs (timezone + date_format scalar columns) — best-effort,
     // runs on every pull so device B picks up choices made on device A.
