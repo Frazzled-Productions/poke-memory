@@ -24,3 +24,5 @@ export default defineConfig({
     },
   ],
 });
+
+// trigger: e2e path-filter (measurement experiment)
