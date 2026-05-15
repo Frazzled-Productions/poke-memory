@@ -34,13 +34,6 @@ type Props = {
    * id the page passes `forceOpen` so it expands and scrolls into view.
    */
   forceOpen?: boolean;
-  /**
-   * Visual variant for special sections.
-   * - "default": neutral zinc border/text.
-   * - "danger": red border/text.
-   * - "developer": amber border/text.
-   */
-  variant?: "default" | "danger" | "developer";
 };
 
 export function CollapsibleSection({
@@ -49,7 +42,6 @@ export function CollapsibleSection({
   className,
   children,
   forceOpen = false,
-  variant = "default",
 }: Props) {
   // Initialise from localStorage so there is no layout flash on re-mount.
   const [open, setOpen] = useState<boolean>(() => readOpenState(sectionId));
@@ -78,28 +70,12 @@ export function CollapsibleSection({
     writeOpenState(sectionId, next);
   }
 
-  // ── Heading style variants ────────────────────────────────────────────────
-  const variantBorder =
-    variant === "danger"
-      ? "border-red-200 dark:border-red-900"
-      : variant === "developer"
-        ? "border-amber-300 dark:border-amber-700"
-        : "border-zinc-200 dark:border-zinc-800";
-
-  const variantHeadingText =
-    variant === "danger"
-      ? "text-red-600 dark:text-red-400"
-      : variant === "developer"
-        ? "text-amber-700 dark:text-amber-400"
-        : "text-zinc-500 dark:text-zinc-400";
-
   return (
     <section
       id={sectionId}
       ref={sectionRef}
       className={[
-        "rounded-xl border px-5 py-4",
-        variantBorder,
+        "rounded-xl border border-zinc-200 px-5 py-4 dark:border-zinc-800",
         className ?? "",
       ]
         .filter(Boolean)
@@ -124,15 +100,10 @@ export function CollapsibleSection({
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded",
           ].join(" ")}
         >
-          <span
-            className={[
-              "text-sm font-semibold uppercase tracking-wide",
-              variantHeadingText,
-            ].join(" ")}
-          >
+          <span className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             {heading}
           </span>
-          <ChevronIcon open={open} variant={variant} />
+          <ChevronIcon open={open} />
         </button>
       </h2>
 
@@ -150,21 +121,13 @@ export function CollapsibleSection({
   );
 }
 
-function ChevronIcon({ open, variant }: { open: boolean; variant: Props["variant"] }) {
-  const colourClass =
-    variant === "danger"
-      ? "text-red-400 dark:text-red-500"
-      : variant === "developer"
-        ? "text-amber-500 dark:text-amber-400"
-        : "text-zinc-400 dark:text-zinc-500";
-
+function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg
       aria-hidden="true"
       className={[
-        "h-4 w-4 shrink-0 transition-transform duration-200",
+        "h-4 w-4 shrink-0 transition-transform duration-200 text-zinc-400 dark:text-zinc-500",
         open ? "rotate-180" : "rotate-0",
-        colourClass,
       ].join(" ")}
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 20 20"

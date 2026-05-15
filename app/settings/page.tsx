@@ -183,6 +183,12 @@ function FavouritePicker({
 
   return (
     <>
+      <h3
+        id="theme-heading"
+        className="text-sm font-semibold text-foreground"
+      >
+        App Theme
+      </h3>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         Master a Pokémon to unlock it as an app colour theme.
       </p>
@@ -642,7 +648,7 @@ export default function SettingsPage() {
                 forceOpen={targetCategoryId === "appearance-heading"}
               >
                 {/* App Theme (mascot picker) — only shown when unlocked entries exist */}
-                <div id="theme-heading">
+                <div>
                   <FavouritePicker
                     settings={settings}
                     favouriteId={favouriteId}
@@ -1406,9 +1412,14 @@ export default function SettingsPage() {
                 {unlocked && (
                   <div
                     id="developer-heading"
+                    role="region"
+                    aria-labelledby="developer-section-label"
                     className="rounded-xl border border-amber-300 p-5 dark:border-amber-700"
                   >
-                    <p className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                    <p
+                      id="developer-section-label"
+                      className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400"
+                    >
                       Developer
                     </p>
                     <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">

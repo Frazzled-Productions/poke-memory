@@ -23,8 +23,10 @@ async function seedSuperuser(page: Page, opts: SeedOptions): Promise<void> {
 test.describe("Superuser mode", () => {
   test("Developer panel is hidden by default", async ({ page }) => {
     await page.goto("/settings");
+    // The developer region is only rendered when superuser mode is unlocked.
+    // Without unlocked state, the element should not be in the DOM at all.
     await expect(
-      page.getByRole("heading", { level: 2, name: "Developer" }),
+      page.getByRole("region", { name: /developer/i }),
     ).toHaveCount(0);
   });
 
@@ -33,9 +35,11 @@ test.describe("Superuser mode", () => {
   }) => {
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: false });
     await page.goto("/settings");
+    // Expand the Advanced section — the Developer panel lives inside it.
+    await page.getByRole("button", { name: "Advanced", exact: true }).click();
     // Wait for settings to hydrate — the Developer panel only renders once
     // `settings !== null` (useEffect) AND `unlocked` (SuperuserContext useEffect)
-    // are both resolved. Waiting for the heading is the right gate.
+    // are both resolved. Waiting for the region is the right gate.
     const developerSection = page.getByRole("region", {
       name: /developer/i,
     });
