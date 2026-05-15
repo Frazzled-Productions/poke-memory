@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { seedSessionIdb } from "./helpers/seedIdb";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 
 // Smoke coverage for the FSRS scheduler swap (#263). Asserts structural
 // behaviour — queue movement and the relative shape of the per-button
@@ -94,6 +94,7 @@ test.describe("FSRS smoke", () => {
     });
 
     await page.goto("/");
+    await awaitSeedIdb(page);
     const reveal = page.getByRole("button", { name: /reveal/i });
     await expect(reveal).toBeVisible();
     await reveal.click();

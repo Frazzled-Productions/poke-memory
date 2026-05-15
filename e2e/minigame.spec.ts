@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { seedSessionIdb } from "./helpers/seedIdb";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import seedData from "../lib/pokemon/generated.json";
 
 // ---------------------------------------------------------------------------
@@ -258,6 +258,7 @@ test.describe("Higher-or-Lower mini-game", () => {
       evolutionCardIds: EVOLUTION_CARD_IDS,
     }));
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Confirm the session-complete end-state is reached
     await expect(page.getByText("All caught up!")).toBeVisible();
@@ -282,6 +283,7 @@ test.describe("Higher-or-Lower mini-game", () => {
       evolutionCardIds: EVOLUTION_CARD_IDS,
     }));
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     await expect(page.getByText("All caught up!")).toBeVisible();
 
@@ -306,6 +308,7 @@ test.describe("Higher-or-Lower mini-game", () => {
       evolutionCardIds: EVOLUTION_CARD_IDS,
     }));
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     await expect(
       page.getByText("New cards locked for today"),

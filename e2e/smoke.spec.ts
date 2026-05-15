@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { seedSessionIdb } from "./helpers/seedIdb";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 
 test.describe("Navigation", () => {
   test("nav links are visible and navigate between pages", async ({
@@ -110,6 +110,7 @@ test.describe("Practice page", () => {
     });
 
     await page.goto("/");
+    await awaitSeedIdb(page);
     const reveal = page.getByRole("button", { name: "Reveal" });
     if (!(await reveal.isVisible().catch(() => false))) {
       test.skip();
@@ -162,6 +163,7 @@ test.describe("Practice page", () => {
     });
 
     await page.goto("/");
+    await awaitSeedIdb(page);
     const reveal = page.getByRole("button", { name: "Reveal" });
     if (!(await reveal.isVisible().catch(() => false))) {
       test.skip();
@@ -228,6 +230,7 @@ test.describe("Practice page", () => {
     });
 
     await page.goto("/");
+    await awaitSeedIdb(page);
     const reveal = page.getByRole("button", { name: "Reveal" });
     if (!(await reveal.isVisible().catch(() => false))) {
       test.skip();
@@ -283,6 +286,7 @@ test.describe("Practice page", () => {
     });
 
     await page.goto("/");
+    await awaitSeedIdb(page);
     // Reverse cards have no Reveal step — the prompt + sprite picker render on load.
     const speaker = page.getByRole("button", { name: "Hear Bulbasaur" });
     if (!(await speaker.isVisible().catch(() => false))) {
@@ -527,6 +531,7 @@ test.describe("Settings page", () => {
     });
 
     await page.goto("/settings");
+    await awaitSeedIdb(page);
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
     // Expand the Appearance section — App Theme lives inside it.
@@ -732,6 +737,7 @@ test.describe("Evolution edge card prompt (#262)", () => {
     });
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Wait for the session to load from IndexedDB (async post-#486) before
     // asserting card content. The Reveal button appearing confirms hydration.
