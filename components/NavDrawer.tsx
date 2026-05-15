@@ -176,13 +176,31 @@ export function NavDrawer() {
     firstFocusable?.focus();
   }, [open]);
 
+  // Apply `inert` to page content behind the drawer while it is open, so
+  // keyboard / screen-reader users cannot reach background elements.
+  useEffect(() => {
+    const contentEl = document.querySelector<HTMLElement>("[data-page-content]");
+    const footerEl = document.querySelector<HTMLElement>("footer");
+    if (open) {
+      contentEl?.setAttribute("inert", "");
+      footerEl?.setAttribute("inert", "");
+    } else {
+      contentEl?.removeAttribute("inert");
+      footerEl?.removeAttribute("inert");
+    }
+    return () => {
+      contentEl?.removeAttribute("inert");
+      footerEl?.removeAttribute("inert");
+    };
+  }, [open]);
+
   return (
     <>
       {/* Hamburger trigger — visible only below md breakpoint */}
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Open navigation menu"
+        aria-label={open ? "Close navigation menu" : "Open navigation menu"}
         aria-expanded={open}
         aria-controls="mobile-nav-drawer"
         onClick={() => setOpen((v) => !v)}
@@ -199,14 +217,20 @@ export function NavDrawer() {
         />
       )}
 
-      {/* Drawer panel */}
+      {/* Drawer panel — always in the DOM so the slide transition runs.
+          Closed state: translate-x-full keeps it off-screen; inert + aria-hidden
+          prevent focus/announcement by AT while hidden. */}
       <div
         id="mobile-nav-drawer"
         ref={drawerRef}
         role="dialog"
         aria-label="Navigation menu"
         aria-modal="true"
-        hidden={!open}
+        aria-hidden={!open}
+        // React 19 types `inert` as boolean. When closed the element is
+        // off-screen and inaccessible; removing `hidden` lets the CSS
+        // transition actually paint.
+        {...(!open ? { inert: true } : {})}
         className={[
           "fixed inset-y-0 right-0 z-40 flex w-72 max-w-[calc(100vw-3rem)] flex-col",
           "border-l border-theme-secondary bg-theme-primary shadow-xl",

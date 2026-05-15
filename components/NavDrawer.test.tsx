@@ -7,9 +7,10 @@
  * - Esc key closes the drawer and returns focus to the trigger
  * - Clicking the close button inside the drawer closes it
  * - aria-current="page" is set on the active link
+ * - Pasture link appears when pretendAllMastered flag is on (hasMastered = false)
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -60,8 +61,10 @@ vi.mock("@/lib/review/useSessionStorageKey", () => ({
   useSessionStorageKey: vi.fn().mockReturnValue(0),
 }));
 
+// useSuperuser is mocked via a vi.fn() so individual tests can override it.
+const mockUseSuperuser = vi.fn(() => ({ flags: { pretendAllMastered: false } }));
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
-  useSuperuser: () => ({ flags: { pretendAllMastered: false } }),
+  useSuperuser: () => mockUseSuperuser(),
 }));
 
 vi.mock("@/components/whats-new/WhatsNewIndicator", () => ({
@@ -80,6 +83,7 @@ import { NavDrawer } from "@/components/NavDrawer";
 
 beforeEach(() => {
   mockPathname.value = "/";
+  mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: false } });
 });
 
 describe("NavDrawer", () => {
@@ -97,17 +101,18 @@ describe("NavDrawer", () => {
 
     const trigger = screen.getByRole("button", { name: "Open navigation menu" });
 
-    // Drawer starts hidden
+    // Drawer starts with aria-hidden="true" (always in DOM, off-screen)
     const drawer = document.getElementById("mobile-nav-drawer");
-    expect(drawer).toHaveAttribute("hidden");
+    expect(drawer).toHaveAttribute("aria-hidden", "true");
 
     await user.click(trigger);
 
-    // aria-expanded flips to true
+    // aria-expanded flips to true; the trigger's label changes to "Close"
     expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).toHaveAttribute("aria-label", "Close navigation menu");
 
-    // Drawer becomes visible
-    expect(drawer).not.toHaveAttribute("hidden");
+    // Drawer becomes visible (aria-hidden set to false)
+    expect(drawer).toHaveAttribute("aria-hidden", "false");
 
     // Primary nav links are accessible
     expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
@@ -120,44 +125,47 @@ describe("NavDrawer", () => {
     const user = userEvent.setup();
     render(<NavDrawer />);
 
-    const trigger = screen.getByRole("button", { name: "Open navigation menu" });
-    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
 
-    const closeBtn = screen.getByRole("button", { name: "Close navigation menu" });
+    // The close button inside the drawer header (scoped to avoid matching the
+    // hamburger trigger which also bears "Close navigation menu" when open)
+    const drawerEl = document.getElementById("mobile-nav-drawer")!;
+    const closeBtn = within(drawerEl).getByRole("button", { name: "Close navigation menu" });
     await user.click(closeBtn);
 
     const drawer = document.getElementById("mobile-nav-drawer");
-    expect(drawer).toHaveAttribute("hidden");
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(drawer).toHaveAttribute("aria-hidden", "true");
+    // Trigger label goes back to "Open"
+    expect(screen.getByRole("button", { name: "Open navigation menu" })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("closes the drawer when Esc is pressed", async () => {
     const user = userEvent.setup();
     render(<NavDrawer />);
 
-    const trigger = screen.getByRole("button", { name: "Open navigation menu" });
-    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
 
     const drawer = document.getElementById("mobile-nav-drawer");
-    expect(drawer).not.toHaveAttribute("hidden");
+    expect(drawer).toHaveAttribute("aria-hidden", "false");
 
     await user.keyboard("{Escape}");
 
-    expect(drawer).toHaveAttribute("hidden");
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(drawer).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("button", { name: "Open navigation menu" })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("restores focus to the hamburger trigger after closing with Esc", async () => {
     const user = userEvent.setup();
     render(<NavDrawer />);
 
-    const trigger = screen.getByRole("button", { name: "Open navigation menu" });
-    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
     await user.keyboard("{Escape}");
 
     // Focus should be back on the trigger
     await waitFor(() => {
-      expect(document.activeElement).toBe(trigger);
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Open navigation menu" }),
+      );
     });
   });
 
@@ -176,22 +184,13 @@ describe("NavDrawer", () => {
     expect(practiceLink).not.toHaveAttribute("aria-current");
   });
 
-  it("shows the Pasture link when pretendAllMastered flag is on", async () => {
-    // Re-mock with flag on
-    vi.doMock("@/lib/superuser/SuperuserContext", () => ({
-      useSuperuser: () => ({ flags: { pretendAllMastered: true } }),
-    }));
+  it("shows the Pasture link when pretendAllMastered flag is on (hasMastered false)", async () => {
+    // hasMastered stays false (loadSession returns null, filterMastered returns []).
+    // The Pasture link should appear solely because pretendAllMastered is true.
+    mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: true } });
 
-    // We test this path via hasMastered state — simulate mastered cards
-    const { filterMastered } = await import("@/lib/pasture/arrivals");
-    (filterMastered as ReturnType<typeof vi.fn>).mockReturnValue([{ id: 1 }]);
-    const { loadSession } = await import("@/lib/review/persistence");
-    (loadSession as ReturnType<typeof vi.fn>).mockResolvedValue({ cards: [{ id: 1 }] });
-
-    const { NavDrawer: NavDrawerFresh } = await import("@/components/NavDrawer");
     const user = userEvent.setup();
-
-    render(<NavDrawerFresh />);
+    render(<NavDrawer />);
 
     await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
 
