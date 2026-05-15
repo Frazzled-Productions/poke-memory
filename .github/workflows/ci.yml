@@ -9,22 +9,96 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Classify the PR by what changed, so test/e2e bodies can skip when irrelevant.
+  # The `test` and `e2e` jobs themselves always run (they are required checks),
+  # but their inner steps are gated on these outputs and become no-ops when the
+  # changes don't warrant the work. On `push` to main, both outputs are forced
+  # true so the full suite always runs as a safety net.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.decide.outputs.code }}
+      e2e_relevant: ${{ steps.decide.outputs.e2e_relevant }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Detect changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          # `code` matches any changed file that isn't in the docs/agents/changelog
+          # ignore list. dorny/paths-filter uses picomatch — a `!`-prefixed pattern
+          # excludes matches from earlier positive patterns, so `**` followed by
+          # exclusions yields "any file except these".
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!changelog.d/**'
+              - '!docs/**'
+              - '!.claude/agents/**'
+            e2e_relevant:
+              - 'app/**'
+              - 'components/**'
+              - 'lib/**'
+              - 'public/**'
+              - 'e2e/**'
+              - 'playwright.config.ts'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'next.config.ts'
+      - name: Decide outputs (force true on push to main)
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "e2e_relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=${{ steps.filter.outputs.code }}" >> "$GITHUB_OUTPUT"
+            echo "e2e_relevant=${{ steps.filter.outputs.e2e_relevant }}" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
+      - name: Skip notice (docs-only change)
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changes detected — skipping typecheck/build/vitest."
       - uses: actions/checkout@v6
+        if: needs.changes.outputs.code == 'true'
+        with:
+          # vitest --changed needs history to diff against the base ref.
+          fetch-depth: 0
       - uses: actions/setup-node@v6
+        if: needs.changes.outputs.code == 'true'
         with:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+        if: needs.changes.outputs.code == 'true'
       - run: npm run typecheck
+        if: needs.changes.outputs.code == 'true'
       - run: npm run build
-      - run: npm test
+        if: needs.changes.outputs.code == 'true'
+      - name: Run vitest (changed only on PR, full on push)
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            npm test -- --changed "origin/${{ github.base_ref }}"
+          else
+            npm test
+          fi
       - name: Upload .next build for e2e
+        if: needs.changes.outputs.code == 'true' && needs.changes.outputs.e2e_relevant == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: next-build
@@ -37,26 +111,35 @@ jobs:
     # deployment_status-triggered e2e.yml remains as a redundant preview-mode
     # signal, but this job is the one to mark required in the main-protection
     # ruleset.
-    needs: test
+    needs: [changes, test]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
     steps:
+      - name: Skip notice (no app/lib/components/public/e2e change)
+        if: needs.changes.outputs.e2e_relevant != 'true'
+        run: echo "No e2e-relevant changes detected — skipping Playwright suite."
       - uses: actions/checkout@v6
+        if: needs.changes.outputs.e2e_relevant == 'true'
       - uses: actions/setup-node@v6
+        if: needs.changes.outputs.e2e_relevant == 'true'
         with:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+        if: needs.changes.outputs.e2e_relevant == 'true'
       - name: Download .next build from test job
+        if: needs.changes.outputs.e2e_relevant == 'true'
         uses: actions/download-artifact@v8
         with:
           name: next-build
           path: .next/
       - name: Install Playwright browsers
+        if: needs.changes.outputs.e2e_relevant == 'true'
         run: npx playwright install --with-deps chromium webkit
       - name: Start Next.js and run Playwright
+        if: needs.changes.outputs.e2e_relevant == 'true'
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
         run: |
@@ -65,13 +148,13 @@ jobs:
           npx wait-on http://localhost:3000 --timeout 60000
           npm run test:e2e
       - name: Stop Next.js
-        if: always()
+        if: always() && needs.changes.outputs.e2e_relevant == 'true'
         run: |
           if [ -f /tmp/next.pid ]; then
             kill "$(cat /tmp/next.pid)" 2>/dev/null || true
           fi
       - name: Upload Playwright report
-        if: failure()
+        if: failure() && needs.changes.outputs.e2e_relevant == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
