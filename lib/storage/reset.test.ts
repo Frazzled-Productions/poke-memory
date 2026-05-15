@@ -117,6 +117,7 @@ describe("clearLocalProgress", () => {
   it("removes poke-memory:* localStorage keys while preserving settings:* keys", async () => {
     stubLocalStorage.setItem("poke-memory:streak", "5");
     stubLocalStorage.setItem("poke-memory:scope", '{"axes":[]}');
+    stubLocalStorage.setItem("poke-memory:daily-summary:v1", '{"date":"2026-05-15","gradeSequence":[4],"reviewed":1,"newCards":0,"mastered":0}');
     stubLocalStorage.setItem("poke-memory:settings:retention", "0.9");
     stubLocalStorage.setItem("poke-memory:settings:theme", "dark");
     stubLocalStorage.setItem("unrelated:key", "kept");
@@ -125,6 +126,7 @@ describe("clearLocalProgress", () => {
 
     expect(stubLocalStorage.getItem("poke-memory:streak")).toBeNull();
     expect(stubLocalStorage.getItem("poke-memory:scope")).toBeNull();
+    expect(stubLocalStorage.getItem("poke-memory:daily-summary:v1")).toBeNull();
     expect(stubLocalStorage.getItem("poke-memory:settings:retention")).toBe("0.9");
     expect(stubLocalStorage.getItem("poke-memory:settings:theme")).toBe("dark");
     expect(stubLocalStorage.getItem("unrelated:key")).toBe("kept");

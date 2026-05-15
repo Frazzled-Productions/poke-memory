@@ -51,6 +51,11 @@ import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
 import { formatDailySummary } from "@/lib/review/share";
+import {
+  loadDailySummary,
+  saveDailySummary,
+  mergeDailySummary,
+} from "@/lib/review/dailySummaryPersistence";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import {
   EMPTY_SCOPE,
@@ -584,6 +589,15 @@ export function ReviewSession() {
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
 
+      // Hydrate the daily summary from localStorage so the "Share today" button
+      // survives a page reload on the session-complete screen (#685).
+      const storedSummary = loadDailySummary(settings.timezone ?? "UTC");
+      if (storedSummary !== null) {
+        setSessionGradeSeq(storedSummary.gradeSequence);
+        setNewCardsThisSession(storedSummary.newCards);
+        setMasteredThisSession(storedSummary.mastered);
+      }
+
       // Initialize the learning queue from persisted learning-step cards.
       // Use stepStartedAt from persisted state so the countdown resumes correctly
       // after navigation instead of resetting to the full step duration.
@@ -722,6 +736,15 @@ export function ReviewSession() {
           if (undoSnapshot.gradeLogOccurredAt !== null) {
             await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
           }
+          // Roll back persisted daily summary to match reverted state (#685).
+          const kbSeq = undoSnapshot.sessionGradeSeq;
+          saveDailySummary({
+            date: todayString(new Date(), timezone),
+            gradeSequence: kbSeq,
+            reviewed: kbSeq.length,
+            newCards: undoSnapshot.newCardsThisSession,
+            mastered: undoSnapshot.masteredThisSession,
+          });
           revealedCardId.current = undoSnapshot.cardId;
           setRevealed(true);
           // Bump presentation counter so SpritePicker remounts with fresh
@@ -733,9 +756,10 @@ export function ReviewSession() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // notifySaveResult and limits are stable inside the same render
+    // notifySaveResult and limits are stable inside the same render;
+    // timezone is included so the persist call sees the current value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [undoSnapshot, grading, limits]);
+  }, [undoSnapshot, grading, limits, timezone]);
 
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
@@ -1216,6 +1240,27 @@ export function ReviewSession() {
       }
     }
 
+    // Persist the cumulative daily summary so the share button survives a
+    // reload (#685). React state setters above are async; compute totals from
+    // the pre-grade snapshot + this grade.  snapshot.sessionGradeSeq is
+    // already the day's cumulative sequence (hydrated at mount), so writing
+    // directly is correct — no need to re-read and merge from localStorage.
+    {
+      const nextGradeSeq = [...snapshot.sessionGradeSeq, grade];
+      const nextNewCards =
+        snapshot.newCardsThisSession +
+        (wasNew && nextState.firstSeen !== null ? 1 : 0);
+      const nextMastered =
+        snapshot.masteredThisSession + (!wasMastered && nowMastered ? 1 : 0);
+      saveDailySummary({
+        date: today,
+        gradeSequence: nextGradeSeq,
+        reviewed: nextGradeSeq.length,
+        newCards: nextNewCards,
+        mastered: nextMastered,
+      });
+    }
+
     // Update the learning queue based on the new state.
     setLearningQueue((prev) => {
       if (nextState.learningStep !== null) {
@@ -1268,6 +1313,15 @@ export function ReviewSession() {
     if (undoSnapshot.gradeLogOccurredAt !== null) {
       await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
     }
+    // Roll back the persisted daily summary to match the reverted state (#685).
+    const seq = undoSnapshot.sessionGradeSeq;
+    saveDailySummary({
+      date: todayString(new Date(), timezone),
+      gradeSequence: seq,
+      reviewed: seq.length,
+      newCards: undoSnapshot.newCardsThisSession,
+      mastered: undoSnapshot.masteredThisSession,
+    });
     // Make the undone card the current revealed card so the user lands
     // back on the prompt they just graded.
     revealedCardId.current = undoSnapshot.cardId;

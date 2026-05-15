@@ -677,6 +677,77 @@ test.describe("Streak milestone celebration (#419)", () => {
   });
 });
 
+test.describe("Daily summary persistence (#685)", () => {
+  // Seed a session with one card due far in the future so the practice page
+  // lands on the "All caught up" complete screen immediately.
+  const completedSession = {
+    cards: [
+      {
+        id: 1,
+        name: "Bulbasaur",
+        spriteUrl: "/sprites/pokemon/1.png",
+        cardType: "name",
+        state: {
+          stability: 10,
+          difficulty: 5,
+          elapsedDays: 1,
+          scheduledDays: 365,
+          reps: 5,
+          lapses: 0,
+          fsrsState: "review",
+          dueDate: "2099-01-01",
+          lastReview: "2026-05-14",
+          firstSeen: "2026-05-01",
+          learningStep: null,
+          stepStartedAt: null,
+        },
+      },
+    ],
+    limits: {
+      name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    },
+  };
+
+  test("'Share today' button visible when today-dated summary is in localStorage", async ({ page }) => {
+    await seedSessionIdb(page, completedSession);
+
+    // Seed a valid today-dated daily summary in localStorage.
+    await page.addInitScript(() => {
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
+      localStorage.setItem("poke-memory:daily-summary:v1", JSON.stringify({
+        date: today,
+        gradeSequence: [4, 5, 4],
+        reviewed: 3,
+        newCards: 1,
+        mastered: 0,
+      }));
+    });
+
+    await page.goto("/");
+
+    // Wait for the complete screen to render.
+    await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
+
+    // Share today button should be visible because we seeded a valid summary.
+    await expect(page.getByRole("button", { name: "Share today" })).toBeVisible();
+  });
+
+  test("'Share today' button absent with no daily summary seeded", async ({ page }) => {
+    await seedSessionIdb(page, completedSession);
+
+    await page.goto("/");
+
+    // Wait for the complete screen to render.
+    await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
+
+    // No daily summary — share button must not be shown.
+    await expect(page.getByRole("button", { name: "Share today" })).toHaveCount(0);
+  });
+});
+
 test.describe("Evolution edge card prompt (#262)", () => {
   test("renders 'What does {preEvo} evolve into {trigger}?' for an edge card", async ({ page }) => {
     // Seed a deterministic session containing exactly one evolution edge card
