@@ -150,3 +150,11 @@ Hobby project, work-in-progress. See [CHANGELOG.md](./CHANGELOG.md) for what's b
 The project's own source code is released under the [MIT Licence](./LICENSE).
 
 Bundled Pokémon assets — sprites, cries, and names — are **not** covered by that licence. They remain the intellectual property of Nintendo, Game Freak, and The Pokémon Company. This is an unofficial fan project, not affiliated with or endorsed by those companies.
+
+## Disclaimer
+
+Poké Memory is an unofficial, non-commercial fan project. It is not affiliated with, endorsed by, or in any way connected to Nintendo, Game Freak, or The Pokémon Company International.
+
+Pokémon and all related names, characters, sprites, cries, and other creative assets are trademarks and/or copyrights of Nintendo / Creatures Inc. / GAME FREAK inc. All rights remain with their respective owners.
+
+Pokémon species data and sprites are sourced from [PokéAPI](https://pokeapi.co/) (an open Pokémon data API) and are used here solely for non-commercial, educational fan purposes. Sprites are self-hosted and served as static files from the same infrastructure as the app — no runtime requests are made to PokéAPI or any Nintendo-affiliated server.
