@@ -98,3 +98,33 @@ test.describe("Settings page — alternate forms toggle (#658)", () => {
     await expect(toggle).toHaveAttribute("aria-checked", "true");
   });
 });
+
+test.describe("Alternate forms — ScopeControl visibility (#658)", () => {
+  test("Alternate forms section is absent in ScopeControl when toggle is off (default)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // Open the scope panel.
+    await page.locator("button[aria-controls='scope-panel']").click();
+
+    // The "Alternate forms" fieldset legend must NOT be present when the gate is off.
+    await expect(page.getByText("Alternate forms")).not.toBeVisible();
+  });
+
+  test("Alternate forms section appears in ScopeControl after enabling the toggle", async ({
+    page,
+  }) => {
+    // Enable the toggle on the Settings page first.
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("switch", { name: /include alternate forms in practice/i }).click();
+
+    // Navigate to the practice page and open the scope panel.
+    await page.goto("/");
+    await page.locator("button[aria-controls='scope-panel']").click();
+
+    // The "Alternate forms" section heading must now be visible.
+    await expect(page.getByText("Alternate forms")).toBeVisible();
+  });
+});

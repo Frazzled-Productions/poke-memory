@@ -54,6 +54,13 @@ export type UserSettings = {
   evolutionCardsEnabled: boolean;    // show sprite; identify evolution chain
   reverseEvolutionCardsEnabled: boolean; // reverse-direction evolution edge cards (#343)
   reverseCardsEnabled: boolean;      // show name as prompt; reveal sprite
+  maxNewReversePerDay: number;       // hard daily cap for new reverse cards
+  maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
+  playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
+  speakNameOnReveal: boolean;        // speak Pokémon name aloud (TTS) on card reveal
+  cryCardsEnabled: boolean;          // enable third-direction cards: audio prompt → name
+  maxNewCryPerDay: number;
+  maxReviewsCryPerDay: number;
   /**
    * Master gate for alternate-form cards (#658). When false, form cards
    * (regional variants, Megas, formes, etc.) are excluded from practice
@@ -66,13 +73,6 @@ export type UserSettings = {
    * false (existing users lose forms from practice until they re-enable).
    */
   alternateFormsEnabled: boolean;
-  maxNewReversePerDay: number;       // hard daily cap for new reverse cards
-  maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
-  playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
-  speakNameOnReveal: boolean;        // speak Pokémon name aloud (TTS) on card reveal
-  cryCardsEnabled: boolean;          // enable third-direction cards: audio prompt → name
-  maxNewCryPerDay: number;
-  maxReviewsCryPerDay: number;
   favouriteTheme: StoredFavouriteTheme | null; // chosen mastery accent Pokémon
   /** How broadly the chosen palette is painted across the UI (#411). */
   themeIntensity: ThemeIntensity;
@@ -167,7 +167,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
   reverseCardsEnabled: false,
-  alternateFormsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
@@ -175,6 +174,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   cryCardsEnabled: false,
   maxNewCryPerDay: 10,
   maxReviewsCryPerDay: 100,
+  alternateFormsEnabled: false,
   favouriteTheme: null,
   themeIntensity: "accents",
   retentionTarget: 0.9,
@@ -306,12 +306,6 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.reverseCardsEnabled === "boolean"
         ? obj.reverseCardsEnabled
         : DEFAULT_SETTINGS.reverseCardsEnabled,
-    // Defensive default: missing/non-boolean → false. Existing users lose form
-    // cards from practice until they opt in via the Settings toggle (#658).
-    alternateFormsEnabled:
-      typeof obj.alternateFormsEnabled === "boolean"
-        ? obj.alternateFormsEnabled
-        : DEFAULT_SETTINGS.alternateFormsEnabled,
     maxNewReversePerDay:
       typeof obj.maxNewReversePerDay === "number"
         ? obj.maxNewReversePerDay
@@ -340,6 +334,12 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.maxReviewsCryPerDay === "number"
         ? obj.maxReviewsCryPerDay
         : DEFAULT_SETTINGS.maxReviewsCryPerDay,
+    // Defensive default: missing/non-boolean → false. Existing users lose form
+    // cards from practice until they opt in via the Settings toggle (#658).
+    alternateFormsEnabled:
+      typeof obj.alternateFormsEnabled === "boolean"
+        ? obj.alternateFormsEnabled
+        : DEFAULT_SETTINGS.alternateFormsEnabled,
     // Shallow validation only — lib/theme/persistence.ts does the deep
     // validation (HEX_COLOR, known Pokémon id) on read.
     favouriteTheme:

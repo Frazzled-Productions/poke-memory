@@ -77,8 +77,10 @@ const PILL_BASE =
 export function ScopeControl({ scope, onChange, alternateFormsEnabled = false }: Props) {
   const [open, setOpen] = useState(false);
   const active = !isScopeEmpty(scope);
-  const matchCount = countMatchingSpecies(SEED_POKEMON, scope);
-  const totalCount = SEED_POKEMON.length;
+  // When the forms gate is off, alternate-form entries are excluded from the
+  // count so the "X of N" display is consistent with what the session builds.
+  const matchCount = countMatchingSpecies(SEED_POKEMON, scope, alternateFormsEnabled);
+  const totalCount = countMatchingSpecies(SEED_POKEMON, EMPTY_SCOPE, alternateFormsEnabled);
   const availableFormCategories = useMemo(() => presentFormCategories(SEED_POKEMON), []);
 
   const formFilter: FormCategoryFilter = scope.formCategories ?? { mode: "all" };

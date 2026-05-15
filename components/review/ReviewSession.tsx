@@ -71,7 +71,6 @@ const LEARN_AHEAD_MS = 20 * 60_000;
 // Map would be wasteful to rebuild on every render of ReviewSession.
 const SEED_BY_ID = new Map(SEED_POKEMON.map((p) => [p.id, p]));
 
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
