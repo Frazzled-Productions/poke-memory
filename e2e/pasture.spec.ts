@@ -257,7 +257,7 @@ test.describe("Pasture page — name search", () => {
   test("typing a matching name filters to that Pokémon only", async ({ page }) => {
     await page.goto("/pasture");
 
-    const searchInput = page.getByRole("searchbox", { name: "Search Pokémon" });
+    const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
     await expect(searchInput).toBeVisible();
 
     await searchInput.fill("Caterpie");
@@ -271,7 +271,7 @@ test.describe("Pasture page — name search", () => {
   test("clearing the search restores all Pokémon", async ({ page }) => {
     await page.goto("/pasture");
 
-    const searchInput = page.getByRole("searchbox", { name: "Search Pokémon" });
+    const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
     await searchInput.fill("Caterpie");
     await expect(page.getByRole("button", { name: /Tentacool/ })).not.toBeVisible();
 
@@ -283,7 +283,7 @@ test.describe("Pasture page — name search", () => {
   test("a query with no matches shows a no-results message", async ({ page }) => {
     await page.goto("/pasture");
 
-    const searchInput = page.getByRole("searchbox", { name: "Search Pokémon" });
+    const searchInput = page.getByRole("textbox", { name: "Search Pokémon" });
     await searchInput.fill("zzznomatch");
 
     await expect(page.getByText(/No Pokémon match/i)).toBeVisible();
