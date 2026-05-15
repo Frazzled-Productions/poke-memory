@@ -736,14 +736,18 @@ export function ReviewSession() {
             await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
           }
           // Roll back persisted daily summary to match reverted state (#685).
-          const kbSeq = undoSnapshot.sessionGradeSeq;
-          saveDailySummary({
-            date: todayString(new Date(), timezone),
-            gradeSequence: kbSeq,
-            reviewed: kbSeq.length,
-            newCards: undoSnapshot.newCardsThisSession,
-            mastered: undoSnapshot.masteredThisSession,
-          });
+          // Skipped while a superuser flag is on so QA grade sequences never
+          // reach localStorage — consistent with the cloud write-guard.
+          if (!superuserGuarded) {
+            const kbSeq = undoSnapshot.sessionGradeSeq;
+            saveDailySummary({
+              date: todayString(new Date(), timezone),
+              gradeSequence: kbSeq,
+              reviewed: kbSeq.length,
+              newCards: undoSnapshot.newCardsThisSession,
+              mastered: undoSnapshot.masteredThisSession,
+            });
+          }
           revealedCardId.current = undoSnapshot.cardId;
           setRevealed(true);
           // Bump presentation counter so SpritePicker remounts with fresh
@@ -1246,7 +1250,9 @@ export function ReviewSession() {
     // the pre-grade snapshot + this grade.  snapshot.sessionGradeSeq is
     // already the day's cumulative sequence (hydrated at mount), so writing
     // directly is correct — no need to re-read and merge from localStorage.
-    {
+    // Skipped while a superuser flag is on so QA grade sequences never reach
+    // localStorage — consistent with the cloud write-guard.
+    if (!superuserGuarded) {
       const nextGradeSeq = [...snapshot.sessionGradeSeq, grade];
       const nextNewCards =
         snapshot.newCardsThisSession +
@@ -1315,14 +1321,18 @@ export function ReviewSession() {
       await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
     }
     // Roll back the persisted daily summary to match the reverted state (#685).
-    const seq = undoSnapshot.sessionGradeSeq;
-    saveDailySummary({
-      date: todayString(new Date(), timezone),
-      gradeSequence: seq,
-      reviewed: seq.length,
-      newCards: undoSnapshot.newCardsThisSession,
-      mastered: undoSnapshot.masteredThisSession,
-    });
+    // Skipped while a superuser flag is on so QA grade sequences never reach
+    // localStorage — consistent with the cloud write-guard.
+    if (!superuserGuarded) {
+      const seq = undoSnapshot.sessionGradeSeq;
+      saveDailySummary({
+        date: todayString(new Date(), timezone),
+        gradeSequence: seq,
+        reviewed: seq.length,
+        newCards: undoSnapshot.newCardsThisSession,
+        mastered: undoSnapshot.masteredThisSession,
+      });
+    }
     // Make the undone card the current revealed card so the user lands
     // back on the prompt they just graded.
     revealedCardId.current = undoSnapshot.cardId;

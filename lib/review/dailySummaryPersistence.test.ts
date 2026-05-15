@@ -2,13 +2,13 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import {
   loadDailySummary,
   saveDailySummary,
+  STORAGE_KEY,
   type DailySummaryRecord,
 } from "./dailySummaryPersistence";
 
-const STORAGE_KEY = "poke-memory:daily-summary:v1";
-
-// Fixed "today" used throughout.
-const TODAY = "2026-05-15";
+// Fixed synthetic "today" used throughout — deliberately not the real date so
+// the fixture intent is obvious and git history stays stable over time.
+const TODAY = "2025-01-01";
 
 // Patch todayInTimezone to return a fixed date so tests are deterministic.
 vi.mock("@/lib/utils/format-date", () => ({
@@ -26,15 +26,15 @@ const localStorageMock = {
   get length() { return Object.keys(store).length; },
 };
 
-vi.stubGlobal("window", { localStorage: localStorageMock });
-vi.stubGlobal("localStorage", localStorageMock);
-
 beforeEach(() => {
   localStorageMock.clear();
+  vi.stubGlobal("window", { localStorage: localStorageMock });
+  vi.stubGlobal("localStorage", localStorageMock);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 const freshRecord: DailySummaryRecord = {
@@ -74,6 +74,12 @@ describe("loadDailySummary", () => {
   it("returns null when gradeSequence contains invalid grade values", () => {
     const corrupted = { ...freshRecord, gradeSequence: [4, 3, 5] };
     localStorageMock.setItem(STORAGE_KEY, JSON.stringify(corrupted));
+    expect(loadDailySummary("UTC")).toBeNull();
+  });
+
+  it("returns null when reviewed disagrees with gradeSequence length", () => {
+    const tampered = { ...freshRecord, reviewed: 999 };
+    localStorageMock.setItem(STORAGE_KEY, JSON.stringify(tampered));
     expect(loadDailySummary("UTC")).toBeNull();
   });
 });

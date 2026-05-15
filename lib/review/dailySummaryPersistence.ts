@@ -1,7 +1,7 @@
 import type { Grade } from "@/lib/srs/scheduler";
 import { todayInTimezone } from "@/lib/utils/format-date";
 
-const STORAGE_KEY = "poke-memory:daily-summary:v1";
+export const STORAGE_KEY = "poke-memory:daily-summary:v1";
 
 export type DailySummaryRecord = {
   date: string;
@@ -27,12 +27,16 @@ export function loadDailySummary(timezone: string): DailySummaryRecord | null {
         (v) => v === 1 || v === 2 || v === 4 || v === 5,
       ) ||
       typeof p.reviewed !== "number" ||
+      p.reviewed !== (p.gradeSequence as unknown[]).length ||
       typeof p.newCards !== "number" ||
       typeof p.mastered !== "number"
     ) {
       return null;
     }
     const record = parsed as DailySummaryRecord;
+    // A date mismatch — whether the record is days old or was written seconds
+    // before a midnight rollover — means it is no longer "today's" summary, so
+    // discarding it here is the intended behaviour, not a lost-data bug.
     if (record.date !== todayInTimezone(timezone)) return null;
     return record;
   } catch {

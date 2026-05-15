@@ -715,6 +715,9 @@ test.describe("Daily summary persistence (#685)", () => {
     await seedSessionIdb(page, completedSession);
 
     // Seed a valid today-dated daily summary in localStorage.
+    // The date expression deliberately re-implements todayInTimezone("UTC")
+    // inline — addInitScript runs in the browser before any app module loads,
+    // so the production helper cannot be imported here.
     await page.addInitScript(() => {
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
       localStorage.setItem("poke-memory:daily-summary:v1", JSON.stringify({
