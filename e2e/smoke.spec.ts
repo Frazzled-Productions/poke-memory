@@ -433,16 +433,33 @@ test.describe("Settings page", () => {
     // Wait for settings to load (skeleton disappears)
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    for (const heading of ["Audio", "Name cards", "About", "Backup", "Danger zone", "Personalize my schedule"]) {
-      // exact: true is required for "Name cards" to avoid also matching
-      // "Cry → name cards" which was added in #481.
+    // Top-level collapsible section headings are rendered as <h2> disclosure
+    // toggles and should be visible on fresh load (collapsed but present).
+    for (const heading of ["Appearance", "Practice", "Audio", "Account & Data", "Advanced"]) {
       await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
     }
 
-    // Save button present
+    // Expand Practice to verify sub-section content is present.
+    await page.getByRole("button", { name: "Practice", exact: true }).click();
+
+    // Save button is inside the Practice panel.
     await expect(
       page.getByRole("button", { name: "Save" }),
     ).toBeVisible();
+
+    // Sub-section label and FSRS section present inside Practice.
+    // exact: true avoids matching "Cry → name cards" added in #481.
+    await expect(page.getByText("Name cards", { exact: true })).toBeVisible();
+    await expect(page.getByText("Personalize my schedule", { exact: true })).toBeVisible();
+
+    // Expand Account & Data to verify Backup and About sub-sections.
+    await page.getByRole("button", { name: "Account & Data", exact: true }).click();
+    await expect(page.getByText("Backup", { exact: true })).toBeVisible();
+    await expect(page.getByText("About", { exact: true })).toBeVisible();
+
+    // Expand Advanced to verify Danger zone sub-section.
+    await page.getByRole("button", { name: "Advanced", exact: true }).click();
+    await expect(page.getByText("Danger zone", { exact: true })).toBeVisible();
   });
 
   test("FSRS optimizer section shows sign-in prompt for guests", async ({ page }) => {
@@ -450,9 +467,12 @@ test.describe("Settings page", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Section heading is present
+    // Expand the Practice section first — FSRS optimizer lives inside it.
+    await page.getByRole("button", { name: "Practice", exact: true }).click();
+
+    // Sub-section label is present inside the expanded panel.
     await expect(
-      page.getByRole("heading", { name: "Personalize my schedule" }),
+      page.getByText("Personalize my schedule", { exact: true }),
     ).toBeVisible();
 
     // Guest state: sign-in prompt is visible
@@ -470,6 +490,9 @@ test.describe("Settings page", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
+    // Expand the Practice section first — New cards per day and Save live inside it.
+    await page.getByRole("button", { name: "Practice", exact: true }).click();
+
     const input = page.getByLabel("New cards per day").first();
     await input.click();
     await input.selectText();
@@ -480,7 +503,9 @@ test.describe("Settings page", () => {
     await page.getByRole("button", { name: "Save" }).click();
 
     await expect(page.getByText("Saved!")).toBeVisible();
-    // Reload and verify the value persisted.
+    // Reload and verify the value persisted. The Practice section remains
+    // expanded after reload because the open state is persisted in localStorage
+    // (no addInitScript clear in this test), so we can read the input directly.
     await page.reload();
     await expect(page.getByLabel("Loading settings")).toBeHidden();
     await expect(page.getByLabel("New cards per day").first()).toHaveValue("5");
@@ -524,7 +549,10 @@ test.describe("Settings page", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // App Theme section should be visible with Charizard
+    // Expand the Appearance section — App Theme lives inside it.
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
+
+    // App Theme heading and Charizard card should be visible.
     await expect(page.getByRole("heading", { name: "App Theme" })).toBeVisible();
     await expect(page.getByText("Charizard")).toBeVisible();
 

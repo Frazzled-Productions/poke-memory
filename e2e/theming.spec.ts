@@ -86,6 +86,9 @@ test.describe("Theme intensity — Settings page picker", () => {
     // Wait for the skeleton to disappear (settings loaded).
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
+    // Expand the Appearance section — IntensityPicker lives inside it.
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
+
     // The section heading rendered by IntensityPicker.
     await expect(
       page.getByRole("heading", { name: "Theme intensity" }),
@@ -110,6 +113,9 @@ test.describe("Theme intensity — Settings page picker", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
+    // Expand the Appearance section — radios live inside it.
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
+
     await expect(
       page.getByRole("radio", { name: "Subtle accents only" }),
     ).toBeChecked();
@@ -127,6 +133,9 @@ test.describe("Theme intensity — Settings page picker", () => {
     await page.addInitScript(() => window.localStorage.clear());
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
+
+    // Expand the Appearance section — radios live inside it.
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     await page.getByRole("radio", { name: "Tinted backgrounds" }).click();
 
@@ -148,6 +157,9 @@ test.describe("Theme intensity — Settings page picker", () => {
   }) => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
+
+    // Expand the Appearance section — radios live inside it.
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     await page.getByRole("radio", { name: "Tinted backgrounds" }).click();
 
@@ -184,6 +196,9 @@ test.describe("Theme intensity — Settings page picker", () => {
     await seedSettings(page, "tinted");
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
+
+    // Expand the Appearance section — radios live inside it.
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     // Confirm tinted is active.
     await expect(
@@ -246,6 +261,9 @@ test.describe("Theme watermark visibility", () => {
     await expect(page.locator('[data-testid="theme-watermark"]')).toHaveCount(
       0,
     );
+
+    // Expand the Appearance section — radios live inside it.
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     await page.getByRole("radio", { name: "Tinted backgrounds" }).click();
 

@@ -29,9 +29,9 @@ test.describe("Onboarding (#433)", () => {
     }
 
     await page.goto("/settings");
-    await expect(
-      page.getByRole("heading", { name: /how this works/i }),
-    ).toBeVisible();
+    // "How this works" now lives inside the collapsible "Account & Data" section.
+    // Expand the section first, then interact with the reset button.
+    await page.getByRole("button", { name: /account & data/i }).click();
 
     await page.getByRole("button", { name: /show tips again/i }).click();
 
