@@ -5,11 +5,14 @@ import type { CardClass } from "@/lib/stats/derive";
 
 export type PokemonCellData = SeedPokemon & { cardClass: CardClass };
 
+export type MasteryStatus = "all" | "mastered" | "not-yet-mastered";
+
 export type PokedexFilters = {
   query: string;              // substring match on name or form displayName; empty = no filter
   types: string[];            // AND/intersection: pokemon must have all selected types; empty = no type filter
   gen: number | null;         // null = all gens; 1–9 = specific gen
   hasAlternateForms: boolean; // true = only species with at least one non-default form
+  masteryStatus: MasteryStatus; // "all" = no mastery filter; "mastered" / "not-yet-mastered" = filter by cardClass
 };
 
 // Pre-compute a map from speciesId → non-default form displayNames for fast
@@ -66,6 +69,15 @@ export function filterPokemon(
       }
     }
 
+    if (filters.masteryStatus !== "all") {
+      if (filters.masteryStatus === "mastered" && p.cardClass !== "mastered") {
+        return false;
+      }
+      if (filters.masteryStatus === "not-yet-mastered" && p.cardClass === "mastered") {
+        return false;
+      }
+    }
+
     return true;
   });
 }
@@ -87,5 +99,11 @@ export function parseFilters(
 
   const hasAlternateForms = searchParams.get("forms") === "1";
 
-  return { query, types, gen, hasAlternateForms };
+  const masteryParam = searchParams.get("mastery") ?? "";
+  const masteryStatus: MasteryStatus =
+    masteryParam === "mastered" || masteryParam === "not-yet-mastered"
+      ? masteryParam
+      : "all";
+
+  return { query, types, gen, hasAlternateForms, masteryStatus };
 }

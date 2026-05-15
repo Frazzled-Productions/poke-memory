@@ -35,7 +35,7 @@ function basePokemon(overrides: Partial<PokemonCellData> = {}): PokemonCellData 
   };
 }
 
-const noFilters: PokedexFilters = { query: '', types: [], gen: null, hasAlternateForms: false };
+const noFilters: PokedexFilters = { query: '', types: [], gen: null, hasAlternateForms: false, masteryStatus: 'all' };
 
 // A small fixture set covering two gens and multiple types.
 // Gen 1 IDs: 1–151; Gen 2 IDs: 152–251.
@@ -105,19 +105,60 @@ describe('filterPokemon', () => {
 
   it('combined query + gen: both axes must match (AND)', () => {
     // "charman" matches only charmander (gen 1), not anything in gen 2
-    const result = filterPokemon(FIXTURES, { query: 'charman', types: [], gen: 1, hasAlternateForms: false });
+    const result = filterPokemon(FIXTURES, { query: 'charman', types: [], gen: 1, hasAlternateForms: false, masteryStatus: 'all' });
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('charmander');
   });
 
   it('combined query + gen: returns empty when gen matches but query does not', () => {
-    const result = filterPokemon(FIXTURES, { query: 'xyz', types: [], gen: 1, hasAlternateForms: false });
+    const result = filterPokemon(FIXTURES, { query: 'xyz', types: [], gen: 1, hasAlternateForms: false, masteryStatus: 'all' });
     expect(result).toHaveLength(0);
   });
 
   it('zero-result case returns empty array', () => {
-    const result = filterPokemon(FIXTURES, { query: 'zzz', types: ['electric'], gen: 9, hasAlternateForms: false });
+    const result = filterPokemon(FIXTURES, { query: 'zzz', types: ['electric'], gen: 9, hasAlternateForms: false, masteryStatus: 'all' });
     expect(result).toEqual([]);
+  });
+});
+
+describe('filterPokemon — masteryStatus filter', () => {
+  // Fixture set with varied cardClass values.
+  const MASTERY_FIXTURES: PokemonCellData[] = [
+    basePokemon({ id: 1, speciesId: 1, name: 'bulbasaur',  types: ['grass', 'poison'], cardClass: 'locked' }),
+    basePokemon({ id: 4, speciesId: 4, name: 'charmander', types: ['fire'],            cardClass: 'learning' }),
+    basePokemon({ id: 6, speciesId: 6, name: 'charizard',  types: ['fire', 'flying'],  cardClass: 'mastered' }),
+    basePokemon({ id: 7, speciesId: 7, name: 'squirtle',   types: ['water'],           cardClass: 'mastered' }),
+  ];
+
+  it('masteryStatus "all" returns all pokemon', () => {
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, masteryStatus: 'all' });
+    expect(result).toHaveLength(MASTERY_FIXTURES.length);
+  });
+
+  it('masteryStatus "mastered" returns only mastered pokemon', () => {
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, masteryStatus: 'mastered' });
+    const names = result.map((p) => p.name).sort();
+    expect(names).toEqual(['charizard', 'squirtle']);
+  });
+
+  it('masteryStatus "not-yet-mastered" returns locked and learning pokemon', () => {
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, masteryStatus: 'not-yet-mastered' });
+    const names = result.map((p) => p.name).sort();
+    expect(names).toEqual(['bulbasaur', 'charmander']);
+  });
+
+  it('masteryStatus "mastered" composes with type filter (AND semantics)', () => {
+    // Only charizard is fire + mastered; squirtle is mastered but not fire
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, types: ['fire'], masteryStatus: 'mastered' });
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('charizard');
+  });
+
+  it('masteryStatus "not-yet-mastered" composes with type filter', () => {
+    // charmander is fire + not-yet-mastered; charizard is fire but mastered
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, types: ['fire'], masteryStatus: 'not-yet-mastered' });
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('charmander');
   });
 });
 
@@ -257,7 +298,7 @@ describe('parseFilters', () => {
 
   it('returns defaults when no params are present', () => {
     const result = parseFilters(params({}));
-    expect(result).toEqual({ query: '', types: [], gen: null, hasAlternateForms: false });
+    expect(result).toEqual({ query: '', types: [], gen: null, hasAlternateForms: false, masteryStatus: 'all' });
   });
 
   it('reads q into query', () => {
@@ -303,5 +344,25 @@ describe('parseFilters', () => {
   it('maps forms=0 to hasAlternateForms=false', () => {
     const result = parseFilters(params({ forms: '0' }));
     expect(result.hasAlternateForms).toBe(false);
+  });
+
+  it('parses mastery=mastered', () => {
+    const result = parseFilters(params({ mastery: 'mastered' }));
+    expect(result.masteryStatus).toBe('mastered');
+  });
+
+  it('parses mastery=not-yet-mastered', () => {
+    const result = parseFilters(params({ mastery: 'not-yet-mastered' }));
+    expect(result.masteryStatus).toBe('not-yet-mastered');
+  });
+
+  it('maps missing mastery param to "all"', () => {
+    const result = parseFilters(params({}));
+    expect(result.masteryStatus).toBe('all');
+  });
+
+  it('maps invalid mastery param to "all"', () => {
+    const result = parseFilters(params({ mastery: 'unknown' }));
+    expect(result.masteryStatus).toBe('all');
   });
 });
