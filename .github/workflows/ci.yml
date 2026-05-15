@@ -85,6 +85,8 @@ jobs:
           cache: 'npm'
       - run: npm ci
         if: needs.changes.outputs.code == 'true'
+      - run: npm run lint
+        if: needs.changes.outputs.code == 'true'
       - run: npm run typecheck
         if: needs.changes.outputs.code == 'true'
       - run: npm run build

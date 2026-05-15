@@ -7,6 +7,7 @@ import { pullGradeLog } from "@/lib/sync/gradeLog";
 import { saveSession, loadSession } from "@/lib/review/persistence";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { buildSession } from "@/lib/review/session";
+import type { ReviewableCard } from "@/lib/review/session";
 import { hasStoredSettings, loadSettings, saveSettings, DEFAULT_SETTINGS } from "@/lib/settings/persistence";
 import { loadStreakData, saveStreakData } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
@@ -553,8 +554,14 @@ describe("pullAndMerge", () => {
 
   describe("SYNC_PULL_APPLIED_EVENT", () => {
     // Minimal card shape needed by mergeAffectsProgress
-    function card(id: string, lastReview: string | null, firstSeen: string | null) {
-      return { id, state: { lastReview, firstSeen } };
+    // Minimal fixture: only the fields pullAndMerge's cold-load detection reads.
+    // Cast through unknown to the real card type so call sites stay type-clean.
+    function card(
+      id: string,
+      lastReview: string | null,
+      firstSeen: string | null,
+    ): ReviewableCard {
+      return { id, state: { lastReview, firstSeen } } as unknown as ReviewableCard;
     }
 
     // Stub window + CustomEvent before each test in this block; unstub after.
@@ -581,8 +588,8 @@ describe("pullAndMerge", () => {
 
     it("fires when cold load + merge advances a card's lastReview", async () => {
       mockLoadSession.mockResolvedValue(null);
-      mockBuildSession.mockReturnValue([card("pikachu", null, null)] as any);
-      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-10")] as any);
+      mockBuildSession.mockReturnValue([card("pikachu", null, null)]);
+      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-10")]);
 
       await pullAndMerge(fakeClient, fakeUserId);
 
@@ -592,8 +599,8 @@ describe("pullAndMerge", () => {
 
     it("stays silent on cold load when merge is a no-op (cloud matches seed)", async () => {
       mockLoadSession.mockResolvedValue(null);
-      mockBuildSession.mockReturnValue([card("pikachu", null, null)] as any);
-      mockMerge.mockReturnValue([card("pikachu", null, null)] as any);
+      mockBuildSession.mockReturnValue([card("pikachu", null, null)]);
+      mockMerge.mockReturnValue([card("pikachu", null, null)]);
 
       await pullAndMerge(fakeClient, fakeUserId);
 
@@ -603,12 +610,12 @@ describe("pullAndMerge", () => {
     it("stays silent when local session already exists (not a cold load)", async () => {
       // Non-cold load: user already has local review state
       mockLoadSession.mockResolvedValue({
-        cards: [card("pikachu", "2026-05-13", "2026-05-01")] as any,
-        limits: {} as any,
-      });
+        cards: [card("pikachu", "2026-05-13", "2026-05-01")],
+        limits: {},
+      } as unknown as Awaited<ReturnType<typeof loadSession>>);
       // Cloud brings newer lastReview — mergeAffectsProgress would return true,
       // so suppression must come from wasColdLoad, not from the no-op check.
-      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-01")] as any);
+      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-01")]);
 
       await pullAndMerge(fakeClient, fakeUserId);
 
@@ -626,10 +633,10 @@ describe("pullAndMerge", () => {
     // a cold load, the dispatch never fires for the canonical PWA bug.
     it("fires when local session is non-null but pristine (race with ReviewSession.load)", async () => {
       mockLoadSession.mockResolvedValue({
-        cards: [card("pikachu", null, null)] as any,
-        limits: {} as any,
-      });
-      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-10")] as any);
+        cards: [card("pikachu", null, null)],
+        limits: {},
+      } as unknown as Awaited<ReturnType<typeof loadSession>>);
+      mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-10")]);
 
       await pullAndMerge(fakeClient, fakeUserId);
 
@@ -639,10 +646,10 @@ describe("pullAndMerge", () => {
 
     it("stays silent when local session is pristine but merge is a no-op", async () => {
       mockLoadSession.mockResolvedValue({
-        cards: [card("pikachu", null, null)] as any,
-        limits: {} as any,
-      });
-      mockMerge.mockReturnValue([card("pikachu", null, null)] as any);
+        cards: [card("pikachu", null, null)],
+        limits: {},
+      } as unknown as Awaited<ReturnType<typeof loadSession>>);
+      mockMerge.mockReturnValue([card("pikachu", null, null)]);
 
       await pullAndMerge(fakeClient, fakeUserId);
 

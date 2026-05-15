@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 
@@ -8,9 +8,17 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type CooldownState = { optimizedAt: string; daysRemaining: number };
 
-function computeCooldown(optimizedAt: string | undefined): CooldownState | null {
+/**
+ * Pure given a `nowMs` reference time — the caller captures `Date.now()` once
+ * (in a lazy `useState` initialiser) so the render body itself stays
+ * deterministic.
+ */
+function computeCooldown(
+  optimizedAt: string | undefined,
+  nowMs: number,
+): CooldownState | null {
   if (optimizedAt === undefined) return null;
-  const sinceMs = Date.now() - new Date(optimizedAt).getTime();
+  const sinceMs = nowMs - new Date(optimizedAt).getTime();
   if (sinceMs >= OPTIMIZER_COOLDOWN_MS) return null;
   return {
     optimizedAt,
@@ -42,7 +50,15 @@ export function FsrsOptimizerSection({
 }: Props) {
   const [optimizerState, setOptimizerState] = useState<OptimizerState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const cooldown = computeCooldown(fsrsWeightsOptimizedAt);
+  // Capture the current time once at mount. The lazy initialiser runs outside
+  // the render pass, so the render body stays pure — the cooldown is a
+  // coarse day-granularity countdown, so a snapshot at mount is accurate
+  // enough without a ticking timer.
+  const [nowMs] = useState(() => Date.now());
+  const cooldown = useMemo(
+    () => computeCooldown(fsrsWeightsOptimizedAt, nowMs),
+    [fsrsWeightsOptimizedAt, nowMs],
+  );
 
   async function handleOptimize() {
     setOptimizerState("running");

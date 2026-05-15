@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { default_w } from "ts-fsrs";
 import { nextReview, initialReviewState } from "@/lib/srs/scheduler";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { migrateReviewState } from "@/lib/review/persistence";
@@ -518,7 +519,6 @@ describe("retentionTarget option", () => {
 describe("weights option", () => {
   // Use the default ts-fsrs weight vector as a baseline.
   // We obtain it from the library's own export rather than hard-coding.
-  const { default_w } = require("ts-fsrs");
   const defaultWeights: number[] = [...default_w];
 
   it("two calls with the same weights + retention return identical scheduledDays", () => {
