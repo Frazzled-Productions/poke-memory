@@ -170,6 +170,14 @@ Two card-mix shapes specifically look "broken" on a fresh dev session but aren't
   Update the topic file in the same commit that changes its subsystem; the pointer in AGENTS.md stays short.
 - **All of these are updated inline in the commit that lands the change** — no separate docs-only commit, no specialist agent.
 
+### Spelling
+
+All prose written for this project — code comments, commit messages, PR descriptions, docs (`README.md`, `CHANGELOG.md`, `WORKFLOW.md`, `docs/**`, `AGENTS.md`), user-facing UI strings, and error messages — uses **British English** spelling (`colour`, `behaviour`, `optimise`, `serialise`, `centre`).
+
+- **In scope**: prose, comments, commit messages, PR descriptions, docs, user-facing UI copy, error messages.
+- **Out of scope**: identifiers from external APIs and standards — CSS (`color`, `text-align: center`), JS/DOM (`Intl.DateTimeFormat`), React props (`onColorChange`), PokéAPI fields, FSRS (`optimizer`), Supabase column names already shipped. Renaming those breaks integrations for no benefit.
+- **Internal identifiers**: prefer British (`colour`, `behaviour`) for new code, but don't churn existing identifiers — too noisy, too risky for sync/migration code.
+
 ### Screenshots
 
 The README shows five screenshots (`docs/screenshots/{practice-front,practice-flipped,pokedex-grid,pasture,stats}.png`), all captured at the **iPhone 17 Pro viewport** (402×874 CSS px @ 3× DPR) so the README grid lines up uniformly. The capture script is `scripts/capture-screenshots.mjs`, wrapped as `npm run screenshots`.
