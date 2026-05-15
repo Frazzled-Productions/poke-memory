@@ -1,24 +1,31 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Mobile nav — bottom tab bar E2E tests (supersedes the hamburger-drawer
- * tests from #659).
+ * Mobile nav E2E tests (#661).
  *
- * mobile-safari project: verifies the bottom tab bar is visible and fixed,
- * tabs navigate, the active tab is highlighted with aria-current="page",
- * and the header carries no hamburger button.
+ * Two modes:
+ * - Default (new user, no persisted settings) → bottom tab bar.
+ * - Hamburger (user toggles the setting on the Settings page) → hamburger drawer.
  *
- * chromium project: verifies the desktop horizontal nav row is still shown
- * and no bottom tab bar leaks into the desktop layout.
+ * Desktop is unaffected by the setting — the inline header nav row is always
+ * shown and no bottom tab bar leaks in.
  */
 
-test.describe("Mobile nav — bottom tab bar", () => {
-  test("bottom tab bar is visible on mobile", async ({ page }, testInfo) => {
+// ─── Bottom tab bar (default mode) ───────────────────────────────────────────
+
+test.describe("Mobile nav — bottom tab bar (default)", () => {
+  test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
-      "bottom-tab-bar check is mobile-only",
+      "bottom-tab-bar checks are mobile-only",
     );
+    // Clear localStorage so we get the new-user default (bottom tab bar).
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+  });
 
+  test("bottom tab bar is visible on mobile", async ({ page }) => {
     await page.goto("/");
 
     const tabBar = page.getByRole("navigation", {
@@ -27,15 +34,7 @@ test.describe("Mobile nav — bottom tab bar", () => {
     await expect(tabBar).toBeVisible();
   });
 
-  test("bottom tab bar contains all primary destinations", async (
-    { page },
-    testInfo,
-  ) => {
-    test.skip(
-      testInfo.project.name !== "mobile-safari",
-      "bottom-tab-bar check is mobile-only",
-    );
-
+  test("bottom tab bar contains all primary destinations", async ({ page }) => {
     await page.goto("/");
 
     const tabBar = page.getByRole("navigation", {
@@ -47,15 +46,7 @@ test.describe("Mobile nav — bottom tab bar", () => {
     }
   });
 
-  test("tab bar is fixed — does not scroll with the page", async (
-    { page },
-    testInfo,
-  ) => {
-    test.skip(
-      testInfo.project.name !== "mobile-safari",
-      "bottom-tab-bar position check is mobile-only",
-    );
-
+  test("tab bar is fixed — does not scroll with the page", async ({ page }) => {
     await page.goto("/pokedex");
 
     const tabBar = page.getByRole("navigation", {
@@ -79,12 +70,7 @@ test.describe("Mobile nav — bottom tab bar", () => {
     }
   });
 
-  test("active tab has aria-current='page'", async ({ page }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== "mobile-safari",
-      "active-tab check is mobile-only",
-    );
-
+  test("active tab has aria-current='page'", async ({ page }) => {
     await page.goto("/stats");
 
     const tabBar = page.getByRole("navigation", {
@@ -106,15 +92,7 @@ test.describe("Mobile nav — bottom tab bar", () => {
     ).not.toHaveAttribute("aria-current", "page");
   });
 
-  test("tapping a tab navigates to the destination and marks it active", async (
-    { page },
-    testInfo,
-  ) => {
-    test.skip(
-      testInfo.project.name !== "mobile-safari",
-      "tab-navigation check is mobile-only",
-    );
-
+  test("tapping a tab navigates to the destination and marks it active", async ({ page }) => {
     await page.goto("/");
 
     const tabBar = page.getByRole("navigation", {
@@ -139,29 +117,16 @@ test.describe("Mobile nav — bottom tab bar", () => {
     ).toHaveAttribute("aria-current", "page");
   });
 
-  test("no hamburger button on mobile", async ({ page }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== "mobile-safari",
-      "hamburger-absent check is mobile-only",
-    );
-
+  test("no hamburger button on mobile when bottom tab bar is active", async ({ page }) => {
     await page.goto("/");
 
-    // The hamburger should not be present now that the bottom tab bar replaces it
+    // The hamburger should not be present in bottom-tab-bar mode
     await expect(
       page.getByRole("button", { name: /open navigation menu/i }),
     ).toHaveCount(0);
   });
 
-  test("header shows only brand and auth on mobile — no link row", async (
-    { page },
-    testInfo,
-  ) => {
-    test.skip(
-      testInfo.project.name !== "mobile-safari",
-      "header-minimal check is mobile-only",
-    );
-
+  test("header shows only brand and auth on mobile — no link row", async ({ page }) => {
     await page.goto("/");
 
     const header = page.getByRole("navigation", { name: "Main navigation" });
@@ -172,6 +137,69 @@ test.describe("Mobile nav — bottom tab bar", () => {
     await expect(statsLinkInHeader).toBeHidden();
   });
 });
+
+// ─── Hamburger mode ───────────────────────────────────────────────────────────
+
+test.describe("Mobile nav — hamburger mode (via Settings toggle)", () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "hamburger-mode checks are mobile-only",
+    );
+    // Seed localStorage with mobileNav: 'hamburger' to simulate an existing
+    // user or a user who has switched the toggle.
+    await page.goto("/");
+    await page.evaluate(() => {
+      const key = "poke-memory:settings:v1";
+      const existing = JSON.parse(localStorage.getItem(key) ?? "{}");
+      localStorage.setItem(key, JSON.stringify({ ...existing, mobileNav: "hamburger" }));
+    });
+    await page.reload();
+  });
+
+  test("hamburger button is visible on mobile in hamburger mode", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(
+      page.getByRole("button", { name: /open navigation menu/i }),
+    ).toBeVisible();
+  });
+
+  test("bottom tab bar is absent in hamburger mode", async ({ page }) => {
+    await page.goto("/");
+
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
+    await expect(tabBar).toHaveCount(0);
+  });
+
+  test("hamburger opens the nav drawer with all destinations", async ({ page }) => {
+    await page.goto("/");
+
+    await page.getByRole("button", { name: /open navigation menu/i }).click();
+
+    const drawer = page.getByRole("dialog", { name: "Navigation menu" });
+    await expect(drawer).toBeVisible();
+
+    for (const label of ["Practice", "Stats", "Pokédex", "Settings"]) {
+      await expect(drawer.getByRole("link", { name: label })).toBeVisible();
+    }
+  });
+
+  test("Esc closes the drawer in hamburger mode", async ({ page }) => {
+    await page.goto("/");
+
+    await page.getByRole("button", { name: /open navigation menu/i }).click();
+    const drawer = page.getByRole("dialog", { name: "Navigation menu" });
+    await expect(drawer).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+  });
+});
+
+// ─── Desktop — unaffected by mobileNav setting ────────────────────────────────
 
 test.describe("Desktop nav — inline header row, no tab bar", () => {
   test("desktop shows the horizontal link row and no bottom tab bar", async (
@@ -191,7 +219,7 @@ test.describe("Desktop nav — inline header row, no tab bar", () => {
       await expect(nav.getByRole("link", { name: label })).toBeVisible();
     }
 
-    // Bottom tab bar must not be visible on desktop
+    // Bottom tab bar must not be visible on desktop regardless of mobileNav setting
     const tabBar = page.getByRole("navigation", {
       name: "Mobile tab navigation",
     });

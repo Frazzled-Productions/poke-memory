@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { MobileNavPaddingWrapper } from "@/components/MobileNavPaddingWrapper";
 import { Footer } from "@/components/Footer";
 import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { SignInPull } from "@/components/sync/SignInPull";
@@ -75,12 +76,21 @@ export default function RootLayout({
               </Suspense>
               <SignInPull />
               <AutoSyncOnChange />
-              {/* Bottom padding on mobile so the fixed tab bar never overlaps content */}
-              <div className="flex flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0" data-page-content>{children}</div>
+              {/*
+                MobileNavPaddingWrapper adds bottom padding on mobile only when
+                the bottom tab bar is active, so the fixed bar never overlaps content.
+                The padding is removed automatically when the user switches to the
+                hamburger nav style via Settings.
+              */}
+              <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
               <Footer />
-              <Suspense fallback={null}>
-                <BottomTabBar />
-              </Suspense>
+              {/*
+                BottomTabBar is always mounted but returns null internally when
+                mobileNav === 'hamburger'. The single Suspense boundary here is
+                sufficient — the component has its own inner Suspense for the
+                async mastery check.
+              */}
+              <BottomTabBar />
             </FavouriteThemeProvider>
           </SuperuserProvider>
         </AuthProvider>

@@ -60,6 +60,7 @@ const SAMPLE: UserSettings = {
   ttsVolume: 1,
   timezone: null,
   dateFormat: null,
+  mobileNav: "bottom" as const,
 };
 
 describe("pushSettings", () => {

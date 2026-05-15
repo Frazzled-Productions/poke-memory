@@ -7,6 +7,7 @@ import { filterMastered } from "@/lib/pasture/arrivals";
 import { loadSession } from "@/lib/review/persistence";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
 // ─── SVG icons ──────────────────────────────────────────────────────────────
 
@@ -130,6 +131,20 @@ function BottomTabBarInner() {
   // Re-runs the mastery check when the session key changes, matching the logic
   // in NavLinks and NavDrawer.
   const sessionVersion = useSessionStorageKey();
+  // Track mobileNav setting so the bar disappears immediately when the user
+  // switches to hamburger mode on the Settings page.
+  const [mobileNav, setMobileNav] = useState<"bottom" | "hamburger">(() => {
+    if (typeof window === "undefined") return "bottom";
+    return loadSettings().mobileNav;
+  });
+
+  useEffect(() => {
+    function onSaved() {
+      setMobileNav(loadSettings().mobileNav);
+    }
+    window.addEventListener(SETTINGS_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -140,6 +155,9 @@ function BottomTabBarInner() {
     }
     void load();
   }, [sessionVersion]);
+
+  // Hidden in hamburger mode — the NavDrawer handles navigation instead.
+  if (mobileNav === "hamburger") return null;
 
   const showPasture = hasMastered || flags.pretendAllMastered;
 
@@ -200,11 +218,13 @@ function BottomTabBarInner() {
 /**
  * Static fallback rendered while the client bundle is loading. Shows
  * the same tab positions so the layout does not shift during hydration.
+ * Uses a plain `<div>` with `aria-hidden` rather than a `<nav>` because a
+ * hidden landmark is semantically odd — assistive technology should not
+ * discover a nav that provides no interactive content.
  */
 function BottomTabBarFallback() {
   return (
-    <nav
-      aria-label="Mobile tab navigation"
+    <div
       aria-hidden="true"
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-theme-secondary bg-theme-primary md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -224,7 +244,7 @@ function BottomTabBarFallback() {
           </li>
         ))}
       </ul>
-    </nav>
+    </div>
   );
 }
 
