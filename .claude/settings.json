@@ -18,6 +18,11 @@
             "type": "command",
             "command": "git fetch origin main --quiet 2>/dev/null || true; if [ \"$(git symbolic-ref --short HEAD 2>/dev/null)\" = \"main\" ] && git diff --quiet && git diff --cached --quiet; then git merge --ff-only origin/main --quiet 2>/dev/null || true; fi",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/prune-worktrees.sh",
+            "timeout": 30
           }
         ]
       }
