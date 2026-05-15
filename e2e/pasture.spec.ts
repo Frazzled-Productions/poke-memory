@@ -354,10 +354,20 @@ test.describe("Pasture page — biome landscape view", () => {
     await expect(page).toHaveURL("/pasture");
   });
 
-  test("unknown biome slug returns 404", async ({ page }) => {
-    const response = await page.goto("/pasture/not-a-real-biome");
-    // Next.js App Router returns 404 for notFound() pages.
-    expect(response?.status()).toBe(404);
+  test("unknown biome slug shows the not-found page", async ({ page }) => {
+    // With cacheComponents: true the /pasture/[biome] route is a Partial
+    // Prerender (PPR) — the static shell is streamed with HTTP 200 before the
+    // dynamic segment runs notFound(). The HTTP status will therefore always be
+    // 200, so we assert on the rendered UI instead of the status code.
+    await page.goto("/pasture/not-a-real-biome");
+
+    // Next.js's default not-found page renders an <h1>404</h1> and an
+    // <h2>This page could not be found.</h2>. Assert on both to confirm the
+    // not-found UI is actually rendered in the browser.
+    await expect(page.getByRole("heading", { level: 1, name: "404" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "This page could not be found." }),
+    ).toBeVisible();
   });
 });
 
