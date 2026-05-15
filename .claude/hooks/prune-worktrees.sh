@@ -20,11 +20,12 @@ wt="$root/.claude/worktrees"
 cd "$root" || exit 0
 git worktree prune 2>/dev/null
 
-# Absolute paths of locked worktrees (active background jobs).
-# sub(/^worktree /,"") captures the full remainder of the line so paths
-# containing spaces are not truncated.
-locked="$(git worktree list --porcelain 2>/dev/null \
-  | awk '/^worktree /{sub(/^worktree /,""); p=$0} /^locked/{print p}')"
+# Snapshot worktree metadata once; abort if the listing fails — we cannot
+# safely determine what is locked.  sub(/^worktree /,"") captures the full
+# remainder so paths with spaces are not truncated.
+wt_listing="$(git worktree list --porcelain 2>/dev/null)" || exit 0
+locked="$(printf '%s\n' "$wt_listing" | awk '/^worktree /{sub(/^worktree /,""); p=$0} /^locked/{print p}')"
+tracked="$(printf '%s\n' "$wt_listing" | awk '/^worktree /{sub(/^worktree /,""); print}')"
 
 now=$(date +%s)
 cutoff=$((3 * 86400))   # 3 days
@@ -45,11 +46,9 @@ for d in "$wt"/*/; do
 
   if git worktree remove --force "$d" 2>/dev/null; then
     removed=$((removed + 1))
-  else
-    if ! git worktree list --porcelain 2>/dev/null | grep -qxF "worktree $d"; then
-      # git no longer tracks this directory — safe to remove the orphaned dir.
-      rm -rf "$d" && removed=$((removed + 1))
-    fi
+  elif ! printf '%s\n' "$tracked" | grep -qxF "$d"; then
+    # Pre-loop snapshot confirms git no longer tracks this dir — safe to remove.
+    rm -rf "$d" && removed=$((removed + 1))
   fi
 done
 
