@@ -76,17 +76,29 @@ test.describe("Pasture nav guard", () => {
 
   test("Pasture link appears when at least one card is mastered", async ({
     page,
-  }) => {
+  }, testInfo) => {
     // Caterpie is in the Forest habitat. reps=4, scheduledDays=28 → mastered.
     await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
 
     await page.goto("/");
 
-    const nav = page.getByRole("navigation", { name: "Main navigation" });
-    const pastureLink = nav.getByRole("link", { name: "Pasture" });
-    await expect(pastureLink).toBeVisible();
+    // On mobile the Pasture link is inside the hamburger drawer; open it first.
+    const hamburger = page.locator('[aria-controls="mobile-nav-drawer"]');
+    const isMobile = testInfo.project.name === "mobile-safari";
+    if (isMobile) {
+      await hamburger.click();
+      const drawer = page.getByRole("dialog", { name: "Navigation menu" });
+      await expect(drawer).toBeVisible();
+      const pastureLink = drawer.getByRole("link", { name: "Pasture" });
+      await expect(pastureLink).toBeVisible();
+      await pastureLink.click();
+    } else {
+      const nav = page.getByRole("navigation", { name: "Main navigation" });
+      const pastureLink = nav.getByRole("link", { name: "Pasture" });
+      await expect(pastureLink).toBeVisible();
+      await pastureLink.click();
+    }
 
-    await pastureLink.click();
     await expect(page).toHaveURL("/pasture");
   });
 });

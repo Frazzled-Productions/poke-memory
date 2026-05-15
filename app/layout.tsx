@@ -74,7 +74,7 @@ export default function RootLayout({
               </Suspense>
               <SignInPull />
               <AutoSyncOnChange />
-              <div className="flex flex-1 flex-col">{children}</div>
+              <div className="flex flex-1 flex-col" data-page-content>{children}</div>
               <Footer />
             </FavouriteThemeProvider>
           </SuperuserProvider>
