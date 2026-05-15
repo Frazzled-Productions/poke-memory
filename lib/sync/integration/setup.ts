@@ -177,8 +177,9 @@ export async function applyPreMigrationFixture(pool: pg.Pool): Promise<void> {
  * Simulate an authenticated user by setting `request.jwt.claims` for the
  * duration of a callback.
  *
- * The setting is applied with `SET LOCAL` inside an explicit transaction so it
- * is automatically reverted when the transaction ends (ROLLBACK or COMMIT).
+ * The setting is applied transaction-locally via `set_config(..., true)` inside
+ * an explicit transaction so it is automatically reverted when the transaction
+ * ends (ROLLBACK or COMMIT).
  *
  * @param client  A pg.PoolClient from pool.connect().
  * @param userId  UUID string to expose as `auth.uid()`.

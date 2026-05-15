@@ -39,7 +39,7 @@ const USER_B = randomUUID();
 let rlsPool: pg.Pool;
 
 /**
- * Helper: insert a card_reviews row as the given user using `SET LOCAL` to
+ * Helper: insert a card_reviews row as the given user using `set_config` to
  * simulate auth.uid(). Runs in its own transaction that commits so subsequent
  * selects can see the row.
  */
