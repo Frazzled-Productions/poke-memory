@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { NavLinks, NavLinksFallback } from "./NavLinks";
-import { NavDrawer, NavDrawerFallback } from "./NavDrawer";
 import { FavouriteMascot } from "./theme/FavouriteMascot";
+import { AuthButton } from "@/components/auth/AuthButton";
+import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 
 export function Nav() {
   return (
@@ -30,10 +31,13 @@ export function Nav() {
           </Suspense>
         </div>
 
-        {/* Mobile hamburger + drawer — hidden at md and above */}
-        <Suspense fallback={<NavDrawerFallback />}>
-          <NavDrawer />
-        </Suspense>
+        {/* Mobile right-side cluster: What's New indicator + Auth — hidden at md and above */}
+        <div className="flex items-center gap-2 md:hidden">
+          <Suspense fallback={null}>
+            <WhatsNewIndicator />
+          </Suspense>
+          <AuthButton />
+        </div>
       </nav>
     </header>
   );

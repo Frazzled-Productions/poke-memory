@@ -1,118 +1,183 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Mobile nav hamburger E2E tests.
+ * Mobile nav — bottom tab bar E2E tests (supersedes the hamburger-drawer
+ * tests from #659).
  *
- * mobile-safari project: verifies the hamburger is visible, opens/closes,
- * links navigate, and menu closes after navigation.
+ * mobile-safari project: verifies the bottom tab bar is visible and fixed,
+ * tabs navigate, the active tab is highlighted with aria-current="page",
+ * and the header carries no hamburger button.
  *
- * chromium project: verifies the desktop horizontal row is shown (no hamburger).
+ * chromium project: verifies the desktop horizontal nav row is still shown
+ * and no bottom tab bar leaks into the desktop layout.
  */
 
-test.describe("Mobile nav — hamburger drawer", () => {
-  test("hamburger button is visible on mobile and opens the drawer", async ({
-    page,
-    browserName,
-  }, testInfo) => {
+test.describe("Mobile nav — bottom tab bar", () => {
+  test("bottom tab bar is visible on mobile", async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
-      "hamburger-visible check is mobile-only",
+      "bottom-tab-bar check is mobile-only",
     );
 
     await page.goto("/");
 
-    // Locate the hamburger by its stable aria-controls attribute so the
-    // assertion below survives the label changing from "Open…" to "Close…".
-    const hamburger = page.locator('[aria-controls="mobile-nav-drawer"]');
-    await expect(hamburger).toBeVisible();
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
+    await expect(tabBar).toBeVisible();
+  });
 
-    // Drawer starts closed
-    const drawer = page.getByRole("dialog", { name: "Navigation menu" });
-    await expect(drawer).toBeHidden();
+  test("bottom tab bar contains all primary destinations", async (
+    { page },
+    testInfo,
+  ) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "bottom-tab-bar check is mobile-only",
+    );
 
-    // Open the drawer
-    await hamburger.click();
+    await page.goto("/");
 
-    await expect(drawer).toBeVisible();
-    // After opening the label changes to "Close navigation menu"; locate by
-    // aria-controls (stable) so the aria-expanded assertion always resolves.
-    await expect(hamburger).toHaveAttribute("aria-expanded", "true");
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
 
-    // All primary links are present inside the drawer
     for (const label of ["Practice", "Stats", "Pokédex", "Settings"]) {
-      await expect(drawer.getByRole("link", { name: label })).toBeVisible();
+      await expect(tabBar.getByRole("link", { name: label })).toBeVisible();
     }
   });
 
-  test("navigating via the drawer closes the menu and loads the page", async ({
-    page,
-  }, testInfo) => {
+  test("tab bar is fixed — does not scroll with the page", async (
+    { page },
+    testInfo,
+  ) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
-      "hamburger-nav check is mobile-only",
+      "bottom-tab-bar position check is mobile-only",
     );
 
-    await page.goto("/");
+    await page.goto("/pokedex");
 
-    const hamburger = page.getByRole("button", { name: "Open navigation menu" });
-    await hamburger.click();
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
+    await expect(tabBar).toBeVisible();
 
-    const drawer = page.getByRole("dialog", { name: "Navigation menu" });
-    await expect(drawer).toBeVisible();
+    // Record position before scrolling
+    const boxBefore = await tabBar.boundingBox();
+    expect(boxBefore).not.toBeNull();
 
-    // Click the Stats link inside the drawer
-    await drawer.getByRole("link", { name: "Stats" }).click();
+    // Scroll the page down
+    await page.evaluate(() => window.scrollBy(0, 300));
 
-    // Navigated to /stats
-    await expect(page).toHaveURL("/stats");
+    // Position should be unchanged (fixed positioning)
+    const boxAfter = await tabBar.boundingBox();
+    expect(boxAfter).not.toBeNull();
 
-    // Drawer should be closed after navigation
-    await expect(drawer).toBeHidden();
+    if (boxBefore && boxAfter) {
+      expect(Math.abs(boxAfter.y - boxBefore.y)).toBeLessThanOrEqual(2);
+    }
   });
 
-  test("Esc key closes the drawer", async ({ page }, testInfo) => {
+  test("active tab has aria-current='page'", async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
-      "Esc-close check is mobile-only",
+      "active-tab check is mobile-only",
     );
 
-    await page.goto("/");
+    await page.goto("/stats");
 
-    const hamburger = page.getByRole("button", { name: "Open navigation menu" });
-    await hamburger.click();
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
 
-    const drawer = page.getByRole("dialog", { name: "Navigation menu" });
-    await expect(drawer).toBeVisible();
+    // Stats tab should be marked as active
+    await expect(tabBar.getByRole("link", { name: "Stats" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
 
-    await page.keyboard.press("Escape");
-
-    await expect(drawer).toBeHidden();
+    // Other tabs should not be active
+    await expect(
+      tabBar.getByRole("link", { name: "Practice" }),
+    ).not.toHaveAttribute("aria-current", "page");
+    await expect(
+      tabBar.getByRole("link", { name: "Settings" }),
+    ).not.toHaveAttribute("aria-current", "page");
   });
 
-  test("close button inside the drawer closes it", async ({ page }, testInfo) => {
+  test("tapping a tab navigates to the destination and marks it active", async (
+    { page },
+    testInfo,
+  ) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
-      "drawer-close-btn check is mobile-only",
+      "tab-navigation check is mobile-only",
     );
 
     await page.goto("/");
 
-    const hamburger = page.getByRole("button", { name: "Open navigation menu" });
-    await hamburger.click();
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
 
-    const drawer = page.getByRole("dialog", { name: "Navigation menu" });
-    await expect(drawer).toBeVisible();
+    // Tap the Settings tab
+    await tabBar.getByRole("link", { name: "Settings" }).click();
+    await expect(page).toHaveURL("/settings");
 
-    await drawer.getByRole("button", { name: "Close navigation menu" }).click();
+    // Settings tab should now be active
+    await expect(
+      tabBar.getByRole("link", { name: "Settings" }),
+    ).toHaveAttribute("aria-current", "page");
 
-    await expect(drawer).toBeHidden();
+    // Tap the Pokédex tab
+    await tabBar.getByRole("link", { name: "Pokédex" }).click();
+    await expect(page).toHaveURL("/pokedex");
+
+    await expect(
+      tabBar.getByRole("link", { name: "Pokédex" }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  test("no hamburger button on mobile", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "hamburger-absent check is mobile-only",
+    );
+
+    await page.goto("/");
+
+    // The hamburger should not be present now that the bottom tab bar replaces it
+    await expect(
+      page.getByRole("button", { name: /open navigation menu/i }),
+    ).toHaveCount(0);
+  });
+
+  test("header shows only brand and auth on mobile — no link row", async (
+    { page },
+    testInfo,
+  ) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "header-minimal check is mobile-only",
+    );
+
+    await page.goto("/");
+
+    const header = page.getByRole("navigation", { name: "Main navigation" });
+
+    // The inline nav links should not be visible inside the header on mobile
+    // (they live in a `hidden md:flex` container)
+    const statsLinkInHeader = header.getByRole("link", { name: "Stats" });
+    await expect(statsLinkInHeader).toBeHidden();
   });
 });
 
-test.describe("Desktop nav — no hamburger", () => {
-  test("desktop shows the horizontal link row and no hamburger", async ({
-    page,
-  }, testInfo) => {
+test.describe("Desktop nav — inline header row, no tab bar", () => {
+  test("desktop shows the horizontal link row and no bottom tab bar", async (
+    { page },
+    testInfo,
+  ) => {
     test.skip(
       testInfo.project.name !== "chromium",
       "desktop layout check is chromium-only",
@@ -120,20 +185,20 @@ test.describe("Desktop nav — no hamburger", () => {
 
     await page.goto("/");
 
-    // Hamburger button should not be visible on desktop
-    const hamburger = page.getByRole("button", { name: "Open navigation menu" });
-    await expect(hamburger).toBeHidden();
-
-    // Desktop nav links are directly in the header (not inside a drawer)
+    // Desktop nav links are directly in the header
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     for (const label of ["Practice", "Stats", "Pokédex", "Settings"]) {
       await expect(nav.getByRole("link", { name: label })).toBeVisible();
     }
+
+    // Bottom tab bar must not be visible on desktop
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
+    await expect(tabBar).toBeHidden();
   });
 
-  test("desktop nav links still navigate correctly", async ({
-    page,
-  }, testInfo) => {
+  test("desktop nav links navigate correctly", async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "chromium",
       "desktop navigation check is chromium-only",

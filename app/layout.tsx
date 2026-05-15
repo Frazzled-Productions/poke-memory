@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { Footer } from "@/components/Footer";
 import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { SignInPull } from "@/components/sync/SignInPull";
@@ -74,8 +75,12 @@ export default function RootLayout({
               </Suspense>
               <SignInPull />
               <AutoSyncOnChange />
-              <div className="flex flex-1 flex-col" data-page-content>{children}</div>
+              {/* Bottom padding on mobile so the fixed tab bar never overlaps content */}
+              <div className="flex flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0" data-page-content>{children}</div>
               <Footer />
+              <Suspense fallback={null}>
+                <BottomTabBar />
+              </Suspense>
             </FavouriteThemeProvider>
           </SuperuserProvider>
         </AuthProvider>

@@ -1,0 +1,244 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { filterMastered } from "@/lib/pasture/arrivals";
+import { loadSession } from "@/lib/review/persistence";
+import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+
+// ─── SVG icons ──────────────────────────────────────────────────────────────
+
+function PracticeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Pokéball silhouette — simplified as a card/book icon */}
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
+
+function StatsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  );
+}
+
+function PokedexIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function PastureIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
+function SettingsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+// ─── Static tab definitions ───────────────────────────────────────────────
+
+const STATIC_TABS = [
+  { href: "/", label: "Practice", Icon: PracticeIcon },
+  { href: "/stats", label: "Stats", Icon: StatsIcon },
+  { href: "/pokedex", label: "Pokédex", Icon: PokedexIcon },
+  { href: "/settings", label: "Settings", Icon: SettingsIcon },
+] as const;
+
+// ─── Inner component (requires client hooks) ─────────────────────────────
+
+function BottomTabBarInner() {
+  const pathname = usePathname();
+  const { flags } = useSuperuser();
+  const [hasMastered, setHasMastered] = useState(false);
+  // Re-runs the mastery check when the session key changes, matching the logic
+  // in NavLinks and NavDrawer.
+  const sessionVersion = useSessionStorageKey();
+
+  useEffect(() => {
+    async function load() {
+      const session = await loadSession();
+      setHasMastered(
+        session !== null && filterMastered(session.cards).length > 0,
+      );
+    }
+    void load();
+  }, [sessionVersion]);
+
+  const showPasture = hasMastered || flags.pretendAllMastered;
+
+  // Build the tab list, inserting Pasture before Settings when visible.
+  const tabs: Array<{
+    href: string;
+    label: string;
+    Icon: React.ComponentType<{ className?: string }>;
+  }> = [];
+
+  for (const tab of STATIC_TABS) {
+    if (tab.href === "/settings" && showPasture) {
+      tabs.push({ href: "/pasture", label: "Pasture", Icon: PastureIcon });
+    }
+    tabs.push(tab);
+  }
+
+  return (
+    <nav
+      aria-label="Mobile tab navigation"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-theme-secondary bg-theme-primary md:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <ul
+        role="list"
+        className="mx-auto flex max-w-5xl items-stretch justify-around"
+      >
+        {tabs.map(({ href, label, Icon }) => {
+          const isActive =
+            pathname === href ||
+            (href !== "/" && pathname.startsWith(href + "/"));
+          return (
+            <li key={href} className="flex-1">
+              <Link
+                href={href}
+                aria-current={isActive ? "page" : undefined}
+                className={[
+                  "flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-inset",
+                  isActive
+                    ? "text-theme-fg-on-primary"
+                    : "text-theme-fg-on-primary opacity-55 hover:opacity-80",
+                ].join(" ")}
+              >
+                <Icon
+                  className={isActive ? "opacity-100" : "opacity-70"}
+                />
+                <span>{label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+/**
+ * Static fallback rendered while the client bundle is loading. Shows
+ * the same tab positions so the layout does not shift during hydration.
+ */
+function BottomTabBarFallback() {
+  return (
+    <nav
+      aria-label="Mobile tab navigation"
+      aria-hidden="true"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-theme-secondary bg-theme-primary md:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <ul
+        role="list"
+        className="mx-auto flex max-w-5xl items-stretch justify-around"
+      >
+        {STATIC_TABS.map(({ href, label, Icon }) => (
+          <li key={href} className="flex-1">
+            <span
+              className="flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium text-theme-fg-on-primary opacity-55"
+            >
+              <Icon />
+              <span>{label}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/**
+ * Fixed bottom tab bar — visible only on mobile (below the `md` breakpoint).
+ *
+ * Tabs: Practice / Stats / Pokédex / [Pasture when mastered] / Settings.
+ * Active tab is indicated with `aria-current="page"` and full opacity.
+ * Respects iOS safe-area-inset-bottom so the bar clears the home indicator.
+ */
+export function BottomTabBar() {
+  return (
+    <Suspense fallback={<BottomTabBarFallback />}>
+      <BottomTabBarInner />
+    </Suspense>
+  );
+}
