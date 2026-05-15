@@ -1,0 +1,88 @@
+name: Monitor grade_log divergence
+
+# Daily check that flags users whose grade_log shows activity but whose
+# card_reviews table is missing the corresponding rows — the #584 sync-
+# break signature. See #607 and .github/scripts/check-grade-log-divergence.mjs.
+#
+# Cron-only — does NOT fire on push, so this workflow file landing in a
+# PR will not trigger an alert on the PR itself. The first real run is the
+# next 08:00 UTC tick after merge.
+
+on:
+  schedule:
+    # 08:00 UTC daily — well before users open the app most days, so an
+    # alert created here is sitting in the inbox by the start of the day.
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: "Override the divergence threshold (default 5)"
+        required: false
+        default: ""
+
+concurrency:
+  group: monitor-grade-log-divergence
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.repository == 'fraserbrookhouse/poke-memory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Ensure `monitoring` label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Self-healing label create. If the label already exists the
+        # command exits non-zero; we swallow that with `|| true` so the
+        # step is a true no-op on the steady-state path.
+        run: |
+          gh label create monitoring \
+            --color D93F0B \
+            --description "Automated monitoring alert" \
+            || true
+
+      - name: Run divergence check
+        id: check
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          DIVERGENCE_THRESHOLD: ${{ github.event.inputs.threshold }}
+          DIVERGENCE_BODY_PATH: /tmp/divergence-body.md
+        run: |
+          set -euo pipefail
+          OUTPUT=$(node .github/scripts/check-grade-log-divergence.mjs)
+          echo "$OUTPUT"
+          if [ "$OUTPUT" = "OK" ]; then
+            echo "alert=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "alert=true" >> "$GITHUB_OUTPUT"
+            # Extract user_count from the JSON for the issue title.
+            USER_COUNT=$(echo "$OUTPUT" | node -e "let s=''; process.stdin.on('data', d => s += d); process.stdin.on('end', () => { try { console.log(JSON.parse(s).user_count); } catch { console.log('?'); } })")
+            echo "user_count=$USER_COUNT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open alert issue
+        if: steps.check.outputs.alert == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          USER_COUNT: ${{ steps.check.outputs.user_count }}
+        # `gh issue create --body-file` is the supported path. We avoid
+        # `--json` here per the #537 lesson: gh's `--json` flag is for
+        # output formatting and is not accepted on `issue create`.
+        run: |
+          gh issue create \
+            --title "[monitoring] grade_log divergence detected (${USER_COUNT} users)" \
+            --body-file /tmp/divergence-body.md \
+            --label monitoring \
+            --label "area:workflow"
