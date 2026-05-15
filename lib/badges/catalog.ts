@@ -23,6 +23,11 @@ export type BadgeDefinition = {
   id: string;
   name: string;
   description: string;
+  /**
+   * Short teaser shown when the badge is locked. Evocative but non-spoiler —
+   * hints at the theme without revealing the exact mastery criterion.
+   */
+  lockedHint: string;
   criterion: BadgeCriterion;
 };
 
@@ -34,48 +39,56 @@ export const BADGE_CATALOG: readonly BadgeDefinition[] = [
     id: "boulder-badge",
     name: "Boulder Badge",
     description: "You've mastered Brock's roster.",
+    lockedHint: "A Kanto gym leader's rocky roster…",
     criterion: { kind: "all-mastered", speciesIds: [74, 95] },
   },
   {
     id: "cascade-badge",
     name: "Cascade Badge",
     description: "You've mastered Misty's roster.",
+    lockedHint: "A Cerulean gym leader favours the sea…",
     criterion: { kind: "all-mastered", speciesIds: [120, 121] },
   },
   {
     id: "thunder-badge",
     name: "Thunder Badge",
     description: "You've mastered Lt. Surge's electric roster.",
+    lockedHint: "A Vermilion commander sparks with voltage…",
     criterion: { kind: "all-mastered", speciesIds: [26, 100] },
   },
   {
     id: "rainbow-badge",
     name: "Rainbow Badge",
     description: "You've mastered Erika's grass roster.",
+    lockedHint: "A Celadon gym leader tends her garden…",
     criterion: { kind: "all-mastered", speciesIds: [70, 71] },
   },
   {
     id: "soul-badge",
     name: "Soul Badge",
     description: "You've mastered Koga's poison roster.",
+    lockedHint: "A Fuchsia ninja deals in hidden toxins…",
     criterion: { kind: "all-mastered", speciesIds: [49, 110] },
   },
   {
     id: "marsh-badge",
     name: "Marsh Badge",
     description: "You've mastered Sabrina's psychic roster.",
+    lockedHint: "A Saffron psychic bends minds and matter…",
     criterion: { kind: "all-mastered", speciesIds: [63, 65] },
   },
   {
     id: "volcano-badge",
     name: "Volcano Badge",
     description: "You've mastered Blaine's fire roster.",
+    lockedHint: "A Cinnabar island quiz master commands fire…",
     criterion: { kind: "all-mastered", speciesIds: [59, 78] },
   },
   {
     id: "earth-badge",
     name: "Earth Badge",
     description: "You've mastered Giovanni's ground roster.",
+    lockedHint: "A Viridian leader of shadowy reputation…",
     criterion: { kind: "all-mastered", speciesIds: [76, 112] },
   },
 
@@ -84,12 +97,14 @@ export const BADGE_CATALOG: readonly BadgeDefinition[] = [
     id: "kanto-starters",
     name: "Kanto Starters",
     description: "Bulbasaur, Charmander, Squirtle and their final evolutions.",
+    lockedHint: "Three Kanto partners and the paths they grow into…",
     criterion: { kind: "all-mastered", speciesIds: [1, 3, 4, 6, 7, 9] },
   },
   {
     id: "johto-starters",
     name: "Johto Starters",
     description: "Chikorita, Cyndaquil, Totodile and their final evolutions.",
+    lockedHint: "Three Johto companions and their final forms…",
     criterion: {
       kind: "all-mastered",
       speciesIds: [152, 154, 155, 157, 158, 160],
@@ -99,6 +114,7 @@ export const BADGE_CATALOG: readonly BadgeDefinition[] = [
     id: "hoenn-starters",
     name: "Hoenn Starters",
     description: "Treecko, Torchic, Mudkip and their final evolutions.",
+    lockedHint: "Three Hoenn beginnings and where they lead…",
     criterion: {
       kind: "all-mastered",
       speciesIds: [252, 254, 255, 257, 258, 260],
@@ -108,6 +124,7 @@ export const BADGE_CATALOG: readonly BadgeDefinition[] = [
     id: "sinnoh-starters",
     name: "Sinnoh Starters",
     description: "Turtwig, Chimchar, Piplup and their final evolutions.",
+    lockedHint: "Three Sinnoh starters and their evolved destinies…",
     criterion: {
       kind: "all-mastered",
       speciesIds: [387, 389, 390, 392, 393, 395],
@@ -117,6 +134,7 @@ export const BADGE_CATALOG: readonly BadgeDefinition[] = [
     id: "galar-starters",
     name: "Galar Starters",
     description: "Grookey, Scorbunny, Sobble and their final evolutions.",
+    lockedHint: "Three Galar rivals and the champions they become…",
     criterion: {
       kind: "all-mastered",
       speciesIds: [810, 812, 813, 815, 816, 818],
@@ -126,24 +144,28 @@ export const BADGE_CATALOG: readonly BadgeDefinition[] = [
     id: "legendary-birds",
     name: "Legendary Birds",
     description: "Articuno, Zapdos, and Moltres.",
+    lockedHint: "Three legendary wings soar above Kanto…",
     criterion: { kind: "all-mastered", speciesIds: [144, 145, 146] },
   },
   {
     id: "legendary-beasts",
     name: "Legendary Beasts",
     description: "Raikou, Entei, and Suicune.",
+    lockedHint: "Three sacred beasts roam the Johto wilds…",
     criterion: { kind: "all-mastered", speciesIds: [243, 244, 245] },
   },
   {
     id: "lake-trio",
     name: "Lake Trio",
     description: "Uxie, Mesprit, and Azelf — the lake guardians of Sinnoh.",
+    lockedHint: "Three spirits dwell in Sinnoh's still waters…",
     criterion: { kind: "all-mastered", speciesIds: [480, 481, 482] },
   },
   {
     id: "eeveelutions",
     name: "Eeveelutions",
     description: "Eevee and all eight of its evolutions.",
+    lockedHint: "One adaptable Pokémon and the many paths it can take…",
     criterion: {
       kind: "all-mastered",
       speciesIds: [133, 134, 135, 136, 196, 197, 470, 471, 700],

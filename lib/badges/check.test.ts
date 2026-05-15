@@ -7,12 +7,14 @@ const CATALOG: readonly BadgeDefinition[] = [
     id: "birds",
     name: "Birds",
     description: "",
+    lockedHint: "Three legendary wings soar above Kanto…",
     criterion: { kind: "all-mastered", speciesIds: [144, 145, 146] },
   },
   {
     id: "starters",
     name: "Starters",
     description: "",
+    lockedHint: "Three Kanto partners and the paths they grow into…",
     criterion: { kind: "all-mastered", speciesIds: [1, 4, 7] },
   },
 ];

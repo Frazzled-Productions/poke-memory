@@ -185,12 +185,14 @@ describe("TrainerCard", () => {
             id: "eeveelutions",
             name: "Eeveelutions",
             description: "Eevee + all eight evolutions.",
+            lockedHint: "One adaptable Pokémon…",
             criterion: { kind: "all-mastered", speciesIds: [133] },
           },
           {
             id: "cascade-badge",
             name: "Cascade Badge",
             description: "x",
+            lockedHint: "A Cerulean gym leader favours the sea…",
             criterion: { kind: "all-mastered", speciesIds: [120, 121] },
           },
         ]}
