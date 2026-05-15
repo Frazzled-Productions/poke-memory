@@ -208,8 +208,12 @@ test.describe("Settings page — search/filter (#662)", () => {
       ).not.toBeVisible();
     }
 
-    // The no-match message must be visible.
-    await expect(page.getByText(/no settings match/i)).toBeVisible();
+    // The visible no-match message echoes the query back. Scope the locator
+    // to the query text so it does not also match the sr-only aria-live
+    // status announcer, which carries similar copy.
+    await expect(
+      page.getByText(/no settings match.*xyzzynosuchthing/i),
+    ).toBeVisible();
   });
 
   test("search input is keyboard-reachable via click and accepts input", async ({ page }) => {
