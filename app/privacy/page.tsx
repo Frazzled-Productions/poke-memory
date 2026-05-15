@@ -166,13 +166,75 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 4. Purposes and lawful basis */}
+        {/* 4. Cookies and similar technologies (PECR) */}
+        <section aria-labelledby="section-cookies">
+          <h2
+            id="section-cookies"
+            className="mb-3 text-base font-semibold"
+          >
+            4. Cookies and similar technologies
+          </h2>
+          <p className="mb-3">
+            This section sets out our position under the UK Privacy and
+            Electronic Communications Regulations 2003 (PECR), which governs
+            the use of cookies and similar client-side storage.
+          </p>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            What we use
+          </h3>
+          <ul className="list-disc space-y-2 pl-5 mb-3">
+            <li>
+              <strong>Browser local storage (guest path).</strong> We store
+              your card review state, application settings, and temporary
+              superuser QA flags in <code>localStorage</code>. This storage
+              never leaves your device; nothing is transmitted to any server
+              we operate. It is strictly necessary for the app to function
+              in guest mode.
+            </li>
+            <li>
+              <strong>Supabase Auth session cookie (signed-in path only).</strong>{" "}
+              When you sign in with GitHub, Supabase Auth sets an HTTP-only
+              session cookie containing a signed JWT. This cookie is strictly
+              necessary to keep you authenticated across requests. It is not
+              set in guest mode and is not used for advertising or tracking.
+            </li>
+          </ul>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            What we do not use
+          </h3>
+          <p className="mb-3">
+            We do not use tracking cookies, advertising cookies, or
+            third-party profiling cookies of any kind. Vercel Analytics and
+            Speed Insights collect aggregate, anonymous metrics (page path,
+            referrer, country, device type, Core Web Vitals) without setting
+            any cookie or writing to <code>localStorage</code> — they operate
+            entirely via server-side telemetry and do not identify individual
+            users.
+          </p>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            PECR position — no consent banner required
+          </h3>
+          <p>
+            Under PECR, consent is only required for cookies and similar
+            storage that are not strictly necessary. Because every item of
+            client-side storage used by this app is either strictly necessary
+            for the service to function (the auth cookie and SRS state in
+            local storage) or does not involve cookies or storage at all
+            (Vercel Analytics), no consent banner is required. We disclose
+            this position here for transparency.
+          </p>
+        </section>
+
+        {/* 5. Purposes and lawful basis */}
         <section aria-labelledby="section-basis">
           <h2
             id="section-basis"
             className="mb-3 text-base font-semibold"
           >
-            4. Why do we process your data and on what lawful basis?
+            5. Why do we process your data and on what lawful basis?
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-xs">
@@ -220,13 +282,13 @@ export default function PrivacyPage() {
           </div>
         </section>
 
-        {/* 5. Sub-processors */}
+        {/* 6. Sub-processors */}
         <section aria-labelledby="section-subprocessors">
           <h2
             id="section-subprocessors"
             className="mb-3 text-base font-semibold"
           >
-            5. Sub-processors
+            6. Sub-processors
           </h2>
           <p className="mb-3">
             We use the following third-party sub-processors. We have a data
@@ -286,13 +348,13 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 6. Cross-border transfers */}
+        {/* 7. Cross-border transfers */}
         <section aria-labelledby="section-transfers">
           <h2
             id="section-transfers"
             className="mb-3 text-base font-semibold"
           >
-            6. International transfers
+            7. International transfers
           </h2>
           <p>
             Vercel and Supabase may process data outside the UK / EEA. Both
@@ -303,13 +365,13 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 7. Retention */}
+        {/* 8. Retention */}
         <section aria-labelledby="section-retention">
           <h2
             id="section-retention"
             className="mb-3 text-base font-semibold"
           >
-            7. How long do we keep your data?
+            8. How long do we keep your data?
           </h2>
           <p>
             Your review history, daily activity log, grade event log, and
@@ -328,13 +390,13 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 8. Data-subject rights */}
+        {/* 9. Data-subject rights */}
         <section aria-labelledby="section-rights">
           <h2
             id="section-rights"
             className="mb-3 text-base font-semibold"
           >
-            8. Your rights
+            9. Your rights
           </h2>
           <p className="mb-3">
             Under UK GDPR and GDPR, you have the following rights where they
@@ -394,13 +456,13 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 9. ICO complaint route */}
+        {/* 10. ICO complaint route */}
         <section aria-labelledby="section-ico">
           <h2
             id="section-ico"
             className="mb-3 text-base font-semibold"
           >
-            9. Right to complain to the ICO
+            10. Right to complain to the ICO
           </h2>
           <p>
             If you are in the UK and are unhappy with how we handle your
@@ -419,13 +481,13 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 10. Children */}
+        {/* 11. Children */}
         <section aria-labelledby="section-children">
           <h2
             id="section-children"
             className="mb-3 text-base font-semibold"
           >
-            10. Children&rsquo;s data
+            11. Children&rsquo;s data
           </h2>
           <p>
             Poké Memory is not directed at children under the age of 13. We do
@@ -443,13 +505,13 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 11. Changes */}
+        {/* 12. Changes */}
         <section aria-labelledby="section-changes">
           <h2
             id="section-changes"
             className="mb-3 text-base font-semibold"
           >
-            11. Changes to this notice
+            12. Changes to this notice
           </h2>
           <p>
             We may update this notice when the data flows change (for example,
@@ -466,13 +528,13 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 12. Third-party content */}
+        {/* 13. Third-party content */}
         <section aria-labelledby="section-ip">
           <h2
             id="section-ip"
             className="mb-3 text-base font-semibold"
           >
-            12. Third-party content and intellectual property
+            13. Third-party content and intellectual property
           </h2>
           <p className="mb-3">
             Poké Memory is an unofficial, non-commercial fan project. It is not
