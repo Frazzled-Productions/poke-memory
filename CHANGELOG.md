@@ -6,6 +6,23 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.59] — 2026-05-15
+
+### Changed
+
+- Rewrite all 12 RLS policies on `card_reviews`, `streak_days`, `user_settings`, and `grade_log` to use `(SELECT auth.uid())` instead of `auth.uid()` directly. PostgREST now evaluates the auth function once per query rather than once per row, clearing Supabase advisor lint 0003 and improving plan quality on the larger tables.
+
+### Fixed
+
+- Sign-in conflict picker now acts on all synced data (cards, settings, streak, grade-log, regional prefs), not just cards. The picker also shows streak-day and grade-entry counts for each side so you have more signal to choose. Previously picking "Keep cloud" silently retained local settings/streak/grade-log and let them overwrite cloud on the next sync.
+- Sync: settings pushes now send only the keys that changed since the last successful push from this device, rather than the whole JSONB blob. Two devices changing disjoint settings (themeIntensity on A, maxNewPerDay on B) no longer race to clobber each other.
+- Stats: an open Stats mount now picks up cloud-side streak updates the same cycle they're pulled, instead of lagging by one full pull cycle. Same shape as the grade-log fix in #575.
+
+### Security
+
+- Pin `merge_user_settings`'s `search_path` to `''` and qualify table references with `public.`. Matches `reset_all_progress` (migration 018) and clears Supabase advisor lint 0011 for this function.
+- `rls_auto_enable()` SECURITY DEFINER function is no longer callable via the REST API by `anon` or `authenticated`. The function is a leftover DDL event-trigger helper that operates on `pg_event_trigger_ddl_commands()` (no-op outside an event trigger), but exposing it via `/rest/v1/rpc/rls_auto_enable` was unnecessary attack surface. EXECUTE is now revoked from PUBLIC, anon, and authenticated; the function remains callable by privileged roles (postgres).
+
 ## [0.9.58] — 2026-05-14
 
 ### Changed
@@ -935,7 +952,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.58...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.59...HEAD
+[0.9.59]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.59
 [0.9.58]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.58
 [0.9.57]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.57
 [0.9.56]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.56
