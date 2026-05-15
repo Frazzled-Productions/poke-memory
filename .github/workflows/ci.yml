@@ -114,6 +114,10 @@ jobs:
     needs: [changes, test]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     permissions:
       contents: read
     steps:
@@ -146,7 +150,7 @@ jobs:
           npm start &
           echo $! > /tmp/next.pid
           npx wait-on http://localhost:3000 --timeout 60000
-          npm run test:e2e
+          npm run test:e2e -- --shard=${{ matrix.shard }}/2
       - name: Stop Next.js
         if: always() && needs.changes.outputs.e2e_relevant == 'true'
         run: |
