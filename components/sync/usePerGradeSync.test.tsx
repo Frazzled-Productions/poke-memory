@@ -256,6 +256,16 @@ describe("usePerGradeSync — consecutive-failure banner (#606)", () => {
     expect(vi.mocked(markPushFailed)).not.toHaveBeenCalled();
   });
 
+  it("fires markPushFailed exactly once even after 5 consecutive failures (not on 4th or 5th)", async () => {
+    const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    // 5 all-failure drains — threshold is 3, so markPushFailed should fire only
+    // on drain 3 (the === transition), not on drains 4 or 5.
+    await drainNTimes(result.current.enqueueGrade, 5);
+
+    expect(vi.mocked(markPushFailed)).toHaveBeenCalledTimes(1);
+  });
+
   it("calls markPushSucceeded (not markPushFailed) when a success follows failures", async () => {
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 

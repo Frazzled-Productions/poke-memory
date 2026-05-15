@@ -89,8 +89,13 @@ export function usePerGradeSync(
       // and surface the banner after FAILURE_THRESHOLD attempts (#606). A single
       // network blip should not show the banner; three consecutive all-failure
       // drains strongly suggests the push channel is broken.
+      //
+      // Use === (not >=) so markPushFailed fires exactly once per failure
+      // episode — only on the transition from threshold-1 to threshold. When
+      // failures resume after a successful drain resets the counter, the next
+      // === hit naturally re-fires.
       consecutiveFailuresRef.current += 1;
-      if (consecutiveFailuresRef.current >= FAILURE_THRESHOLD) {
+      if (consecutiveFailuresRef.current === FAILURE_THRESHOLD) {
         markPushFailed(pendingQueueRef.current.length);
       }
     }
