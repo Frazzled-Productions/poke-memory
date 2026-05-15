@@ -115,10 +115,17 @@ test.describe("Alternate forms — ScopeControl visibility (#658)", () => {
   test("Alternate forms section appears in ScopeControl after enabling the toggle", async ({
     page,
   }) => {
-    // Enable the toggle on the Settings page first.
+    // Enable the toggle on the Settings page and persist via Save.
+    // handleToggle only updates React state; saveSettings is only called from
+    // handleSave — so we must click Save before navigating away.
     await page.goto("/settings");
     await page.getByRole("button", { name: /^practice$/i }).click();
     await page.getByRole("switch", { name: /include alternate forms in practice/i }).click();
+
+    // Click Save and wait for the "Saved!" confirmation so we know the
+    // setting has been written to localStorage before we navigate.
+    await page.getByRole("button", { name: /^save$/i }).click();
+    await expect(page.getByText("Saved!")).toBeVisible();
 
     // Navigate to the practice page and open the scope panel.
     await page.goto("/");
