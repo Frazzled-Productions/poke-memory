@@ -204,6 +204,83 @@ test.describe("Pokédex detail — Forms section hidden when locked (#495)", () 
   });
 });
 
+test.describe("Pokédex mastery-status filter (#542)", () => {
+  test("selecting a type then 'Not yet mastered' narrows the grid", async ({ page }) => {
+    // Seed Bulbasaur (id=1) as mastered so there is at least one mastered species,
+    // and leave all others at default (locked) so "not-yet-mastered" yields results.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 30,
+            difficulty: 4,
+            elapsedDays: 30,
+            scheduledDays: 30,
+            reps: 5,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    // Wait for the grid to load (IDB hydration).
+    const pokemonLists = page.getByRole("list", { name: /Pokémon/ });
+    await expect(pokemonLists.first()).toBeVisible();
+
+    // Count all Grass-type tiles.
+    const typeGroup = page.getByRole("group", { name: "Filter by type" });
+    await typeGroup.getByRole("button", { name: "Grass" }).click();
+    await page.waitForURL(/type=grass/);
+    const grassCount = await pokemonLists.getByRole("listitem").count();
+    expect(grassCount).toBeGreaterThan(0);
+
+    // Now narrow by "Not yet mastered" — Bulbasaur is mastered so it should drop out.
+    const masteryGroup = page.getByRole("group", { name: "Filter by mastery" });
+    await masteryGroup.getByRole("button", { name: "Not yet mastered" }).click();
+    await page.waitForURL(/mastery=not-yet-mastered/);
+
+    // The result should still have some Grass Pokémon (the locked ones) but
+    // strictly fewer than the full Grass set (Bulbasaur is now excluded).
+    const notYetMasteredCount = await pokemonLists.getByRole("listitem").count();
+    expect(notYetMasteredCount).toBeGreaterThan(0);
+    expect(notYetMasteredCount).toBeLessThan(grassCount);
+  });
+
+  test("mastery filter URL param is preserved on page load", async ({ page }) => {
+    await page.goto("/pokedex?mastery=mastered");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    // The "Mastered" chip should be pressed.
+    const masteryGroup = page.getByRole("group", { name: "Filter by mastery" });
+    await expect(
+      masteryGroup.getByRole("button", { name: "Mastered" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
 test.describe("Pokédex — alternate-form surfaces (#450)", () => {
   test("searching 'alolan' shows at least 1 result when seed has forms, or shows 0 gracefully", async ({
     page,

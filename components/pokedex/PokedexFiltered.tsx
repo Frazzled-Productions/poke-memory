@@ -3,7 +3,8 @@
 import { useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { filterPokemon, parseFilters } from "@/lib/pokemon/filter";
-import type { PokemonCellData, PokedexFilters } from "@/lib/pokemon/filter";
+import type { PokemonCellData, PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import PokedexFilterBar from "./PokedexFilterBar";
 import PokedexGrid from "./PokedexGrid";
 
@@ -17,6 +18,7 @@ function buildUrl(filters: PokedexFilters): string {
   if (filters.types.length > 0) params.set("type", filters.types.join(","));
   if (filters.gen !== null) params.set("gen", String(filters.gen));
   if (filters.hasAlternateForms) params.set("forms", "1");
+  if (filters.masteryStatus !== "all") params.set("mastery", filters.masteryStatus);
   const qs = params.toString();
   return qs ? `/pokedex?${qs}` : "/pokedex";
 }
@@ -34,6 +36,7 @@ type Props = { enrichedPokemon: PokemonCellData[] };
 export default function PokedexFiltered({ enrichedPokemon }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { flags } = useSuperuser();
 
   const filters = parseFilters(searchParams);
 
@@ -80,19 +83,36 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
     );
   }, [router, filters]);
 
+  const handleMasteryChange = useCallback(
+    (masteryStatus: MasteryStatus) => {
+      router.replace(buildUrl({ ...filters, masteryStatus }), { scroll: false });
+    },
+    [router, filters],
+  );
+
+  // When pretendAllMastered is on, every Pokémon reads as mastered in the grid,
+  // so "not-yet-mastered" would always yield an empty result. Override the
+  // effective mastery filter to "all" so the grid stays coherent.
+  const effectiveMasteryStatus: MasteryStatus = flags.pretendAllMastered
+    ? "all"
+    : filters.masteryStatus;
+
   const filtered = filterPokemon(enrichedPokemon, {
     ...filters,
+    masteryStatus: effectiveMasteryStatus,
     query: localQuery,
   });
 
   return (
     <>
       <PokedexFilterBar
-        filters={{ ...filters, query: localQuery }}
+        filters={{ ...filters, query: localQuery, masteryStatus: effectiveMasteryStatus }}
         onQueryChange={handleQueryChange}
         onTypeToggle={handleTypeToggle}
         onGenChange={handleGenChange}
         onAlternateFormsToggle={handleAlternateFormsToggle}
+        onMasteryChange={handleMasteryChange}
+        superuserMasteryLocked={flags.pretendAllMastered}
       />
       <PokedexGrid
         pokemon={filtered}

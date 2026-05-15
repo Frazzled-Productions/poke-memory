@@ -1,6 +1,6 @@
 "use client";
 
-import type { PokedexFilters } from "@/lib/pokemon/filter";
+import type { PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 
 // ---------------------------------------------------------------------------
@@ -29,11 +29,20 @@ type FilterBarProps = {
   onTypeToggle: (type: string) => void;
   onGenChange: (gen: number | null) => void;
   onAlternateFormsToggle: () => void;
+  onMasteryChange: (masteryStatus: MasteryStatus) => void;
+  /** When true (superuser pretendAllMastered on), the mastery filter is locked to "all" and disabled. */
+  superuserMasteryLocked?: boolean;
 };
 
 // ---------------------------------------------------------------------------
 // PokedexFilterBar
 // ---------------------------------------------------------------------------
+
+const MASTERY_OPTIONS: { value: MasteryStatus; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "mastered", label: "Mastered" },
+  { value: "not-yet-mastered", label: "Not yet mastered" },
+];
 
 export default function PokedexFilterBar({
   filters,
@@ -41,6 +50,8 @@ export default function PokedexFilterBar({
   onTypeToggle,
   onGenChange,
   onAlternateFormsToggle,
+  onMasteryChange,
+  superuserMasteryLocked = false,
 }: FilterBarProps) {
   return (
     <div className="sticky top-0 z-10 bg-background py-3 border-b border-zinc-200 dark:border-zinc-800 mb-6">
@@ -145,7 +156,7 @@ export default function PokedexFilterBar({
       <div
         role="group"
         aria-label="Additional filters"
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap gap-2 mb-3"
       >
         <button
           type="button"
@@ -160,6 +171,41 @@ export default function PokedexFilterBar({
         >
           Has alternate forms
         </button>
+      </div>
+
+      {/* Mastery status filter */}
+      <div
+        role="group"
+        aria-label="Filter by mastery"
+        className="flex flex-wrap gap-2"
+      >
+        {MASTERY_OPTIONS.map(({ value, label }) => {
+          const isSelected = filters.masteryStatus === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onMasteryChange(value)}
+              aria-pressed={isSelected}
+              disabled={superuserMasteryLocked && value !== "all"}
+              title={
+                superuserMasteryLocked && value !== "all"
+                  ? "Mastery filter unavailable while pretend-all-mastered is on"
+                  : undefined
+              }
+              className={[
+                "rounded-full px-3 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
+                superuserMasteryLocked && value !== "all"
+                  ? "cursor-not-allowed opacity-40 bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  : isSelected
+                    ? "bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+              ].join(" ")}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
