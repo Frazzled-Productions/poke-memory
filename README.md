@@ -144,3 +144,9 @@ This repo doubles as a sandbox for practicing Claude Code sub-agent workflows. T
 ## Status
 
 Hobby project, work-in-progress. See [CHANGELOG.md](./CHANGELOG.md) for what's been built so far and [Releases](https://github.com/fraserbrookhouse/poke-memory/releases) for tagged versions.
+
+## Licence
+
+The project's own source code is released under the [MIT Licence](./LICENSE).
+
+Bundled Pokémon assets — sprites, cries, and names — are **not** covered by that licence. They remain the intellectual property of Nintendo, Game Freak, and The Pokémon Company. This is an unofficial fan project, not affiliated with or endorsed by those companies.
