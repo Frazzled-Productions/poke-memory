@@ -136,6 +136,12 @@ Two vitest projects in `vitest.config.ts`, partitioned by directory:
 
 A React hook can live in `lib/` (e.g. `lib/review/useStorageQuota.ts`), but if its test calls `renderHook`, the test file must live under `components/` so the jsdom project picks it up. Imports are absolute (`@/lib/...`), so co-locating a hook test next to its source is not required and will fail in CI with `ReferenceError: document is not defined`.
 
+#### Integration tests (vitest + local Postgres)
+
+Integration tests live in `lib/sync/integration/` and run against a local Postgres service container — no Supabase Pro plan or branch quota required. They are opt-in: set `VITEST_INTEGRATION=1` and run `npm run test:integration`. In CI the `integration-tests.yml` workflow spins up a `postgres:15` service container and passes `DATABASE_URL` to the test runner; the workflow is gated behind the `integration-tests` PR label so it does not run on every PR. The original Supabase-branching approach (PR #531) was replaced here because Supabase branching requires the Pro plan (#464 / #545).
+
+Three tests are in scope: `apply-migrations.test.ts` (all `db/migrations/*.sql` apply cleanly), `rls.test.ts` (user A cannot read/write user B's rows), and `regression-trigger.test.ts` (the `card_reviews_reject_regression_trigger` fires on illegal UPDATEs). All use direct SQL via `pg`; the `auth.uid()` polyfill in `setup.ts` simulates an authenticated session by setting `SET LOCAL "request.jwt.claims"` inside a transaction.
+
 #### E2E tests (Playwright)
 
 Playwright smoke tests live in `e2e/` and run against Vercel preview deployments via `e2e.yml`. Config is in `playwright.config.ts`.

@@ -1,184 +1,216 @@
 /**
- * Integration test helpers for Supabase branch lifecycle.
+ * Integration test helpers for local Postgres.
  *
- * Requires:
- *   SUPABASE_ACCESS_TOKEN  — Management API personal access token.
- *   SUPABASE_PROJECT_REF   — The parent project ref (e.g. "abcdefghijklmnop").
+ * Connects to the Postgres service container started by the GHA `services:`
+ * block (or any Postgres instance pointed at by DATABASE_URL). No Management
+ * API calls, no Supabase branch quota.
  *
- * Creates an ephemeral branch, returns a configured client pair, and tears
- * the branch down when you are done.  The branch is named:
- *   test-<GITHUB_RUN_ID|"local">-<Date.now()>
- * so concurrent files within the same CI run (and separate local runs) each
- * get a unique name.
+ * Required env var (defaults work for the GHA service container):
+ *   DATABASE_URL  — connection string, default:
+ *                   postgres://postgres:testpass@localhost:5432/poke_memory_test
+ *
+ * Each test file gets its own isolated database created from DATABASE_URL at
+ * runtime, so running multiple test files serially never causes duplicate-index
+ * or duplicate-table errors from migrations re-applying to the same schema.
+ *
+ * Before the user migrations are applied the fixture step must call
+ * `applyPreMigrationFixture()`, which installs:
+ *   - the `auth` schema + minimal `auth.users` table (FK target for migrations)
+ *   - the `auth.uid()` polyfill (reads from `request.jwt.claims` session var)
+ *   - the `anon` and `authenticated` roles (required by GRANT/REVOKE in migrations)
+ *   - a stub `public.rls_auto_enable()` function (required by migration 025)
  */
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import pg from "pg";
+import { randomBytes } from "node:crypto";
 
-const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN ?? "";
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF ?? "";
+const { Pool } = pg;
 
-/** Milliseconds to wait between polling the branch-ready endpoint. */
-const POLL_INTERVAL_MS = 3_000;
-/** Maximum time to wait for a branch to become ready before throwing. */
-const BRANCH_READY_TIMEOUT_MS = 120_000;
+/** Base connection string. Override with DATABASE_URL env var. */
+export const DATABASE_URL =
+  process.env.DATABASE_URL ??
+  "postgres://postgres:testpass@localhost:5432/poke_memory_test";
 
-/** Shape returned by the Management API GET /v1/branches/{ref}. */
-interface BranchDetails {
-  id: string;
-  name: string;
-  project_ref: string;
-  /** "running" once migrations have been applied. */
-  status: string;
-  db_host?: string;
-  anon_key?: string;
-  service_role_key?: string;
-}
-
-interface BranchListItem {
-  id: string;
-  name: string;
-  project_ref: string;
-  status: string;
-}
-
-async function managementFetch(
-  path: string,
-  options: RequestInit = {},
-): Promise<unknown> {
-  const url = `https://api.supabase.com${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(no body)");
-    throw new Error(
-      `Management API ${options.method ?? "GET"} ${path} failed with ${res.status}: ${body}`,
-    );
-  }
-  // 204 No Content on delete
-  if (res.status === 204) return null;
-  return res.json();
-}
-
-const TERMINAL_FAILURE_STATES = new Set(["failed", "error", "removed"]);
-
-/** Wait for the branch to reach "running" status, polling every POLL_INTERVAL_MS. */
-async function waitForBranchReady(branchId: string): Promise<BranchDetails> {
-  const deadline = Date.now() + BRANCH_READY_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const details = (await managementFetch(
-      `/v1/branches/${branchId}`,
-    )) as BranchDetails;
-    if (details.status === "running") return details;
-    if (TERMINAL_FAILURE_STATES.has(details.status)) {
-      throw new Error(
-        `Branch ${branchId} entered terminal state '${details.status}' — cannot proceed`,
-      );
-    }
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-  }
-  throw new Error(
-    `Branch ${branchId} did not reach 'running' status within ${BRANCH_READY_TIMEOUT_MS}ms`,
-  );
-}
-
-export interface TestBranch {
-  /** Management API branch ID (UUID). */
-  branchId: string;
-  /** The branch project ref (used to construct the Supabase URL). */
-  branchRef: string;
-  /** Base URL for the branch, e.g. "https://<branchRef>.supabase.co". */
-  branchUrl: string;
-  /** Anon key for constructing per-test user clients. */
-  anonKey: string;
-  /** Anon-key client — mirrors what a browser would use (subject to RLS). */
-  client: SupabaseClient;
-  /** Service-role client — bypasses RLS; used for test setup/teardown. */
-  serviceClient: SupabaseClient;
+/**
+ * Parses a Postgres connection string and returns a copy with a different
+ * database name.
+ */
+function withDbName(connectionString: string, dbName: string): string {
+  // Replace the database segment at the end of the URL path.
+  // postgres://user:pass@host:port/dbname → postgres://user:pass@host:port/<dbName>
+  return connectionString.replace(/\/[^/?]+(\?.*)?$/, `/${dbName}$1`);
 }
 
 /**
- * Creates an ephemeral Supabase branch, applies all migrations in numeric
- * order, and returns a ready-to-use client pair.
+ * Creates an isolated test database and returns a Pool connected to it.
+ * The caller must call `dropTestDatabase(pool, dbName)` in `afterAll` to clean up.
  *
- * Call `teardownTestBranch(branch)` in `afterAll` to clean up.
+ * Returns `{ pool, dbName }`.
  */
-export async function setupTestBranch(): Promise<TestBranch> {
-  if (!ACCESS_TOKEN) throw new Error("SUPABASE_ACCESS_TOKEN is not set");
-  if (!PROJECT_REF) throw new Error("SUPABASE_PROJECT_REF is not set");
+export async function createTestDatabase(): Promise<{
+  pool: pg.Pool;
+  dbName: string;
+}> {
+  const suffix = randomBytes(4).toString("hex");
+  const dbName = `poke_test_${suffix}`;
 
-  const branchName = `test-${process.env.GITHUB_RUN_ID ?? "local"}-${Date.now()}`;
-
-  // Create the branch.
-  const created = (await managementFetch(
-    `/v1/projects/${PROJECT_REF}/branches`,
-    {
-      method: "POST",
-      body: JSON.stringify({ branch_name: branchName }),
-    },
-  )) as { id: string; ref: string };
-
-  const branchId = created.id;
-  // The branch ref is used to build the Supabase project URL.
-  if (!created.ref) {
-    throw new Error("Supabase branch creation response missing 'ref'");
-  }
-  const branchRef = created.ref;
-
-  // Wait until the branch is accepting connections.
-  const details = await waitForBranchReady(branchId);
-
-  // Supabase branch URLs follow the same pattern as the parent project:
-  // https://<branchRef>.supabase.co
-  const branchUrl = `https://${branchRef}.supabase.co`;
-
-  // Keys may be returned on the branch details or must be fetched separately.
-  // A single refetch is used for both keys to avoid inconsistency between two
-  // separate GETs if branch state changes between calls.
-  let anonKey = details.anon_key;
-  let serviceKey = details.service_role_key;
-  if (!anonKey || !serviceKey) {
-    const refetched = (await managementFetch(
-      `/v1/branches/${branchId}`,
-    )) as BranchDetails;
-    anonKey = refetched.anon_key;
-    serviceKey = refetched.service_role_key;
-  }
-
-  if (!anonKey || !serviceKey) {
-    throw new Error(
-      `Branch ${branchId} did not return API keys. Check Management API response shape.`,
-    );
-  }
-
-  const client = createClient(branchUrl, anonKey, {
-    auth: { persistSession: false },
-  });
-  const serviceClient = createClient(branchUrl, serviceKey, {
-    auth: { persistSession: false },
-  });
-
-  return { branchId, branchRef, branchUrl, anonKey, client, serviceClient };
-}
-
-/**
- * Deletes the ephemeral branch, cleaning up all DB resources.
- * Safe to call from `afterAll` even when setup failed — it no-ops if
- * branchId is empty.
- */
-export async function teardownTestBranch(branch: TestBranch): Promise<void> {
-  if (!branch.branchId) return;
+  // Create the DB using a connection to the base database.
+  const adminPool = new Pool({ connectionString: DATABASE_URL });
   try {
-    await managementFetch(`/v1/branches/${branch.branchId}`, {
-      method: "DELETE",
-    });
-  } catch (err) {
-    // Log but do not rethrow — a failed teardown should not mask test failures.
-    console.warn("[integration] Failed to delete branch:", err);
+    // CREATE DATABASE cannot run inside a transaction block; pg single-client
+    // executes it as a standalone statement.
+    await adminPool.query(`CREATE DATABASE ${dbName}`);
+  } finally {
+    await adminPool.end();
   }
+
+  const testUrl = withDbName(DATABASE_URL, dbName);
+  const pool = new Pool({ connectionString: testUrl });
+  return { pool, dbName };
+}
+
+/**
+ * Drops the isolated test database created by `createTestDatabase`.
+ * Safe to call from `afterAll` — it ends the pool and drops the DB.
+ */
+export async function dropTestDatabase(
+  pool: pg.Pool,
+  dbName: string,
+): Promise<void> {
+  await pool.end();
+
+  const adminPool = new Pool({ connectionString: DATABASE_URL });
+  try {
+    // Terminate any remaining connections to avoid "database is being accessed
+    // by other users" error on DROP DATABASE.
+    await adminPool.query(
+      `SELECT pg_terminate_backend(pid)
+       FROM pg_stat_activity
+       WHERE datname = $1 AND pid <> pg_backend_pid()`,
+      [dbName],
+    );
+    await adminPool.query(`DROP DATABASE IF EXISTS ${dbName}`);
+  } finally {
+    await adminPool.end();
+  }
+}
+
+/**
+ * Applies the pre-migration fixture that provides Supabase-specific schema
+ * objects that vanilla Postgres does not include:
+ *
+ *   - `auth` schema
+ *   - `auth.users` table (minimal — FK target for card_reviews etc.)
+ *   - `auth.uid()` function — polyfill that reads `request.jwt.claims` and
+ *     returns the `sub` claim as a uuid. Matches what Supabase's GoTrue sets.
+ *   - `anon` role (for REVOKE statements in migrations 018 / 025)
+ *   - `authenticated` role (for GRANT/REVOKE in migrations 018 / 025)
+ *   - `public.rls_auto_enable()` stub (REVOKE target in migration 025)
+ *
+ * Roles are shared across all databases in the cluster; the DO block guards
+ * against "role already exists" errors when multiple test files run serially.
+ *
+ * Must be called once per test database, before `applyMigrations()`.
+ */
+export async function applyPreMigrationFixture(pool: pg.Pool): Promise<void> {
+  const client = await pool.connect();
+  try {
+    // Roles — shared cluster-level objects; use DO block to guard duplicates.
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
+          CREATE ROLE anon NOLOGIN;
+        END IF;
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+          CREATE ROLE authenticated NOLOGIN;
+        END IF;
+      END;
+      $$;
+    `);
+
+    // auth schema + minimal users table.
+    await client.query(`
+      CREATE SCHEMA IF NOT EXISTS auth;
+
+      CREATE TABLE IF NOT EXISTS auth.users (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+      );
+    `);
+
+    // auth.uid() polyfill: reads the sub claim from request.jwt.claims.
+    // Returns NULL when the setting is absent (unauthenticated context).
+    await client.query(`
+      CREATE OR REPLACE FUNCTION auth.uid()
+      RETURNS uuid
+      LANGUAGE sql
+      STABLE
+      AS $$
+        SELECT COALESCE(
+          NULLIF(
+            current_setting('request.jwt.claims', true)::jsonb ->> 'sub',
+            ''
+          ),
+          NULL
+        )::uuid
+      $$;
+    `);
+
+    // Stub rls_auto_enable so migration 025 can REVOKE EXECUTE from it.
+    // On Supabase this is a real DDL event-trigger helper; here it is a no-op.
+    await client.query(`
+      CREATE OR REPLACE FUNCTION public.rls_auto_enable()
+      RETURNS event_trigger
+      LANGUAGE plpgsql
+      AS $$
+      BEGIN
+        -- no-op stub; exists only so migration 025 can REVOKE EXECUTE on it
+      END;
+      $$;
+    `);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Simulate an authenticated user by setting `request.jwt.claims` for the
+ * duration of a callback.
+ *
+ * The setting is applied with `SET LOCAL` inside an explicit transaction so it
+ * is automatically reverted when the transaction ends (ROLLBACK or COMMIT).
+ *
+ * @param client  A pg.PoolClient from pool.connect().
+ * @param userId  UUID string to expose as `auth.uid()`.
+ * @param fn      Callback that runs inside the transaction.
+ */
+export async function withUser<T>(
+  client: pg.PoolClient,
+  userId: string,
+  fn: (client: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  await client.query("BEGIN");
+  try {
+    const claims = JSON.stringify({ sub: userId, role: "authenticated" });
+    await client.query(`SET LOCAL "request.jwt.claims" TO $1`, [claims]);
+    const result = await fn(client);
+    await client.query("ROLLBACK");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  }
+}
+
+/**
+ * Insert a row into auth.users with the given id (used to satisfy FK constraints).
+ */
+export async function insertAuthUser(
+  pool: pg.Pool,
+  userId: string,
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING`,
+    [userId],
+  );
 }

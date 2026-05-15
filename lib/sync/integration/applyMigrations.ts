@@ -1,44 +1,20 @@
 /**
  * Programmatic migration runner for integration tests.
  *
- * Reads every *.sql file from db/migrations/ in zero-padded numeric order
- * and executes each against the branch via the Supabase Management API's
- * database-query endpoint:
- *   POST /v1/projects/{ref}/database/query
+ * Reads every *.sql file from db/migrations/ in zero-padded numeric order and
+ * executes each against the local Postgres instance via the `pg` client.
  *
- * This endpoint accepts raw SQL and is available on all Supabase plans.
- * It runs as a superuser-equivalent role, so it can create extensions,
- * set up RLS policies, and execute functions that reference auth.users.
+ * No Management API calls, no Supabase branch quota.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
-
-const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN ?? "";
+import pg from "pg";
 
 /** Absolute path to the migrations directory. */
 const MIGRATIONS_DIR = resolve(
   new URL("../../../db/migrations", import.meta.url).pathname,
 );
-
-/** Execute a SQL string against a branch via the Management API. */
-async function executeSql(projectRef: string, sql: string): Promise<void> {
-  const url = `https://api.supabase.com/v1/projects/${projectRef}/database/query`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query: sql }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(no body)");
-    throw new Error(
-      `database/query failed for ${projectRef}: HTTP ${res.status}: ${body}`,
-    );
-  }
-}
 
 /**
  * Extracts the leading numeric prefix from a migration filename, e.g.:
@@ -105,14 +81,6 @@ export function sortAndValidateMigrationFiles(filenames: string[]): string[] {
 /**
  * Returns migration filenames from the migrations directory, sorted in strict
  * ascending numeric order.
- *
- * Files must be named with a zero-padded numeric prefix, e.g.:
- *   001_initial_sync_schema.sql
- *   010_card_reviews_string_keys.sql
- *
- * Node's readdirSync returns entries in filesystem (typically alphabetical)
- * order; we sort explicitly by numeric prefix so the order is stable
- * regardless of filename alphabetical ordering.
  */
 export function listMigrationFiles(): string[] {
   const rawFiles = readdirSync(MIGRATIONS_DIR).filter((f) =>
@@ -122,20 +90,23 @@ export function listMigrationFiles(): string[] {
 }
 
 /**
- * Applies all migrations in numeric order to the given project/branch ref.
- *
- * @param branchRef  The branch project ref (e.g. "abcdefghijklmnop").
+ * Applies all migrations in numeric order to the given pg Pool.
+ * Each migration runs inside its own connection to keep error messages clear.
+ * A failed migration throws with the filename included in the message.
  */
-export async function applyMigrations(branchRef: string): Promise<void> {
+export async function applyMigrations(pool: pg.Pool): Promise<void> {
   const files = listMigrationFiles();
   for (const filename of files) {
     const sql = readFileSync(join(MIGRATIONS_DIR, filename), "utf8");
+    const client = await pool.connect();
     try {
-      await executeSql(branchRef, sql);
+      await client.query(sql);
     } catch (err) {
       throw new Error(
-        `Migration ${filename} failed on branch ${branchRef}: ${String(err)}`,
+        `Migration ${filename} failed: ${String(err)}`,
       );
+    } finally {
+      client.release();
     }
   }
 }
