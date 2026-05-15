@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import {
+  SEED_POKEMON_IDS,
+  EVOLUTION_CARD_IDS,
+  buildCompletedSession,
+} from "./helpers/completedSession";
 
 test.describe("Navigation", () => {
   test("nav links are visible and navigate between pages", async ({
@@ -678,38 +683,14 @@ test.describe("Streak milestone celebration (#419)", () => {
 });
 
 test.describe("Daily summary persistence (#685)", () => {
-  // Seed a session with one card due far in the future so the practice page
-  // lands on the "All caught up" complete screen immediately.
-  const completedSession = {
-    cards: [
-      {
-        id: 1,
-        name: "Bulbasaur",
-        spriteUrl: "/sprites/pokemon/1.png",
-        cardType: "name",
-        state: {
-          stability: 10,
-          difficulty: 5,
-          elapsedDays: 1,
-          scheduledDays: 365,
-          reps: 5,
-          lapses: 0,
-          fsrsState: "review",
-          dueDate: "2099-01-01",
-          lastReview: "2026-05-14",
-          firstSeen: "2026-05-01",
-          learningStep: null,
-          stepStartedAt: null,
-        },
-      },
-    ],
-    limits: {
-      name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-      evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-      reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-      cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-    },
-  };
+  // Pre-seed every known card ID as already-reviewed so hydrateSession adds no
+  // new cards and the practice page lands on the "All caught up!" complete
+  // screen immediately. Seeding only a single card is not enough — hydrateSession
+  // would append the full SEED_POKEMON list as new cards and queue them.
+  const completedSession = buildCompletedSession({
+    pokemonIds: SEED_POKEMON_IDS,
+    evolutionCardIds: EVOLUTION_CARD_IDS,
+  });
 
   test("'Share today' button visible when today-dated summary is in localStorage", async ({ page }) => {
     await seedSessionIdb(page, completedSession);
@@ -730,6 +711,7 @@ test.describe("Daily summary persistence (#685)", () => {
     });
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Wait for the complete screen to render.
     await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
@@ -742,6 +724,7 @@ test.describe("Daily summary persistence (#685)", () => {
     await seedSessionIdb(page, completedSession);
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Wait for the complete screen to render.
     await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
