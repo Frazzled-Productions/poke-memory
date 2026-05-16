@@ -49,6 +49,7 @@ import {
   type DateFormat,
 } from "@/lib/utils/format-date";
 import { pushRegionalPrefs } from "@/lib/sync/settings";
+import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -1341,6 +1342,11 @@ export default function SettingsPage() {
                 forceOpen={targetCategoryId === "account-data-heading"}
                 transientOpen={isFiltering}
               >
+                {/* Sign-in methods — only shown for signed-in users */}
+                {user && supabase && (
+                  <LinkIdentitiesSection user={user} supabase={supabase} />
+                )}
+
                 {/* Onboarding explainer */}
                 <div id="onboarding-heading" className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
