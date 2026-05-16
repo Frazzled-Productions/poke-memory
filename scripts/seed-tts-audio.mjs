@@ -472,6 +472,19 @@ async function main() {
     await Promise.all(
       batch.map(async (entry) => {
         const { id, displayName } = entry;
+
+        // Validate id before it reaches the filesystem path. generated.json
+        // always supplies non-negative integers, but constructing destPath
+        // from an unchecked value would be a path-traversal sink; this guard
+        // keeps the resolved path provably inside outputDir.
+        if (!Number.isInteger(id) || id < 0) {
+          process.stderr.write(
+            `[tts] FAIL: skipping entry with invalid id: ${JSON.stringify(id)}\n`,
+          );
+          failed++;
+          done++;
+          return;
+        }
         const destPath = resolve(outputDir, `${id}.mp3`);
 
         // Skip-if-exists: resumable.
