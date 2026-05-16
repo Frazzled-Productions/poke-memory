@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, act, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SpritePicker, fisherYatesShuffle } from "@/components/review/SpritePicker";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 
@@ -17,6 +17,10 @@ vi.mock("next/image", () => ({
 vi.mock("@/lib/audio/tts", () => ({
   speakName: vi.fn(),
 }));
+
+const { mockPlayCry } = vi.hoisted(() => ({ mockPlayCry: vi.fn() }));
+
+vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -162,5 +166,107 @@ describe("SpritePicker", () => {
     const first = orders[0];
     const allSame = orders.every((o) => o === first);
     expect(allSame).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SpritePicker — playCryOnAnswer tests (#707)
+// ---------------------------------------------------------------------------
+
+describe("SpritePicker playCryOnAnswer", () => {
+  const TARGET_WITH_CRY = makePokemon({ id: 1, name: "Bulbasaur", cryUrl: "https://example.com/bulbasaur.ogg" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("plays the cry (volume 0.6) on a correct pick when playCryOnAnswer is true", () => {
+    render(
+      <SpritePicker
+        targetPokemon={TARGET_WITH_CRY}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+        playCryOnAnswer={true}
+      />,
+    );
+
+    const correctTile = screen.getByRole("button", { name: "Bulbasaur" });
+    act(() => { fireEvent.click(correctTile); });
+
+    expect(mockPlayCry).toHaveBeenCalledOnce();
+    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg", 0.6);
+  });
+
+  it("plays the cry on an incorrect pick when playCryOnAnswer is true", () => {
+    render(
+      <SpritePicker
+        targetPokemon={TARGET_WITH_CRY}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+        playCryOnAnswer={true}
+      />,
+    );
+
+    const incorrectTile = screen.getByRole("button", { name: "Ivysaur" });
+    act(() => { fireEvent.click(incorrectTile); });
+
+    expect(mockPlayCry).toHaveBeenCalledOnce();
+    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg", 0.6);
+  });
+
+  it("does NOT play the cry when playCryOnAnswer is false", () => {
+    render(
+      <SpritePicker
+        targetPokemon={TARGET_WITH_CRY}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+        playCryOnAnswer={false}
+      />,
+    );
+
+    const correctTile = screen.getByRole("button", { name: "Bulbasaur" });
+    act(() => { fireEvent.click(correctTile); });
+
+    expect(mockPlayCry).not.toHaveBeenCalled();
+  });
+
+  it("does NOT play the cry when playCryOnAnswer is omitted (default false)", () => {
+    render(
+      <SpritePicker
+        targetPokemon={TARGET_WITH_CRY}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+      />,
+    );
+
+    const correctTile = screen.getByRole("button", { name: "Bulbasaur" });
+    act(() => { fireEvent.click(correctTile); });
+
+    expect(mockPlayCry).not.toHaveBeenCalled();
+  });
+
+  it("skips cry silently when the target's cryUrl is null, even when playCryOnAnswer is true", () => {
+    // TARGET has cryUrl: null (the default in makePokemon).
+    render(
+      <SpritePicker
+        targetPokemon={TARGET}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+        playCryOnAnswer={true}
+      />,
+    );
+
+    const correctTile = screen.getByRole("button", { name: "Bulbasaur" });
+    act(() => { fireEvent.click(correctTile); });
+
+    // playCry is still called — with null — so the audio module handles the
+    // null case itself (as it does on flip cards). No throw is expected.
+    expect(mockPlayCry).toHaveBeenCalledOnce();
+    expect(mockPlayCry).toHaveBeenCalledWith(null, 0.6);
   });
 });
