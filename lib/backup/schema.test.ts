@@ -129,6 +129,12 @@ describe("isBackupFile — valid inputs", () => {
     delete (b.limits as Record<string, unknown>)["reverse"];
     expect(isBackupFile(b)).toBe(true);
   });
+
+  it("accepts a limits object that includes an optional 'reverse' key", () => {
+    const b = validBackup();
+    (b.limits as Record<string, unknown>)["reverse"] = { maxNewPerDay: 10, maxReviewsPerDay: 100 };
+    expect(isBackupFile(b)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

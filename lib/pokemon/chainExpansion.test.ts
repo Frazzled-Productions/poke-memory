@@ -136,12 +136,9 @@ describe("addFormEdges — regional form edges (Pikachu → Raichu / Alolan Raic
     { speciesId: 26, isDefaultForm: false, formSlug: "alola", id: 10100, displayName: "Alolan Raichu" },
   ]);
 
-  it("emits the default edge and a form-aware edge for the regional variant", () => {
-    // Both edges share the same (evolvesFromId=25, speciesId=26) dedup key, so the
-    // second (regional-tagged) node is deduped away. The form node is then emitted
-    // from the surviving default edge — BUT the default edge has no region on its
-    // detail, so only the default node is kept. To exercise the form-edge emission
-    // we must provide a node whose detail carries a region field.
+  it("emits the regional-tagged node and a form-aware edge alongside it", () => {
+    // A single node whose detail carries region: "alola". addFormEdges passes the
+    // node through unchanged, then emits an additional form node for Alolan Raichu.
     const regionalEdge = node(26, "Raichu", 25, { region: "alola" });
     const result = addFormEdges([regionalEdge], lookup);
 
