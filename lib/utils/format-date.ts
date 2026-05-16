@@ -10,6 +10,16 @@
 export type DateFormat = "iso" | "dmy" | "mdy";
 
 /**
+ * Format a `Date` as a UTC `YYYY-MM-DD` string.
+ *
+ * Canonical single implementation of the `.toISOString().slice(0, 10)` idiom
+ * so callers don't hand-roll it. UTC-based — no local-timezone drift.
+ */
+export function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/**
  * Returns the current date in the given IANA timezone as a "YYYY-MM-DD" string.
  * en-CA locale natively formats as YYYY-MM-DD with dashes, giving us ISO order
  * for free without any string surgery.
