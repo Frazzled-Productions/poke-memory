@@ -582,3 +582,91 @@ describe('alternateFormsEnabled (#658)', () => {
     expect(loadSettings().alternateFormsEnabled).toBe(false);
   });
 });
+
+// ─── coercion helper coverage ────────────────────────────────────────────────
+//
+// These tests assert behaviour that the num/bool/str helpers must preserve.
+// They serve as a regression guard confirming the refactor did not change
+// observable outcomes for any of the collapsed fields.
+
+describe('coercion helper: num fields fall back to DEFAULT_SETTINGS on wrong type', () => {
+  const numFields = [
+    'masteryRepetitions',
+    'maxNewPerDay',
+    'maxReviewsPerDay',
+    'maxNewEvolutionPerDay',
+    'maxReviewsEvolutionPerDay',
+    'maxNewReversePerDay',
+    'maxReviewsReversePerDay',
+    'maxNewCryPerDay',
+    'maxReviewsCryPerDay',
+  ] as const;
+
+  it('returns the default value when the stored field is a non-number', () => {
+    for (const field of numFields) {
+      for (const bad of ['42', true, null, [], {}]) {
+        mockLocalStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ ...DEFAULT_SETTINGS, [field]: bad }),
+        );
+        expect(loadSettings()[field]).toBe(DEFAULT_SETTINGS[field]);
+      }
+    }
+  });
+
+  it('round-trips a non-default number correctly', () => {
+    for (const field of numFields) {
+      const nonDefault = DEFAULT_SETTINGS[field] + 7;
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, [field]: nonDefault }),
+      );
+      expect(loadSettings()[field]).toBe(nonDefault);
+    }
+  });
+});
+
+describe('coercion helper: bool fields fall back to DEFAULT_SETTINGS on wrong type', () => {
+  const boolFields = [
+    'nameCardsEnabled',
+    'evolutionCardsEnabled',
+    'reverseEvolutionCardsEnabled',
+    'reverseCardsEnabled',
+    'playCryOnReveal',
+    'speakNameOnReveal',
+    'cryCardsEnabled',
+    'alternateFormsEnabled',
+  ] as const;
+
+  it('returns the default value when the stored field is a non-boolean', () => {
+    for (const field of boolFields) {
+      for (const bad of [1, 'true', null, {}, []]) {
+        mockLocalStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ ...DEFAULT_SETTINGS, [field]: bad }),
+        );
+        expect(loadSettings()[field]).toBe(DEFAULT_SETTINGS[field]);
+      }
+    }
+  });
+});
+
+describe('coercion helper: str fields fall back to DEFAULT_SETTINGS on wrong type', () => {
+  it('timezone defaults to null when the stored value is not a string', () => {
+    for (const bad of [42, null, undefined, true, {}]) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, timezone: bad }),
+      );
+      expect(loadSettings().timezone).toBeNull();
+    }
+  });
+
+  it('timezone round-trips a stored string value', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, timezone: 'Europe/London' }),
+    );
+    expect(loadSettings().timezone).toBe('Europe/London');
+  });
+});
