@@ -9,6 +9,8 @@ vi.mock("next/image", () => ({
   ),
 }));
 
+vi.mock("@/lib/audio/tts", () => ({ speakName: vi.fn() }));
+
 const PRE_SPRITE = "https://example.com/eevee.png";
 const POST_SPRITE = "https://example.com/jolteon.png";
 
@@ -109,5 +111,35 @@ describe("ReverseEvolutionCard", () => {
 
     expect(screen.getByText("Type")).toBeInTheDocument();
     expect(screen.getByText("Normal")).toBeInTheDocument();
+  });
+
+  it("renders an inline TTS button for the post-evo name in the prompt", () => {
+    render(
+      <ReverseEvolutionCard
+        preEvoName="eevee"
+        preEvoSpriteUrl={PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={false}
+        postEvoId={135}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hear jolteon" })).toBeInTheDocument();
+  });
+
+  it("renders a reveal TTS button for the pre-evo name (answer) after reveal", () => {
+    render(
+      <ReverseEvolutionCard
+        preEvoName="eevee"
+        preEvoSpriteUrl={PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={true}
+        preEvoId={133}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hear eevee" })).toBeInTheDocument();
   });
 });

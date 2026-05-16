@@ -3,6 +3,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AutoSyncOnChange } from "@/components/sync/AutoSyncOnChange";
 
+// Superuser context: default to no flags on. Tests that exercise the write-guard
+// can override anyFlagOn via vi.mocked(useSuperuser).mockReturnValue(...).
+const mockUseSuperuser = vi.fn(() => ({
+  unlocked: false,
+  flags: { pretendAllMastered: false },
+  anyFlagOn: false,
+  setFlag: vi.fn(),
+}));
+vi.mock("@/lib/superuser/SuperuserContext", () => ({
+  useSuperuser: () => mockUseSuperuser(),
+}));
+
 vi.mock("@/lib/sync/persistence", () => ({
   markPushSucceeded: vi.fn(),
 }));
@@ -63,10 +75,17 @@ import { GRADE_LOG_APPENDED_EVENT } from "@/lib/gradelog/persistence";
 describe("AutoSyncOnChange", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default to signed-in with no superuser flags active.
     vi.mocked(useAuth).mockReturnValue({
       user: FAKE_USER as unknown as ReturnType<typeof useAuth>["user"],
       supabase: FAKE_CLIENT,
     } as ReturnType<typeof useAuth>);
+    mockUseSuperuser.mockReturnValue({
+      unlocked: false,
+      flags: { pretendAllMastered: false },
+      anyFlagOn: false,
+      setFlag: vi.fn(),
+    });
     vi.mocked(pushSettings).mockResolvedValue(true);
     vi.mocked(pushStreak).mockResolvedValue(true);
     vi.mocked(pushGradeLog).mockResolvedValue(true);
@@ -365,6 +384,102 @@ describe("AutoSyncOnChange", () => {
     };
 
     act(() => {
+      window.dispatchEvent(
+        new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: entry }),
+      );
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Superuser write-guard (#754) ─────────────────────────────────────────────
+//
+// When any superuser flag is active, AutoSyncOnChange must treat the user as
+// signed out — client and userId are nulled out — so no cloud writes occur even
+// though auth credentials are present. This mirrors the guard in
+// ReviewSession.tsx that passes null to usePerGradeSync / useSyncOnUnload.
+
+describe("AutoSyncOnChange — superuser write-guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Signed-in user — credentials are valid. The guard must kick in despite this.
+    vi.mocked(useAuth).mockReturnValue({
+      user: FAKE_USER as unknown as ReturnType<typeof useAuth>["user"],
+      supabase: FAKE_CLIENT,
+    } as ReturnType<typeof useAuth>);
+    // Activate a superuser flag so anyFlagOn is true.
+    mockUseSuperuser.mockReturnValue({
+      unlocked: true,
+      flags: { pretendAllMastered: true },
+      anyFlagOn: true,
+      setFlag: vi.fn(),
+    });
+    vi.mocked(pushSettings).mockResolvedValue(true);
+    vi.mocked(pushStreak).mockResolvedValue(true);
+    vi.mocked(pushGradeLog).mockResolvedValue(true);
+    vi.mocked(loadStreakData).mockReturnValue(["2026-05-12"]);
+  });
+
+  it("does not push settings when a superuser flag is active", () => {
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: { masteryRepetitions: 5 } }),
+      );
+    });
+
+    expect(pushSettings).not.toHaveBeenCalled();
+  });
+
+  it("does not push streak when a superuser flag is active", () => {
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
+    });
+
+    expect(pushStreak).not.toHaveBeenCalled();
+  });
+
+  it("does not push grade log when a superuser flag is active", () => {
+    render(<AutoSyncOnChange />);
+
+    const entry = {
+      occurredAt: 1700000000000,
+      date: "2026-05-12",
+      grade: 4 as const,
+      cardType: "name" as const,
+    };
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: entry }),
+      );
+    });
+
+    expect(pushGradeLog).not.toHaveBeenCalled();
+  });
+
+  it("does not call markPushSucceeded on any event when a superuser flag is active", async () => {
+    render(<AutoSyncOnChange />);
+
+    const entry = {
+      occurredAt: 1700000000000,
+      date: "2026-05-12",
+      grade: 4 as const,
+      cardType: "name" as const,
+    };
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: { masteryRepetitions: 5 } }),
+      );
+      window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
       window.dispatchEvent(
         new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: entry }),
       );

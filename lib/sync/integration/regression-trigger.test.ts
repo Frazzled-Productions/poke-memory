@@ -7,8 +7,13 @@
  *   - first_seen cannot transition to NULL
  *   - last_review cannot move backward
  *
- * Also covers the reps / lapses monotonicity guards from migrations 015/016
- * and the scheduled_days same-date regression guard from migration 016.
+ * Also covers:
+ *   - reps / lapses monotonicity guards (migrations 015/016)
+ *   - scheduled_days same-date regression guard (migration 016)
+ *   - seen_in_pasture one-way flag (migration 017)
+ *   - stability / difficulty bounds CHECK constraints (migration 020)
+ *   - streak_days no-future-date constraint (migration 021)
+ *   - user_settings last_reset_at tombstone triggers (migration 022)
  *
  * All writes use direct SQL via pg, wrapped in transactions that ROLLBACK at
  * the end for isolation. `set_config('request.jwt.claims', ...)` makes `auth.uid()`
@@ -246,6 +251,340 @@ describe("regression trigger (integration)", () => {
             `UPDATE card_reviews
              SET last_review = '2026-06-01', scheduled_days = 1
              WHERE user_id = $1 AND card_type = 'name' AND subject_key = '109'`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ── Migration 017: seen_in_pasture one-way flag ──────────────────────────
+
+  it("blocks UPDATE that clears seen_in_pasture (migration 017)", async () => {
+    // Insert a committed row with seen_in_pasture=true so the trigger has an
+    // OLD value to compare against.
+    await pool.query(
+      `INSERT INTO card_reviews
+         (user_id, card_type, subject_key,
+          stability, difficulty, elapsed_days, scheduled_days,
+          reps, lapses, fsrs_state,
+          due_date, last_review, first_seen,
+          seen_in_pasture, updated_at)
+       VALUES ($1, 'name', '201',
+               2.0, 5.0, 1, 3,
+               2, 0, 'review',
+               '2026-06-01', '2026-05-20', '2026-05-18',
+               true, now())`,
+      [USER_ID],
+    );
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // Attempting to flip seen_in_pasture from true back to false must be
+        // rejected — once a user has acknowledged a pasture entry it is permanent.
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET seen_in_pasture = false
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '201'`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("allows UPDATE that sets seen_in_pasture to true (migration 017)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await insertCard(c, "202"); // seen_in_pasture=false
+        // Transitioning false → true is the normal pasture-acknowledgement
+        // path and must succeed.
+        await expect(
+          c.query(
+            `UPDATE card_reviews
+             SET seen_in_pasture = true
+             WHERE user_id = $1 AND card_type = 'name' AND subject_key = '202'`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ── Migration 020: stability / difficulty bounds ─────────────────────────
+
+  it("blocks INSERT with difficulty above 10 (migration 020)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // difficulty > 10 violates the card_reviews_difficulty_range CHECK.
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '301',
+                     2.0, 11.0, 1, 3,
+                     2, 0, 'review',
+                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     false, now())`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("blocks INSERT with difficulty below 0 (migration 020)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // difficulty < 0 violates the card_reviews_difficulty_range CHECK.
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '302',
+                     2.0, -1.0, 1, 3,
+                     2, 0, 'review',
+                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     false, now())`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("blocks INSERT with negative stability (migration 020)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // stability < 0 violates the card_reviews_stability_non_negative CHECK.
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '303',
+                     -0.1, 5.0, 1, 3,
+                     2, 0, 'review',
+                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     false, now())`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("allows INSERT with boundary-valid stability and difficulty (migration 020)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // stability=0, difficulty=0 are the new-card sentinels — both on the
+        // lower bound; difficulty=10 is the upper bound. All must be accepted.
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '304',
+                     0.0, 10.0, 1, 3,
+                     2, 0, 'review',
+                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     false, now())`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ── Migration 021: streak_days no-future-date constraint ─────────────────
+
+  it("blocks INSERT of a streak_days row far in the future (migration 021)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // Any date more than +1 day ahead of current_date must be rejected.
+        // Using a fixed far-future date so the test is not sensitive to clock
+        // skew between the DB and the test runner.
+        await expect(
+          c.query(
+            `INSERT INTO streak_days (user_id, review_date)
+             VALUES ($1, '2099-12-31')`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("allows INSERT of a streak_days row for today (migration 021)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // current_date is always within the allowed window.
+        await expect(
+          c.query(
+            `INSERT INTO streak_days (user_id, review_date)
+             VALUES ($1, current_date)`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("allows INSERT of a streak_days row for tomorrow (+1 grace day for UTC+14 clients, migration 021)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // current_date + 1 is explicitly permitted to accommodate clients whose
+        // local clock is a day ahead of the DB's UTC clock (e.g. UTC+14).
+        await expect(
+          c.query(
+            `INSERT INTO streak_days (user_id, review_date)
+             VALUES ($1, current_date + 1)`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ── Migration 022: user_settings last_reset_at tombstone triggers ─────────
+
+  it("blocks INSERT of card_reviews row with first_seen before last_reset_at (migration 022)", async () => {
+    // Write a user_settings row with last_reset_at = today so any card whose
+    // first_seen is before that date is treated as a resurrection of stale data.
+    await pool.query(
+      `INSERT INTO user_settings (user_id, last_reset_at, updated_at)
+       VALUES ($1, now(), now())
+       ON CONFLICT (user_id) DO UPDATE
+         SET last_reset_at = EXCLUDED.last_reset_at,
+             updated_at    = EXCLUDED.updated_at`,
+      [USER_ID],
+    );
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // first_seen in 2020 is clearly before last_reset_at = now().
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '401',
+                     2.0, 5.0, 1, 3,
+                     2, 0, 'review',
+                     '2020-06-01', '2020-05-20', '2020-05-18',
+                     false, now())`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("blocks INSERT of a streak_days row with review_date before last_reset_at (migration 022)", async () => {
+    // last_reset_at is already set to now() from the previous test; a
+    // streak_days row dated before that moment must be rejected.
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await expect(
+          c.query(
+            `INSERT INTO streak_days (user_id, review_date)
+             VALUES ($1, '2020-01-01')`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("blocks INSERT of a grade_log row with entry_date before last_reset_at (migration 022)", async () => {
+    // last_reset_at is already set to now() from the card_reviews test above.
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await expect(
+          c.query(
+            `INSERT INTO grade_log
+               (user_id, occurred_at, entry_date, card_type, grade)
+             VALUES ($1, extract(epoch from now())::bigint * 1000, '2020-01-01', 'name', 4)`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("allows INSERT of card_reviews with dates on/after last_reset_at (migration 022)", async () => {
+    // last_reset_at is already set to now(). Inserting a card with today's
+    // dates (on or after the reset boundary) must succeed.
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '402',
+                     2.0, 5.0, 1, 3,
+                     2, 0, 'review',
+                     current_date + 10, current_date, current_date,
+                     false, now())`,
             [USER_ID],
           ),
         ).resolves.toBeDefined();
