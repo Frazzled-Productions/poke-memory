@@ -54,3 +54,24 @@ test.describe("Stats page — badge gallery", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Stats page — review charts", () => {
+  test("the three new chart sections render", async ({ page }) => {
+    await page.goto("/stats");
+    // The recall-vs-target indicator, per-direction breakdown and difficulty
+    // histogram are pure-derive, so they render even for a fresh guest with
+    // an empty grade log (each shows its own empty state).
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Recall vs target" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("heading", {
+        level: 2,
+        name: "Accuracy by card direction",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Card difficulty spread" }),
+    ).toBeVisible();
+  });
+});

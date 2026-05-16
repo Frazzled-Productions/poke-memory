@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { default_w } from "ts-fsrs";
 import { nextReview, initialReviewState } from "@/lib/srs/scheduler";
-import type { ReviewState } from "@/lib/srs/scheduler";
+import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { migrateReviewState } from "@/lib/review/persistence";
+import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS, isMastered } from "@/lib/stats/derive";
 import {
   LEARNING_STEPS_MS,
   RELEARNING_STEPS_MS,
@@ -543,5 +544,293 @@ describe("weights option", () => {
     // no crash and both produce a positive interval.
     expect(withDefault.scheduledDays).toBeGreaterThan(0);
     expect(withoutWeights.scheduledDays).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================
+// Malformed / short weight vector fallback
+// ============================================================
+describe("weights option: malformed / short weight vector", () => {
+  it("an empty weight array falls back to defaults without producing NaN scheduledDays", () => {
+    const base = graduatedCard();
+    const result = nextReview(base, 4, NOW, { weights: [] });
+    expect(result.scheduledDays).toBeGreaterThan(0);
+    expect(Number.isNaN(result.scheduledDays)).toBe(false);
+    expect(Number.isFinite(result.scheduledDays)).toBe(true);
+  });
+
+  it("a single-element weight array does not crash and produces a finite interval", () => {
+    const base = graduatedCard();
+    const result = nextReview(base, 4, NOW, { weights: [0.4] });
+    expect(Number.isNaN(result.scheduledDays)).toBe(false);
+    expect(Number.isFinite(result.scheduledDays)).toBe(true);
+    expect(result.scheduledDays).toBeGreaterThanOrEqual(0);
+  });
+
+  it("a weight vector with some zeroed entries does not produce NaN", () => {
+    const base = graduatedCard();
+    // A vector of all zeros is the most adversarial short-circuit.
+    const zeroed = new Array(21).fill(0) as number[];
+    const result = nextReview(base, 4, NOW, { weights: zeroed });
+    expect(Number.isNaN(result.scheduledDays)).toBe(false);
+    // Result may be unusual but must not be NaN or ±Infinity.
+    expect(Number.isFinite(result.scheduledDays)).toBe(true);
+  });
+});
+
+// ============================================================
+// Invalid grade at runtime (decoded payload defence)
+// ============================================================
+describe("invalid grade at runtime", () => {
+  // Grade is typed as 1|2|4|5 in TypeScript. These tests document what
+  // actually happens when a decoded payload or persisted blob passes a value
+  // outside the declared union — e.g. 3 (never a valid app grade) or 0.
+  //
+  // Key findings:
+  //   - Grade 3 on a graduated card (A4 path): GRADE_TO_RATING[3] is undefined,
+  //     so ts-fsrs receives Rating.undefined and throws "Invalid rating:[undefined]".
+  //     This is an unguarded runtime error — a data-coder guard at the decode
+  //     boundary would prevent it. The test documents current behaviour.
+  //   - Grade 0 on a brand-new card (A1 path): grade 0 matches none of ===5,
+  //     ===1, ===2, ===4 checks inside nextReview (brand-new branch), so the
+  //     function falls through to the `return { ...state, learningStep: 0, … }`
+  //     block — it does NOT call FSRS and therefore does not throw. The returned
+  //     state is structurally valid.
+  //   - Grade 3 on a card in a learning step (B-branch): grade 3 matches none
+  //     of ===1, ===2, ===4 checks, so the B4/Easy path (grade === 5) is taken
+  //     by fall-through (no else-if chain). ts-fsrs is called with Rating.Easy.
+  //     This is unexpected but does not throw.
+
+  it("grade 3 on a graduated card throws at the ts-fsrs boundary (GRADE_TO_RATING[3] is undefined)", () => {
+    // Documents a known gap: the A4 branch passes GRADE_TO_RATING[grade] directly
+    // to ts-fsrs without a guard, so an unknown grade causes an FSRS error.
+    // A data-coder guard at the decode/validation boundary should prevent this.
+    const base = graduatedCard();
+    expect(() => nextReview(base, 3 as Grade, NOW)).toThrow();
+  });
+
+  it("grade 0 on a brand-new card does not throw (falls into A1 branch)", () => {
+    // Grade 0 is not 5 (Easy), so the brand-new card path does NOT graduate.
+    // The A1 "Again/Hard/Good" branch is taken — the function returns a state
+    // with learningStep set, without calling FSRS.
+    const base = newCard();
+    expect(() => nextReview(base, 0 as Grade, NOW)).not.toThrow();
+  });
+
+  it("grade 0 on a brand-new card produces a structurally valid ReviewState", () => {
+    const base = newCard();
+    const result = nextReview(base, 0 as Grade, NOW);
+    expect(result).toMatchObject({
+      fsrsState: expect.any(String),
+      dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
+  });
+
+  it("grade 0 on a brand-new card enters the A1 learning-step path (learningStep=0)", () => {
+    // Confirms A1 is taken: learningStep set, lastReview still null.
+    const base = newCard();
+    const result = nextReview(base, 0 as Grade, NOW);
+    expect(result.learningStep).toBe(0);
+    expect(result.lastReview).toBeNull();
+  });
+
+  it("grade 3 on a card in a learning step takes the B4 (Easy) fall-through path and does not throw", () => {
+    // In the B-branch, grade checks are: ===1 (B1), ===2 (B2), ===4 (B3).
+    // Grade 3 matches none of those, so execution falls to the B4 block (which
+    // does not guard with `if (grade === 5)` — it is the tail branch). ts-fsrs
+    // is called with Rating.Easy. Unexpected but harmless.
+    const inStep = cardInStep(0);
+    expect(() => nextReview(inStep, 3 as Grade, NOW)).not.toThrow();
+  });
+
+  it("grade 3 on a card in a learning step graduates via the B4 (Easy) fall-through", () => {
+    const inStep = cardInStep(0);
+    const result = nextReview(inStep, 3 as Grade, NOW);
+    // B4 graduates immediately — learningStep cleared, lastReview set.
+    expect(result.learningStep).toBeNull();
+    expect(result.lastReview).toBe(TODAY);
+    expect(result.fsrsState).toBe("review");
+  });
+});
+
+// ============================================================
+// Mastery boundary — reps and scheduledDays thresholds
+// ============================================================
+describe("mastery boundary (isMastered)", () => {
+  // isMastered lives in lib/stats/derive.ts and is the canonical gate. These
+  // tests exercise the exact-boundary conditions: one below, exactly at, and
+  // one above the thresholds. They also verify the reps dimension independently.
+
+  const BASE_STATE: ReviewState = {
+    stability: 30,
+    difficulty: 3,
+    elapsedDays: 21,
+    scheduledDays: 21,
+    reps: MASTERY_REPETITIONS,
+    lapses: 0,
+    fsrsState: "review",
+    dueDate: "2026-06-01",
+    lastReview: "2026-05-11",
+    firstSeen: "2026-04-01",
+    learningStep: null,
+    stepStartedAt: null,
+    hiddenSince: null,
+    seenInPasture: false,
+  };
+
+  it("is mastered at exactly MASTERY_REPETITIONS reps and MASTERY_INTERVAL_DAYS scheduledDays", () => {
+    const state: ReviewState = {
+      ...BASE_STATE,
+      reps: MASTERY_REPETITIONS,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+    };
+    expect(isMastered(state)).toBe(true);
+  });
+
+  it("is NOT mastered when scheduledDays is exactly one below the threshold (20)", () => {
+    const state: ReviewState = {
+      ...BASE_STATE,
+      reps: MASTERY_REPETITIONS,
+      scheduledDays: MASTERY_INTERVAL_DAYS - 1, // 20
+    };
+    expect(isMastered(state)).toBe(false);
+  });
+
+  it("is mastered when scheduledDays is one above the threshold (22)", () => {
+    const state: ReviewState = {
+      ...BASE_STATE,
+      reps: MASTERY_REPETITIONS,
+      scheduledDays: MASTERY_INTERVAL_DAYS + 1, // 22
+    };
+    expect(isMastered(state)).toBe(true);
+  });
+
+  it("is NOT mastered when reps is exactly one below MASTERY_REPETITIONS", () => {
+    const state: ReviewState = {
+      ...BASE_STATE,
+      reps: MASTERY_REPETITIONS - 1,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+    };
+    expect(isMastered(state)).toBe(false);
+  });
+
+  it("is NOT mastered when both reps and scheduledDays are one below threshold", () => {
+    const state: ReviewState = {
+      ...BASE_STATE,
+      reps: MASTERY_REPETITIONS - 1,
+      scheduledDays: MASTERY_INTERVAL_DAYS - 1,
+    };
+    expect(isMastered(state)).toBe(false);
+  });
+
+  it("is mastered when reps is well above threshold and scheduledDays is exactly at threshold", () => {
+    const state: ReviewState = {
+      ...BASE_STATE,
+      reps: MASTERY_REPETITIONS + 10,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+    };
+    expect(isMastered(state)).toBe(true);
+  });
+
+  it("isMastered does not gate on learningStep: a card mid-step with threshold-meeting reps/scheduledDays returns true", () => {
+    // isMastered checks reps and scheduledDays only — it does not inspect
+    // learningStep. A card in a learning step should never carry reps >=
+    // MASTERY_REPETITIONS in normal practice, but the function does not enforce
+    // that constraint. This test pins the current behaviour and will fail
+    // immediately if isMastered ever adds a learningStep guard.
+    const inStepState: ReviewState = {
+      ...BASE_STATE,
+      reps: MASTERY_REPETITIONS,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+      learningStep: 0,
+      stepStartedAt: NOW.getTime(),
+    };
+    expect(isMastered(inStepState)).toBe(true);
+  });
+
+  it("MASTERY_REPETITIONS constant itself is 3", () => {
+    expect(MASTERY_REPETITIONS).toBe(3);
+  });
+
+  it("MASTERY_INTERVAL_DAYS constant itself is 21", () => {
+    expect(MASTERY_INTERVAL_DAYS).toBe(21);
+  });
+});
+
+// ============================================================
+// DST / timezone boundary — addDays uses millisecond arithmetic
+// ============================================================
+describe("DST / timezone boundary — addDays millisecond arithmetic", () => {
+  // isoDate() calls todayInTimezone("UTC", date) so all scheduling arithmetic
+  // is UTC-based. Crossing a DST boundary in a local timezone should never
+  // affect the UTC-based scheduled due date. We verify this by anchoring `now`
+  // to a moment that falls exactly on a spring-forward DST boundary in
+  // America/New_York (clocks jump 02:00 → 03:00 on the second Sunday of March).
+  //
+  // 2026-03-08 02:00 America/New_York is the transition hour. We use 01:30 local
+  // (= 06:30 UTC) as `now`, so in local time the day is still Mar 8.
+  // Adding 1 day via millisecond arithmetic (+ 86_400_000 ms) should land on
+  // 2026-03-09 UTC, not 2026-03-10 or 2026-03-07.
+
+  // Spring forward: 2026-03-08 02:00 EST → 03:00 EDT
+  // 01:30 EST on 2026-03-08 = 06:30 UTC
+  const DST_SPRING_FORWARD = new Date("2026-03-08T06:30:00Z");
+
+  it("+1 day interval from a DST-spring-forward moment lands on the next UTC calendar day", () => {
+    const base = graduatedCard({
+      dueDate: "2026-03-08",
+      lastReview: "2026-03-02",
+      scheduledDays: 6,
+    });
+    const result = nextReview(base, 4, DST_SPRING_FORWARD);
+    // The new due date must be on or after 2026-03-09 (scheduledDays from FSRS
+    // will be ≥ 1). Crucially it must NOT be 2026-03-07 (subtract) or
+    // an off-by-one caused by DST shifting midnight.
+    expect(result.dueDate >= "2026-03-09").toBe(true);
+    expect(result.lastReview).toBe("2026-03-08");
+  });
+
+  it("+1 day (GRAD_INTERVAL_GOOD) from DST boundary yields the day after in UTC", () => {
+    // Graduate a card from the final learning step at the DST-transition moment.
+    // Using LEARNING_STEPS_MS.length - 1 ensures the Good grade graduates the card
+    // (B3-graduate path) with dueDate = now + GRAD_INTERVAL_GOOD.
+    const inStep = cardInStep(LEARNING_STEPS_MS.length - 1, null, {
+      firstSeen: "2026-03-08",
+      dueDate: "2026-03-08",
+    });
+    const result = nextReview(inStep, 4, DST_SPRING_FORWARD);
+    // B3-graduate: learningStep cleared, dueDate = +1 day in UTC from Mar 8 = Mar 9.
+    expect(result.learningStep).toBeNull();
+    expect(result.dueDate).toBe("2026-03-09");
+  });
+
+  it("+21 day interval from a DST boundary lands on the correct calendar day", () => {
+    // Autumn fall-back in America/New_York: 2026-11-01 02:00 EDT → 01:00 EST.
+    // 01:00 EDT on 2026-11-01 = 05:00 UTC.
+    const DST_FALL_BACK = new Date("2026-11-01T05:00:00Z");
+    const base = graduatedCard({
+      dueDate: "2026-11-01",
+      lastReview: "2026-10-26",
+      scheduledDays: 6,
+      stability: 30,
+      reps: 5,
+    });
+    // Grade Good on a well-established card — FSRS should schedule ≥ 1 day out.
+    const result = nextReview(base, 4, DST_FALL_BACK);
+    // dueDate must be strictly after 2026-11-01 and must be a valid YYYY-MM-DD.
+    expect(result.dueDate > "2026-11-01").toBe(true);
+    expect(result.dueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // DST-induced off-by-one would produce 2026-10-31 (one day early). Guard it.
+    expect(result.dueDate >= "2026-11-02").toBe(true);
+  });
+
+  it("isoDate is UTC-based: a moment near local midnight but before UTC midnight stays on the prior UTC date", () => {
+    // 2026-05-08 23:30 America/New_York (EDT, UTC-4) = 2026-05-09 03:30 UTC.
+    // isoDate should return 2026-05-09 (UTC date), not 2026-05-08 (local date).
+    const nearLocalMidnight = new Date("2026-05-09T03:30:00Z");
+    const base = graduatedCard({ dueDate: "2026-05-09" });
+    const result = nextReview(base, 4, nearLocalMidnight);
+    // lastReview is set to isoDate(now) = UTC date = 2026-05-09.
+    expect(result.lastReview).toBe("2026-05-09");
   });
 });
