@@ -10,6 +10,7 @@ import {
   type StatKey,
 } from "@/lib/minigame/higherOrLower";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { decodeSpriteUrls } from "@/lib/review/decode";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 
 type Phase = "picking" | "revealed";
@@ -20,40 +21,6 @@ type Pair = {
   right: SeedPokemon;
   stat: StatKey;
 };
-
-/**
- * Safety-valve timeout for sprite decode. If any sprite is slow (e.g. a cold
- * CDN edge), we let the swap proceed anyway so the UI is never stuck. Sprites
- * are self-hosted static assets, so in practice decode completes well under
- * 100 ms after the first visit.
- */
-const DECODE_TIMEOUT_MS = 500;
-
-/**
- * Decode a list of sprite URLs via `HTMLImageElement.decode()` so the browser
- * fully fetches and decodes each image before the caller swaps visible state.
- * This prevents the brief name/sprite mismatch that occurs when the pair state
- * updates synchronously but `next/image` still needs a network round-trip for
- * the new sprite.
- */
-async function decodeSpriteUrls(urls: string[]): Promise<void> {
-  const decodes = urls.map((url) => {
-    const img = new window.Image();
-    img.src = url;
-    // `decode()` is a modern browser API; it may be absent in test environments
-    // (jsdom) or very old browsers. Fall back gracefully — the swap proceeds
-    // immediately rather than blocking.
-    if (typeof img.decode !== "function") return Promise.resolve();
-    return img.decode().catch(() => {
-      // Ignore per-image failures — better to show the new pair with a
-      // brief pop-in than to block the swap indefinitely.
-    });
-  });
-  await Promise.race([
-    Promise.all(decodes),
-    new Promise<void>((resolve) => setTimeout(resolve, DECODE_TIMEOUT_MS)),
-  ]);
-}
 
 function statLabel(key: StatKey): string {
   return BASE_STATS.find((s) => s.key === key)?.label ?? key;
