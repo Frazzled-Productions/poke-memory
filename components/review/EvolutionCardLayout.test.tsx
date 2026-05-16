@@ -158,3 +158,4 @@ describe("EvolutionCardLayout — sprites at intrinsic 320px", () => {
     expect(screen.getByAltText("charmeleon")).toHaveAttribute("width", "320");
   });
 });
+

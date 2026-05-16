@@ -58,15 +58,15 @@ export function EvolutionCardLayout({
   revealed,
   fact,
 }: Props) {
-  // The "always visible" sprite loads with priority; the "hidden until reveal"
-  // sprite is lazy (no priority) — preserving the original LCP behaviour.
+  // The always-visible sprite gets `priority` for LCP; the hidden/revealed
+  // sprite does not — preserving the original per-card behaviour.
   const preEvoImg = (
     <Image
       src={preEvoSpriteUrl}
       alt={preEvoName}
       width={320}
       height={320}
-      priority={hiddenSide === "pre"}
+      priority={hiddenSide !== "pre"}
       className={SPRITE_CLASS}
     />
   );
@@ -77,7 +77,7 @@ export function EvolutionCardLayout({
       alt={postEvoName}
       width={320}
       height={320}
-      priority={hiddenSide === "post"}
+      priority={hiddenSide !== "post"}
       className={SPRITE_CLASS}
     />
   );
