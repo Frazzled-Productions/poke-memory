@@ -504,9 +504,11 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Erasure</strong> — ask us to delete your data (&ldquo;right to
-              be forgotten&rdquo;). You can also use the <em>Reset all progress</em>{" "}
-              option on the Settings page to delete your review history
-              immediately.
+              be forgotten&rdquo;). You can also do this yourself from the
+              Settings page: <em>Reset all progress</em> deletes your review
+              history immediately, and <em>Delete account</em> permanently
+              erases your account, all cloud data, and your sign-in identity —
+              no email request needed.
             </li>
             <li>
               <strong>Data portability</strong> — receive your data in a

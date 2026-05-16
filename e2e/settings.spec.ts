@@ -311,3 +311,30 @@ test.describe("Settings page — search/filter (#662)", () => {
     await expect(page.getByRole("slider", { name: /recall target/i })).toBeVisible();
   });
 });
+
+test.describe("Settings — Danger zone (#697)", () => {
+  test("danger zone shows Reset all progress; Delete account is hidden for guests", async ({
+    page,
+  }) => {
+    // E2E runs guest-mode only. The "Delete account" control is gated on a
+    // signed-in session — there is no cloud identity for a guest to delete —
+    // so a guest should see "Reset all progress" but NOT "Delete account".
+    await page.goto("/settings#danger-zone-heading");
+
+    // The Advanced category (which contains the Danger zone) is force-expanded
+    // by the hash deep-link.
+    await expect(
+      page.getByRole("heading", { name: /danger zone/i }),
+    ).toBeVisible();
+
+    // Reset-progress control is always present.
+    await expect(
+      page.getByRole("button", { name: /^reset all progress$/i }),
+    ).toBeVisible();
+
+    // Delete-account control must NOT render for a guest.
+    await expect(
+      page.getByTestId("delete-account-button"),
+    ).toHaveCount(0);
+  });
+});

@@ -131,6 +131,7 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "danger zone",
       "reset all progress",
       "delete",
+      "delete account",
     ],
   },
 ];
