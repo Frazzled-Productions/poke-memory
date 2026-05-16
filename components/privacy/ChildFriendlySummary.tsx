@@ -12,7 +12,7 @@ export default function ChildFriendlySummary() {
       >
         In plain language — what does Poké Memory do with your data?
       </h2>
-      <ol className="space-y-3 text-base leading-relaxed text-zinc-800 dark:text-zinc-200">
+      <ol className="list-decimal space-y-3 pl-5 leading-relaxed text-zinc-800 dark:text-zinc-200">
         <li>
           <strong>Just playing (no sign-in).</strong> When you play without
           signing in, the app saves your Pokémon progress only on your own
