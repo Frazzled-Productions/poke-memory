@@ -304,5 +304,41 @@ describe("HigherOrLowerGame", () => {
       // After decode resolves the game should be back in picking phase.
       expect(screen.getByText(/which has higher/i)).toBeInTheDocument();
     });
+
+    it("keeps the correct streak value in the game-over banner while Play again decode is in-flight", async () => {
+      const user = userEvent.setup();
+      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // Build a streak of 1 with a correct pick, then advance to the next pair.
+      await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+      // Resolve the first decode (triggered by "Next pair") so we reach the next round.
+      resolveDecodes.forEach((resolve) => resolve());
+      resolveDecodes.length = 0;
+      await user.click(screen.getByRole("button", { name: /next pair/i }));
+      await vi.waitFor(() => {
+        expect(screen.queryByText(/correct/i)).toBeNull();
+      });
+
+      // Now pick wrong — streak was 1, so the banner should read "streak of 1!".
+      await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
+      expect(screen.getByText(/game over — streak of 1/i)).toBeInTheDocument();
+
+      // Click "Play again" — decode is now pending; streak must NOT flip to 0 yet.
+      await user.click(screen.getByRole("button", { name: /play again/i }));
+
+      // The game-over banner must still show the correct (non-zero) streak value.
+      expect(screen.getByText(/game over — streak of 1/i)).toBeInTheDocument();
+
+      // Resolve the decode.
+      resolveDecodes.forEach((resolve) => resolve());
+
+      // After decode resolves, the banner disappears and the streak resets.
+      await vi.waitFor(() => {
+        expect(screen.queryByText(/game over/i)).toBeNull();
+      });
+      expect(
+        screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Streak: 0"),
+      ).toBeInTheDocument();
+    });
   });
 });

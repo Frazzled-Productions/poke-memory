@@ -22,19 +22,21 @@ type Pair = {
 };
 
 /**
+ * Safety-valve timeout for sprite decode. If any sprite is slow (e.g. a cold
+ * CDN edge), we let the swap proceed anyway so the UI is never stuck. Sprites
+ * are self-hosted static assets, so in practice decode completes well under
+ * 100 ms after the first visit.
+ */
+const DECODE_TIMEOUT_MS = 500;
+
+/**
  * Decode a list of sprite URLs via `HTMLImageElement.decode()` so the browser
  * fully fetches and decodes each image before the caller swaps visible state.
  * This prevents the brief name/sprite mismatch that occurs when the pair state
  * updates synchronously but `next/image` still needs a network round-trip for
  * the new sprite.
- *
- * A 500 ms timeout acts as a safety valve: if any sprite is slow (e.g. a
- * cold CDN edge), we let the swap proceed anyway so the UI is never stuck.
- * Sprites are self-hosted static assets, so in practice decode completes well
- * under 100 ms after the first visit.
  */
 async function decodeSpriteUrls(urls: string[]): Promise<void> {
-  const TIMEOUT_MS = 500;
   const decodes = urls.map((url) => {
     const img = new window.Image();
     img.src = url;
@@ -49,7 +51,7 @@ async function decodeSpriteUrls(urls: string[]): Promise<void> {
   });
   await Promise.race([
     Promise.all(decodes),
-    new Promise<void>((resolve) => setTimeout(resolve, TIMEOUT_MS)),
+    new Promise<void>((resolve) => setTimeout(resolve, DECODE_TIMEOUT_MS)),
   ]);
 }
 
@@ -174,9 +176,12 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   const handlePlayAgain = useCallback(() => {
     if (transitioning) return;
     const nextPair = shufflePair(pickPair(seenPokemon));
-    setStreak(0);
     setTransitioning(true);
     void decodeSpriteUrls([nextPair.left.spriteUrl, nextPair.right.spriteUrl]).then(() => {
+      // Reset streak atomically with the new pair so the game-over banner
+      // ("Game over — streak of N!") keeps showing the correct value during
+      // the decode window and only disappears when all state flips together.
+      setStreak(0);
       setPair(nextPair);
       setPhase("picking");
       setLastResult(null);
