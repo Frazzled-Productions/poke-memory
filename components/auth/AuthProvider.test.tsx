@@ -13,7 +13,7 @@
 
 import { render, screen, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
 // Mock: @/lib/supabase/client
@@ -27,7 +27,6 @@ const mockOnAuthStateChange = vi.fn();
 // AuthProvider actually calls. Cast via `unknown` to sidestep the deep generic
 // signature of SupabaseClient<Database, ...> — the same pattern used in the
 // sync test suite (FAKE_CLIENT = {} as unknown as SupabaseClient).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeFakeClient(overrides: Partial<{
   getUser: typeof mockGetUser;
   onAuthStateChange: typeof mockOnAuthStateChange;
