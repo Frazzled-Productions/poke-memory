@@ -135,6 +135,19 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 
 ---
 
+### `coverage.yml` — Coverage
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (any), `workflow_dispatch` |
+| **Job** | `coverage` |
+| **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), then posts the coverage summary (statements / branches / functions / lines) as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork PRs run with a read-only token and cannot post comments). |
+| **Required check** | No — non-blocking by design (#762). There is no threshold gate in `vitest.config.ts`, the coverage step carries `continue-on-error`, and the job is not in the `main-protection` ruleset. The report is informational so coverage gaps are visible without merge friction; a threshold gate can be added later once a baseline is agreed. |
+| **Concurrency** | Cancels concurrent runs on the same ref. |
+
+---
+
 ### `auto-issue.yml` — Auto Issue Worker
 
 Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
