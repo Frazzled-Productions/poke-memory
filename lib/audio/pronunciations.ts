@@ -17,10 +17,17 @@ export function stripDecorativeSymbols(name: string): string {
 // wrong are worth carrying.
 //
 // NOTE: ♀/♂ symbols are stripped by stripDecorativeSymbols() before this
-// lookup, so "Nidoran♀" → "Nidoran" → no override needed here.
+// lookup, so "Nidoran♀" → "Nidoran" → no override needed here. This is a
+// deliberate product decision (#435): the gender symbol is visual metadata,
+// not something to pronounce, so both Nidoran forms intentionally speak as
+// "Nidoran". Do not re-add nidoran♀/♂ overrides to "disambiguate" them.
 const OVERRIDES: Record<string, string> = {
   // Orthographic curveballs: hyphens, apostrophes, accents, special glyphs,
   // missing letters. The synth otherwise parses these as separators / errors.
+  // Both ASCII apostrophe (U+0027) and right single quotation mark (U+2019)
+  // variants are included for Farfetch’d and Sirfetch’d: generated.json currently
+  // uses U+2019, so the ASCII keys are unreachable today, but they are kept as a
+  // safety net if PokéAPI ever normalises to ASCII apostrophes.
   "farfetch’d": "farfetched",
   "farfetch'd": "farfetched",
   "sirfetch’d": "sir fetched",

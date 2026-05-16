@@ -170,9 +170,13 @@ export function speakName(
     audio.volume = ttsVolume;
     _currentAudio = audio;
 
+    let hasCalledFallback = false;
     const fallbackToSpeech = (): void => {
-      // Only fall back if this element is still the active one (i.e. a
-      // subsequent speakName call hasn't already superseded it).
+      // A 404 fires both the 'error' event and rejects play() — guard so only
+      // the first call reaches speakNameViaSpeech; the second would cancel the
+      // utterance the first already queued.
+      if (hasCalledFallback) return;
+      hasCalledFallback = true;
       if (_currentAudio === audio) _currentAudio = null;
       speakNameViaSpeech(name, ttsVoice, ttsRate, ttsVolume);
     };

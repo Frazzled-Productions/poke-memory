@@ -36,14 +36,9 @@ const RATE_LIMIT_BACKOFF_MS = [2000, 5000, 10000, 20000, 30000, 60000];
 const PROGRESS_INTERVAL = 50;
 
 // ---------------------------------------------------------------------------
-// IMPORTANT: inlined copy of pronunciations logic from lib/audio/pronunciations.ts
-//
-// This .mjs script cannot import the .ts module directly. This copy MUST be
-// kept in sync with:
-//   - stripDecorativeSymbols() in lib/audio/pronunciations.ts
-//   - the OVERRIDES dictionary in lib/audio/pronunciations.ts
-//
-// When adding or modifying overrides, update BOTH places.
+// .mjs cannot import .ts modules without a bundler, so the pronunciation
+// logic from lib/audio/pronunciations.ts is inlined here. Update BOTH places
+// when adding or modifying overrides.
 // ---------------------------------------------------------------------------
 
 /**
@@ -58,6 +53,10 @@ function stripDecorativeSymbols(name) {
 const OVERRIDES = {
   // Orthographic curveballs: hyphens, apostrophes, accents, special glyphs,
   // missing letters. The synth otherwise parses these as separators / errors.
+  // Both ASCII apostrophe (U+0027) and right single quotation mark (U+2019)
+  // variants are included for Farfetch'd and Sirfetch'd: generated.json currently
+  // uses U+2019, so the ASCII keys are unreachable today, but they are kept as a
+  // safety net if PokéAPI ever normalises to ASCII apostrophes.
   "farfetch'd": "farfetched",
   "farfetch’d": "farfetched",
   "sirfetch'd": "sir fetched",
@@ -319,6 +318,10 @@ async function fileExists(filePath) {
  * On success: returns { ok: true, audioContent } (base64 string).
  */
 async function synthesize(text, apiKey) {
+  // Cloud TTS v1 REST requires the key as a URL query parameter; there is no
+  // Authorization-header path for API-key auth. The key will appear in Node.js
+  // --inspect heap dumps and in proxy logs that record request URIs — never
+  // log `url` and never commit a key value.
   const url = `${TTS_API_URL}?key=${apiKey}`;
   const body = JSON.stringify({
     input: { text },

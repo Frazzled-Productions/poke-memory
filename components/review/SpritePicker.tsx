@@ -105,7 +105,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
         <button
           type="button"
           aria-label={`Hear ${targetPokemon.displayName}`}
-          onClick={() => speakName(targetPokemon.name, targetPokemon.id)}
+          onClick={() => speakName(targetPokemon.displayName, targetPokemon.id)}
           className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
         >
           🔊

@@ -586,10 +586,7 @@ describe("speakName — Audio element path (id provided)", () => {
 
     // play() called on the mock audio object
     expect(mockAudio.play).toHaveBeenCalledOnce();
-    // src set to the expected path
-    // (mockAudio.src is written by the ctor via Object.assign; check via the
-    // instance-method mock instead since src is copied from the mock object)
-    // We verify correctness via the fallback behaviour in subsequent tests.
+    expect(mockAudio.src).toBe("/audio/names/1.mp3");
   });
 
   it("applies ttsRate and ttsVolume to the Audio element", async () => {
@@ -642,6 +639,28 @@ describe("speakName — Audio element path (id provided)", () => {
     await Promise.resolve();
     vi.runAllTimers();
 
+    expect(synth.speak).toHaveBeenCalledOnce();
+  });
+
+  it("falls back exactly once when error event and play() rejection both fire", async () => {
+    const mockAudio = makeMockAudio({
+      play: vi.fn(() => Promise.reject(new Error("AbortError"))),
+    });
+    vi.stubGlobal("Audio", makeAudioCtor(mockAudio));
+    const synth = makeSynthesis([voice("en-GB", true, "Daniel")]);
+    vi.stubGlobal("window", { speechSynthesis: synth });
+    vi.stubGlobal("SpeechSynthesisUtterance", MockUtterance);
+
+    const { speakName } = await import("./tts");
+    speakName("Bulbasaur", 1);
+
+    // Fire error event first (as a browser does on 404), then flush play() rejection.
+    mockAudio._fireError();
+    await Promise.resolve();
+    vi.runAllTimers();
+
+    // The second path must not invoke speakNameViaSpeech again — that would
+    // cancel the utterance the first call already queued.
     expect(synth.speak).toHaveBeenCalledOnce();
   });
 
