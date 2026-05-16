@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { preloadableSpriteUrls, PRACTICE_SPRITE_SIZE } from "./sprites";
+import { preloadableSpriteUrls, PRACTICE_SPRITE_SIZE, PICKER_SPRITE_SIZE } from "./sprites";
 import type { ReviewableCard } from "./session";
 
 describe("preloadableSpriteUrls", () => {
@@ -44,5 +44,9 @@ describe("preloadableSpriteUrls", () => {
 
   it("exposes the practice sprite size shared with the flip cards", () => {
     expect(PRACTICE_SPRITE_SIZE).toBe(320);
+  });
+
+  it("pins the picker sprite size to 150 px — must match SpritePicker's <Image width={150}>", () => {
+    expect(PICKER_SPRITE_SIZE).toBe(150);
   });
 });

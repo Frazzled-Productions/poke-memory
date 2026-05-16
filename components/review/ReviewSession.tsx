@@ -918,8 +918,8 @@ export function ReviewSession() {
   // newQueue and dueLearning are themselves rebuilt on every render (see
   // buildSessionQueues above), so a useMemo keyed on them would never hit.
   // The cost is a handful of Set ops and O(1) cardMap lookups, and
-  // SpritePreloader keys its <Image> children by URL+size, so handing it a
-  // fresh array reference each render triggers no refetch.
+  // SpritePreloader keys its <Image> children by a composite `${width}:${url}`
+  // string, so handing it a fresh array reference each render triggers no refetch.
   //
   // Reverse cards render as a four-tile SpritePicker at 150 px — a different
   // optimiser variant from the 320 px flip cards. They are expanded into
@@ -1549,7 +1549,7 @@ export function ReviewSession() {
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-8">
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-      <SpritePreloader urls={preloadSpriteUrls} />
+      <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
       <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
       {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard
