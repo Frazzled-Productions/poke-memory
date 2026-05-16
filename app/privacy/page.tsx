@@ -64,13 +64,13 @@ export default function PrivacyPage() {
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
-            Signed-in mode (GitHub OAuth)
+            Signed-in mode (GitHub or Google OAuth)
           </h3>
           <p>
-            When you sign in with GitHub, your per-card review history is
-            synchronised to a Supabase Postgres database so you can continue
-            across devices. This is where personal data processing begins and
-            this notice applies in full.
+            When you sign in with GitHub or Google, your per-card review
+            history is synchronised to a Supabase Postgres database so you can
+            continue across devices. This is where personal data processing
+            begins and this notice applies in full.
           </p>
         </section>
 
@@ -104,10 +104,20 @@ export default function PrivacyPage() {
             <li>Due date, date of last review, date first seen</li>
           </ul>
           <p className="mt-2">
-            This data is keyed by your GitHub user identifier. It does not
-            include your GitHub username, email address, or any profile
-            information beyond the opaque identifier required to associate
-            rows with your account.
+            Our review-history, settings, streak, and grade-log tables are
+            keyed by your account&rsquo;s opaque user identifier (a UUID issued
+            by Supabase Auth). They do not contain your username, email
+            address, or any profile information beyond that identifier.
+          </p>
+          <p className="mt-2">
+            Separately, Supabase Auth maintains your account record. When you
+            sign in via GitHub or Google, the OAuth provider returns a profile
+            to Supabase Auth that typically includes the email address and
+            display name associated with the account you signed in with;
+            Supabase Auth stores this on the account record so it can identify
+            you on your next sign-in. We use it only for authentication — it is
+            never written into our review-history tables and is never used for
+            marketing or tracking.
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
@@ -193,8 +203,8 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Supabase Auth session cookie (signed-in path only).</strong>{" "}
-              When you sign in with GitHub, Supabase Auth sets an HTTP-only
-              session cookie containing a signed JWT. This cookie is strictly
+              When you sign in with GitHub or Google, Supabase Auth sets an
+              HTTP-only session cookie containing a signed JWT. This cookie is strictly
               necessary to keep you authenticated across requests. It is not
               set in guest mode and is not used for advertising or tracking.
             </li>
@@ -332,12 +342,32 @@ export default function PrivacyPage() {
                 </tr>
                 <tr>
                   <td className="py-2 pr-4 font-medium">GitHub (OAuth)</td>
-                  <td className="py-2 pr-4">Sign-in provider</td>
+                  <td className="py-2 pr-4">
+                    Optional sign-in provider — used only if you choose
+                    &ldquo;Continue with GitHub&rdquo;
+                  </td>
                   <td className="py-2">
                     The OAuth token exchange is handled server-side by Supabase
-                    Auth — the app itself never sees the OAuth token. We receive
-                    only the opaque user identifier; we do not store your GitHub
-                    username or email
+                    Auth — the app itself never sees the OAuth token. The
+                    provider returns a profile (typically email and display
+                    name) to Supabase Auth, which holds it on your account
+                    record for authentication. Our own review-history tables
+                    store only the opaque user identifier
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4 font-medium">Google (OAuth)</td>
+                  <td className="py-2 pr-4">
+                    Optional sign-in provider — used only if you choose
+                    &ldquo;Continue with Google&rdquo;
+                  </td>
+                  <td className="py-2">
+                    The OAuth token exchange is handled server-side by Supabase
+                    Auth — the app itself never sees the OAuth token. The
+                    provider returns a profile (typically email and display
+                    name) to Supabase Auth, which holds it on your account
+                    record for authentication. Our own review-history tables
+                    store only the opaque user identifier
                   </td>
                 </tr>
               </tbody>
@@ -358,11 +388,12 @@ export default function PrivacyPage() {
             7. International transfers
           </h2>
           <p>
-            Vercel and Supabase may process data outside the UK / EEA. Both
-            operate under the EU Standard Contractual Clauses (SCCs) as the
-            transfer mechanism, providing equivalent safeguards to those
-            required under UK GDPR via the UK International Data Transfer
-            Agreement (IDTA) addendum.
+            Vercel, Supabase, and — if you choose to sign in with it — GitHub
+            or Google may process data outside the UK / EEA. Each operates
+            under the EU Standard Contractual Clauses (SCCs) as the transfer
+            mechanism, providing equivalent safeguards to those required under
+            UK GDPR via the UK International Data Transfer Agreement (IDTA)
+            addendum.
           </p>
         </section>
 
@@ -452,7 +483,8 @@ export default function PrivacyPage() {
             >
               fbrookhouse@gmail.com
             </a>{" "}
-            from the email address associated with your GitHub account. We will
+            from the email address associated with the GitHub or Google
+            account you signed in with, so we can verify the request. We will
             respond within one month.
           </p>
         </section>
