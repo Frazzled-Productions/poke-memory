@@ -331,7 +331,7 @@ export default function PrivacyPage() {
                     Hosting and static asset delivery
                   </td>
                   <td className="py-2">
-                    Aggregate, anonymous analytics only — no card data
+                    Aggregate, anonymous analytics only — no card data.
                   </td>
                 </tr>
                 <tr>
@@ -341,7 +341,7 @@ export default function PrivacyPage() {
                   </td>
                   <td className="py-2">
                     Per-card review state, daily activity dates, grade event
-                    log, settings, and auth session (authenticated users only)
+                    log, settings, and auth session (authenticated users only).
                   </td>
                 </tr>
               </tbody>
@@ -451,8 +451,9 @@ export default function PrivacyPage() {
             under the EU Standard Contractual Clauses (SCCs), providing
             equivalent safeguards via the UK International Data Transfer
             Agreement (IDTA) addendum. GitHub and Google act as independent
-            controllers under their own applicable transfer mechanisms,
-            including their own published SCCs with end-users.
+            controllers under their own applicable transfer mechanisms (which
+            may include SCCs or other recognised safeguards); see their
+            respective privacy policies for details.
           </p>
         </section>
 
