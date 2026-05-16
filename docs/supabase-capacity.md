@@ -5,9 +5,10 @@ project can absorb a public-launch traffic spike before posting publicly.
 
 Assessment date: 2026-05-16. Project ref: `nvxvvtvnthsgdxgksmju`.
 
-**Verdict: launch-ready.** No blocking issues. Two advisor warnings, both
-non-material (one is an intentional design choice, one does not apply to this
-app's auth model). Details below.
+**Verdict: launch-ready.** No blocking issues. The advisor warnings are all
+non-material — the `SECURITY DEFINER`-function lints are intentional design
+choices, and the leaked-password lint does not apply to this app's auth model.
+Details below.
 
 ## 1. Connection model — PostgREST, no direct Postgres connection
 
@@ -54,7 +55,7 @@ instance default). Free-tier headline limits and current usage:
 | Database size | 500 MB | 11 MB | Ample (~2 %) |
 | Egress / bandwidth | 5 GB / month | Well under | Ample |
 | Monthly active users (Auth) | 50,000 MAU | 3 users | Ample |
-| Postgres connections | `max_connections = 60` | 12 active | Sufficient (see note) |
+| Postgres connections | `max_connections = 60` | 12 active (as of the assessment date, 2026-05-16) | Sufficient (see note) |
 | Project pausing | Paused after 7 days of inactivity | n/a (active project) | — |
 
 Sizing against a plausible spike:
@@ -104,7 +105,13 @@ upgrading reactively only if sustained latency appears.
 `get_advisors(performance)` returned an empty lint list. No missing indexes, no
 unindexed foreign keys, no slow-query warnings.
 
-### Security — two warnings, both non-material
+### Security — warnings, all non-material
+
+The `SECURITY DEFINER`-function lint count depends on what has merged: today the
+advisor reports two warnings, and once issue [#697](https://github.com/fbrookhouse/poke-memory/issues/697)
+(PR #728) lands it becomes three. The two `SECURITY DEFINER`-class lints —
+`reset_all_progress` and, after #728, `delete_account` — are both intentional;
+the leaked-password lint does not apply.
 
 1. **`reset_all_progress` is a `SECURITY DEFINER` function callable by signed-in
    users**
@@ -115,12 +122,25 @@ unindexed foreign keys, no slow-query warnings.
    `auth.uid()` and raises `insufficient_privilege` when the session is
    unauthenticated. It deletes only `WHERE user_id = uid`, so a user can wipe
    their own data and no one else's. `EXECUTE` is revoked from `public`/`anon`
-   and granted only to `authenticated`, and `search_path` is pinned to `''`.
-   This is the canonical Supabase pattern for a self-service destructive RPC and
-   is documented in AGENTS.md. The advisor flags every `SECURITY DEFINER`
-   function it can see; here the warning is expected and correct to leave as-is.
+   and granted only to `authenticated` (PostgreSQL preserves these grants across
+   `CREATE OR REPLACE FUNCTION`, so migration 026 recreating the function does
+   not re-issue the GRANT), and `search_path` is pinned to `''`. This is the
+   canonical Supabase pattern for a self-service destructive RPC and is
+   documented in AGENTS.md. The advisor flags every `SECURITY DEFINER` function
+   it can see; here the warning is expected and correct to leave as-is.
 
-2. **Leaked-password protection disabled**
+2. **`delete_account` is a `SECURITY DEFINER` function callable by signed-in
+   users** (same
+   [lint 0029](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable);
+   appears only once issue [#697](https://github.com/fbrookhouse/poke-memory/issues/697)
+   / PR #728 and its migration `027_delete_account_rpc.sql` have merged — the
+   migration is already applied to the live project).
+   **Intentional — no action.** It gets the same treatment as
+   `reset_all_progress`: an explicit `auth.uid()` guard, deletion scoped to the
+   caller's own data only, `EXECUTE` granted solely to `authenticated`, and a
+   pinned `search_path`. The lint is expected and correct to leave as-is.
+
+3. **Leaked-password protection disabled**
    ([password-security](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)).
    **Does not apply — no action.** This feature checks user-chosen passwords
    against HaveIBeenPwned. The app uses **OAuth only** (`signInWithOAuth` with
@@ -129,7 +149,7 @@ unindexed foreign keys, no slow-query warnings.
    Enabling it would have no effect. If a password provider is ever added, this
    should be enabled at that point.
 
-Neither warning blocks launch; no migration or fix is warranted.
+None of these warnings block launch; no migration or fix is warranted.
 
 ## 4. RLS confirmation
 
@@ -165,7 +185,7 @@ rows.
 | Connection model | PostgREST over HTTPS; no direct Postgres connection in production code |
 | Plan limits vs spike | Free tier; ample storage/bandwidth/MAU headroom; watch compute latency on launch day |
 | Performance advisors | Clean — no lints |
-| Security advisors | Two warnings, both non-material (intentional RPC; password protection N/A for OAuth-only) |
+| Security advisors | All non-material (intentional `SECURITY DEFINER` RPCs — two today, three once #728 lands; password protection N/A for OAuth-only) |
 | RLS | Enabled on all four tables, every policy scoped to `auth.uid()` |
 
 The Supabase project is launch-ready on the Free tier. The single operational
