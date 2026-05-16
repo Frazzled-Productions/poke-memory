@@ -357,8 +357,7 @@ export default function PrivacyPage() {
           </h3>
           <p className="mb-3">
             When you sign in via GitHub or Google, that provider processes the
-            authentication interaction as an <strong>independent
-            controller</strong> under its own terms of service and privacy
+            authentication interaction as an <strong>independent controller</strong> under its own terms of service and privacy
             policy — not as our processor. We do not have a
             controller-to-processor DPA with these providers, and we do not
             instruct or control how they handle their side of the
@@ -392,7 +391,7 @@ export default function PrivacyPage() {
                     provider returns a profile (typically email and display
                     name) to Supabase Auth, which holds it on your account
                     record for authentication. Our own review-history tables
-                    store only the opaque user identifier
+                    store only the opaque user identifier.
                   </td>
                 </tr>
                 <tr>
@@ -407,7 +406,7 @@ export default function PrivacyPage() {
                     provider returns a profile (typically email and display
                     name) to Supabase Auth, which holds it on your account
                     record for authentication. Our own review-history tables
-                    store only the opaque user identifier
+                    store only the opaque user identifier.
                   </td>
                 </tr>
               </tbody>
@@ -448,10 +447,12 @@ export default function PrivacyPage() {
           <p>
             The third-party services listed in §6 — Vercel, Supabase, and (if
             you choose to sign in) GitHub or Google — may process data outside
-            the UK / EEA. Each operates under the EU Standard Contractual
-            Clauses (SCCs) as the transfer mechanism, providing equivalent
-            safeguards to those required under UK GDPR via the UK International
-            Data Transfer Agreement (IDTA) addendum.
+            the UK / EEA. Vercel and Supabase (our sub-processors) operate
+            under the EU Standard Contractual Clauses (SCCs), providing
+            equivalent safeguards via the UK International Data Transfer
+            Agreement (IDTA) addendum. GitHub and Google act as independent
+            controllers under their own applicable transfer mechanisms,
+            including their own published SCCs with end-users.
           </p>
         </section>
 
