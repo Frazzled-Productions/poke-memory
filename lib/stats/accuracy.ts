@@ -1,5 +1,6 @@
 import type { Grade } from "@/lib/srs/scheduler";
 import type { GradeLog } from "@/lib/gradelog/persistence";
+import { isoDate } from "@/lib/utils/format-date";
 
 const PASS_GRADES: ReadonlySet<Grade> = new Set([4, 5]);
 
@@ -24,7 +25,7 @@ function isoMinusDays(today: string, n: number): string {
   // so dates line up with the scheduler and the due-forecast.
   const result = new Date(today);
   result.setDate(result.getDate() - n);
-  return result.toISOString().slice(0, 10);
+  return isoDate(result);
 }
 
 /**
