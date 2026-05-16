@@ -8,6 +8,7 @@ import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { SpritePreloader, type SizedSpriteUrl } from "@/components/review/SpritePreloader";
 import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites";
+import { decodeSpriteUrls } from "@/lib/review/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -1297,6 +1298,36 @@ export function ReviewSession() {
     recordReview(today, gradedToday, dueQueueEmpty);
     const appended = await appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, subjectKey: effectiveCard.subjectKey });
     snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
+
+    // Decode-ahead: fetch and decode the next card's sprite(s) before advancing
+    // React state. `SpritePreloader` has already warmed the network cache —
+    // this call bridges the fetch→decode gap so the bitmap is GPU-ready by the
+    // time the next <Image> mounts, eliminating the residual pop-in (#719).
+    //
+    // We peek at the post-grade queues (using `newCards`, which already reflects
+    // the graded card's updated state) to find what card will be shown next.
+    // `buildSessionQueues` is O(n) in the card list but is already called on
+    // every render — one extra call here is negligible. The effective limits and
+    // scope eligibility set are those captured from the current render closure.
+    const nextQueues = buildSessionQueues(
+      newCards,
+      effectiveLimits,
+      today,
+      isScopeEmpty(scope) ? undefined : eligibleCardIds,
+    );
+    const nextLearningDue = learningQueue
+      .filter((e) => e.dueAt <= Date.now() && e.cardId !== effectiveCard.id)
+      .sort((a, b) => a.dueAt - b.dueAt);
+    const nextCardId =
+      nextLearningDue[0]?.cardId ??
+      getNextCardId(nextQueues.reviewQueue, nextQueues.newQueue);
+    if (nextCardId !== null) {
+      const nextCard = newCards.find((c) => c.id === nextCardId);
+      if (nextCard) {
+        await decodeSpriteUrls(preloadableSpriteUrls(nextCard));
+      }
+    }
+
     setUndoSnapshot(snapshot);
     enqueueGrade({ ...effectiveCard, state: nextState });
     setCards(newCards);
