@@ -379,7 +379,7 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
 
       {stats.struggling.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          No data yet — review some cards first!
+          No struggling cards yet. Keep it up!
         </p>
       ) : (
         <ul className="flex flex-col gap-2" role="list">

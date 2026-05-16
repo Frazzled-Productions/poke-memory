@@ -8,6 +8,8 @@ import {
   GEN_RANGES,
   MASTERY_REPETITIONS,
   MASTERY_INTERVAL_DAYS,
+  STRUGGLING_MIN_REPS,
+  STRUGGLING_DIFFICULTY_CUTOFF,
 } from "./derive";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import type { NameReviewCard } from "@/lib/review/session";
@@ -412,5 +414,134 @@ describe("computeStats form-card generation bucketing", () => {
     expect(gen1.total).toBe(2);    // both cards
     expect(gen1.mastered).toBe(1); // only Raichu mastered
     expect(gen1.introduced).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeStats — struggling-card gate (#736)
+// ---------------------------------------------------------------------------
+
+describe("computeStats struggling gate", () => {
+  // Helper: a card below MIN_REPS (1 graduated review), non-struggling difficulty.
+  const belowMinReps = () =>
+    card(1, {
+      lastReview: TODAY,
+      reps: STRUGGLING_MIN_REPS - 1,
+      lapses: 0,
+      difficulty: 5,
+    });
+
+  // Helper: a card meeting MIN_REPS but with no struggle signal.
+  const enoughRepsNoStruggle = () =>
+    card(2, {
+      lastReview: TODAY,
+      reps: STRUGGLING_MIN_REPS,
+      lapses: 0,
+      difficulty: STRUGGLING_DIFFICULTY_CUTOFF - 1,
+    });
+
+  // Helper: a card meeting MIN_REPS with a lapse (struggle via lapses).
+  const enoughRepsLapsed = () =>
+    card(3, {
+      lastReview: TODAY,
+      reps: STRUGGLING_MIN_REPS,
+      lapses: 1,
+      difficulty: 5,
+    });
+
+  // Helper: a card meeting MIN_REPS with high difficulty but no lapse.
+  const enoughRepsHighDifficulty = () =>
+    card(4, {
+      lastReview: TODAY,
+      reps: STRUGGLING_MIN_REPS,
+      lapses: 0,
+      difficulty: STRUGGLING_DIFFICULTY_CUTOFF,
+    });
+
+  it("excludes a card below STRUGGLING_MIN_REPS even when difficulty is high", () => {
+    const cards = [
+      card(1, {
+        lastReview: TODAY,
+        reps: STRUGGLING_MIN_REPS - 1,
+        lapses: 1,
+        difficulty: STRUGGLING_DIFFICULTY_CUTOFF + 1,
+      }),
+    ];
+    const result = computeStats(cards, TODAY);
+    expect(result.struggling).toHaveLength(0);
+  });
+
+  it("excludes a card with reps >= MIN_REPS but no struggle signal (lapses = 0, difficulty below cutoff)", () => {
+    const result = computeStats([enoughRepsNoStruggle()], TODAY);
+    expect(result.struggling).toHaveLength(0);
+  });
+
+  it("includes a card with reps >= MIN_REPS and lapses > 0 regardless of difficulty", () => {
+    const result = computeStats([enoughRepsLapsed()], TODAY);
+    expect(result.struggling).toHaveLength(1);
+    expect(result.struggling[0].id).toBe(3);
+  });
+
+  it("includes a card with reps >= MIN_REPS and difficulty >= STRUGGLING_DIFFICULTY_CUTOFF even when lapses = 0", () => {
+    const result = computeStats([enoughRepsHighDifficulty()], TODAY);
+    expect(result.struggling).toHaveLength(1);
+    expect(result.struggling[0].id).toBe(4);
+  });
+
+  it("is empty when no card qualifies (all below MIN_REPS or no struggle signal)", () => {
+    const result = computeStats([belowMinReps(), enoughRepsNoStruggle()], TODAY);
+    expect(result.struggling).toHaveLength(0);
+  });
+
+  it("includes only qualifying cards from a mixed set", () => {
+    const cards = [
+      belowMinReps(),          // excluded: below MIN_REPS
+      enoughRepsNoStruggle(),  // excluded: no struggle signal
+      enoughRepsLapsed(),      // included: lapses > 0
+      enoughRepsHighDifficulty(), // included: high difficulty
+    ];
+    const result = computeStats(cards, TODAY);
+    expect(result.struggling).toHaveLength(2);
+    const ids = result.struggling.map((c) => c.id).sort();
+    expect(ids).toEqual([3, 4]);
+  });
+
+  it("sorts qualifying cards by difficulty descending", () => {
+    const cards = [
+      card(10, {
+        lastReview: TODAY,
+        reps: STRUGGLING_MIN_REPS,
+        lapses: 1,
+        difficulty: 6,
+      }),
+      card(11, {
+        lastReview: TODAY,
+        reps: STRUGGLING_MIN_REPS,
+        lapses: 1,
+        difficulty: 8,
+      }),
+      card(12, {
+        lastReview: TODAY,
+        reps: STRUGGLING_MIN_REPS,
+        lapses: 1,
+        difficulty: 7,
+      }),
+    ];
+    const result = computeStats(cards, TODAY);
+    expect(result.struggling.map((c) => c.id)).toEqual([11, 12, 10]);
+  });
+
+  it("respects the strugglingLimit cap", () => {
+    const cards = Array.from({ length: 15 }, (_, i) =>
+      card(i + 100, {
+        lastReview: TODAY,
+        reps: STRUGGLING_MIN_REPS,
+        lapses: 1,
+        difficulty: 8,
+      }),
+    );
+    // Default limit is 10
+    const result = computeStats(cards, TODAY);
+    expect(result.struggling).toHaveLength(10);
   });
 });
