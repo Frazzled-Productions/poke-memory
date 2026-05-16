@@ -6,6 +6,8 @@ import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
+import { SpritePreloader } from "@/components/review/SpritePreloader";
+import { preloadableSpriteUrls } from "@/lib/review/sprites";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -487,6 +489,11 @@ export function ReviewSession() {
     [cards],
   );
 
+  const cardMap = useMemo(
+    () => new Map(cards !== null ? cards.map((c) => [c.id, c]) : []),
+    [cards],
+  );
+
   useEffect(() => {
     async function load() {
       const settings = loadSettings();
@@ -898,6 +905,38 @@ export function ReviewSession() {
       ? (cards.find((c) => c.id === revealedCardId.current) ?? null)
       : null;
   const effectiveCard = lockedCard ?? currentCard;
+
+  // --- Sprite preloading (#705) ---
+  // Warm the browser cache for the current card's reveal-face sprite(s) and
+  // the sprites of whatever cards are likely to come next, so neither pops
+  // in on grade/reveal. The exact next card depends on how grading mutates
+  // state, so preload the heads of every queue that could resolve next.
+  // Two heads are taken from each queue so that at least one look-ahead
+  // survives after the current card's ID is excluded.
+  //
+  // Computed inline rather than via useMemo on purpose: reviewQueue,
+  // newQueue and dueLearning are themselves rebuilt on every render (see
+  // buildSessionQueues above), so a useMemo keyed on them would never hit.
+  // The cost is a handful of Set ops and O(1) cardMap lookups, and
+  // SpritePreloader keys its <Image> children by URL, so handing it a fresh
+  // array reference each render triggers no refetch.
+  const preloadSpriteUrls: string[] = (() => {
+    const ids = new Set<number>();
+    for (const id of reviewQueue.slice(0, 2)) ids.add(id);
+    if (newQueue.length > 0) ids.add(newQueue[0]);
+    for (const e of dueLearning.slice(0, 2)) ids.add(e.cardId);
+    if (effectiveCard !== null) ids.delete(effectiveCard.id);
+
+    const urls: string[] = [];
+    // The current card's front face is already on screen; including it here
+    // warms its reveal-face sprite (evolution answer / cry sprite).
+    if (effectiveCard !== null) urls.push(...preloadableSpriteUrls(effectiveCard));
+    for (const id of ids) {
+      const c = cardMap.get(id);
+      if (c) urls.push(...preloadableSpriteUrls(c));
+    }
+    return urls;
+  })();
 
   // Per-button interval previews — computed for every render (O(1) per grade, cheap).
   const gradePreviewsOrNull =
@@ -1352,6 +1391,7 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+        <SpritePreloader urls={preloadSpriteUrls} />
         <div className="flex w-full max-w-xl flex-col gap-2">
           <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
         </div>
@@ -1449,6 +1489,7 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+        <SpritePreloader urls={preloadSpriteUrls} />
         <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
         <SpritePicker
           key={`${effectiveCard.id}-${cardPresentationCount}`}
@@ -1485,6 +1526,7 @@ export function ReviewSession() {
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-8">
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+      <SpritePreloader urls={preloadSpriteUrls} />
       <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
       {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard
