@@ -10,6 +10,8 @@
  * module is for already-ISO inputs where there is no `Date.now()` involved.
  */
 
+import { isoDate } from "./format-date";
+
 /**
  * Number of whole days between two YYYY-MM-DD strings. Returns negative
  * values when `to` is earlier than `from`. Robust to DST / TZ since both
@@ -29,5 +31,5 @@ export function daysBetweenIsoDates(fromIso: string, toIso: string): number {
 export function addDaysToIsoDate(date: string, days: number): string {
   const result = new Date(date + "T00:00:00Z");
   result.setUTCDate(result.getUTCDate() + days);
-  return result.toISOString().slice(0, 10);
+  return isoDate(result);
 }
