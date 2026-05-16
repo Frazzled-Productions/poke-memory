@@ -5,6 +5,7 @@ import { DEFAULT_LIMITS } from "@/lib/review/session";
 import type { ReviewableCard, DailyLimits } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { BACKUP_VERSION, isBackupFile } from "./schema";
+import { isoDate } from "@/lib/utils/format-date";
 
 // Built once at module load — SEED_POKEMON and SEED_EVOLUTION_CARDS are constants.
 const VALID_IDS = new Set<number>([
@@ -37,7 +38,7 @@ export async function exportProgress(): Promise<void> {
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-  const date = now.toISOString().slice(0, 10);
+  const date = isoDate(now);
 
   const a = document.createElement("a");
   a.href = url;
