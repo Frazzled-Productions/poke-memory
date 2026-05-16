@@ -1,0 +1,191 @@
+name: Cron Health Monitor
+
+# Watch the repo's cron-driven workflows for staleness or failure. GitHub
+# disables scheduled workflows after 60 days of repo inactivity, and a
+# malformed cron or an expired secret can also silently stop a workflow
+# firing — none of which produces an alert on its own. This workflow runs
+# on its own schedule (independent of the workflows it watches) and, for
+# each monitored workflow, checks that (a) there has been at least one run
+# within the expected interval and (b) the most recent run did not fail.
+# On a stale or failing workflow it opens or updates a tracking issue.
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'   # Monday 10:00 UTC, weekly
+  workflow_dispatch:
+
+concurrency:
+  group: cron-health-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    name: Check cron-driven workflows for staleness/failure
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+
+    steps:
+      - name: Check cron workflows and open/update tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Monitored workflows: "<file>|<human name>|<max-age-hours>".
+          # max-age-hours is the longest acceptable gap between runs — the
+          # cron cadence plus generous headroom for GitHub's cron jitter
+          # (which can run hours late under load) and dispatch skew.
+          # Daily workflows: 48h. Weekly digests: 240h (10 days).
+          WORKFLOWS=(
+            "auto-release.yml|Auto Release|48"
+            "refresh-user-count.yml|Refresh User Count|48"
+            "monitor-grade-log-divergence.yml|Monitor Grade-Log Divergence|48"
+            "auto-workflow-suggest.yml|Auto Workflow Suggest|240"
+            "auto-codequality-suggest.yml|Auto Code-Quality Suggest|240"
+            "auto-app-suggest.yml|Auto App Suggest|240"
+            "auto-backlog-groom.yml|Auto Backlog Groom|240"
+          )
+
+          NOW=$(date -u +%s)
+
+          for entry in "${WORKFLOWS[@]}"; do
+            FILE="${entry%%|*}"
+            REST="${entry#*|}"
+            NAME="${REST%%|*}"
+            MAX_AGE_HOURS="${REST##*|}"
+            MAX_AGE=$(( MAX_AGE_HOURS * 3600 ))
+
+            echo "::group::$FILE"
+
+            # Most recent run on the default branch, schedule-triggered.
+            # --json gives status/conclusion/createdAt for the latest run.
+            # Capture the exit status separately so a real API failure
+            # (network blip, rate limit, GitHub outage) is not confused
+            # with a genuine empty result. On an API error we skip this
+            # workflow rather than treat the error as evidence of
+            # staleness — otherwise a transient outage would spam a
+            # tracking issue for every monitored workflow at once.
+            RUN_EXIT=0
+            RUN=$(gh run list \
+              --repo "$REPO" \
+              --workflow "$FILE" \
+              --event schedule \
+              --branch "${{ github.event.repository.default_branch }}" \
+              --limit 1 \
+              --json status,conclusion,createdAt,databaseId) || RUN_EXIT=$?
+
+            if [ "$RUN_EXIT" -ne 0 ]; then
+              echo "::warning::$FILE: 'gh run list' failed (exit $RUN_EXIT) — likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
+              echo "::endgroup::"
+              continue
+            fi
+
+            PROBLEM=""
+
+            COUNT=$(echo "$RUN" | jq 'length')
+            if [ "$COUNT" -eq 0 ]; then
+              # No scheduled run has ever been recorded — either the
+              # workflow is brand new or it has never fired on cron.
+              PROBLEM="No scheduled run found for \`$FILE\`. The workflow may be newly added, disabled, or its \`schedule:\` trigger may be malformed."
+            else
+              STATUS=$(echo "$RUN" | jq -r '.[0].status')
+              CONCLUSION=$(echo "$RUN" | jq -r '.[0].conclusion')
+              CREATED_AT=$(echo "$RUN" | jq -r '.[0].createdAt')
+              RUN_ID=$(echo "$RUN" | jq -r '.[0].databaseId')
+
+              RUN_TIME=$(date -u -d "$CREATED_AT" +%s 2>/dev/null \
+                || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null \
+                || echo 0)
+
+              if [ "$RUN_TIME" -eq 0 ]; then
+                echo "$FILE: malformed timestamp '$CREATED_AT', skipping"
+                echo "::endgroup::"
+                continue
+              fi
+
+              AGE=$(( NOW - RUN_TIME ))
+              AGE_HOURS=$(( AGE / 3600 ))
+
+              # Only completed runs carry a conclusion. Treat an in-flight
+              # run (status != completed) as healthy — it has not failed.
+              # A completed run is unhealthy unless its conclusion is
+              # 'success' or 'skipped'; this catches 'failure',
+              # 'timed_out', 'startup_failure', and 'cancelled' alike, so a
+              # cron that consistently times out still raises an alert.
+              if [ "$STATUS" = "completed" ] \
+                && [ "$CONCLUSION" != "success" ] \
+                && [ "$CONCLUSION" != "skipped" ]; then
+                PROBLEM="The most recent scheduled run of \`$FILE\` did not succeed (conclusion: \`$CONCLUSION\`) ([run #$RUN_ID](https://github.com/$REPO/actions/runs/$RUN_ID))."
+              elif [ "$AGE" -gt "$MAX_AGE" ]; then
+                PROBLEM="The most recent scheduled run of \`$FILE\` is **${AGE_HOURS}h old** (expected at most ${MAX_AGE_HOURS}h between runs). The workflow may have been disabled after 60 days of repo inactivity, or its \`schedule:\` trigger may be malformed."
+              fi
+
+              if [ -z "$PROBLEM" ]; then
+                echo "$FILE: healthy (last run ${AGE_HOURS}h ago, conclusion=$CONCLUSION)"
+              fi
+            fi
+
+            # HTML marker keyed by workflow file so each workflow has its
+            # own tracking issue; re-runs update that issue rather than
+            # opening duplicates.
+            MARKER="<!-- cron-health-monitor:$FILE -->"
+
+            EXISTING=$(gh issue list \
+              --repo "$REPO" \
+              --state open \
+              --search "$MARKER in:body" \
+              --json number,body \
+              --limit 10 \
+              2>/dev/null | jq -r --arg marker "$MARKER" \
+              '[.[] | select(.body | contains($marker))] | .[0].number // empty')
+
+            if [ -z "$PROBLEM" ]; then
+              # Healthy: close any stale tracking issue so it does not
+              # linger after the workflow recovers.
+              if [ -n "$EXISTING" ]; then
+                echo "$FILE: healthy again, closing tracking issue #$EXISTING"
+                gh issue close "$EXISTING" --repo "$REPO" \
+                  --comment "$MARKER"$'\n'"\`$FILE\` is healthy again — closing automatically."
+              fi
+              echo "::endgroup::"
+              continue
+            fi
+
+            echo "$FILE: PROBLEM — $PROBLEM"
+
+            BODY_FILE=$(mktemp)
+            cat >"$BODY_FILE" <<EOF
+          $MARKER
+          **Cron workflow health alert: \`$FILE\` ($NAME)**
+
+          $PROBLEM
+
+          **What to check:**
+          1. Open the [workflow's run history](https://github.com/$REPO/actions/workflows/$FILE) and confirm whether it is still scheduled.
+          2. If GitHub has disabled it (60-day repo-inactivity rule), re-enable it from the Actions tab or push any commit to reset the timer.
+          3. If the most recent run failed, open the run log and fix the underlying cause.
+          4. Confirm the \`schedule:\` cron expression in \`.github/workflows/$FILE\` is well-formed.
+
+          This issue was opened by the \`cron-health-monitor\` workflow. It updates in place on each weekly run and closes automatically once \`$FILE\` is healthy again.
+          EOF
+
+            if [ -n "$EXISTING" ]; then
+              echo "$FILE: updating tracking issue #$EXISTING"
+              gh issue edit "$EXISTING" --repo "$REPO" --body-file "$BODY_FILE"
+              gh issue comment "$EXISTING" --repo "$REPO" \
+                --body "$MARKER"$'\n'"Re-checked on $(date -u '+%Y-%m-%d %H:%M UTC') — still unhealthy. Details above have been refreshed."
+            else
+              echo "$FILE: opening new tracking issue"
+              gh issue create --repo "$REPO" \
+                --title "Cron workflow unhealthy: $FILE" \
+                --body-file "$BODY_FILE"
+            fi
+
+            rm -f "$BODY_FILE"
+            echo "::endgroup::"
+          done
