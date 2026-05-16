@@ -24,9 +24,15 @@ import { randomBytes } from "node:crypto";
 const TTS_VOICE_NAME = "en-GB-Chirp3-HD-Aoede";
 
 const TTS_API_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
-const CONCURRENCY = 20;
+// Concurrency is kept modest: the Cloud TTS per-minute quota is easily
+// overshot by a fast burst, and 429s then dominate the run.
+const CONCURRENCY = 6;
 const MAX_RETRIES = 3;
 const BACKOFF_MS = [500, 1000, 2000];
+// 429 (rate limit) is transient and retryable — back off generously so a
+// one-off full run completes rather than silently skipping names.
+const RATE_LIMIT_MAX_RETRIES = 6;
+const RATE_LIMIT_BACKOFF_MS = [2000, 5000, 10000, 20000, 30000, 60000];
 const PROGRESS_INTERVAL = 50;
 
 // ---------------------------------------------------------------------------
@@ -304,8 +310,10 @@ async function fileExists(filePath) {
 }
 
 /**
- * POST to the Google Cloud TTS API with retry on 5xx / network errors.
- * On HTTP 429: warns and returns { ok: false, reason: "rate-limited", skip: true }.
+ * POST to the Google Cloud TTS API with retry on 429 / 5xx / network errors.
+ * On HTTP 429: retries with generous backoff (honouring Retry-After); if still
+ *   rate-limited after RATE_LIMIT_MAX_RETRIES, returns { ok: false, skip: false }
+ *   so the entry counts as a real failure (re-run to retry).
  * On network error / 5xx after retries: returns { ok: false, reason, skip: false }.
  * On 4xx (non-429): warns and returns { ok: false, reason, skip: true }.
  * On success: returns { ok: true, audioContent } (base64 string).
@@ -319,6 +327,7 @@ async function synthesize(text, apiKey) {
   });
 
   let attempt = 0;
+  let rateLimitAttempt = 0;
   while (true) {
     let res;
     try {
@@ -341,8 +350,22 @@ async function synthesize(text, apiKey) {
     }
 
     if (res.status === 429) {
-      process.stderr.write(`[tts] WARN: rate-limited for "${text}", skipping\n`);
-      return { ok: false, reason: "rate-limited", skip: true };
+      if (rateLimitAttempt < RATE_LIMIT_MAX_RETRIES) {
+        const retryAfterSec = Number(res.headers.get("retry-after"));
+        const base = RATE_LIMIT_BACKOFF_MS[Math.min(rateLimitAttempt, RATE_LIMIT_BACKOFF_MS.length - 1)];
+        // Honour Retry-After when given; add jitter to avoid a thundering herd.
+        const delay =
+          (Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? retryAfterSec * 1000 : base) +
+          Math.floor(Math.random() * 1000);
+        process.stderr.write(
+          `[tts] WARN: rate-limited for "${text}" (attempt ${rateLimitAttempt + 1}/${RATE_LIMIT_MAX_RETRIES + 1}), retrying in ${delay}ms\n`,
+        );
+        await sleep(delay);
+        rateLimitAttempt++;
+        continue;
+      }
+      process.stderr.write(`[tts] WARN: still rate-limited for "${text}" after ${RATE_LIMIT_MAX_RETRIES + 1} attempts\n`);
+      return { ok: false, reason: "rate-limited", skip: false };
     }
 
     if (res.status >= 500) {
