@@ -1671,6 +1671,19 @@ export function ReviewSession() {
           playCryOnAnswer={playCryOnAnswer}
           speakNameOnAnswer={speakNameOnAnswer}
         />
+        {audioFeaturesOff && (
+          <OnboardingHint
+            id="audioHintDismissed"
+            title="Add sound to your reviews"
+            ctaHref="/settings#audio-heading"
+            ctaLabel="Open audio settings"
+          >
+            <p>
+              Want to hear Pokémon cries and names read aloud? Turn on
+              audio in Settings.
+            </p>
+          </OnboardingHint>
+        )}
         {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
         <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
         {undoSnapshot !== null && (

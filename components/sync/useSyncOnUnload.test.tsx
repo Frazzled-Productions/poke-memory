@@ -189,3 +189,89 @@ describe("useSyncOnUnload — visibilitychange path (fetch+keepalive)", () => {
     expect(init.method).toBe("POST");
   });
 });
+
+// ─── Superuser write-guard (#754) ─────────────────────────────────────────────
+//
+// ReviewSession.tsx passes null client/userId to useSyncOnUnload when
+// anyFlagOn is true, so neither the pagehide nor visibilitychange path can fire
+// a beacon or fetch during a QA session. These tests verify the null short-circuit
+// holds for both transport paths.
+
+describe("useSyncOnUnload — superuser write-guard (null client/userId)", () => {
+  let beacon: ReturnType<typeof vi.fn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.mocked(loadSyncStatus).mockReturnValue(ZERO_STATUS);
+    beacon = vi.fn(() => true);
+    Object.defineProperty(navigator, "sendBeacon", {
+      value: beacon,
+      configurable: true,
+      writable: true,
+    });
+    fetchSpy = vi.spyOn(global, "fetch");
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "sendBeacon", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    fetchSpy.mockRestore();
+    vi.clearAllMocks();
+  });
+
+  it("does not call sendBeacon on pagehide when client is null (superuser guarded)", () => {
+    // Simulates ReviewSession.tsx passing syncClient=null when anyFlagOn is true.
+    renderHook(() => useSyncOnUnload(null, FAKE_USER, mockUnsynced(2)));
+
+    act(() => firePagehide());
+
+    expect(beacon).not.toHaveBeenCalled();
+    expect(saveSyncStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not call sendBeacon on pagehide when userId is null (superuser guarded)", () => {
+    // Simulates ReviewSession.tsx passing syncUserId=null when anyFlagOn is true.
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, null, mockUnsynced(2)));
+
+    act(() => firePagehide());
+
+    expect(beacon).not.toHaveBeenCalled();
+    expect(saveSyncStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not call sendBeacon on pagehide when both client and userId are null (superuser guarded)", () => {
+    // The canonical superuser-guarded call: both are null simultaneously.
+    renderHook(() => useSyncOnUnload(null, null, mockUnsynced(3)));
+
+    act(() => firePagehide());
+
+    expect(beacon).not.toHaveBeenCalled();
+    expect(saveSyncStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not call fetch on visibilitychange when client is null (superuser guarded)", async () => {
+    renderHook(() => useSyncOnUnload(null, FAKE_USER, mockUnsynced(2)));
+
+    act(() => fireVisibilityHidden());
+
+    // Settle any microtasks — the hook should not have started an async path.
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(saveSyncStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not call fetch on visibilitychange when userId is null (superuser guarded)", async () => {
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, null, mockUnsynced(2)));
+
+    act(() => fireVisibilityHidden());
+
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(saveSyncStatus).not.toHaveBeenCalled();
+  });
+});

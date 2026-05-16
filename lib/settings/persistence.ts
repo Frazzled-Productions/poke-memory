@@ -296,6 +296,48 @@ function validatePracticeScope(value: unknown): PracticeScope | null {
   return { gens, types, presets, formCategories };
 }
 
+// ─── Coercion helpers (local to this file) ──────────────────────────────────
+//
+// Each helper reads a single key from the raw parsed object and returns the
+// stored value when its runtime type matches, or the corresponding default
+// otherwise.  They are intentionally narrow — no side-effects, no clamping.
+// Custom validators (retentionTarget clamp, practiceScope, etc.) are left
+// inline so they remain visually distinct.
+
+type RawObj = Record<string, unknown>;
+
+/** Returns `obj[key]` when it is a `number`, otherwise `DEFAULT_SETTINGS[key]`. */
+function num<K extends keyof UserSettings>(
+  obj: RawObj,
+  key: K,
+): UserSettings[K] {
+  return (typeof obj[key] === "number"
+    ? obj[key]
+    : DEFAULT_SETTINGS[key]) as UserSettings[K];
+}
+
+/** Returns `obj[key]` when it is a `boolean`, otherwise `DEFAULT_SETTINGS[key]`. */
+function bool<K extends keyof UserSettings>(
+  obj: RawObj,
+  key: K,
+): UserSettings[K] {
+  return (typeof obj[key] === "boolean"
+    ? obj[key]
+    : DEFAULT_SETTINGS[key]) as UserSettings[K];
+}
+
+/** Returns `obj[key]` when it is a `string`, otherwise `DEFAULT_SETTINGS[key]`. */
+function str<K extends keyof UserSettings>(
+  obj: RawObj,
+  key: K,
+): UserSettings[K] {
+  return (typeof obj[key] === "string"
+    ? obj[key]
+    : DEFAULT_SETTINGS[key]) as UserSettings[K];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * Internal: parse settings JSON without applying the legacy-scope migration.
  * Used by both `loadSettings` and the migration path so the migration can
@@ -313,78 +355,27 @@ function parseStoredSettings(raw: string | null): UserSettings {
     return { ...DEFAULT_SETTINGS };
   }
   if (typeof parsed !== "object" || parsed === null) return { ...DEFAULT_SETTINGS };
-  const obj = parsed as Record<string, unknown>;
+  const obj = parsed as RawObj;
   return {
-    masteryRepetitions:
-      typeof obj.masteryRepetitions === "number"
-        ? obj.masteryRepetitions
-        : DEFAULT_SETTINGS.masteryRepetitions,
-    maxNewPerDay:
-      typeof obj.maxNewPerDay === "number"
-        ? obj.maxNewPerDay
-        : DEFAULT_SETTINGS.maxNewPerDay,
-    maxReviewsPerDay:
-      typeof obj.maxReviewsPerDay === "number"
-        ? obj.maxReviewsPerDay
-        : DEFAULT_SETTINGS.maxReviewsPerDay,
-    maxNewEvolutionPerDay:
-      typeof obj.maxNewEvolutionPerDay === "number"
-        ? obj.maxNewEvolutionPerDay
-        : DEFAULT_SETTINGS.maxNewEvolutionPerDay,
-    maxReviewsEvolutionPerDay:
-      typeof obj.maxReviewsEvolutionPerDay === "number"
-        ? obj.maxReviewsEvolutionPerDay
-        : DEFAULT_SETTINGS.maxReviewsEvolutionPerDay,
-    nameCardsEnabled:
-      typeof obj.nameCardsEnabled === "boolean"
-        ? obj.nameCardsEnabled
-        : DEFAULT_SETTINGS.nameCardsEnabled,
-    evolutionCardsEnabled:
-      typeof obj.evolutionCardsEnabled === "boolean"
-        ? obj.evolutionCardsEnabled
-        : DEFAULT_SETTINGS.evolutionCardsEnabled,
-    reverseEvolutionCardsEnabled:
-      typeof obj.reverseEvolutionCardsEnabled === "boolean"
-        ? obj.reverseEvolutionCardsEnabled
-        : DEFAULT_SETTINGS.reverseEvolutionCardsEnabled,
-    reverseCardsEnabled:
-      typeof obj.reverseCardsEnabled === "boolean"
-        ? obj.reverseCardsEnabled
-        : DEFAULT_SETTINGS.reverseCardsEnabled,
-    maxNewReversePerDay:
-      typeof obj.maxNewReversePerDay === "number"
-        ? obj.maxNewReversePerDay
-        : DEFAULT_SETTINGS.maxNewReversePerDay,
-    maxReviewsReversePerDay:
-      typeof obj.maxReviewsReversePerDay === "number"
-        ? obj.maxReviewsReversePerDay
-        : DEFAULT_SETTINGS.maxReviewsReversePerDay,
-    playCryOnReveal:
-      typeof obj.playCryOnReveal === "boolean"
-        ? obj.playCryOnReveal
-        : DEFAULT_SETTINGS.playCryOnReveal,
-    speakNameOnReveal:
-      typeof obj.speakNameOnReveal === "boolean"
-        ? obj.speakNameOnReveal
-        : DEFAULT_SETTINGS.speakNameOnReveal,
-    cryCardsEnabled:
-      typeof obj.cryCardsEnabled === "boolean"
-        ? obj.cryCardsEnabled
-        : DEFAULT_SETTINGS.cryCardsEnabled,
-    maxNewCryPerDay:
-      typeof obj.maxNewCryPerDay === "number"
-        ? obj.maxNewCryPerDay
-        : DEFAULT_SETTINGS.maxNewCryPerDay,
-    maxReviewsCryPerDay:
-      typeof obj.maxReviewsCryPerDay === "number"
-        ? obj.maxReviewsCryPerDay
-        : DEFAULT_SETTINGS.maxReviewsCryPerDay,
+    masteryRepetitions:        num(obj, "masteryRepetitions"),
+    maxNewPerDay:              num(obj, "maxNewPerDay"),
+    maxReviewsPerDay:          num(obj, "maxReviewsPerDay"),
+    maxNewEvolutionPerDay:     num(obj, "maxNewEvolutionPerDay"),
+    maxReviewsEvolutionPerDay: num(obj, "maxReviewsEvolutionPerDay"),
+    nameCardsEnabled:             bool(obj, "nameCardsEnabled"),
+    evolutionCardsEnabled:        bool(obj, "evolutionCardsEnabled"),
+    reverseEvolutionCardsEnabled: bool(obj, "reverseEvolutionCardsEnabled"),
+    reverseCardsEnabled:          bool(obj, "reverseCardsEnabled"),
+    maxNewReversePerDay:     num(obj, "maxNewReversePerDay"),
+    maxReviewsReversePerDay: num(obj, "maxReviewsReversePerDay"),
+    playCryOnReveal:   bool(obj, "playCryOnReveal"),
+    speakNameOnReveal: bool(obj, "speakNameOnReveal"),
+    cryCardsEnabled:   bool(obj, "cryCardsEnabled"),
+    maxNewCryPerDay:     num(obj, "maxNewCryPerDay"),
+    maxReviewsCryPerDay: num(obj, "maxReviewsCryPerDay"),
     // Defensive default: missing/non-boolean → false. Existing users lose form
     // cards from practice until they opt in via the Settings toggle (#658).
-    alternateFormsEnabled:
-      typeof obj.alternateFormsEnabled === "boolean"
-        ? obj.alternateFormsEnabled
-        : DEFAULT_SETTINGS.alternateFormsEnabled,
+    alternateFormsEnabled: bool(obj, "alternateFormsEnabled"),
     // Shallow validation only — lib/theme/persistence.ts does the deep
     // validation (HEX_COLOR, known Pokémon id) on read.
     favouriteTheme:
@@ -417,8 +408,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
       obj.appVisitCount >= 0
         ? obj.appVisitCount
         : DEFAULT_SETTINGS.appVisitCount,
-    ttsVoice:
-      typeof obj.ttsVoice === "string" ? obj.ttsVoice : DEFAULT_SETTINGS.ttsVoice,
+    ttsVoice: str(obj, "ttsVoice"),
     ttsRate:
       typeof obj.ttsRate === "number" && Number.isFinite(obj.ttsRate)
         ? Math.max(0.5, Math.min(2.0, obj.ttsRate))
@@ -427,8 +417,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
       typeof obj.ttsVolume === "number" && Number.isFinite(obj.ttsVolume)
         ? Math.max(0, Math.min(1, obj.ttsVolume))
         : DEFAULT_SETTINGS.ttsVolume,
-    timezone:
-      typeof obj.timezone === "string" ? obj.timezone : DEFAULT_SETTINGS.timezone,
+    timezone: str(obj, "timezone"),
     dateFormat:
       obj.dateFormat === "iso" || obj.dateFormat === "dmy" || obj.dateFormat === "mdy"
         ? obj.dateFormat
