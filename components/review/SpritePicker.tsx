@@ -46,9 +46,16 @@ type Props = {
    * Silently skipped when `targetPokemon.cryUrl` is null.
    */
   playCryOnAnswer?: boolean;
+  /**
+   * When true, speaks the target Pokémon's name at the answer-feedback moment.
+   * When both `playCryOnAnswer` and `speakNameOnAnswer` are true, the cry plays
+   * first and the name is spoken via the `onEnded` callback — consistent with
+   * the cry → TTS chaining in handleReveal on flip cards.
+   */
+  speakNameOnAnswer?: boolean;
 };
 
-export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAnswer = false }: Props) {
+export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAnswer = false, speakNameOnAnswer = false }: Props) {
   const [answered, setAnswered] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,10 +76,17 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
     setAnswered(true);
     setSelectedId(tile.id);
 
-    // Play the target cry at the answer-feedback moment — the reverse-card
-    // equivalent of the reveal moment on flip cards (#707).
+    // Play the target cry and/or speak the name at the answer-feedback moment —
+    // the reverse-card equivalent of the reveal moment on flip cards (#707, #731).
+    // When both are enabled, chain TTS to fire after the cry ends, consistent
+    // with the cry → TTS ordering in handleReveal on flip cards.
+    const speakAfterCry =
+      speakNameOnAnswer ? () => speakName(targetPokemon.displayName, targetPokemon.id) : undefined;
+
     if (playCryOnAnswer) {
-      playCry(targetPokemon.cryUrl, 0.6);
+      playCry(targetPokemon.cryUrl, 0.6, speakAfterCry);
+    } else if (speakNameOnAnswer) {
+      speakName(targetPokemon.displayName, targetPokemon.id);
     }
 
     if (tile.isCorrect) {

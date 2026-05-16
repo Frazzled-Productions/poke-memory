@@ -1620,9 +1620,11 @@ export function ReviewSession() {
       3,
       String(effectiveCard.id),
     );
-    // Read the setting once before the return, matching the pattern in
+    // Read settings once before the return, matching the pattern in
     // handleReveal which resolves loadSettings() in the handler, not in JSX.
-    const playCryOnAnswer = loadSettings().playCryOnReveal;
+    const reverseSettings = loadSettings();
+    const playCryOnAnswer = reverseSettings.playCryOnReveal;
+    const speakNameOnAnswer = reverseSettings.speakNameOnReveal;
     return (
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
@@ -1634,6 +1636,7 @@ export function ReviewSession() {
           distractors={reverseDistractors}
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}
           playCryOnAnswer={playCryOnAnswer}
+          speakNameOnAnswer={speakNameOnAnswer}
         />
         {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
         <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
