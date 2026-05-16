@@ -64,13 +64,26 @@ jobs:
 
             # Most recent run on the default branch, schedule-triggered.
             # --json gives status/conclusion/createdAt for the latest run.
+            # Capture the exit status separately so a real API failure
+            # (network blip, rate limit, GitHub outage) is not confused
+            # with a genuine empty result. On an API error we skip this
+            # workflow rather than treat the error as evidence of
+            # staleness — otherwise a transient outage would spam a
+            # tracking issue for every monitored workflow at once.
+            RUN_EXIT=0
             RUN=$(gh run list \
               --repo "$REPO" \
               --workflow "$FILE" \
               --event schedule \
+              --branch "${{ github.event.repository.default_branch }}" \
               --limit 1 \
-              --json status,conclusion,createdAt,databaseId \
-              2>/dev/null || echo "[]")
+              --json status,conclusion,createdAt,databaseId) || RUN_EXIT=$?
+
+            if [ "$RUN_EXIT" -ne 0 ]; then
+              echo "::warning::$FILE: 'gh run list' failed (exit $RUN_EXIT) — likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
+              echo "::endgroup::"
+              continue
+            fi
 
             PROBLEM=""
 
@@ -100,8 +113,14 @@ jobs:
 
               # Only completed runs carry a conclusion. Treat an in-flight
               # run (status != completed) as healthy — it has not failed.
-              if [ "$STATUS" = "completed" ] && [ "$CONCLUSION" = "failure" ]; then
-                PROBLEM="The most recent scheduled run of \`$FILE\` **failed** ([run #$RUN_ID](https://github.com/$REPO/actions/runs/$RUN_ID))."
+              # A completed run is unhealthy unless its conclusion is
+              # 'success' or 'skipped'; this catches 'failure',
+              # 'timed_out', 'startup_failure', and 'cancelled' alike, so a
+              # cron that consistently times out still raises an alert.
+              if [ "$STATUS" = "completed" ] \
+                && [ "$CONCLUSION" != "success" ] \
+                && [ "$CONCLUSION" != "skipped" ]; then
+                PROBLEM="The most recent scheduled run of \`$FILE\` did not succeed (conclusion: \`$CONCLUSION\`) ([run #$RUN_ID](https://github.com/$REPO/actions/runs/$RUN_ID))."
               elif [ "$AGE" -gt "$MAX_AGE" ]; then
                 PROBLEM="The most recent scheduled run of \`$FILE\` is **${AGE_HOURS}h old** (expected at most ${MAX_AGE_HOURS}h between runs). The workflow may have been disabled after 60 days of repo inactivity, or its \`schedule:\` trigger may be malformed."
               fi
