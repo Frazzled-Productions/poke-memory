@@ -279,9 +279,8 @@ jobs:
           # restrict the count to comments newer than the status comment
           # (which is created at the start of every run). Comment IDs are
           # monotonically increasing on GitHub.
-          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
-            --jq --argjson statusId "${STATUS_ID:-0}" \
-              '[.[] | select(.id > $statusId) | select(.body | startswith("<!-- auto-plan -->"))] | length')
+          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate --jq \
+            "[.[] | select(.id > ${STATUS_ID:-0}) | select(.body | startswith(\"<!-- auto-plan -->\"))] | length")
 
           SALVAGED=false
           if [ "${PLAN_POSTED:-0}" = "0" ] && [ -s "$PLAN_FILE" ]; then
@@ -384,9 +383,8 @@ jobs:
           STATUS_ID: ${{ steps.status.outputs.comment_id }}
         run: |
           set -uo pipefail
-          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
-            --jq --argjson statusId "${STATUS_ID:-0}" \
-              '[.[] | select(.id > $statusId) | select(.body | startswith("<!-- auto-plan -->"))] | length')
+          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate --jq \
+            "[.[] | select(.id > ${STATUS_ID:-0}) | select(.body | startswith(\"<!-- auto-plan -->\"))] | length")
           if [ "${PLAN_POSTED:-0}" = "0" ]; then
             echo "No plan posted in this run — leaving project status unchanged."
             exit 0
@@ -1567,9 +1565,8 @@ jobs:
         run: |
           set -uo pipefail
 
-          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
-            --jq --argjson statusId "${STATUS_ID:-0}" \
-              '[.[] | select(.id > $statusId) | select(.body | startswith("<!-- auto-plan -->"))] | length')
+          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate --jq \
+            "[.[] | select(.id > ${STATUS_ID:-0}) | select(.body | startswith(\"<!-- auto-plan -->\"))] | length")
 
           SALVAGED=false
           if [ "${PLAN_POSTED:-0}" = "0" ] && [ -s "$PLAN_FILE" ]; then
@@ -1664,9 +1661,8 @@ jobs:
           STATUS_ID: ${{ steps.status.outputs.comment_id }}
         run: |
           set -uo pipefail
-          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
-            --jq --argjson statusId "${STATUS_ID:-0}" \
-              '[.[] | select(.id > $statusId) | select(.body | startswith("<!-- auto-plan -->"))] | length')
+          PLAN_POSTED=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate --jq \
+            "[.[] | select(.id > ${STATUS_ID:-0}) | select(.body | startswith(\"<!-- auto-plan -->\"))] | length")
           if [ "${PLAN_POSTED:-0}" = "0" ]; then
             echo "No plan posted in this run — leaving project status unchanged."
             exit 0
