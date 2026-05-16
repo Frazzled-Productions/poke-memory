@@ -16,6 +16,7 @@ import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
+import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -79,6 +80,14 @@ export default function RootLayout({
             __html: `try{var s=JSON.parse(localStorage.getItem('poke-memory:settings:v1')||'null');if(s){var r=document.documentElement;var h=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;var c=s.favouriteTheme&&s.favouriteTheme.colors;if(c&&h.test(c.primary))r.style.setProperty('--theme-primary',c.primary);if(c&&h.test(c.secondary))r.style.setProperty('--theme-secondary',c.secondary);if(c&&h.test(c.accent))r.style.setProperty('--theme-accent',c.accent);if(c&&h.test(c.fgOnPrimary))r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);var i=s.themeIntensity;if(i==='tinted'||i==='full')r.setAttribute('data-intensity',i);}}catch(e){}`,
           }}
         />
+        {/* Captures beforeinstallprompt synchronously — must run before React hydrates
+            so Chrome's mini-infobar is suppressed. The hook in PwaInstallNudge reads
+            window.__pwaInstallPrompt after hydration. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaInstallPrompt=e;});`,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col">
         <AuthProvider>
@@ -91,6 +100,7 @@ export default function RootLayout({
               </Suspense>
               <SignInPull />
               <AutoSyncOnChange />
+              <PwaInstallNudge />
               {/*
                 MobileNavPaddingWrapper adds bottom padding on mobile only when
                 the bottom tab bar is active, so the fixed bar never overlaps content.
