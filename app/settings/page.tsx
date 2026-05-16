@@ -1706,9 +1706,9 @@ export default function SettingsPage() {
                   id="danger-zone-heading"
                   className="rounded-xl border border-red-200 p-5 dark:border-red-900"
                 >
-                  <p className="text-sm font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
                     Danger zone
-                  </p>
+                  </h3>
                   <div className="mt-4 flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">Reset all progress</p>
