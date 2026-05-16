@@ -1,20 +1,5 @@
 import Image from "next/image";
-import type { ReviewableCard } from "@/lib/review/session";
-
-/**
- * Every sprite URL a card needs to display across its front and reveal
- * faces. name / cry / reverse cards show a single sprite; evolution edges
- * show two (pre- and post-evolution).
- */
-export function cardSpriteUrls(card: ReviewableCard): string[] {
-  switch (card.cardType) {
-    case "evolution":
-    case "reverse-evolution":
-      return [card.preEvoSpriteUrl, card.postEvoSpriteUrl];
-    default:
-      return [card.spriteUrl];
-  }
-}
+import { PRACTICE_SPRITE_SIZE } from "@/lib/review/sprites";
 
 type Props = {
   /** Sprite URLs to warm in the browser cache ahead of display. */
@@ -24,8 +9,8 @@ type Props = {
 /**
  * Off-screen sprite preloader (#705).
  *
- * Renders each URL as a hidden, eagerly-loaded `next/image` with the same
- * `width`/`height` the real practice cards use, so
+ * Renders each URL as a hidden, eagerly-loaded `next/image` at the same
+ * size the real practice flip cards use ({@link PRACTICE_SPRITE_SIZE}), so
  * the browser fetches the exact optimised variant ahead of time. When the
  * real card later mounts an `<Image>` with the same `src`, it is served
  * from cache and appears without the pop-in delay.
@@ -34,23 +19,30 @@ type Props = {
  * not yet on screen, so they should not contend with the visible card's
  * high-priority fetch — they just need to start before the user grades.
  *
+ * The container is a 1px, fully-transparent, non-interactive box: 1px (not
+ * 0px) guarantees a painted area so engines that skip fetches for
+ * zero-area images still load the sprites; `opacity-0` and
+ * `pointer-events-none` keep it invisible and unhittable.
+ *
  * Keyed by URL so a sprite that stays in the preload set across renders
  * keeps its `<img>` mounted and is not refetched.
  */
 export function SpritePreloader({ urls }: Props) {
-  const unique = Array.from(new Set(urls)).filter(Boolean);
+  // Drop empty strings — `next/image` throws on an empty `src`, so a stray
+  // empty sprite URL would crash practice rather than just skip a preload.
+  const unique = Array.from(new Set(urls)).filter((url) => url !== "");
   return (
     <div
-      aria-hidden
-      className="fixed top-0 left-0 w-0 h-0 overflow-hidden"
+      aria-hidden="true"
+      className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
     >
       {unique.map((url) => (
         <Image
           key={url}
           src={url}
           alt=""
-          width={320}
-          height={320}
+          width={PRACTICE_SPRITE_SIZE}
+          height={PRACTICE_SPRITE_SIZE}
           loading="eager"
         />
       ))}

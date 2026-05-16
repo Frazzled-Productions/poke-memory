@@ -6,7 +6,8 @@ import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
-import { SpritePreloader, cardSpriteUrls } from "@/components/review/SpritePreloader";
+import { SpritePreloader } from "@/components/review/SpritePreloader";
+import { preloadableSpriteUrls } from "@/lib/review/sprites";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -912,6 +913,13 @@ export function ReviewSession() {
   // state, so preload the heads of every queue that could resolve next.
   // Two heads are taken from each queue so that at least one look-ahead
   // survives after the current card's ID is excluded.
+  //
+  // Computed inline rather than via useMemo on purpose: reviewQueue,
+  // newQueue and dueLearning are themselves rebuilt on every render (see
+  // buildSessionQueues above), so a useMemo keyed on them would never hit.
+  // The cost is a handful of Set ops and O(1) cardMap lookups, and
+  // SpritePreloader keys its <Image> children by URL, so handing it a fresh
+  // array reference each render triggers no refetch.
   const preloadSpriteUrls: string[] = (() => {
     const ids = new Set<number>();
     for (const id of reviewQueue.slice(0, 2)) ids.add(id);
@@ -922,10 +930,10 @@ export function ReviewSession() {
     const urls: string[] = [];
     // The current card's front face is already on screen; including it here
     // warms its reveal-face sprite (evolution answer / cry sprite).
-    if (effectiveCard !== null) urls.push(...cardSpriteUrls(effectiveCard));
+    if (effectiveCard !== null) urls.push(...preloadableSpriteUrls(effectiveCard));
     for (const id of ids) {
       const c = cardMap.get(id);
-      if (c) urls.push(...cardSpriteUrls(c));
+      if (c) urls.push(...preloadableSpriteUrls(c));
     }
     return urls;
   })();
