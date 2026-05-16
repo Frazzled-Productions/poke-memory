@@ -115,6 +115,58 @@ function stopCurrentAudio(): void {
   }
 }
 
+/**
+ * Returns a Promise that resolves when any in-flight TTS audio finishes.
+ *
+ * Covers two playback paths:
+ *   1. Static MP3 (`_currentAudio`) — waits for `ended` or `error`.
+ *   2. Web Speech API (`speechSynthesis.speaking`) — polls at 50 ms until
+ *      the utterance queue drains, then resolves.
+ *
+ * Resolves immediately when neither path is active. A 5-second safety net
+ * prevents an infinite wait if an event is never dispatched.
+ */
+export function awaitTtsEnd(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+
+  const audioPlaying = _currentAudio !== null && !_currentAudio.paused;
+  const speechPlaying =
+    "speechSynthesis" in window &&
+    (window.speechSynthesis.speaking || window.speechSynthesis.pending);
+
+  if (!audioPlaying && !speechPlaying) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(safetyTimer);
+      clearInterval(pollTimer);
+      resolve();
+    };
+
+    // Safety net — never stall longer than 5 s.
+    const safetyTimer = setTimeout(finish, 5_000);
+
+    if (audioPlaying && _currentAudio !== null) {
+      const captured = _currentAudio;
+      captured.addEventListener("ended", finish, { once: true });
+      captured.addEventListener("error", finish, { once: true });
+    }
+
+    // Poll the speechSynthesis queue. This covers both the Web Speech path
+    // and the case where the MP3 path fell back to speech mid-play.
+    const pollTimer = setInterval(() => {
+      const stillSpeaking =
+        "speechSynthesis" in window &&
+        (window.speechSynthesis.speaking || window.speechSynthesis.pending);
+      const stillAudio = _currentAudio !== null && !_currentAudio.paused;
+      if (!stillSpeaking && !stillAudio) finish();
+    }, 50);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // speakName
 // ---------------------------------------------------------------------------
