@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard } from "@/lib/review/session";
+import type { UserSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
@@ -78,7 +79,10 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     return { ...card, id, name, displayName: displayName ?? name, subjectKey: String(id), spriteUrl: `https://example.com/${name.toLowerCase()}.png` };
   }
 
-  const defaultSettings = {
+  // Partial so individual tests can pass any subset of settings via
+  // mockReturnValue without TS demanding the full UserSettings surface,
+  // while still key-name-checking every field against UserSettings.
+  const defaultSettings: Partial<UserSettings> = {
     masteryRepetitions: 3,
     maxNewPerDay: 10,
     maxReviewsPerDay: 100,
@@ -134,6 +138,16 @@ vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
   saveSettings: vi.fn(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
+  // OnboardingHint imports DEFAULT_ONBOARDING for its dismissal fallback.
+  DEFAULT_ONBOARDING: {
+    welcomeDismissed: false,
+    practiceHintDismissed: false,
+    statsHintDismissed: false,
+    settingsHintDismissed: false,
+    installNudgeDismissed: false,
+    audioHintDismissed: false,
+    cardTypesHintDismissed: false,
+  },
 }));
 
 vi.mock("@/lib/streak", () => ({
@@ -273,6 +287,100 @@ describe("ReviewSession reveal flow", () => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
     );
     expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("ReviewSession onboarding nudges (#702)", () => {
+  it("shows the audio hint at reveal when no audio feature is enabled", async () => {
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    expect(
+      screen.getByText(/hear Pokémon cries and names read aloud/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /open audio settings/i }),
+    ).toHaveAttribute("href", "/settings#audio-heading");
+  });
+
+  it("hides the audio hint when an audio feature is already on", async () => {
+    const user = userEvent.setup();
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: true,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    expect(
+      screen.queryByText(/hear Pokémon cries and names read aloud/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the card-types hint on the session-complete screen", async () => {
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(/reverse cards, reverse-evolution cards/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /open practice settings/i }),
+    ).toHaveAttribute("href", "/settings#practice-heading");
+  });
+
+  it("hides the card-types hint when every card type is already on", async () => {
+    // Empty seed → the session-complete screen renders immediately, so the
+    // hint visibility is driven purely by the card-type settings.
+    mockSeedPokemon.mockReturnValue([]);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: true,
+      reverseEvolutionCardsEnabled: true,
+      alternateFormsEnabled: true,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+    render(<ReviewSession />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText(/reverse cards, reverse-evolution cards/i),
+    ).not.toBeInTheDocument();
   });
 });
 

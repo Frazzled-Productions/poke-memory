@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  DEFAULT_ONBOARDING,
   SETTINGS_SAVED_EVENT,
   loadSettings,
   saveSettings,
@@ -64,12 +65,10 @@ export function OnboardingHint({
 
   function handleDismiss() {
     const settings = loadSettings();
-    const onboarding = settings.onboarding ?? {
-      welcomeDismissed: false,
-      practiceHintDismissed: false,
-      statsHintDismissed: false,
-      settingsHintDismissed: false,
-    };
+    // Defensive: stub-mocked or pre-#433 settings may omit `onboarding`.
+    // DEFAULT_ONBOARDING is the canonical full shape, so spreading from it
+    // keeps any flag added later (e.g. #702) present after a dismissal.
+    const onboarding = settings.onboarding ?? { ...DEFAULT_ONBOARDING };
     saveSettings({
       ...settings,
       onboarding: { ...onboarding, [id]: true },

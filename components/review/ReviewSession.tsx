@@ -237,6 +237,7 @@ function SessionCompleteScreen({
   reverseEnabled,
   shareText,
   dueTomorrow,
+  showCardTypesHint,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
@@ -246,6 +247,12 @@ function SessionCompleteScreen({
   shareText: string | null;
   /** Count of graduated cards whose dueDate falls exactly on tomorrow. 0 hides the teaser. */
   dueTomorrow: number;
+  /**
+   * True when at least one off-by-default card type is still disabled, so the
+   * one-time card-types nudge (#702) is worth showing here. The hint itself
+   * still self-suppresses once dismissed via `OnboardingFlags`.
+   */
+  showCardTypesHint: boolean;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
@@ -260,6 +267,21 @@ function SessionCompleteScreen({
       )}
       <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
       {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
+      {showCardTypesHint && (
+        <div className="w-full max-w-xs text-left">
+          <OnboardingHint
+            id="cardTypesHintDismissed"
+            title="Ready for more variety?"
+            ctaHref="/settings#practice-heading"
+            ctaLabel="Open practice settings"
+          >
+            <p>
+              Try reverse cards, reverse-evolution cards, or alternate-form
+              cards for a fresh challenge.
+            </p>
+          </OnboardingHint>
+        </div>
+      )}
     </div>
   );
 }
@@ -384,6 +406,13 @@ export function ReviewSession() {
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
+  // Onboarding nudges (#702). `audioFeaturesOff` is true when the user has no
+  // audio behaviour switched on at all (no cry playback, no spoken names, no
+  // cry cards) — only then does the audio hint at card reveal make sense.
+  // `cardTypesAllOn` is true when every off-by-default card type is enabled —
+  // when that holds there is nothing left to nudge towards.
+  const [audioFeaturesOff, setAudioFeaturesOff] = useState(false);
+  const [cardTypesAllOn, setCardTypesAllOn] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [grading, setGrading] = useState(false);
   // Transient flag: user chose "Keep reviewing" at the soft wall.
@@ -591,6 +620,15 @@ export function ReviewSession() {
       setNameCardsEnabled(nameEnabled);
       setEvolutionCardsEnabled(evolutionEnabled);
       setAlternateFormsEnabled(formsEnabled);
+      // Onboarding nudges (#702): derive once from the same settings read.
+      setAudioFeaturesOff(
+        !settings.playCryOnReveal &&
+          !settings.speakNameOnReveal &&
+          !cryEnabled,
+      );
+      setCardTypesAllOn(
+        enabled && reverseEvolutionEnabledLocal && formsEnabled,
+      );
       setScope(persistedScope);
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
@@ -1128,6 +1166,7 @@ export function ReviewSession() {
           reverseEnabled={reverseEnabled}
           shareText={shareText}
           dueTomorrow={dueTomorrow}
+          showCardTypesHint={!cardTypesAllOn}
         />
         {seenPokemon.length >= 2 && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />
@@ -1599,6 +1638,19 @@ export function ReviewSession() {
               this to space your next review.
             </p>
           </OnboardingHint>
+          {audioFeaturesOff && (
+            <OnboardingHint
+              id="audioHintDismissed"
+              title="Add sound to your reviews"
+              ctaHref="/settings#audio-heading"
+              ctaLabel="Open audio settings"
+            >
+              <p>
+                Want to hear Pokémon cries and names read aloud? Turn on
+                audio in Settings.
+              </p>
+            </OnboardingHint>
+          )}
           <GradeButtons
             onGrade={handleGrade}
             disabled={grading}

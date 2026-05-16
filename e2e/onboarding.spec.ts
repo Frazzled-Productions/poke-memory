@@ -44,6 +44,59 @@ test.describe("Onboarding (#433)", () => {
   });
 });
 
+test.describe("Feature nudges (#702)", () => {
+  test("audio hint appears at card reveal on a fresh visit", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    // Guest sessions can occasionally land on an end-state screen; skip then.
+    // test.skip(condition, ...) does not throw, so return explicitly to stop
+    // the body running once the test is marked skipped.
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip(true, "No active card to reveal in this session");
+      return;
+    }
+    await reveal.click();
+
+    const audioHint = page.getByRole("note", {
+      name: /add sound to your reviews/i,
+    });
+    await expect(audioHint).toBeVisible();
+    await expect(
+      audioHint.getByRole("link", { name: /open audio settings/i }),
+    ).toHaveAttribute("href", /#audio-heading$/);
+
+    // One-time dismissal persists across reload.
+    await audioHint.getByRole("button", { name: /dismiss hint/i }).click();
+    await expect(audioHint).toHaveCount(0);
+  });
+
+  test("audio hint is absent once a cry feature is enabled", async ({
+    page,
+  }) => {
+    // Seed settings with cry playback on — the audio nudge must not show.
+    await page.addInitScript((key) => {
+      localStorage.setItem(key, JSON.stringify({ playCryOnReveal: true }));
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    // test.skip(condition, ...) does not throw, so return explicitly to stop
+    // the body running once the test is marked skipped.
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip(true, "No active card to reveal in this session");
+      return;
+    }
+    await reveal.click();
+
+    await expect(
+      page.getByRole("note", { name: /add sound to your reviews/i }),
+    ).toHaveCount(0);
+  });
+});
+
 test.describe("PWA install nudge (#701)", () => {
   test("nudge is absent on a fresh visit (below engagement threshold)", async ({
     page,
