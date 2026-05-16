@@ -29,6 +29,13 @@ export function Footer() {
           Privacy
         </Link>
         <span aria-hidden="true">·</span>
+        <Link
+          href="/terms"
+          className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+        >
+          Terms
+        </Link>
+        <span aria-hidden="true">·</span>
         <span className="font-mono">v{APP_VERSION}</span>
       </div>
       <p className="mx-auto max-w-5xl px-4 pb-3 text-center text-xs text-zinc-400 dark:text-zinc-500">

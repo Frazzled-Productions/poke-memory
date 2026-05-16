@@ -656,6 +656,28 @@ export default function PrivacyPage() {
           </p>
         </section>
 
+        {/* Cross-link to Terms of Use */}
+        <section aria-labelledby="section-terms-link">
+          <h2
+            id="section-terms-link"
+            className="mb-3 text-base font-semibold"
+          >
+            14. Terms of Use
+          </h2>
+          <p>
+            For the terms that govern use of the hosted service — including
+            disclaimers, liability limitations, acceptable use, and governing
+            law — see the{" "}
+            <a
+              href="/terms"
+              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+            >
+              Terms of Use
+            </a>
+            .
+          </p>
+        </section>
+
       </div>
     </main>
   );
