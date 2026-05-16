@@ -217,12 +217,12 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
           )}
           {lastResult === "tie" && (
             <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-              Equal — both count.
+              Equal, both count.
             </p>
           )}
           {lastResult === "wrong" && (
             <p className="text-sm font-medium text-red-500 dark:text-red-400">
-              Game over — streak of {streak}!
+              Game over! Streak of {streak}.
             </p>
           )}
 

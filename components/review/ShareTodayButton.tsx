@@ -57,7 +57,7 @@ export function ShareTodayButton({ text }: Props) {
       ) : null}
       {status === "error" ? (
         <p className="text-xs text-rose-600 dark:text-rose-400" role="status">
-          Couldn&apos;t copy — please try again.
+          Couldn&apos;t copy. Please try again.
         </p>
       ) : null}
     </div>

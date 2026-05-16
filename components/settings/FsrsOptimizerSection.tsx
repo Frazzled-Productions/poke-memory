@@ -90,7 +90,7 @@ export function FsrsOptimizerSection({
               : 7;
           setErrorMsg(`Try again in ${days} day${days === 1 ? "" : "s"}.`);
         } else {
-          setErrorMsg("Couldn't optimize — try again later.");
+          setErrorMsg("Couldn't optimize. Try again later.");
         }
         return;
       }
@@ -111,7 +111,7 @@ export function FsrsOptimizerSection({
       onOptimized(data.optimizedAt, data.weights);
     } catch {
       setOptimizerState("error");
-      setErrorMsg("Couldn't optimize — try again later.");
+      setErrorMsg("Couldn't optimize. Try again later.");
     }
   }
 

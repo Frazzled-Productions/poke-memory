@@ -22,7 +22,7 @@ const OPTIONS: Option[] = [
   {
     value: "full",
     label: "Full mascot theme",
-    description: "Your mascot colour drives all backgrounds — loud by design.",
+    description: "Your mascot colour drives all backgrounds: loud by design.",
   },
 ];
 

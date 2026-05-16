@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Use — Poké Memory",
+  title: "Terms of Use - Poké Memory",
   description:
     "The terms under which Poké Memory is provided at pokememory.com.",
 };
@@ -41,7 +41,7 @@ export default function TermsPage() {
           </p>
           <p className="mt-3">
             These Terms govern use of the hosted service only. The underlying
-            source code is separately licensed under the MIT Licence — see the{" "}
+            source code is separately licensed under the MIT Licence; see the{" "}
             <a
               href="https://github.com/frasercl/poke-memory/blob/main/LICENSE"
               target="_blank"
@@ -98,7 +98,7 @@ export default function TermsPage() {
             Postgres. We make reasonable efforts to maintain that data, but we
             do not provide any guarantee of availability or durability. In
             particular, <strong>there is currently no point-in-time backup
-            (PITR) in place for this project</strong> — a destructive operation
+            (PITR) in place for this project</strong>: a destructive operation
             or database failure could result in permanent data loss. We will not
             be liable for any such loss.
           </p>
@@ -120,7 +120,7 @@ export default function TermsPage() {
             To the fullest extent permitted by law, Frazzled Productions shall
             not be liable for any indirect, incidental, special, consequential,
             or punitive damages arising from your use of, or inability to use,
-            the Service — including but not limited to loss of data, loss of
+            the Service, including but not limited to loss of data, loss of
             progress, or loss of access. Our total aggregate liability to you
             for any claim arising out of these Terms or your use of the Service
             shall not exceed the maximum extent permitted by applicable law.
@@ -157,7 +157,7 @@ export default function TermsPage() {
               >
                 PokéAPI
               </a>
-              {" "}— please use that source directly.
+              {" "}- please use that source directly.
             </li>
             <li>
               Deliberately overload, disrupt, or degrade the performance of the

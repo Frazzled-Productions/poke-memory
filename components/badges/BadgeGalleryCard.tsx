@@ -13,7 +13,7 @@ type Props = {
  * badge's `lockedHint` text in place of the description — evocative but
  * non-spoiler.
  *
- * Accessibility: the accessible name is "${name} — earned" or
+ * Accessibility: the accessible name is "${name}, earned" or
  * "${name} (locked): ${hint}" so screen readers always have the badge name
  * to anchor on, regardless of lock state.
  */
@@ -21,7 +21,7 @@ export function BadgeGalleryCard({ badge, earned }: Props) {
   if (earned) {
     return (
       <li
-        aria-label={`${badge.name} — earned`}
+        aria-label={`${badge.name}, earned`}
         className="flex flex-col items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center dark:border-amber-800/60 dark:bg-amber-950/30"
       >
         <span

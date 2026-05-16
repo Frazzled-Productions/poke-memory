@@ -135,7 +135,7 @@ export default function CallbackCompletePage() {
           failedCardCount: ok ? 0 : null,
         });
         if (!ok && !cancelled) {
-          setStatus({ kind: "push-warning", message: "Sync upload failed — your progress is safe locally." });
+          setStatus({ kind: "push-warning", message: "Sync upload failed. Your progress is safe locally." });
           return;
         }
         if (!cancelled) router.replace("/");
@@ -306,7 +306,7 @@ export default function CallbackCompletePage() {
         failedCardCount: cardsOk ? 0 : null,
       });
       if (!cardsOk) {
-        setStatus({ kind: "push-warning", message: "Sync failed — your progress is safe locally." });
+        setStatus({ kind: "push-warning", message: "Sync failed. Your progress is safe locally." });
         return;
       }
       router.replace("/");
@@ -388,7 +388,7 @@ export default function CallbackCompletePage() {
         <h1 className="text-2xl font-bold text-foreground text-center">Sync conflict</h1>
         <p className="mt-2 text-center text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
           You have progress on this device and in the cloud. Picking a side replaces
-          the other for all synced data — cards, settings, streak, and grade history.
+          the other for all synced data: cards, settings, streak, and grade history.
         </p>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SideCard

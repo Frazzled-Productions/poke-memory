@@ -305,7 +305,7 @@ function ReviewSoftWallScreen({
     <div className="flex flex-col items-center gap-6 text-center">
       <p className="text-2xl font-semibold text-foreground">Daily review limit reached</p>
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-        You have hit a daily review cap. More cards are due — keep going?
+        You have hit a daily review cap. More cards are due. Keep going?
       </p>
       <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
       <div className="flex flex-wrap justify-center gap-3">
@@ -346,7 +346,7 @@ function NewCardsLockedScreen({
     <div className="flex flex-col items-center gap-4 text-center">
       <p className="text-2xl font-semibold text-foreground">New cards locked for today</p>
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-        You have hit a daily new-card cap. Come back tomorrow for more — keeping
+        You have hit a daily new-card cap. Come back tomorrow for more; keeping
         this limit prevents tomorrow&apos;s review pile from growing too large.
       </p>
       <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
@@ -388,7 +388,7 @@ function CountdownScreen({
         {formatCountdown(remaining)}
       </p>
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-        Hang tight — a learning card will be ready shortly.
+        Hang tight, a learning card will be ready shortly.
       </p>
       <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
     </div>
@@ -1592,9 +1592,9 @@ export function ReviewSession() {
           <>
             <OnboardingHint id="practiceHintDismissed" title="How to grade">
               <p>
-                <strong>Again</strong> — forgot. <strong>Hard</strong> —
-                struggled. <strong>Good</strong> — recalled with effort.{" "}
-                <strong>Easy</strong> — instant. Grade honestly; FSRS uses
+                <strong>Again</strong>: forgot. <strong>Hard</strong>:
+                struggled. <strong>Good</strong>: recalled with effort.{" "}
+                <strong>Easy</strong>: instant. Grade honestly; FSRS uses
                 this to space your next review.
               </p>
             </OnboardingHint>
@@ -1740,9 +1740,9 @@ export function ReviewSession() {
         <>
           <OnboardingHint id="practiceHintDismissed" title="How to grade">
             <p>
-              <strong>Again</strong> — forgot. <strong>Hard</strong> —
-              struggled. <strong>Good</strong> — recalled with effort.{" "}
-              <strong>Easy</strong> — instant. Grade honestly; FSRS uses
+              <strong>Again</strong>: forgot. <strong>Hard</strong>:
+              struggled. <strong>Good</strong>: recalled with effort.{" "}
+              <strong>Easy</strong>: instant. Grade honestly; FSRS uses
               this to space your next review.
             </p>
           </OnboardingHint>

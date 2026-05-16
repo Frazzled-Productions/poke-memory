@@ -93,7 +93,7 @@ export function PwaInstallNudge() {
         {installState.platform === "android" ? (
           <>
             <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-              Add to your home screen for quick access — no app store needed.
+              Add to your home screen for quick access, no app store needed.
             </p>
             <button
               type="button"

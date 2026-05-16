@@ -189,6 +189,13 @@ All prose written for this project — code comments, commit messages, PR descri
 - **Out of scope**: identifiers from external APIs and standards — CSS (`color`, `text-align: center`), JS/DOM (`Intl.DateTimeFormat`), React props (`onColorChange`), PokéAPI fields, FSRS (`optimizer`), Supabase column names already shipped. Renaming those breaks integrations for no benefit.
 - **Internal identifiers**: prefer British (`colour`, `behaviour`) for new code, but don't churn existing identifiers — too noisy, too risky for sync/migration code.
 
+### Punctuation
+
+Do not use em dashes (`—`) in user-facing copy. Restructure the sentence, or replace with a comma, colon, parentheses, or a spaced hyphen (` - `), whichever reads best.
+
+- **In scope**: rendered UI text, button/label text, ARIA labels, `alt` text, `placeholder`/`title` attributes, error messages, page metadata (`<title>`/description), and `CHANGELOG.md` plus `changelog.d/` fragments (fragments become user-visible when a release is cut).
+- **Out of scope**: code comments, commit messages, and developer docs (`AGENTS.md`, `README.md`, `docs/**`, etc.) may keep em dashes.
+
 ### Screenshots
 
 The README shows five screenshots (`docs/screenshots/{practice-front,practice-flipped,pokedex-grid,pasture,stats}.png`), all captured at the **iPhone 17 Pro viewport** (402×874 CSS px @ 3× DPR) so the README grid lines up uniformly. The capture script is `scripts/capture-screenshots.mjs`, wrapped as `npm run screenshots`.

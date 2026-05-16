@@ -10,13 +10,13 @@ export default function ChildFriendlySummary() {
         id="plain-language-heading"
         className="mb-4 text-lg font-semibold"
       >
-        In plain language — what does Poké Memory do with your data?
+        In plain language: what does Poké Memory do with your data?
       </h2>
       <ol className="list-decimal space-y-3 pl-5 leading-relaxed text-zinc-800 dark:text-zinc-200">
         <li>
           <strong>Just playing (no sign-in).</strong> When you play without
           signing in, the app saves your Pokémon progress only on your own
-          device — nothing is sent to us or stored anywhere on the internet.
+          device, and nothing is sent to us or stored anywhere on the internet.
         </li>
         <li>
           <strong>Signing in.</strong> If you sign in with a GitHub or Google
@@ -27,7 +27,7 @@ export default function ChildFriendlySummary() {
         <li>
           <strong>What we save.</strong> We only save which Pokémon cards
           you&rsquo;ve practised, how well you know them, and when you last
-          practised — nothing else. We don&rsquo;t know your name, your
+          practised, and nothing else. We don&rsquo;t know your name, your
           address, or anything about you as a person.
         </li>
         <li>
@@ -50,7 +50,7 @@ export default function ChildFriendlySummary() {
           >
             reset all progress
           </Link>{" "}
-          at any time from the Settings page. You don&rsquo;t need to ask us —
+          at any time from the Settings page. You don&rsquo;t need to ask us;
           you can do it yourself, right now.
         </li>
       </ol>

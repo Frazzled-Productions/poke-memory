@@ -5,7 +5,7 @@ import { ReviewSession } from "@/components/review/ReviewSession";
 import { StreakBadge } from "@/components/review/StreakBadge";
 
 export const metadata: Metadata = {
-  title: "Poké Memory — Learn every Pokémon",
+  title: "Poké Memory - Learn every Pokémon",
   description:
     "Free spaced-repetition flashcards for learning all 1025 Pokémon names and evolutions. No sign-up required.",
 };
@@ -50,7 +50,7 @@ export default function Home({
             ctaLabel="How this works"
           >
             Learn every Pokémon&apos;s name and evolutions with spaced
-            repetition. Grade honestly — the app shows each card right before
+            repetition. Grade honestly: the app shows each card right before
             you&apos;d likely forget it, so gaps grow as you remember.
           </OnboardingHint>
         </div>

@@ -301,7 +301,7 @@ export function ScopeControl({ scope, onChange, alternateFormsEnabled = false }:
             </p>
             {active ? (
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Hidden cards are paused — their review dates shift forward by the time
+                Hidden cards are paused: their review dates shift forward by the time
                 they&apos;re hidden, so removing the scope won&apos;t flood your queue with overdue
                 reviews.
               </p>
