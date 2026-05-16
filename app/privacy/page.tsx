@@ -12,7 +12,7 @@ export default function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          Last updated: 15 May 2026
+          Last updated: 16 May 2026
         </p>
       </header>
 
