@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ChildFriendlySummary from "@/components/privacy/ChildFriendlySummary";
 
 export const metadata: Metadata = {
   title: "Privacy Notice — Poké Memory",
@@ -17,6 +18,8 @@ export default function PrivacyPage() {
       </header>
 
       <div className="space-y-10 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+
+        <ChildFriendlySummary />
 
         {/* 1. Controller */}
         <section aria-labelledby="section-controller">
@@ -587,8 +590,10 @@ export default function PrivacyPage() {
             Poké Memory is not directed at children under the age of 13. We do
             not knowingly collect personal data from under-13s. If you are
             under 13, please do not sign in — use guest mode instead, which
-            stores nothing outside your own device. If you believe a child
-            under 13 has signed in, please contact us at{" "}
+            stores nothing outside your own device. For a plain-language
+            version of this notice suited to younger readers, see the summary
+            above. If you believe a child under 13 has signed in, please
+            contact us at{" "}
             <a
               href="mailto:fbrookhouse@gmail.com"
               className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
