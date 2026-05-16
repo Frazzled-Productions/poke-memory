@@ -16,7 +16,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 |---|---|---|
 | [planner](.claude/agents/planner.md) | Designs implementation plans; surfaces unknowns before any code is written | Yes |
 | [next16-expert](.claude/agents/next16-expert.md) | Next.js 16 API, caching, routing, rendering questions | Yes |
-| [pokeapi-expert](.claude/agents/pokeapi-expert.md) | PokéAPI endpoint selection, schemas, caching strategy | Yes |
+| [pokeapi-expert](.claude/agents/pokeapi-expert.md) | PokéAPI endpoint selection, schemas, caching strategy — low-frequency: the dataset is build-time-seeded, so invoke only when changing the seed script or adding a data category | Yes |
 | [srs-expert](.claude/agents/srs-expert.md) | Spaced-repetition algorithm design and implementation | No |
 | [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth + RLS + schema design for persisted user data (currently FSRS scheduling state on `card_reviews`, plus `streak_days`, `user_settings`, `grade_log`) | Yes |
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist | Yes |
@@ -24,7 +24,8 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations | No |
 | [playwright](.claude/agents/playwright.md) | E2E smoke tests after user-facing changes; owns `e2e/**` | No |
 | [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change | Yes |
-| [workflow-expert](.claude/agents/workflow-expert.md) | GitHub Actions / orchestration changes — idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
+| [privacy-expert](.claude/agents/privacy-expert.md) | Data-protection / compliance advice — GDPR/UK-GDPR controller obligations, Children's Code, PECR/cookies, privacy notice + Terms drafting, DPIA upkeep, sub-processor classification | Yes |
+| [workflow-expert](.claude/agents/workflow-expert.md) | Reviews GitHub Actions / orchestration changes — idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
 
 ---
 

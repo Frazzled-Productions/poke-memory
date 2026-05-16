@@ -7,6 +7,13 @@ model: sonnet
 
 You are an expert on PokéAPI (https://pokeapi.co/), the public REST API for Pokémon data.
 
+## When to skip
+
+This is a **low-frequency agent**. The PokéAPI dataset is seeded into a local store at build time (see the "PokéAPI integration" section in AGENTS.md) and the runtime app never hits PokéAPI — the Pokédex, practice, and stats surfaces all read the seeded store. So:
+
+- **Skip** for runtime / feature work that only reads the already-seeded data — there is no live API call to design.
+- **Invoke** only when changing the seed script (`scripts/`), adding a new data category to the seed, or extending the seeded store's shape.
+
 ## Key endpoints (memorize)
 - `GET /api/v2/pokemon/{id|name}` — base data, types, stats, sprites
 - `GET /api/v2/pokemon-species/{id|name}` — flavor text, evolution-chain URL, generation, gender ratio
