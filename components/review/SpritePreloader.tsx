@@ -25,7 +25,7 @@ type Props = {
  * Off-screen sprite preloader (#705).
  *
  * Renders each URL as a hidden, eagerly-loaded `next/image` with the same
- * `width`/`height` (and default quality) the real practice cards use, so
+ * `width`/`height` the real practice cards use, so
  * the browser fetches the exact optimised variant ahead of time. When the
  * real card later mounts an `<Image>` with the same `src`, it is served
  * from cache and appears without the pop-in delay.
@@ -42,12 +42,7 @@ export function SpritePreloader({ urls }: Props) {
   return (
     <div
       aria-hidden
-      style={{
-        position: "absolute",
-        width: 0,
-        height: 0,
-        overflow: "hidden",
-      }}
+      className="fixed top-0 left-0 w-0 h-0 overflow-hidden"
     >
       {unique.map((url) => (
         <Image

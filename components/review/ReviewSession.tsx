@@ -488,6 +488,11 @@ export function ReviewSession() {
     [cards],
   );
 
+  const cardMap = useMemo(
+    () => new Map(cards !== null ? cards.map((c) => [c.id, c]) : []),
+    [cards],
+  );
+
   useEffect(() => {
     async function load() {
       const settings = loadSettings();
@@ -904,9 +909,9 @@ export function ReviewSession() {
   // Warm the browser cache for the current card's reveal-face sprite(s) and
   // the sprites of whatever cards are likely to come next, so neither pops
   // in on grade/reveal. The exact next card depends on how grading mutates
-  // state, so preload the heads of every queue that could resolve next —
-  // two deep, to cover the card *after* the current one when the current
-  // card is itself a queue head.
+  // state, so preload the heads of every queue that could resolve next.
+  // Two heads are taken from each queue so that at least one look-ahead
+  // survives after the current card's ID is excluded.
   const preloadSpriteUrls: string[] = (() => {
     const ids = new Set<number>();
     for (const id of reviewQueue.slice(0, 2)) ids.add(id);
@@ -919,7 +924,7 @@ export function ReviewSession() {
     // warms its reveal-face sprite (evolution answer / cry sprite).
     if (effectiveCard !== null) urls.push(...cardSpriteUrls(effectiveCard));
     for (const id of ids) {
-      const c = cards.find((x) => x.id === id);
+      const c = cardMap.get(id);
       if (c) urls.push(...cardSpriteUrls(c));
     }
     return urls;
