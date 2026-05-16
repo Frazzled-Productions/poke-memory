@@ -1,14 +1,26 @@
+/**
+ * Remove the ♀ (U+2640) and ♂ (U+2642) decorative gender symbols from a
+ * Pokémon display name and collapse any resulting extra whitespace. Only those
+ * two code points are stripped — apostrophes, accents (é), %, and parentheses
+ * are intentionally preserved so that overrides for names like Farfetch’d
+ * continue to work.
+ */
+export function stripDecorativeSymbols(name: string): string {
+  return name.replace(/[♀♂]/g, "").replace(/\s+/g, " ").trim();
+}
+
 // Phonetic overrides for the Web Speech API "Hear name" button. Keys are
 // lower-cased Pokémon display names; values are respellings that the default
-// en-GB system voices (Apple's Daniel on macOS/iOS, Google UK English on
+// en-GB system voices (Apple’s Daniel on macOS/iOS, Google UK English on
 // Chrome/Android) pronounce noticeably better than the raw name. The list is
 // deliberately conservative — only entries whose default rendering is clearly
 // wrong are worth carrying.
+//
+// NOTE: ♀/♂ symbols are stripped by stripDecorativeSymbols() before this
+// lookup, so "Nidoran♀" → "Nidoran" → no override needed here.
 const OVERRIDES: Record<string, string> = {
   // Orthographic curveballs: hyphens, apostrophes, accents, special glyphs,
   // missing letters. The synth otherwise parses these as separators / errors.
-  "nidoran♀": "nidoran female",
-  "nidoran♂": "nidoran male",
   "farfetch’d": "farfetched",
   "farfetch'd": "farfetched",
   "sirfetch’d": "sir fetched",
@@ -208,6 +220,7 @@ const OVERRIDES: Record<string, string> = {
 };
 
 export function pronunciationFor(name: string): string {
-  const override = OVERRIDES[name.toLowerCase()];
-  return override ?? name;
+  const stripped = stripDecorativeSymbols(name);
+  const override = OVERRIDES[stripped.toLowerCase()];
+  return override ?? stripped;
 }

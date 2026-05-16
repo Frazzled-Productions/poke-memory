@@ -30,7 +30,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
   }, []);
 
   function handlePreview() {
-    speakName("Bulbasaur", { ttsVoice, ttsRate, ttsVolume });
+    speakName("Bulbasaur", null, { ttsVoice, ttsRate, ttsVolume });
   }
 
   return (

@@ -127,6 +127,64 @@ test.describe("Practice page", () => {
     await expect(page.getByRole("button", { name: "Hear Bulbasaur" })).toBeVisible();
   });
 
+  test("Hear name button on practice card is clickable without page error (#435)", async ({ page }) => {
+    // Smoke-level guard: clicking the speaker button on a revealed name card must
+    // not produce an uncaught page exception. speakName tries /audio/names/1.mp3
+    // first and falls back to Web Speech on error, so a 404 on the preview
+    // deployment is not a failure.
+    const pageErrors: Error[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err));
+
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await reveal.click();
+
+    const hearBtn = page.getByRole("button", { name: "Hear Bulbasaur" });
+    await expect(hearBtn).toBeVisible();
+    await hearBtn.click();
+
+    // Brief pause to let any async rejection surface.
+    await page.waitForTimeout(300);
+    expect(pageErrors).toHaveLength(0);
+  });
+
   test("Hear name buttons appear on an evolution card (prompt + answer)", async ({ page }) => {
     // Seed an evolution card (Bulbasaur → Ivysaur, edgeId 1500001). hydrateSession
     // refreshes the per-side names/sprites from the seed; we only need cardType,

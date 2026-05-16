@@ -100,15 +100,45 @@ export function getPreferredVoice(): SpeechSynthesisVoice | null {
   return preferredVoice;
 }
 
-export function speakName(name: string, overrides?: { ttsVoice?: string | null; ttsRate?: number; ttsVolume?: number }): void {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+// ---------------------------------------------------------------------------
+// Audio element — static MP3 path
+// ---------------------------------------------------------------------------
 
-  initVoices();
+// Tracks the currently-playing Audio element so we can stop it before
+// starting a new one, mirroring the speechSynthesis.cancel() guard.
+let _currentAudio: HTMLAudioElement | null = null;
 
-  // Chrome bug (crbug.com/335907): cancel() + speak() in the same tick silently no-ops.
-  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) window.speechSynthesis.cancel();
-  // Read settings synchronously (before setTimeout) so the call captures the
-  // state at the moment speakName is invoked — avoids a stale closure.
+function stopCurrentAudio(): void {
+  if (_currentAudio !== null) {
+    _currentAudio.pause();
+    _currentAudio = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// speakName
+// ---------------------------------------------------------------------------
+
+/**
+ * Speak a Pokémon name aloud.
+ *
+ * When `id` is a number and `Audio` is available in this environment, the
+ * pre-generated static MP3 at `/audio/names/<id>.mp3` is played via an Audio
+ * element. On any playback error (missing file, decode failure, rejected
+ * promise) the function falls back to the Web Speech API path.
+ *
+ * When `id` is null/undefined, the Web Speech API path is used directly —
+ * no regression from the prior behaviour.
+ *
+ * Settings (`ttsRate`, `ttsVolume`, `ttsVoice`) resolve from the `overrides`
+ * parameter when provided, otherwise from `loadSettings()`.
+ */
+export function speakName(
+  name: string,
+  id?: number | null,
+  overrides?: { ttsVoice?: string | null; ttsRate?: number; ttsVolume?: number },
+): void {
+  // Resolve settings synchronously — captures state at call time, avoids stale closure.
   let resolvedSettings: { ttsVoice: string | null; ttsRate: number; ttsVolume: number };
   if (overrides !== undefined) {
     resolvedSettings = { ttsVoice: overrides.ttsVoice ?? null, ttsRate: overrides.ttsRate ?? 1, ttsVolume: overrides.ttsVolume ?? 1 };
@@ -122,6 +152,59 @@ export function speakName(name: string, overrides?: { ttsVoice?: string | null; 
     }
   }
   const { ttsVoice, ttsRate, ttsVolume } = resolvedSettings;
+
+  // ---------------------------------------------------------------------------
+  // Audio element path — used when a numeric id is supplied and Audio exists.
+  // ---------------------------------------------------------------------------
+  if (typeof id === "number" && typeof Audio !== "undefined") {
+    stopCurrentAudio();
+    // Also cancel any in-flight Web Speech utterance.
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+      }
+    }
+
+    const audio = new Audio(`/audio/names/${id}.mp3`);
+    audio.playbackRate = ttsRate;
+    audio.volume = ttsVolume;
+    _currentAudio = audio;
+
+    const fallbackToSpeech = (): void => {
+      // Only fall back if this element is still the active one (i.e. a
+      // subsequent speakName call hasn't already superseded it).
+      if (_currentAudio === audio) _currentAudio = null;
+      speakNameViaSpeech(name, ttsVoice, ttsRate, ttsVolume);
+    };
+
+    audio.addEventListener("error", fallbackToSpeech, { once: true });
+
+    audio.play().catch(() => {
+      fallbackToSpeech();
+    });
+
+    return;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Web Speech API path — no id supplied, or Audio unavailable.
+  // ---------------------------------------------------------------------------
+  speakNameViaSpeech(name, ttsVoice, ttsRate, ttsVolume);
+}
+
+function speakNameViaSpeech(
+  name: string,
+  ttsVoice: string | null,
+  ttsRate: number,
+  ttsVolume: number,
+): void {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+  initVoices();
+
+  // Chrome bug (crbug.com/335907): cancel() + speak() in the same tick silently no-ops.
+  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) window.speechSynthesis.cancel();
+
   setTimeout(() => {
     const utterance = new SpeechSynthesisUtterance(pronunciationFor(name));
     utterance.lang = "en-GB";

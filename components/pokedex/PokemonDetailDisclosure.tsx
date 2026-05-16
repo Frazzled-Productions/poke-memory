@@ -177,7 +177,7 @@ function FormBlock({ form }: { form: SeedPokemon }) {
 
         {/* Audio buttons */}
         <div className="flex justify-center gap-2">
-          <NameTtsButton name={form.displayName} />
+          <NameTtsButton name={form.displayName} id={form.id} />
           <CryButton cryUrl={form.cryUrl} label={form.displayName} />
         </div>
       </div>
@@ -238,7 +238,7 @@ export function PokemonDetailDisclosure({
         ) : (
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">{name}</h1>
-            <NameTtsButton name={pokemon.displayName ?? name} />
+            <NameTtsButton name={pokemon.displayName ?? name} id={pokemon.id} />
             <CryButton cryUrl={pokemon.cryUrl} label={pokemon.displayName ?? name} />
           </div>
         )}
