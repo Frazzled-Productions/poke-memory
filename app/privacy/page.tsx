@@ -293,24 +293,28 @@ export default function PrivacyPage() {
           </div>
         </section>
 
-        {/* 6. Sub-processors */}
+        {/* 6. Sub-processors and third-party sign-in services */}
         <section aria-labelledby="section-subprocessors">
           <h2
             id="section-subprocessors"
             className="mb-3 text-base font-semibold"
           >
-            6. Sub-processors
+            6. Sub-processors and third-party sign-in services
           </h2>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            Sub-processors (DPA in place)
+          </h3>
           <p className="mb-3">
-            We use the following third-party sub-processors. We have a data
-            processing agreement in place with each.
+            The following companies process personal data on our behalf as data
+            processors. We have a data processing agreement in place with each.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-xs">
               <thead>
                 <tr className="border-b border-zinc-200 dark:border-zinc-700">
                   <th className="pb-2 pr-4 font-semibold text-zinc-600 dark:text-zinc-400">
-                    Sub-processor
+                    Processor
                   </th>
                   <th className="pb-2 pr-4 font-semibold text-zinc-600 dark:text-zinc-400">
                     Role
@@ -340,6 +344,41 @@ export default function PrivacyPage() {
                     log, settings, and auth session (authenticated users only)
                   </td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3">
+            Row-Level Security in Supabase ensures each user can only read and
+            write their own rows.
+          </p>
+
+          <h3 className="mb-1 mt-6 font-semibold text-zinc-700 dark:text-zinc-300">
+            Third-party sign-in services
+          </h3>
+          <p className="mb-3">
+            When you sign in via GitHub or Google, that provider processes the
+            authentication interaction as an <strong>independent controller</strong> under its own terms of service and privacy
+            policy — not as our processor. We do not have a
+            controller-to-processor DPA with these providers, and we do not
+            instruct or control how they handle their side of the
+            authentication flow.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                  <th className="pb-2 pr-4 font-semibold text-zinc-600 dark:text-zinc-400">
+                    Provider
+                  </th>
+                  <th className="pb-2 pr-4 font-semibold text-zinc-600 dark:text-zinc-400">
+                    Role
+                  </th>
+                  <th className="pb-2 font-semibold text-zinc-600 dark:text-zinc-400">
+                    Data shared at sign-in
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 <tr>
                   <td className="py-2 pr-4 font-medium">GitHub (OAuth)</td>
                   <td className="py-2 pr-4">
@@ -352,7 +391,7 @@ export default function PrivacyPage() {
                     provider returns a profile (typically email and display
                     name) to Supabase Auth, which holds it on your account
                     record for authentication. Our own review-history tables
-                    store only the opaque user identifier
+                    store only the opaque user identifier.
                   </td>
                 </tr>
                 <tr>
@@ -367,15 +406,33 @@ export default function PrivacyPage() {
                     provider returns a profile (typically email and display
                     name) to Supabase Auth, which holds it on your account
                     record for authentication. Our own review-history tables
-                    store only the opaque user identifier
+                    store only the opaque user identifier.
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p className="mt-3">
-            Row-Level Security in Supabase ensures each user can only read and
-            write their own rows.
+            For details on how each provider handles the authentication
+            interaction, see the{" "}
+            <a
+              href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+            >
+              GitHub Privacy Statement
+            </a>
+            {" "}and the{" "}
+            <a
+              href="https://policies.google.com/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+            >
+              Google Privacy Policy
+            </a>
+            .
           </p>
         </section>
 
@@ -388,12 +445,14 @@ export default function PrivacyPage() {
             7. International transfers
           </h2>
           <p>
-            Vercel, Supabase, and — if you choose to sign in with it — GitHub
-            or Google may process data outside the UK / EEA. Each operates
-            under the EU Standard Contractual Clauses (SCCs) as the transfer
-            mechanism, providing equivalent safeguards to those required under
-            UK GDPR via the UK International Data Transfer Agreement (IDTA)
-            addendum.
+            The third-party services listed in §6 — Vercel, Supabase, and (if
+            you choose to sign in) GitHub or Google — may process data outside
+            the UK / EEA. Vercel and Supabase (our sub-processors) operate
+            under the EU Standard Contractual Clauses (SCCs), providing
+            equivalent safeguards via the UK International Data Transfer
+            Agreement (IDTA) addendum. GitHub and Google act as independent
+            controllers under their own applicable transfer mechanisms,
+            including their own published SCCs with end-users.
           </p>
         </section>
 
