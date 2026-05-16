@@ -6,6 +6,21 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.65] — 2026-05-16
+
+### Added
+
+- Added a self-serve "Delete account" action in Settings that erases all cloud and local data.
+- Added a Terms of Use page, linked from the footer and cross-linked with the privacy notice.
+- Adds a dismissible "Add to Home Screen" nudge shown after three visits on browsers that support PWA install.
+- Added one-time contextual hints pointing new users to off-by-default audio and card-type features.
+
+### Fixed
+
+- Corrected the privacy notice sub-processor section: the “DPA in place” claim now applies only to Vercel and Supabase (true processors); GitHub and Google OAuth providers are now described as independent controllers, not sub-processors.
+- Fixed a brief name/sprite mismatch when advancing pairs in the Higher or Lower mini-game.
+- Fixed residual sprite pop-in when advancing to the next card in practice.
+
 ## [0.9.64] — 2026-05-16
 
 ### Added
@@ -1035,7 +1050,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.64...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.65...HEAD
+[0.9.65]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.65
 [0.9.64]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.64
 [0.9.63]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.63
 [0.9.62]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.62
