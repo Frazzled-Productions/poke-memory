@@ -37,6 +37,7 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 | SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
 | Supabase schema / RLS | supabase-expert designs; data-coder implements |
+| Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
 | `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
 | `e2e/**` | playwright |
 | `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
