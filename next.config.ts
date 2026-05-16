@@ -1,5 +1,12 @@
 import type { NextConfig } from "next";
 import pkg from "./package.json";
+import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
+
+// SECURITY: fail the build loudly if the test-only mock-auth seam (issue #751)
+// is enabled in a production build. The seam is already inert in production
+// (isMockAuthEnabled() short-circuits on NODE_ENV), so this is defence-in-depth
+// — it turns a silent misconfiguration into a hard build failure.
+assertMockAuthNotInProduction();
 
 const nextConfig: NextConfig = {
   cacheComponents: true,

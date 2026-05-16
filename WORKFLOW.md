@@ -131,7 +131,31 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | **What it does** | Installs chromium + webkit, runs Playwright smoke tests against the Vercel preview URL (`deployment_status.target_url`), uploads the HTML report as an artifact (14-day retention) |
 | **Required check** | No — non-blocking. Promote to required once flake rate is proven stable. |
 | **Concurrency** | Serialized per deployment ID (`cancel-in-progress: false`) |
-| **Scope** | Guest-mode flows only — page loads, navigation, card flip, grade buttons, key sections on Stats / Pokédex / Settings. No auth flows. |
+| **Scope** | Guest-mode flows, plus signed-in UI flows via the mock-auth seam (see below). Page loads, navigation, card flip, grade buttons, key sections on Stats / Pokédex / Settings; the signed-in avatar / sign-out / nav, the conflict picker, and the superuser cloud-write-guard surfaces. |
+
+#### Mock-auth seam (E2E)
+
+`e2e/auth.spec.ts` exercises the **signed-in** UI in a real browser without a
+real OAuth handshake (issue #751, Option 2 of #742). It relies on a test-only
+seam in `lib/auth/mockAuth.ts` that makes `AuthProvider` return a hard-coded
+fake `User` plus a fake `SupabaseClient` whose `.from()` calls resolve from an
+in-memory fixture.
+
+- **Activation**: the seam activates only when `NEXT_PUBLIC_E2E_AUTH_MOCK === "1"`
+  AND `process.env.NODE_ENV !== "production"`. Both conditions are checked by
+  `isMockAuthEnabled()`.
+- **Deployment wiring**: `NEXT_PUBLIC_*` vars are inlined at **build time**, so
+  the seam is enabled by setting `NEXT_PUBLIC_E2E_AUTH_MOCK=1` in the Vercel
+  project's **Preview** environment scope (Preview only — **never** Production).
+  `e2e.yml` also sets the var on the Playwright runner as a documented
+  companion; the specs in `e2e/auth.spec.ts` detect at runtime whether the seam
+  is live and skip themselves if it is not, so a preview built without the
+  Preview-scoped var simply skips the auth specs rather than failing.
+- **Production safety**: the seam is provably unreachable in production.
+  `isMockAuthEnabled()` short-circuits on `NODE_ENV === "production"`, and
+  `next.config.ts` calls `assertMockAuthNotInProduction()` which fails the
+  build loudly if the flag is ever set in a production build.
+  `lib/auth/mockAuth.test.ts` asserts both guards.
 
 ---
 
