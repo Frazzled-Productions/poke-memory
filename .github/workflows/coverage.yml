@@ -1,0 +1,122 @@
+name: Coverage
+
+# Non-blocking test-coverage report (#762). Runs `npm run test:coverage` on
+# every PR and posts the v8 coverage summary as an idempotent PR comment.
+#
+# This is deliberately NOT a required check: it has no threshold gate and never
+# fails the PR. The intent is to make coverage gaps visible (so audits like
+# #741 become mechanical) without adding merge friction. A threshold gate can
+# be layered on later once a baseline is agreed.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Test coverage report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Skip fork PRs: pull_request from a fork runs with a read-only token, so
+    # the comment step would fail. Same guard pattern as auto-review.yml.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.fork == false
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # `vitest run --coverage` always exits 0 here — no thresholds are set in
+      # vitest.config.ts — but guard with `continue-on-error` anyway so a flaky
+      # test never turns this informational job red.
+      - name: Run coverage
+        id: coverage
+        continue-on-error: true
+        run: npm run test:coverage
+
+      # Build the comment body from coverage/coverage-summary.json (the
+      # `json-summary` reporter configured in vitest.config.ts).
+      - name: Build coverage summary
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          BODY_FILE=$(mktemp)
+          echo "BODY_FILE=$BODY_FILE" >> "$GITHUB_ENV"
+          SUMMARY="coverage/coverage-summary.json"
+
+          # Idempotent marker: re-runs find and update this comment instead of
+          # posting a new one. Same pattern as pr-check-monitor.yml.
+          MARKER="<!-- coverage-report -->"
+
+          if [ -f "$SUMMARY" ]; then
+            node -e '
+              const t = require("./coverage/coverage-summary.json").total;
+              const row = (label, m) =>
+                `| ${label} | ${m.pct.toFixed(2)}% | ${m.covered} / ${m.total} |`;
+              console.log([
+                "### Test coverage",
+                "",
+                "| Metric | Coverage | Covered / Total |",
+                "|---|---|---|",
+                row("Statements", t.statements),
+                row("Branches", t.branches),
+                row("Functions", t.functions),
+                row("Lines", t.lines),
+                "",
+                "_Non-blocking report. No threshold gate is enforced. See the `coverage` workflow._",
+              ].join("\n"));
+            ' > /tmp/coverage-table.md
+          else
+            # printf, not a heredoc: a quoted-delimiter heredoc inside an
+            # indented YAML `run:` block keeps the leading indentation as
+            # literal text, which would corrupt the Markdown.
+            printf '%s\n' \
+              '### Test coverage' \
+              '' \
+              'Coverage run did not produce `coverage/coverage-summary.json` - the test step may have failed. Check the workflow logs.' \
+              > /tmp/coverage-table.md
+          fi
+
+          {
+            echo "$MARKER"
+            cat /tmp/coverage-table.md
+          } > "$BODY_FILE"
+
+      - name: Post or update coverage comment
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          MARKER="<!-- coverage-report -->"
+
+          # Find an existing coverage comment by its hidden marker.
+          COMMENT_ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1 || echo "")
+
+          if [ -n "$COMMENT_ID" ]; then
+            echo "Updating existing coverage comment #$COMMENT_ID"
+            # Build a JSON payload with jq so the body is encoded safely
+            # (Markdown table pipes, newlines). `gh api -F body=@file` would
+            # send multipart form data, which the REST API does not accept.
+            jq -Rs '{body: .}' "$BODY_FILE" \
+              | gh api --method PATCH "repos/$REPO/issues/comments/$COMMENT_ID" \
+                  --input - >/dev/null
+          else
+            echo "Posting new coverage comment"
+            gh pr comment "$PR" --repo "$REPO" --body-file "$BODY_FILE"
+          fi

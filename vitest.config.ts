@@ -11,6 +11,35 @@ const integrationEnabled = process.env.VITEST_INTEGRATION === "1";
 
 export default defineConfig({
   test: {
+    // Coverage tooling (#762). Non-blocking: no thresholds are configured, so
+    // `vitest run --coverage` reports numbers without ever failing the run.
+    // A threshold gate can be layered on later once a baseline is established.
+    coverage: {
+      provider: "v8",
+      // text  → printed summary table (scraped by coverage.yml for the PR comment)
+      // json-summary → machine-readable totals if a future job needs them
+      // html  → drillable local report under coverage/
+      reporter: ["text", "json-summary", "html"],
+      // Measure the application/library source we actually ship and test.
+      include: ["app/**", "components/**", "lib/**"],
+      exclude: [
+        // Test files — not product code.
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "lib/sync/integration/**",
+        // Config, tooling, E2E and generated/seed data.
+        "**/*.config.*",
+        "vitest.setup.*",
+        "e2e/**",
+        "scripts/**",
+        "db/**",
+        // Generated seed payload — produced by scripts/seed-pokemon.mjs, not
+        // hand-written, so it carries no meaningful coverage signal.
+        "lib/pokemon/generated.json",
+        "**/*.d.ts",
+        "node_modules/**",
+      ],
+    },
     projects: [
       {
         resolve: { alias },
