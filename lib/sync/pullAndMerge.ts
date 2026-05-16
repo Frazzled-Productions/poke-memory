@@ -17,6 +17,7 @@ import {
   STREAK_UPDATED_EVENT,
 } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
+import { preserveDeviceLocalKeys } from "@/lib/settings/lastPushedSnapshot";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
@@ -165,7 +166,15 @@ export async function pullAndMerge(
         // mobileNav) would store an incomplete object and trigger a two-load
         // inconsistency until the next loadSettings() call. Spreading over
         // DEFAULT_SETTINGS ensures the stored blob is always complete.
-        saveSettings({ ...DEFAULT_SETTINGS, ...pulledRow.settings });
+        // preserveDeviceLocalKeys keeps this device's appVisitCount — a stale
+        // cloud value (legacy row, manual edit) must not reset the nudge
+        // threshold, mirroring the push-side exclusion in diffSettings.
+        saveSettings(
+          preserveDeviceLocalKeys(
+            { ...DEFAULT_SETTINGS, ...pulledRow.settings },
+            loadSettings(),
+          ),
+        );
       }
       if (pulledRow.updatedAt !== null) {
         nextLastSettingsPullAt = pulledRow.updatedAt;

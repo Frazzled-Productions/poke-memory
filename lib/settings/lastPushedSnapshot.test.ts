@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffSettings } from "./lastPushedSnapshot";
+import { diffSettings, preserveDeviceLocalKeys } from "./lastPushedSnapshot";
 import type { UserSettings } from "./persistence";
 
 function s(overrides: Partial<UserSettings>): UserSettings {
@@ -51,5 +51,26 @@ describe("diffSettings", () => {
       onboarding: { welcomeDismissed: true } as never,
     });
     expect(diffSettings(prev, next)).toEqual({});
+  });
+
+  it("excludes device-local appVisitCount from the first push", () => {
+    const next = s({ appVisitCount: 9 });
+    expect(diffSettings(null, next)).not.toHaveProperty("appVisitCount");
+  });
+
+  it("excludes device-local appVisitCount from the incremental diff", () => {
+    const prev = s({ appVisitCount: 1 });
+    const next = s({ appVisitCount: 99 });
+    expect(diffSettings(prev, next)).toEqual({});
+  });
+});
+
+describe("preserveDeviceLocalKeys", () => {
+  it("keeps the local appVisitCount over the cloud value", () => {
+    const cloud = s({ appVisitCount: 100, themeIntensity: "tinted" });
+    const local = s({ appVisitCount: 4 });
+    const result = preserveDeviceLocalKeys(cloud, local);
+    expect(result.appVisitCount).toBe(4);
+    expect(result.themeIntensity).toBe("tinted");
   });
 });

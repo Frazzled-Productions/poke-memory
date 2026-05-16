@@ -40,8 +40,9 @@ function detectInstallState(): InstallState {
       platform: "android",
       canPrompt: true,
       prompt: async () => {
-        await deferred.prompt();
-        const { outcome } = await deferred.userChoice;
+        // `prompt()` resolves with the same `{ outcome }` as `userChoice`;
+        // awaiting it alone avoids racing two promises over one event.
+        const { outcome } = await deferred.prompt();
         if (outcome === "accepted") {
           delete window.__pwaInstallPrompt;
         }
@@ -50,9 +51,13 @@ function detectInstallState(): InstallState {
     };
   }
 
-  // iOS Safari — no beforeinstallprompt, show manual instructions instead
+  // iOS Safari — no beforeinstallprompt, show manual instructions instead.
+  // iPadOS 13+ reports a desktop `Macintosh` user-agent, so an iPad is only
+  // distinguishable from a real Mac by its touch support.
   const ua = navigator.userAgent;
-  const isIos = /iPhone|iPad|iPod/.test(ua);
+  const isIpadOs =
+    /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  const isIos = /iPhone|iPad|iPod/.test(ua) || isIpadOs;
   const isChrome = /Chrome|CriOS/.test(ua);
   if (isIos && !isChrome) {
     return { platform: "ios", canPrompt: false };

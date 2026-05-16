@@ -13,11 +13,23 @@ const VISIT_THRESHOLD = 3;
 
 export function PwaInstallNudge() {
   const installState = useInstallPrompt();
-  // null = not yet loaded from localStorage
+  // `dismissed` stays null until the first read so the nudge never flashes
+  // before localStorage is known.
   const [dismissed, setDismissed] = useState<boolean | null>(null);
   const [visitCount, setVisitCount] = useState(0);
 
+  // A single effect increments the per-session visit count and then reads
+  // both pieces of state, so `dismissed` and `visitCount` always land in the
+  // same commit — no intermediate render where one is stale.
   useEffect(() => {
+    if (!sessionStorage.getItem(VISIT_SESSION_KEY)) {
+      sessionStorage.setItem(VISIT_SESSION_KEY, "1");
+      const settings = loadSettings();
+      saveSettings({
+        ...settings,
+        appVisitCount: (settings.appVisitCount ?? 0) + 1,
+      });
+    }
     function sync() {
       const settings = loadSettings();
       setDismissed(settings.onboarding?.installNudgeDismissed ?? false);
@@ -26,16 +38,6 @@ export function PwaInstallNudge() {
     sync();
     window.addEventListener(SETTINGS_SAVED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_SAVED_EVENT, sync);
-  }, []);
-
-  // Increment visit count once per browser session
-  useEffect(() => {
-    if (sessionStorage.getItem(VISIT_SESSION_KEY)) return;
-    sessionStorage.setItem(VISIT_SESSION_KEY, "1");
-    const settings = loadSettings();
-    const next = { ...settings, appVisitCount: (settings.appVisitCount ?? 0) + 1 };
-    saveSettings(next);
-    setVisitCount(next.appVisitCount);
   }, []);
 
   function handleDismiss() {
@@ -50,13 +52,17 @@ export function PwaInstallNudge() {
 
   async function handleInstall() {
     if (installState.platform !== "android") return;
-    const { outcome } = await installState.prompt();
-    if (outcome === "accepted") {
-      handleDismiss();
+    try {
+      const { outcome } = await installState.prompt();
+      if (outcome === "accepted") {
+        handleDismiss();
+      }
+    } catch {
+      // prompt() rejects if the deferred event was already consumed; leave
+      // the nudge in place so the user can retry.
     }
   }
 
-  // Render nothing until localStorage is read, or when conditions aren't met
   if (
     dismissed !== false ||
     visitCount < VISIT_THRESHOLD ||
