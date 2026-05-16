@@ -275,6 +275,19 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `cron-health-monitor.yml` — Cron Health Monitor
+
+| | |
+|---|---|
+| **Trigger** | `schedule: '0 10 * * 1'` (weekly, Monday 10:00 UTC); `workflow_dispatch` |
+| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, and the four weekly digests `auto-workflow-suggest` / `auto-codequality-suggest` / `auto-app-suggest` / `auto-backlog-groom`), calls `gh run list --workflow=<file> --event schedule` and checks (a) a scheduled run exists within the expected interval (48h for daily workflows, 240h for weekly) and (b) the most recent run did not fail. On a stale or failing workflow it opens or updates a per-workflow tracking issue. |
+| **Dedup** | A `<!-- cron-health-monitor:{file} -->` HTML marker keyed by workflow filename gives each watched workflow its own tracking issue. Re-runs edit that issue in place and add a re-check comment rather than opening duplicates. When a workflow recovers, the monitor closes its tracking issue automatically. |
+| **Why schedule?** | The monitor runs on GitHub's internal cron queue, independently of the workflows it watches — so it still fires even if those workflows have stopped. It cannot detect its own staleness, but the blast radius of one un-monitored monitor is small. |
+| **Permissions** | `contents: read`, `actions: read`, `issues: write`. `GITHUB_TOKEN` only — no Claude, no App token, no app checkout. |
+| **Why monitor cron workflows?** | GitHub disables scheduled workflows after 60 days of repo inactivity, and a malformed cron or an expired secret can silently stop a workflow firing — none of which produces an alert on its own. `pr-check-monitor` watches open PRs; this watches the schedule-driven workflows themselves. |
+
+---
+
 ### `issue-overlap-scan.yml` — Issue Overlap Scan
 
 | | |
