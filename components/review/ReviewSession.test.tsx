@@ -174,6 +174,13 @@ vi.mock("@/lib/audio/tts", () => ({
   speakName: mockSpeakName,
   getPreferredVoice: vi.fn(() => null),
   voiceTier: vi.fn(() => "compact"),
+  awaitTtsEnd: vi.fn(() => Promise.resolve()),
+}));
+
+// waitForAudio resolves immediately by default — audio timing is tested in its
+// own dedicated test file (waitForAudio.test.ts in this directory).
+vi.mock("@/lib/audio/waitForAudio", () => ({
+  waitForAudio: vi.fn(() => Promise.resolve()),
 }));
 
 // ---------------------------------------------------------------------------

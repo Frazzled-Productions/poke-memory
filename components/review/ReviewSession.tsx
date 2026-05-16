@@ -38,6 +38,7 @@ import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
 import { speakName, warmupTts } from "@/lib/audio/tts";
+import { waitForAudio } from "@/lib/audio/waitForAudio";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
@@ -500,6 +501,13 @@ export function ReviewSession() {
   // Locks the card the user clicked Reveal on so a learning-queue re-render
   // can't swap it out before the user submits a grade.
   const revealedCardId = useRef<number | null>(null);
+  // Guards against advancing to the next card after the component has unmounted
+  // (e.g. the user navigates away during the waitForAudio delay).
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
   const { user, supabase } = useAuth();
   const { anyFlagOn: superuserGuarded } = useSuperuser();
@@ -1369,19 +1377,39 @@ export function ReviewSession() {
       }
     }
 
+    // Commit the grade to the undo snapshot and the cloud-sync queue.
+    // These are invisible side-effects that do not change the rendered card, so
+    // they run before the audio wait. The visible swap (setCards + state
+    // resets below) is deferred until any in-progress cry / TTS finishes (#732).
     setUndoSnapshot(snapshot);
     enqueueGrade({ ...effectiveCard, state: nextState });
+
+    // Derive new/mastered transitions now (while effectiveCard / nextState are
+    // in scope) so the values are available after the audio wait below.
+    const wasNew = effectiveCard.state.firstSeen === null;
+    const wasMastered = isMastered(effectiveCard.state, loadSettings().masteryRepetitions);
+    const nowMastered = isMastered(nextState, loadSettings().masteryRepetitions);
+
+    // Wait for any in-progress cry and/or TTS playback to finish before
+    // swapping the visible card. Resolves immediately when audio features are
+    // off or nothing is currently playing. A 5-second safety net in each
+    // helper prevents an infinite wait on decoding errors or unexpected browser
+    // behaviour. The decode-ahead above still runs immediately — only the
+    // visible swap is deferred (#732).
+    await waitForAudio();
+
+    // Guard against advancing after the component has unmounted (e.g. the user
+    // navigated away during the audio wait).
+    if (!isMountedRef.current) return;
+
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
     setSessionGradeSeq((prev) => [...prev, grade]);
     // Track new / mastered transitions for the daily share card. Uses
     // `isMastered` against the current mastery threshold.
-    const wasNew = effectiveCard.state.firstSeen === null;
     if (wasNew && nextState.firstSeen !== null) {
       setNewCardsThisSession((n) => n + 1);
     }
-    const wasMastered = isMastered(effectiveCard.state, loadSettings().masteryRepetitions);
-    const nowMastered = isMastered(nextState, loadSettings().masteryRepetitions);
     if (!wasMastered && nowMastered) {
       setMasteredThisSession((n) => n + 1);
       // Badge award (#420). Only fires when a card just crossed the mastery

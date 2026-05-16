@@ -2,6 +2,40 @@ let audioEl: HTMLAudioElement | null = null;
 let pendingEndedListener: (() => void) | null = null;
 
 /**
+ * Returns a Promise that resolves when the currently-playing cry finishes.
+ *
+ * Resolves immediately when:
+ *   - No audio element has ever been created (`audioEl` is null).
+ *   - The element is paused (playback has not started, or has already ended).
+ *
+ * Otherwise, the Promise resolves on the next `ended` or `error` event.
+ * A 5-second fallback timer guarantees resolution even if the event never
+ * fires (e.g. a decoding stall) — so the card transition cannot hang forever.
+ */
+export function awaitCryEnd(): Promise<void> {
+  if (audioEl === null || audioEl.paused) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    // Resolve on natural completion or on error (audio won't advance further).
+    audioEl!.addEventListener("ended", finish, { once: true });
+    audioEl!.addEventListener("error", finish, { once: true });
+    // Safety net: never block the transition longer than 5 s.
+    const timer = setTimeout(() => {
+      audioEl?.removeEventListener("ended", finish);
+      audioEl?.removeEventListener("error", finish);
+      finish();
+    }, 5_000);
+  });
+}
+
+/**
  * Play a Pokémon cry, optionally chaining a callback to fire after the cry finishes.
  *
  * `onEnded` fires:
