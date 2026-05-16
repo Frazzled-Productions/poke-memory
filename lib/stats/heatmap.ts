@@ -1,4 +1,5 @@
 import type { GradeLog } from "@/lib/gradelog/persistence";
+import { isoDate } from "@/lib/utils/format-date";
 
 export type HeatmapCell = {
   date: string;   // YYYY-MM-DD
@@ -39,7 +40,7 @@ export function computeReviewHeatmap(
   for (let i = totalCells - 1; i >= 0; i--) {
     const d = new Date(endOfWeek);
     d.setUTCDate(d.getUTCDate() - i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = isoDate(d);
     cells.push({ date: iso, count: perDay.get(iso) ?? 0 });
   }
 

@@ -136,6 +136,31 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 
 ---
 
+### `codeql.yml` — CodeQL
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (opened, synchronize, reopened); push to `main`; weekly `schedule` (`0 9 * * 1` — Monday 09:00 UTC) |
+| **Job** | `analyze` |
+| **What it does** | Runs GitHub's CodeQL security scan over the `javascript-typescript` language pack with the `security-extended` query suite. No `autobuild` step — CodeQL v3 source-traces JS/TS without a build, keeping the scan fast; generated `.next/` output is out of scope. The weekly cron catches newly-published CVEs and dependency drift that no push would otherwise trigger. |
+| **Permissions** | `security-events: write` (uploads results to the Security tab), `contents: read`, `actions: read`. |
+| **Concurrency** | Scheduled runs get a per-`run_id` group with `cancel-in-progress: false`, so a push to `main` during the weekly window cannot cancel the scan. Push and PR runs share a per-event-type+ref group and may cancel stale siblings. |
+
+---
+
+### `integration-tests.yml` — Integration Tests
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (opened, synchronize, reopened, labeled); `workflow_dispatch` |
+| **Jobs** | `decide` (gate), `integration` |
+| **What it does** | The `decide` job runs on every PR and uses `dorny/paths-filter` to check whether the PR touches the cloud-write surface (`lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, or this workflow file). If a path matches, the PR carries the `integration-tests` label, or the run is a manual dispatch, the `integration` job runs the DB-backed suite (`npm run test:integration`) against a `postgres:15` service container — migration apply, RLS isolation, and the regression trigger. No Supabase API calls, no branch quota. |
+| **Why a gate job** | A bare `on.pull_request.paths:` filter would also filter out `labeled` events on PRs that don't touch the paths, breaking the label escape hatch. The cheap `decide` job combines "paths OR label" so the opt-in label still works. |
+| **Required check** | No — `integration` is not a required status check, so PRs outside the path filter simply don't run it and aren't blocked. |
+| **Concurrency** | Cancels concurrent runs on the same ref. |
+
+---
+
 ### `auto-issue.yml` — Auto Issue Worker
 
 Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
@@ -406,15 +431,40 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 | | |
 |---|---|
-| **Trigger** | `push` to `main` |
-| **Gate** | Skipped if the head commit message starts with `chore(release):` (defensive guard — the release commit also carries `[skip ci]`, which suppresses workflow runs entirely) |
+| **Trigger** | `schedule` (daily `0 9 * * *` cron — 09:00 UTC) + `workflow_dispatch` |
+| **Gate** | Each cron tick (or manual dispatch) cuts at most one release — `cut-release.mjs` writes `skip=true` when no fragments exist. The `chore(release):` commit-message prefix and `[skip ci]` marker are no longer trigger gates: since the workflow is not `push`-triggered, the release commit cannot re-fire it regardless. |
 | **What it does** | Runs `.github/scripts/cut-release.mjs`: scans `changelog.d/unreleased/*.md` fragments, groups bullets by `kind` into Keep-a-Changelog subsections, decides bump type (`minor-bump` fragment or Added/Changed/Removed/Deprecated → minor; only Fixed/Security → patch), writes the new `## [X.Y.Z]` section into `CHANGELOG.md`, bumps `package.json`, deletes consumed fragments (`git rm changelog.d/unreleased/*.md`), commits as `chore(release): vX.Y.Z (TYPE) [skip ci]`, tags `vX.Y.Z`, pushes commit + tag to `main`, and creates a matching GitHub Release with the assembled section as the body |
 | **No-op condition** | No `*.md` files in `changelog.d/unreleased/` → script writes `skip=true` and the workflow exits cleanly. Internal-only changes without a fragment do not trigger a release. |
 | **Bootstrap** | One-time: on first run, if no `v0.1.0` tag exists, creates `v0.1.0` at SHA `cddb3a8` (last commit whose CHANGELOG content matched the current `[0.1.0]` section) and the matching GitHub Release. Subsequent runs no-op the bootstrap. |
-| **Loop break** | The release commit carries `[skip ci]`, which suppresses all GitHub Actions on it — so neither `ci.yml` nor `auto-release.yml` re-fires. If `[skip ci]` is ever bypassed, the `chore(release):` prefix guard and the now-empty `[Unreleased]` provide two further layers of defense. |
+| **Loop break** | Structural: the trigger is `schedule` + `workflow_dispatch`, not `push`, so a release commit landing on `main` cannot re-fire this workflow. The `[skip ci]` marker on the release commit is defence in depth only — it still suppresses the `push`-triggered workflows (`ci.yml`, `migration-check.yml`) on that commit, but it is not what stops `auto-release.yml` from looping. |
 | **Vercel interaction** | The release commit touches `package.json`, which is in `WATCH_PATHS` in `scripts/vercel-ignored-build.sh` — so Vercel rebuilds and the in-app version banner (`NEXT_PUBLIC_APP_VERSION`) updates. |
 | **Prerequisite** | The `poke-memory-bot` App must be a bypass actor on the `main-protection` ruleset so the release commit can land directly on `main`. If `git push origin main` fails with a protected-branch error, that is the missing setup. |
 | **Concurrency** | `group: auto-release` with `cancel-in-progress: false` — back-to-back merges queue rather than collapse. |
+
+---
+
+### `monitor-grade-log-divergence.yml` — Monitor grade_log divergence
+
+| | |
+|---|---|
+| **Trigger** | Daily `schedule` (`0 8 * * *` — 08:00 UTC); `workflow_dispatch` (with an optional `threshold` input overriding the default divergence threshold of 5) |
+| **Job** | `check` |
+| **What it does** | Runs `.github/scripts/check-grade-log-divergence.mjs`, which flags users whose `grade_log` shows activity but whose `card_reviews` table is missing the corresponding rows — the #584 sync-break signature. If divergence is detected, the workflow opens an issue titled `[monitoring] grade_log divergence detected (N users)` from a generated body file, labelled `monitoring` and `area:workflow`. The `monitoring` label is self-healing — created with `gh label create ... || true`. |
+| **Required secrets** | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`. |
+| **Cron-only** | Does not fire on push, so the workflow file landing in a PR will not raise an alert on the PR itself — the first real run is the next 08:00 UTC tick after merge. |
+| **Concurrency** | `group: monitor-grade-log-divergence` with `cancel-in-progress: false`. |
+
+---
+
+### `refresh-user-count.yml` — Refresh user count badge
+
+| | |
+|---|---|
+| **Trigger** | Daily `schedule` (`17 6 * * *` — 06:17 UTC); `workflow_dispatch` |
+| **Job** | `refresh` |
+| **What it does** | Runs `scripts/refresh-user-count.mjs` to refresh `.github/stats/users.json`, the source for the README user-count Shields.io badge (#400). If the file changed, it commits as `chore(stats): refresh user count [skip ci]` and pushes directly to `main`. The commit is authored by the `poke-memory-bot` App identity, so it lands despite branch protection; the `[skip ci]` marker stops the push retriggering any push-triggered workflow. |
+| **Required secrets** | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `BOT_APP_PRIVATE_KEY`, `BOT_APP_ID` (var). |
+| **Concurrency** | `group: refresh-user-count` with `cancel-in-progress: false`. |
 
 ---
 
