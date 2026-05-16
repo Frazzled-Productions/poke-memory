@@ -299,7 +299,7 @@ const NAME_NUMERIC_FIELDS: FieldConfig[] = [
   {
     key: "maxReviewsPerDay",
     label: "Reviews per day",
-    helper: "Soft cap — you can always override it during a session.",
+    helper: "Soft cap; you can always override it during a session.",
     min: 1,
     max: 500,
   },
@@ -1096,7 +1096,7 @@ export default function SettingsPage() {
                           Include alternate forms in practice
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Regional forms, Megas and other variants. Off by default — the base Pokédex is already a large deck.
+                          Regional forms, Megas and other variants. Off by default: the base Pokédex is already a large deck.
                         </p>
                       </div>
                       <button
@@ -1235,7 +1235,7 @@ export default function SettingsPage() {
                           Enable cry cards
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Audio prompt — hear the cry and name the Pokémon. Species without a cry are skipped automatically.
+                          Audio prompt: hear the cry and name the Pokémon. Species without a cry are skipped automatically.
                           Re-enabling after disabling will reset cry-card progress.
                         </p>
                       </div>
@@ -1364,7 +1364,7 @@ export default function SettingsPage() {
                     strong your memory of that card is, and sets the next
                     review for when you&apos;re most likely to be about to
                     forget it. Forgetting and then re-remembering is what
-                    actually moves a card into long-term memory — so getting
+                    actually moves a card into long-term memory, so getting
                     a few <em>Again</em>s is normal and part of the system
                     working.
                   </p>
@@ -1382,7 +1382,7 @@ export default function SettingsPage() {
                     </p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Restores the welcome message and the contextual hints on
-                      Practice, Stats, and Settings — including the audio and
+                      Practice, Stats, and Settings, including the audio and
                       card-type nudges.
                     </p>
                     <button

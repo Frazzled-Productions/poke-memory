@@ -153,7 +153,7 @@ test.describe("Higher-or-Lower mini-game", () => {
 
     // Result banner appears after pick; regex covers all three outcome strings
     const resultBanner = page.getByText(
-      /correct!|equal — both count\.|game over/i,
+      /correct!|equal, both count\.|game over/i,
     );
     await expect(resultBanner).toBeVisible();
   });

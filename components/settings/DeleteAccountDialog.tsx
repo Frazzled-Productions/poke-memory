@@ -78,8 +78,8 @@ export function DeleteAccountDialog({ open, onClose, onConfirm }: Props) {
         id="delete-account-dialog-desc"
         className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400"
       >
-        This permanently erases your account and all of its data — review
-        history, streaks, settings, and your sign-in identity — from the cloud
+        This permanently erases your account and all of its data (review
+        history, streaks, settings, and your sign-in identity) from the cloud
         and this device. It cannot be undone. Type{" "}
         <strong className="text-foreground">DELETE</strong> to confirm.
       </p>

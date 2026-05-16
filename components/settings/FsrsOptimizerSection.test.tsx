@@ -251,7 +251,7 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimize — try again later.",
+          "Couldn't optimize. Try again later.",
         );
       });
     });
@@ -325,7 +325,7 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimize — try again later.",
+          "Couldn't optimize. Try again later.",
         );
       });
     });

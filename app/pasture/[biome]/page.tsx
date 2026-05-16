@@ -251,7 +251,7 @@ export default function BiomeLandscapePage({
         <main className="px-4 pb-8 pt-2">
           {isEmpty ? (
             <p className="mt-6 text-zinc-500 dark:text-zinc-400">
-              No mastered Pokémon in this biome yet — keep practising!
+              No mastered Pokémon in this biome yet. Keep practising!
             </p>
           ) : (
             <PastureZone

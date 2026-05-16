@@ -560,7 +560,7 @@ function ForcePullSection({
         Data
       </h2>
       <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
-        Use this if your stats look wrong — it pulls authoritative data from the cloud.
+        Use this if your stats look wrong; it pulls authoritative data from the cloud.
       </p>
       <button
         type="button"
@@ -577,7 +577,7 @@ function ForcePullSection({
           aria-live="polite"
           className="mt-2 text-sm text-emerald-600 dark:text-emerald-400"
         >
-          Done — stats updated from cloud.
+          Done. Stats updated from cloud.
         </p>
       )}
       {status === "error" && (
@@ -785,7 +785,7 @@ export default function StatsPage() {
                 />
               ) : (
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  No active streak — review some cards to start one!
+                  No active streak. Review some cards to start one!
                 </p>
               )}
             </section>
@@ -806,7 +806,7 @@ export default function StatsPage() {
                 A card is mastered once you&apos;ve recalled it correctly{" "}
                 {masteryRepetitions} time{masteryRepetitions === 1 ? "" : "s"}{" "}
                 in a row <em>and</em> the next review is scheduled at least 21
-                days out — that&apos;s when the scheduler is confident
+                days out: that&apos;s when the scheduler is confident
                 you&apos;ve actually learnt it, not just memorised it short
                 term.
               </p>

@@ -19,7 +19,7 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
       <DirectionBadge direction={direction} />
       <Image
         src={spriteUrl}
-        alt={revealed ? name : "A Pokémon sprite — answer hidden"}
+        alt={revealed ? name : "A Pokémon sprite, answer hidden"}
         width={320}
         height={320}
         priority

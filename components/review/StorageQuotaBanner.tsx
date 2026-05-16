@@ -8,7 +8,7 @@ export function StorageQuotaBanner({ onDismiss }: Props) {
       role="alert"
       className="flex w-full items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
     >
-      <span>Progress saving is disabled — storage is full.</span>
+      <span>Progress saving is disabled: storage is full.</span>
       <button
         type="button"
         onClick={onDismiss}

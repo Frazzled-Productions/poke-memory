@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Poké Memory — spaced repetition flashcards for every Pokémon";
+export const alt = "Poké Memory: spaced repetition flashcards for every Pokémon";
 
 export const size = {
   width: 1200,

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ChildFriendlySummary from "@/components/privacy/ChildFriendlySummary";
 
 export const metadata: Metadata = {
-  title: "Privacy Notice — Poké Memory",
+  title: "Privacy Notice - Poké Memory",
   description:
     "How Poké Memory collects, uses, and protects your data under UK GDPR / GDPR.",
 };
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
             All card progress and review history stays in your browser&rsquo;s
             local storage. Nothing is transmitted to any server we operate.
             Pokémon sprites are served as static files from the same Vercel
-            infrastructure that hosts the app — no third-party image CDN is
+            infrastructure that hosts the app; no third-party image CDN is
             involved.
           </p>
 
@@ -118,7 +118,7 @@ export default function PrivacyPage() {
             to Supabase Auth that typically includes the email address and
             display name associated with the account you signed in with;
             Supabase Auth stores this on the account record so it can identify
-            you on your next sign-in. We use it only for authentication — it is
+            you on your next sign-in. We use it only for authentication; it is
             never written into our review-history tables and is never used for
             marketing or tracking.
           </p>
@@ -138,7 +138,7 @@ export default function PrivacyPage() {
           <p>
             We record which calendar dates you completed at least one review.
             This is stored in a <code>streak_days</code> table and used to
-            calculate your review streak. It is an append-only log — dates are
+            calculate your review streak. It is an append-only log: dates are
             never removed except by a full progress reset.
           </p>
 
@@ -151,7 +151,7 @@ export default function PrivacyPage() {
             identifier, the grade you chose, the entry date, and the precise
             timestamp it occurred (<code>occurred_at</code>). This log is used
             to compute per-user FSRS optimiser weights and review statistics. It
-            is append-only — individual entries are never mutated or deleted
+            is append-only: individual entries are never mutated or deleted
             except by a full progress reset.
           </p>
 
@@ -173,7 +173,7 @@ export default function PrivacyPage() {
             When you sign in, Supabase Auth sets an HTTP-only session cookie
             containing a signed JWT that keeps you authenticated across requests.
             This cookie is strictly necessary for the signed-in service to
-            function — it is not used for tracking or advertising, and it is not
+            function; it is not used for tracking or advertising, and it is not
             set in guest mode. See §4 below for our PECR position on this cookie.
           </p>
         </section>
@@ -228,7 +228,7 @@ export default function PrivacyPage() {
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
-            PECR position — no consent banner required
+            PECR position: no consent banner required
           </h3>
           <p>
             Under PECR, consent is only required for cookies and similar
@@ -268,7 +268,7 @@ export default function PrivacyPage() {
                     Store and synchronise your review history across devices
                   </td>
                   <td className="py-2">
-                    Contract performance — this is the core service you signed
+                    Contract performance: this is the core service you signed
                     up for
                   </td>
                 </tr>
@@ -334,7 +334,7 @@ export default function PrivacyPage() {
                     Hosting and static asset delivery
                   </td>
                   <td className="py-2">
-                    Aggregate, anonymous analytics only — no card data
+                    Aggregate, anonymous analytics only; no card data
                   </td>
                 </tr>
                 <tr>
@@ -361,7 +361,7 @@ export default function PrivacyPage() {
           <p className="mb-3">
             When you sign in via GitHub or Google, that provider processes the
             authentication interaction as an <strong>independent controller</strong> under its own terms of service and privacy
-            policy — not as our processor. We do not have a
+            policy, not as our processor. We do not have a
             controller-to-processor DPA with these providers, and we do not
             instruct or control how they handle their side of the
             authentication flow.
@@ -385,12 +385,12 @@ export default function PrivacyPage() {
                 <tr>
                   <td className="py-2 pr-4 font-medium">GitHub (OAuth)</td>
                   <td className="py-2 pr-4">
-                    Optional sign-in provider — used only if you choose
+                    Optional sign-in provider, used only if you choose
                     &ldquo;Continue with GitHub&rdquo;
                   </td>
                   <td className="py-2">
                     The OAuth token exchange is handled server-side by Supabase
-                    Auth — the app itself never sees the OAuth token. The
+                    Auth; the app itself never sees the OAuth token. The
                     provider returns a profile (typically email and display
                     name) to Supabase Auth, which holds it on your account
                     record for authentication. Our own review-history tables
@@ -400,12 +400,12 @@ export default function PrivacyPage() {
                 <tr>
                   <td className="py-2 pr-4 font-medium">Google (OAuth)</td>
                   <td className="py-2 pr-4">
-                    Optional sign-in provider — used only if you choose
+                    Optional sign-in provider, used only if you choose
                     &ldquo;Continue with Google&rdquo;
                   </td>
                   <td className="py-2">
                     The OAuth token exchange is handled server-side by Supabase
-                    Auth — the app itself never sees the OAuth token. The
+                    Auth; the app itself never sees the OAuth token. The
                     provider returns a profile (typically email and display
                     name) to Supabase Auth, which holds it on your account
                     record for authentication. Our own review-history tables
@@ -448,8 +448,8 @@ export default function PrivacyPage() {
             7. International transfers
           </h2>
           <p>
-            The third-party services listed in §6 — Vercel, Supabase, and (if
-            you choose to sign in) GitHub or Google — may process data outside
+            The third-party services listed in §6 (Vercel, Supabase, and, if
+            you choose to sign in, GitHub or Google) may process data outside
             the UK / EEA. Vercel and Supabase (our sub-processors) operate
             under the EU Standard Contractual Clauses (SCCs), providing
             equivalent safeguards via the UK International Data Transfer
@@ -498,23 +498,23 @@ export default function PrivacyPage() {
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              <strong>Access</strong> — request a copy of the personal data we
+              <strong>Access</strong>: request a copy of the personal data we
               hold about you.
             </li>
             <li>
-              <strong>Rectification</strong> — ask us to correct inaccurate
+              <strong>Rectification</strong>: ask us to correct inaccurate
               data.
             </li>
             <li>
-              <strong>Erasure</strong> — ask us to delete your data (&ldquo;right to
+              <strong>Erasure</strong>: ask us to delete your data (&ldquo;right to
               be forgotten&rdquo;). You can also do this yourself from the
               Settings page: <em>Reset all progress</em> deletes your review
               history immediately, and <em>Delete account</em> permanently
-              erases your account, all cloud data, and your sign-in identity —
-              no email request needed.
+              erases your account, all cloud data, and your sign-in identity,
+              with no email request needed.
             </li>
             <li>
-              <strong>Data portability</strong> — receive your data in a
+              <strong>Data portability</strong>: receive your data in a
               structured, machine-readable format. The{" "}
               <em>Export progress</em> option on the Settings page downloads
               your locally-cached review history as JSON. Note that this export
@@ -531,11 +531,11 @@ export default function PrivacyPage() {
               and we will provide a full export.
             </li>
             <li>
-              <strong>Objection</strong> — object to processing carried out
+              <strong>Objection</strong>: object to processing carried out
               under legitimate interest.
             </li>
             <li>
-              <strong>Restriction</strong> — ask us to restrict processing
+              <strong>Restriction</strong>: ask us to restrict processing
               while a dispute is resolved.
             </li>
           </ul>
@@ -589,7 +589,7 @@ export default function PrivacyPage() {
           <p>
             Poké Memory is not directed at children under the age of 13. We do
             not knowingly collect personal data from under-13s. If you are
-            under 13, please do not sign in — use guest mode instead, which
+            under 13, please do not sign in; use guest mode instead, which
             stores nothing outside your own device. For a plain-language
             version of this notice suited to younger readers, see the summary
             above. If you believe a child under 13 has signed in, please
@@ -658,7 +658,7 @@ export default function PrivacyPage() {
               PokéAPI
             </a>
             {" "}(an open Pokémon data API). Sprites are self-hosted and served as
-            static files from the same infrastructure as the app — no runtime
+            static files from the same infrastructure as the app; no runtime
             requests are made to PokéAPI or any Nintendo-affiliated server.
           </p>
         </section>
@@ -672,9 +672,9 @@ export default function PrivacyPage() {
             14. Terms of Use
           </h2>
           <p>
-            For the terms that govern use of the hosted service — including
+            For the terms that govern use of the hosted service (including
             disclaimers, liability limitations, acceptable use, and governing
-            law — see the{" "}
+            law), see the{" "}
             <a
               href="/terms"
               className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"

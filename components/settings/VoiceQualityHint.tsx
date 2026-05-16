@@ -36,7 +36,7 @@ export function VoiceQualityHint() {
         <div>
           <p className="text-sm font-medium text-foreground">Voice sounding robotic?</p>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            The default English voice on most devices is a low-quality &ldquo;compact&rdquo; version. Your device&apos;s accessibility or spoken-content settings let you download a higher-quality (Premium or Enhanced) British English voice — once installed, the app picks it automatically.
+            The default English voice on most devices is a low-quality &ldquo;compact&rdquo; version. Your device&apos;s accessibility or spoken-content settings let you download a higher-quality (Premium or Enhanced) British English voice. Once installed, the app picks it automatically.
           </p>
         </div>
         <button

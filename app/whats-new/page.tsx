@@ -4,7 +4,7 @@ import { BulletText } from "@/components/whats-new/BulletText";
 import { MarkVisited } from "@/components/whats-new/MarkVisited";
 
 export const metadata: Metadata = {
-  title: "What's New — Poké Memory",
+  title: "What's New - Poké Memory",
   description:
     "Recent updates to Poké Memory: new features, improvements, and bug fixes.",
 };

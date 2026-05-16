@@ -58,7 +58,7 @@ export function Footer() {
         <span className="font-mono">v{APP_VERSION}</span>
       </div>
       <p className="mx-auto max-w-5xl px-4 pb-3 text-center text-xs text-zinc-400 dark:text-zinc-500">
-        Unofficial fan project — not affiliated with or endorsed by Nintendo,
+        Unofficial fan project, not affiliated with or endorsed by Nintendo,
         Game Freak, or The Pokémon Company. Pokémon and all related names,
         sprites, and cries are the property of their respective owners.
         Sprite and species data sourced from{" "}

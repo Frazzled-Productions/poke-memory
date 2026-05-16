@@ -237,7 +237,7 @@ describe("HigherOrLowerGame", () => {
 
     await user.click(screen.getByRole("button", { name: "Tieface" }));
 
-    expect(screen.getByText(/equal — both count/i)).toBeInTheDocument();
+    expect(screen.getByText(/equal, both count/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
     expect(
       screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Streak: 1"),
@@ -321,13 +321,13 @@ describe("HigherOrLowerGame", () => {
 
       // Now pick wrong — streak was 1, so the banner should read "streak of 1!".
       await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
-      expect(screen.getByText(/game over — streak of 1/i)).toBeInTheDocument();
+      expect(screen.getByText(/game over! streak of 1/i)).toBeInTheDocument();
 
       // Click "Play again" — decode is now pending; streak must NOT flip to 0 yet.
       await user.click(screen.getByRole("button", { name: /play again/i }));
 
       // The game-over banner must still show the correct (non-zero) streak value.
-      expect(screen.getByText(/game over — streak of 1/i)).toBeInTheDocument();
+      expect(screen.getByText(/game over! streak of 1/i)).toBeInTheDocument();
 
       // Resolve the decode.
       resolveDecodes.forEach((resolve) => resolve());

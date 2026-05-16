@@ -47,10 +47,10 @@ test.describe("Stats page — badge gallery", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Under the flag every badge tile has "— earned" in its accessible name.
+    // Under the flag every badge tile has ", earned" in its accessible name.
     // Boulder Badge is the first catalog entry.
     await expect(
-      page.getByLabel("Boulder Badge — earned"),
+      page.getByLabel("Boulder Badge, earned"),
     ).toBeVisible();
   });
 });

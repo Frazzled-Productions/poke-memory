@@ -181,7 +181,7 @@ export default function PasturePage() {
           Pasture
         </h1>
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
-          Your pasture is empty — master your first Pokémon in Practice to see
+          Your pasture is empty. Master your first Pokémon in Practice to see
           it here.
         </p>
       </main>

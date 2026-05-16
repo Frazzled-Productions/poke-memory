@@ -139,7 +139,7 @@ if (afterUnreleased < 0) {
 
 // Insert the new version section right before the existing `\n## [X.Y.Z]` block,
 // preserving the [Unreleased] stub (with any HTML comment) exactly as-is.
-const newSection = `\n## [${newVersion}] — ${today}\n\n${cleanBody}\n`;
+const newSection = `\n## [${newVersion}] - ${today}\n\n${cleanBody}\n`;
 
 let newChangelog =
   changelog.slice(0, afterUnreleased) +
