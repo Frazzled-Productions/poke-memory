@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 
@@ -247,5 +247,98 @@ describe("HigherOrLowerGame", () => {
   it("returns null when fewer than 2 Pokémon are provided", () => {
     const { container } = render(<HigherOrLowerGame seenPokemon={[BULBASAUR]} />);
     expect(container.firstChild).toBeNull();
+  });
+
+  describe("sprite-decode-before-swap", () => {
+    // These tests install a controlled `window.Image` whose `decode()` resolves
+    // on demand so we can assert that the pair does not swap until after decode.
+
+    let originalImage: typeof window.Image;
+    let resolveDecodes: (() => void)[];
+
+    beforeEach(() => {
+      originalImage = window.Image;
+      resolveDecodes = [];
+
+      // Replace window.Image with a constructor that exposes a decode() method
+      // backed by a manually-resolvable promise.
+      window.Image = class FakeImage {
+        src = "";
+        decode() {
+          return new Promise<void>((resolve) => {
+            resolveDecodes.push(resolve);
+          });
+        }
+      } as unknown as typeof window.Image;
+    });
+
+    afterEach(() => {
+      window.Image = originalImage;
+    });
+
+    it("does not swap the pair until sprite decode resolves", async () => {
+      const user = userEvent.setup();
+      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // Make a correct pick to reveal the result and show "Next pair".
+      await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+      expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
+
+      // Click "Next pair" — decode is now pending.
+      await user.click(screen.getByRole("button", { name: /next pair/i }));
+
+      // The "Next pair" button should be disabled while decode is in-flight.
+      expect(screen.getByRole("button", { name: /next pair/i })).toBeDisabled();
+
+      // The result banner should still be visible (pair hasn't swapped yet).
+      expect(screen.getByText(/correct/i)).toBeInTheDocument();
+
+      // Resolve all pending decodes.
+      resolveDecodes.forEach((resolve) => resolve());
+
+      // Wait for React to flush the deferred state update.
+      await vi.waitFor(() => {
+        expect(screen.queryByText(/correct/i)).toBeNull();
+      });
+
+      // After decode resolves the game should be back in picking phase.
+      expect(screen.getByText(/which has higher/i)).toBeInTheDocument();
+    });
+
+    it("keeps the correct streak value in the game-over banner while Play again decode is in-flight", async () => {
+      const user = userEvent.setup();
+      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // Build a streak of 1 with a correct pick, then advance to the next pair.
+      await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+      // Resolve the first decode (triggered by "Next pair") so we reach the next round.
+      resolveDecodes.forEach((resolve) => resolve());
+      resolveDecodes.length = 0;
+      await user.click(screen.getByRole("button", { name: /next pair/i }));
+      await vi.waitFor(() => {
+        expect(screen.queryByText(/correct/i)).toBeNull();
+      });
+
+      // Now pick wrong — streak was 1, so the banner should read "streak of 1!".
+      await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
+      expect(screen.getByText(/game over — streak of 1/i)).toBeInTheDocument();
+
+      // Click "Play again" — decode is now pending; streak must NOT flip to 0 yet.
+      await user.click(screen.getByRole("button", { name: /play again/i }));
+
+      // The game-over banner must still show the correct (non-zero) streak value.
+      expect(screen.getByText(/game over — streak of 1/i)).toBeInTheDocument();
+
+      // Resolve the decode.
+      resolveDecodes.forEach((resolve) => resolve());
+
+      // After decode resolves, the banner disappears and the streak resets.
+      await vi.waitFor(() => {
+        expect(screen.queryByText(/game over/i)).toBeNull();
+      });
+      expect(
+        screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Streak: 0"),
+      ).toBeInTheDocument();
+    });
   });
 });

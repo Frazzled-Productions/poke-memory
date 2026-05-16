@@ -21,6 +21,40 @@ type Pair = {
   stat: StatKey;
 };
 
+/**
+ * Safety-valve timeout for sprite decode. If any sprite is slow (e.g. a cold
+ * CDN edge), we let the swap proceed anyway so the UI is never stuck. Sprites
+ * are self-hosted static assets, so in practice decode completes well under
+ * 100 ms after the first visit.
+ */
+const DECODE_TIMEOUT_MS = 500;
+
+/**
+ * Decode a list of sprite URLs via `HTMLImageElement.decode()` so the browser
+ * fully fetches and decodes each image before the caller swaps visible state.
+ * This prevents the brief name/sprite mismatch that occurs when the pair state
+ * updates synchronously but `next/image` still needs a network round-trip for
+ * the new sprite.
+ */
+async function decodeSpriteUrls(urls: string[]): Promise<void> {
+  const decodes = urls.map((url) => {
+    const img = new window.Image();
+    img.src = url;
+    // `decode()` is a modern browser API; it may be absent in test environments
+    // (jsdom) or very old browsers. Fall back gracefully — the swap proceeds
+    // immediately rather than blocking.
+    if (typeof img.decode !== "function") return Promise.resolve();
+    return img.decode().catch(() => {
+      // Ignore per-image failures — better to show the new pair with a
+      // brief pop-in than to block the swap indefinitely.
+    });
+  });
+  await Promise.race([
+    Promise.all(decodes),
+    new Promise<void>((resolve) => setTimeout(resolve, DECODE_TIMEOUT_MS)),
+  ]);
+}
+
 function statLabel(key: StatKey): string {
   return BASE_STATS.find((s) => s.key === key)?.label ?? key;
 }
@@ -87,6 +121,8 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   const [streak, setStreak] = useState(0);
   const [bestScore, setBestScore] = useState(0);
   const [lastResult, setLastResult] = useState<LastResult>(null);
+  // True while sprite decode is in-flight; prevents a second click from racing.
+  const [transitioning, setTransitioning] = useState(false);
 
   const canPlay = seenPokemon.length >= 2;
 
@@ -126,17 +162,32 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   );
 
   const handleNext = useCallback(() => {
-    setPair(shufflePair(pickPair(seenPokemon)));
-    setPhase("picking");
-    setLastResult(null);
-  }, [seenPokemon]);
+    if (transitioning) return;
+    const nextPair = shufflePair(pickPair(seenPokemon));
+    setTransitioning(true);
+    void decodeSpriteUrls([nextPair.left.spriteUrl, nextPair.right.spriteUrl]).then(() => {
+      setPair(nextPair);
+      setPhase("picking");
+      setLastResult(null);
+      setTransitioning(false);
+    });
+  }, [seenPokemon, transitioning]);
 
   const handlePlayAgain = useCallback(() => {
-    setStreak(0);
-    setPair(shufflePair(pickPair(seenPokemon)));
-    setPhase("picking");
-    setLastResult(null);
-  }, [seenPokemon]);
+    if (transitioning) return;
+    const nextPair = shufflePair(pickPair(seenPokemon));
+    setTransitioning(true);
+    void decodeSpriteUrls([nextPair.left.spriteUrl, nextPair.right.spriteUrl]).then(() => {
+      // Reset streak atomically with the new pair so the game-over banner
+      // ("Game over — streak of N!") keeps showing the correct value during
+      // the decode window and only disappears when all state flips together.
+      setStreak(0);
+      setPair(nextPair);
+      setPhase("picking");
+      setLastResult(null);
+      setTransitioning(false);
+    });
+  }, [seenPokemon, transitioning]);
 
   if (!canPlay || !pair) return null;
 
@@ -212,7 +263,8 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
             <button
               type="button"
               onClick={handlePlayAgain}
-              className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+              disabled={transitioning}
+              className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50"
             >
               Play again
             </button>
@@ -220,7 +272,8 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
             <button
               type="button"
               onClick={handleNext}
-              className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+              disabled={transitioning}
+              className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50"
             >
               Next pair
             </button>
