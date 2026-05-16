@@ -11,6 +11,14 @@ import type { ReviewableCard } from "@/lib/review/session";
 export const PRACTICE_SPRITE_SIZE = 320;
 
 /**
+ * The render width (and height) in CSS px that `SpritePicker` passes to
+ * each tile `<Image>`. Preloading reverse-card sprites must use this value
+ * so the Next.js image optimiser produces the same variant URL — a 320 px
+ * preload would fetch a different variant and produce no cache benefit.
+ */
+export const PICKER_SPRITE_SIZE = 150;
+
+/**
  * Sprite URLs worth preloading for a card, across its front and reveal
  * faces.
  *

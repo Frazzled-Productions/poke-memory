@@ -6,8 +6,8 @@ import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
-import { SpritePreloader } from "@/components/review/SpritePreloader";
-import { preloadableSpriteUrls } from "@/lib/review/sprites";
+import { SpritePreloader, type SizedSpriteUrl } from "@/components/review/SpritePreloader";
+import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -906,7 +906,7 @@ export function ReviewSession() {
       : null;
   const effectiveCard = lockedCard ?? currentCard;
 
-  // --- Sprite preloading (#705) ---
+  // --- Sprite preloading (#705, extended in #708) ---
   // Warm the browser cache for the current card's reveal-face sprite(s) and
   // the sprites of whatever cards are likely to come next, so neither pops
   // in on grade/reveal. The exact next card depends on how grading mutates
@@ -918,24 +918,47 @@ export function ReviewSession() {
   // newQueue and dueLearning are themselves rebuilt on every render (see
   // buildSessionQueues above), so a useMemo keyed on them would never hit.
   // The cost is a handful of Set ops and O(1) cardMap lookups, and
-  // SpritePreloader keys its <Image> children by URL, so handing it a fresh
-  // array reference each render triggers no refetch.
-  const preloadSpriteUrls: string[] = (() => {
+  // SpritePreloader keys its <Image> children by a composite `${width}:${url}`
+  // string, so handing it a fresh array reference each render triggers no refetch.
+  //
+  // Reverse cards render as a four-tile SpritePicker at 150 px — a different
+  // optimiser variant from the 320 px flip cards. They are expanded into
+  // `preloadPickerUrls` (passed as `sizedUrls` to SpritePreloader) so the
+  // correct variant is warmed. `preloadableSpriteUrls` returns [] for reverse
+  // cards deliberately; the expansion here covers that gap.
+  const preloadSpriteUrls: string[] = [];
+  const preloadPickerUrls: SizedSpriteUrl[] = [];
+
+  (() => {
     const ids = new Set<number>();
     for (const id of reviewQueue.slice(0, 2)) ids.add(id);
     if (newQueue.length > 0) ids.add(newQueue[0]);
     for (const e of dueLearning.slice(0, 2)) ids.add(e.cardId);
     if (effectiveCard !== null) ids.delete(effectiveCard.id);
 
-    const urls: string[] = [];
     // The current card's front face is already on screen; including it here
     // warms its reveal-face sprite (evolution answer / cry sprite).
-    if (effectiveCard !== null) urls.push(...preloadableSpriteUrls(effectiveCard));
+    if (effectiveCard !== null) {
+      preloadSpriteUrls.push(...preloadableSpriteUrls(effectiveCard));
+    }
+
     for (const id of ids) {
       const c = cardMap.get(id);
-      if (c) urls.push(...preloadableSpriteUrls(c));
+      if (!c) continue;
+      if (c.cardType === "reverse") {
+        // Expand the reverse card into its four picker tile sprites at the
+        // same size SpritePicker renders them (PICKER_SPRITE_SIZE = 150 px).
+        const target = SEED_BY_ID.get(c.pokemonId);
+        if (target) {
+          const distractors = pickDistractors(c.pokemonId, SEED_POKEMON, 3, String(c.id));
+          for (const pokemon of [target, ...distractors]) {
+            preloadPickerUrls.push({ src: pokemon.spriteUrl, width: PICKER_SPRITE_SIZE });
+          }
+        }
+      } else {
+        preloadSpriteUrls.push(...preloadableSpriteUrls(c));
+      }
     }
-    return urls;
   })();
 
   // Per-button interval previews — computed for every render (O(1) per grade, cheap).
@@ -1391,7 +1414,7 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-        <SpritePreloader urls={preloadSpriteUrls} />
+        <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
         <div className="flex w-full max-w-xl flex-col gap-2">
           <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
         </div>
@@ -1489,7 +1512,7 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-        <SpritePreloader urls={preloadSpriteUrls} />
+        <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
         <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
         <SpritePicker
           key={`${effectiveCard.id}-${cardPresentationCount}`}
@@ -1526,7 +1549,7 @@ export function ReviewSession() {
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-8">
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-      <SpritePreloader urls={preloadSpriteUrls} />
+      <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
       <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
       {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard
