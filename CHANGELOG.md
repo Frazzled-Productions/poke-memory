@@ -6,6 +6,25 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.9.66] - 2026-05-16
+
+### Added
+
+- Added a plain-language privacy summary to the Privacy Notice page, written so younger users can understand what data the app collects and what controls they have.
+- Added a formal Data Protection Impact Assessment (`docs/dpia.md`) covering the ICO's seven-step structure, produced as good practice under Standard 2 of the UK Children's Code.
+
+### Changed
+
+- Stats: "Struggling cards" now requires a minimum of 3 graduated reviews and a genuine struggle signal (at least one lapse, or FSRS difficulty 7 or above) before a card is listed. Freshly-introduced cards no longer appear as struggling.
+- Removed em dashes from all user-facing copy, replacing them with commas, colons, parentheses, or spaced hyphens so the prose reads consistently across the app, page metadata, and the changelog.
+
+### Fixed
+
+- Reverse cards now speak the Pokémon name on answer when "speak name on reveal" is enabled, consistent with the other card types. When both cry and TTS are on, the name is spoken after the cry finishes.
+- Grading a card no longer cuts off an in-progress Pokémon cry or spoken name. The session now waits for any playing audio to finish before advancing to the next card.
+- Mobile bottom tab bar: tap targets now meet the 44pt Apple HIG minimum and extend into the iOS home-indicator safe-area inset, eliminating the dead tap strip below the icons.
+- Bottom-nav (app-like) mode: the footer is hidden when the tab bar is active, resolving the overlap with the fixed bar. Privacy, Terms, and the fan-project disclaimer remain accessible via Settings, under About.
+
 ## [0.9.65] - 2026-05-16
 
 ### Added
@@ -1050,7 +1069,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.65...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.66...HEAD
+[0.9.66]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.66
 [0.9.65]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.65
 [0.9.64]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.64
 [0.9.63]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.63
