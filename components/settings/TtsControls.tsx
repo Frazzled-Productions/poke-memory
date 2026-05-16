@@ -58,6 +58,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
         </select>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
           English voices from your device. &ldquo;Auto&rdquo; picks the highest-quality British English voice available.
+          This voice is used for the spoken-name fallback; pre-generated name audio uses a fixed British English voice.
         </p>
       </div>
 

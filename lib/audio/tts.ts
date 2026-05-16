@@ -183,6 +183,17 @@ export function speakName(
 
     audio.addEventListener("error", fallbackToSpeech, { once: true });
 
+    // Clear the module reference when playback finishes naturally, so the
+    // "_currentAudio === null means nothing is playing" invariant holds and
+    // the next call does not pause an already-ended element.
+    audio.addEventListener(
+      "ended",
+      () => {
+        if (_currentAudio === audio) _currentAudio = null;
+      },
+      { once: true },
+    );
+
     audio.play().catch(() => {
       fallbackToSpeech();
     });

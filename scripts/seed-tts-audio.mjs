@@ -464,6 +464,7 @@ async function main() {
   let skipped = 0;
   let failed = 0;
   let done = 0;
+  let lastProgress = 0;
 
   process.stderr.write(
     `[tts] Generating audio for ${total} Pokémon using voice ${TTS_VOICE_NAME}\n`,
@@ -476,11 +477,11 @@ async function main() {
       batch.map(async (entry) => {
         const { id, displayName } = entry;
 
-        // Validate id before it reaches the filesystem path. generated.json
-        // always supplies non-negative integers, but constructing destPath
-        // from an unchecked value would be a path-traversal sink; this guard
-        // keeps the resolved path provably inside outputDir.
-        if (!Number.isInteger(id) || id < 0) {
+        // Validate id before it reaches the filesystem path. Valid species
+        // ids are positive integers; constructing destPath from an unchecked
+        // value would be a path-traversal sink, so this guard keeps the
+        // resolved path provably inside outputDir.
+        if (!Number.isInteger(id) || id < 1) {
           process.stderr.write(
             `[tts] FAIL: skipping entry with invalid id: ${JSON.stringify(id)}\n`,
           );
@@ -527,7 +528,11 @@ async function main() {
       }),
     );
 
-    if (done % PROGRESS_INTERVAL === 0 || done === total) {
+    // done advances by CONCURRENCY per batch, so a strict `% INTERVAL` test
+    // would rarely land exactly on a multiple — report once INTERVAL entries
+    // have elapsed since the last line instead.
+    if (done - lastProgress >= PROGRESS_INTERVAL || done === total) {
+      lastProgress = done;
       process.stderr.write(`[tts] [${done}/${total}] written=${written} skipped=${skipped} failed=${failed}\n`);
     }
   }
