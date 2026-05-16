@@ -607,7 +607,12 @@ export default function SettingsPage() {
         "Could not delete your account. Check your connection and try again.",
       );
     }
-    saveFavourite(null);
+    // Note: do NOT call saveFavourite(null) here — deleteAccountEverywhere
+    // has already wiped every poke-memory:* localStorage key. saveFavourite
+    // would re-create the settings key (leaving stale settings the deletion
+    // was meant to erase) and dispatch SETTINGS_SAVED_EVENT, triggering a
+    // doomed pushSettings against the just-deleted account. Only reset the
+    // in-memory React state below.
     setFavouriteId(null);
     updateFavourite(null);
     // Deliberate departure from normal sign-out, which preserves local data:

@@ -89,6 +89,9 @@ export function DeleteAccountDialog({ open, onClose, onConfirm }: Props) {
         onChange={(e) => setValue(e.target.value)}
         placeholder="Type DELETE to confirm"
         aria-label="Type DELETE to confirm account deletion"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         disabled={pending}
         className="mt-4 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 dark:border-zinc-700"
       />
