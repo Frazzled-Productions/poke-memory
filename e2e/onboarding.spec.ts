@@ -82,6 +82,57 @@ test.describe("PWA install nudge (#701)", () => {
     ).toHaveCount(0);
   });
 
+  test("nudge renders and dismisses when engagement threshold is met", async ({
+    page,
+  }) => {
+    // Inject a minimal mock of the deferred install prompt so the Android
+    // variant renders in Chromium (which won't fire beforeinstallprompt in a
+    // test environment). The mock returns "dismissed" so handleInstall does
+    // not call handleDismiss — the dismiss click below is the real trigger.
+    await page.addInitScript(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__pwaInstallPrompt = {
+        prompt: () => Promise.resolve({ outcome: "dismissed" }),
+        userChoice: Promise.resolve({ outcome: "dismissed" }),
+      };
+    });
+
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          appVisitCount: 3,
+          onboarding: {
+            welcomeDismissed: false,
+            practiceHintDismissed: false,
+            statsHintDismissed: false,
+            settingsHintDismissed: false,
+            installNudgeDismissed: false,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    const nudge = page.getByRole("note", { name: /install poké memory/i });
+    await expect(nudge).toBeVisible();
+
+    await nudge.getByRole("button", { name: /dismiss install nudge/i }).click();
+    await expect(nudge).toHaveCount(0);
+
+    // Verify dismiss is persisted to localStorage.
+    const stored = await page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }, SETTINGS_KEY);
+    expect(stored?.onboarding?.installNudgeDismissed).toBe(true);
+  });
+
   test("show tips again resets installNudgeDismissed flag", async ({ page }) => {
     // Seed as dismissed with a high visit count.
     await page.addInitScript((key) => {

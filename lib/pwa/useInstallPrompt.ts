@@ -9,12 +9,14 @@ declare global {
 }
 
 interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>;
+  prompt(): Promise<{ outcome: "accepted" | "dismissed" }>;
   readonly userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+export type InstallPromptOutcome = { outcome: "accepted" | "dismissed" };
+
 export type InstallState =
-  | { platform: "android"; canPrompt: true; prompt: () => Promise<void> }
+  | { platform: "android"; canPrompt: true; prompt: () => Promise<InstallPromptOutcome> }
   | { platform: "ios"; canPrompt: false }
   | { platform: "already-installed"; canPrompt: false }
   | { platform: "unsupported"; canPrompt: false };
@@ -43,6 +45,7 @@ function detectInstallState(): InstallState {
         if (outcome === "accepted") {
           delete window.__pwaInstallPrompt;
         }
+        return { outcome };
       },
     };
   }

@@ -8,7 +8,7 @@ import {
 } from "@/lib/settings/persistence";
 import { useInstallPrompt } from "@/lib/pwa/useInstallPrompt";
 
-const VISIT_SESSION_KEY = "poke-memory:visit-counted";
+const VISIT_SESSION_KEY = "poke-memory:visit-counted:v1";
 const VISIT_THRESHOLD = 3;
 
 export function PwaInstallNudge() {
@@ -30,7 +30,6 @@ export function PwaInstallNudge() {
 
   // Increment visit count once per browser session
   useEffect(() => {
-    if (typeof window === "undefined") return;
     if (sessionStorage.getItem(VISIT_SESSION_KEY)) return;
     sessionStorage.setItem(VISIT_SESSION_KEY, "1");
     const settings = loadSettings();
@@ -51,10 +50,10 @@ export function PwaInstallNudge() {
 
   async function handleInstall() {
     if (installState.platform !== "android") return;
-    await installState.prompt();
-    // Auto-dismiss after accepted — the appinstalled event also fires, but
-    // dismissing here gives immediate feedback even on slower devices.
-    handleDismiss();
+    const { outcome } = await installState.prompt();
+    if (outcome === "accepted") {
+      handleDismiss();
+    }
   }
 
   // Render nothing until localStorage is read, or when conditions aren't met
@@ -71,7 +70,7 @@ export function PwaInstallNudge() {
     <div
       role="note"
       aria-label="Install Poké Memory"
-      className="relative w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+      className="relative mx-auto w-full max-w-md rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
     >
       <button
         type="button"
