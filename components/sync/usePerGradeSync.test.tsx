@@ -284,3 +284,73 @@ describe("usePerGradeSync — consecutive-failure banner (#606)", () => {
     expect(vi.mocked(markPushSucceeded)).toHaveBeenCalledTimes(1);
   });
 });
+
+// ─── Superuser write-guard (#754) ─────────────────────────────────────────────
+//
+// ReviewSession.tsx passes null client/userId to usePerGradeSync when
+// anyFlagOn is true (the superuser write-guard). These tests verify that the
+// hook's null short-circuit actually suppresses every cloud-write path, so a
+// future refactor cannot silently re-enable writes during a QA session.
+
+describe("usePerGradeSync — superuser write-guard (null client/userId)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.mocked(isSyncSafe).mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does not call pushSingleCard when ReviewSession passes null client (superuser guarded)", async () => {
+    // Simulates ReviewSession.tsx: syncClient = null when anyFlagOn is true.
+    const { result } = renderHook(() => usePerGradeSync(null, FAKE_USER));
+
+    act(() => {
+      result.current.enqueueGrade(makeCard(1));
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+    });
+
+    expect(pushSingleCard).not.toHaveBeenCalled();
+  });
+
+  it("does not call pushSingleCard when ReviewSession passes null userId (superuser guarded)", async () => {
+    // Simulates ReviewSession.tsx: syncUserId = null when anyFlagOn is true.
+    const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, null));
+
+    act(() => {
+      result.current.enqueueGrade(makeCard(1));
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+    });
+
+    expect(pushSingleCard).not.toHaveBeenCalled();
+  });
+
+  it("does not call pushSingleCard when both client and userId are null (superuser guarded)", async () => {
+    // The canonical superuser-guarded call: both are null simultaneously.
+    const { result } = renderHook(() => usePerGradeSync(null, null));
+
+    act(() => {
+      result.current.enqueueGrade(makeCard(1));
+      result.current.enqueueGrade(makeCard(2));
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+    });
+
+    expect(pushSingleCard).not.toHaveBeenCalled();
+    expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+    expect(vi.mocked(markPushFailed)).not.toHaveBeenCalled();
+  });
+});
