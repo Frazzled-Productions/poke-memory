@@ -199,7 +199,8 @@ describe("SpritePicker playCryOnAnswer", () => {
     act(() => { fireEvent.click(correctTile); });
 
     expect(mockPlayCry).toHaveBeenCalledOnce();
-    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg", 0.6);
+    // speakNameOnAnswer is false (not passed), so speakAfterCry callback is undefined.
+    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg", 0.6, undefined);
   });
 
   it("plays the cry on an incorrect pick when playCryOnAnswer is true", () => {
@@ -216,7 +217,8 @@ describe("SpritePicker playCryOnAnswer", () => {
     act(() => { fireEvent.click(incorrectTile); });
 
     expect(mockPlayCry).toHaveBeenCalledOnce();
-    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg", 0.6);
+    // speakNameOnAnswer is false (not passed), so speakAfterCry callback is undefined.
+    expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg", 0.6, undefined);
   });
 
   it("does NOT play the cry when playCryOnAnswer is false", () => {
@@ -266,7 +268,89 @@ describe("SpritePicker playCryOnAnswer", () => {
 
     // playCry is still called — with null — so the audio module handles the
     // null case itself (as it does on flip cards). No throw is expected.
+    // speakNameOnAnswer is false (not passed), so speakAfterCry callback is undefined.
     expect(mockPlayCry).toHaveBeenCalledOnce();
-    expect(mockPlayCry).toHaveBeenCalledWith(null, 0.6);
+    expect(mockPlayCry).toHaveBeenCalledWith(null, 0.6, undefined);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SpritePicker — speakNameOnAnswer tests (#731)
+// ---------------------------------------------------------------------------
+
+import { speakName as mockSpeakName } from "@/lib/audio/tts";
+
+describe("SpritePicker speakNameOnAnswer", () => {
+  const TARGET_WITH_CRY = makePokemon({ id: 1, name: "Bulbasaur", cryUrl: "https://example.com/bulbasaur.ogg" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("calls speakName directly when speakNameOnAnswer is true and playCryOnAnswer is false", () => {
+    render(
+      <SpritePicker
+        targetPokemon={TARGET_WITH_CRY}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+        playCryOnAnswer={false}
+        speakNameOnAnswer={true}
+      />,
+    );
+
+    const correctTile = screen.getByRole("button", { name: "Bulbasaur" });
+    act(() => { fireEvent.click(correctTile); });
+
+    expect(mockPlayCry).not.toHaveBeenCalled();
+    expect(mockSpeakName).toHaveBeenCalledOnce();
+    expect(mockSpeakName).toHaveBeenCalledWith("Bulbasaur", 1);
+  });
+
+  it("chains speakName after cry when both speakNameOnAnswer and playCryOnAnswer are true", () => {
+    render(
+      <SpritePicker
+        targetPokemon={TARGET_WITH_CRY}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+        playCryOnAnswer={true}
+        speakNameOnAnswer={true}
+      />,
+    );
+
+    const correctTile = screen.getByRole("button", { name: "Bulbasaur" });
+    act(() => { fireEvent.click(correctTile); });
+
+    // playCry is called with a speakAfterCry callback (not undefined).
+    expect(mockPlayCry).toHaveBeenCalledOnce();
+    const [, , callbackArg] = (mockPlayCry as ReturnType<typeof vi.fn>).mock.calls[0] as [string, number, (() => void) | undefined];
+    expect(typeof callbackArg).toBe("function");
+
+    // speakName is NOT called directly — it fires via the callback.
+    expect(mockSpeakName).not.toHaveBeenCalled();
+
+    // Simulating the onEnded callback fires speakName.
+    act(() => { callbackArg?.(); });
+    expect(mockSpeakName).toHaveBeenCalledOnce();
+    expect(mockSpeakName).toHaveBeenCalledWith("Bulbasaur", 1);
+  });
+
+  it("does NOT call speakName when speakNameOnAnswer is false (default)", () => {
+    render(
+      <SpritePicker
+        targetPokemon={TARGET_WITH_CRY}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+      />,
+    );
+
+    const correctTile = screen.getByRole("button", { name: "Bulbasaur" });
+    act(() => { fireEvent.click(correctTile); });
+
+    expect(mockSpeakName).not.toHaveBeenCalled();
   });
 });
