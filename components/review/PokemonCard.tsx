@@ -1,7 +1,7 @@
 import Image from "next/image";
 import type { PokemonFact } from "@/lib/pokemon/facts";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
-import { speakName } from "@/lib/audio/tts";
+import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 
 type Props = {
   spriteUrl: string;
@@ -36,14 +36,7 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
               <p className="text-3xl font-semibold tracking-wide capitalize text-foreground">
                 {name}
               </p>
-              <button
-                type="button"
-                aria-label={`Hear ${name}`}
-                onClick={() => speakName(name, id)}
-                className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-              >
-                🔊
-              </button>
+              <NameTtsButton name={name} id={id} size="reveal" />
             </div>
             {fact && (
               <div className="mt-1 text-center sm:mt-2">

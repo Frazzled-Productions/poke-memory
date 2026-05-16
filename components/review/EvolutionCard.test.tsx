@@ -9,6 +9,8 @@ vi.mock("next/image", () => ({
   ),
 }));
 
+vi.mock("@/lib/audio/tts", () => ({ speakName: vi.fn() }));
+
 const PRE_SPRITE = "https://example.com/charmander.png";
 const POST_SPRITE = "https://example.com/charmeleon.png";
 
@@ -144,5 +146,35 @@ describe("EvolutionCard", () => {
 
     expect(screen.queryByText("Type")).not.toBeInTheDocument();
     expect(screen.queryByText("Fire")).not.toBeInTheDocument();
+  });
+
+  it("renders an inline TTS button for the pre-evo name in the prompt", () => {
+    render(
+      <EvolutionCard
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
+        revealed={false}
+        preEvoId={4}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hear charmander" })).toBeInTheDocument();
+  });
+
+  it("renders a reveal TTS button for the post-evo name after reveal", () => {
+    render(
+      <EvolutionCard
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
+        revealed={true}
+        postEvoId={5}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hear charmeleon" })).toBeInTheDocument();
   });
 });

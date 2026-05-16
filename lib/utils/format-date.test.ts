@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  isoDate,
   todayInTimezone,
   formatDate,
   formatShortDate,
@@ -7,6 +8,31 @@ import {
   detectTimezone,
   type DateFormat,
 } from "./format-date";
+
+// ---------------------------------------------------------------------------
+// isoDate
+// ---------------------------------------------------------------------------
+
+describe("isoDate", () => {
+  it("formats a UTC Date as YYYY-MM-DD", () => {
+    expect(isoDate(new Date("2026-05-14T00:00:00Z"))).toBe("2026-05-14");
+  });
+
+  it("uses UTC, not local time — midnight UTC stays on the same day", () => {
+    // A Date at exactly midnight UTC is 2026-01-01 in UTC.
+    expect(isoDate(new Date("2026-01-01T00:00:00Z"))).toBe("2026-01-01");
+  });
+
+  it("truncates the time component correctly at noon UTC", () => {
+    expect(isoDate(new Date("2026-05-14T12:34:56Z"))).toBe("2026-05-14");
+  });
+
+  it("returns a string matching YYYY-MM-DD format", () => {
+    const result = isoDate(new Date("2024-02-29T06:00:00Z"));
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result).toBe("2024-02-29");
+  });
+});
 
 // ---------------------------------------------------------------------------
 // todayInTimezone

@@ -1,6 +1,7 @@
 import type { NameReviewCard } from "@/lib/review/session";
 import type { GradeLog } from "@/lib/gradelog/persistence";
 import { isMastered } from "./derive";
+import { isoDate } from "@/lib/utils/format-date";
 
 export type Records = {
   /** Longest run of consecutive review dates ever recorded. */
@@ -43,7 +44,7 @@ export function computeLongestStreak(dates: readonly string[]): number {
     // is missing — so each run is counted once in O(n) total.
     const prev = new Date(d + "T00:00:00Z");
     prev.setUTCDate(prev.getUTCDate() - 1);
-    const prevIso = prev.toISOString().slice(0, 10);
+    const prevIso = isoDate(prev);
     if (set.has(prevIso)) continue;
 
     let cursor = d;
@@ -52,7 +53,7 @@ export function computeLongestStreak(dates: readonly string[]): number {
       count++;
       const next = new Date(cursor + "T00:00:00Z");
       next.setUTCDate(next.getUTCDate() + 1);
-      cursor = next.toISOString().slice(0, 10);
+      cursor = isoDate(next);
     }
     if (count > longest) longest = count;
   }

@@ -4,6 +4,7 @@ import {
   type Grade,
   type ReviewState,
 } from "./scheduler";
+import { isoDate } from "@/lib/utils/format-date";
 
 /**
  * One entry in a fixture life: the grade applied, and the number of days
@@ -90,7 +91,7 @@ export function simulate(
     cursor += step.daysSinceLast * 86_400_000;
     const now = new Date(cursor);
     state = nextReview(state, step.grade, now);
-    trace.push(rowOf(idx, step.grade, step.daysSinceLast, now.toISOString().slice(0, 10), state));
+    trace.push(rowOf(idx, step.grade, step.daysSinceLast, isoDate(now), state));
   });
 
   return { trace, final: state };
