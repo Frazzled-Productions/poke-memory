@@ -1260,3 +1260,213 @@ describe('alternate-form cards (#447)', () => {
     });
   });
 });
+
+// ============================================================
+// buildSessionQueues — "unlimited reviews" edge (#AGENTS.md)
+// ============================================================
+// From AGENTS.md:
+//   "Cards first seen today have firstSeen === today set permanently on the
+//    first grade, so subsequent grades of the same card never count toward
+//    reviewsDoneToday. The 100/day review soft wall therefore cannot fire on
+//    a session built from cleared localStorage."
+//
+// reviewsDoneToday increments only when:
+//   lastReview === today AND firstSeen !== today
+//
+// A card introduced today (firstSeen === today) must never count as a review
+// even if lastReview === today (because it was also introduced today).
+
+describe("buildSessionQueues — firstSeen=today never increments reviewsDoneToday", () => {
+  const TODAY = '2026-05-09';
+  const baseLimits: DailyLimits = {
+    name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+    reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  function nameCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): NameReviewCard {
+    return {
+      ...makeSeedPokemon(id),
+      cardType: 'name',
+      subjectKey: String(id),
+      state: { ...initialReviewState(NOW), ...partialState },
+    };
+  }
+
+  it("card with firstSeen=today and lastReview=today does NOT count toward reviewsDoneToday", () => {
+    // Simulates a card introduced today, graded multiple times in the same
+    // session. The in-step grades do not set lastReview, but once it graduates
+    // on the same day it was first seen, both firstSeen and lastReview land on
+    // today. The reviewsDoneToday counter must stay zero for this card.
+    const cards: ReviewableCard[] = [
+      nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
+    ];
+    const queues = buildSessionQueues(cards, baseLimits, TODAY);
+    expect(queues.perType.name.reviewsDoneToday).toBe(0);
+    expect(queues.reviewsDoneToday).toBe(0);
+  });
+
+  it("card with firstSeen=today and lastReview=today counts toward newIntroducedToday", () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
+    ];
+    const queues = buildSessionQueues(cards, baseLimits, TODAY);
+    expect(queues.perType.name.newIntroducedToday).toBe(1);
+  });
+
+  it("multiple repeat grades within the same day on a same-day-introduced card keep reviewsDoneToday at zero", () => {
+    // Three cards all introduced today, all with lastReview today. None should
+    // contribute to reviewsDoneToday.
+    const cards: ReviewableCard[] = [
+      nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
+      nameCard(2, { firstSeen: TODAY, lastReview: TODAY, reps: 2 }),
+      nameCard(3, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
+    ];
+    const queues = buildSessionQueues(cards, baseLimits, TODAY);
+    expect(queues.reviewsDoneToday).toBe(0);
+    expect(queues.perType.name.newIntroducedToday).toBe(3);
+  });
+
+  it("only cards with firstSeen !== today AND lastReview = today count as reviews", () => {
+    const cards: ReviewableCard[] = [
+      // Introduced on a prior day, reviewed today → counts as review
+      nameCard(1, { firstSeen: '2026-05-01', lastReview: TODAY, reps: 3, scheduledDays: 8 }),
+      // Introduced today, reviewed today → does NOT count as review
+      nameCard(2, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
+    ];
+    const queues = buildSessionQueues(cards, baseLimits, TODAY);
+    expect(queues.reviewsDoneToday).toBe(1);
+    expect(queues.perType.name.newIntroducedToday).toBe(1);
+  });
+});
+
+// ============================================================
+// buildSessionQueues — exact-cap boundary (N budget, N+1th excluded)
+// ============================================================
+describe("buildSessionQueues — exact-cap boundary", () => {
+  const TODAY = '2026-05-09';
+
+  function nameCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): NameReviewCard {
+    return {
+      ...makeSeedPokemon(id),
+      cardType: 'name',
+      subjectKey: String(id),
+      state: { ...initialReviewState(NOW), ...partialState },
+    };
+  }
+  function evoCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): EvolutionReviewCard {
+    const preEvoId = id - 1_500_000;
+    const postEvoId = id - 1_500_000 + 100_000;
+    return {
+      ...makeEvoEdge({
+        id,
+        preEvoId,
+        preEvoName: 'pre-' + id,
+        postEvoId,
+        postEvoName: 'post-' + id,
+      }),
+      subjectKey: `${preEvoId}>>>${postEvoId}`,
+      state: { ...initialReviewState(NOW), ...partialState },
+    };
+  }
+
+  it("exactly N new cards fill the budget and the (N+1)th is excluded", () => {
+    // Budget of 3 for new name cards. Provide exactly 3 + 1 = 4 fresh cards.
+    const limits: DailyLimits = {
+      name: { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+      reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3), nameCard(4), // 4 fresh, cap = 3
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    expect(queues.newQueue.filter((id) => id <= 4)).toHaveLength(3); // exactly the cap
+    // The 4th must not be in the queue.
+    const newIds = new Set(queues.newQueue);
+    const allFourPresent = [1, 2, 3, 4].every((id) => newIds.has(id));
+    expect(allFourPresent).toBe(false); // one must be excluded
+  });
+
+  it("exactly N reviews fill the budget and the (N+1)th is excluded", () => {
+    // Budget of 2 reviews. Provide 3 due-today cards.
+    const limits: DailyLimits = {
+      name: { maxNewPerDay: 10, maxReviewsPerDay: 2 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+      reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    };
+    const dueState = { firstSeen: '2026-05-01', lastReview: '2026-05-03', dueDate: TODAY, reps: 2, scheduledDays: 6 };
+    const cards: ReviewableCard[] = [
+      nameCard(1, dueState), nameCard(2, dueState), nameCard(3, dueState),
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    expect(queues.reviewQueue).toHaveLength(2); // exactly the cap
+    // All three cannot all be present — one must be excluded.
+    const reviewIds = new Set(queues.reviewQueue);
+    expect(reviewIds.size).toBe(2);
+  });
+
+  it("budget already at cap (newIntroducedToday === maxNewPerDay) prevents any new cards entering the queue", () => {
+    // 3 cards already introduced today → at cap. 2 more fresh candidates should
+    // receive zero new slots.
+    const limits: DailyLimits = {
+      name: { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+      reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      // Already introduced today (consume the budget)
+      nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
+      nameCard(2, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
+      nameCard(3, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
+      // Fresh candidates — should be excluded since budget is exhausted
+      nameCard(4),
+      nameCard(5),
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    expect(queues.perType.name.newIntroducedToday).toBe(3);
+    expect(queues.newQueue.filter((id) => id >= 4)).toHaveLength(0);
+  });
+
+  it("budget exactly at cap minus one allows exactly one more new card", () => {
+    // 2 introduced, cap = 3 → 1 slot remaining. 2 candidates compete; only 1 enters.
+    const limits: DailyLimits = {
+      name: { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+      reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }), // introduced today
+      nameCard(2, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }), // introduced today
+      nameCard(3), // fresh candidate 1
+      nameCard(4), // fresh candidate 2
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    expect(queues.perType.name.newIntroducedToday).toBe(2);
+    const freshInQueue = queues.newQueue.filter((id) => id === 3 || id === 4);
+    expect(freshInQueue).toHaveLength(1); // exactly one slot remaining
+  });
+
+  it("evolution budget is independent: filling the name cap leaves evo slots intact", () => {
+    // Name cap = 2, evolution cap = 1. Filling name must not spill into evo.
+    const limits: DailyLimits = {
+      name: { maxNewPerDay: 2, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 1, maxReviewsPerDay: 50 },
+      reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3), // 3 fresh name (cap=2)
+      evoCard(1_500_001), evoCard(1_500_002), // 2 fresh evo (cap=1)
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    const allNewCards = queues.newQueue.map((id) => cards.find((c) => c.id === id)!);
+    expect(allNewCards.filter((c) => c.cardType === 'name')).toHaveLength(2);
+    expect(allNewCards.filter((c) => c.cardType === 'evolution')).toHaveLength(1);
+  });
+});
