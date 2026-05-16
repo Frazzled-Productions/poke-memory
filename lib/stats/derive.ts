@@ -185,7 +185,8 @@ export type StatsResult = {
   dueForecast: readonly DueForecastDay[];
   perGeneration: readonly GenerationStats[];
   perType: readonly TypeStats[];          // 18 entries, alphabetical by `POKEMON_TYPES` order
-  struggling: readonly StrugglingCard[]; // bottom-N introduced cards by easeFactor, ascending
+  /** Introduced cards that pass both struggle gates (reps >= STRUGGLING_MIN_REPS AND lapsed at least once or difficulty >= STRUGGLING_DIFFICULTY_CUTOFF), sorted by FSRS difficulty descending, capped at strugglingLimit. */
+  struggling: readonly StrugglingCard[];
 };
 
 // ---------------------------------------------------------------------------
@@ -222,8 +223,10 @@ export const DUE_FORECAST_DAYS = 14;
  *   - `mastered` cards = repetitions >= masteryRepetitions AND interval >= 21.
  *   - `dueToday` excludes cards already reviewed today (matches the queue policy).
  *   - `dueTomorrow` is exact-match on tomorrow's ISO date.
- *   - `struggling` is the bottom `strugglingLimit` *introduced* cards sorted
- *     ascending by `easeFactor`, tie-broken by lower repetitions, then by lower id.
+ *   - `struggling` is the top `strugglingLimit` introduced cards that pass both
+ *     gates: reps >= STRUGGLING_MIN_REPS AND (lapses > 0 OR difficulty >=
+ *     STRUGGLING_DIFFICULTY_CUTOFF). Sorted by FSRS difficulty descending,
+ *     tie-broken by fewer reps then lower id.
  *   - `perGeneration` covers all 9 generations even when introduced=0.
  */
 export function computeStats(
