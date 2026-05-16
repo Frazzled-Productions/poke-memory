@@ -6,6 +6,24 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ — see changelog.d/README.md -->
 
+## [0.9.64] — 2026-05-16
+
+### Added
+
+- "Hear name" now plays pre-generated British English audio (Google Cloud Chirp 3 HD) for each Pokémon, with the browser's Web Speech API kept as an automatic fallback when no audio file is available.
+
+### Changed
+
+- Removed the "non-commercial" wording from the fan-project disclaimer in the README and privacy notice; the non-affiliation statement and sprite-provenance note are unchanged.
+- Privacy notice and README now accurately list both GitHub and Google as sign-in providers; the privacy notice's sub-processor table gains a Google (OAuth) row and the signed-in copy no longer hard-codes GitHub.
+
+### Fixed
+
+- The "Share today" button now persists on the practice complete screen across page reloads until the next calendar day. Previously, refreshing the page after finishing a session caused the button to disappear.
+- Practice cards now preload upcoming sprites in the background, so a new card's image appears immediately on grade or reveal instead of popping in after a delay.
+- Reverse (sprite-picker) cards now play the Pokémon's cry at the answer-feedback moment when "Play cry on reveal" is enabled, matching the behaviour of name and evolution cards.
+- Reverse-card picker tiles (the 2×2 sprite grid) now preload at the correct 150 px size, eliminating the pop-in delay when a new reverse card appears.
+
 ## [0.9.63] — 2026-05-15
 
 ### Added
@@ -1017,7 +1035,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** — when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** — code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.63...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.64...HEAD
+[0.9.64]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.64
 [0.9.63]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.63
 [0.9.62]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.62
 [0.9.61]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.61
