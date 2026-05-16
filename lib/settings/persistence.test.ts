@@ -135,6 +135,7 @@ describe('loadSettings migration', () => {
       seenStreakMilestones: [3, 7],
       earnedBadges: [{ id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' }],
       onboarding: { ...DEFAULT_ONBOARDING },
+      appVisitCount: 7,
       alternateFormsEnabled: true,
       ttsVoice: 'Daniel:en-GB',
       ttsRate: 1.5,
@@ -495,6 +496,7 @@ describe('themeIntensity setting (#411)', () => {
           practiceHintDismissed: false,
           statsHintDismissed: true,
           settingsHintDismissed: false,
+          installNudgeDismissed: true,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -502,6 +504,7 @@ describe('themeIntensity setting (#411)', () => {
         practiceHintDismissed: false,
         statsHintDismissed: true,
         settingsHintDismissed: false,
+        installNudgeDismissed: true,
       });
     });
 
@@ -533,6 +536,7 @@ describe('themeIntensity setting (#411)', () => {
         practiceHintDismissed: false,
         statsHintDismissed: false,
         settingsHintDismissed: true,
+        installNudgeDismissed: false,
       });
     });
   });
