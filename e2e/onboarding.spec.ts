@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+const SETTINGS_KEY = "poke-memory:settings:v1";
+
 test.describe("Onboarding (#433)", () => {
   test("welcome callout appears on a fresh visit and stays dismissed", async ({
     page,
@@ -39,5 +41,80 @@ test.describe("Onboarding (#433)", () => {
     await expect(
       page.getByRole("note", { name: /welcome to poké memory/i }),
     ).toBeVisible();
+  });
+});
+
+test.describe("PWA install nudge (#701)", () => {
+  test("nudge is absent on a fresh visit (below engagement threshold)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    // Fresh localStorage → appVisitCount = 0 (incremented to 1 by the mount
+    // effect, still below the threshold of 3). The nudge must not appear.
+    await expect(
+      page.getByRole("note", { name: /install poké memory/i }),
+    ).toHaveCount(0);
+  });
+
+  test("nudge is absent when installNudgeDismissed is persisted", async ({
+    page,
+  }) => {
+    // Seed settings with visitCount at threshold but already dismissed.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          appVisitCount: 5,
+          onboarding: {
+            welcomeDismissed: false,
+            practiceHintDismissed: false,
+            statsHintDismissed: false,
+            settingsHintDismissed: false,
+            installNudgeDismissed: true,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    await expect(
+      page.getByRole("note", { name: /install poké memory/i }),
+    ).toHaveCount(0);
+  });
+
+  test("show tips again resets installNudgeDismissed flag", async ({ page }) => {
+    // Seed as dismissed with a high visit count.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          appVisitCount: 5,
+          onboarding: {
+            welcomeDismissed: true,
+            practiceHintDismissed: true,
+            statsHintDismissed: true,
+            settingsHintDismissed: true,
+            installNudgeDismissed: true,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /account & data/i }).click();
+    await page.getByRole("button", { name: /show tips again/i }).click();
+
+    // After the reset, installNudgeDismissed must be false in localStorage.
+    const stored = await page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }, SETTINGS_KEY);
+
+    expect(stored?.onboarding?.installNudgeDismissed).toBe(false);
   });
 });

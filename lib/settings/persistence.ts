@@ -35,6 +35,8 @@ export type OnboardingFlags = {
   practiceHintDismissed: boolean;
   statsHintDismissed: boolean;
   settingsHintDismissed: boolean;
+  /** PWA install nudge (#701). `true` = user dismissed it; resets with the onboarding reset button. */
+  installNudgeDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -42,6 +44,7 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   practiceHintDismissed: false,
   statsHintDismissed: false,
   settingsHintDismissed: false,
+  installNudgeDismissed: false,
 };
 
 /**
@@ -137,6 +140,14 @@ export type UserSettings = {
   /** ISO timestamp of the last successful weight optimization run (#268). */
   fsrsWeightsOptimizedAt?: string;
   /**
+   * Number of distinct browser sessions in which the app has been visited.
+   * Used to gate the PWA install nudge (#701) — shown only after 3 visits.
+   * Incremented once per session (guarded by sessionStorage). Missing in
+   * pre-#701 records; parses to 0 so existing users are not forced through the
+   * threshold immediately (they will still see the nudge after 3 more visits).
+   */
+  appVisitCount: number;
+  /**
    * Mobile navigation style (#661). `'bottom'` = fixed tab bar (new-user
    * default); `'hamburger'` = slide-in drawer (existing-user default for
    * records that pre-date this field). See `MobileNav` type.
@@ -199,6 +210,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   seenStreakMilestones: [],
   earnedBadges: [],
   onboarding: DEFAULT_ONBOARDING,
+  appVisitCount: 0,
   // New users get the bottom tab bar; existing users who have a settings record
   // without this field are migrated to 'hamburger' in parseStoredSettings.
   mobileNav: "bottom" as MobileNav,
@@ -385,6 +397,12 @@ function parseStoredSettings(raw: string | null): UserSettings {
     seenStreakMilestones: validateSeenStreakMilestones(obj.seenStreakMilestones),
     earnedBadges: validateEarnedBadges(obj.earnedBadges),
     onboarding: validateOnboarding(obj.onboarding),
+    appVisitCount:
+      typeof obj.appVisitCount === "number" &&
+      Number.isInteger(obj.appVisitCount) &&
+      obj.appVisitCount >= 0
+        ? obj.appVisitCount
+        : DEFAULT_SETTINGS.appVisitCount,
     ttsVoice:
       typeof obj.ttsVoice === "string" ? obj.ttsVoice : DEFAULT_SETTINGS.ttsVoice,
     ttsRate:
@@ -420,6 +438,7 @@ function validateOnboarding(value: unknown): OnboardingFlags {
     practiceHintDismissed: v.practiceHintDismissed === true,
     statsHintDismissed: v.statsHintDismissed === true,
     settingsHintDismissed: v.settingsHintDismissed === true,
+    installNudgeDismissed: v.installNudgeDismissed === true,
   };
 }
 
