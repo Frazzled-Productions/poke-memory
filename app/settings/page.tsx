@@ -1346,7 +1346,8 @@ export default function SettingsPage() {
                     </p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Restores the welcome message and the contextual hints on
-                      Practice, Stats, and Settings.
+                      Practice, Stats, and Settings — including the audio and
+                      card-type nudges.
                     </p>
                     <button
                       type="button"

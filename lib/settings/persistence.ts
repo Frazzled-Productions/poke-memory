@@ -37,6 +37,18 @@ export type OnboardingFlags = {
   settingsHintDismissed: boolean;
   /** PWA install nudge (#701). `true` = user dismissed it; resets with the onboarding reset button. */
   installNudgeDismissed: boolean;
+  /**
+   * Audio-features nudge (#702). Shown at card reveal when the user has no
+   * audio behaviour switched on, pointing them to Settings → Audio (cry
+   * playback and spoken names). `true` = user dismissed it.
+   */
+  audioHintDismissed: boolean;
+  /**
+   * Card-types nudge (#702). Shown on the session-complete screen when at
+   * least one off-by-default card type (reverse, reverse-evolution, alternate
+   * forms) is still disabled. `true` = user dismissed it.
+   */
+  cardTypesHintDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -45,6 +57,8 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   statsHintDismissed: false,
   settingsHintDismissed: false,
   installNudgeDismissed: false,
+  audioHintDismissed: false,
+  cardTypesHintDismissed: false,
 };
 
 /**
@@ -439,6 +453,8 @@ function validateOnboarding(value: unknown): OnboardingFlags {
     statsHintDismissed: v.statsHintDismissed === true,
     settingsHintDismissed: v.settingsHintDismissed === true,
     installNudgeDismissed: v.installNudgeDismissed === true,
+    audioHintDismissed: v.audioHintDismissed === true,
+    cardTypesHintDismissed: v.cardTypesHintDismissed === true,
   };
 }
 

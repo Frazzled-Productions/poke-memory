@@ -96,6 +96,54 @@ describe("OnboardingHint", () => {
     expect(await screen.findByText("Body.")).toBeTruthy();
   });
 
+  it("dismissing the audio hint persists audioHintDismissed (#702)", async () => {
+    render(
+      <OnboardingHint id="audioHintDismissed">Turn on audio.</OnboardingHint>,
+    );
+    const dismiss = await screen.findByRole("button", {
+      name: /dismiss hint/i,
+    });
+    await userEvent.click(dismiss);
+
+    expect(currentSettings.onboarding.audioHintDismissed).toBe(true);
+    expect(screen.queryByText("Turn on audio.")).toBeNull();
+  });
+
+  it("dismissing the card-types hint persists cardTypesHintDismissed (#702)", async () => {
+    render(
+      <OnboardingHint id="cardTypesHintDismissed">More variety.</OnboardingHint>,
+    );
+    const dismiss = await screen.findByRole("button", {
+      name: /dismiss hint/i,
+    });
+    await userEvent.click(dismiss);
+
+    expect(currentSettings.onboarding.cardTypesHintDismissed).toBe(true);
+    expect(screen.queryByText("More variety.")).toBeNull();
+  });
+
+  it("dismissal preserves other onboarding flags when onboarding is absent", async () => {
+    // Pre-#433 / stub-mocked settings may omit `onboarding`. The dismissal
+    // fallback must produce a full OnboardingFlags shape so later-added flags
+    // (#702) are not dropped.
+    const partial = { ...DEFAULT_SETTINGS } as Partial<UserSettings>;
+    delete (partial as { onboarding?: unknown }).onboarding;
+    currentSettings = partial as UserSettings;
+
+    render(
+      <OnboardingHint id="audioHintDismissed">Turn on audio.</OnboardingHint>,
+    );
+    const dismiss = await screen.findByRole("button", {
+      name: /dismiss hint/i,
+    });
+    await userEvent.click(dismiss);
+
+    expect(currentSettings.onboarding).toEqual({
+      ...DEFAULT_SETTINGS.onboarding,
+      audioHintDismissed: true,
+    });
+  });
+
   it("treats an absent onboarding field as not dismissed (defensive)", async () => {
     // Older stored payloads written before #433 omit the onboarding field.
     // The component must not crash and must show the hint.

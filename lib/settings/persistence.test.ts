@@ -497,6 +497,8 @@ describe('themeIntensity setting (#411)', () => {
           statsHintDismissed: true,
           settingsHintDismissed: false,
           installNudgeDismissed: true,
+          audioHintDismissed: false,
+          cardTypesHintDismissed: true,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -505,6 +507,8 @@ describe('themeIntensity setting (#411)', () => {
         statsHintDismissed: true,
         settingsHintDismissed: false,
         installNudgeDismissed: true,
+        audioHintDismissed: false,
+        cardTypesHintDismissed: true,
       });
     });
 
@@ -528,6 +532,8 @@ describe('themeIntensity setting (#411)', () => {
             practiceHintDismissed: 1,
             statsHintDismissed: null,
             settingsHintDismissed: true,
+            audioHintDismissed: 'yes',
+            cardTypesHintDismissed: 0,
           },
         }),
       );
@@ -537,6 +543,8 @@ describe('themeIntensity setting (#411)', () => {
         statsHintDismissed: false,
         settingsHintDismissed: true,
         installNudgeDismissed: false,
+        audioHintDismissed: false,
+        cardTypesHintDismissed: false,
       });
     });
   });
