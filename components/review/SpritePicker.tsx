@@ -72,7 +72,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
     // Play the target cry at the answer-feedback moment — the reverse-card
     // equivalent of the reveal moment on flip cards (#707).
     if (playCryOnAnswer) {
-      playCry(targetPokemon.cryUrl ?? null, 0.6);
+      playCry(targetPokemon.cryUrl, 0.6);
     }
 
     if (tile.isCorrect) {
