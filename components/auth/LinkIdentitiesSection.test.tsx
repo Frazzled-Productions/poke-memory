@@ -57,7 +57,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
       expect(
@@ -72,7 +71,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
       expect(
@@ -87,7 +85,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
       expect(
@@ -105,7 +102,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
       expect(
@@ -122,7 +118,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
       expect(
@@ -140,7 +135,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
       expect(
@@ -158,7 +152,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
       expect(
@@ -176,7 +169,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
       expect(
@@ -189,15 +181,15 @@ describe("LinkIdentitiesSection", () => {
   });
 
   describe("linking flow", () => {
-    it("calls linkIdentity with the correct provider and redirectTo", async () => {
+    it("calls linkIdentity with the correct provider and redirectTo from NEXT_PUBLIC_SITE_URL", async () => {
       const ue = userEvent.setup();
       const user = makeUser(["github"]);
       const supabase = makeMockSupabase({ error: null });
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pokememory.com");
       render(
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://pokememory.com"
         />,
       );
 
@@ -209,6 +201,32 @@ describe("LinkIdentitiesSection", () => {
           options: { redirectTo: "https://pokememory.com/api/auth/callback" },
         });
       });
+
+      vi.unstubAllEnvs();
+    });
+
+    it("falls back to localhost redirectTo when NEXT_PUBLIC_SITE_URL is unset", async () => {
+      const ue = userEvent.setup();
+      const user = makeUser(["github"]);
+      const supabase = makeMockSupabase({ error: null });
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", undefined);
+      render(
+        <LinkIdentitiesSection
+          user={user}
+          supabase={supabase as never}
+        />,
+      );
+
+      await ue.click(screen.getByRole("button", { name: /connect google/i }));
+
+      await waitFor(() => {
+        expect(supabase.auth.linkIdentity).toHaveBeenCalledWith({
+          provider: "google",
+          options: { redirectTo: "http://localhost:3000/api/auth/callback" },
+        });
+      });
+
+      vi.unstubAllEnvs();
     });
 
     it("disables the button while a link is pending", async () => {
@@ -224,7 +242,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
 
@@ -248,7 +265,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
 
@@ -271,7 +287,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
 
@@ -297,7 +312,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
 
@@ -307,7 +321,7 @@ describe("LinkIdentitiesSection", () => {
         expect(
           screen.getByTestId("link-identities-error"),
         ).toHaveTextContent(
-          "That email address is already associated with a different account.",
+          "That email address is already linked to a different account. Sign in with that account directly.",
         );
       });
     });
@@ -324,7 +338,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
 
@@ -347,7 +360,6 @@ describe("LinkIdentitiesSection", () => {
         <LinkIdentitiesSection
           user={user}
           supabase={supabase as never}
-          siteUrl="https://example.com"
         />,
       );
 

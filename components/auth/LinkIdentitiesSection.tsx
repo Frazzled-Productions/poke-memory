@@ -29,8 +29,6 @@ type LinkState = "idle" | "pending" | "success" | "error";
 type Props = {
   user: User;
   supabase: SupabaseClient;
-  /** Origin used to build the linkIdentity redirectTo. Defaults to window.location.origin. */
-  siteUrl?: string;
 };
 
 /**
@@ -65,15 +63,12 @@ function friendlyError(rawMessage: string): string {
     return "That provider is already connected to your account.";
   }
 
-  // The email on the OAuth account is already in use by a different user.
-  if (
-    msg.includes("email address is already used") ||
-    msg.includes("email already in use") ||
-    msg.includes("email conflict") ||
-    msg.includes("a user with this email address has already been registered") ||
-    msg.includes("already registered")
-  ) {
-    return "That email address is already associated with a different account. Sign in with that account to merge instead.";
+  // The email on the OAuth account is already in use by a different Supabase user.
+  // Supabase returns "a user with this email address has already been registered"
+  // for the identity-already-linked-to-another-user case. We match the full
+  // phrase to avoid misclassifying unrelated errors that happen to mention "registered".
+  if (msg.includes("a user with this email address has already been registered")) {
+    return "That email address is already linked to a different account. Sign in with that account directly.";
   }
 
   return "Could not connect the provider. Please try again.";
@@ -88,13 +83,13 @@ function LinkProviderRow({
   disabled,
 }: {
   provider: AuthProvider;
-  onLink: (provider: AuthProvider) => void;
+  onLink: () => void;
   disabled: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onLink(provider)}
+      onClick={onLink}
       disabled={disabled}
       className="min-h-[44px] w-full rounded-lg border border-zinc-300 bg-background px-4 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
       aria-label={`Connect ${PROVIDER_LABELS[provider]}`}
@@ -110,7 +105,7 @@ function LinkProviderRow({
  *
  * Only rendered when the user is signed in (the caller gates on this).
  */
-export function LinkIdentitiesSection({ user, supabase, siteUrl }: Props) {
+export function LinkIdentitiesSection({ user, supabase }: Props) {
   const [linkState, setLinkState] = useState<LinkState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
@@ -124,12 +119,11 @@ export function LinkIdentitiesSection({ user, supabase, siteUrl }: Props) {
     setErrorMsg(null);
 
     try {
-      const origin =
-        siteUrl ??
-        (typeof window !== "undefined" ? window.location.origin : "");
+      const base =
+        process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
       const { error } = await supabase.auth.linkIdentity({
         provider,
-        options: { redirectTo: `${origin}/api/auth/callback` },
+        options: { redirectTo: `${base}/api/auth/callback` },
       });
 
       if (error) {
