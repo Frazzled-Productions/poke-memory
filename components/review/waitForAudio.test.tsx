@@ -260,6 +260,8 @@ describe("waitForAudio", () => {
   });
 
   it("resolves immediately when no audio is in flight", async () => {
+    // Uses real timers so the setTimeout(0) yield inside waitForAudio resolves
+    // naturally without needing explicit timer advancement.
     vi.stubGlobal("window", {
       speechSynthesis: { speaking: false, pending: false },
     });
@@ -315,7 +317,7 @@ describe("waitForAudio", () => {
     expect(resolved).toBe(true);
   });
 
-  it("resolves immediately when both cry and TTS are idle", async () => {
+  it("resolves once timers tick when both cry and TTS are idle", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("Audio", MockAudio);
     vi.stubGlobal("window", {
@@ -323,6 +325,89 @@ describe("waitForAudio", () => {
     });
 
     const { waitForAudio } = await import("@/lib/audio/waitForAudio");
-    await expect(waitForAudio()).resolves.toBeUndefined();
+    const waitPromise = waitForAudio();
+    let resolved = false;
+    void waitPromise.then(() => { resolved = true; });
+
+    // The sequential flow always yields a setTimeout(0) macrotask between the
+    // cry and TTS legs, even when both are idle. Advance past it.
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    expect(resolved).toBe(true);
+  });
+
+  it("does not resolve until TTS finishes when TTS starts only after the cry ends (chained flow)", async () => {
+    // This is the PRIMARY real-world scenario for dual-audio mode:
+    //   playCry(url, vol, speakAfterCry) — cry plays; speakAfterCry fires when
+    //   the cry's 'ended' event fires and starts TTS. waitForAudio() is called
+    //   while the cry is still playing and TTS has NOT started yet.
+    //
+    // The sequential await in waitForAudio must gate on BOTH legs: first
+    // awaiting the cry, then (after yielding so TTS has been queued) awaiting
+    // TTS. If the two were awaited concurrently (Promise.all), waitForAudio
+    // would settle the moment the cry ends — exactly when TTS begins — and the
+    // card would swap over the start of the spoken name.
+    vi.useFakeTimers();
+
+    // TTS starts as idle; it becomes active only after the cry ends.
+    let isSpeaking = false;
+    const instances: MockAudio[] = [];
+    const OrigAudio = MockAudio;
+
+    vi.stubGlobal(
+      "Audio",
+      class extends OrigAudio {
+        constructor() {
+          super();
+          instances.push(this);
+        }
+      },
+    );
+    vi.stubGlobal("window", {
+      speechSynthesis: {
+        get speaking() { return isSpeaking; },
+        pending: false,
+      },
+    });
+
+    // Set up a cry with an onEnded callback that starts TTS (chained flow).
+    const { playCry } = await import("@/lib/audio/cry");
+    playCry("/cry/1.ogg", 0.6, () => {
+      // Simulate speakAfterCry: TTS begins when the cry ends.
+      isSpeaking = true;
+    });
+    await Promise.resolve(); // flush play() microtask
+    const cryEl = instances[instances.length - 1];
+    expect(cryEl.paused).toBe(false);
+
+    // Call waitForAudio while TTS is still idle — only the cry is active.
+    const { waitForAudio } = await import("@/lib/audio/waitForAudio");
+    const waitPromise = waitForAudio();
+    let resolved = false;
+    void waitPromise.then(() => { resolved = true; });
+
+    // Cry ends — this fires playCry's onEnded callback (sets isSpeaking=true),
+    // then resolves awaitCryEnd. waitForAudio must NOT resolve yet.
+    cryEl.fire("ended");
+
+    // Flush microtasks (awaitCryEnd resolves here, sequential code continues).
+    await Promise.resolve();
+    await Promise.resolve();
+    // TTS has just started but waitForAudio has not resolved yet because it
+    // still needs to yield a macrotask and then await TTS.
+    expect(resolved).toBe(false);
+    expect(isSpeaking).toBe(true);
+
+    // Advance past the setTimeout(0) yield inside waitForAudio.
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    // awaitTtsEnd is now polling. TTS is still speaking — not resolved yet.
+    expect(resolved).toBe(false);
+
+    // TTS finishes; next poll tick resolves waitForAudio.
+    isSpeaking = false;
+    await vi.advanceTimersByTimeAsync(50); // one poll interval
+    await Promise.resolve();
+    expect(resolved).toBe(true);
   });
 });

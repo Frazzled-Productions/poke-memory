@@ -15,6 +15,8 @@ let pendingEndedListener: (() => void) | null = null;
 export function awaitCryEnd(): Promise<void> {
   if (audioEl === null || audioEl.paused) return Promise.resolve();
 
+  const captured = audioEl;
+
   return new Promise<void>((resolve) => {
     let settled = false;
     const finish = () => {
@@ -24,12 +26,12 @@ export function awaitCryEnd(): Promise<void> {
       resolve();
     };
     // Resolve on natural completion or on error (audio won't advance further).
-    audioEl!.addEventListener("ended", finish, { once: true });
-    audioEl!.addEventListener("error", finish, { once: true });
+    captured.addEventListener("ended", finish, { once: true });
+    captured.addEventListener("error", finish, { once: true });
     // Safety net: never block the transition longer than 5 s.
     const timer = setTimeout(() => {
-      audioEl?.removeEventListener("ended", finish);
-      audioEl?.removeEventListener("error", finish);
+      captured.removeEventListener("ended", finish);
+      captured.removeEventListener("error", finish);
       finish();
     }, 5_000);
   });

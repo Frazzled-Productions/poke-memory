@@ -1399,8 +1399,13 @@ export function ReviewSession() {
     await waitForAudio();
 
     // Guard against advancing after the component has unmounted (e.g. the user
-    // navigated away during the audio wait).
-    if (!isMountedRef.current) return;
+    // navigated away during the audio wait). Clear the grading flag so it is
+    // not stuck as `true` if the component somehow re-mounts or a stale
+    // closure reads it.
+    if (!isMountedRef.current) {
+      setGrading(false);
+      return;
+    }
 
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
