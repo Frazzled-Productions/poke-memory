@@ -77,6 +77,10 @@ test.describe("Settings page — collapsible sections (#660)", () => {
   }) => {
     await page.goto("/settings#onboarding-heading");
 
+    // Wait for the accordion to open before asserting nested content.
+    await expect(
+      page.getByRole("button", { name: "Account & Data" }),
+    ).toHaveAttribute("aria-expanded", "true");
     // The "Show tips again" button lives inside Account & Data → onboarding sub-section.
     await expect(
       page.getByRole("button", { name: /show tips again/i }),

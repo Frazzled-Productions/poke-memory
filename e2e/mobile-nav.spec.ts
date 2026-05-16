@@ -229,13 +229,16 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
     await page.evaluate(() => localStorage.clear());
     await page.reload();
 
-    // Navigate to Settings → About via the tab bar.
+    // Navigate to Settings via the tab bar.
     const tabBar = page.getByRole("navigation", { name: "Mobile tab navigation" });
     await tabBar.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL("/settings");
 
-    // The About section is inside "Account & Data". Deep-link directly to it.
-    await page.goto("/settings#about-heading");
+    // The Privacy link lives inside the "Account & Data" accordion. Expand it.
+    await page.getByRole("button", { name: "Account & Data" }).click();
+    await expect(
+      page.getByRole("button", { name: "Account & Data" }),
+    ).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
     await page.getByRole("link", { name: "Privacy" }).click();
     await expect(page).toHaveURL("/privacy");
@@ -254,8 +257,13 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
     await page.evaluate(() => localStorage.clear());
     await page.reload();
 
-    // Deep-link to Settings → About and click Terms.
-    await page.goto("/settings#about-heading");
+    // The Terms link lives inside the "Account & Data" accordion. Navigate to
+    // /settings fresh so the component mounts cleanly, then expand the accordion.
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Account & Data" }).click();
+    await expect(
+      page.getByRole("button", { name: "Account & Data" }),
+    ).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("link", { name: "Terms" })).toBeVisible();
     await page.getByRole("link", { name: "Terms" }).click();
     await expect(page).toHaveURL("/terms");
@@ -272,6 +280,9 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
 
     await page.goto("/settings#about-heading");
     // The "Account & Data" section opens via the hash deep-link.
+    await expect(
+      page.getByRole("button", { name: "Account & Data" }),
+    ).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Terms" })).toBeVisible();
   });
