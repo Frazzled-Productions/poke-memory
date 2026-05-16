@@ -1305,7 +1305,8 @@ export function ReviewSession() {
     // time the next <Image> mounts, eliminating the residual pop-in (#719).
     //
     // We peek at the post-grade queues (using `newCards`, which already reflects
-    // the graded card's updated state) to find what card will be shown next.
+    // the graded card's updated state, and `nextLearningQueue`, the post-grade
+    // learning queue computed below) to find what card will be shown next.
     // `buildSessionQueues` is O(n) in the card list but is already called on
     // every render — one extra call here is negligible. The effective limits and
     // scope eligibility set are those captured from the current render closure.
@@ -1315,12 +1316,52 @@ export function ReviewSession() {
       today,
       isScopeEmpty(scope) ? undefined : eligibleCardIds,
     );
-    const nextLearningDue = learningQueue
-      .filter((e) => e.dueAt <= Date.now() && e.cardId !== effectiveCard.id)
+
+    // Compute the post-grade learning queue here, mirroring the `setLearningQueue`
+    // updater below. The decode-ahead prediction must run against the queue as it
+    // will be *after* this grade — using the pre-grade `learningQueue` closure
+    // would mispredict when the graded card re-enters a learning step (its new
+    // `dueAt`) or graduates out (#719).
+    const nextLearningQueue: LearningQueueEntry[] = (() => {
+      if (nextState.learningStep !== null) {
+        const stepMs = stepDurationMs(
+          nextState.lastReview,
+          nextState.learningStep,
+          nextState.difficulty,
+        );
+        const newEntry: LearningQueueEntry = {
+          cardId: effectiveCard.id,
+          dueAt: nextState.stepStartedAt! + stepMs,
+        };
+        const exists = learningQueue.some((e) => e.cardId === effectiveCard.id);
+        return exists
+          ? learningQueue.map((e) => (e.cardId === effectiveCard.id ? newEntry : e))
+          : [...learningQueue, newEntry];
+      }
+      return learningQueue.filter((e) => e.cardId !== effectiveCard.id);
+    })();
+
+    const nextLearningDue = nextLearningQueue
+      .filter((e) => e.dueAt <= Date.now())
       .sort((a, b) => a.dueAt - b.dueAt);
-    const nextCardId =
+    let nextCardId =
       nextLearningDue[0]?.cardId ??
       getNextCardId(nextQueues.reviewQueue, nextQueues.newQueue);
+
+    // Learn-ahead fallback: when the queue is otherwise empty, the render-time
+    // card picker pulls the earliest learning card forward if it falls within
+    // LEARN_AHEAD_MS. Mirror that here so the card that actually renders is the
+    // one we decode — otherwise the learn-ahead card pops in (#719).
+    if (nextCardId === null) {
+      const decodeNow = Date.now();
+      const ahead = nextLearningQueue
+        .filter((e) => e.dueAt > decodeNow && e.dueAt <= decodeNow + LEARN_AHEAD_MS)
+        .sort((a, b) => a.dueAt - b.dueAt);
+      if (ahead.length > 0) {
+        nextCardId = ahead[0].cardId;
+      }
+    }
+
     if (nextCardId !== null) {
       const nextCard = newCards.find((c) => c.id === nextCardId);
       if (nextCard) {

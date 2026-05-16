@@ -12,14 +12,11 @@ import { decodeSpriteUrls, DECODE_TIMEOUT_MS } from "@/lib/review/decode";
  */
 function makeFakeImageClass(
   resolvers: Array<() => void>,
-  opts: { decodeFails?: boolean; decodeUnsupported?: boolean } = {},
+  opts: { decodeFails?: boolean } = {},
 ) {
   return class FakeImage {
     src = "";
     decode() {
-      if (opts.decodeUnsupported) {
-        throw new Error("decode is not a function");
-      }
       if (opts.decodeFails) {
         return Promise.reject(new Error("decode failed"));
       }
