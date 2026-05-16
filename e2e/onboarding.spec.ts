@@ -52,8 +52,11 @@ test.describe("Feature nudges (#702)", () => {
 
     const reveal = page.getByRole("button", { name: "Reveal" });
     // Guest sessions can occasionally land on an end-state screen; skip then.
+    // test.skip(condition, ...) does not throw, so return explicitly to stop
+    // the body running once the test is marked skipped.
     if (!(await reveal.isVisible().catch(() => false))) {
       test.skip(true, "No active card to reveal in this session");
+      return;
     }
     await reveal.click();
 
@@ -80,8 +83,11 @@ test.describe("Feature nudges (#702)", () => {
 
     await page.goto("/");
     const reveal = page.getByRole("button", { name: "Reveal" });
+    // test.skip(condition, ...) does not throw, so return explicitly to stop
+    // the body running once the test is marked skipped.
     if (!(await reveal.isVisible().catch(() => false))) {
       test.skip(true, "No active card to reveal in this session");
+      return;
     }
     await reveal.click();
 

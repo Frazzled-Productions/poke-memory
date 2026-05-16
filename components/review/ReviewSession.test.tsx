@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard } from "@/lib/review/session";
+import type { UserSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
@@ -78,9 +79,10 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
     return { ...card, id, name, displayName: displayName ?? name, subjectKey: String(id), spriteUrl: `https://example.com/${name.toLowerCase()}.png` };
   }
 
-  // Loosely typed so individual tests can pass any partial settings shape via
-  // mockReturnValue without TS demanding the full UserSettings surface.
-  const defaultSettings: Record<string, unknown> = {
+  // Partial so individual tests can pass any subset of settings via
+  // mockReturnValue without TS demanding the full UserSettings surface,
+  // while still key-name-checking every field against UserSettings.
+  const defaultSettings: Partial<UserSettings> = {
     masteryRepetitions: 3,
     maxNewPerDay: 10,
     maxReviewsPerDay: 100,
