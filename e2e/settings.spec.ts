@@ -16,6 +16,10 @@ test.describe("Settings — Audio TTS controls (#435)", () => {
     // Expand the Audio section.
     await page.getByRole("button", { name: /^audio$/i }).click();
 
+    // TtsControls (and its "Hear sample" button) only mounts once the
+    // "Speak name on reveal" toggle is enabled — it defaults to off.
+    await page.getByRole("switch", { name: "Speak name on reveal" }).click();
+
     // The "Hear sample" button sits inside the Speech rate row of TtsControls.
     const hearSampleBtn = page.getByRole("button", { name: "Hear sample" });
     await expect(hearSampleBtn).toBeVisible();
