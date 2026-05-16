@@ -8,10 +8,14 @@ test.describe("Privacy notice page", () => {
     ).toBeVisible();
   });
 
-  test("footer link navigates to /privacy", async ({ page }) => {
-    await page.goto("/");
-    const footer = page.getByRole("contentinfo");
-    await footer.getByRole("link", { name: "Privacy" }).click();
+  // The page footer is hidden when mobileNav === "bottom" (the default for new
+  // users). Privacy is now also reachable via Settings → About, which is the
+  // canonical path for bottom-nav users. This test exercises that path.
+  test("Settings → About link navigates to /privacy", async ({ page }) => {
+    await page.goto("/settings#about-heading");
+    // The "Account & Data" section force-expands via the hash deep-link.
+    await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
+    await page.getByRole("link", { name: "Privacy" }).click();
     await expect(page).toHaveURL("/privacy");
     await expect(
       page.getByRole("heading", { level: 1, name: "Privacy Notice" }),

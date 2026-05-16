@@ -199,6 +199,84 @@ test.describe("Mobile nav — hamburger mode (via Settings toggle)", () => {
   });
 });
 
+// ─── Footer visibility & legal-page access (#734 / #735) ─────────────────────
+
+test.describe("Mobile nav — footer hidden and legal pages via Settings → About", () => {
+  test("footer is not rendered in bottom-nav mode (default)", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "footer-visibility check is mobile-only (desktop always shows footer)",
+    );
+
+    // Clear any persisted settings so we get the new-user default (bottom tab bar).
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    await page.goto("/");
+    // The <footer> element has role="contentinfo". In bottom-nav mode, the
+    // Footer component returns null, so the element must not be in the DOM.
+    await expect(page.getByRole("contentinfo")).toHaveCount(0);
+  });
+
+  test("Privacy page is reachable via Settings → About in bottom-nav mode", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "bottom-nav path check is mobile-only",
+    );
+
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    // Navigate to Settings → About via the tab bar.
+    const tabBar = page.getByRole("navigation", { name: "Mobile tab navigation" });
+    await tabBar.getByRole("link", { name: "Settings" }).click();
+    await expect(page).toHaveURL("/settings");
+
+    // The About section is inside "Account & Data". Deep-link directly to it.
+    await page.goto("/settings#about-heading");
+    await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
+    await page.getByRole("link", { name: "Privacy" }).click();
+    await expect(page).toHaveURL("/privacy");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Privacy Notice" }),
+    ).toBeVisible();
+  });
+
+  test("Terms page is reachable via Settings → About in bottom-nav mode", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "bottom-nav path check is mobile-only",
+    );
+
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    // Deep-link to Settings → About and click Terms.
+    await page.goto("/settings#about-heading");
+    await expect(page.getByRole("link", { name: "Terms" })).toBeVisible();
+    await page.getByRole("link", { name: "Terms" }).click();
+    await expect(page).toHaveURL("/terms");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Terms of Use" }),
+    ).toBeVisible();
+  });
+
+  test("Settings → About section shows Privacy and Terms links on desktop too", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "chromium",
+      "desktop About-section check is chromium-only",
+    );
+
+    await page.goto("/settings#about-heading");
+    // The "Account & Data" section opens via the hash deep-link.
+    await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Terms" })).toBeVisible();
+  });
+});
+
 // ─── Desktop — unaffected by mobileNav setting ────────────────────────────────
 
 test.describe("Desktop nav — inline header row, no tab bar", () => {
