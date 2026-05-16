@@ -1,3 +1,5 @@
+import { isoDate } from "@/lib/utils/format-date";
+
 /**
  * Count the current streak from an array of reviewed dates. Order and
  * duplicates don't matter — the function builds a Set internally.
@@ -32,5 +34,5 @@ export function computeStreak(dates: string[], today: string): number {
 function offsetDate(date: string, days: number): string {
   const d = new Date(date + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  return isoDate(d);
 }
