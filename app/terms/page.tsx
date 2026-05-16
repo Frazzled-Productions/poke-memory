@@ -123,8 +123,7 @@ export default function TermsPage() {
             the Service — including but not limited to loss of data, loss of
             progress, or loss of access. Our total aggregate liability to you
             for any claim arising out of these Terms or your use of the Service
-            shall not exceed £0 (zero pounds), reflecting that the Service is
-            provided free of charge.
+            shall not exceed the maximum extent permitted by applicable law.
           </p>
         </section>
 
@@ -165,9 +164,8 @@ export default function TermsPage() {
               Service or its underlying infrastructure.
             </li>
             <li>
-              Exploit any superuser or developer-mode features (see the Settings
-              page) to manipulate cloud-stored data in a way that is not
-              consistent with normal use of the spaced-repetition service.
+              Intentionally corrupt, falsify, or tamper with your synced review
+              history, or attempt to interfere with the service for other users.
             </li>
           </ul>
         </section>
