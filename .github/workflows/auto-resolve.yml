@@ -202,10 +202,12 @@ jobs:
             checklist. Use TodoWrite as your visible progress board: keep a
             granular task list, update statuses
             (pending / in_progress / completed) as you go, and the PR
-            timeline tracks along automatically. Do NOT post or PATCH the
-            status comment yourself — the hook owns it. If you hit a blocker,
-            post a separate comment explaining what's blocked, then stop —
-            don't push half-done work.
+            timeline tracks along automatically. **The status comment only
+            ever updates when you call `TodoWrite` — if you never call it the
+            PR sits at "Starting up" for the whole run.** Do NOT post or PATCH
+            the status comment yourself — the hook owns it. If you hit a
+            blocker, post a separate comment explaining what's blocked, then
+            stop — don't push half-done work.
 
             **Context:** The shell fast-path confirmed this PR has merge
             conflicts with `origin/main`. The working tree is clean (the
@@ -214,6 +216,15 @@ jobs:
             path.
 
             **Workflow:**
+
+            0. **Before anything else, call `TodoWrite`** with your initial
+               task list — at minimum: "Merge origin/main", "Resolve
+               conflicts", "Build gate", "Push and summarise". This MUST be
+               your first action. The live status comment only updates when
+               `TodoWrite` fires, so skipping it leaves the PR showing
+               "Starting up" for the entire run. Refine the list as you go:
+               add one item per conflicted file once they are enumerated, and
+               update statuses (pending / in_progress / completed).
 
             1. Run `git fetch origin main --quiet && git merge origin/main --no-edit`.
 

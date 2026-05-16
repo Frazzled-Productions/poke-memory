@@ -148,6 +148,26 @@ jobs:
                `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`
             2. Invoke the `code-reviewer` sub-agent (Agent tool, subagent_type
                "code-reviewer") against that diff.
+
+               **Cycle-aware briefing.** This is review
+               ${{ steps.cycles.outputs.next }}; there are
+               ${{ steps.cycles.outputs.count }} prior auto-review comment(s).
+               - If there are **no** prior reviews, this is the first review —
+                 brief the sub-agent to review the full diff normally.
+               - If there is **at least one** prior review, this is a
+                 **follow-up review of a `/fix` push**. Load the most recent
+                 `<!-- auto-review:N -->` comment and brief the sub-agent that
+                 its job is to (a) confirm each prior Blocker/Concern is
+                 resolved, and (b) flag only *genuine new regressions the fix
+                 commit introduced*. It must NOT re-scan untouched code for
+                 fresh nitpicks, NOT escalate the severity of an item that was
+                 a Nit last cycle, and NOT raise net-new Concerns about code
+                 the prior review already saw and accepted. The bar must not
+                 drift between cycles: a finding acceptable in cycle 1 is still
+                 acceptable in cycle 2. If every prior Blocker/Concern is
+                 resolved and the fix introduced no new ones, the verdict is
+                 `Looks good to me` even if minor Nits remain — converging is
+                 the goal, not finding something new every pass.
             3. Post the findings on the PR via
                `gh pr comment ${{ github.event.pull_request.number }} --body-file <path>`,
                formatted exactly like this (no other content before the marker):
@@ -177,11 +197,27 @@ jobs:
                response omits the standard Retry-After header. Why: needed
                for CDNs and generic clients to back off correctly." The four
                severities are **Blocker**, **Concern**, **Nit**, and
-               **Praise** — sort the list by severity in that order. Do NOT
-               group findings under headings, and do NOT strip the severity
-               prefixes when composing the comment. If the sub-agent returns
-               "No significant issues.", post that single line in place of
-               the bulleted list.
+               **Praise** — sort the list by severity in that order.
+               Calibrate them strictly:
+               - **Blocker** — the change is broken, unsafe, or breaks a hard
+                 project rule (data loss, security hole, build/type failure,
+                 a violated documented invariant).
+               - **Concern** — a real correctness, security, or convention
+                 problem *in the code this PR changed* that should be fixed
+                 before merge. NOT for hypothetical futures ("fragile if a
+                 later refactor adds…"), NOT for pre-existing issues the PR
+                 did not touch, NOT for subjective style preferences.
+               - **Nit** — style, naming, comment wording, minor consistency,
+                 "could be tidier", and anything hypothetical or pre-existing.
+                 When torn between Concern and Nit, choose Nit.
+               - **Praise** — genuinely good decisions worth calling out.
+               A `Needs fixes` verdict requires at least one Blocker or
+               Concern, so mis-tagging a Nit as a Concern needlessly burns a
+               whole fix cycle — tag conservatively.
+               Do NOT group findings under headings, and do NOT strip the
+               severity prefixes when composing the comment. If the sub-agent
+               returns "No significant issues.", post that single line in
+               place of the bulleted list.
 
                A verdict line starting with `Verdict: ` MUST be present, with
                either `Looks good to me — @fraserbrookhouse` (no significant
