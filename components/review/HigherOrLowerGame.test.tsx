@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 
@@ -247,5 +247,62 @@ describe("HigherOrLowerGame", () => {
   it("returns null when fewer than 2 Pokémon are provided", () => {
     const { container } = render(<HigherOrLowerGame seenPokemon={[BULBASAUR]} />);
     expect(container.firstChild).toBeNull();
+  });
+
+  describe("sprite-decode-before-swap", () => {
+    // These tests install a controlled `window.Image` whose `decode()` resolves
+    // on demand so we can assert that the pair does not swap until after decode.
+
+    let originalImage: typeof window.Image;
+    let resolveDecodes: (() => void)[];
+
+    beforeEach(() => {
+      originalImage = window.Image;
+      resolveDecodes = [];
+
+      // Replace window.Image with a constructor that exposes a decode() method
+      // backed by a manually-resolvable promise.
+      window.Image = class FakeImage {
+        src = "";
+        decode() {
+          return new Promise<void>((resolve) => {
+            resolveDecodes.push(resolve);
+          });
+        }
+      } as unknown as typeof window.Image;
+    });
+
+    afterEach(() => {
+      window.Image = originalImage;
+    });
+
+    it("does not swap the pair until sprite decode resolves", async () => {
+      const user = userEvent.setup();
+      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // Make a correct pick to reveal the result and show "Next pair".
+      await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+      expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
+
+      // Click "Next pair" — decode is now pending.
+      await user.click(screen.getByRole("button", { name: /next pair/i }));
+
+      // The "Next pair" button should be disabled while decode is in-flight.
+      expect(screen.getByRole("button", { name: /next pair/i })).toBeDisabled();
+
+      // The result banner should still be visible (pair hasn't swapped yet).
+      expect(screen.getByText(/correct/i)).toBeInTheDocument();
+
+      // Resolve all pending decodes.
+      resolveDecodes.forEach((resolve) => resolve());
+
+      // Wait for React to flush the deferred state update.
+      await vi.waitFor(() => {
+        expect(screen.queryByText(/correct/i)).toBeNull();
+      });
+
+      // After decode resolves the game should be back in picking phase.
+      expect(screen.getByText(/which has higher/i)).toBeInTheDocument();
+    });
   });
 });
