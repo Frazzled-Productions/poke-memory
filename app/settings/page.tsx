@@ -17,6 +17,9 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { resetAllProgressEverywhere } from "@/lib/sync/reset";
 import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
+import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
+import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
+import { signOut } from "@/lib/auth/actions";
 import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
 import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
 import { loadFavourite, saveFavourite } from "@/lib/theme/persistence";
@@ -408,6 +411,7 @@ export default function SettingsPage() {
   const [draftValues, setDraftValues] = useState<Partial<Record<keyof UserSettings, string>>>({});
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
@@ -583,6 +587,38 @@ export default function SettingsPage() {
     setFavouriteId(null);
     updateFavourite(null);
     router.replace("/");
+  }
+
+  /**
+   * Full account erasure: wipe the cloud identity (and all cascaded data) via
+   * the delete_account RPC, clear ALL local poke-memory keys — including the
+   * settings keys a normal reset spares — then sign out.
+   *
+   * This is gated on a signed-in session; the button is only rendered for
+   * `user`. The superuser write-guard (anyFlagOn) disables the button at the
+   * call site, mirroring the reset-progress control and FsrsOptimizerSection.
+   */
+  async function handleDeleteAccount() {
+    if (anyFlagOn) return;
+    if (!user || !supabase) return;
+    const result = await deleteAccountEverywhere(supabase);
+    if (!result.ok) {
+      throw new Error(
+        "Could not delete your account. Check your connection and try again.",
+      );
+    }
+    // Note: do NOT call saveFavourite(null) here — deleteAccountEverywhere
+    // has already wiped every poke-memory:* localStorage key. saveFavourite
+    // would re-create the settings key (leaving stale settings the deletion
+    // was meant to erase) and dispatch SETTINGS_SAVED_EVENT, triggering a
+    // doomed pushSettings against the just-deleted account. Only reset the
+    // in-memory React state below.
+    setFavouriteId(null);
+    updateFavourite(null);
+    // Deliberate departure from normal sign-out, which preserves local data:
+    // the account is gone, so signing out here leaves nothing behind. signOut
+    // redirects to "/".
+    await signOut();
   }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1670,9 +1706,9 @@ export default function SettingsPage() {
                   id="danger-zone-heading"
                   className="rounded-xl border border-red-200 p-5 dark:border-red-900"
                 >
-                  <p className="text-sm font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
                     Danger zone
-                  </p>
+                  </h3>
                   <div className="mt-4 flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">Reset all progress</p>
@@ -1690,6 +1726,51 @@ export default function SettingsPage() {
                       Reset all progress
                     </button>
                   </div>
+
+                  {/*
+                    Delete account — full erasure, distinct from reset-progress.
+                    Only meaningful for a signed-in user (there is a cloud
+                    identity to delete), so the row is gated on `user`. Visually
+                    separated from the reset control by a divider. While a
+                    superuser flag is on, all cloud writes are paused — so the
+                    button shows the same disabled "Sync paused (superuser)"
+                    treatment as FsrsOptimizerSection.
+                  */}
+                  {user && (
+                    <div className="mt-5 border-t border-red-200 pt-5 dark:border-red-900">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Delete account
+                          </p>
+                          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                            Permanently erases your account, cloud data, and
+                            sign-in identity. This cannot be undone.
+                          </p>
+                        </div>
+                        {anyFlagOn ? (
+                          <button
+                            type="button"
+                            disabled
+                            data-testid="delete-account-button"
+                            title="Account deletion is paused while a superuser flag is on."
+                            className="min-h-[44px] shrink-0 rounded-lg bg-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                          >
+                            Sync paused (superuser)
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteOpen(true)}
+                            data-testid="delete-account-button"
+                            className="min-h-[44px] shrink-0 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 dark:bg-red-600 dark:hover:bg-red-500"
+                          >
+                            Delete account
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CollapsibleSection>
               )}
@@ -1700,6 +1781,11 @@ export default function SettingsPage() {
               open={resetOpen}
               onClose={() => setResetOpen(false)}
               onConfirm={handleReset}
+            />
+            <DeleteAccountDialog
+              open={deleteOpen}
+              onClose={() => setDeleteOpen(false)}
+              onConfirm={handleDeleteAccount}
             />
           </>
         )}
