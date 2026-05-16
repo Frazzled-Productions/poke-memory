@@ -1351,6 +1351,8 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => {
+                        // DEFAULT_ONBOARDING includes installNudgeDismissed: false (#701),
+                        // so this spread also resets the PWA install nudge for free.
                         const next = { ...settings, onboarding: { ...DEFAULT_ONBOARDING } };
                         setSettings(next);
                         saveSettings(next);
