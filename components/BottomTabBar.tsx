@@ -186,7 +186,6 @@ function BottomTabBarInner() {
     <nav
       aria-label="Mobile tab navigation"
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-theme-secondary bg-theme-primary md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul
         role="list"
@@ -202,7 +201,14 @@ function BottomTabBarInner() {
                 href={href}
                 aria-current={isActive ? "page" : undefined}
                 className={[
-                  "flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
+                  // py-3 top padding + safe-area-aware bottom padding so the
+                  // interactive area extends into the iOS home-indicator strip —
+                  // no dead tap zone below the visible icons.
+                  // min-h-[44px] ensures the Apple HIG 44pt minimum above the
+                  // safe-area inset (the inset itself is additional space).
+                  "flex flex-col items-center gap-0.5 px-2 pt-3 min-h-[44px]",
+                  "pb-[max(12px,env(safe-area-inset-bottom))]",
+                  "text-[10px] font-medium transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-inset",
                   isActive
                     ? "text-theme-fg-on-primary"
@@ -234,7 +240,6 @@ function BottomTabBarFallback() {
     <div
       aria-hidden="true"
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-theme-secondary bg-theme-primary md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul
         role="list"
@@ -243,7 +248,7 @@ function BottomTabBarFallback() {
         {STATIC_TABS.map(({ href, label, Icon }) => (
           <li key={href} className="flex-1">
             <span
-              className="flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium text-theme-fg-on-primary opacity-55"
+              className="flex flex-col items-center gap-0.5 px-2 pt-3 min-h-[44px] pb-[max(12px,env(safe-area-inset-bottom))] text-[10px] font-medium text-theme-fg-on-primary opacity-55"
             >
               <Icon />
               <span>{label}</span>
