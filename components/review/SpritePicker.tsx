@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { speakName } from "@/lib/audio/tts";
+import { playCry } from "@/lib/audio/cry";
 
 // How long to show correctness feedback before advancing (ms).
 // Correct tap: brief highlight. Incorrect tap: time to see the right answer.
@@ -39,9 +40,15 @@ type Props = {
   targetPokemon: SeedPokemon;
   distractors: readonly SeedPokemon[];
   onGrade: (correct: boolean) => void;
+  /**
+   * When true, plays the target Pokémon's cry at the moment the picker
+   * enters the answered state (equivalent to the reveal moment on flip cards).
+   * Silently skipped when `targetPokemon.cryUrl` is null.
+   */
+  playCryOnAnswer?: boolean;
 };
 
-export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
+export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAnswer = false }: Props) {
   const [answered, setAnswered] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +68,12 @@ export function SpritePicker({ targetPokemon, distractors, onGrade }: Props) {
     if (answered) return;
     setAnswered(true);
     setSelectedId(tile.id);
+
+    // Play the target cry at the answer-feedback moment — the reverse-card
+    // equivalent of the reveal moment on flip cards (#707).
+    if (playCryOnAnswer) {
+      playCry(targetPokemon.cryUrl ?? null, 0.6);
+    }
 
     if (tile.isCorrect) {
       timerRef.current = setTimeout(() => {

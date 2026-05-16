@@ -1233,7 +1233,7 @@ export default function SettingsPage() {
                         Play cry on reveal
                       </p>
                       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Plays the Pokémon&apos;s cry once when you reveal a name or evolution card. Does not affect reverse cards.
+                        Plays the Pokémon&apos;s cry once when you reveal a name or evolution card, and when you answer a reverse (sprite-picker) card.
                       </p>
                     </div>
                     <button

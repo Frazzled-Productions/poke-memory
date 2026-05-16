@@ -1519,6 +1519,7 @@ export function ReviewSession() {
           targetPokemon={reverseTarget}
           distractors={reverseDistractors}
           onGrade={(correct) => handleGrade(correct ? 4 : 1)}
+          playCryOnAnswer={loadSettings().playCryOnReveal}
         />
         {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
         <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
