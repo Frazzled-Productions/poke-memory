@@ -11,6 +11,8 @@ type Props = {
   triggerPhrase: string | null;
   revealed: boolean;
   fact?: PokemonFact | null;
+  preEvoId?: number | null;
+  postEvoId?: number | null;
 };
 
 const SPRITE_CLASS = "h-28 w-28 object-contain sm:h-48 sm:w-48";
@@ -37,6 +39,8 @@ export function ReverseEvolutionCard({
   triggerPhrase,
   revealed,
   fact,
+  preEvoId,
+  postEvoId,
 }: Props) {
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4">
@@ -46,7 +50,7 @@ export function ReverseEvolutionCard({
         <button
           type="button"
           aria-label={`Hear ${postEvoName}`}
-          onClick={() => speakName(postEvoName)}
+          onClick={() => speakName(postEvoName, postEvoId)}
           className={INLINE_SPEAK_BUTTON_CLASS}
         >
           🔊
@@ -93,7 +97,7 @@ export function ReverseEvolutionCard({
               <button
                 type="button"
                 aria-label={`Hear ${preEvoName}`}
-                onClick={() => speakName(preEvoName)}
+                onClick={() => speakName(preEvoName, preEvoId)}
                 className={REVEAL_SPEAK_BUTTON_CLASS}
               >
                 🔊

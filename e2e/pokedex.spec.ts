@@ -40,6 +40,57 @@ test.describe("Pokédex detail — Hear name button", () => {
     await expect(page.getByText("Bulbasaur")).toBeVisible();
     await expect(page.getByRole("button", { name: "Hear Bulbasaur" })).toBeVisible();
   });
+
+  test("Hear name button is clickable without throwing a page error (#435)", async ({ page }) => {
+    // Clicking the button triggers speakName(name, id). The MP3 at
+    // /audio/names/1.mp3 may 404 on a preview deployment — speakName must
+    // degrade gracefully to Web Speech and must not throw an uncaught exception.
+    const pageErrors: Error[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err));
+
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-13",
+            firstSeen: "2026-05-13",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+    await expect(page.getByText("Bulbasaur")).toBeVisible();
+
+    const hearBtn = page.getByRole("button", { name: "Hear Bulbasaur" });
+    await expect(hearBtn).toBeVisible();
+    await hearBtn.click();
+
+    // Allow a brief moment for any async rejection to bubble before asserting.
+    await page.waitForTimeout(300);
+    expect(pageErrors).toHaveLength(0);
+  });
 });
 
 test.describe("Pokédex type filter — intersection", () => {

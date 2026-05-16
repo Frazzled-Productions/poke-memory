@@ -150,7 +150,7 @@ describe("PokemonDetailDisclosure — audio buttons", () => {
     render(<PokemonDetailDisclosure pokemon={pokemon} />);
 
     await user.click(screen.getByRole("button", { name: "Hear Bulbasaur" }));
-    expect(mockSpeakName).toHaveBeenCalledWith("Bulbasaur");
+    expect(mockSpeakName).toHaveBeenCalledWith("Bulbasaur", 1);
   });
 
   it("cry button calls playCry with the cryUrl", async () => {
