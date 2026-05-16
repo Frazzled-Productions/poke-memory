@@ -30,7 +30,7 @@ test.describe("Privacy notice page", () => {
     await page.goto("/privacy");
     await expect(
       page.getByRole("heading", {
-        name: "In plain language — what does Poké Memory do with your data?",
+        name: "In plain language: what does Poké Memory do with your data?",
       }),
     ).toBeVisible();
   });
