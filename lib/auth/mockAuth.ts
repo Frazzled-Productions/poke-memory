@@ -39,15 +39,21 @@ export const MOCK_AUTH_ENABLED_VALUE = "1";
  * unreachable in production: `NODE_ENV === "production"` short-circuits to
  * false regardless of the flag.
  *
- * Both reads are static `process.env.*` member expressions so Next.js inlines
- * them at build time — a production bundle has this collapse to `false` and
- * the mock code becomes dead code the minifier can drop.
+ * Both `process.env` reads here are LITERAL static member expressions
+ * (`process.env.NODE_ENV`, `process.env.NEXT_PUBLIC_E2E_AUTH_MOCK`). Next.js
+ * only inlines `NEXT_PUBLIC_*` vars when they are accessed as a literal static
+ * member — bracket notation with a variable (`process.env[someVar]`) is NOT
+ * inlined. With the literal form, a production bundle collapses this function
+ * to `false` and the mock code becomes dead code the minifier can drop. The
+ * `MOCK_AUTH_ENV_VAR` constant below still names the var for tests and docs,
+ * but the actual reads must stay literal for inlining to happen.
  */
 export function isMockAuthEnabled(): boolean {
   // Production short-circuit FIRST — this is the security gate. Even if the
   // flag is somehow set, a production build can never enable the seam.
   if (process.env.NODE_ENV === "production") return false;
-  return process.env[MOCK_AUTH_ENV_VAR] === MOCK_AUTH_ENABLED_VALUE;
+  // Literal static access — see the dead-code-elimination note above.
+  return process.env.NEXT_PUBLIC_E2E_AUTH_MOCK === MOCK_AUTH_ENABLED_VALUE;
 }
 
 /**
@@ -60,7 +66,10 @@ export function isMockAuthEnabled(): boolean {
  * to turn a silent misconfiguration into a hard, visible build failure.
  */
 export function assertMockAuthNotInProduction(): void {
-  const flagSet = process.env[MOCK_AUTH_ENV_VAR] === MOCK_AUTH_ENABLED_VALUE;
+  // Literal static access so Next.js inlines the value at build time (see the
+  // dead-code-elimination note on `isMockAuthEnabled`).
+  const flagSet =
+    process.env.NEXT_PUBLIC_E2E_AUTH_MOCK === MOCK_AUTH_ENABLED_VALUE;
   if (flagSet && process.env.NODE_ENV === "production") {
     throw new Error(
       `[mock-auth] SECURITY: ${MOCK_AUTH_ENV_VAR}=${MOCK_AUTH_ENABLED_VALUE} ` +

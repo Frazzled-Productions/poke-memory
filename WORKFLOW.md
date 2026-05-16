@@ -145,9 +145,12 @@ in-memory fixture.
 - **Activation**: the seam activates only when `NEXT_PUBLIC_E2E_AUTH_MOCK === "1"`
   AND `process.env.NODE_ENV !== "production"`. Both conditions are checked by
   `isMockAuthEnabled()`.
-- **Deployment wiring**: `NEXT_PUBLIC_*` vars are inlined at **build time**, so
-  the seam is enabled by setting `NEXT_PUBLIC_E2E_AUTH_MOCK=1` in the Vercel
-  project's **Preview** environment scope (Preview only — **never** Production).
+- **Deployment wiring**: `NEXT_PUBLIC_*` vars are inlined at **build time** when
+  accessed as a literal static member expression (`process.env.NEXT_PUBLIC_…`);
+  `isMockAuthEnabled()` and `assertMockAuthNotInProduction()` use that literal
+  form so a production bundle dead-code-eliminates the mock branch. The seam is
+  enabled by setting `NEXT_PUBLIC_E2E_AUTH_MOCK=1` in the Vercel project's
+  **Preview** environment scope (Preview only — **never** Production).
   `e2e.yml` also sets the var on the Playwright runner as a documented
   companion; the specs in `e2e/auth.spec.ts` detect at runtime whether the seam
   is live and skip themselves if it is not, so a preview built without the
