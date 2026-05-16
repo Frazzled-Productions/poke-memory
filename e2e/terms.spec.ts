@@ -8,10 +8,18 @@ test.describe("Terms of Use page", () => {
     ).toBeVisible();
   });
 
-  test("footer link navigates to /terms", async ({ page }) => {
-    await page.goto("/");
-    const footer = page.getByRole("contentinfo");
-    await footer.getByRole("link", { name: "Terms" }).click();
+  // The page footer is hidden when mobileNav === "bottom" (the default for new
+  // users). Terms is now also reachable via Settings → About, which is the
+  // canonical path for bottom-nav users. This test exercises that path.
+  test("Settings → About link navigates to /terms", async ({ page }) => {
+    await page.goto("/settings#about-heading");
+    // The "Account & Data" section force-expands via the hash deep-link; wait
+    // for the accordion button to confirm it is open before asserting the link.
+    await expect(
+      page.getByRole("button", { name: "Account & Data" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("link", { name: "Terms" })).toBeVisible();
+    await page.getByRole("link", { name: "Terms" }).click();
     await expect(page).toHaveURL("/terms");
     await expect(
       page.getByRole("heading", { level: 1, name: "Terms of Use" }),

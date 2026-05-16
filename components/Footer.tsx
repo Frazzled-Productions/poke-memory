@@ -2,14 +2,33 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 
 export function Footer() {
   const [year, setYear] = useState<number | null>(null);
+  // Initialise to null so the first client render matches the server render
+  // (both produce the footer), avoiding a React hydration mismatch for users
+  // whose persisted setting is "bottom". The real value is applied in
+  // useEffect after mount.
+  const [mobileNav, setMobileNav] = useState<"bottom" | "hamburger" | null>(null);
+
   useEffect(() => {
     setYear(new Date().getFullYear());
+    setMobileNav(loadSettings().mobileNav);
+
+    function onSaved() {
+      setMobileNav(loadSettings().mobileNav);
+    }
+    window.addEventListener(SETTINGS_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
   }, []);
+
+  // In bottom-nav (app-like) mode the footer is hidden — it would sit
+  // underneath the fixed tab bar and is unreachable. Privacy / Terms / the
+  // fan-project disclaimer remain accessible via Settings → About.
+  if (mobileNav === "bottom") return null;
   return (
     <footer className="border-t border-zinc-200 bg-background dark:border-zinc-800">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-3 text-center text-xs text-zinc-500 dark:text-zinc-400">

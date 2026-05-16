@@ -1575,6 +1575,39 @@ export default function SettingsPage() {
                       View changelog
                     </Link>
                   </div>
+
+                  <hr className="border-zinc-200 dark:border-zinc-800" />
+
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      href="/privacy"
+                      className="inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      Privacy
+                    </Link>
+                    <Link
+                      href="/terms"
+                      className="inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      Terms
+                    </Link>
+                  </div>
+
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                    Unofficial fan project, not affiliated with or endorsed by Nintendo,
+                    Game Freak, or The Pok&eacute;mon Company. Pok&eacute;mon and all
+                    related names, sprites, and cries are the property of their respective
+                    owners. Sprite and species data sourced from{" "}
+                    <a
+                      href="https://pokeapi.co"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+                    >
+                      Pok&eacute;API
+                    </a>
+                    .
+                  </p>
                 </div>
               </CollapsibleSection>
               )}
