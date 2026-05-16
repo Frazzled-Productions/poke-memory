@@ -110,6 +110,8 @@ npm run dev    # http://localhost:3000
 
 The seed step writes `lib/pokemon/generated.json`, which is committed to the repo, so the seed is only required if that file is missing or you want to regenerate it (e.g. after a new Pokémon generation ships).
 
+Pre-generated name audio under `public/audio/names/` is likewise committed. To regenerate it — for example after a new generation ships — set `GOOGLE_CLOUD_TTS_API_KEY` in `.env.local` and run `npm run seed:tts`.
+
 ### Other scripts
 
 ```bash

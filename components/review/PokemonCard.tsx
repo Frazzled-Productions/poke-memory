@@ -10,9 +10,10 @@ type Props = {
   fact?: PokemonFact | null;
   /** Which direction this card is being rendered for. Determines the badge. */
   direction?: "name" | "cry";
+  id?: number | null;
 };
 
-export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name" }: Props) {
+export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name", id }: Props) {
   return (
     <div className="flex flex-col items-center gap-2 sm:gap-4">
       <DirectionBadge direction={direction} />
@@ -38,7 +39,7 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
               <button
                 type="button"
                 aria-label={`Hear ${name}`}
-                onClick={() => speakName(name)}
+                onClick={() => speakName(name, id)}
                 className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
               >
                 🔊

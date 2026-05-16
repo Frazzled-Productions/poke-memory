@@ -1142,10 +1142,11 @@ export function ReviewSession() {
     // Pick the name to speak per direction (cry cards: speak the answer name; reverse
     // picker cards never reach handleReveal so they're absent here).
     let nameToSpeak: string | null = null;
-    if (currentCard.cardType === "name") nameToSpeak = currentCard.name;
-    else if (currentCard.cardType === "evolution") nameToSpeak = currentCard.postEvoName;
-    else if (currentCard.cardType === "reverse-evolution") nameToSpeak = currentCard.preEvoName;
-    else if (currentCard.cardType === "cry") nameToSpeak = currentCard.name;
+    let idToSpeak: number | null = null;
+    if (currentCard.cardType === "name") { nameToSpeak = currentCard.name; idToSpeak = currentCard.id; }
+    else if (currentCard.cardType === "evolution") { nameToSpeak = currentCard.postEvoName; idToSpeak = currentCard.postEvoId; }
+    else if (currentCard.cardType === "reverse-evolution") { nameToSpeak = currentCard.preEvoName; idToSpeak = currentCard.preEvoId; }
+    else if (currentCard.cardType === "cry") { nameToSpeak = currentCard.name; idToSpeak = currentCard.pokemonId; }
 
     // Pick the cry URL per direction. Cry cards: the cry was the prompt, so don't
     // replay it on reveal.
@@ -1162,7 +1163,7 @@ export function ReviewSession() {
     }
 
     const speakAfterCry =
-      speakOn && nameToSpeak !== null ? () => speakName(nameToSpeak!) : undefined;
+      speakOn && nameToSpeak !== null ? () => speakName(nameToSpeak!, idToSpeak) : undefined;
 
     // Branch on whether a cry will play. If yes, chain TTS to fire after `ended`.
     // If no cry (toggle off or no url), fall through to TTS directly so they don't
@@ -1170,7 +1171,7 @@ export function ReviewSession() {
     if (cryOn && (currentCard.cardType === "name" || currentCard.cardType === "evolution" || currentCard.cardType === "reverse-evolution")) {
       playCry(cryUrlOnReveal, 0.6, speakAfterCry);
     } else if (speakOn && nameToSpeak !== null) {
-      speakName(nameToSpeak);
+      speakName(nameToSpeak, idToSpeak);
     }
   }
 
@@ -1393,6 +1394,7 @@ export function ReviewSession() {
             revealed
             fact={currentFact}
             direction="cry"
+            id={effectiveCard.pokemonId}
           />
         ) : (
           <div className="flex flex-col items-center gap-4">
@@ -1527,6 +1529,8 @@ export function ReviewSession() {
           triggerPhrase={effectiveCard.triggerPhrase}
           revealed={revealed}
           fact={currentFact}
+          preEvoId={effectiveCard.preEvoId}
+          postEvoId={effectiveCard.postEvoId}
         />
       ) : effectiveCard.cardType === "reverse-evolution" ? (
         <ReverseEvolutionCard
@@ -1537,6 +1541,8 @@ export function ReviewSession() {
           triggerPhrase={effectiveCard.triggerPhrase}
           revealed={revealed}
           fact={currentFact}
+          preEvoId={effectiveCard.preEvoId}
+          postEvoId={effectiveCard.postEvoId}
         />
       ) : (
         <PokemonCard
@@ -1544,6 +1550,7 @@ export function ReviewSession() {
           name={effectiveCard.displayName}
           revealed={revealed}
           fact={currentFact}
+          id={effectiveCard.id}
         />
       )}
 

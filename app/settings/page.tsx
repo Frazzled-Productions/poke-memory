@@ -1268,6 +1268,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       role="switch"
+                      aria-label="Speak name on reveal"
                       aria-checked={settings.speakNameOnReveal}
                       onClick={() => handleToggle("speakNameOnReveal")}
                       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${

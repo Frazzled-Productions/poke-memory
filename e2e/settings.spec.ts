@@ -1,5 +1,36 @@
 import { test, expect } from "@playwright/test";
 
+test.describe("Settings — Audio TTS controls (#435)", () => {
+  test("'Hear sample' button is present inside the Audio section and clickable without error", async ({
+    page,
+  }) => {
+    // The "Hear sample" button is rendered by TtsControls inside the Audio
+    // section. Clicking it calls speakName("Bulbasaur", null, overrides) via
+    // the Web Speech API. Audio playback cannot be asserted headlessly, but we
+    // verify the button renders and the click produces no uncaught page error.
+    const pageErrors: Error[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err));
+
+    await page.goto("/settings");
+
+    // Expand the Audio section.
+    await page.getByRole("button", { name: /^audio$/i }).click();
+
+    // TtsControls (and its "Hear sample" button) only mounts once the
+    // "Speak name on reveal" toggle is enabled — it defaults to off.
+    await page.getByRole("switch", { name: "Speak name on reveal" }).click();
+
+    // The "Hear sample" button sits inside the Speech rate row of TtsControls.
+    const hearSampleBtn = page.getByRole("button", { name: "Hear sample" });
+    await expect(hearSampleBtn).toBeVisible();
+    await hearSampleBtn.click();
+
+    // Allow a brief moment for any async rejection to bubble.
+    await page.waitForTimeout(300);
+    expect(pageErrors).toHaveLength(0);
+  });
+});
+
 test.describe("Settings page — collapsible sections (#660)", () => {
   test("settings page opens with all category headings visible and collapsed", async ({
     page,

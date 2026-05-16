@@ -1,14 +1,33 @@
+/**
+ * Remove the ♀ (U+2640) and ♂ (U+2642) decorative gender symbols from a
+ * Pokémon display name and collapse any resulting extra whitespace. Only those
+ * two code points are stripped — apostrophes, accents (é), %, and parentheses
+ * are intentionally preserved so that overrides for names like Farfetch’d
+ * continue to work.
+ */
+export function stripDecorativeSymbols(name: string): string {
+  return name.replace(/[♀♂]/g, "").replace(/\s+/g, " ").trim();
+}
+
 // Phonetic overrides for the Web Speech API "Hear name" button. Keys are
 // lower-cased Pokémon display names; values are respellings that the default
-// en-GB system voices (Apple's Daniel on macOS/iOS, Google UK English on
+// en-GB system voices (Apple’s Daniel on macOS/iOS, Google UK English on
 // Chrome/Android) pronounce noticeably better than the raw name. The list is
 // deliberately conservative — only entries whose default rendering is clearly
 // wrong are worth carrying.
+//
+// NOTE: ♀/♂ symbols are stripped by stripDecorativeSymbols() before this
+// lookup, so "Nidoran♀" → "Nidoran" → no override needed here. This is a
+// deliberate product decision (#435): the gender symbol is visual metadata,
+// not something to pronounce, so both Nidoran forms intentionally speak as
+// "Nidoran". Do not re-add nidoran♀/♂ overrides to "disambiguate" them.
 const OVERRIDES: Record<string, string> = {
   // Orthographic curveballs: hyphens, apostrophes, accents, special glyphs,
   // missing letters. The synth otherwise parses these as separators / errors.
-  "nidoran♀": "nidoran female",
-  "nidoran♂": "nidoran male",
+  // Both ASCII apostrophe (U+0027) and right single quotation mark (U+2019)
+  // variants are included for Farfetch’d and Sirfetch’d: generated.json currently
+  // uses U+2019, so the ASCII keys are unreachable today, but they are kept as a
+  // safety net if PokéAPI ever normalises to ASCII apostrophes.
   "farfetch’d": "farfetched",
   "farfetch'd": "farfetched",
   "sirfetch’d": "sir fetched",
@@ -208,6 +227,7 @@ const OVERRIDES: Record<string, string> = {
 };
 
 export function pronunciationFor(name: string): string {
-  const override = OVERRIDES[name.toLowerCase()];
-  return override ?? name;
+  const stripped = stripDecorativeSymbols(name);
+  const override = OVERRIDES[stripped.toLowerCase()];
+  return override ?? stripped;
 }
