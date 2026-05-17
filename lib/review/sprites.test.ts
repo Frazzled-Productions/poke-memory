@@ -37,7 +37,13 @@ describe("preloadableSpriteUrls", () => {
     ]);
   });
 
-  it("returns nothing for a reverse card — the picker renders tiles at a different size", () => {
+  it("returns nothing for a reverse card — picker tiles are decoded separately in ReviewSession at PICKER_SPRITE_SIZE", () => {
+    // Reverse cards display as a four-tile SpritePicker rendered at 150 px, not
+    // the 320 px flip-card size. `preloadableSpriteUrls` intentionally returns []
+    // here so callers do not accidentally warm the wrong optimiser variant.
+    // The decode-ahead in ReviewSession.handleGrade handles reverse cards
+    // explicitly by calling decodeSpriteUrls on the target + distractor sprites
+    // at the correct 150 px size (#838).
     const card = { cardType: "reverse", spriteUrl: "/sprites/pokemon/1.png" } as unknown as ReviewableCard;
     expect(preloadableSpriteUrls(card)).toEqual([]);
   });

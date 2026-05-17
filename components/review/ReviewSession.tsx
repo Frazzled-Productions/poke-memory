@@ -1425,7 +1425,19 @@ export function ReviewSession() {
     if (nextCardId !== null) {
       const nextCard = newCards.find((c) => c.id === nextCardId);
       if (nextCard) {
-        await decodeSpriteUrls(preloadableSpriteUrls(nextCard));
+        if (nextCard.cardType === "reverse") {
+          // Reverse cards show a four-tile SpritePicker at PICKER_SPRITE_SIZE.
+          // `preloadableSpriteUrls` returns [] for reverse cards (it feeds the
+          // 320 px flip-card pipeline), so decode the picker tile sprites
+          // directly here instead.
+          const target = SEED_BY_ID.get(nextCard.pokemonId);
+          if (target) {
+            const distractors = pickDistractors(nextCard.pokemonId, SEED_POKEMON, 3, String(nextCard.id));
+            await decodeSpriteUrls([target, ...distractors].map((p) => p.spriteUrl));
+          }
+        } else {
+          await decodeSpriteUrls(preloadableSpriteUrls(nextCard));
+        }
       }
     }
 
