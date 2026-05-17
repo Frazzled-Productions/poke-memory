@@ -16,7 +16,7 @@
  *  - Both GitHub and Google provider branches invoke signIn with the right provider
  */
 
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { User } from "@supabase/supabase-js";
@@ -213,13 +213,35 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   // ── Pending transition ───────────────────────────────────────────────────
   // useTransition's isPending is true during the async Server Action call.
-  // We test the steady-state: button text is "Sign in" by default and the
-  // button is not disabled before any action is triggered.
 
   it("trigger button is not disabled before any action is triggered", () => {
     render(<AuthButton />);
     const trigger = screen.getByRole("button", { name: /sign in/i });
     expect(trigger).not.toBeDisabled();
+  });
+
+  it("renders 'Signing in…' and disables the trigger while signIn is pending", async () => {
+    // Hold the signIn promise open so isPending stays true during the check.
+    let resolveSignIn!: () => void;
+    mockSignIn.mockReturnValue(new Promise<void>((res) => { resolveSignIn = res; }));
+
+    const user = userEvent.setup();
+    render(<AuthButton />);
+
+    // Open the picker and click a provider inside an act block so React
+    // processes the transition start synchronously.
+    await act(async () => {
+      await user.click(screen.getByRole("button", { name: /sign in/i }));
+      await user.click(screen.getByRole("menuitem", { name: /continue with github/i }));
+    });
+
+    // While the transition is pending, the trigger should show the loading label
+    // and be disabled.
+    expect(screen.getByRole("button", { name: /signing in/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /signing in/i })).toBeDisabled();
+
+    // Let the action finish so React can clean up the transition state.
+    await act(async () => { resolveSignIn(); });
   });
 });
 
@@ -261,6 +283,29 @@ describe("AuthButton — signed-in state", () => {
     await user.click(screen.getByRole("button", { name: /sign out/i }));
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders 'Signing out…' and disables the button while signOut is pending", async () => {
+    // Hold the signOut promise open so isPending stays true during the check.
+    let resolveSignOut!: () => void;
+    mockSignOut.mockReturnValue(new Promise<void>((res) => { resolveSignOut = res; }));
+
+    mockUseAuth.mockReturnValue({
+      user: makeUser({ user_name: "ash" }),
+      loading: false,
+    });
+
+    const user = userEvent.setup();
+    render(<AuthButton />);
+
+    await act(async () => {
+      await user.click(screen.getByRole("button", { name: /sign out/i }));
+    });
+
+    expect(screen.getByRole("button", { name: /signing out/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /signing out/i })).toBeDisabled();
+
+    await act(async () => { resolveSignOut(); });
   });
 
   // ── Avatar rendering ─────────────────────────────────────────────────────

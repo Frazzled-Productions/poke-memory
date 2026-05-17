@@ -17,11 +17,16 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({
+  revalidateTag: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports after mocks.
 // ---------------------------------------------------------------------------
 import { POST } from "./route";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateTag } from "next/cache";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,8 +140,7 @@ describe("POST /api/sync", () => {
   });
 
   it("returns 400 when cards field is missing from payload", async () => {
-    makeSupabaseMock();
-
+    // The route validates the payload before touching Supabase — no mock needed.
     const res = await POST(makeRequest({ notCards: [] }));
     const body = await res.json();
 
@@ -146,8 +150,6 @@ describe("POST /api/sync", () => {
   });
 
   it("returns 400 when cards is not an array", async () => {
-    makeSupabaseMock();
-
     const res = await POST(makeRequest({ cards: "not-an-array" }));
     const body = await res.json();
 
@@ -157,8 +159,6 @@ describe("POST /api/sync", () => {
   });
 
   it("returns 400 when cards is null", async () => {
-    makeSupabaseMock();
-
     const res = await POST(makeRequest({ cards: null }));
     const body = await res.json();
 
@@ -226,6 +226,20 @@ describe("POST /api/sync", () => {
     const [upsertRows] = upsertMock.mock.calls[0];
     expect(upsertRows[0].user_id).toBe("user-xyz-789");
     expect(typeof upsertRows[0].updated_at).toBe("string");
+  });
+
+  it("upserts into card_reviews with the correct onConflict columns", async () => {
+    const { upsertMock, fromMock } = makeSupabaseMock();
+
+    await POST(makeRequest({ cards: [makeCard()] }));
+
+    // The route must target the card_reviews table.
+    expect(fromMock).toHaveBeenCalledWith("card_reviews");
+    // The composite conflict key must match the DB unique constraint.
+    expect(upsertMock).toHaveBeenCalledWith(
+      expect.any(Array),
+      { onConflict: "user_id,card_type,subject_key" },
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -304,18 +318,14 @@ describe("POST /api/sync", () => {
   // No cache-invalidation side effects
   // -------------------------------------------------------------------------
 
-  it("does not import or invoke revalidateTag — the sync route is write-only with no cache side effects", async () => {
-    // This test acts as a regression guard: if someone adds a revalidateTag
-    // call to the sync route, the mock below would need updating and the
-    // team would be forced to decide whether that is intentional.
-    //
-    // Because the route does not import next/cache, we simply verify a
-    // successful write returns 200 without any unexpected thrown errors that
-    // would indicate a missing mock for cache functions.
+  it("does not invoke revalidateTag — the sync route is write-only with no cache side effects", async () => {
+    // Regression guard: if someone adds a revalidateTag call to the sync
+    // route, this assertion fails and forces an explicit decision.
     makeSupabaseMock();
 
     const res = await POST(makeRequest({ cards: [makeCard()] }));
 
     expect(res.status).toBe(200);
+    expect(vi.mocked(revalidateTag)).not.toHaveBeenCalled();
   });
 });
