@@ -46,7 +46,7 @@ import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { SYNC_PULL_APPLIED_EVENT } from "@/lib/sync/pullAndMerge";
-import { appendGradeEntry, loadGradeLog, removeGradeEntry } from "@/lib/gradelog/persistence";
+import { appendGradeEntry, loadGradeLog, removeGradeEntry, todayGradeSequence } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 import { ShareTodayButton } from "@/components/review/ShareTodayButton";
@@ -192,6 +192,20 @@ function TodayPill({
   reverseEnabled: boolean;
   cryEnabled: boolean;
 }) {
+  // Passive hint (#880): when more than one card direction is enabled, a user
+  // will often see the review queue dominated by a single direction (typically
+  // reverse / sprite-picker). This is correct behaviour - the review queue
+  // surfaces only graduated cards, and recognition cards graduate from the
+  // learning steps sooner than recall cards. Surface a one-line explanation so
+  // the user can discover why without reading the docs. Only shown when 2+
+  // directions are on, since there is nothing to explain with a single one.
+  const enabledDirections = [
+    nameEnabled,
+    evolutionEnabled,
+    reverseEnabled,
+    cryEnabled,
+  ].filter(Boolean).length;
+  const showGraduatedHint = enabledDirections > 1;
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
       <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -243,6 +257,12 @@ function TodayPill({
           <span className="font-medium text-foreground">
             {perType.cry.reviewsDoneToday} reviewed
           </span>
+        </p>
+      )}
+      {showGraduatedHint && (
+        <p className="mt-2 max-w-xs text-[11px] leading-snug text-zinc-400 dark:text-zinc-500">
+          Reviews surface only graduated cards, so one direction can dominate.
+          Cards still in learning steps wait in a separate queue.
         </p>
       )}
     </div>
@@ -699,13 +719,30 @@ export function ReviewSession() {
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
 
-      // Hydrate the daily summary from localStorage so the "Share today" button
-      // survives a page reload on the session-complete screen (#685).
+      // Hydrate the daily summary so the "Share today" button survives a page
+      // reload, a navigation away and back, or reopening the app later in the
+      // day (#685, #896). Prefer the persisted daily-summary record — it also
+      // carries the new-card and mastered counts. When that record is absent
+      // (e.g. its best-effort write hit a quota error, or the user finished
+      // their cards in an earlier browsing session), fall back to the grade
+      // log, which is the durable append-only record of every grade. The grade
+      // log lacks new/mastered counts, so those stay at their defaults of 0 in
+      // the fallback path; the grade grid and reviewed total still reconstruct.
       const storedSummary = loadDailySummary(settings.timezone ?? "UTC");
       if (storedSummary !== null) {
         setSessionGradeSeq(storedSummary.gradeSequence);
         setNewCardsThisSession(storedSummary.newCards);
         setMasteredThisSession(storedSummary.mastered);
+      } else if (!superuserGuarded) {
+        // Grade-log entries are stamped with a UTC date (see handleGrade), so
+        // reconstruct against the same UTC day boundary the entries use.
+        // Skipped while a superuser flag is on, mirroring the saveDailySummary
+        // write-guard: a QA session must not drive the Share affordance.
+        const gradeLog = await loadGradeLog();
+        const todaysGrades = todayGradeSequence(gradeLog, today);
+        if (todaysGrades.length > 0) {
+          setSessionGradeSeq(todaysGrades);
+        }
       }
 
       // Initialize the learning queue from persisted learning-step cards.
@@ -1259,10 +1296,16 @@ export function ReviewSession() {
       tomorrow,
       eligibleCardIds,
     );
+    // The share grid is gated on persisted completion state: `sessionGradeSeq`
+    // is hydrated at mount from the daily-summary record or, failing that, the
+    // grade log (#896), so the button survives a reload or navigation rather
+    // than only appearing in the page-load that graded the final card.
+    // The displayed date uses the user's timezone (a calendar label), while
+    // streak lookup stays on the UTC `today` the streak data is keyed by.
     const shareText =
       sessionGradeSeq.length > 0
         ? formatDailySummary({
-            date: today,
+            date: todayTz,
             streak: computeStreak(loadStreakData(), today),
             reviewed: sessionGradeSeq.length,
             newCards: newCardsThisSession,
