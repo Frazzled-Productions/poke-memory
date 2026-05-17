@@ -95,8 +95,7 @@ export function computeCompletionProjection(
     return { kind: "complete" };
   }
 
-  // Count currently mastered vs remaining species.
-  let masteredCount = 0;
+  // Count remaining (unmastered) species and mastery events in the trailing window.
   let remaining = 0;
   // Mastery events that fall within the trailing window (last-review date).
   const windowStart = isoMinusDays(today, PROJECTION_WINDOW_DAYS - 1);
@@ -108,7 +107,6 @@ export function computeCompletionProjection(
   for (const card of cards) {
     const mastered = isMastered(card.state, masteryRepetitions);
     if (mastered) {
-      masteredCount++;
       // Check whether the card's last review falls within the window —
       // this is our proxy for "mastered recently".
       const lr = card.state.lastReview;
