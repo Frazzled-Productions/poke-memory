@@ -36,9 +36,17 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
    If the result is empty, stop and tell the user there is nothing to do.
 
-2. **Confirm a clean working tree.** If `git status` shows uncommitted changes, surface and stop. Do **not** require being on the `main` branch — under parallel jobs `main` is often checked out by another worktree, leaving this session on a detached HEAD, which is fine. Every implementation agent branches off `origin/qa` in its own worktree regardless.
+2. **Disable Auto Review.** `auto-review.yml` runs on PRs into `qa` as well as `main`. During a batch drain the in-session `code-reviewer` (Implementation step 3) is the review gate, so disable the workflow to avoid a redundant second review on every batch PR:
 
-3. **Sync the `qa` staging branch.** Batch PRs target `qa`. Fetch and inspect it:
+   ```bash
+   gh workflow disable "Auto Review"
+   ```
+
+   Deliberate global mutation per the user's standing ask — paired with the re-enable in Wrap-up and the graceful-exit guardrail so a halted run never leaves it disabled. If the disable fails (already disabled, permissions), surface the error and stop — do not proceed with a half-applied setup.
+
+3. **Confirm a clean working tree.** If `git status` shows uncommitted changes, surface and stop. Do **not** require being on the `main` branch — under parallel jobs `main` is often checked out by another worktree, leaving this session on a detached HEAD, which is fine. Every implementation agent branches off `origin/qa` in its own worktree regardless.
+
+4. **Sync the `qa` staging branch.** Batch PRs target `qa`. Fetch and inspect it:
 
    ```bash
    git fetch origin --quiet
@@ -51,7 +59,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
    - **`qa` ahead** (`ahead > 0`): a previous batch was drained into `qa` but never promoted. Stop and ask the maintainer whether to **promote** (open the `qa -> main` PR for the existing work first) or **discard** (`git push origin +origin/main:qa`) before starting a new batch — do not silently stack a new batch on top.
    - If `qa` does not exist at all, stop and surface it — the qa staging-branch setup (#806) has not been applied.
 
-4. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
+5. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
 
    - **Code** — a concrete, implementable change. Goes into the implementation batches.
    - **Analysis** — a read-only audit or umbrella issue whose deliverable is a report plus scoped follow-up issues, not a PR.
@@ -110,7 +118,7 @@ For each batch, in order:
 
 3. **In-session `code-reviewer` pass per PR.** After each agent's PR is open, run the `code-reviewer` sub-agent against that branch's diff in this session (not a CI run) as a confirmation gate — the agent should already have self-reviewed per step 2, so this pass mostly verifies. Surface findings as a one-line description each — never just counts. (memory: `feedback_review_summaries`.) If a finding is blocking, dispatch a follow-up Agent to fix; non-blocking findings get filed as new issues with the user's existing priority labels, never `priority:now` without direction.
 
-   `auto-review.yml` does **not** run on PRs into `qa` (it only reviews PRs based on `main`), so this in-session pass is the sole review gate during the drain. There is no workflow to disable.
+   `auto-review.yml` *does* run on PRs into `qa`, so Pre-flight disables it for the batch drain — this in-session pass is the review gate instead, and Wrap-up re-enables it.
 
 ## PR queue drain
 
@@ -130,7 +138,13 @@ Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
 After every batch is merged into `qa` and the queue is drained:
 
-1. **Fire the `qa` preview deploy:**
+1. **Re-enable Auto Review** (disabled in Pre-flight):
+
+   ```bash
+   gh workflow enable "Auto Review"
+   ```
+
+2. **Fire the `qa` preview deploy:**
 
    ```bash
    gh workflow run "QA Preview Deploy"
@@ -138,7 +152,7 @@ After every batch is merged into `qa` and the queue is drained:
 
    This creates a Vercel preview deployment of the bundled `qa` branch for the maintainer to test. Confirm it dispatched with `gh run list --workflow="QA Preview Deploy" --limit 1`.
 
-2. **Open the `qa -> main` promotion PR as a draft.** A PR merged into `qa` does **not** auto-close its `closes #N` issue — GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved:
+3. **Open the `qa -> main` promotion PR as a draft.** A PR merged into `qa` does **not** auto-close its `closes #N` issue — GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved:
 
    ```bash
    gh pr create --base main --head qa --draft \
@@ -150,7 +164,7 @@ After every batch is merged into `qa` and the queue is drained:
 
    Leave it as a **draft** — the maintainer marks it ready after QA. Do not merge it yourself.
 
-3. **Hand off to the maintainer.** One summary block:
+4. **Hand off to the maintainer.** One summary block:
    - Issues drained into `qa` (numbers) and the PRs merged (numbers).
    - The draft `qa -> main` promotion PR number.
    - Next steps for the maintainer: "Test the `qa` preview deploy. When satisfied, mark draft PR #N ready and merge it — that cuts the release, deploys production, and resets `qa`. If the batch carries a `minor-bump` fragment, apply `version-bump:approved` to the promotion PR first."
@@ -168,6 +182,7 @@ After every batch is merged into `qa` and the queue is drained:
 - **Don't rationalize** sub-agent decisions if the user pushes back mid-run; evaluate honestly. (memory: `feedback_dont_rationalize_downstream`.)
 - **Never merge the `qa -> main` PR yourself.** The maintainer's QA of the preview deploy is the gate between batch work and production. Open it as a draft and stop.
 - **Graceful-exit on halt.** If the run halts for any reason — CI failures, user interruption, an unfixable conflict — before reaching Wrap-up:
-  1. Commit any in-progress work as `WIP: halted run on #N` and push, per AGENTS.md "Graceful exit on halt".
-  2. Do not skip hooks (`--no-verify`) or `--force` past failures.
-  3. Any PRs already merged into `qa` stay there — a later `/batch-issues` run's pre-flight step 3 will detect the un-promoted `qa` and ask how to handle it.
+  1. Run `gh workflow enable "Auto Review"` so the Pre-flight disable is reversed. Unconditional — even if the disable itself failed, run the enable defensively.
+  2. Commit any in-progress work as `WIP: halted run on #N` and push, per AGENTS.md "Graceful exit on halt".
+  3. Do not skip hooks (`--no-verify`) or `--force` past failures.
+  4. Any PRs already merged into `qa` stay there — a later `/batch-issues` run's pre-flight step 4 will detect the un-promoted `qa` and ask how to handle it.

@@ -526,27 +526,29 @@ jobs:
             exit 0
           fi
 
-          # Fetch to ensure origin/main is current; guard against unreachable base SHA
+          # Fetch so origin/qa is current; guard against unreachable base SHA.
+          # Implement PRs target the `qa` staging branch, so staleness is
+          # measured against `qa`, not `main`.
           git fetch origin
           if ! git cat-file -e "$BASE" 2>/dev/null; then
             echo "::warning::Base SHA ${BASE:0:7} not reachable (force-push or shallow clone) — skipping staleness check."
             exit 0
           fi
 
-          # Split comma-separated file list and check for intersection with origin/main changes
+          # Split comma-separated file list and check for intersection with origin/qa changes
           IFS=',' read -ra FILE_ARRAY <<< "$FILES"
-          CHANGED=$(git diff --name-only "$BASE..origin/main" -- "${FILE_ARRAY[@]}" 2>/dev/null || true)
+          CHANGED=$(git diff --name-only "$BASE..origin/qa" -- "${FILE_ARRAY[@]}" 2>/dev/null || true)
 
           if [ -z "$CHANGED" ]; then
-            echo "origin/main has not touched planned files since plan base ${BASE:0:7} — proceeding."
+            echo "origin/qa has not touched planned files since plan base ${BASE:0:7} — proceeding."
             exit 0
           fi
 
           # List commits that modified the planned files since base
-          COMMITS=$(git log --oneline "$BASE..origin/main" -- "${FILE_ARRAY[@]}" 2>/dev/null | head -20 || true)
+          COMMITS=$(git log --oneline "$BASE..origin/qa" -- "${FILE_ARRAY[@]}" 2>/dev/null | head -20 || true)
 
           {
-            printf 'Cannot proceed with `/go`: the plan was written against `%s` but `origin/main` has since moved and the following planned files were modified:\n\n' "${BASE:0:7}"
+            printf 'Cannot proceed with `/go`: the plan was written against `%s` but `origin/qa` has since moved and the following planned files were modified:\n\n' "${BASE:0:7}"
             printf '%s\n' "$CHANGED" | while IFS= read -r f; do printf '- `%s`\n' "$f"; done
             printf '\nCommits that touched them since the plan was written:\n'
             printf '```\n%s\n```\n\n' "$COMMITS"
@@ -554,7 +556,7 @@ jobs:
           } > /tmp/staleness-comment.md
 
           gh issue comment "$ISSUE" --repo "$REPO" --body-file /tmp/staleness-comment.md
-          echo "::error::Plan is stale — planned files modified in origin/main since plan base ${BASE:0:7}."
+          echo "::error::Plan is stale — planned files modified in origin/qa since plan base ${BASE:0:7}."
           exit 1
 
       - name: Record starting SHA
@@ -639,8 +641,9 @@ jobs:
                is notified) and stop — do NOT open a PR. The branch stays
                pushed for manual inspection. (`npm ci` has already run as a
                workflow step, so dependencies are in place.)
-            7. Open the PR:
-               `gh pr create --title "<title>" --body "<body>" --base main`
+            7. Open the PR against the `qa` staging branch:
+               `gh pr create --title "<title>" --body "<body>" --base qa`
+               (`main` only accepts PRs from `qa` — see the qa staging flow.)
                The body MUST contain `closes #${{ github.event.issue.number }}`
                so the issue auto-closes on merge. Summarise what changed.
                Capture the new PR number for the next step.
@@ -1023,8 +1026,9 @@ jobs:
                (include `@fraserbrookhouse` in the comment so the maintainer
                is notified) and stop — do NOT open a PR. The branch stays
                pushed for manual inspection.
-            7. Open the PR:
-               `gh pr create --title "<title>" --body "<body>" --base main`
+            7. Open the PR against the `qa` staging branch:
+               `gh pr create --title "<title>" --body "<body>" --base qa`
+               (`main` only accepts PRs from `qa` — see the qa staging flow.)
                The body MUST contain `closes #${{ github.event.issue.number }}`
                so the issue auto-closes on merge. Summarise what changed.
                Capture the new PR number for the next step.
