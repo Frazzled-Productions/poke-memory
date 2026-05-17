@@ -19,6 +19,15 @@ import { Serwist } from "@serwist/window";
  * Refresh posts `SKIP_WAITING` (via `messageSkipWaiting`), the new worker
  * activates and takes control, and the page reloads once on `controlling`.
  *
+ * Re-surfacing after "Later" — Serwist fires the `waiting` event only once
+ * per waiting worker, so a user who dismisses the banner with "Later" would
+ * otherwise never see the prompt again for that worker. On every mount we
+ * independently probe `navigator.serviceWorker.getRegistration()` and re-show
+ * the banner if a worker is still waiting. That covers the common case: the
+ * user dismisses, navigates away (unmounting this component), and returns.
+ * The one gap it cannot close is a dismissal with no remount and no reload at
+ * all — the same mounted instance stays dismissed until the next navigation.
+ *
  * Registration is skipped outside production builds so a `next dev` session
  * is never shadowed by a cached shell.
  */
@@ -49,6 +58,15 @@ export function ServiceWorkerProvider() {
     // A new worker has installed and is waiting — offer the update.
     const onWaiting = () => setUpdateReady(true);
     serwist.addEventListener("waiting", onWaiting);
+
+    // Re-surface the banner on mount if a worker is already waiting. The
+    // `waiting` event only fires once per waiting worker, so a user who
+    // dismissed the banner with "Later" and later remounts this component
+    // (e.g. by navigating away and back) would otherwise never be prompted
+    // again. Probing the registration directly closes that gap.
+    void navigator.serviceWorker.getRegistration().then((registration) => {
+      if (registration?.waiting) setUpdateReady(true);
+    });
 
     // A worker has taken control. Reload only when this is the result of the
     // user accepting the update prompt — `clientsClaim` also fires this event

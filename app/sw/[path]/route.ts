@@ -32,8 +32,16 @@ export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
     swSrc: "app/sw.ts",
     // Precache only the static build output (the app shell). The default
     // patterns also glob `public/**/*`, which would pull in every sprite.
+    //
+    // The build-output glob is restricted to `*.{js,css}` on purpose. A
+    // wider extension list (e.g. `json`) pulls `.next/static/` RSC payloads
+    // and route metadata into the precache — those change every deploy and
+    // stale instantly, bloating the install for no benefit. HTML documents
+    // and other build assets are covered by the NetworkFirst runtime handler
+    // instead. Root-level `public/` files (the web manifest, favicons) are
+    // genuinely small and stable, so they stay precached.
     globPatterns: [
-      ".next/static/**/*.{js,css,html,ico,json,webmanifest}",
+      ".next/static/**/*.{js,css}",
       "public/*.{png,svg,ico,webmanifest}",
     ],
     // Belt and braces: even if a sprite path slipped through, ignore it.

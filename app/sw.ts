@@ -9,8 +9,10 @@
  * What it does:
  * - Precaches the app shell. `self.__SW_MANIFEST` is the injection point that
  *   `@serwist/turbopack` replaces at build time with the list of build-output
- *   files (HTML, JS, CSS). With the shell precached, an installed PWA opens
- *   offline.
+ *   files (JS and CSS — see the `globPatterns` in `app/sw/[path]/route.ts`).
+ *   HTML documents are not precached; they are runtime-cached network-first so
+ *   an offline visit still falls back to the last-known shell. With the static
+ *   assets precached, an installed PWA opens offline.
  * - Runtime-caches sprites cache-first and navigations/data network-first, per
  *   the policy in `lib/pwa/cacheStrategy.ts`. Cross-origin requests (Supabase
  *   sync) are never cached, so the best-effort sync model is unchanged.
