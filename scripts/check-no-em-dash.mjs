@@ -53,12 +53,35 @@ const SKIP_DIRS = new Set([
 const violations = [];
 
 /**
+ * Strip a single layer of matching surrounding quote characters (`"`, `'` or
+ * a backtick) from a string. `node.getText(sourceFile)` returns a string
+ * literal *with* its quotes (`"—"`), whereas a JSX text node's `.text` is
+ * already unquoted. Normalising here lets `isStandaloneNoValueGlyph` treat
+ * both call-site shapes identically.
+ */
+function stripSurroundingQuotes(text) {
+  if (text.length >= 2) {
+    const first = text[0];
+    const last = text[text.length - 1];
+    if (first === last && (first === '"' || first === "'" || first === "`")) {
+      return text.slice(1, -1);
+    }
+  }
+  return text;
+}
+
+/**
  * True when a string's only non-whitespace content is em dashes. That is the
  * intentional "no value" placeholder glyph and must not be flagged. An em dash
  * sitting inside other prose ("Game over — streak of N") is a real violation.
+ *
+ * Accepts either an unquoted value (a JSX text node's `.text`) or a quoted
+ * string-literal source (`node.getText(sourceFile)`); surrounding quotes are
+ * stripped first so `alt="—"` and a bare `—` text node behave the same.
  */
 function isStandaloneNoValueGlyph(text) {
-  return text.includes(EM_DASH) && text.replace(/[\s—]/g, "") === "";
+  const unquoted = stripSurroundingQuotes(text);
+  return unquoted.includes(EM_DASH) && unquoted.replace(/[\s—]/g, "") === "";
 }
 
 function recordViolation(file, sourceFile, pos, context) {
@@ -95,15 +118,23 @@ function collectSourceFiles(dir, out) {
   }
 }
 
+// The two Next.js metadata export names. Both `metadata` (static object) and
+// `generateMetadata` (function) may be declared as a `const` (arrow function
+// or object literal) or as a `function` declaration.
+const METADATA_EXPORT_NAMES = new Set(["metadata", "generateMetadata"]);
+
 /** True when `node` is an `export`ed `metadata` const or `generateMetadata`. */
 function isMetadataExport(node) {
   const hasExport = (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Export) !== 0;
   if (!hasExport) return false;
+  // Covers `export const metadata = {...}`,
+  // `export const generateMetadata = async () => ({...})`, etc.
   if (ts.isVariableStatement(node)) {
     return node.declarationList.declarations.some(
-      (d) => ts.isIdentifier(d.name) && d.name.text === "metadata",
+      (d) => ts.isIdentifier(d.name) && METADATA_EXPORT_NAMES.has(d.name.text),
     );
   }
+  // Covers `export function generateMetadata() {...}`.
   if (ts.isFunctionDeclaration(node)) {
     return node.name?.text === "generateMetadata";
   }
@@ -185,9 +216,11 @@ function checkSourceFile(file) {
 
 /**
  * Markdown scan. `changelog.d/**` fragment bodies and `CHANGELOG.md` release
- * notes are user-visible once a release is cut. Front-matter, headings, and
- * the HTML stub comment in CHANGELOG.md are structural, not prose, so they are
- * skipped — but in practice they should never carry an em dash anyway.
+ * notes are user-visible once a release is cut. YAML front-matter (delimited
+ * by `---` at the top of a file) is skipped because it is structural metadata,
+ * not prose. Every other non-front-matter line is checked — headings and the
+ * HTML stub comment in CHANGELOG.md are not exempted, but in practice they
+ * should never carry an em dash anyway.
  */
 function checkMarkdownFile(file) {
   const text = readFileSync(file, "utf8");
@@ -274,8 +307,8 @@ function main() {
   );
   console.error(
     `no-em-dash guard: ${violations.length} violation(s) found.\n` +
-      `An em dash (U+2014) is not allowed in user-facing copy — see the\n` +
-      `"Punctuation" section in AGENTS.md. Restructure the sentence, or use a\n` +
+      `An em dash (U+2014) is not allowed in user-facing copy (see the\n` +
+      `"Punctuation" section in AGENTS.md). Restructure the sentence, or use a\n` +
       `comma, colon, parentheses, or a spaced hyphen instead.\n`,
   );
   for (const v of violations) {
