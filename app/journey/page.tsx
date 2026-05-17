@@ -13,6 +13,8 @@ import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
+import { buildCollectionTimeline, type CollectionTimeline } from "@/lib/timeline/reconstruct";
+import { CollectionTimeline as CollectionTimelineWidget } from "@/components/journey/CollectionTimeline";
 import { TrainerCard } from "@/components/stats/TrainerCard";
 import { BadgeGallery } from "@/components/badges/BadgeGallery";
 import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
@@ -77,6 +79,8 @@ function LoadingSkeleton() {
       aria-label="Loading journey"
     >
       <SkeletonBlock className="h-20 w-full" />
+      {/* Timeline skeleton */}
+      <SkeletonBlock className="h-40 w-full" />
       <SkeletonBlock className="h-28 w-full" />
       <SkeletonBlock className="h-12 w-full" />
       <div className="grid grid-cols-2 gap-4">
@@ -389,6 +393,7 @@ export default function JourneyPage() {
   const [streakDates, setStreakDates] = useState<string[]>([]);
   const [gradeLog, setGradeLog] = useState<Awaited<ReturnType<typeof loadGradeLog>>>([]);
   const [earnedBadgeIds, setEarnedBadgeIds] = useState<readonly string[]>([]);
+  const [timeline, setTimeline] = useState<CollectionTimeline | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -434,6 +439,9 @@ export default function JourneyPage() {
         setEarnedBadgeIds(settings.earnedBadges.map((e) => e.id));
       }
 
+      // Use local cards by default; may be replaced by cloud cards below.
+      let finalCards = sessionCards;
+
       if (supabase !== null && user !== null && !anyFlagOn) {
         try {
           const cloudRows = await pullSession(supabase, user.id);
@@ -446,11 +454,28 @@ export default function JourneyPage() {
               opts,
             );
             setCards(cloudCards);
+            finalCards = cloudCards;
           }
         } catch (err) {
           console.warn("[journey] cloud hydration failed, falling back to local", err);
         }
       }
+
+      // Build the collection timeline with the final card set (local or cloud).
+      const nameCardMap = new Map(
+        finalCards
+          .filter((c) => c.cardType === "name")
+          .map((c) => [c.subjectKey, c.state]),
+      );
+      const tl = buildCollectionTimeline({
+        log,
+        currentNameCards: nameCardMap,
+        totalSpecies: SEED_POKEMON.filter((p) => p.isDefaultForm).length,
+        masteryRepetitions: settings.masteryRepetitions,
+        retentionTarget: settings.retentionTarget,
+        forceAllMastered: flags.pretendAllMastered,
+      });
+      setTimeline(tl);
     }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -517,6 +542,11 @@ export default function JourneyPage() {
               perGeneration={stats.perGeneration}
               earnedBadges={badgesToShow}
             />
+
+            {/* Collection timeline — the hero scrubber */}
+            {timeline !== null && (
+              <CollectionTimelineWidget timeline={timeline} />
+            )}
 
             {/* Badges */}
             <BadgeGallery

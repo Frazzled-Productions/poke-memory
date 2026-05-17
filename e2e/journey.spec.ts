@@ -133,6 +133,69 @@ test.describe("Journey page — superuser flag", () => {
   });
 });
 
+test.describe("Journey page — collection timeline scrubber", () => {
+  test("timeline section heading is visible", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("heading", { name: "Collection timeline" }),
+    ).toBeVisible();
+  });
+
+  test("timeline scrubber is rendered and interactive", async ({ page }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const scrubber = page.getByTestId("timeline-scrubber");
+    await expect(scrubber).toBeVisible();
+    await expect(scrubber).toHaveAttribute("type", "range");
+    // Default position is the centre (value 200 of 0–400).
+    await expect(scrubber).toHaveValue("200");
+  });
+
+  test("dragging the scrubber toward the past updates the direction label", async ({
+    page,
+  }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const scrubber = page.getByTestId("timeline-scrubber");
+    await expect(scrubber).toBeVisible();
+
+    // Move the slider to the far left (value 0 = full past).
+    await scrubber.fill("0");
+    // The direction pill is uniquely identified by data-testid.
+    const pill = page.getByTestId("timeline-direction-pill");
+    await expect(pill).toHaveText("Past");
+  });
+
+  test("dragging the scrubber toward the future updates the direction label", async ({
+    page,
+  }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const scrubber = page.getByTestId("timeline-scrubber");
+    await expect(scrubber).toBeVisible();
+
+    // Move the slider to the far right (value 400 = full future).
+    await scrubber.fill("400");
+    const pill = page.getByTestId("timeline-direction-pill");
+    await expect(pill).toHaveText("Future");
+  });
+});
+
 test.describe("Journey page — navigation", () => {
   test("Journey link in the desktop nav navigates to /journey", async ({
     page,
