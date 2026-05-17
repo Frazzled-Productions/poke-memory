@@ -526,11 +526,16 @@ export function ReviewSession() {
   const { enqueueGrade, flushPending } = usePerGradeSync(syncClient, syncUserId);
   useSyncOnUnload(syncClient, syncUserId, flushPending);
 
-  // Derive seen Pokémon once per cards change — used by the mini-game on the
-  // SESSION_COMPLETE screen. Must stay unconditional (hooks rule).
+  // Derive seen Pokémon for the mini-game on the SESSION_COMPLETE screen.
+  // Apply the same two-tier gate as the practice session: alternate-forms
+  // toggle first, then the gens/types/presets scope. Must stay unconditional
+  // (hooks rule).
   const seenPokemon = useMemo(
-    () => (cards !== null ? getSeenPokemon(cards, SEED_POKEMON) : []),
-    [cards],
+    () =>
+      cards !== null
+        ? getSeenPokemon(cards, SEED_POKEMON, alternateFormsEnabled, scope)
+        : [],
+    [cards, alternateFormsEnabled, scope],
   );
 
   const cardMap = useMemo(

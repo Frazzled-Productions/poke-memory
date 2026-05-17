@@ -10,11 +10,13 @@ import {
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
+import type { PracticeScope } from "@/lib/review/scope";
 
 // Minimal SeedPokemon factory — only the fields touched by this module.
 function makePokemon(
   id: number,
   stats: Partial<Record<StatKey, number>> = {},
+  overrides: Partial<SeedPokemon> = {},
 ): SeedPokemon {
   return {
     id,
@@ -50,7 +52,21 @@ function makePokemon(
     isLegendary: false,
     isMythical: false,
     cryUrl: null,
+    ...overrides,
   };
+}
+
+/** Factory for a minimal alternate-form SeedPokemon entry. */
+function makeAltFormPokemon(
+  id: number,
+  baseSpeciesId: number,
+  stats: Partial<Record<StatKey, number>> = {},
+): SeedPokemon {
+  return makePokemon(id, stats, {
+    speciesId: baseSpeciesId,
+    isDefaultForm: false,
+    formCategory: "regional",
+  });
 }
 
 const seenState: ReviewState = {
@@ -259,6 +275,70 @@ describe("getSeenPokemon", () => {
     ];
     const result = getSeenPokemon(cards, seed);
     expect(result.map((p) => p.id)).toEqual([1]);
+  });
+});
+
+// ── getSeenPokemon — scope filtering ─────────────────────────────────────────
+
+describe("getSeenPokemon — alternate-forms gate", () => {
+  // p10 is an alternate-form entry (e.g. Alolan Raichu).
+  // p1 and p2 are default-form entries.
+  const p1 = makePokemon(1);
+  const p2 = makePokemon(2);
+  const p10 = makeAltFormPokemon(10, 1);
+  const seed = [p1, p2, p10];
+
+  const allSeenCards: ReviewableCard[] = [
+    { ...p1, cardType: "name", subjectKey: "1", state: seenState },
+    { ...p2, cardType: "name", subjectKey: "2", state: seenState },
+    { ...p10, cardType: "name", subjectKey: "10", state: seenState },
+  ];
+
+  it("includes alternate-form Pokémon when alternateFormsEnabled is true (default)", () => {
+    const result = getSeenPokemon(allSeenCards, seed);
+    expect(result.map((p) => p.id).sort((a, b) => a - b)).toEqual([1, 2, 10]);
+  });
+
+  it("excludes alternate-form Pokémon when alternateFormsEnabled is false", () => {
+    const result = getSeenPokemon(allSeenCards, seed, false);
+    expect(result.map((p) => p.id).sort((a, b) => a - b)).toEqual([1, 2]);
+  });
+
+  it("keeps alternate-form Pokémon in the pool when scope is empty and forms are enabled", () => {
+    const emptyScope: PracticeScope = { gens: [], types: [], presets: [] };
+    const result = getSeenPokemon(allSeenCards, seed, true, emptyScope);
+    expect(result.map((p) => p.id).sort((a, b) => a - b)).toEqual([1, 2, 10]);
+  });
+});
+
+describe("getSeenPokemon — gens/types scope", () => {
+  // Gen 1 Pokémon have IDs 1-151. Gen 2 IDs 152-251 etc.
+  // For the scope filter, speciesId drives generationOf(). We use IDs 1 and 152.
+  const p1 = makePokemon(1, {}, { types: ["fire"] as SeedPokemon["types"] });
+  const p152 = makePokemon(152, {}, { types: ["water"] as SeedPokemon["types"] });
+  const seed = [p1, p152];
+
+  const allSeenCards: ReviewableCard[] = [
+    { ...p1, cardType: "name", subjectKey: "1", state: seenState },
+    { ...p152, cardType: "name", subjectKey: "152", state: seenState },
+  ];
+
+  it("returns all seen Pokémon when scope is empty", () => {
+    const emptyScope: PracticeScope = { gens: [], types: [], presets: [] };
+    const result = getSeenPokemon(allSeenCards, seed, true, emptyScope);
+    expect(result.map((p) => p.id).sort((a, b) => a - b)).toEqual([1, 152]);
+  });
+
+  it("filters by generation when gens scope is active", () => {
+    const gen1Scope: PracticeScope = { gens: [1], types: [], presets: [] };
+    const result = getSeenPokemon(allSeenCards, seed, true, gen1Scope);
+    expect(result.map((p) => p.id)).toEqual([1]);
+  });
+
+  it("filters by type when types scope is active", () => {
+    const waterScope: PracticeScope = { gens: [], types: ["water"], presets: [] };
+    const result = getSeenPokemon(allSeenCards, seed, true, waterScope);
+    expect(result.map((p) => p.id)).toEqual([152]);
   });
 });
 
