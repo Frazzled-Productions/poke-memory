@@ -7,7 +7,9 @@ import { useEffect, useRef, useState } from "react";
  * using a simple ease-out curve.
  *
  * Returns the current animated value as an integer. When `target` is 0 the
- * hook returns 0 immediately without scheduling any animation.
+ * hook returns 0 immediately without scheduling any animation. When the user
+ * has requested reduced motion (`prefers-reduced-motion: reduce`), the hook
+ * returns `target` immediately with no animation frames scheduled.
  *
  * @param target    - The final value to count up to.
  * @param durationMs - Animation duration in milliseconds (default 600).
@@ -20,6 +22,19 @@ export function useCountUp(target: number, durationMs = 600): number {
   useEffect(() => {
     if (target === 0) {
       setDisplayed(0);
+      return;
+    }
+
+    // Respect the OS reduced-motion preference — skip the animation entirely
+    // and jump straight to the target value.
+    const motionQuery =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null;
+
+    if (motionQuery?.matches) {
+      lastTargetRef.current = target;
+      setDisplayed(target);
       return;
     }
 

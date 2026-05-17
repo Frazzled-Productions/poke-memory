@@ -9,10 +9,10 @@ import type { AccuracyPoint } from "@/lib/stats/accuracy";
 
 type Window = 7 | 30 | 365;
 
-const WINDOW_OPTIONS: { label: string; value: Window }[] = [
-  { label: "7d",   value: 7 },
-  { label: "30d",  value: 30 },
-  { label: "1yr",  value: 365 },
+const WINDOW_OPTIONS: { label: string; value: Window; ariaLabel: string }[] = [
+  { label: "7d",  value: 7,   ariaLabel: "7-day" },
+  { label: "30d", value: 30,  ariaLabel: "30-day" },
+  { label: "1yr", value: 365, ariaLabel: "1-year" },
 ];
 
 type Props = {
@@ -97,10 +97,8 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
     activeWindow === 30 ? (rolling30d ?? null) :
     (rolling365d ?? null);
 
-  const windowLabel =
-    activeWindow === 7 ? "7-day rolling" :
-    activeWindow === 30 ? "30-day rolling" :
-    "365-day rolling";
+  const activeWindowOption = WINDOW_OPTIONS.find((o) => o.value === activeWindow)!;
+  const windowLabel = `${activeWindowOption.ariaLabel} rolling`;
 
   const { segments, dots } = buildSegments(displayPoints);
   const hasAnyData = displayPoints.some((p) => p.accuracy !== null);
@@ -119,18 +117,20 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
         >
           Recent accuracy
         </h2>
-        {/* Window selector */}
+        {/* Window selector — mutually exclusive, so tablist/tab/aria-selected */}
         <div
-          role="group"
+          role="tablist"
           aria-label="Accuracy window"
           className="flex items-center gap-px rounded-lg border border-zinc-200 bg-zinc-100 p-px dark:border-zinc-700 dark:bg-zinc-800"
         >
           {availableWindows.map((opt) => (
             <button
               key={opt.value}
+              role="tab"
               type="button"
               onClick={() => setActiveWindow(opt.value)}
-              aria-pressed={activeWindow === opt.value}
+              aria-selected={activeWindow === opt.value}
+              tabIndex={activeWindow === opt.value ? 0 : -1}
               className={
                 "rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 " +
                 (activeWindow === opt.value
@@ -158,7 +158,7 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
             width="100%"
             height={SVG_HEIGHT}
             role="img"
-            aria-label={`${activeWindow}-day accuracy sparkline`}
+            aria-label={`${activeWindowOption.ariaLabel} accuracy sparkline`}
             className="overflow-visible"
             preserveAspectRatio="none"
           >

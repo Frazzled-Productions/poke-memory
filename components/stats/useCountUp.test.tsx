@@ -6,6 +6,20 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useCountUp } from "@/lib/stats/useCountUp";
 
+// Helper to mock window.matchMedia for reduced-motion tests.
+function mockMatchMedia(matches: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)" ? matches : false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  });
+}
+
 describe("useCountUp", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -17,6 +31,26 @@ describe("useCountUp", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("returns target immediately when prefers-reduced-motion is set", async () => {
+    mockMatchMedia(true);
+    const { result } = renderHook(() => useCountUp(80, 600));
+
+    // After the effect runs, displayed should jump straight to target.
+    await act(async () => {
+      vi.advanceTimersByTime(0);
+    });
+
+    expect(result.current).toBe(80);
+    // Advance well past the duration — no rAF should have been scheduled.
+    await act(async () => {
+      vi.advanceTimersByTime(700);
+    });
+    expect(result.current).toBe(80);
+
+    // Restore default (no reduced motion) for subsequent tests.
+    mockMatchMedia(false);
   });
 
   it("returns 0 immediately when target is 0", () => {
@@ -36,6 +70,40 @@ describe("useCountUp", () => {
     });
 
     expect(result.current).toBe(100);
+  });
+
+  it("restarts animation from the current displayed value when target changes mid-animation", async () => {
+    // Render with initial target 100.
+    const { result, rerender } = renderHook(({ target }) => useCountUp(target, 600), {
+      initialProps: { target: 100 },
+    });
+
+    // Advance partway through the animation (150 ms = 25% of 600 ms).
+    await act(async () => {
+      vi.advanceTimersByTime(150);
+    });
+
+    // The displayed value should be somewhere between 0 and 100 (non-trivial
+    // progress but not yet finished).
+    const midValue = result.current;
+    expect(midValue).toBeGreaterThan(0);
+    expect(midValue).toBeLessThan(100);
+
+    // Rerender with a different target — the animation should restart from
+    // `midValue`, not from 0, exercising the
+    // `from = lastTargetRef.current === target ? 0 : displayed` branch.
+    rerender({ target: 200 });
+
+    // Immediately after the rerender, displayed is still midValue (no rAF yet).
+    expect(result.current).toBe(midValue);
+
+    // Advance past the full duration so the new animation completes.
+    await act(async () => {
+      vi.advanceTimersByTime(700);
+    });
+
+    // Should have converged on the new target.
+    expect(result.current).toBe(200);
   });
 
   it("returns a non-negative integer throughout the animation", async () => {

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useCountUp } from "@/lib/stats/useCountUp";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
@@ -80,6 +80,31 @@ function formatForecastDate(
 }
 
 // ---------------------------------------------------------------------------
+// useReducedMotion — reads prefers-reduced-motion via useSyncExternalStore so
+// the value is always current without subscribing to a separate effect.
+// ---------------------------------------------------------------------------
+
+function canMatchMedia(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function";
+}
+
+function subscribeToMotionQuery(cb: () => void): () => void {
+  if (!canMatchMedia()) return () => undefined;
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+
+function useReducedMotion(): boolean {
+  return useSyncExternalStore(
+    subscribeToMotionQuery,
+    () => (canMatchMedia() ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false),
+    // Server snapshot — false (no motion suppression) until client hydrates.
+    () => false,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
@@ -139,11 +164,10 @@ function StatCard({
 // RadialRing — single SVG progress ring used in MasteryRings and IntroducedRing
 // ---------------------------------------------------------------------------
 
+// RING_R is the radius at the default size (72). Geometry is scaled
+// proportionally from this baseline inside RadialRing.
 const RING_R = 28;
-const RING_CX = 36;
-const RING_CY = 36;
 const RING_STROKE = 7;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
 function RadialRing({
   pct: fillPct,
@@ -156,10 +180,17 @@ function RadialRing({
   label: string;  // aria-label on the wrapping <svg>
   size?: number;  // viewBox / rendered size
 }) {
+  const reducedMotion = useReducedMotion();
+  // Derive geometry proportionally from size so the ring is self-consistent
+  // at any size (not just the default 72px).
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = (size / 72) * RING_R;
+  const circumference = 2 * Math.PI * r;
   // Clamp to [0, 100] to guard against rounding artefacts.
   const clamped = Math.min(100, Math.max(0, fillPct));
-  const dash = (clamped / 100) * RING_CIRCUMFERENCE;
-  const gap = RING_CIRCUMFERENCE - dash;
+  const dash = (clamped / 100) * circumference;
+  const gap = circumference - dash;
   return (
     <svg
       viewBox={`0 0 ${size} ${size}`}
@@ -170,25 +201,29 @@ function RadialRing({
     >
       {/* Track */}
       <circle
-        cx={RING_CX}
-        cy={RING_CY}
-        r={RING_R}
+        cx={cx}
+        cy={cy}
+        r={r}
         fill="none"
         strokeWidth={RING_STROKE}
         className="stroke-zinc-200 dark:stroke-zinc-700"
       />
       {/* Filled arc — rotated so 0% starts at the top */}
       <circle
-        cx={RING_CX}
-        cy={RING_CY}
-        r={RING_R}
+        cx={cx}
+        cy={cy}
+        r={r}
         fill="none"
         stroke={colour}
         strokeWidth={RING_STROKE}
         strokeLinecap="round"
         strokeDasharray={`${dash.toFixed(2)} ${gap.toFixed(2)}`}
-        transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
-        style={{ transition: "stroke-dasharray 0.6s cubic-bezier(0.22, 1, 0.36, 1)" }}
+        transform={`rotate(-90 ${cx} ${cy})`}
+        style={
+          reducedMotion
+            ? undefined
+            : { transition: "stroke-dasharray 0.6s cubic-bezier(0.22, 1, 0.36, 1)" }
+        }
       />
     </svg>
   );

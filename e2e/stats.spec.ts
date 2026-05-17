@@ -117,6 +117,44 @@ test.describe("Stats page — daily activity chart", () => {
   });
 });
 
+test.describe("Stats page — accuracy window tabs", () => {
+  test("switching accuracy windows updates the sparkline label", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // Wait for the page to hydrate past the loading skeleton.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Recent accuracy" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // The window selector is a tablist with three tab buttons.
+    const tablist = page.getByRole("tablist", { name: "Accuracy window" });
+    await expect(tablist).toBeVisible();
+
+    // Default window is 7d — the "7d" tab should be selected.
+    const tab7d = page.getByRole("tab", { name: "7d" });
+    await expect(tab7d).toHaveAttribute("aria-selected", "true");
+
+    // Switch to 30d — the "30d" tab should become selected.
+    const tab30d = page.getByRole("tab", { name: "30d" });
+    await tab30d.click();
+    await expect(tab30d).toHaveAttribute("aria-selected", "true");
+    await expect(tab7d).toHaveAttribute("aria-selected", "false");
+
+    // The sparkline SVG label should now reference the 30-day window.
+    await expect(page.getByRole("img", { name: "30-day accuracy sparkline" })).toBeVisible();
+
+    // Switch to 1yr.
+    const tab1yr = page.getByRole("tab", { name: "1yr" });
+    await tab1yr.click();
+    await expect(tab1yr).toHaveAttribute("aria-selected", "true");
+    await expect(tab30d).toHaveAttribute("aria-selected", "false");
+
+    // The sparkline SVG label should now reference the 1-year window.
+    await expect(page.getByRole("img", { name: "1-year accuracy sparkline" })).toBeVisible();
+  });
+});
+
 test.describe("Stats page — mastery over time chart", () => {
   test("the mastery over time section is visible on a fresh guest session", async ({
     page,
