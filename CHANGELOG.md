@@ -6,6 +6,17 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.9.67] - 2026-05-17
+
+### Added
+
+- Settings: signed-in users can now connect a second OAuth provider (GitHub or Google) to their account via "Sign-in methods" in Account & Data.
+- New Stats charts: a per-card-direction accuracy breakdown, an FSRS difficulty histogram, and a recall-vs-target indicator.
+
+### Fixed
+
+- Audio-features onboarding nudge ("Add sound to your reviews") now appears during reverse-card (SpritePicker) practice, not only on flip-card reveal.
+
 ## [0.9.66] - 2026-05-16
 
 ### Added
@@ -1069,7 +1080,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.66...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.67...HEAD
+[0.9.67]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.67
 [0.9.66]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.66
 [0.9.65]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.65
 [0.9.64]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.64

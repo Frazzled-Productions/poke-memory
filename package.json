@@ -1,6 +1,6 @@
 {
   "name": "poke-memory",
-  "version": "0.9.66",
+  "version": "0.9.67",
   "private": true,
   "engines": {
     "node": ">=20"
