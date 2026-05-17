@@ -24,14 +24,16 @@
   &nbsp;
   <img src="docs/screenshots/practice-flipped.png" width="180" alt="Practice — card flipped, with grade buttons" />
   &nbsp;
-  <img src="docs/screenshots/stats.png" width="180" alt="Stats" />
+  <img src="docs/screenshots/stats.png" width="180" alt="Stats — analytical dashboard" />
 </p>
 <p align="center">
+  <img src="docs/screenshots/journey.png" width="180" alt="Journey — trainer card and badges" />
+  &nbsp;
   <img src="docs/screenshots/pokedex-grid.png" width="180" alt="Pokédex grid" />
   &nbsp;
   <img src="docs/screenshots/pasture.png" width="180" alt="Pasture" />
 </p>
-<p align="center"><em>Practice (front and flipped), Stats, Pokédex, and Pasture — captured on iPhone 17 Pro.</em></p>
+<p align="center"><em>Practice (front and flipped), Stats, Journey, Pokédex, and Pasture — captured on iPhone 17 Pro.</em></p>
 
 ## How a review works
 
@@ -63,7 +65,10 @@ Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the 
 The daily review loop. Live **Again / Hard / Good / Easy** tally for the current session, with a streak badge that ticks up each day you review. Misclick on a grade? Hit **Undo** (or ⌘/Ctrl+Z) to roll the most recent grade back. Optional **Scope** control narrows the session to specific generations, types, or preset groups (Starters, Legendaries). **Audio mode** keeps the screen awake and plays the cry on every reveal. When the day is done, a **Share today** button generates a Wordle-style summary you can paste anywhere.
 
 ### Stats
-A trainer-card hero strip (level + generation badges), current streak, a four-cell **Records** card (longest streak, best review day, avg days to mastery, most-mastered week), a 30-day **accuracy sparkline** with a 7-day rolling headline, all-time grade breakdown, mastery distribution, a 14-day **due-forecast bar chart**, mastered-by-type and per-generation breakdowns (each gen row deep-links into the Pokédex), a GitHub-style **365-day review heatmap**, and a struggling-card list.
+The analytical dashboard: a 30-day **accuracy sparkline** with a 7-day rolling headline, all-time grade breakdown, grade distribution and weekly trend, retention-vs-target indicator, per-direction accuracy breakdown, difficulty histogram, a GitHub-style **365-day review heatmap**, daily activity chart, mastery-over-time chart, a 14-day **due-forecast bar chart**, and a struggling-card list.
+
+### Journey
+The celebratory home: trainer-card hero strip (level + generation badges), gym badge gallery, current streak, a four-cell **Records** card (longest streak, best review day, avg days to mastery, most-mastered week), mastery distribution rings, species-introduced ring, and mastered-by-type and per-generation breakdowns (each gen row deep-links into the Pokédex).
 
 ### Pokédex
 1025-cell grid with progressive disclosure — unlearned Pokémon appear as silhouettes, reviewed Pokémon greyscale, mastered ones in full colour. Tap any cell to open a detail page that reveals more as you progress: types and flavour text unlock when you start learning; base stats, facts, and the evolution chain unlock once mastered.

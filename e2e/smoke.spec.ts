@@ -28,6 +28,7 @@ test.describe("Navigation", () => {
 
     for (const { label, path } of [
       { label: "Stats", path: "/stats" },
+      { label: "Journey", path: "/journey" },
       { label: "Pokédex", path: "/pokedex" },
       { label: "Settings", path: "/settings" },
     ]) {
@@ -397,38 +398,26 @@ test.describe("Practice page", () => {
 });
 
 test.describe("Stats page", () => {
-  test("loads with key sections", async ({ page }) => {
+  test("loads with key analytical sections", async ({ page }) => {
     await page.goto("/stats");
     await expect(
       page.getByRole("heading", { level: 1, name: "Stats" }),
     ).toBeVisible();
 
-    // Key section headings should be present
-    for (const heading of [
-      "Current streak",
-      "Mastery distribution",
-      "Due forecast",
-    ]) {
-      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    // Analytical section group headings should be present.
+    for (const heading of ["Accuracy", "Activity", "Scheduling"]) {
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible({ timeout: 15_000 });
     }
 
-    // SyncNowButton was removed in #396 — assert it is absent in guest mode
+    // SyncNowButton was removed in #396 — assert it is absent in guest mode.
     await expect(page.getByRole("button", { name: /Sync now/i })).toHaveCount(0);
-  });
-
-  test("trainer card shows progress line", async ({ page }) => {
-    await page.goto("/stats");
-    await expect(
-      page.getByRole("region", { name: "Trainer card" }),
-    ).toBeVisible();
-    await expect(page.getByText(/\d+ \/ \d+ mastered · \d+ to Lv \d+/)).toBeVisible();
   });
 
   test("grade distribution section renders in empty state for a fresh guest (#800)", async ({ page }) => {
     await page.goto("/stats");
     // Wait for the page to finish loading (skeleton gone).
     await expect(
-      page.getByRole("heading", { name: "Current streak" }),
+      page.getByRole("heading", { name: "Accuracy" }),
     ).toBeVisible({ timeout: 10_000 });
     // The section heading must be present.
     await expect(
@@ -439,16 +428,41 @@ test.describe("Stats page", () => {
       page.getByText("No grades recorded yet."),
     ).toBeVisible();
   });
+});
+
+test.describe("Journey page", () => {
+  test("loads with trainer card and key sections", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Journey" }),
+    ).toBeVisible();
+
+    // The trainer card, streak, and mastery rings all render on Journey.
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    for (const heading of ["Current streak", "Mastery distribution"]) {
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    }
+  });
+
+  test("trainer card shows progress line", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/\d+ \/ \d+ mastered · \d+ to Lv \d+/)).toBeVisible();
+  });
 
   // Gym badges (#420) are secret until earned: a fresh guest must see no
   // hint of any badge name on the trainer card. The full superuser overlay
   // path is exercised by component tests; this smoke test guards the
   // discoverability contract end-to-end.
   test("gym badges are not hinted before any are earned", async ({ page }) => {
-    await page.goto("/stats");
+    await page.goto("/journey");
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("list", { name: "Gym badges earned" }),
     ).toHaveCount(0);

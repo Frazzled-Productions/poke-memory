@@ -13,6 +13,7 @@ import { AuthButton } from "@/components/auth/AuthButton";
 const NAV_LINKS = [
   { href: "/", label: "Practice" },
   { href: "/stats", label: "Stats" },
+  { href: "/journey", label: "Journey" },
   { href: "/pokedex", label: "Pokédex" },
   { href: "/settings", label: "Settings" },
 ] as const;

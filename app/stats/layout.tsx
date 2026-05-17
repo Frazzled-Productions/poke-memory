@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Stats - Poké Memory",
   description:
-    "Your review statistics: mastery counts, review streaks, grade history, and earned badges.",
+    "Your review analytics: accuracy sparkline, grade breakdown, retention indicator, difficulty histogram, due forecast, and activity history.",
 };
 
 export default function StatsLayout({
