@@ -3,7 +3,6 @@
 import {
   Bar,
   BarChart,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -226,7 +225,6 @@ export function ActivityHistoryChart({
                       />
                     )}
                   />
-                  <Legend content={<span />} />
                   <Bar
                     dataKey="reviews"
                     name="Reviews"

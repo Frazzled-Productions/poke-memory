@@ -65,8 +65,8 @@ export function computeActivityHistory(
   }
 
   // First pass over the full log: find the earliest date each subjectKey was
-  // graded. We scan the entire log (not just the window) so a card first seen
-  // before the window does not appear as "introduced" inside it.
+  // graded. Scanning the entire log (not just the window) means a card first
+  // seen before the window does not appear as "introduced" inside it.
   const firstSeenDate = new Map<string, string>();
   for (const entry of log) {
     if (typeof entry.subjectKey !== "string") continue;
