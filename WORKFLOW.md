@@ -81,6 +81,34 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 
 ---
 
+## Branching model — qa staging flow
+
+`main` is strict and production-tracked; `qa` is the integration branch where batch work is bundled and QA-tested before promotion (#806).
+
+```
+Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR ─▶ main ─▶ release + production
+```
+
+| Branch | Ruleset | Who PRs into it |
+|---|---|---|
+| `main` | `main-protection` — strict-up-to-date; required checks `test`, `e2e`, `Check version bump approval`, `Restrict main PR source` | Only `qa`. A non-`qa` PR needs the `hotfix` label. |
+| `qa` | `qa-staging` — required checks `test`, `e2e`; **not** strict-up-to-date | Any batch / feature branch. |
+
+**Why `qa` exists.** `main`'s strict-up-to-date rule forces every queued PR to rebase + re-run CI one at a time — the serial-rebase tax. A GitHub merge queue would remove it but is unavailable for personal-account repos (#797). `qa` is non-strict, so `/batch-issues` merges PRs back-to-back with no rebase tax, then promotes the bundled result to `main` in a single PR.
+
+**The flow:**
+
+1. `/batch-issues` opens each batch PR against `qa` and drains them straight in (no rebase tax).
+2. At end of drain it fires `qa-preview-deploy.yml` (a Vercel preview of `qa`) and opens a **draft** `qa -> main` PR carrying every `Closes #N`.
+3. The maintainer tests the preview, marks the draft ready, and merges `qa -> main`. The full required suite runs against strict `main`.
+4. The merge triggers `auto-release.yml`: it cuts the release, pushes the `[skip ci]` release commit to `main` (Vercel deploys production), then resets `qa` to `main` so the next batch starts clean.
+
+**Hotfix bypass.** A genuine hotfix can skip `qa` by opening a PR straight into `main` with the `hotfix` label — `main-pr-source-gate.yml` checks for it. Only the repo owner applies the label.
+
+**Note on `closes #N`.** GitHub auto-closes a linked issue only when the PR merges into the *default* branch. A batch PR merged into `qa` does not close its issue; the `qa -> main` promotion PR carries the aggregated `Closes #N` lines and closes them all on merge.
+
+---
+
 ## GitHub Actions catalog
 
 ### `ci.yml` — CI
@@ -90,7 +118,7 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | **Trigger** | `pull_request` (any), push to `main` |
 | **Jobs** | `changes` (path classification), `test` (`typecheck && build && test`), `e2e-browser` (Playwright matrix — `chromium` + `mobile-safari` legs run in parallel inside the official Playwright container), `e2e` (aggregator over the matrix legs) |
 | **What it does** | `test` runs `npm ci && npm run typecheck && npm run build && npm test`. `e2e-browser` runs the Playwright smoke suite split by browser project so the two projects run as parallel matrix legs (#643). The `changes` job classifies the PR so `test`/`e2e` inner steps no-op on docs-only changes. |
-| **Required checks** | `test` and `e2e` are the required status checks for `main` (not the workflow name `CI`). `e2e` is a thin aggregator over the `e2e-browser` matrix, so the required-check name stays stable when matrix legs are added or renamed. Branch protection enforces strict-up-to-date; the bot app bypasses for auto-merges. |
+| **Required checks** | `test` and `e2e` are `ci.yml`'s two required status checks (not the workflow name `CI`); `main`'s full required set also includes `Check version bump approval` and `Restrict main PR source` (see Branching model). `e2e` is a thin aggregator over the `e2e-browser` matrix, so the required-check name stays stable when matrix legs are added or renamed. The `qa` ruleset requires only `test` + `e2e`. `main-protection` enforces strict-up-to-date; the bot app bypasses for auto-merges. |
 | **Concurrency** | Cancels concurrent runs on the same ref — only the latest push on a branch completes. |
 
 ---
@@ -104,6 +132,20 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | **What it does** | Scans `changelog.d/unreleased/*.md` frontmatter for `kind: minor-bump` or `kind: major-bump`. If found and the PR lacks the `version-bump:approved` label, the job fails. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork contributors cannot apply the label, so running on fork PRs would produce an unresolvable failure). |
 | **Required check** | Yes — `Check version bump approval` is a required status check on the `main-protection` ruleset. |
+| **Concurrency** | Cancels concurrent runs on the same PR. |
+
+---
+
+### `main-pr-source-gate.yml` — Main PR source gate
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` into `main` (opened, synchronize, reopened, labeled, unlabeled) |
+| **Job** | `gate` (check name `Restrict main PR source`) |
+| **What it does** | Fails any PR into `main` whose head branch is not `qa`, unless the PR carries the `hotfix` label. Enforces the qa staging flow — `main` only takes promotion PRs from `qa`. |
+| **Hotfix bypass** | The `hotfix` label lets a non-`qa` PR through. Same approval pattern as `version-bump:approved`; only the repo owner applies it. A `labeled` event re-runs the gate so adding the label to an open PR clears it. |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard — same pattern as `version-bump-gate.yml`). |
+| **Required check** | Yes — `Restrict main PR source` is a required status check on the `main-protection` ruleset. |
 | **Concurrency** | Cancels concurrent runs on the same PR. |
 
 ---
@@ -475,8 +517,22 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm relies on `auto-review.yml` already excluding forks (so no LGTM verdict is ever posted for a fork PR). |
 | **Idempotency** | Posts `<!-- vercel-preview-fired:<sha> -->` on the PR after a successful fire; subsequent re-evaluations at the same SHA are no-ops. |
 | **Why two triggers** | CI and auto-review run independently; whichever finishes second flips the gate. Both events re-evaluate against the current HEAD SHA, so order doesn't matter. |
+| **qa promotion PRs** | Skipped — a `qa -> main` PR's head branch is `qa`, and its preview is handled by `qa-preview-deploy.yml`. Firing here too would double-deploy `qa`. |
 | **Required secrets** | `VERCEL_DEPLOY_HOOK_URL`, `BOT_APP_PRIVATE_KEY`, `BOT_APP_ID` (var). |
-| **Context** | `vercel.json` sets `git.deploymentEnabled = { "**": false, "main": true }`, so non-`main` branches do not auto-deploy. This workflow is the only path that creates preview deployments. Production deploys on `main` are unaffected. `e2e.yml` triggers on the `deployment_status` that Vercel fires when the gated preview deploys, so it inherits the gate. |
+| **Context** | `vercel.json` sets `git.deploymentEnabled = { "**": false, "main": true }`, so non-`main` branches do not auto-deploy. This workflow is the path that creates preview deployments for batch / feature PRs. Production deploys on `main` are unaffected. `e2e.yml` triggers on the `deployment_status` that Vercel fires when the gated preview deploys, so it inherits the gate. |
+
+---
+
+### `qa-preview-deploy.yml` — QA Preview Deploy
+
+| | |
+|---|---|
+| **Trigger** | `workflow_dispatch` only |
+| **Job** | `deploy` |
+| **What it does** | Fires the Vercel Deploy Hook with `?ref=qa`, creating a preview deployment of the `qa` staging branch. Invoked by the `/batch-issues` skill at the end of its queue drain (`gh workflow run "QA Preview Deploy"`), or manually from the Actions tab. |
+| **Why a dedicated workflow** | The deploy-hook URL is a repo secret, so the deploy must be fired server-side, not from the local `/batch-issues` session. `?ref=qa` is hardcoded — dispatching from the default branch would otherwise resolve `github.ref` to `main`. |
+| **Required secrets** | `VERCEL_DEPLOY_HOOK_URL`. |
+| **Concurrency** | `group: qa-preview-deploy` with `cancel-in-progress: false`. |
 
 ---
 
@@ -484,14 +540,15 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 | | |
 |---|---|
-| **Trigger** | `schedule` (daily `0 9 * * *` cron — 09:00 UTC) + `workflow_dispatch` |
-| **Gate** | Each cron tick (or manual dispatch) cuts at most one release — `cut-release.mjs` writes `skip=true` when no fragments exist. The `chore(release):` commit-message prefix and `[skip ci]` marker are no longer trigger gates: since the workflow is not `push`-triggered, the release commit cannot re-fire it regardless. |
+| **Trigger** | `pull_request` (`closed`) into `main` — the primary trigger, a merged `qa -> main` promotion PR; `schedule` (daily `0 9 * * *` cron — 09:00 UTC) as a safety net; `workflow_dispatch` for manual cuts. The job `if:` filters the `pull_request` trigger to merged PRs whose head branch is `qa`. |
+| **Gate** | Each run cuts at most one release — `cut-release.mjs` writes `skip=true` when no fragments exist. The release commit + tag are a `push` to `main`, which does not match the `pull_request`/`schedule`/`workflow_dispatch` triggers, so the release commit cannot re-fire the workflow. |
 | **What it does** | Runs `.github/scripts/cut-release.mjs`: scans `changelog.d/unreleased/*.md` fragments, groups bullets by `kind` into Keep-a-Changelog subsections, decides bump type (`minor-bump` fragment or Added/Changed/Removed/Deprecated → minor; only Fixed/Security → patch), writes the new `## [X.Y.Z]` section into `CHANGELOG.md`, bumps `package.json`, deletes consumed fragments (`git rm changelog.d/unreleased/*.md`), commits as `chore(release): vX.Y.Z (TYPE) [skip ci]`, tags `vX.Y.Z`, pushes commit + tag to `main`, and creates a matching GitHub Release with the assembled section as the body |
 | **No-op condition** | No `*.md` files in `changelog.d/unreleased/` → script writes `skip=true` and the workflow exits cleanly. Internal-only changes without a fragment do not trigger a release. |
 | **Bootstrap** | One-time: on first run, if no `v0.1.0` tag exists, creates `v0.1.0` at SHA `cddb3a8` (last commit whose CHANGELOG content matched the current `[0.1.0]` section) and the matching GitHub Release. Subsequent runs no-op the bootstrap. |
-| **Loop break** | Structural: the trigger is `schedule` + `workflow_dispatch`, not `push`, so a release commit landing on `main` cannot re-fire this workflow. The `[skip ci]` marker on the release commit is defence in depth only — it still suppresses the `push`-triggered workflows (`ci.yml`, `migration-check.yml`) on that commit, but it is not what stops `auto-release.yml` from looping. |
+| **Loop break** | Structural: none of the triggers (`pull_request`, `schedule`, `workflow_dispatch`) is `push`, so the release commit landing on `main` cannot re-fire this workflow. The `[skip ci]` marker on the release commit is defence in depth only — it suppresses the `push`-triggered workflows (`ci.yml`, `migration-check.yml`) on that commit, but it is not what stops `auto-release.yml` from looping. |
+| **qa reset** | On a `qa -> main` trigger only (`github.event_name == 'pull_request'`), a final step force-updates `qa` to `main` (`git push origin +HEAD:refs/heads/qa`) so the next batch run starts from a clean integration branch. `schedule`/`workflow_dispatch` runs skip this — `qa` may hold in-progress batch work. |
 | **Vercel interaction** | The release commit touches `package.json`, which is in `WATCH_PATHS` in `scripts/vercel-ignored-build.sh` — so Vercel rebuilds and the in-app version banner (`NEXT_PUBLIC_APP_VERSION`) updates. |
-| **Prerequisite** | The `poke-memory-bot` App must be a bypass actor on the `main-protection` ruleset so the release commit can land directly on `main`. If `git push origin main` fails with a protected-branch error, that is the missing setup. |
+| **Prerequisite** | The `poke-memory-bot` App must be a bypass actor on **both** the `main-protection` ruleset (to land the release commit on `main`) and the `qa-staging` ruleset (to force-push the qa reset). If a push step fails with a protected-branch error, that is the missing setup. |
 | **Concurrency** | `group: auto-release` with `cancel-in-progress: false` — back-to-back merges queue rather than collapse. |
 
 ---
