@@ -117,6 +117,51 @@ test.describe("Stats page — daily activity chart", () => {
   });
 });
 
+test.describe("Stats page — accuracy window tabs", () => {
+  test("switching accuracy windows updates the selected tab", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // Wait for the page to hydrate past the loading skeleton.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Recent accuracy" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // The window selector is a tablist with three tab buttons.
+    const tablist = page.getByRole("tablist", { name: "Accuracy window" });
+    await expect(tablist).toBeVisible();
+
+    // Default window is 7d — the "7d" tab should be selected.
+    const tab7d = page.getByRole("tab", { name: "7d" });
+    await expect(tab7d).toHaveAttribute("aria-selected", "true");
+
+    // A fresh guest session has no accuracy data — the empty-state message
+    // is shown instead of the sparkline SVG.
+    await expect(
+      page.getByText("No reviews yet in the last 7 days"),
+    ).toBeVisible();
+
+    // Switch to 30d — the "30d" tab should become selected and the 7d tab
+    // deselected. The empty-state message updates to reflect the new window.
+    const tab30d = page.getByRole("tab", { name: "30d" });
+    await tab30d.click();
+    await expect(tab30d).toHaveAttribute("aria-selected", "true");
+    await expect(tab7d).toHaveAttribute("aria-selected", "false");
+    await expect(
+      page.getByText("No reviews yet in the last 30 days"),
+    ).toBeVisible();
+
+    // Switch to 1yr — same pattern.
+    const tab1yr = page.getByRole("tab", { name: "1yr" });
+    await tab1yr.click();
+    await expect(tab1yr).toHaveAttribute("aria-selected", "true");
+    await expect(tab30d).toHaveAttribute("aria-selected", "false");
+    await expect(
+      page.getByText("No reviews yet in the last year"),
+    ).toBeVisible();
+  });
+});
+
 test.describe("Stats page — mastery over time chart", () => {
   test("the mastery over time section is visible on a fresh guest session", async ({
     page,

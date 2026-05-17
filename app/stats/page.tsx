@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCountUp } from "@/lib/stats/useCountUp";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
 import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
@@ -79,6 +80,31 @@ function formatForecastDate(
 }
 
 // ---------------------------------------------------------------------------
+// useReducedMotion — reads prefers-reduced-motion via useSyncExternalStore so
+// the value is always current without subscribing to a separate effect.
+// ---------------------------------------------------------------------------
+
+function canMatchMedia(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function";
+}
+
+function subscribeToMotionQuery(cb: () => void): () => void {
+  if (!canMatchMedia()) return () => undefined;
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+
+function useReducedMotion(): boolean {
+  return useSyncExternalStore(
+    subscribeToMotionQuery,
+    () => (canMatchMedia() ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false),
+    // Server snapshot — false (no motion suppression) until client hydrates.
+    () => false,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
@@ -120,24 +146,132 @@ function StatCard({
   value: number;
   accent?: string;
 }) {
+  const animated = useCountUp(value);
   return (
     <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
-      <p className={`text-2xl font-bold tabular-nums ${accent ?? "text-foreground"}`}>
-        {value.toLocaleString('en-GB')}
+      <p
+        className={`text-2xl font-bold tabular-nums ${accent ?? "text-foreground"}`}
+        aria-label={`${value.toLocaleString("en-GB")} ${label}`}
+      >
+        {animated.toLocaleString("en-GB")}
       </p>
       <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
     </div>
   );
 }
 
-function MasteryBar({ stats, nameCardsEnabled }: { stats: StatsResult; nameCardsEnabled: boolean }) {
+// ---------------------------------------------------------------------------
+// RadialRing — single SVG progress ring used in MasteryRings and IntroducedRing
+// ---------------------------------------------------------------------------
+
+// RING_R is the radius at the default size (72). Geometry is scaled
+// proportionally from this baseline inside RadialRing.
+const RING_R = 28;
+const RING_STROKE = 7;
+
+function RadialRing({
+  pct: fillPct,
+  colour,
+  label,
+  size = 72,
+}: {
+  pct: number;    // 0..100
+  colour: string; // CSS colour for the filled arc
+  label: string;  // aria-label on the wrapping <svg>
+  size?: number;  // viewBox / rendered size
+}) {
+  const reducedMotion = useReducedMotion();
+  // Derive geometry proportionally from size so the ring is self-consistent
+  // at any size (not just the default 72px).
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = (size / 72) * RING_R;
+  const circumference = 2 * Math.PI * r;
+  // Clamp to [0, 100] to guard against rounding artefacts.
+  const clamped = Math.min(100, Math.max(0, fillPct));
+  const dash = (clamped / 100) * circumference;
+  const gap = circumference - dash;
+  return (
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      width={size}
+      height={size}
+      aria-label={label}
+      role="img"
+    >
+      {/* Track */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        strokeWidth={RING_STROKE}
+        className="stroke-zinc-200 dark:stroke-zinc-700"
+      />
+      {/* Filled arc — rotated so 0% starts at the top */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke={colour}
+        strokeWidth={RING_STROKE}
+        strokeLinecap="round"
+        strokeDasharray={`${dash.toFixed(2)} ${gap.toFixed(2)}`}
+        transform={`rotate(-90 ${cx} ${cy})`}
+        style={
+          reducedMotion
+            ? undefined
+            : { transition: "stroke-dasharray 0.6s cubic-bezier(0.22, 1, 0.36, 1)" }
+        }
+      />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MasteryRings — replaces the flat MasteryBar with three radial gauges
+// ---------------------------------------------------------------------------
+
+function MasteryRings({ stats, nameCardsEnabled }: { stats: StatsResult; nameCardsEnabled: boolean }) {
   const { totalCards, locked, learning, mastered } = stats;
-  // Compute mastered + learning by rounding, then derive locked as the
-  // remainder so the three segments always sum to exactly 100% — three
-  // independent Math.rounds can leave a 1px gap or 1px overflow in the bar.
   const masteredPct = pct(mastered, totalCards);
   const learningPct = pct(learning, totalCards);
   const lockedPct = Math.max(0, 100 - masteredPct - learningPct);
+
+  const masteredAnimated = useCountUp(mastered);
+  const learningAnimated = useCountUp(learning);
+  const lockedAnimated = useCountUp(locked);
+
+  const rings = [
+    {
+      key: "locked",
+      label: "Locked",
+      count: lockedAnimated,
+      rawCount: locked,
+      pct: lockedPct,
+      colour: "#a1a1aa", // zinc-400
+      dotClass: "bg-zinc-400",
+    },
+    {
+      key: "learning",
+      label: "Learning",
+      count: learningAnimated,
+      rawCount: learning,
+      pct: learningPct,
+      colour: "#fbbf24", // amber-400
+      dotClass: "bg-amber-400",
+    },
+    {
+      key: "mastered",
+      label: "Mastered",
+      count: masteredAnimated,
+      rawCount: mastered,
+      pct: masteredPct,
+      colour: "#10b981", // emerald-500
+      dotClass: "bg-emerald-500",
+    },
+  ] as const;
 
   return (
     <section aria-labelledby="mastery-heading">
@@ -145,109 +279,86 @@ function MasteryBar({ stats, nameCardsEnabled }: { stats: StatsResult; nameCards
         id="mastery-heading"
         className="mb-4 text-lg font-semibold text-foreground"
       >
-        Mastery distribution{!nameCardsEnabled && <span className="ml-2 text-sm font-normal text-zinc-400 dark:text-zinc-500">(disabled)</span>}
+        Mastery distribution
+        {!nameCardsEnabled && (
+          <span className="ml-2 text-sm font-normal text-zinc-400 dark:text-zinc-500">
+            (disabled)
+          </span>
+        )}
       </h2>
 
-      {/* Stacked bar */}
       <div
-        className="flex h-6 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+        className="grid grid-cols-3 gap-3"
         role="img"
         aria-label={`Mastery distribution: ${mastered} mastered, ${learning} learning, ${locked} locked`}
       >
-        {mastered > 0 && (
+        {rings.map(({ key, label, count, rawCount, pct: ringPct, colour, dotClass }) => (
           <div
-            className="bg-emerald-500 transition-all"
-            style={{ width: `${masteredPct}%` }}
-          />
-        )}
-        {learning > 0 && (
-          <div
-            className="bg-amber-400 transition-all"
-            style={{ width: `${learningPct}%` }}
-          />
-        )}
-        {locked > 0 && (
-          <div
-            className="bg-zinc-300 dark:bg-zinc-700 transition-all"
-            style={{ width: `${lockedPct}%` }}
-          />
-        )}
-      </div>
-
-      {/* Legend chips */}
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-zinc-200 bg-background px-4 py-3 dark:border-zinc-800">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              Locked
-            </span>
+            key={key}
+            className="flex flex-col items-center gap-2 rounded-xl border border-zinc-200 bg-background px-3 py-4 dark:border-zinc-800"
+            aria-hidden="true"
+          >
+            <RadialRing
+              pct={ringPct}
+              colour={colour}
+              label={`${label}: ${rawCount} (${ringPct}%)`}
+              size={72}
+            />
+            <div className="text-center">
+              <div className="mb-0.5 flex items-center justify-center gap-1.5">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+                <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {label}
+                </span>
+              </div>
+              <p className="text-xl font-bold tabular-nums text-foreground">
+                {count.toLocaleString("en-GB")}
+              </p>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">{ringPct}%</p>
+            </div>
           </div>
-          <p className="text-xl font-bold tabular-nums text-foreground">
-            {locked.toLocaleString('en-GB')}
-          </p>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">{lockedPct}%</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-200 bg-background px-4 py-3 dark:border-zinc-800">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              Learning
-            </span>
-          </div>
-          <p className="text-xl font-bold tabular-nums text-foreground">
-            {learning.toLocaleString('en-GB')}
-          </p>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">{learningPct}%</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-200 bg-background px-4 py-3 dark:border-zinc-800">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              Mastered
-            </span>
-          </div>
-          <p className="text-xl font-bold tabular-nums text-foreground">
-            {mastered.toLocaleString('en-GB')}
-          </p>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">{masteredPct}%</p>
-        </div>
+        ))}
       </div>
     </section>
   );
 }
 
-function IntroducedBar({ stats }: { stats: StatsResult }) {
+function IntroducedRing({ stats }: { stats: StatsResult }) {
   const { introduced, totalCards } = stats;
   const introPct = pct(introduced, totalCards);
+  const introducedAnimated = useCountUp(introduced);
 
   return (
     <section aria-labelledby="introduced-heading">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h2
-          id="introduced-heading"
-          className="text-base font-semibold text-foreground"
-        >
-          <span className="tabular-nums">{introduced.toLocaleString('en-GB')}</span>
-          {" / "}
-          <span className="tabular-nums">{totalCards.toLocaleString('en-GB')}</span>
-          {" introduced"}
-        </h2>
-        <span className="text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
-          {introPct}%
-        </span>
-      </div>
-      <div
-        className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
-        role="img"
-        aria-label={`${introduced} of ${totalCards} Pokémon introduced`}
+      <h2
+        id="introduced-heading"
+        className="mb-3 text-base font-semibold text-foreground"
       >
-        <div
-          className="h-full bg-blue-500 transition-all"
-          style={{ width: `${introPct}%` }}
-        />
+        Introduced
+      </h2>
+      <div className="flex items-center gap-5 rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+        <div className="shrink-0" aria-hidden="true">
+          <RadialRing
+            pct={introPct}
+            colour="#3b82f6" /* blue-500 */
+            label={`${introduced} of ${totalCards} Pokémon introduced (${introPct}%)`}
+            size={72}
+          />
+        </div>
+        <div>
+          <p
+            className="text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
+            aria-label={`${introduced} of ${totalCards} introduced`}
+          >
+            <span>{introducedAnimated.toLocaleString("en-GB")}</span>
+            <span className="text-base font-normal text-zinc-400 dark:text-zinc-500">
+              {" / "}{totalCards.toLocaleString("en-GB")}
+            </span>
+          </p>
+          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+            species seen at least once
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -627,6 +738,9 @@ export default function StatsPage() {
   const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
   const [accuracyPoints, setAccuracyPoints] = useState<AccuracyPoint[]>([]);
   const [rolling7d, setRolling7d] = useState<number | null>(null);
+  const [rolling30d, setRolling30d] = useState<number | null>(null);
+  const [rolling365d, setRolling365d] = useState<number | null>(null);
+  const [accuracyPoints365, setAccuracyPoints365] = useState<AccuracyPoint[]>([]);
   const [streakDates, setStreakDates] = useState<string[]>([]);
   const [gradeLog, setGradeLog] = useState<Awaited<ReturnType<typeof loadGradeLog>>>([]);
   const [retentionTarget, setRetentionTarget] = useState(0.9);
@@ -658,6 +772,9 @@ export default function StatsPage() {
       setGradeTotals(computeGradeTotals(log));
       setAccuracyPoints(computeAccuracySparkline(log, today, 30));
       setRolling7d(computeRollingAccuracy(log, today, 7));
+      setRolling30d(computeRollingAccuracy(log, today, 30));
+      setRolling365d(computeRollingAccuracy(log, today, 365));
+      setAccuracyPoints365(computeAccuracySparkline(log, today, 365));
 
       // Retroactive badge award (#420). If a user already meets a badge's
       // criterion when the feature ships (or after a sync pull), award it
@@ -874,7 +991,13 @@ export default function StatsPage() {
               easy={gradeTotals[5]}
               label="All-time grade breakdown"
             />
-            <AccuracySparkline points={accuracyPoints} rolling7d={rolling7d} />
+            <AccuracySparkline
+              points={accuracyPoints}
+              rolling7d={rolling7d}
+              rolling30d={rolling30d}
+              rolling365d={rolling365d}
+              points365={accuracyPoints365}
+            />
             {reviewCharts !== null && (
               <>
                 <GradeDistributionChart
@@ -914,8 +1037,8 @@ export default function StatsPage() {
                 term.
               </p>
             </OnboardingHint>
-            <MasteryBar stats={stats} nameCardsEnabled={nameCardsEnabled} />
-            <IntroducedBar stats={stats} />
+            <MasteryRings stats={stats} nameCardsEnabled={nameCardsEnabled} />
+            <IntroducedRing stats={stats} />
             {completionProjection !== null && (
               <CompletionProjection
                 projection={completionProjection}
