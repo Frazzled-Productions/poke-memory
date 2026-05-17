@@ -29,13 +29,25 @@ test.describe("Stats page — badge gallery", () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("locked badges show hint text", async ({ page }) => {
+  test("locked badges are hidden by default and revealed via toggle", async ({
+    page,
+  }) => {
     await page.goto("/stats");
     await expect(
       page.getByRole("heading", { level: 2, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
-    // A fresh guest session has no earned badges; at least one locked tile
-    // should be present. The Boulder Badge is the first catalog entry.
+    // A fresh guest session has no earned badges. The locked tiles must NOT
+    // be visible until the accordion is opened.
+    await expect(
+      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
+    ).not.toBeVisible();
+    // The "View all badges" toggle should be present.
+    const toggle = page.getByRole("button", { name: /View all badges/i });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // Clicking the toggle reveals locked tiles.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(
       page.getByLabel(/Boulder Badge \(locked\):/i).first(),
     ).toBeVisible();

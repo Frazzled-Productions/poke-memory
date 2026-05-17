@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { BadgeGalleryCard } from "@/components/badges/BadgeGalleryCard";
 
@@ -17,16 +20,30 @@ type Props = {
 };
 
 /**
- * Full gym-badge gallery for the Stats page (#539). Shows every badge in
- * BADGE_CATALOG in order. Earned badges render in colour; locked ones show
- * a greyscale silhouette with a vague teaser hint.
+ * Gym-badge gallery for the Stats page (#539, #830). Earned badges are shown
+ * by default; locked ones are hidden behind a "View all badges" toggle so the
+ * gallery does not crowd out the mastery rings and charts further down the page.
  *
- * Rendered as a Server-Component-compatible pure function — no hooks, no
- * client-side state. The parent Stats page (already 'use client') drives
- * the earned/locked decision and passes it down.
+ * When `forceAllMastered` is true every badge renders as earned and no locked
+ * section exists, so the toggle is hidden.
+ *
+ * Accessible: the toggle button carries aria-expanded and aria-controls so
+ * screen readers can track the collapsed/expanded state.
  */
 export function BadgeGallery({ earnedBadges, forceAllMastered = false }: Props) {
+  const [lockedExpanded, setLockedExpanded] = useState(false);
+
   const earnedSet = new Set(earnedBadges.map((b) => b.id));
+
+  const earned = forceAllMastered
+    ? BADGE_CATALOG
+    : BADGE_CATALOG.filter((b) => earnedSet.has(b.id));
+
+  const locked = forceAllMastered
+    ? []
+    : BADGE_CATALOG.filter((b) => !earnedSet.has(b.id));
+
+  const hasLocked = locked.length > 0;
 
   return (
     <section aria-labelledby="badge-gallery-heading">
@@ -36,19 +53,57 @@ export function BadgeGallery({ earnedBadges, forceAllMastered = false }: Props) 
       >
         Gym badges
       </h2>
-      <ul
-        role="list"
-        className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
-        aria-label="Gym badge gallery"
-      >
-        {BADGE_CATALOG.map((badge) => (
-          <BadgeGalleryCard
-            key={badge.id}
-            badge={badge}
-            earned={forceAllMastered || earnedSet.has(badge.id)}
-          />
-        ))}
-      </ul>
+
+      {earned.length > 0 ? (
+        <ul
+          role="list"
+          className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
+          aria-label="Earned gym badges"
+        >
+          {earned.map((badge) => (
+            <BadgeGalleryCard key={badge.id} badge={badge} earned />
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          No badges earned yet. Keep mastering Pokémon to unlock your first gym badge!
+        </p>
+      )}
+
+      {hasLocked && (
+        <div className="mt-3">
+          <button
+            type="button"
+            aria-expanded={lockedExpanded}
+            aria-controls="badge-gallery-locked"
+            onClick={() => setLockedExpanded((prev) => !prev)}
+            className="flex items-center gap-1.5 rounded px-1 py-0.5 text-sm text-zinc-500 underline-offset-2 hover:text-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            <span
+              aria-hidden="true"
+              className={`inline-block transition-transform duration-200 ${lockedExpanded ? "rotate-90" : ""}`}
+            >
+              &#9658;
+            </span>
+            {lockedExpanded
+              ? `Hide locked badges (${locked.length})`
+              : `View all badges (${locked.length} locked)`}
+          </button>
+
+          {lockedExpanded && (
+            <ul
+              id="badge-gallery-locked"
+              role="list"
+              className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
+              aria-label="Locked gym badges"
+            >
+              {locked.map((badge) => (
+                <BadgeGalleryCard key={badge.id} badge={badge} earned={false} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </section>
   );
 }
