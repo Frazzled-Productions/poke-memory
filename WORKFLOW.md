@@ -104,7 +104,7 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | **What it does** | Scans `changelog.d/unreleased/*.md` frontmatter for `kind: minor-bump` or `kind: major-bump`. If found and the PR lacks the `version-bump:approved` label, the job fails. On a `merge_group` event the job passes trivially — the approval was already enforced when the PR's required checks were green — so it reports the required status without re-scanning. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork contributors cannot apply the label, so running on fork PRs would produce an unresolvable failure). |
 | **Required check** | Yes — `Check version bump approval` is a required status check on the `main-protection` ruleset. Because of that it must also run on `merge_group`, or the merge queue would stall waiting for a check that never reports. |
-| **Concurrency** | Cancels concurrent runs on the same PR. |
+| **Concurrency** | Cancels concurrent runs on the same PR or merge-queue entry. |
 
 ---
 
@@ -544,9 +544,7 @@ Runs on every `pull_request` event, every push to `main`, and every `merge_group
 
 `main` uses a GitHub merge queue (a `merge_queue` rule on the `main-protection` ruleset). The branch is strict-up-to-date, so without a queue every merge forces every other open PR to rebase and re-run CI one at a time. The queue automates that: PRs are merged with `gh pr merge <PR> --squash --auto`, GitHub builds a temporary `gh-readonly-queue/main/*` branch combining `main` + the queued PR(s), runs the required checks against it, and merges in order when green — testing multiple entries speculatively in parallel.
 
-- The three required checks (`test`, `e2e`, `Check version bump approval`) all trigger on the `merge_group` event. **If a required check's workflow does not run on `merge_group`, the queue stalls** waiting for a status that never reports — so any new required check must add a `merge_group` trigger.
-- `ci.yml` treats `merge_group` like a push to main: full `test` + `e2e` suite, no path-based skipping.
-- `version-bump-gate.yml` passes trivially on `merge_group` — the approval was already enforced on the PR.
+- The three required checks (`test`, `e2e`, `Check version bump approval`) all trigger on the `merge_group` event. **If a required check's workflow does not run on `merge_group`, the queue stalls** waiting for a status that never reports — so any new required check must add a `merge_group` trigger. See the `ci.yml` and `version-bump-gate.yml` catalogue rows above for how each workflow satisfies this requirement.
 - The `poke-memory-bot` App remains a bypass actor for the `auto-release` commit, which still lands on `main` directly without going through the queue.
 
 ---
