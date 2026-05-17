@@ -1,8 +1,16 @@
 name: E2E
 
-# Run Playwright smoke tests against Vercel preview deployments.
+# Run the Playwright auth specs against Vercel preview deployments.
 # Triggered by the deployment_status webhook that Vercel sends on every deploy.
 # Non-required check — does not gate merge. Promote to required once stable.
+#
+# Scope: ONLY `e2e/auth.spec.ts` runs here (#829). The full 340-test suite
+# against a slow preview chronically timed out at the 10-minute wall and never
+# completed. Guest-mode smoke is already covered by the required `e2e-browser`
+# check, which runs a local build. The auth specs are the unique value of the
+# preview run: they exercise the build-time-inlined mock-auth seam (#751), which
+# a local build cannot reproduce. Keep this run scoped to the auth specs — do
+# not re-add the full suite here.
 
 on:
   deployment_status: {}
@@ -26,7 +34,10 @@ jobs:
     # Node 24 (an upgrade from the previous Node 20 pin on this job).
     container:
       image: mcr.microsoft.com/playwright:v1.60.0-noble
-    timeout-minutes: 10
+    # Scoped to the auth specs only (#829), so the previous 10-minute wall is
+    # comfortably oversized; 6 minutes leaves ample headroom for a slow preview
+    # plus the two Playwright retries while still failing fast on a real hang.
+    timeout-minutes: 6
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -63,8 +74,8 @@ jobs:
       # unreachable in production: `isMockAuthEnabled()` short-circuits on
       # `NODE_ENV === "production"` and `next.config.ts` fails the build loudly
       # if the flag is ever set in a production build.
-      - name: Run Playwright tests
-        run: npx playwright test --project=chromium --project=mobile-safari
+      - name: Run Playwright auth specs
+        run: npx playwright test e2e/auth.spec.ts --project=chromium --project=mobile-safari
         env:
           PLAYWRIGHT_BASE_URL: ${{ github.event.deployment_status.target_url }}
           NEXT_PUBLIC_E2E_AUTH_MOCK: "1"

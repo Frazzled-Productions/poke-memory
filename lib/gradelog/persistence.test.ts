@@ -4,6 +4,8 @@ import {
   appendGradeEntry,
   pruneGradeLog,
   computeGradeTotals,
+  trimToQuota,
+  LS_QUOTA_BYTES,
   type GradeLogEntry,
 } from "./persistence";
 import { __resetForTests } from "@/lib/idb/db";
@@ -123,10 +125,9 @@ describe("appendGradeEntry (IDB-backed)", () => {
     ).resolves.toBeNull();
   });
 
-  it("prunes entries older than 365 days on write", async () => {
-    // Seed old entry directly into IDB via appendGradeEntry with an old date,
-    // then add a newer entry and verify pruning.
-    // We manually seed old data by calling the store directly.
+  it("retains entries older than 365 days on the IDB path", async () => {
+    // Seed old entries directly into IDB, then append a new one.
+    // The IDB path must not prune by date — full history is kept.
     const { openAppDb } = await import("@/lib/idb/db");
     vi.stubGlobal("window", {
       indexedDB: globalThis.indexedDB,
@@ -142,9 +143,11 @@ describe("appendGradeEntry (IDB-backed)", () => {
 
     await appendGradeEntry({ date: "2026-05-09", grade: 5, cardType: "evolution" });
     const log = await loadGradeLog();
-    expect(log.some((e) => e.date === "2024-05-08")).toBe(false);
+    // Both old entries are retained — no date-based prune on the IDB path.
+    expect(log.some((e) => e.date === "2024-05-08")).toBe(true);
     expect(log.some((e) => e.date === "2025-05-09")).toBe(true);
     expect(log.some((e) => e.date === "2026-05-09")).toBe(true);
+    expect(log).toHaveLength(3);
   });
 });
 
@@ -173,6 +176,46 @@ describe("pruneGradeLog", () => {
 
   it("returns [] for an empty log", () => {
     expect(pruneGradeLog([], 30, "2026-05-09")).toEqual([]);
+  });
+});
+
+describe("trimToQuota", () => {
+  function makeEntry(date: string, i: number): GradeLogEntry {
+    return { date, grade: 4, cardType: "name", occurredAt: i };
+  }
+
+  it("returns the log unchanged when it fits within the quota", () => {
+    const log = [makeEntry("2026-05-09", 1), makeEntry("2026-05-09", 2)];
+    expect(trimToQuota(log, LS_QUOTA_BYTES)).toEqual(log);
+  });
+
+  it("trims oldest entries when the log exceeds the quota", () => {
+    // Build a log large enough to exceed a tiny quota.
+    const smallQuota = 100; // bytes
+    const log: GradeLogEntry[] = Array.from({ length: 200 }, (_, i) =>
+      makeEntry("2026-05-09", i),
+    );
+    const trimmed = trimToQuota(log, smallQuota);
+    expect(trimmed.length).toBeLessThan(log.length);
+    // Oldest entries (lowest occurredAt / lowest index) are dropped first.
+    expect(trimmed[0].occurredAt).toBeGreaterThan(log[0].occurredAt);
+  });
+
+  it("never trims below LS_MIN_KEEP_ENTRIES (100) entries", () => {
+    // Even with a quota of 0, at least 100 entries are kept.
+    const log: GradeLogEntry[] = Array.from({ length: 200 }, (_, i) =>
+      makeEntry("2026-05-09", i),
+    );
+    const trimmed = trimToQuota(log, 0);
+    expect(trimmed).toHaveLength(100);
+  });
+
+  it("returns the full log when it is shorter than LS_MIN_KEEP_ENTRIES", () => {
+    const log: GradeLogEntry[] = Array.from({ length: 50 }, (_, i) =>
+      makeEntry("2026-05-09", i),
+    );
+    const trimmed = trimToQuota(log, 0);
+    expect(trimmed).toHaveLength(50);
   });
 });
 

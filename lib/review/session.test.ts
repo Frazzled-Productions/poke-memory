@@ -6,6 +6,7 @@ import {
   buildQueueCounters,
   countDueTomorrow,
   limitBucket,
+  cardTypeIsEnabled,
   type DailyLimits,
   type EvolutionReviewCard,
   type NameReviewCard,
@@ -16,6 +17,7 @@ import {
 import type { EvolutionCard, SeedPokemon } from '@/lib/pokemon/seed';
 import {
   REVERSE_ID_OFFSET,
+  CRY_ID_OFFSET,
   REVERSE_EDGE_ID_BASE,
   reverseEdgeIdFor,
   isReverseEdgeId,
@@ -331,7 +333,7 @@ describe('hydrateSession (reverse cards)', () => {
     expect(reverseCards).toHaveLength(2);
   });
 
-  it('strips saved reverse cards when reverseEnabled is false', () => {
+  it('preserves saved reverse cards when reverseEnabled is false (non-destructive disable, #835)', () => {
     const revCard: ReverseReviewCard = {
       ...makeSeedPokemon(1),
       id: REVERSE_ID_OFFSET + 1,
@@ -342,13 +344,15 @@ describe('hydrateSession (reverse cards)', () => {
     };
     const saved = [makeCard(makeSeedPokemon(1)), revCard];
     const result = hydrateSession(saved, seed, [], NOW, { reverseEnabled: false });
-    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
+    // Saved reverse cards are kept in storage so progress is not lost on re-enable.
+    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(1);
   });
 
-  it('strips reverse cards when toggle is turned off (build-then-disable path)', () => {
+  it('preserves reverse cards when toggle is turned off (build-then-disable path, #835)', () => {
     const built = buildSession(seed, [], NOW, { reverseEnabled: true });
     const result = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
-    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
+    // Cards are kept; filtering is done via eligibleCardIds in the queue builder.
+    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(seed.length);
     expect(result.filter((c) => c.cardType === 'name')).toHaveLength(seed.length);
   });
 
@@ -422,10 +426,11 @@ describe('reverse-evolution cards (#343)', () => {
     expect(result.filter((c) => c.cardType === 'reverse-evolution')).toHaveLength(evoSeed.length);
   });
 
-  it('hydrateSession strips saved reverse-evolution cards when toggled off', () => {
+  it('hydrateSession preserves saved reverse-evolution cards when toggled off (non-destructive disable, #835)', () => {
     const built = buildSession(seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
     const result = hydrateSession(built, seed, evoSeed, NOW, { reverseEvolutionEnabled: false });
-    expect(result.filter((c) => c.cardType === 'reverse-evolution')).toHaveLength(0);
+    // Cards are kept so progress survives a re-enable; the queue builder filters them.
+    expect(result.filter((c) => c.cardType === 'reverse-evolution')).toHaveLength(evoSeed.length);
   });
 
   it('hydrateSession preserves review state on reverse-evolution cards across reloads', () => {
@@ -500,16 +505,17 @@ describe('hydrateSession (name/evolution enabled flags)', () => {
   const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
   const evoSeed: EvolutionCard[] = [makeEvoEdge({ id: 1_500_001 })];
 
-  it('hydrateSession strips saved name cards when nameEnabled: false', () => {
+  it('hydrateSession preserves saved name cards when nameEnabled: false (non-destructive disable, #835)', () => {
     const saved: ReviewableCard[] = [
       makeCard(makeSeedPokemon(1)),
       makeCard(makeSeedPokemon(2)),
     ];
     const result = hydrateSession(saved, seed, evoSeed, NOW, { nameEnabled: false });
-    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
+    // Saved name cards are kept so progress is available when re-enabled.
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(2);
   });
 
-  it('hydrateSession strips saved evolution cards when evolutionEnabled: false', () => {
+  it('hydrateSession preserves saved evolution cards when evolutionEnabled: false (non-destructive disable, #835)', () => {
     const savedEvo: EvolutionReviewCard = {
       ...makeEvoEdge({ id: 1_500_001 }),
       subjectKey: '1>>>2',
@@ -517,7 +523,8 @@ describe('hydrateSession (name/evolution enabled flags)', () => {
     };
     const saved: ReviewableCard[] = [makeCard(makeSeedPokemon(1)), savedEvo];
     const result = hydrateSession(saved, seed, evoSeed, NOW, { evolutionEnabled: false });
-    expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(0);
+    // Saved evolution cards are kept so progress is available when re-enabled.
+    expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(1);
   });
 
   it('hydrateSession does not add new name cards when nameEnabled: false', () => {
@@ -838,6 +845,182 @@ describe('buildSessionQueues (per-type budgets)', () => {
     expect(queues.reviewQueue).toEqual([]);
     expect(queues.newQueue).toEqual([]);
     expect(queues.perType.name.newIntroducedToday).toBe(1);
+  });
+});
+
+describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
+  const TODAY = '2026-05-09';
+  const highLimits: DailyLimits = {
+    name:      { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    reverse:   { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    cry:       { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  function nameCard(id: number): NameReviewCard {
+    return {
+      ...makeSeedPokemon(id),
+      cardType: 'name',
+      subjectKey: String(id),
+      state: initialReviewState(NOW),
+    };
+  }
+  function reverseCard(pokemonId: number): ReverseReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId),
+      id: REVERSE_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'reverse',
+      subjectKey: String(pokemonId),
+      state: initialReviewState(NOW),
+    };
+  }
+  function cryCard(pokemonId: number): CryReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId, { cryUrl: `https://example.com/${pokemonId}.ogg` }),
+      id: CRY_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'cry',
+      subjectKey: String(pokemonId),
+      state: initialReviewState(NOW),
+    };
+  }
+
+  it('balances new cards across name and reverse directions (difference <= 1)', () => {
+    // 5 name candidates, 5 reverse candidates, both caps = 10
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3), nameCard(4), nameCard(5),
+      reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4), reverseCard(5),
+    ];
+    const queues = buildSessionQueues(cards, highLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    const nameCt  = byType['name']    ?? 0;
+    const revCt   = byType['reverse'] ?? 0;
+    // All 5 of each should be present — both below their cap
+    expect(nameCt).toBe(5);
+    expect(revCt).toBe(5);
+  });
+
+  it('no direction exceeds its per-type cap even with round-robin active', () => {
+    const tightLimits: DailyLimits = {
+      name:      { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 2, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+    };
+    // Provide more candidates than each cap
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3), nameCard(4), nameCard(5),
+      reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4),
+      cryCard(1), cryCard(2), cryCard(3), cryCard(4),
+    ];
+    const queues = buildSessionQueues(cards, tightLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(byType['name']    ?? 0).toBeLessThanOrEqual(3);
+    expect(byType['reverse'] ?? 0).toBeLessThanOrEqual(3);
+    expect(byType['cry']     ?? 0).toBeLessThanOrEqual(3);
+  });
+
+  it('difference between any two enabled directions is at most 1 when same cap and many candidates', () => {
+    const equalLimits: DailyLimits = {
+      name:      { maxNewPerDay: 4, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 4, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 4, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 4, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3), nameCard(4), nameCard(5),
+      reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4), reverseCard(5),
+      cryCard(1), cryCard(2), cryCard(3), cryCard(4), cryCard(5),
+    ];
+    const queues = buildSessionQueues(cards, equalLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    const nameCt = byType['name']    ?? 0;
+    const revCt  = byType['reverse'] ?? 0;
+    const cryCt  = byType['cry']     ?? 0;
+    // Each cap is 4 and there are 5 candidates — all 4 slots should be filled
+    expect(nameCt).toBe(4);
+    expect(revCt).toBe(4);
+    expect(cryCt).toBe(4);
+    // Difference between any two directions is at most 1
+    expect(Math.abs(nameCt - revCt)).toBeLessThanOrEqual(1);
+    expect(Math.abs(nameCt - cryCt)).toBeLessThanOrEqual(1);
+    expect(Math.abs(revCt  - cryCt)).toBeLessThanOrEqual(1);
+  });
+
+  it('handles one direction exhausted before another — remaining direction still fills its cap', () => {
+    const limits: DailyLimits = {
+      name:      { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+    };
+    // 2 name candidates, 5 reverse candidates — name bucket drains first
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2),
+      reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4), reverseCard(5),
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    // name has only 2 candidates — all introduced
+    expect(byType['name']    ?? 0).toBe(2);
+    // reverse has 5 candidates and a cap of 5 — all introduced
+    expect(byType['reverse'] ?? 0).toBe(5);
+  });
+
+  it('per-type daily cap applied before round-robin honours existing newIntroducedToday', () => {
+    // Simulate a day where 3 name cards were already introduced (cap = 5 → 2 remaining)
+    const limits: DailyLimits = {
+      name:      { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      // Already introduced today:
+      { ...nameCard(1), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
+      { ...nameCard(2), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
+      { ...nameCard(3), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
+      // Remaining new candidates:
+      nameCard(4), nameCard(5), nameCard(6),
+      reverseCard(1), reverseCard(2), reverseCard(3),
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    // name has 3 already introduced → 2 remaining slots; 3 candidates → 2 new
+    expect(byType['name']    ?? 0).toBe(2);
+    // reverse has 0 introduced → 5 slots; 3 candidates → 3 new
+    expect(byType['reverse'] ?? 0).toBe(3);
+  });
+
+  it('newQueue is still deterministically ordered (same result on repeated calls with same today)', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3),
+      reverseCard(1), reverseCard(2), reverseCard(3),
+    ];
+    const first  = buildSessionQueues(cards, highLimits, TODAY).newQueue;
+    const second = buildSessionQueues(cards, highLimits, TODAY).newQueue;
+    expect(first).toEqual(second);
   });
 });
 
@@ -1468,5 +1651,145 @@ describe("buildSessionQueues — exact-cap boundary", () => {
     const allNewCards = queues.newQueue.map((id) => cards.find((c) => c.id === id)!);
     expect(allNewCards.filter((c) => c.cardType === 'name')).toHaveLength(2);
     expect(allNewCards.filter((c) => c.cardType === 'evolution')).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #835 — non-destructive re-enable and cardTypeIsEnabled
+// ---------------------------------------------------------------------------
+
+describe('cardTypeIsEnabled (#835)', () => {
+  const seed1 = makeSeedPokemon(1);
+
+  function nameCard(id: number): NameReviewCard {
+    return { ...makeSeedPokemon(id), cardType: 'name', subjectKey: String(id), state: initialReviewState(NOW) };
+  }
+  function reverseCard(id: number): ReverseReviewCard {
+    return { ...makeSeedPokemon(id), id: REVERSE_ID_OFFSET + id, pokemonId: id, cardType: 'reverse', subjectKey: String(id), state: initialReviewState(NOW) };
+  }
+  function cryCard(id: number): CryReviewCard {
+    return { ...makeSeedPokemon(id), id: 3_000_000 + id, pokemonId: id, cardType: 'cry', subjectKey: String(id), state: initialReviewState(NOW) };
+  }
+  function evoCard(id: number): EvolutionReviewCard {
+    return { ...makeEvoEdge({ id }), subjectKey: `1>>>2`, state: initialReviewState(NOW) };
+  }
+
+  it('returns true for name cards when nameEnabled is true (default)', () => {
+    expect(cardTypeIsEnabled(nameCard(1), {})).toBe(true);
+  });
+
+  it('returns false for name cards when nameEnabled is false', () => {
+    expect(cardTypeIsEnabled(nameCard(1), { nameEnabled: false })).toBe(false);
+  });
+
+  it('returns false for reverse cards by default (default is disabled)', () => {
+    expect(cardTypeIsEnabled(reverseCard(1), {})).toBe(false);
+  });
+
+  it('returns true for reverse cards when reverseEnabled is true', () => {
+    expect(cardTypeIsEnabled(reverseCard(1), { reverseEnabled: true })).toBe(true);
+  });
+
+  it('returns false for cry cards by default', () => {
+    expect(cardTypeIsEnabled(cryCard(1), {})).toBe(false);
+  });
+
+  it('returns true for cry cards when cryEnabled is true', () => {
+    expect(cardTypeIsEnabled(cryCard(1), { cryEnabled: true })).toBe(true);
+  });
+
+  it('returns true for evolution cards by default', () => {
+    expect(cardTypeIsEnabled(evoCard(1_500_001), {})).toBe(true);
+  });
+
+  it('returns false for evolution cards when evolutionEnabled is false', () => {
+    expect(cardTypeIsEnabled(evoCard(1_500_001), { evolutionEnabled: false })).toBe(false);
+  });
+});
+
+describe('non-destructive re-enable: hydrateSession + cardTypeIsEnabled (#835)', () => {
+  const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
+  const TODAY = '2026-05-09';
+  const baseLimits: DailyLimits = {
+    name: { maxNewPerDay: 100, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 100, maxReviewsPerDay: 100 },
+    reverse: { maxNewPerDay: 100, maxReviewsPerDay: 100 },
+    cry: { maxNewPerDay: 100, maxReviewsPerDay: 100 },
+  };
+
+  it('saved reverse cards survive a disable-then-re-enable cycle with FSRS state intact', () => {
+    // Start: reverse enabled, one card has progress.
+    const revCard: ReverseReviewCard = {
+      ...makeSeedPokemon(1),
+      id: REVERSE_ID_OFFSET + 1,
+      pokemonId: 1,
+      cardType: 'reverse',
+      subjectKey: '1',
+      state: { ...initialReviewState(NOW), reps: 8, scheduledDays: 30 },
+    };
+    // Disable — cards are preserved, not stripped.
+    const afterDisable = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: false });
+    expect(afterDisable.filter((c) => c.cardType === 'reverse')).toHaveLength(1);
+    // Re-enable — cards already there, state intact.
+    const afterReEnable = hydrateSession(afterDisable, seed, [], NOW, { reverseEnabled: true });
+    const found = afterReEnable.find((c) => c.id === REVERSE_ID_OFFSET + 1);
+    expect(found?.state.reps).toBe(8);
+    expect(found?.state.scheduledDays).toBe(30);
+  });
+
+  it('buildSessionQueues excludes disabled-type cards via eligibleCardIds', () => {
+    // Build a session with name + reverse cards.
+    const built = buildSession(seed, [], NOW, { reverseEnabled: true });
+    // hydrate with reverse disabled — cards preserved in session.
+    const hydrated = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
+    expect(hydrated.filter((c) => c.cardType === 'reverse')).toHaveLength(2); // preserved
+
+    // Build eligibleCardIds that excludes disabled types.
+    const cardTypeOpts = { reverseEnabled: false, nameEnabled: true, evolutionEnabled: true };
+    const eligibleIds = new Set(
+      hydrated
+        .filter((c) => cardTypeIsEnabled(c, cardTypeOpts))
+        .map((c) => c.id),
+    );
+
+    const queues = buildSessionQueues(hydrated, baseLimits, TODAY, eligibleIds);
+    // Reverse cards must not appear in any queue.
+    const allQueued = [...queues.newQueue, ...queues.reviewQueue];
+    const allCards = new Map(hydrated.map((c) => [c.id, c]));
+    const queuedTypes = allQueued.map((id) => allCards.get(id)?.cardType);
+    expect(queuedTypes.some((t) => t === 'reverse')).toBe(false);
+    // Name cards (enabled) are still queued.
+    expect(queuedTypes.some((t) => t === 'name')).toBe(true);
+  });
+
+  it('re-enable fresh start: resetting card states to initialReviewState clears all progress', () => {
+    const revCard: ReverseReviewCard = {
+      ...makeSeedPokemon(1),
+      id: REVERSE_ID_OFFSET + 1,
+      pokemonId: 1,
+      cardType: 'reverse',
+      subjectKey: '1',
+      state: { ...initialReviewState(NOW), reps: 5, scheduledDays: 21, lastReview: '2026-05-01' },
+    };
+    const freshNow = new Date('2026-05-09T12:00:00Z');
+    // Simulate "start fresh": reset reverse cards to initial state.
+    const reset = [revCard].map((c) =>
+      c.cardType === 'reverse' ? { ...c, state: initialReviewState(freshNow) } : c,
+    );
+    // The card must now have null lastReview (unreviewed).
+    expect(reset[0].state.lastReview).toBeNull();
+    expect(reset[0].state.reps).toBe(0);
+    expect(reset[0].state.scheduledDays).toBe(0);
+  });
+
+  it('disabled name cards do not get new additions during disable period', () => {
+    // No saved cards.
+    const result = hydrateSession([], seed, [], NOW, { nameEnabled: false });
+    expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
+  });
+
+  it('disabled reverse cards do not get new additions during disable period', () => {
+    const result = hydrateSession([], seed, [], NOW, { reverseEnabled: false });
+    expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
   });
 });

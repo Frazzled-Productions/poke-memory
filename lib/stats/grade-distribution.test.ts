@@ -78,21 +78,92 @@ describe("computeGradeDistribution", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeGradeTrend", () => {
-  it("returns the requested number of weeks", () => {
-    const points = computeGradeTrend([], "2026-05-12", 12);
-    expect(points).toHaveLength(12);
+  // With trimLeadingZeros=false the function behaves like the original
+  // implementation and always returns exactly `weeks` entries.
+  describe("trimLeadingZeros=false (fixed-length behaviour)", () => {
+    it("returns the requested number of weeks", () => {
+      const points = computeGradeTrend([], "2026-05-12", 12, false);
+      expect(points).toHaveLength(12);
+    });
+
+    it("returns weeks in ascending weekStart order", () => {
+      const points = computeGradeTrend([], "2026-05-12", 4, false);
+      for (let i = 1; i < points.length; i++) {
+        expect(points[i].weekStart > points[i - 1].weekStart).toBe(true);
+      }
+    });
+
+    it("all-zero totals for an empty log", () => {
+      const points = computeGradeTrend([], "2026-05-12", 4, false);
+      expect(points.every((p) => p.total === 0)).toBe(true);
+    });
   });
 
-  it("returns weeks in ascending weekStart order", () => {
-    const points = computeGradeTrend([], "2026-05-12", 4);
-    for (let i = 1; i < points.length; i++) {
-      expect(points[i].weekStart > points[i - 1].weekStart).toBe(true);
-    }
-  });
+  // With trimLeadingZeros=true (the default) the function drops leading
+  // all-zero weeks so the chart starts at the user's first active week.
+  describe("trimLeadingZeros=true (default)", () => {
+    it("returns an empty array when the log is empty", () => {
+      const points = computeGradeTrend([], "2026-05-12", 12);
+      expect(points).toHaveLength(0);
+    });
 
-  it("all-zero totals for an empty log", () => {
-    const points = computeGradeTrend([], "2026-05-12", 4);
-    expect(points.every((p) => p.total === 0)).toBe(true);
+    it("returns an empty array when all entries are in the current week", () => {
+      // today = 2026-05-12 (Tue); currentWeekStart = 2026-05-11 (Mon).
+      // All grades are in the current in-progress week — excluded from the
+      // window — so no complete weeks have data.
+      const log: GradeLog = [
+        entry(4, "2026-05-11"),
+        entry(5, "2026-05-12"),
+      ];
+      const points = computeGradeTrend(log, "2026-05-12", 12);
+      expect(points).toHaveLength(0);
+    });
+
+    it("returns only the weeks from the first active week onward", () => {
+      // today = 2026-05-12 (Tue); 12-week window starts 2026-02-16.
+      // Only the last slot (2026-05-04) has data — 11 leading zero weeks
+      // are trimmed, leaving exactly 1 point.
+      const log: GradeLog = [entry(4, "2026-05-04")];
+      const points = computeGradeTrend(log, "2026-05-12", 12);
+      expect(points).toHaveLength(1);
+      expect(points[0].weekStart).toBe("2026-05-04");
+      expect(points[0].good).toBe(1);
+    });
+
+    it("preserves trailing zero weeks after the first active week", () => {
+      // today = 2026-05-12; weeks=4 covers 2026-04-13, 2026-04-20, 2026-04-27,
+      // 2026-05-04. Put data only in the first slot — three trailing zero weeks
+      // should remain, giving 4 points total.
+      const log: GradeLog = [entry(1, "2026-04-13")];
+      const points = computeGradeTrend(log, "2026-05-12", 4);
+      expect(points).toHaveLength(4);
+      expect(points[0].weekStart).toBe("2026-04-13");
+      expect(points[0].again).toBe(1);
+      // Subsequent weeks are zero.
+      expect(points[1].total).toBe(0);
+      expect(points[2].total).toBe(0);
+      expect(points[3].total).toBe(0);
+    });
+
+    it("returns all weeks when data starts in the oldest slot", () => {
+      // 12-week window, data in the first slot — no leading zeros to trim.
+      // today = 2026-05-12; oldest slot = 2026-02-16.
+      const log: GradeLog = [entry(5, "2026-02-16")];
+      const points = computeGradeTrend(log, "2026-05-12", 12);
+      expect(points).toHaveLength(12);
+      expect(points[0].weekStart).toBe("2026-02-16");
+    });
+
+    it("returns weeks in ascending weekStart order", () => {
+      const log: GradeLog = [
+        entry(4, "2026-04-27"),
+        entry(5, "2026-05-04"),
+      ];
+      const points = computeGradeTrend(log, "2026-05-12", 4);
+      for (let i = 1; i < points.length; i++) {
+        expect(points[i].weekStart > points[i - 1].weekStart).toBe(true);
+      }
+    });
   });
 
   it("buckets entries into the correct week", () => {

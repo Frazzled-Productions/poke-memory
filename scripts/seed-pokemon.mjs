@@ -463,7 +463,15 @@ function isWorthLearning(formData, pokemonData) {
 }
 
 /**
- * Classifies a form into a broad category for future scope-toggle filtering.
+ * Classifies a form into a broad category for scope-toggle filtering.
+ *
+ * This function is only called for alternate varieties (varieties[1..n]), so
+ * `form_name` will never be empty for a valid entry — `isWorthLearning` already
+ * rejects entries with an empty `form_name`.  The `formData.is_default` field
+ * is deliberately ignored here: PokéAPI sometimes sets `is_default: true` on
+ * non-default varieties (e.g. Small Pumpkaboo, Therian formes), which would
+ * cause them to be misclassified as `"default"` and escape the alternate-forms
+ * toggle.  Classification is derived solely from `form_name`.
  */
 function formCategoryFor(formData) {
   const fn = formData.form_name ?? "";
@@ -471,7 +479,7 @@ function formCategoryFor(formData) {
   if (/^mega/.test(fn)) return "mega";
   if (fn === "gmax") return "gmax";
   if (fn === "primal") return "primal";
-  if (fn === "" || formData.is_default) return "default";
+  if (fn === "") return "default";
   return "forme";
 }
 

@@ -17,46 +17,8 @@ async function seedSuperuser(
   }, opts);
 }
 
-test.describe("Stats page — badge gallery", () => {
-  test("badge gallery section is visible on the stats page", async ({
-    page,
-  }) => {
-    await page.goto("/stats");
-    // Wait for the page to hydrate past the loading skeleton — the heading
-    // only renders once stats are loaded.
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
-    ).toBeVisible({ timeout: 15_000 });
-  });
-
-  test("locked badges show hint text", async ({ page }) => {
-    await page.goto("/stats");
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
-    ).toBeVisible({ timeout: 15_000 });
-    // A fresh guest session has no earned badges; at least one locked tile
-    // should be present. The Boulder Badge is the first catalog entry.
-    await expect(
-      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
-    ).toBeVisible();
-  });
-
-  test("pretendAllMastered shows all badges as earned", async ({ page }) => {
-    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
-    await page.goto("/stats");
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
-    ).toBeVisible({ timeout: 15_000 });
-    // Under the flag every badge tile has ", earned" in its accessible name.
-    // Boulder Badge is the first catalog entry.
-    await expect(
-      page.getByLabel("Boulder Badge, earned"),
-    ).toBeVisible();
-  });
-});
-
 test.describe("Stats page — review charts", () => {
-  test("the three new chart sections render", async ({ page }) => {
+  test("the three analytical chart sections render", async ({ page }) => {
     await page.goto("/stats");
     // The recall-vs-target indicator, per-direction breakdown and difficulty
     // histogram are pure-derive, so they render even for a fresh guest with
@@ -87,7 +49,7 @@ test.describe("Stats page — Pokédex completion projection", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Pokédex completion" }),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("Not enough data yet")).toBeVisible();
+    await expect(page.getByText("Projection not available yet")).toBeVisible();
   });
 
   test("pretendAllMastered shows the completion state", async ({ page }) => {
@@ -198,5 +160,38 @@ test.describe("Stats page — mastery over time chart", () => {
     await expect(
       page.getByText(/No mastered species yet/i),
     ).not.toBeVisible();
+  });
+});
+
+test.describe("Stats page — section headings", () => {
+  test("analytical section headings are present", async ({ page }) => {
+    await page.goto("/stats");
+    // Wait for hydration.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Accuracy", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Activity", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible();
+  });
+
+  test("celebratory content (trainer card, badge gallery) has moved to Journey", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // Wait for the page to hydrate.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Accuracy", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    // Trainer card and badge gallery must NOT appear on Stats.
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Gym badges" }),
+    ).toHaveCount(0);
   });
 });

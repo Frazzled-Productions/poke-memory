@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   CARD_DIRECTIONS,
   computeDirectionBreakdown,
+  enabledDirectionsFromSettings,
   totalDirectionReviews,
   type CardDirection,
 } from "./direction-breakdown";
@@ -25,6 +26,11 @@ describe("computeDirectionBreakdown", () => {
     expect(rows.every((r) => r.total === 0 && r.passes === 0)).toBe(true);
     expect(rows.every((r) => r.accuracy === null)).toBe(true);
     expect(totalDirectionReviews(rows)).toBe(0);
+  });
+
+  it("disabled is false for all rows when enabledDirections is omitted", () => {
+    const rows = computeDirectionBreakdown([]);
+    expect(rows.every((r) => r.disabled === false)).toBe(true);
   });
 
   it("counts passes (4 / 5) and fails (1 / 2) per direction", () => {
@@ -63,5 +69,75 @@ describe("computeDirectionBreakdown", () => {
     ];
     const rows = computeDirectionBreakdown(log);
     expect(totalDirectionReviews(rows)).toBe(1);
+  });
+
+  describe("with enabledDirections", () => {
+    it("marks directions absent from the set as disabled", () => {
+      const enabled = new Set<CardDirection>(["name", "evolution"]);
+      const rows = computeDirectionBreakdown([], enabled);
+      expect(rows.find((r) => r.direction === "name")!.disabled).toBe(false);
+      expect(rows.find((r) => r.direction === "evolution")!.disabled).toBe(false);
+      expect(rows.find((r) => r.direction === "reverse")!.disabled).toBe(true);
+      expect(rows.find((r) => r.direction === "cry")!.disabled).toBe(true);
+      expect(rows.find((r) => r.direction === "reverse-evolution")!.disabled).toBe(true);
+    });
+
+    it("a direction with history and disabled=true still has accurate counts", () => {
+      const enabled = new Set<CardDirection>(["name"]);
+      const log: GradeLog = [entry("cry", 4), entry("cry", 5), entry("cry", 1)];
+      const rows = computeDirectionBreakdown(log, enabled);
+      const cry = rows.find((r) => r.direction === "cry")!;
+      expect(cry.disabled).toBe(true);
+      expect(cry.total).toBe(3);
+      expect(cry.passes).toBe(2);
+    });
+
+    it("a direction with zero reviews is still included (caller decides to hide)", () => {
+      const enabled = new Set<CardDirection>(["name"]);
+      const rows = computeDirectionBreakdown([], enabled);
+      // Every direction is present; directions not in the set have disabled true.
+      expect(rows).toHaveLength(CARD_DIRECTIONS.length);
+      const zero = rows.filter((r) => r.total === 0);
+      expect(zero).toHaveLength(CARD_DIRECTIONS.length);
+    });
+  });
+});
+
+describe("enabledDirectionsFromSettings", () => {
+  it("includes only enabled directions", () => {
+    const enabled = enabledDirectionsFromSettings({
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      reverseCardsEnabled: false,
+      cryCardsEnabled: false,
+    });
+    expect(enabled.has("name")).toBe(true);
+    expect(enabled.has("evolution")).toBe(true);
+    expect(enabled.has("reverse-evolution")).toBe(false);
+    expect(enabled.has("reverse")).toBe(false);
+    expect(enabled.has("cry")).toBe(false);
+  });
+
+  it("includes all five when all are enabled", () => {
+    const enabled = enabledDirectionsFromSettings({
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: true,
+      reverseCardsEnabled: true,
+      cryCardsEnabled: true,
+    });
+    expect(enabled.size).toBe(5);
+  });
+
+  it("returns an empty set when all are disabled", () => {
+    const enabled = enabledDirectionsFromSettings({
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      reverseCardsEnabled: false,
+      cryCardsEnabled: false,
+    });
+    expect(enabled.size).toBe(0);
   });
 });

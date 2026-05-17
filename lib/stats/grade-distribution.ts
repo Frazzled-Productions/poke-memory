@@ -80,15 +80,20 @@ function isoWeekStart(isoDate: string): string {
  * Weeks are ISO weeks starting on Monday. The window covers the `weeks`
  * complete past weeks (oldest = `currentWeekStart - weeks*7`; newest =
  * `currentWeekStart - 7`). The current in-progress week is excluded so every
- * returned bucket represents a full seven-day period. Weeks with no grades
- * are included as zero rows so the chart has a continuous x-axis.
+ * returned bucket represents a full seven-day period.
  *
- * Pure — no I/O. Returns `weeks` entries in ascending `weekStart` order.
+ * When `trimLeadingZeros` is true (the default), any all-zero weeks at the
+ * start of the window are dropped so the chart is not padded with empty bars
+ * before the user's first recorded activity. Trailing zero weeks are kept so
+ * the x-axis extends to the most recent complete week.
+ *
+ * Pure — no I/O. Returns up to `weeks` entries in ascending `weekStart` order.
  */
 export function computeGradeTrend(
   log: GradeLog,
   today: string,
   weeks = 12,
+  trimLeadingZeros = true,
 ): GradeTrendPoint[] {
   // Determine the Monday of the current week.
   const currentWeekStart = isoWeekStart(today);
@@ -128,7 +133,7 @@ export function computeGradeTrend(
     }
   }
 
-  return weekStarts.map((ws) => {
+  const points = weekStarts.map((ws) => {
     const b = buckets.get(ws)!;
     return {
       weekStart: ws,
@@ -139,4 +144,12 @@ export function computeGradeTrend(
       total: b.again + b.hard + b.good + b.easy,
     };
   });
+
+  if (!trimLeadingZeros) return points;
+
+  // Drop leading zero-total weeks so the chart starts at the user's first
+  // week of activity rather than showing a long run of empty bars.
+  const firstNonZero = points.findIndex((p) => p.total > 0);
+  if (firstNonZero === -1) return []; // no data in the window at all
+  return points.slice(firstNonZero);
 }

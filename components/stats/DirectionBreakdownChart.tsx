@@ -37,6 +37,7 @@ type ChartDatum = {
   total: number;
   passes: number;
   hasData: boolean;
+  disabled: boolean;
 };
 
 function TooltipBody({ datum }: { datum: ChartDatum }) {
@@ -51,10 +52,13 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
           <p className="tabular-nums text-zinc-500 dark:text-zinc-400">
             {datum.passes} of {datum.total} reviews passed
           </p>
+          {datum.disabled && (
+            <p className="mt-1 text-zinc-400 dark:text-zinc-500">
+              This card type is currently disabled in Settings.
+            </p>
+          )}
         </>
-      ) : (
-        <p className="mt-1 text-zinc-500 dark:text-zinc-400">No reviews yet</p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -67,14 +71,23 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
  * intentionally unaffected by the `pretendAllMastered` superuser flag.
  */
 export function DirectionBreakdownChart({ rows }: Props) {
-  const total = totalDirectionReviews(rows);
+  // Only show directions that have at least one review. Directions with zero
+  // reviews (never used, or disabled before any history was recorded) are pure
+  // clutter and are hidden entirely.
+  const visibleRows = rows.filter((r) => r.total > 0);
+  const total = totalDirectionReviews(visibleRows);
 
-  const data: ChartDatum[] = rows.map((row) => ({
-    label: DIRECTION_LABELS[row.direction],
+  const data: ChartDatum[] = visibleRows.map((row) => ({
+    // Append "(disabled)" when the direction has history but is switched off,
+    // so the user understands why a type they turned off still appears.
+    label: row.disabled
+      ? `${DIRECTION_LABELS[row.direction]} (disabled)`
+      : DIRECTION_LABELS[row.direction],
     accuracyPct: row.accuracy === null ? 0 : Math.round(row.accuracy * 100),
     total: row.total,
     passes: row.passes,
     hasData: row.total > 0,
+    disabled: row.disabled,
   }));
 
   return (
@@ -98,10 +111,10 @@ export function DirectionBreakdownChart({ rows }: Props) {
           <>
             <div
               role="img"
-              aria-label={`Accuracy by card direction: ${rows
+              aria-label={`Accuracy by card direction: ${visibleRows
                 .map(
                   (r) =>
-                    `${DIRECTION_LABELS[r.direction]} ${
+                    `${DIRECTION_LABELS[r.direction]}${r.disabled ? " (disabled)" : ""} ${
                       r.accuracy === null
                         ? "no reviews"
                         : `${Math.round(r.accuracy * 100)}% over ${r.total} reviews`
@@ -128,7 +141,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
                   <YAxis
                     type="category"
                     dataKey="label"
-                    width={108}
+                    width={140}
                     tick={{ fontSize: 12, fill: "currentColor" }}
                     className="text-zinc-600 dark:text-zinc-300"
                     axisLine={false}
@@ -164,12 +177,17 @@ export function DirectionBreakdownChart({ rows }: Props) {
               role="list"
               className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400 sm:grid-cols-3"
             >
-              {rows.map((row) => (
+              {visibleRows.map((row) => (
                 <li
                   key={row.direction}
                   className="flex items-center justify-between gap-2 tabular-nums"
                 >
-                  <span>{DIRECTION_LABELS[row.direction]}</span>
+                  <span>
+                    {DIRECTION_LABELS[row.direction]}
+                    {row.disabled && (
+                      <span className="ml-1 text-zinc-400 dark:text-zinc-500">(disabled)</span>
+                    )}
+                  </span>
                   <span>
                     {row.total} review{row.total === 1 ? "" : "s"}
                   </span>

@@ -17,6 +17,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
+import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -120,6 +121,8 @@ export default function RootLayout({
           </SuperuserProvider>
         </AuthProvider>
         <IdbMigration />
+        {/* Registers the offline service worker and surfaces the update prompt (#703). */}
+        <ServiceWorkerProvider />
         <Analytics />
         <SpeedInsights />
       </body>

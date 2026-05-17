@@ -213,9 +213,10 @@ in-memory fixture.
 |---|---|
 | **Trigger** | `pull_request` (any), `workflow_dispatch` |
 | **Job** | `coverage` |
-| **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), then posts the coverage summary (statements / branches / functions / lines) as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). |
+| **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), enforces two coverage gates, then posts the coverage summary (statements / branches / functions / lines) plus the diff-coverage result as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). The comment posts on both pass and fail. |
+| **Gates (#824)** | **Global floor** — `coverage.thresholds` in `vitest.config.ts` (Statements 64 / Branches 59 / Functions 55 / Lines 65, just below the measured baseline). `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** — `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit an 80% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork PRs run with a read-only token and cannot post comments). |
-| **Required check** | No — non-blocking by design (#762). There is no threshold gate in `vitest.config.ts`, the coverage step carries `continue-on-error`, and the job is not in the `main-protection` ruleset. The report is informational so coverage gaps are visible without merge friction; a threshold gate can be added later once a baseline is agreed. |
+| **Required check** | Not yet — the gates fail the job, but `coverage` must still be added as a required check on the `qa` and `main` rulesets (owner action) before a breach blocks merge. Until then the job goes red without blocking. (Originally non-blocking by design under #762; gated under #824.) |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
 
 ---
@@ -372,6 +373,22 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `qa-issue-label.yml` — QA Issue Label
+
+| | |
+|---|---|
+| **Trigger** | `pull_request: [closed]`, guarded to merged PRs only |
+| **Job** | `label` (check name `Label referenced issues`) |
+| **What it does** | Bridges the gap left by GitHub auto-closing `closes #N` issues only on the default branch. When a PR merges into `qa`, it parses the PR body and commit messages for `closes/fixes/resolves #N` keywords and adds the `status:in-qa` label to each referenced issue — a board signal that the work is done and staged. When the `qa -> main` promotion PR merges (`base: main`, `head: qa`), GitHub auto-closes those issues on `main`, so this run strips the now-stale `status:in-qa` label for tidiness. |
+| **Label creation** | The `status:in-qa` label (colon-namespaced, consistent with `priority:*`) is created idempotently on first run via `gh label create ... \|\| true`. The workflow owns the label — it is not created by hand. |
+| **Scope** | Label only. Project-board column transitions are deliberately left to `auto-status.yml`; this workflow never touches board columns. |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard — same pattern as `auto-review.yml`; fork PRs run with a read-only token and cannot edit issue labels). |
+| **Idempotency** | `gh label create ... \|\| true` no-ops once the label exists; `--add-label` / `--remove-label` are idempotent by nature, so a re-run changes nothing. |
+| **Required check** | No — board hygiene only, does not gate merge. |
+| **Concurrency** | Serialized per PR (`cancel-in-progress: false`). |
+
+---
+
 ### `pr-check-monitor.yml` — PR Check Monitor
 
 | | |
@@ -390,7 +407,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | | |
 |---|---|
 | **Trigger** | `schedule: '0 10 * * 1'` (weekly, Monday 10:00 UTC); `workflow_dispatch` |
-| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, and the four weekly digests `auto-workflow-suggest` / `auto-codequality-suggest` / `auto-app-suggest` / `auto-backlog-groom`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for daily workflows, 240h for weekly) and (b) the most recent completed run succeeded — any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
+| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, the four weekly digests `auto-workflow-suggest` / `auto-codequality-suggest` / `auto-app-suggest` / `auto-backlog-groom`, and the monthly `auto-deep-audit`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for daily workflows, 240h for weekly, 840h for monthly) and (b) the most recent completed run succeeded — any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
 | **Dedup** | A `<!-- cron-health-monitor:{file} -->` HTML marker keyed by workflow filename gives each watched workflow its own tracking issue. Re-runs edit that issue in place and add a re-check comment rather than opening duplicates. When a workflow recovers, the monitor closes its tracking issue automatically. |
 | **Why schedule?** | The monitor runs on GitHub's internal cron queue, independently of the workflows it watches — so it still fires even if those workflows have stopped. It cannot detect its own staleness, but the blast radius of one un-monitored monitor is small. |
 | **Permissions** | `contents: read`, `actions: read`, `issues: write`. `GITHUB_TOKEN` only — no Claude, no App token, no app checkout. |
@@ -482,6 +499,35 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **No-op** | Skips silently when nothing crosses the signal bar or when a digest issue already exists for the week |
 | **Scope** | Proposals only — never edits labels or moves issues |
 | **Label** | Digest issue is labelled `area:backlog`; label is created if absent |
+
+---
+
+### `auto-deep-audit.yml` — Monthly Deep Audit
+
+| | |
+|---|---|
+| **Trigger** | Monthly cron 1st of the month 08:00 UTC + `workflow_dispatch` (optional `axis` input forces a single axis) |
+| **Rotation** | One rotating workflow covering four axes. Keyed on calendar month: code-quality (#739) and test-coverage (#741) run **every** month; workflow-structural (#743) runs in months 1/4/7/10; sub-agent roster (#744) runs in months 2/5/8/11. A normal month runs two axes; a quarter-boundary month runs three. |
+| **Idempotency key** | Per-axis dated comment marker `<!-- auto-deep-audit:<axis>:YYYY-MM -->` on the umbrella issue. An axis whose marker for the current month already exists is skipped. |
+| **Inputs** | Full codebase (no recency window) — distinguishes a deep audit from the 30-day `auto-*-suggest.yml` digests. Code-quality scans `app/**`/`components/**`/`lib/**`/`db/**`; workflow scans `.github/workflows/**` plus `gh run list` history; sub-agent scans `.claude/agents/**`. |
+| **Output** | A fresh dated report comment on the **existing** umbrella issue (#739/#741/#743/#744 — reused, never re-spawned), plus one scoped follow-up issue per finding (≤8 per axis), each labelled `priority:later`. |
+| **No-op** | If an axis finds nothing actionable it still posts a marker-carrying "no findings" comment (so idempotency holds) and files no issues. |
+| **Issue-filing rules** | Follow-up issues are `priority:later` only — never `auto`, never `priority:now`/`priority:next`. The user owns promotion. |
+| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; minimal `permissions` (`issues: write`, rest read) |
+
+---
+
+### `settings-coverage-audit.yml` — Settings Coverage Audit
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (opened/synchronize/reopened) path-filtered to `lib/settings/**`, `lib/superuser/**`, `components/superuser/**`, `components/settings/**`, `app/settings/**` + `workflow_dispatch`. Event-driven rather than cron — settings-coverage drift (#738, exemplar #731) is introduced by code changes, not by the calendar. |
+| **Idempotency key** | Monthly dated comment marker `<!-- settings-coverage-audit:YYYY-MM -->` on umbrella issue #738. Several settings PRs in one month trigger the audit once, not once per PR. |
+| **Inputs** | Full-codebase audit of every `UserSettings` field and every superuser flag against every code path that should honour it (card-type render paths, daily caps, practice scope, secondary surfaces). |
+| **Output** | A dated report comment on existing umbrella issue #738, plus one scoped `priority:later` follow-up issue per missed-path finding (≤8). |
+| **No-op** | Posts a marker-carrying "no missed paths" comment when clean; files no issues. Advisory — never fails the job or blocks the PR. |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork PRs run with a read-only token and cannot post comments or create issues). |
+| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; minimal `permissions` (`issues: write`, rest read) |
 
 ---
 
@@ -599,6 +645,10 @@ Runs on every `pull_request` event and every push to `main`: the same `typecheck
 
 - Named checks: `test` and `e2e` (job IDs). `e2e` aggregates the parallel `e2e-browser` matrix legs into one status so the required-check name is stable. Branch protection requires both by name.
 - Concurrent runs on the same ref are cancelled — only the latest push completes.
+
+### Coverage gate (`coverage.yml`)
+
+Runs on every `pull_request` event. Fails the `coverage` job on either a global-floor breach (`coverage.thresholds` in `vitest.config.ts`) or a diff-coverage breach (`scripts/diff-coverage.mjs`, 80% patch bar). See the `coverage.yml` catalog entry above for detail. Not yet a required check — owner must add `coverage` to the `qa` and `main` rulesets to block merge on a breach.
 
 ---
 

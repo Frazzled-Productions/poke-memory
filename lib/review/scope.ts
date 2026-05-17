@@ -254,6 +254,34 @@ export function cardIsEligible(
 }
 
 /**
+ * Species-level eligibility check — mirrors `cardIsEligible` but operates on
+ * a `SeedPokemon` rather than a `ReviewableCard`. Used by `getSeenPokemon` in
+ * the Higher-or-Lower minigame so the pool respects the same two-tier gate
+ * (master alternate-forms toggle first, then gens/types/presets scope) as the
+ * practice session itself.
+ *
+ * @param alternateFormsEnabled  Mirror of `UserSettings.alternateFormsEnabled`.
+ *   Defaults to `true` so callers that do not yet pass the flag see the
+ *   previous behaviour — all species included.
+ */
+export function seedPokemonIsEligible(
+  p: SeedPokemon,
+  scope: PracticeScope,
+  alternateFormsEnabled: boolean = true,
+): boolean {
+  const isDefaultForm = (p as { isDefaultForm?: boolean }).isDefaultForm ?? true;
+
+  // Master gate: exclude alternate-form species when the toggle is off.
+  if (!alternateFormsEnabled && !isDefaultForm) return false;
+
+  if (isScopeEmpty(scope)) return true;
+
+  const resolvedId = (p as { speciesId?: number }).speciesId ?? p.id;
+  const formCategory = (p as { formCategory?: FormCategory }).formCategory ?? "default";
+  return speciesMatchesScope(resolvedId, p.types, scope, isDefaultForm, formCategory);
+}
+
+/**
  * Count species in the seed pool that match the active scope, applying the
  * same two-tier gate as `cardIsEligible`. Returns `seed.length` (minus
  * alternate-form entries when gated off) for the empty scope.

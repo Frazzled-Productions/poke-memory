@@ -712,3 +712,49 @@ describe("cardIsEligible: alternateFormsEnabled gate", () => {
     });
   });
 });
+
+// ─── Size-variant / formCategory regression (#837) ───────────────────────────
+//
+// Small / Large / Super Pumpkaboo (and other size variants) had
+// formCategory: "default" in the seed even though isDefaultForm: false.
+// The master alternateFormsEnabled gate already blocked them via isDefaultForm,
+// but a "include" mode formCategories filter would incorrectly pass them through
+// because "default" was in the allowed set.  The seed fix ensures such entries
+// now carry formCategory: "forme".
+
+describe("cardIsEligible: size-variant formCategory regression (#837)", () => {
+  // Simulate Small Pumpkaboo: isDefaultForm=false, but wrongly classified as
+  // formCategory:"default" (the pre-fix state).
+  const wronglyCategorised = formCard(10027, 710, "default", ["ghost", "grass"]);
+  // Correctly-classified version after the fix.
+  const correctlyCategorised = formCard(10027, 710, "forme", ["ghost", "grass"]);
+
+  it("wrongly-categorised size variant passes include:default filter when gate ON (regression)", () => {
+    // With formCategory:"default", the include filter incorrectly allows it.
+    const scope = {
+      gens: [] as number[],
+      types: [] as string[],
+      presets: [] as PracticeScopePreset[],
+      formCategories: { mode: "include" as const, categories: ["default" as FormCategory] },
+    };
+    expect(cardIsEligible(wronglyCategorised, scope, true)).toBe(true);
+  });
+
+  it("correctly-categorised size variant is excluded by include:default filter when gate ON", () => {
+    // With formCategory:"forme", the include filter correctly excludes it.
+    const scope = {
+      gens: [] as number[],
+      types: [] as string[],
+      presets: [] as PracticeScopePreset[],
+      formCategories: { mode: "include" as const, categories: ["default" as FormCategory] },
+    };
+    expect(cardIsEligible(correctlyCategorised, scope, true)).toBe(false);
+  });
+
+  it("size variant (correctly-categorised) is excluded by master gate when alternateFormsEnabled is off", () => {
+    // Both before and after the fix, the master gate blocks size variants because
+    // isDefaultForm === false.  Confirm this invariant holds.
+    expect(cardIsEligible(correctlyCategorised, EMPTY_SCOPE, false)).toBe(false);
+    expect(cardIsEligible(wronglyCategorised, EMPTY_SCOPE, false)).toBe(false);
+  });
+});

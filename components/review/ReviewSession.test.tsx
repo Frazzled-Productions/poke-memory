@@ -701,6 +701,127 @@ describe("Baseline: due review card reveal → grade cycle", () => {
   });
 });
 
+describe("Regression: learning-card displaces current card before Reveal (#839)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps the current card on screen when a learning card becomes due before Reveal is clicked", async () => {
+    // Scenario: the user is looking at a review card on its front face
+    // (Reveal not yet clicked). A learning card's dueAt passes and the
+    // countdown setTimeout fires, triggering a re-render. Without the
+    // displayedCardId lock the learning card would displace the current
+    // card and the user's tap-in-progress would land on the wrong card.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+    const now = Date.now();
+
+    // Review card (due today) — the card currently on screen.
+    const reviewCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      name: "Bulbasaur",
+      state: {
+        stability: 5,
+        difficulty: 1,
+        elapsedDays: 0,
+        scheduledDays: 5,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-17",
+        lastReview: "2026-05-12",
+        firstSeen: "2026-05-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    // Learning card due in 150 ms — will fire its timeout before the user taps Reveal.
+    const learningCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 2,
+      name: "Ivysaur",
+      spriteUrl: "https://example.com/ivysaur.png",
+      state: {
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "new" as const,
+        dueDate: "2026-05-17",
+        lastReview: null,
+        firstSeen: "2026-05-17",
+        learningStep: 0,
+        stepStartedAt: now - (LEARNING_STEPS_MS[0] - 150), // dueAt = now + 150 ms
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([reviewCard, learningCard]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [reviewCard, learningCard],
+      limits: DEFAULT_LIMITS,
+    });
+
+    await act(async () => { render(<ReviewSession />); });
+
+    // Review card is on screen — Reveal button visible, name hidden.
+    const revealBtn = screen.getByRole("button", { name: /reveal/i });
+    expect(revealBtn).toBeInTheDocument();
+
+    // Advance time past the learning card's dueAt WITHOUT clicking Reveal.
+    // This fires the countdown setTimeout and triggers a re-render.
+    await act(async () => { vi.advanceTimersByTime(300); });
+
+    // The Reveal button must still be present — the review card was NOT displaced.
+    expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    // Grade buttons must not be visible — we haven't revealed anything.
+    expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
+
+    // Reveal the card — confirm it is still the review card, not the learning card.
+    act(() => { fireEvent.click(screen.getByRole("button", { name: /reveal/i })); });
+    // The review card's name must be visible after reveal.
+    expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
+    expect(screen.queryByText("Ivysaur")).not.toBeInTheDocument();
+    // Grade buttons must now be present.
+    expect(screen.getByRole("button", { name: /easy/i })).toBeInTheDocument();
+
+    // Grade the review card using the same pattern as the #196 regression test:
+    // click inside fake-timer mode, then switch to real timers so the async
+    // handleGrade microtasks can settle and waitFor can poll.
+    act(() => { fireEvent.click(screen.getByRole("button", { name: /easy/i })); });
+
+    vi.useRealTimers();
+
+    // The review card (id 1) must have been graded after the grade settles.
+    await waitFor(() => {
+      expect(vi.mocked(saveSession)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: expect.arrayContaining([
+            expect.objectContaining({
+              id: 1,
+              state: expect.objectContaining({ lastReview: "2026-05-17" }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    // The learning card (id 2) must remain in its learning step — it was not graded.
+    const lastCallArg = vi.mocked(saveSession).mock.lastCall?.[0] as
+      | { cards: { id: number; state: { learningStep: number | null } }[] }
+      | undefined;
+    const savedLearningCard = lastCallArg?.cards.find((c) => c.id === 2);
+    expect(savedLearningCard?.state.learningStep).toBe(0);
+  });
+});
+
 describe("Regression: learning-queue preemption during grading window (#196)", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -1092,6 +1213,57 @@ describe("Practice scope (#333)", () => {
   });
 });
 
+describe("Practice scope: Clear scope button (#835)", () => {
+  it("re-computes eligibility including card-type check when scope is cleared", async () => {
+    // Start with a scoped session that shows the empty-state screen. Clicking
+    // "Clear scope" triggers handleScopeChange(EMPTY_SCOPE) with cards loaded,
+    // covering the cardTypeOpts/cardTypeIsEnabled block inside that handler.
+    const user = userEvent.setup();
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      // Scope to Gen IX — Bulbasaur is Gen I, so zero match.
+      practiceScope: { gens: [9], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // Wait for the empty-state screen with the Clear scope button.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no Pok[ée]mon match your scope/i),
+      ).toBeInTheDocument();
+    });
+
+    const clearBtn = screen.getByRole("button", { name: /clear scope/i });
+    expect(clearBtn).toBeInTheDocument();
+
+    // Click Clear scope — this fires handleScopeChange with cards !== null.
+    await user.click(clearBtn);
+
+    // After clearing, the scope is empty and Bulbasaur is eligible again.
+    // The Reveal button should now appear.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /reveal/i }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/no Pok[ée]mon match your scope/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("ReviewSession TTS warm-up (#479)", () => {
   it("calls warmupTts on the first grade button click", async () => {
     const user = userEvent.setup();
@@ -1273,5 +1445,152 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
       expect(screen.getByRole("alert")).toBeInTheDocument(),
     );
     expect(screen.getByText(/this grade could not be saved/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Card-type enable/disable guards (#835, #863)
+// ---------------------------------------------------------------------------
+
+describe("Card-type disable guards (#835)", () => {
+  it("does NOT show 'No card types enabled' when only cry cards are enabled", async () => {
+    // Regression guard for the all-disabled check omitting cryCardsEnabled.
+    // With cry as the only enabled type the session must present a card,
+    // not the "No card types enabled" dead-end.
+    mockSeedPokemon.mockReturnValue([
+      { ...FIXTURE_CARD, cryUrl: "https://example.com/bulbasaur.ogg" },
+    ]);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 10,
+      maxReviewsCryPerDay: 100,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // The cry branch shows a Reveal button — the all-disabled guard must not fire.
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/no card types enabled/i),
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("button", { name: /reveal/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows 'No card types enabled' when every type including cry is off", async () => {
+    // Complementary positive case: all types disabled → dead-end message.
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no card types enabled/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("does not produce NEW_CARDS_LOCKED after a daily new-card cap is hit on a now-disabled type", async () => {
+    // Scenario: name cards have hit their new-card cap (maxNewPerDay: 0 so any
+    // name card in storage would trigger the wall), but the user has since
+    // disabled name cards. Evolution cards are the active type, but the seed
+    // has no evolution cards, so the queue is empty.
+    //
+    // Without the fix: hasMoreNewCardsOf("name") iterates `cards!` without
+    // consulting eligibleCardIds → sees the unseen name card → returns true →
+    // NEW_CARDS_LOCKED fires even though name cards are off.
+    // With the fix: the name card is excluded from eligibleCardIds →
+    // hasMoreNewCardsOf finds nothing → SESSION_COMPLETE.
+    const unseenNameCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      state: {
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "new" as const,
+        dueDate: "1970-01-01",
+        lastReview: null,
+        firstSeen: null,
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([unseenNameCard]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [unseenNameCard],
+      limits: DEFAULT_LIMITS,
+    });
+    // Name cards disabled; evolution cards enabled but seed has none.
+    // maxNewPerDay: 0 ensures name cards would fire the new-card wall if seen.
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 10,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // With the fix, the disabled name card is excluded from eligibleCardIds and
+    // therefore excluded from hasMoreNewCardsOf — SESSION_COMPLETE, not NEW_CARDS_LOCKED.
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/new card limit reached/i),
+    ).not.toBeInTheDocument();
   });
 });

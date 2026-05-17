@@ -145,6 +145,15 @@ The CI suite runs automatically on any PR that touches the cloud-write surface �
 
 Three tests are in scope: `apply-migrations.test.ts` (all `db/migrations/*.sql` apply cleanly), `rls.test.ts` (user A cannot read/write user B's rows), and `regression-trigger.test.ts` (the `card_reviews_reject_regression_trigger` fires on illegal UPDATEs). All use direct SQL via `pg`; the `auth.uid()` polyfill in `setup.ts` simulates an authenticated session by setting `SET LOCAL "request.jwt.claims"` inside a transaction.
 
+#### Coverage gate (#824)
+
+`npm run test:coverage` runs the fast suite under the v8 coverage provider. Two gates apply:
+
+- **Global floor.** `coverage.thresholds` in `vitest.config.ts` (Statements 64 / Branches 59 / Functions 55 / Lines 65) is a regression guard set just below the measured baseline. `vitest run --coverage` exits non-zero if overall coverage drops below the floor. Ratchet the floor *upward* as coverage improves — never lower it to make a red build pass.
+- **Diff coverage.** `scripts/diff-coverage.mjs` cross-references the lines a PR adds/changes against the v8 per-statement hit counts in `coverage/coverage-final.json` (the `json` reporter) and requires changed product lines to hit an 80% patch-coverage bar. Lines in test files, the generated seed payload, and non-product directories are excluded; a PR that changes no instrumented product lines skips the gate.
+
+Both gates run in the `coverage` workflow on every PR (see WORKFLOW.md "Build gates"). The coverage step no longer carries `continue-on-error`, so a breach fails the job. The PR comment posts on both pass and fail.
+
 #### E2E tests (Playwright)
 
 Playwright smoke tests live in `e2e/` and run against Vercel preview deployments via `e2e.yml`. Config is in `playwright.config.ts`.
@@ -199,14 +208,15 @@ Do not use em dashes (`—`) in user-facing copy. Restructure the sentence, or r
 
 ### Screenshots
 
-The README shows five screenshots (`docs/screenshots/{practice-front,practice-flipped,pokedex-grid,pasture,stats}.png`), all captured at the **iPhone 17 Pro viewport** (402×874 CSS px @ 3× DPR) so the README grid lines up uniformly. The capture script is `scripts/capture-screenshots.mjs`, wrapped as `npm run screenshots`.
+The README shows six screenshots (`docs/screenshots/{practice-front,practice-flipped,pokedex-grid,pasture,stats,journey}.png`), all captured at the **iPhone 17 Pro viewport** (402×874 CSS px @ 3× DPR) so the README grid lines up uniformly. The capture script is `scripts/capture-screenshots.mjs`, wrapped as `npm run screenshots`.
 
-**Rule.** When a change visibly affects any of those five surfaces — `app/page.tsx` (Practice), `app/pokedex/**`, `app/pasture/**`, `app/stats/**`, or a `components/**` change that the surface renders — regenerate the affected screenshot(s) and commit them in the same PR. **Run locally on macOS only.** CI does not regenerate, because Linux font anti-aliasing differs visibly from macOS Core Text and would clobber every screenshot on every PR.
+**Rule.** When a change visibly affects any of those six surfaces — `app/page.tsx` (Practice), `app/pokedex/**`, `app/pasture/**`, `app/stats/**`, `app/journey/**`, or a `components/**` change that the surface renders — regenerate the affected screenshot(s) and commit them in the same PR. **Run locally on macOS only.** CI does not regenerate, because Linux font anti-aliasing differs visibly from macOS Core Text and would clobber every screenshot on every PR.
 
 ```bash
 npm run dev &                          # in another terminal, or in the background
-npm run screenshots                    # all five
+npm run screenshots                    # all six
 npm run screenshots -- --page=pasture  # one surface
+npm run screenshots -- --page=journey  # journey surface
 ```
 
 The script uses the `pretendAllMastered` superuser flag so renders are deterministic without depending on a particular review history. Don't change the viewport, the device-scale factor, or the surface list without updating every existing screenshot in the same commit — the README layout assumes consistent shape.

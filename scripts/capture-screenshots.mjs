@@ -15,7 +15,8 @@
  *   practice-flipped.png – card flipped (name + flavour + grade buttons)
  *   pokedex-grid.png     – Pokédex with all species rendered as mastered
  *   pasture.png          – Pasture page populated by habitat zones
- *   stats.png            – Stats hero strip (trainer card + records)
+ *   stats.png            – Stats analytical dashboard (accuracy, activity, scheduling)
+ *   journey.png          – Journey page (trainer card, badges, mastery rings)
  *
  * All screenshots are taken under the superuser `pretendAllMastered` flag
  * so the rendering is deterministic without depending on a particular
@@ -76,11 +77,24 @@ const SHOTS = {
   stats: {
     url: "/stats",
     file: "stats.png",
-    // Wait for the Gym badges heading to confirm the page has hydrated past
+    // Wait for the Accuracy section heading to confirm the page has hydrated
+    // past the loading skeleton before taking the screenshot.
+    action: async (page) => {
+      await page
+        .getByRole("heading", { name: "Accuracy", exact: true })
+        .waitFor({ state: "visible", timeout: 15_000 });
+      // Short pause so trailing layout animations settle.
+      await page.waitForTimeout(400);
+    },
+  },
+  journey: {
+    url: "/journey",
+    file: "journey.png",
+    // Wait for the trainer card region to confirm the page has hydrated past
     // the loading skeleton before taking the screenshot.
     action: async (page) => {
       await page
-        .getByRole("heading", { name: "Gym badges" })
+        .getByRole("region", { name: "Trainer card" })
         .waitFor({ state: "visible", timeout: 15_000 });
       // Short pause so trailing layout animations settle.
       await page.waitForTimeout(400);

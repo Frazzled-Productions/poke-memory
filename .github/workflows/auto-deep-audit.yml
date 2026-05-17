@@ -1,0 +1,350 @@
+name: Auto Deep Audit
+
+# Monthly cron that runs ONE full-codebase deep audit per cycle, rotating
+# across four audit axes. Unlike the weekly `auto-*-suggest.yml` digests
+# (which scan a 30-day window and only PROPOSE), each deep audit re-runs the
+# corresponding one-off audit over the WHOLE codebase: it posts a fresh dated
+# report comment on the existing umbrella issue and files scoped follow-up
+# issues at `priority:later`.
+#
+# Rotation — keyed on the calendar month so the schedule self-selects:
+#   - code-quality (#739)  — monthly  (every run)
+#   - test-coverage (#741) — monthly  (every run)
+#   - workflow-structural (#743) — quarterly (months 1, 4, 7, 10)
+#   - sub-agent roster (#744)    — quarterly (months 2, 5, 8, 11)
+#
+# So a normal month runs two axes (the two monthly ones); a quarter-boundary
+# month runs three. One workflow, one cron, no redundant scheduler files.
+#
+# The fifth audit — settings-coverage (#738) — is NOT here: it is event-driven
+# and lives in `settings-coverage-audit.yml` (path filter on `lib/settings/**`
+# and the superuser code paths), per #827's own recommendation.
+#
+# Idempotency: a shell-level pre-flight step (`idempotency`) checks each
+# rotation axis against its umbrella issue and drops any axis whose
+# current-month (`YYYY-MM`) report comment already exists — the dated marker
+# `<!-- auto-deep-audit:<axis>:<YYYY-MM> -->` is the source of truth. Only the
+# remaining axes are passed to Claude; if none remain the Claude step is
+# skipped entirely. This makes a mid-run failure (e.g. report posted but
+# follow-up issues not yet filed) recoverable: a re-run sees the marker, drops
+# the finished axes, and resumes the rest. The in-prompt "Step A" check stays
+# as defence-in-depth for a comment that lands during the run.
+
+on:
+  schedule:
+    - cron: '0 8 1 * *'   # 1st of the month, 08:00 UTC
+  workflow_dispatch:
+    inputs:
+      axis:
+        description: 'Force a single axis (code-quality | test-coverage | workflow | subagent). Leave blank for the normal monthly rotation.'
+        required: false
+        default: ''
+
+concurrency:
+  group: auto-deep-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Monthly Deep Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Compute month key and rotation
+        id: rotation
+        env:
+          FORCED_AXIS: ${{ github.event.inputs.axis }}
+        run: |
+          set -euo pipefail
+          MONTH_KEY=$(date -u +"%Y-%m")
+          MONTH_NUM=$(date -u +"%-m")
+          echo "month_key=${MONTH_KEY}" >> "$GITHUB_OUTPUT"
+
+          # A forced axis (workflow_dispatch) runs exactly that one axis.
+          if [ -n "${FORCED_AXIS}" ]; then
+            case "${FORCED_AXIS}" in
+              code-quality|test-coverage|workflow|subagent)
+                echo "axes=${FORCED_AXIS}" >> "$GITHUB_OUTPUT"
+                echo "Forced single axis: ${FORCED_AXIS}"
+                exit 0 ;;
+              *)
+                echo "Unknown axis '${FORCED_AXIS}' — valid: code-quality test-coverage workflow subagent" >&2
+                exit 1 ;;
+            esac
+          fi
+
+          # Normal rotation: the two monthly axes always; one quarterly axis
+          # on its quarter boundary.
+          AXES="code-quality test-coverage"
+          case "${MONTH_NUM}" in
+            1|4|7|10) AXES="${AXES} workflow" ;;
+            2|5|8|11) AXES="${AXES} subagent" ;;
+          esac
+          echo "axes=${AXES}" >> "$GITHUB_OUTPUT"
+          echo "Month ${MONTH_KEY} rotation: ${AXES}"
+
+      - name: Idempotency pre-flight — drop axes already done this month
+        id: idempotency
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          MONTH_KEY: ${{ steps.rotation.outputs.month_key }}
+          AXES: ${{ steps.rotation.outputs.axes }}
+        run: |
+          set -euo pipefail
+
+          # Per-axis umbrella issue. Keep in sync with the axis table in the
+          # Claude prompt below.
+          umbrella_for() {
+            case "$1" in
+              code-quality)  echo 739 ;;
+              test-coverage) echo 741 ;;
+              workflow)      echo 743 ;;
+              subagent)      echo 744 ;;
+              *) echo "" ;;
+            esac
+          }
+
+          REMAINING=""
+          for AXIS in ${AXES}; do
+            UMBRELLA=$(umbrella_for "${AXIS}")
+            if [ -z "${UMBRELLA}" ]; then
+              echo "Unknown axis '${AXIS}' — skipping (no umbrella issue)." >&2
+              continue
+            fi
+            MARKER="<!-- auto-deep-audit:${AXIS}:${MONTH_KEY} -->"
+            HITS=$(gh issue view "${UMBRELLA}" --json comments \
+              --jq '.comments[].body' | grep -Fc "${MARKER}" || true)
+            if [ "${HITS:-0}" -gt 0 ]; then
+              echo "Axis '${AXIS}' already has a ${MONTH_KEY} report on #${UMBRELLA} — dropping."
+            else
+              echo "Axis '${AXIS}' has no ${MONTH_KEY} report yet — keeping."
+              REMAINING="${REMAINING:+${REMAINING} }${AXIS}"
+            fi
+          done
+
+          if [ -z "${REMAINING}" ]; then
+            echo "All axes for ${MONTH_KEY} already audited — nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "remaining_axes=${REMAINING}" >> "$GITHUB_OUTPUT"
+          echo "Axes to run this invocation: ${REMAINING:-<none>}"
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.idempotency.outputs.skip != 'true'
+        id: claude
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          MONTH_KEY: ${{ steps.rotation.outputs.month_key }}
+          AXES: ${{ steps.idempotency.outputs.remaining_axes }}
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 120 --disable-slash-commands --disallowed-tools Skill
+          prompt: |
+            You are running this repository's monthly **deep audit** rotation.
+
+            Today is the 1st of the month. The month key is **${{ steps.rotation.outputs.month_key }}**.
+            The axes to run this cycle are: **${{ steps.idempotency.outputs.remaining_axes }}**
+            (a space-separated subset of: code-quality test-coverage workflow subagent).
+
+            A shell-level pre-flight guard has already dropped any axis whose
+            `${{ steps.rotation.outputs.month_key }}` report comment already
+            exists — so every axis listed here genuinely needs running.
+
+            Run each listed axis **sequentially** (one at a time, never in
+            parallel — stay within rate limits). For each axis follow the
+            shared procedure below.
+
+            ## What a deep audit is
+
+            Each axis re-runs a one-off full-codebase audit that was first done
+            as a manual issue. Unlike the weekly `auto-*-suggest.yml` digests
+            (30-day window, propose-only), a deep audit:
+
+              1. Analyses the **entire** codebase / workflow set / roster — no
+                 recency window.
+              2. Posts a fresh **dated report comment** on the existing umbrella
+                 issue for that axis (reuse it — never open a new umbrella
+                 issue).
+              3. **Files scoped follow-up issues** for concrete, actionable
+                 findings, each labelled `priority:later`.
+
+            ## Axis table
+
+            | Axis key      | Umbrella issue | What to audit |
+            |---------------|----------------|---------------|
+            | code-quality  | #739           | DRY violations, duplication, near-duplicate components, inconsistent patterns, dead code, over-complex functions, missing shared abstractions, type-safety gaps. Whole `app/**`, `components/**`, `lib/**`, `db/**`. |
+            | test-coverage | #741           | Untested modules and happy-path-only suites across all three test layers (vitest unit/component, integration in `lib/sync/integration/`, Playwright `e2e/`). Emphasise missing **negative** scenarios — invalid input, error paths, conflict/regression cases, boundary conditions. |
+            | workflow      | #743           | Every file in `.github/workflows/**`: health (use `gh run list` for recent run history), redundancy (overlapping triggers/jobs), and gaps (process steps with no automation). |
+            | subagent      | #744           | The `.claude/agents/**` roster vs. the kinds of work the repo actually does: coverage gaps that recur often enough to justify a specialist, plus redundant / underused / scope-drifted existing agents. |
+
+            ## Per-axis procedure
+
+            For each axis in `${{ steps.idempotency.outputs.remaining_axes }}`:
+
+            ### Step A — Idempotency check (defence-in-depth)
+
+            The shell-level pre-flight guard is the **primary** idempotency
+            mechanism — it already dropped any axis with a current-month
+            report comment, so the axis list above is pre-filtered. This
+            in-prompt check is a secondary safety net for the case where a
+            report comment lands *during* this run.
+
+            The dated comment marker is `<!-- auto-deep-audit:<axis>:${{ steps.rotation.outputs.month_key }} -->`
+            (e.g. `<!-- auto-deep-audit:code-quality:${{ steps.rotation.outputs.month_key }} -->`).
+            Fetch the umbrella issue's comments:
+
+            ```
+            gh issue view <umbrella#> --json comments \
+              --jq '.comments[].body' | grep -F 'auto-deep-audit:<axis>:${{ steps.rotation.outputs.month_key }}' || true
+            ```
+
+            If a comment with that exact marker already exists, this axis has
+            already run this month — **skip it entirely** (no comment, no
+            issues) and move to the next axis.
+
+            ### Step B — Run the full-codebase audit
+
+            Analyse per the axis table above. Be thorough — this is a deep
+            audit, not a 30-day skim. Collect concrete findings, each with:
+            - A one-line imperative title (suitable as an issue title).
+            - File paths / workflow names / agent files the finding touches.
+            - A short evidence snippet or description (≤4 lines).
+
+            Quality bar: only **concrete, actionable** findings. Do NOT propose
+            churn for its own sake (e.g. mass-renaming existing identifiers —
+            AGENTS.md forbids this). Respect AGENTS.md conventions: British
+            English in prose, the file-ownership map, "decisions are
+            deliberate". Cap at **8 findings per axis** — pick the
+            highest-signal ones.
+
+            ### Step C — Post the dated report comment on the umbrella issue
+
+            Write the report to `/tmp/report-<axis>.md` in this format:
+
+            ```markdown
+            <!-- auto-deep-audit:<axis>:${{ steps.rotation.outputs.month_key }} -->
+            ## Deep audit — <axis> — ${{ steps.rotation.outputs.month_key }}
+
+            Full-codebase re-run of this audit. <N> findings; scoped follow-up
+            issues filed at `priority:later` (see links below).
+
+            ---
+
+            ### 1. <one-line finding>
+
+            **Where:** `path/a.ts`, `path/b.ts`
+            **Evidence:** <concrete snippet or description>
+            **Filed as:** #<issue> <!-- filled in after Step D -->
+
+            ---
+
+            ### 2. ...
+            ```
+
+            Post it: `gh issue comment <umbrella#> --body-file /tmp/report-<axis>.md`
+
+            If the audit found **nothing** actionable, still post a short
+            "no actionable findings this cycle" comment carrying the marker,
+            so the idempotency check holds and the umbrella issue records the
+            run. Do NOT file any issues in that case.
+
+            ### Step D — File scoped follow-up issues
+
+            For each finding, create one issue:
+
+            ```
+            gh issue create \
+              --title "<one-line finding title>" \
+              --body "<the finding's Where + Evidence, plus a line: \
+                'Surfaced by the monthly deep audit — see #<umbrella>.'>" \
+              --label "priority:later"
+            ```
+
+            Hard rules for these issues:
+            - Label **`priority:later`** only. **Never** `auto`. **Never**
+              `priority:now` or `priority:next`. The user owns promotion.
+            - If the `priority:later` label does not exist, create it first
+              (`gh label create "priority:later" --color "ededed"`), but it
+              should already exist.
+            - One issue per finding — do not batch multiple findings into one.
+
+            After filing, edit the report comment (or note inline before
+            posting) so each finding's **Filed as:** line carries the new
+            issue number.
+
+            ## Closing
+
+            When all axes for this cycle are done, write a one-paragraph
+            summary to stdout: which axes ran, which skipped (already done
+            this month), and how many follow-up issues were filed in total.
+
+      - name: Surface tool denials
+        if: always() && steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+          # Code-quality umbrella (#739) is always part of the rotation, so it
+          # is a stable home for denial reports. Comment there; fall back to
+          # stdout if the comment fails.
+          DENIALS_ISSUE: 739
+        run: |
+          set -u
+          if [ ! -f "$LOG" ]; then exit 0; fi
+
+          DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          if [ "$DENIAL_COUNT" = "0" ] || [ -z "$DENIAL_COUNT" ]; then
+            echo "No tool denials."
+            exit 0
+          fi
+
+          DENIAL_DETAILS=$(jq -r '
+            def text_of:
+              if type == "string" then .
+              elif type == "array" then map(.text // "" | tostring) | join(" ")
+              else tostring end;
+            select(.type == "user")
+            | .message.content[]?
+            | select(.type == "tool_result")
+            | select((.is_error // false) == true)
+            | (.content | text_of) as $c
+            | select($c | test("permission|denied|not allowed"; "i"))
+            | $c | gsub("\\s+"; " ") | .[0:240]
+          ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+
+          {
+            printf '<!-- auto-denials:deep-audit -->\n'
+            printf '## %s tool denial(s) during the monthly deep-audit run\n\n' "$DENIAL_COUNT"
+            printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
+            if [ -n "$DENIAL_DETAILS" ]; then
+              printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+            fi
+          } > /tmp/denials.md
+
+          echo "Tool denials detected during the deep-audit run."
+          if gh issue comment "$DENIALS_ISSUE" --repo "$REPO" --body-file /tmp/denials.md; then
+            echo "Denial report posted as a comment on #${DENIALS_ISSUE}."
+          else
+            echo "Could not comment on #${DENIALS_ISSUE} — denial details logged to stdout only."
+            cat /tmp/denials.md
+          fi

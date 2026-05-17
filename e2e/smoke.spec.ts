@@ -28,6 +28,7 @@ test.describe("Navigation", () => {
 
     for (const { label, path } of [
       { label: "Stats", path: "/stats" },
+      { label: "Journey", path: "/journey" },
       { label: "Pokédex", path: "/pokedex" },
       { label: "Settings", path: "/settings" },
     ]) {
@@ -397,38 +398,26 @@ test.describe("Practice page", () => {
 });
 
 test.describe("Stats page", () => {
-  test("loads with key sections", async ({ page }) => {
+  test("loads with key analytical sections", async ({ page }) => {
     await page.goto("/stats");
     await expect(
       page.getByRole("heading", { level: 1, name: "Stats" }),
     ).toBeVisible();
 
-    // Key section headings should be present
-    for (const heading of [
-      "Current streak",
-      "Mastery distribution",
-      "Due forecast",
-    ]) {
-      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    // Analytical section group headings should be present.
+    for (const heading of ["Accuracy", "Activity", "Scheduling"]) {
+      await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible({ timeout: 15_000 });
     }
 
-    // SyncNowButton was removed in #396 — assert it is absent in guest mode
+    // SyncNowButton was removed in #396 — assert it is absent in guest mode.
     await expect(page.getByRole("button", { name: /Sync now/i })).toHaveCount(0);
-  });
-
-  test("trainer card shows progress line", async ({ page }) => {
-    await page.goto("/stats");
-    await expect(
-      page.getByRole("region", { name: "Trainer card" }),
-    ).toBeVisible();
-    await expect(page.getByText(/\d+ \/ \d+ mastered · \d+ to Lv \d+/)).toBeVisible();
   });
 
   test("grade distribution section renders in empty state for a fresh guest (#800)", async ({ page }) => {
     await page.goto("/stats");
     // Wait for the page to finish loading (skeleton gone).
     await expect(
-      page.getByRole("heading", { name: "Current streak" }),
+      page.getByRole("heading", { name: "Accuracy", exact: true }),
     ).toBeVisible({ timeout: 10_000 });
     // The section heading must be present.
     await expect(
@@ -439,16 +428,41 @@ test.describe("Stats page", () => {
       page.getByText("No grades recorded yet."),
     ).toBeVisible();
   });
+});
+
+test.describe("Journey page", () => {
+  test("loads with trainer card and key sections", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Journey" }),
+    ).toBeVisible();
+
+    // The trainer card, streak, and mastery rings all render on Journey.
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    for (const heading of ["Current streak", "Mastery distribution"]) {
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    }
+  });
+
+  test("trainer card shows progress line", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/\d+ \/ \d+ mastered · \d+ to Lv \d+/)).toBeVisible();
+  });
 
   // Gym badges (#420) are secret until earned: a fresh guest must see no
   // hint of any badge name on the trainer card. The full superuser overlay
   // path is exercised by component tests; this smoke test guards the
   // discoverability contract end-to-end.
   test("gym badges are not hinted before any are earned", async ({ page }) => {
-    await page.goto("/stats");
+    await page.goto("/journey");
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("list", { name: "Gym badges earned" }),
     ).toHaveCount(0);
@@ -882,5 +896,58 @@ test.describe("Evolution edge card prompt (#262)", () => {
     await expect(
       page.getByText(/What does.*bulbasaur.*evolve into.*at level 16\?/i),
     ).toBeVisible();
+  });
+});
+
+test.describe("PWA / offline support", () => {
+  test("web app manifest is served with the app identity", async ({
+    request,
+  }) => {
+    const res = await request.get("/manifest.webmanifest");
+    expect(res.ok()).toBeTruthy();
+    const manifest = await res.json();
+    expect(manifest.name).toBe("Poké Memory");
+    expect(manifest.display).toBe("standalone");
+    expect(Array.isArray(manifest.icons)).toBeTruthy();
+    expect(manifest.icons.length).toBeGreaterThan(0);
+  });
+
+  test("the service worker script is served as JavaScript", async ({
+    request,
+  }) => {
+    // The Serwist Turbopack route at /sw/[path] bundles and serves the worker.
+    const res = await request.get("/sw/sw.js");
+    expect(res.ok()).toBeTruthy();
+    expect(res.headers()["content-type"]).toContain("javascript");
+    // The route grants whole-site scope so the worker can control "/".
+    expect(res.headers()["service-worker-allowed"]).toBe("/");
+    const body = await res.text();
+    expect(body.length).toBeGreaterThan(0);
+  });
+
+  test("the service worker registers against the production deployment", async ({
+    page,
+    baseURL,
+  }) => {
+    // Registration is gated to production builds, so it only happens on the
+    // Vercel preview deployment, not a local `next dev` server. Skip the
+    // assertion when running against localhost.
+    test.skip(
+      !baseURL || baseURL.includes("localhost") || baseURL.includes("127.0.0.1"),
+      "Service worker is only registered in production builds",
+    );
+
+    await page.goto("/");
+    // The Serwist registration delays until the window has loaded.
+    await page.waitForLoadState("load");
+    const registered = await page.waitForFunction(
+      async () => {
+        if (!("serviceWorker" in navigator)) return false;
+        const reg = await navigator.serviceWorker.getRegistration();
+        return Boolean(reg);
+      },
+      { timeout: 15_000 },
+    );
+    expect(await registered.jsonValue()).toBeTruthy();
   });
 });

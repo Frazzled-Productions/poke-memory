@@ -117,6 +117,7 @@ describe("NavDrawer", () => {
     // Primary nav links are accessible
     expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Stats" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Journey" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Pokédex" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
   });

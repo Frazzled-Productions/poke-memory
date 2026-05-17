@@ -23,6 +23,7 @@ import {
   hydrateSession,
   limitBucket,
   todayString,
+  cardTypeIsEnabled,
   type DailyLimits,
   type ReviewableCard,
   type Grade,
@@ -408,6 +409,7 @@ export function ReviewSession() {
   const [reverseEvolutionEnabled, setReverseEvolutionEnabled] = useState(false);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
+  const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
   // Onboarding nudges (#702). `audioFeaturesOff` is true when the user has no
   // audio behaviour switched on at all (no cry playback, no spoken names, no
@@ -473,12 +475,19 @@ export function ReviewSession() {
     if (cards !== null) {
       const today = todayString(new Date());
       reconcileHiddenState(cards, next, today);
-      // `alternateFormsEnabled` is captured from component state set at mount.
-      // The Settings page triggers a full page reload when toggling card-type
-      // gates, so the state is always current here.
+      // `alternateFormsEnabled` and the card-type flags are captured from
+      // component state set at mount. The Settings page triggers a full page
+      // reload when toggling card-type gates, so the state is always current.
+      const cardTypeOpts = {
+        nameEnabled: nameCardsEnabled,
+        evolutionEnabled: evolutionCardsEnabled,
+        reverseEnabled,
+        reverseEvolutionEnabled,
+        cryEnabled: cryCardsEnabled,
+      };
       const eligibleIds = new Set(
         cards
-          .filter((c) => cardIsEligible(c, next, alternateFormsEnabled))
+          .filter((c) => cardTypeIsEnabled(c, cardTypeOpts) && cardIsEligible(c, next, alternateFormsEnabled))
           .map((c) => c.id),
       );
       setEligibleCardIds(eligibleIds);
@@ -507,6 +516,11 @@ export function ReviewSession() {
   // Locks the card the user clicked Reveal on so a learning-queue re-render
   // can't swap it out before the user submits a grade.
   const revealedCardId = useRef<number | null>(null);
+  // Locks the card being displayed from the moment it first appears on screen
+  // until the user explicitly advances by grading. Without this lock a learning
+  // card whose dueAt passes mid-render can displace the current card before the
+  // user has had a chance to tap Reveal, causing a mis-click (#839).
+  const displayedCardId = useRef<number | null>(null);
   // Guards against advancing to the next card after the component has unmounted
   // (e.g. the user navigates away during the waitForAudio delay).
   const isMountedRef = useRef(true);
@@ -526,11 +540,16 @@ export function ReviewSession() {
   const { enqueueGrade, flushPending } = usePerGradeSync(syncClient, syncUserId);
   useSyncOnUnload(syncClient, syncUserId, flushPending);
 
-  // Derive seen Pokémon once per cards change — used by the mini-game on the
-  // SESSION_COMPLETE screen. Must stay unconditional (hooks rule).
+  // Derive seen Pokémon for the mini-game on the SESSION_COMPLETE screen.
+  // Apply the same two-tier gate as the practice session: alternate-forms
+  // toggle first, then the gens/types/presets scope. Must stay unconditional
+  // (hooks rule).
   const seenPokemon = useMemo(
-    () => (cards !== null ? getSeenPokemon(cards, SEED_POKEMON) : []),
-    [cards],
+    () =>
+      cards !== null
+        ? getSeenPokemon(cards, SEED_POKEMON, alternateFormsEnabled, scope)
+        : [],
+    [cards, alternateFormsEnabled, scope],
   );
 
   const cardMap = useMemo(
@@ -616,11 +635,19 @@ export function ReviewSession() {
       const formsEnabled = settings.alternateFormsEnabled;
       const today = todayString(now);
       reconcileHiddenState(sessionCards, persistedScope, today);
-      // Two-tier eligibility: `alternateFormsEnabled` gate first, then scope
-      // filter (#658). `cardIsEligible` encapsulates both checks.
+      // Three-tier eligibility: card-type-enabled gate, then
+      // `alternateFormsEnabled` gate, then scope filter (#658, #835).
+      // `cardIsEligible` encapsulates the second and third checks.
+      const cardTypeOpts = {
+        nameEnabled,
+        evolutionEnabled,
+        reverseEnabled: enabled,
+        reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
+        cryEnabled,
+      };
       const eligibleIds = new Set(
         sessionCards
-          .filter((c) => cardIsEligible(c, persistedScope, formsEnabled))
+          .filter((c) => cardTypeIsEnabled(c, cardTypeOpts) && cardIsEligible(c, persistedScope, formsEnabled))
           .map((c) => c.id),
       );
       // Persist whenever scope is active so reconciliation results survive a
@@ -634,6 +661,7 @@ export function ReviewSession() {
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
       setNameCardsEnabled(nameEnabled);
       setEvolutionCardsEnabled(evolutionEnabled);
+      setCryCardsEnabled(cryEnabled);
       setAlternateFormsEnabled(formsEnabled);
       // Onboarding nudges (#702): derive once from the same settings read.
       setAudioFeaturesOff(
@@ -808,6 +836,7 @@ export function ReviewSession() {
               mastered: undoSnapshot.masteredThisSession,
             });
           }
+          displayedCardId.current = undoSnapshot.cardId;
           revealedCardId.current = undoSnapshot.cardId;
           setRevealed(true);
           // Bump presentation counter so SpritePicker remounts with fresh
@@ -846,7 +875,8 @@ export function ReviewSession() {
     !nameCardsEnabled &&
     !evolutionCardsEnabled &&
     !reverseEnabled &&
-    !reverseEvolutionEnabled
+    !reverseEvolutionEnabled &&
+    !cryCardsEnabled
   ) {
     return (
       <div className="flex flex-col items-center gap-4 text-center">
@@ -903,11 +933,15 @@ export function ReviewSession() {
   // changing scope mid-day cannot reset daily caps (#333). Out-of-scope cards
   // are snoozed by `reconcileHiddenState` at session-load time, so their
   // dueDate doesn't drift while they're hidden.
+  //
+  // `eligibleCardIds` also gates out disabled-type cards (#835): saved progress
+  // is preserved in storage but excluded from the active queue. We always pass
+  // the set (even when scope is empty) so that disabled types are never queued.
   const { reviewQueue, newQueue, perType, learningCardIds, outOfScopeLearningIds } = buildSessionQueues(
     cards,
     effectiveLimits,
     today,
-    isScopeEmpty(scope) ? undefined : eligibleCardIds,
+    eligibleCardIds,
   );
 
   // Cards that are mid-learning-step but fall outside the active scope.
@@ -949,15 +983,33 @@ export function ReviewSession() {
   const currentCard =
     currentCardId !== null ? cards.find((c) => c.id === currentCardId) ?? null : null;
 
-  // If the user has clicked Reveal, lock that card for the duration of the
-  // grading window. A learning-queue setTimeout may fire mid-session and flip
-  // currentCardId to the now-due learning card; without this lock the grade
-  // buttons would show for the wrong card.
-  const lockedCard =
+  // Maintain the display lock: once a card is on screen, keep it there until
+  // the user explicitly advances by grading (#839). Setting a ref during render
+  // is safe here — it is always in the same render branch and never triggers a
+  // re-render itself. The lock is cleared at the end of handleGrade.
+  if (currentCard !== null && displayedCardId.current === null) {
+    // A new card just became the current card — lock it in.
+    displayedCardId.current = currentCard.id;
+  } else if (currentCard === null) {
+    // No card left (session complete) — release the lock.
+    displayedCardId.current = null;
+  }
+
+  // Prefer the locked displayed card over the freshly computed one.
+  // This prevents a learning card whose dueAt passes mid-render from
+  // displacing the card the user is currently looking at.
+  const lockedDisplayCard =
+    displayedCardId.current !== null
+      ? (cards.find((c) => c.id === displayedCardId.current) ?? null)
+      : null;
+
+  // If the user has clicked Reveal, additionally lock that card for the
+  // duration of the grading window so the grade buttons act on the right card.
+  const lockedRevealCard =
     revealed && revealedCardId.current !== null
       ? (cards.find((c) => c.id === revealedCardId.current) ?? null)
       : null;
-  const effectiveCard = lockedCard ?? currentCard;
+  const effectiveCard = lockedRevealCard ?? lockedDisplayCard ?? currentCard;
 
   // --- Sprite preloading (#705, extended in #708) ---
   // Warm the browser cache for the current card's reveal-face sprite(s) and
@@ -1038,13 +1090,29 @@ export function ReviewSession() {
     // Compare by limit bucket, not raw cardType — reverse-evolution cards
     // count under "evolution" so the wall-detection matches the per-type
     // counters in `perType`.
+    // Card-type gate for end-state checks: disabled-type cards must never
+    // drive the wall. We check card-type enablement directly — not via
+    // eligibleCardIds — so that alternate-form and scope filters do not
+    // suppress the wall for genuinely-enabled card types (#835).
+    const endStateTypeOpts = {
+      nameEnabled: nameCardsEnabled,
+      evolutionEnabled: evolutionCardsEnabled,
+      reverseEnabled,
+      reverseEvolutionEnabled,
+      cryEnabled: cryCardsEnabled,
+    };
+
     function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse"): boolean {
       // Mirror the candidate filter in buildSessionQueues — cards in a
       // learning/relearning step are served via the in-memory learning
       // queue, not the review queue, and must not count toward "more due
       // reviews exist" or the soft-wall would fire spuriously.
+      // Disabled-type cards must not drive end-state; check card-type enablement
+      // directly rather than eligibleCardIds so alternate-form and scope
+      // filters do not suppress the wall for enabled card types (#835).
       return cards!.some(
         (c) =>
+          cardTypeIsEnabled(c, endStateTypeOpts) &&
           limitBucket(c.cardType) === type &&
           c.state.learningStep === null &&
           c.state.lastReview !== null &&
@@ -1053,8 +1121,13 @@ export function ReviewSession() {
       );
     }
     function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse"): boolean {
+      // Disabled-type cards must not keep the session in NEW_CARDS_LOCKED
+      // after that type is turned off. Check card-type enablement directly
+      // rather than eligibleCardIds so alternate-form and scope filters do
+      // not suppress the wall for enabled card types (#835).
       return cards!.some(
         (c) =>
+          cardTypeIsEnabled(c, endStateTypeOpts) &&
           limitBucket(c.cardType) === type &&
           c.state.lastReview === null &&
           c.state.learningStep === null,
@@ -1159,7 +1232,7 @@ export function ReviewSession() {
     const dueTomorrow = countDueTomorrow(
       cards,
       tomorrow,
-      isScopeEmpty(scope) ? undefined : eligibleCardIds,
+      eligibleCardIds,
     );
     const shareText =
       sessionGradeSeq.length > 0
@@ -1194,32 +1267,36 @@ export function ReviewSession() {
   // --- Handlers ---
 
   function handleReveal() {
-    if (currentCard === null) return;
-    if (currentCard.cardType === "name") {
-      const facts = getPokemonFacts(currentCard);
+    // Use effectiveCard rather than currentCard so the reveal always acts on
+    // the card currently displayed (#839). After a learning-queue re-render,
+    // currentCard may have shifted to a newly-due learning card while the
+    // displayedCardId lock keeps effectiveCard pointing to the original card.
+    if (effectiveCard === null) return;
+    if (effectiveCard.cardType === "name") {
+      const facts = getPokemonFacts(effectiveCard);
       setCurrentFact(selectFact(facts));
-    } else if (currentCard.cardType === "evolution") {
-      const evoPokemon = SEED_POKEMON.find((p) => p.id === currentCard.postEvoId);
+    } else if (effectiveCard.cardType === "evolution") {
+      const evoPokemon = SEED_POKEMON.find((p) => p.id === effectiveCard.postEvoId);
       if (evoPokemon) {
         setCurrentFact(selectFact(getPokemonFacts(evoPokemon)));
       } else {
-        console.warn(`[handleReveal] seed data missing for evolution target: ${currentCard.postEvoName}`);
+        console.warn(`[handleReveal] seed data missing for evolution target: ${effectiveCard.postEvoName}`);
         setCurrentFact(null);
       }
-    } else if (currentCard.cardType === "reverse-evolution") {
+    } else if (effectiveCard.cardType === "reverse-evolution") {
       // Reverse direction: the answer is the pre-evo, so surface its facts.
-      const preEvo = SEED_POKEMON.find((p) => p.id === currentCard.preEvoId);
+      const preEvo = SEED_POKEMON.find((p) => p.id === effectiveCard.preEvoId);
       if (preEvo) {
         setCurrentFact(selectFact(getPokemonFacts(preEvo)));
       } else {
-        console.warn(`[handleReveal] seed data missing for reverse-evolution source: ${currentCard.preEvoName}`);
+        console.warn(`[handleReveal] seed data missing for reverse-evolution source: ${effectiveCard.preEvoName}`);
         setCurrentFact(null);
       }
     } else {
       setCurrentFact(null);
     }
     setRevealed(true);
-    revealedCardId.current = currentCard.id;
+    revealedCardId.current = effectiveCard.id;
     const revealSettings = loadSettings();
     const cryOn = revealSettings.playCryOnReveal;
     const speakOn = revealSettings.speakNameOnReveal;
@@ -1228,21 +1305,21 @@ export function ReviewSession() {
     // picker cards never reach handleReveal so they're absent here).
     let nameToSpeak: string | null = null;
     let idToSpeak: number | null = null;
-    if (currentCard.cardType === "name") { nameToSpeak = currentCard.name; idToSpeak = currentCard.id; }
-    else if (currentCard.cardType === "evolution") { nameToSpeak = currentCard.postEvoName; idToSpeak = currentCard.postEvoId; }
-    else if (currentCard.cardType === "reverse-evolution") { nameToSpeak = currentCard.preEvoName; idToSpeak = currentCard.preEvoId; }
-    else if (currentCard.cardType === "cry") { nameToSpeak = currentCard.name; idToSpeak = currentCard.pokemonId; }
+    if (effectiveCard.cardType === "name") { nameToSpeak = effectiveCard.name; idToSpeak = effectiveCard.id; }
+    else if (effectiveCard.cardType === "evolution") { nameToSpeak = effectiveCard.postEvoName; idToSpeak = effectiveCard.postEvoId; }
+    else if (effectiveCard.cardType === "reverse-evolution") { nameToSpeak = effectiveCard.preEvoName; idToSpeak = effectiveCard.preEvoId; }
+    else if (effectiveCard.cardType === "cry") { nameToSpeak = effectiveCard.name; idToSpeak = effectiveCard.pokemonId; }
 
     // Pick the cry URL per direction. Cry cards: the cry was the prompt, so don't
     // replay it on reveal.
     let cryUrlOnReveal: string | null = null;
     if (cryOn) {
-      if (currentCard.cardType === "name") cryUrlOnReveal = currentCard.cryUrl ?? null;
-      else if (currentCard.cardType === "evolution") {
-        const target = SEED_POKEMON.find((p) => p.id === currentCard.postEvoId);
+      if (effectiveCard.cardType === "name") cryUrlOnReveal = effectiveCard.cryUrl ?? null;
+      else if (effectiveCard.cardType === "evolution") {
+        const target = SEED_POKEMON.find((p) => p.id === effectiveCard.postEvoId);
         cryUrlOnReveal = target?.cryUrl ?? null;
-      } else if (currentCard.cardType === "reverse-evolution") {
-        const target = SEED_POKEMON.find((p) => p.id === currentCard.preEvoId);
+      } else if (effectiveCard.cardType === "reverse-evolution") {
+        const target = SEED_POKEMON.find((p) => p.id === effectiveCard.preEvoId);
         cryUrlOnReveal = target?.cryUrl ?? null;
       }
     }
@@ -1253,7 +1330,7 @@ export function ReviewSession() {
     // Branch on whether a cry will play. If yes, chain TTS to fire after `ended`.
     // If no cry (toggle off or no url), fall through to TTS directly so they don't
     // both fire on the same tick.
-    if (cryOn && (currentCard.cardType === "name" || currentCard.cardType === "evolution" || currentCard.cardType === "reverse-evolution")) {
+    if (cryOn && (effectiveCard.cardType === "name" || effectiveCard.cardType === "evolution" || effectiveCard.cardType === "reverse-evolution")) {
       playCry(cryUrlOnReveal, 0.6, speakAfterCry);
     } else if (speakOn && nameToSpeak !== null) {
       speakName(nameToSpeak, idToSpeak);
@@ -1341,7 +1418,7 @@ export function ReviewSession() {
       newCards,
       effectiveLimits,
       today,
-      isScopeEmpty(scope) ? undefined : eligibleCardIds,
+      eligibleCardIds,
     );
 
     // Compute the post-grade learning queue here, mirroring the `setLearningQueue`
@@ -1392,7 +1469,19 @@ export function ReviewSession() {
     if (nextCardId !== null) {
       const nextCard = newCards.find((c) => c.id === nextCardId);
       if (nextCard) {
-        await decodeSpriteUrls(preloadableSpriteUrls(nextCard));
+        if (nextCard.cardType === "reverse") {
+          // Reverse cards show a four-tile SpritePicker at PICKER_SPRITE_SIZE.
+          // `preloadableSpriteUrls` returns [] for reverse cards (it feeds the
+          // 320 px flip-card pipeline), so decode the picker tile sprites
+          // directly here instead.
+          const target = SEED_BY_ID.get(nextCard.pokemonId);
+          if (target) {
+            const distractors = pickDistractors(nextCard.pokemonId, SEED_POKEMON, 3, String(nextCard.id));
+            await decodeSpriteUrls([target, ...distractors].map((p) => p.spriteUrl));
+          }
+        } else {
+          await decodeSpriteUrls(preloadableSpriteUrls(nextCard));
+        }
       }
     }
 
@@ -1526,6 +1615,9 @@ export function ReviewSession() {
     setCurrentFact(null);
     setRevealed(false);
     revealedCardId.current = null;
+    // Release the display lock so the next card can be picked up on the
+    // following render (#839).
+    displayedCardId.current = null;
     // Advance the presentation counter so the next card (or a replay of this
     // same card) gets a fresh SpritePicker mount with a re-shuffled option
     // grid (#496).
@@ -1563,7 +1655,9 @@ export function ReviewSession() {
       });
     }
     // Make the undone card the current revealed card so the user lands
-    // back on the prompt they just graded.
+    // back on the prompt they just graded. Also reset the display lock so
+    // the undo card is locked in from this point (#839).
+    displayedCardId.current = undoSnapshot.cardId;
     revealedCardId.current = undoSnapshot.cardId;
     setRevealed(true);
     // Bump the presentation counter so SpritePicker remounts with a fresh

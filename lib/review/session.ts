@@ -105,13 +105,45 @@ export const DEFAULT_LIMITS: DailyLimits = {
   cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
-export type BuildSessionOpts = {
-  reverseEnabled?: boolean;
+export type CardTypeOpts = {
   nameEnabled?: boolean;
   evolutionEnabled?: boolean;
+  reverseEnabled?: boolean;
   reverseEvolutionEnabled?: boolean;
   cryEnabled?: boolean;
 };
+
+export type BuildSessionOpts = CardTypeOpts;
+
+/**
+ * Returns true when the card's type is enabled by the given opts.
+ * Used to gate out saved-but-disabled cards from the active queue
+ * without removing them from storage (non-destructive disable).
+ *
+ * Defaults for each type match the historical behaviour:
+ *   name / evolution — enabled by default
+ *   reverse / reverseEvolution / cry — disabled by default
+ */
+export function cardTypeIsEnabled(
+  card: ReviewableCard,
+  opts: CardTypeOpts,
+): boolean {
+  const {
+    nameEnabled = true,
+    evolutionEnabled = true,
+    reverseEnabled = false,
+    reverseEvolutionEnabled = false,
+    cryEnabled = false,
+  } = opts;
+  switch (card.cardType) {
+    case "name": return nameEnabled;
+    case "evolution": return evolutionEnabled;
+    case "reverse": return reverseEnabled;
+    case "reverse-evolution": return reverseEvolutionEnabled;
+    case "cry": return cryEnabled;
+    default: return true;
+  }
+}
 
 export function buildSession(
   seed: readonly SeedPokemon[],
@@ -176,21 +208,23 @@ export function buildSession(
 
 // Merge saved cards with the current seed, refreshing seed fields (e.g. newly
 // added flavorTexts) on existing cards while preserving their SM-2 state.
-// Missing seed entries are appended at initialReviewState — due immediately.
-// When reverseEnabled is false, any persisted reverse cards are filtered out;
-// re-enabling reverse cards starts fresh (no saved state carried over).
+// Missing seed entries for ENABLED types are appended at initialReviewState —
+// due immediately.
+//
+// Saved cards of a disabled type are PRESERVED in the output — they are kept
+// in storage so progress is not lost when a type is re-enabled. The session
+// queue builder filters them out of the active queue via the eligibleCardIds
+// gate; the cards themselves remain intact. New cards of disabled types are
+// NOT added (no point introducing cards that will not be scheduled).
+//
+// To deliberately reset progress for a re-enabled type, callers should reset
+// those card states to initialReviewState before calling hydrateSession.
 export function hydrateSession(
   saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: {
-    reverseEnabled?: boolean;
-    nameEnabled?: boolean;
-    evolutionEnabled?: boolean;
-    reverseEvolutionEnabled?: boolean;
-    cryEnabled?: boolean;
-  } = {},
+  opts: CardTypeOpts = {},
 ): ReviewableCard[] {
   const {
     reverseEnabled = false,
@@ -209,24 +243,12 @@ export function hydrateSession(
     ]),
   );
 
-  // When disabled, drop saved cards of that type so re-enabling starts fresh.
-  let filteredSaved = reverseEnabled
-    ? saved
-    : saved.filter((c) => c.cardType !== "reverse");
-  if (!reverseEvolutionEnabled) {
-    filteredSaved = filteredSaved.filter((c) => c.cardType !== "reverse-evolution");
-  }
-  if (!cryEnabled) {
-    filteredSaved = filteredSaved.filter((c) => c.cardType !== "cry");
-  }
-  if (!nameEnabled) {
-    filteredSaved = filteredSaved.filter((c) => c.cardType !== "name");
-  }
-  if (!evolutionEnabled) {
-    filteredSaved = filteredSaved.filter((c) => c.cardType !== "evolution");
-  }
+  // All saved cards are kept regardless of whether their type is currently
+  // enabled — disabling a type is non-destructive. Seed fields are refreshed
+  // on every card so display data stays current.
+  const allSaved = saved;
 
-  const refreshed: ReviewableCard[] = filteredSaved.map((card) => {
+  const refreshed: ReviewableCard[] = allSaved.map((card) => {
     if (card.cardType === "evolution") {
       const fresh = evoSeedById.get(card.id);
       if (!fresh) return card;
@@ -277,7 +299,7 @@ export function hydrateSession(
     }
   });
 
-  const savedIds = new Set(filteredSaved.map((c) => c.id));
+  const savedIds = new Set(allSaved.map((c) => c.id));
 
   const nameAdditions: NameReviewCard[] = nameEnabled
     ? seed
@@ -489,7 +511,6 @@ export function buildSessionQueues(
   }
 
   const reviewQueue: number[] = [];
-  const newQueue: number[] = [];
 
   for (const type of ["name", "evolution", "reverse", "cry"] as const) {
     const reviewSlots = Math.max(
@@ -499,13 +520,51 @@ export function buildSessionQueues(
     reviewQueue.push(
       ...stableShuffleForDay(reviewCandidatesByType[type], today).slice(0, reviewSlots),
     );
-    const newSlots = Math.max(
+  }
+
+  // Build the new-card queue with round-robin interleaving across enabled
+  // directions so no single type races ahead of the others day after day.
+  //
+  // Each type's candidates are stable-shuffled independently (deterministic
+  // per-day ordering within the type), then capped at that type's remaining
+  // new-card budget.  We then pull one card at a time from each non-empty
+  // type bucket, cycling through the four buckets in order, until all budgets
+  // are exhausted.  Within a single round-robin cycle the imbalance between
+  // any two directions is at most 1 card.  Directions with different
+  // maxNewPerDay caps (e.g. evolution = 5, name/reverse/cry = 10) will still
+  // end the day at their respective caps — round-robin does not equalise
+  // totals across directions, only interleaves them fairly.
+  const newCandidateSlices: Record<CardTypeKey, number[]> = {
+    name: stableShuffleForDay(newCandidatesByType.name, today).slice(
       0,
-      limits[type].maxNewPerDay - perType[type].newIntroducedToday,
-    );
-    newQueue.push(
-      ...stableShuffleForDay(newCandidatesByType[type], today).slice(0, newSlots),
-    );
+      Math.max(0, limits.name.maxNewPerDay - perType.name.newIntroducedToday),
+    ),
+    evolution: stableShuffleForDay(newCandidatesByType.evolution, today).slice(
+      0,
+      Math.max(0, limits.evolution.maxNewPerDay - perType.evolution.newIntroducedToday),
+    ),
+    reverse: stableShuffleForDay(newCandidatesByType.reverse, today).slice(
+      0,
+      Math.max(0, limits.reverse.maxNewPerDay - perType.reverse.newIntroducedToday),
+    ),
+    cry: stableShuffleForDay(newCandidatesByType.cry, today).slice(
+      0,
+      Math.max(0, limits.cry.maxNewPerDay - perType.cry.newIntroducedToday),
+    ),
+  };
+
+  const newQueue: number[] = [];
+  const bucketOrder: CardTypeKey[] = ["name", "evolution", "reverse", "cry"] as const;
+  let anyAdded = true;
+  while (anyAdded) {
+    anyAdded = false;
+    for (const type of bucketOrder) {
+      const slice = newCandidateSlices[type];
+      if (slice.length > 0) {
+        newQueue.push(slice.shift()!);
+        anyAdded = true;
+      }
+    }
   }
 
   // Reshuffle the merged per-type slices so name, evolution, and reverse
