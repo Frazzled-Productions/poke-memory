@@ -407,7 +407,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | | |
 |---|---|
 | **Trigger** | `schedule: '0 10 * * 1'` (weekly, Monday 10:00 UTC); `workflow_dispatch` |
-| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, and the four weekly digests `auto-workflow-suggest` / `auto-codequality-suggest` / `auto-app-suggest` / `auto-backlog-groom`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for daily workflows, 240h for weekly) and (b) the most recent completed run succeeded — any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
+| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, the four weekly digests `auto-workflow-suggest` / `auto-codequality-suggest` / `auto-app-suggest` / `auto-backlog-groom`, and the monthly `auto-deep-audit`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for daily workflows, 240h for weekly, 840h for monthly) and (b) the most recent completed run succeeded — any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
 | **Dedup** | A `<!-- cron-health-monitor:{file} -->` HTML marker keyed by workflow filename gives each watched workflow its own tracking issue. Re-runs edit that issue in place and add a re-check comment rather than opening duplicates. When a workflow recovers, the monitor closes its tracking issue automatically. |
 | **Why schedule?** | The monitor runs on GitHub's internal cron queue, independently of the workflows it watches — so it still fires even if those workflows have stopped. It cannot detect its own staleness, but the blast radius of one un-monitored monitor is small. |
 | **Permissions** | `contents: read`, `actions: read`, `issues: write`. `GITHUB_TOKEN` only — no Claude, no App token, no app checkout. |
@@ -499,6 +499,35 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **No-op** | Skips silently when nothing crosses the signal bar or when a digest issue already exists for the week |
 | **Scope** | Proposals only — never edits labels or moves issues |
 | **Label** | Digest issue is labelled `area:backlog`; label is created if absent |
+
+---
+
+### `auto-deep-audit.yml` — Monthly Deep Audit
+
+| | |
+|---|---|
+| **Trigger** | Monthly cron 1st of the month 08:00 UTC + `workflow_dispatch` (optional `axis` input forces a single axis) |
+| **Rotation** | One rotating workflow covering four axes. Keyed on calendar month: code-quality (#739) and test-coverage (#741) run **every** month; workflow-structural (#743) runs in months 1/4/7/10; sub-agent roster (#744) runs in months 2/5/8/11. A normal month runs two axes; a quarter-boundary month runs three. |
+| **Idempotency key** | Per-axis dated comment marker `<!-- auto-deep-audit:<axis>:YYYY-MM -->` on the umbrella issue. An axis whose marker for the current month already exists is skipped. |
+| **Inputs** | Full codebase (no recency window) — distinguishes a deep audit from the 30-day `auto-*-suggest.yml` digests. Code-quality scans `app/**`/`components/**`/`lib/**`/`db/**`; workflow scans `.github/workflows/**` plus `gh run list` history; sub-agent scans `.claude/agents/**`. |
+| **Output** | A fresh dated report comment on the **existing** umbrella issue (#739/#741/#743/#744 — reused, never re-spawned), plus one scoped follow-up issue per finding (≤8 per axis), each labelled `priority:later`. |
+| **No-op** | If an axis finds nothing actionable it still posts a marker-carrying "no findings" comment (so idempotency holds) and files no issues. |
+| **Issue-filing rules** | Follow-up issues are `priority:later` only — never `auto`, never `priority:now`/`priority:next`. The user owns promotion. |
+| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; minimal `permissions` (`issues: write`, rest read) |
+
+---
+
+### `settings-coverage-audit.yml` — Settings Coverage Audit
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (opened/synchronize/reopened) path-filtered to `lib/settings/**`, `lib/superuser/**`, `components/superuser/**`, `components/settings/**`, `app/settings/**` + `workflow_dispatch`. Event-driven rather than cron — settings-coverage drift (#738, exemplar #731) is introduced by code changes, not by the calendar. |
+| **Idempotency key** | Monthly dated comment marker `<!-- settings-coverage-audit:YYYY-MM -->` on umbrella issue #738. Several settings PRs in one month trigger the audit once, not once per PR. |
+| **Inputs** | Full-codebase audit of every `UserSettings` field and every superuser flag against every code path that should honour it (card-type render paths, daily caps, practice scope, secondary surfaces). |
+| **Output** | A dated report comment on existing umbrella issue #738, plus one scoped `priority:later` follow-up issue per missed-path finding (≤8). |
+| **No-op** | Posts a marker-carrying "no missed paths" comment when clean; files no issues. Advisory — never fails the job or blocks the PR. |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork PRs run with a read-only token and cannot post comments or create issues). |
+| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; minimal `permissions` (`issues: write`, rest read) |
 
 ---
 

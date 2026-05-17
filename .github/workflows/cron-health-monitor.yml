@@ -41,6 +41,7 @@ jobs:
           # cron cadence plus generous headroom for GitHub's cron jitter
           # (which can run hours late under load) and dispatch skew.
           # Daily workflows: 48h. Weekly digests: 240h (10 days).
+          # Monthly workflows: 840h (35 days) — a full month plus headroom.
           WORKFLOWS=(
             "auto-release.yml|Auto Release|48"
             "refresh-user-count.yml|Refresh User Count|48"
@@ -49,6 +50,7 @@ jobs:
             "auto-codequality-suggest.yml|Auto Code-Quality Suggest|240"
             "auto-app-suggest.yml|Auto App Suggest|240"
             "auto-backlog-groom.yml|Auto Backlog Groom|240"
+            "auto-deep-audit.yml|Auto Deep Audit|840"
           )
 
           NOW=$(date -u +%s)

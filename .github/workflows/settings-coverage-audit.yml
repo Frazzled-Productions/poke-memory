@@ -1,0 +1,237 @@
+name: Settings Coverage Audit
+
+# Event-driven deep audit for the settings-coverage axis (#738) — the
+# bug class where a `UserSettings` field or superuser flag is honoured in
+# some code paths but not all (exemplar: #731, `speakNameOnReveal` missed
+# the reverse-card render path).
+#
+# Per #827, this axis is a poor fit for a cron: settings-coverage drift is
+# introduced by *code changes*, not by the calendar. So it runs as a
+# path-filtered check on PRs that touch the settings model or the superuser
+# code paths — exactly the changes that can introduce a missed code path.
+#
+# Like the cron-driven `auto-deep-audit.yml` axes, it posts a dated report
+# comment on the existing umbrella issue (#738) and files scoped follow-up
+# issues at `priority:later`. It does NOT block the PR — it is advisory.
+#
+# Idempotency: skips silently when a report comment for the current month
+# (`YYYY-MM`) already exists on #738 — the marker
+# `<!-- settings-coverage-audit:<YYYY-MM> -->` is the source of truth. A
+# month with several settings PRs therefore triggers the audit once, not
+# once per PR.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'lib/settings/**'
+      - 'lib/superuser/**'
+      - 'components/superuser/**'
+      - 'components/settings/**'
+      - 'app/settings/**'
+  workflow_dispatch:
+
+concurrency:
+  group: settings-coverage-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Settings Coverage Deep Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Skip fork PRs: a fork pull_request runs with a read-only token, so the
+    # comment and issue-create steps would fail. Same guard pattern as
+    # auto-review.yml / coverage.yml. workflow_dispatch always runs.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.fork == false
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Compute month key
+        id: month
+        run: echo "key=$(date -u +"%Y-%m")" >> "$GITHUB_OUTPUT"
+
+      - name: Idempotency check — skip if a report already exists this month
+        id: idempotency
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          MONTH_KEY: ${{ steps.month.outputs.key }}
+        run: |
+          set -euo pipefail
+          MARKER="<!-- settings-coverage-audit:${MONTH_KEY} -->"
+          HITS=$(gh issue view 738 --json comments \
+            --jq '.comments[].body' | grep -Fc "${MARKER}" || true)
+          if [ "${HITS:-0}" -gt 0 ]; then
+            echo "Settings-coverage report for ${MONTH_KEY} already exists on #738 — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.idempotency.outputs.skip != 'true'
+        id: claude
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          MONTH_KEY: ${{ steps.month.outputs.key }}
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 80 --disable-slash-commands --disallowed-tools Skill
+          prompt: |
+            You are running this repository's **settings-coverage deep audit**
+            (umbrella issue #738). The month key is **${{ steps.month.outputs.key }}**.
+
+            This run was triggered because a PR touched the settings model or
+            the superuser code paths — exactly the kind of change that can
+            introduce a missed code path.
+
+            ## The bug class
+
+            A `UserSettings` field, or a superuser flag, is read in some code
+            paths but **not all** of the paths where it should take effect.
+            The exemplar is #731: `speakNameOnReveal` worked for name / cry /
+            evolution / reverse-evolution cards but not `reverse` cards,
+            because reverse cards render via a different component
+            (`SpritePicker`) that the TTS-on-reveal logic never reached.
+
+            ## Your task — a full-codebase audit (not just the PR diff)
+
+            1. Enumerate every field of `UserSettings` (`lib/settings/persistence.ts`)
+               and every superuser flag (`lib/superuser/`).
+            2. For each, enumerate every place it *should* take effect, and
+               verify it actually does. Cross-cutting risk areas:
+               - **Card-type render paths** — flip cards vs the `SpritePicker`
+                 multiple-choice path. Behavioural settings
+                 (`playCryOnReveal`, `speakNameOnReveal`, etc.) must be checked
+                 against every card type: name / reverse / cry / evolution /
+                 reverse-evolution.
+               - **Daily caps** (`maxNew*PerDay`, `maxReviews*PerDay`) — applied
+                 consistently across all card types and in the queue builder?
+               - **Practice scope** — applied to every card type and every
+                 surface that samples cards (review, mini-game, etc.)?
+               - **`alternateFormsEnabled`** — gates form cards everywhere?
+               - **`mobileNav`, `themeIntensity`, `retentionTarget`** — honoured
+                 on every surface, including secondary ones?
+               - **Superuser flags** — per AGENTS.md "Superuser mode", every
+                 feature that displays mastery / collection / completion state
+                 must honour `pretendAllMastered`. Audit that too.
+            3. For each setting/flag with a genuinely missed path, that is a
+               finding. Cap at **8 findings** — highest-signal ones only. Do
+               not propose churn; only concrete, actionable missed-path bugs.
+
+            ## Idempotency
+
+            The pre-flight check already confirmed no report exists for
+            ${{ steps.month.outputs.key }} on #738. Still, if you discover a
+            comment carrying `<!-- settings-coverage-audit:${{ steps.month.outputs.key }} -->`,
+            stop and exit cleanly.
+
+            ## Output — dated report comment on #738
+
+            Write the report to `/tmp/settings-report.md`:
+
+            ```markdown
+            <!-- settings-coverage-audit:${{ steps.month.outputs.key }} -->
+            ## Settings-coverage deep audit — ${{ steps.month.outputs.key }}
+
+            Full-codebase audit of every `UserSettings` field and superuser
+            flag for code paths that should honour it but do not. Triggered by
+            a PR touching the settings / superuser code paths. <N> findings;
+            scoped follow-up issues filed at `priority:later`.
+
+            ---
+
+            ### 1. <setting/flag> not honoured on <path>
+
+            **Setting:** `<field or flag name>`
+            **Missed path:** `path/to/component-or-fn.ts`
+            **Evidence:** <concrete description — which paths honour it, which miss it>
+            **Filed as:** #<issue>
+
+            ---
+
+            ### 2. ...
+            ```
+
+            Post it: `gh issue comment 738 --body-file /tmp/settings-report.md`
+
+            If the audit finds **nothing**, still post a short "no missed
+            paths found this cycle" comment carrying the marker (so the
+            idempotency check holds), and file no issues.
+
+            ## File scoped follow-up issues
+
+            For each finding, create exactly one issue:
+
+            ```
+            gh issue create \
+              --title "<setting/flag> not honoured on <path>" \
+              --body "<Setting + Missed path + Evidence, plus a line: \
+                'Surfaced by the settings-coverage deep audit — see #738.'>" \
+              --label "priority:later"
+            ```
+
+            Hard rules:
+            - Label **`priority:later`** only. **Never** `auto`. **Never**
+              `priority:now` / `priority:next`. The user owns promotion.
+            - One issue per finding.
+            - This workflow is advisory: do NOT fail the job or block the PR
+              on findings.
+
+      - name: Surface tool denials
+        if: always() && steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -u
+          if [ ! -f "$LOG" ]; then exit 0; fi
+
+          DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          if [ "$DENIAL_COUNT" = "0" ] || [ -z "$DENIAL_COUNT" ]; then
+            echo "No tool denials."
+            exit 0
+          fi
+
+          DENIAL_DETAILS=$(jq -r '
+            def text_of:
+              if type == "string" then .
+              elif type == "array" then map(.text // "" | tostring) | join(" ")
+              else tostring end;
+            select(.type == "user")
+            | .message.content[]?
+            | select(.type == "tool_result")
+            | select((.is_error // false) == true)
+            | (.content | text_of) as $c
+            | select($c | test("permission|denied|not allowed"; "i"))
+            | $c | gsub("\\s+"; " ") | .[0:240]
+          ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+
+          {
+            printf '## %s tool denial(s) during the settings-coverage audit run\n\n' "$DENIAL_COUNT"
+            printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
+            if [ -n "$DENIAL_DETAILS" ]; then
+              printf '\n```\n%s\n```\n' "$DENIAL_DETAILS"
+            fi
+          } > /tmp/denials.md
+
+          echo "Tool denials detected during the settings-coverage audit run — details logged to stdout."
+          cat /tmp/denials.md
