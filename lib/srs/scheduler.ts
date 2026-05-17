@@ -237,12 +237,28 @@ export type NextReviewOptions = {
   weights?: number[];
 };
 
+/** Valid grade values — 1 (Again), 2 (Hard), 4 (Good), 5 (Easy). */
+const VALID_GRADES: ReadonlySet<number> = new Set([1, 2, 4, 5]);
+
 export function nextReview(
   state: ReviewState,
   grade: Grade,
   now: Date,
   options: NextReviewOptions = {},
 ): ReviewState {
+  // Guard against invalid grades reaching the FSRS boundary. TypeScript's
+  // 1|2|4|5 union is a compile-time constraint only; a decoded/corrupted
+  // payload can still pass an arbitrary number at runtime. Grade 3 on a
+  // graduated card would cause GRADE_TO_RATING[3] to be undefined, which
+  // ts-fsrs rejects with an opaque "Invalid rating:[undefined]" error.
+  // A descriptive throw here surfaces the problem at the call site rather
+  // than silently clamping to a different grade and mis-scheduling the card.
+  if (!VALID_GRADES.has(grade)) {
+    throw new RangeError(
+      `nextReview: invalid grade ${grade}. Expected one of 1 (Again), 2 (Hard), 4 (Good), or 5 (Easy).`,
+    );
+  }
+
   const today = isoDate(now);
   const scheduler = getScheduler(options.retentionTarget, options.weights);
 
