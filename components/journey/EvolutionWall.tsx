@@ -363,7 +363,9 @@ export function EvolutionWall({
   families: readonly EvolutionFamily[];
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
+  const [isOpen, setIsOpen] = useState(false);
   const headingId = useId();
+  const panelId = useId();
 
   const stats = useMemo(
     () => computeEvolutionWallStats(families),
@@ -377,15 +379,44 @@ export function EvolutionWall({
 
   return (
     <section aria-labelledby={headingId}>
-      <h2
-        id={headingId}
-        className="mb-1 text-base font-semibold text-foreground"
-      >
-        Evolution wall
-      </h2>
+      {/* Section heading + disclosure toggle on the same row */}
+      <div className="flex items-center justify-between gap-3">
+        <h2
+          id={headingId}
+          className="text-base font-semibold text-foreground"
+        >
+          Evolution wall
+        </h2>
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+        >
+          <span>{isOpen ? "Collapse" : "Expand"}</span>
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            className={[
+              "h-4 w-4 text-zinc-400 transition-transform",
+              isOpen ? "rotate-180" : "",
+            ].join(" ")}
+            aria-hidden="true"
+          >
+            <path
+              d="M4 6L8 10L12 6"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
 
-      {/* Headline metric */}
-      <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+      {/* Summary line — always visible, gives a progress snapshot at a glance */}
+      <p className="mb-3 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
         Families completed:{" "}
         <span className="font-semibold tabular-nums text-foreground">
           {stats.completedFamilies.toLocaleString("en-GB")}
@@ -396,59 +427,65 @@ export function EvolutionWall({
         </span>
       </p>
 
-      {/* Filter tabs */}
-      <div className="mb-4">
-        <FilterTabs active={filter} onChange={setFilter} />
-      </div>
-
-      {/* Gallery */}
-      {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-zinc-400 dark:text-zinc-600">
-          {filter === "in-progress"
-            ? "No families in progress yet. Start practising evolution cards!"
-            : filter === "completed"
-              ? "No families completed yet. Keep going!"
-              : "No evolution families found."}
-        </p>
-      ) : (
-        <div
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-          role="list"
-          aria-label="Evolution families"
-          aria-live="polite"
-          aria-atomic="false"
-        >
-          {filtered.map((family) => (
-            <div key={family.rootId} role="listitem">
-              <FamilyCard family={family} />
-            </div>
-          ))}
+      {/*
+        Panel is always in the DOM so aria-controls always references a real
+        element — use the `hidden` attribute rather than conditional render (#856).
+      */}
+      <div id={panelId} hidden={!isOpen}>
+        {/* Filter tabs */}
+        <div className="mb-4">
+          <FilterTabs active={filter} onChange={setFilter} />
         </div>
-      )}
 
-      {/* Legend */}
-      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
-        <span className="flex items-center gap-1.5">
-          <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
-            <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-emerald-500 dark:stroke-emerald-400" stroke="currentColor" />
-            <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-emerald-500 dark:stroke-emerald-400" stroke="currentColor" />
-          </svg>
-          <span className="text-emerald-600 dark:text-emerald-400">Both mastered</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
-            <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-amber-500" stroke="currentColor" />
-            <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-amber-500" stroke="currentColor" />
-          </svg>
-          <span className="text-amber-600 dark:text-amber-400">One direction mastered</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
-            <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-zinc-300 dark:stroke-zinc-600" stroke="currentColor" />
-            <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-zinc-300 dark:stroke-zinc-600" stroke="currentColor" />
-          </svg>
-          <span>Not yet mastered</span>
-        </span>
+        {/* Gallery */}
+        {filtered.length === 0 ? (
+          <p className="py-8 text-center text-sm text-zinc-400 dark:text-zinc-600">
+            {filter === "in-progress"
+              ? "No families in progress yet. Start practising evolution cards!"
+              : filter === "completed"
+                ? "No families completed yet. Keep going!"
+                : "No evolution families found."}
+          </p>
+        ) : (
+          <div
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            role="list"
+            aria-label="Evolution families"
+            aria-live="polite"
+            aria-atomic="false"
+          >
+            {filtered.map((family) => (
+              <div key={family.rootId} role="listitem">
+                <FamilyCard family={family} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="flex items-center gap-1.5">
+            <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
+              <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-emerald-500 dark:stroke-emerald-400" stroke="currentColor" />
+              <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-emerald-500 dark:stroke-emerald-400" stroke="currentColor" />
+            </svg>
+            <span className="text-emerald-600 dark:text-emerald-400">Both mastered</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
+              <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-amber-500" stroke="currentColor" />
+              <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-amber-500" stroke="currentColor" />
+            </svg>
+            <span className="text-amber-600 dark:text-amber-400">One direction mastered</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
+              <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-zinc-300 dark:stroke-zinc-600" stroke="currentColor" />
+              <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-zinc-300 dark:stroke-zinc-600" stroke="currentColor" />
+            </svg>
+            <span>Not yet mastered</span>
+          </span>
+        </div>
       </div>
     </section>
   );

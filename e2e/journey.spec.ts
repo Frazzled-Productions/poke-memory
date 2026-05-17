@@ -207,23 +207,46 @@ test.describe("Journey page — evolution wall", () => {
     ).toBeVisible();
   });
 
-  test("evolution wall shows families completed headline metric", async ({
+  test("evolution wall shows families completed headline metric (always visible)", async ({
     page,
   }) => {
     await page.goto("/journey");
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
+    // The summary line is visible even when the wall is collapsed.
     await expect(
       page.getByText(/Families completed:/i),
     ).toBeVisible();
   });
 
-  test("filter tabs are visible and interactive", async ({ page }) => {
+  test("wall is collapsed by default and expands via the toggle button", async ({
+    page,
+  }) => {
     await page.goto("/journey");
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
+    // Toggle button must be present and report collapsed state.
+    const toggle = page.getByRole("button", { name: /Expand/i });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // Filter tabs are not visible while collapsed.
+    await expect(page.getByRole("tab", { name: "All" })).not.toBeVisible();
+    // Expand the wall.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Filter tabs are now visible.
+    await expect(page.getByRole("tab", { name: "All" })).toBeVisible();
+  });
+
+  test("filter tabs are visible and interactive after expanding", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // Expand the wall first.
+    await page.getByRole("button", { name: /Expand/i }).click();
     // All three filter tabs present.
     await expect(page.getByRole("tab", { name: "All" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "In progress" })).toBeVisible();
@@ -241,10 +264,11 @@ test.describe("Journey page — evolution wall", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Under pretendAllMastered the families count = completedFamilies count.
-    // The headline will read "Families completed: N / N" — verify it contains non-zero digits.
+    // The summary line is visible without expanding.
     const headline = page.getByText(/Families completed:/i);
     await expect(headline).toBeVisible();
+    // Expand the wall to access the filter tabs and gallery.
+    await page.getByRole("button", { name: /Expand/i }).click();
     // Switch to "Completed" filter — gallery should be non-empty.
     await page.getByRole("tab", { name: "Completed" }).click();
     await expect(
@@ -259,6 +283,8 @@ test.describe("Journey page — evolution wall", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
+    // Expand the wall first.
+    await page.getByRole("button", { name: /Expand/i }).click();
     // Switch to "In progress" — fresh guest has no mastered edges.
     await page.getByRole("tab", { name: "In progress" }).click();
     await expect(
