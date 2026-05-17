@@ -71,7 +71,11 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonl
 type Props = {
   /** Overall grade totals, from `computeGradeDistribution`. */
   distribution: GradeDistribution;
-  /** Weekly trend points (12 weeks), from `computeGradeTrend`. */
+  /**
+   * Weekly trend points from `computeGradeTrend` (up to 12 weeks, leading
+   * zeros trimmed). An empty array means no complete weeks of history exist
+   * yet in the window.
+   */
   trend: readonly GradeTrendPoint[];
 };
 
@@ -130,14 +134,17 @@ function OverallBar({ distribution }: { distribution: GradeDistribution }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Stacked bar chart showing grade-button volume per week over the last 12
- * weeks, plus an overall distribution bar for context.
+ * Stacked bar chart showing grade-button volume per week over the available
+ * history window (up to 12 complete weeks), plus an overall distribution bar
+ * for context.
  *
  * Derives from review history (`grade_log`), not mastery state, so it is
  * intentionally NOT affected by the `pretendAllMastered` superuser flag.
  */
 export function GradeDistributionChart({ distribution, trend }: Props) {
-  const hasTrendData = trend.some((p) => p.total > 0);
+  // With leading zeros trimmed by `computeGradeTrend`, a non-empty `trend`
+  // array always contains at least one week with data.
+  const hasTrendData = trend.length > 0;
 
   // X-axis tick: show the day-of-month for the week start date.
   function weekLabel(weekStart: string): string {
@@ -149,6 +156,14 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
     ...p,
     weekLabel: weekLabel(p.weekStart),
   }));
+
+  const weekCount = trend.length;
+  const subheading =
+    weekCount === 0
+      ? "Weekly volume"
+      : weekCount === 1
+        ? "Weekly volume (1 week)"
+        : `Weekly volume (${weekCount} week${weekCount === 12 ? "s" : "s so far"})`;
 
   return (
     <section aria-labelledby="grade-dist-heading">
@@ -174,13 +189,13 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
             <OverallBar distribution={distribution} />
 
             <div className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              Weekly volume (last 12 weeks)
+              {subheading}
             </div>
 
             {hasTrendData ? (
               <div
                 role="img"
-                aria-label={`Weekly grade volume over the last 12 weeks: ${trend
+                aria-label={`Weekly grade volume: ${trend
                   .filter((p) => p.total > 0)
                   .map(
                     (p) =>
@@ -248,7 +263,8 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
               </div>
             ) : (
               <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                No data in the last 12 weeks yet.
+                Weekly history builds up as you complete full weeks of reviews.
+                Keep going!
               </p>
             )}
           </>
