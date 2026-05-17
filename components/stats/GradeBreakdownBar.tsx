@@ -20,7 +20,7 @@ export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegm
 
   const segments: Segment[] = [
     { key: "again", label: "Again", count: again, color: "bg-rose-500" },
-    { key: "hard",  label: "Hard",  count: hard,  color: "bg-amber-400" },
+    { key: "hard",  label: "Hard",  count: hard,  color: "bg-amber-500" },
     { key: "good",  label: "Good",  count: good,  color: "bg-blue-500" },
     { key: "easy",  label: "Easy",  count: easy,  color: "bg-emerald-500" },
   ];

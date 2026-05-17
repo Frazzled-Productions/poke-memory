@@ -25,7 +25,9 @@ import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { computeDirectionBreakdown } from "@/lib/stats/direction-breakdown";
 import { computeDifficultyHistogram, meanDifficulty } from "@/lib/stats/difficulty-histogram";
 import { computeRetentionComparison } from "@/lib/stats/retention";
+import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-distribution";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
+import { GradeDistributionChart } from "@/components/stats/GradeDistributionChart";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
 import { DirectionBreakdownChart } from "@/components/stats/DirectionBreakdownChart";
 import { DifficultyHistogram } from "@/components/stats/DifficultyHistogram";
@@ -775,6 +777,10 @@ export default function StatsPage() {
               flags.pretendAllMastered,
             ),
             difficultyMean: meanDifficulty(cards, flags.pretendAllMastered),
+            // Grade distribution and weekly trend — derive from review history,
+            // NOT mastery state, so they are unaffected by pretendAllMastered.
+            gradeDistribution: computeGradeDistribution(gradeLog),
+            gradeTrend: computeGradeTrend(gradeLog, today, 12),
           };
         })()
       : null;
@@ -840,6 +846,10 @@ export default function StatsPage() {
             <AccuracySparkline points={accuracyPoints} rolling7d={rolling7d} />
             {reviewCharts !== null && (
               <>
+                <GradeDistributionChart
+                  distribution={reviewCharts.gradeDistribution}
+                  trend={reviewCharts.gradeTrend}
+                />
                 <RetentionIndicator comparison={reviewCharts.retentionComparison} />
                 <DirectionBreakdownChart rows={reviewCharts.directionRows} />
                 <DifficultyHistogram
