@@ -213,9 +213,10 @@ in-memory fixture.
 |---|---|
 | **Trigger** | `pull_request` (any), `workflow_dispatch` |
 | **Job** | `coverage` |
-| **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), then posts the coverage summary (statements / branches / functions / lines) as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). |
+| **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), enforces two coverage gates, then posts the coverage summary (statements / branches / functions / lines) plus the diff-coverage result as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). The comment posts on both pass and fail. |
+| **Gates (#824)** | **Global floor** — `coverage.thresholds` in `vitest.config.ts` (Statements 64 / Branches 59 / Functions 55 / Lines 65, just below the measured baseline). `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** — `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit an 80% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork PRs run with a read-only token and cannot post comments). |
-| **Required check** | No — non-blocking by design (#762). There is no threshold gate in `vitest.config.ts`, the coverage step carries `continue-on-error`, and the job is not in the `main-protection` ruleset. The report is informational so coverage gaps are visible without merge friction; a threshold gate can be added later once a baseline is agreed. |
+| **Required check** | Not yet — the gates fail the job, but `coverage` must still be added as a required check on the `qa` and `main` rulesets (owner action) before a breach blocks merge. Until then the job goes red without blocking. (Originally non-blocking by design under #762; gated under #824.) |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
 
 ---
@@ -615,6 +616,10 @@ Runs on every `pull_request` event and every push to `main`: the same `typecheck
 
 - Named checks: `test` and `e2e` (job IDs). `e2e` aggregates the parallel `e2e-browser` matrix legs into one status so the required-check name is stable. Branch protection requires both by name.
 - Concurrent runs on the same ref are cancelled — only the latest push completes.
+
+### Coverage gate (`coverage.yml`)
+
+Runs on every `pull_request` event. Fails the `coverage` job on either a global-floor breach (`coverage.thresholds` in `vitest.config.ts`) or a diff-coverage breach (`scripts/diff-coverage.mjs`, 80% patch bar). See the `coverage.yml` catalog entry above for detail. Not yet a required check — owner must add `coverage` to the `qa` and `main` rulesets to block merge on a breach.
 
 ---
 
