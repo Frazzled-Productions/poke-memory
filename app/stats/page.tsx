@@ -855,11 +855,16 @@ export default function StatsPage() {
     cards !== null
       ? (cards.filter((c) => c.cardType === "name") as Parameters<typeof computeStats>[0])
       : null;
+  // Card dueDate and lastReview values are stored as UTC dates by the FSRS
+  // scheduler (isoDate() always uses UTC). The forecast comparison must use
+  // UTC today so that cards due "today" in UTC match the same window the
+  // Practice screen's queue builder uses. The user's timezone is only used
+  // for display formatting (DueForecast chart labels) via the `tz` prop below.
   const stats: StatsResult | null =
     nameCards !== null && masteryRepetitions !== null
       ? computeStats(
           nameCards,
-          todayString(new Date(), userTimezone),
+          todayString(new Date()),
           10,
           masteryRepetitions,
           flags.pretendAllMastered,
@@ -892,11 +897,13 @@ export default function StatsPage() {
         )
       : null;
 
+  // Card lastReview dates are stored as UTC by the FSRS scheduler; use UTC
+  // today so the mastery-window comparison aligns with the scheduler.
   const completionProjection =
     nameCards !== null && masteryRepetitions !== null
       ? computeCompletionProjection(
           nameCards,
-          todayString(new Date(), userTimezone),
+          todayString(new Date()),
           masteryRepetitions,
           flags.pretendAllMastered,
         )

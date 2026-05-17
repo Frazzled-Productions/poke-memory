@@ -214,7 +214,11 @@ export const DUE_FORECAST_DAYS = 14;
 
 /**
  * Compute all stats from the full card array. Pure — no I/O.
- * `today` is a YYYY-MM-DD string (use `todayString(now)` from session.ts).
+ * `today` MUST be a UTC YYYY-MM-DD string (use `todayString(now)` with no
+ * timezone argument from session.ts). Card `dueDate` and `lastReview` fields
+ * are stored as UTC dates by the FSRS scheduler, so passing a user-timezone
+ * "today" would cause the due-forecast to miscount cards when the local date
+ * differs from the UTC date.
  * `strugglingLimit` defaults to 10.
  *
  * Card filters:
