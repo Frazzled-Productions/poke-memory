@@ -38,6 +38,21 @@ export const GRADE_LOG_APPENDED_EVENT = "poke-memory:grade-log-appended";
 
 const EMPTY_TOTALS: GradeTotals = { 1: 0, 2: 0, 4: 0, 5: 0 };
 
+/**
+ * localStorage safety-valve threshold. Trim oldest entries when the
+ * serialised grade log would exceed this many bytes. 4.5 MB leaves ~500 KB
+ * headroom within the typical 5 MB origin quota for other poke-memory keys.
+ * Only applied on the localStorage FALLBACK path — IndexedDB has no
+ * meaningful per-key size limit.
+ */
+export const LS_QUOTA_BYTES = 4.5 * 1024 * 1024;
+
+/**
+ * Minimum entries to keep after a quota trim so the log is never emptied
+ * entirely (e.g. if a single serialised entry somehow exceeded the threshold).
+ */
+const LS_MIN_KEEP_ENTRIES = 100;
+
 function isGrade(v: unknown): v is Grade {
   return v === 1 || v === 2 || v === 4 || v === 5;
 }
@@ -136,11 +151,40 @@ export async function loadGradeLog(): Promise<GradeLog> {
   }
 }
 
+/**
+ * Trim oldest entries from `log` until `JSON.stringify(log)` fits within
+ * `quotaBytes`, keeping at least `LS_MIN_KEEP_ENTRIES` entries.
+ * Entries are assumed to be sorted oldest-first (appendGradeEntry appends at
+ * the tail, so index 0 is the oldest). Exported for unit testing.
+ */
+export function trimToQuota(log: GradeLog, quotaBytes: number): GradeLog {
+  let trimmed = log;
+  while (
+    trimmed.length > LS_MIN_KEEP_ENTRIES &&
+    new Blob([JSON.stringify(trimmed)]).size > quotaBytes
+  ) {
+    // Drop the oldest 10 % in one step to avoid O(n²) iteration on a large log,
+    // but never drop below LS_MIN_KEEP_ENTRIES.
+    const maxDrop = trimmed.length - LS_MIN_KEEP_ENTRIES;
+    const dropCount = Math.min(maxDrop, Math.max(1, Math.floor(trimmed.length * 0.1)));
+    trimmed = trimmed.slice(dropCount);
+  }
+  return trimmed;
+}
+
 // Synchronous localStorage fallback for appendGradeEntry.
+// Applies a quota-aware safety valve before writing to avoid exceeding the
+// ~5 MB origin limit. Returns false on write failure.
 function saveGradeLogLS(log: GradeLog): boolean {
   if (typeof window === "undefined") return true;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+    const trimmed = trimToQuota(log, LS_QUOTA_BYTES);
+    if (trimmed.length < log.length) {
+      console.warn(
+        `poke-memory: grade log trimmed ${log.length - trimmed.length} oldest entries to stay within localStorage quota`,
+      );
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
     return true;
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
@@ -165,14 +209,13 @@ export async function appendGradeEntry(
       ...(typeof entry.subjectKey === "string" ? { subjectKey: entry.subjectKey } : {}),
     };
     const existing = await loadGradeLog();
-    const pruned = pruneGradeLog(existing, 365, entry.date);
-    pruned.push(stamped);
-    const json = JSON.stringify(pruned);
+    existing.push(stamped);
 
     if (isIdbAvailable()) {
-      await idbSet(STORAGE_KEY, json);
+      await idbSet(STORAGE_KEY, JSON.stringify(existing));
     } else {
-      const ok = saveGradeLogLS(pruned);
+      // localStorage fallback: apply quota-aware trim before writing.
+      const ok = saveGradeLogLS(existing);
       if (!ok) return null;
     }
 
