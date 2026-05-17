@@ -144,7 +144,13 @@ function main() {
 
     const hits = lineHits.get(repoPath);
     // A measurable file with no coverage entry was never imported by any
-    // test — every changed line counts as uncovered.
+    // test. The line loop below skips every line when `hits` is undefined,
+    // so such a file contributes nothing to the diff totals rather than
+    // counting as fully uncovered. This is a deliberate choice: it avoids
+    // false failures on files not yet reachable from any test. The known
+    // blind spot is that a brand-new product file with zero tests passes
+    // the diff gate unnoticed; the global coverage floor is what catches
+    // that case.
     let fileChanged = 0;
     let fileCovered = 0;
     for (const ln of [...lines].sort((a, b) => a - b)) {
