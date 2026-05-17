@@ -38,6 +38,8 @@ import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { computeRecords, type Records } from "@/lib/stats/records";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
+import { ActivityHistoryChart } from "@/components/stats/ActivityHistoryChart";
+import { computeActivityHistory } from "@/lib/stats/activity-history";
 import { TrainerCard } from "@/components/stats/TrainerCard";
 import { BadgeGallery } from "@/components/badges/BadgeGallery";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -781,6 +783,10 @@ export default function StatsPage() {
             // NOT mastery state, so they are unaffected by pretendAllMastered.
             gradeDistribution: computeGradeDistribution(gradeLog),
             gradeTrend: computeGradeTrend(gradeLog, today, 12),
+            // Activity history — reviews per day and new cards introduced per
+            // day over the rolling year. Derives from review history, NOT
+            // mastery state, so it is unaffected by pretendAllMastered.
+            activityHistory: computeActivityHistory(gradeLog, today, 365),
           };
         })()
       : null;
@@ -861,6 +867,12 @@ export default function StatsPage() {
             <ReviewHeatmap
               columns={computeReviewHeatmap(gradeLog, todayString(new Date(), userTimezone))}
             />
+            {reviewCharts !== null && (
+              <ActivityHistoryChart
+                series={reviewCharts.activityHistory}
+                dateFormat={userDateFormat}
+              />
+            )}
             <OnboardingHint id="statsHintDismissed" title="What &quot;mastered&quot; means">
               <p>
                 A card is mastered once you&apos;ve recalled it correctly{" "}

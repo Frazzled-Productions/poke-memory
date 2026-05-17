@@ -75,3 +75,20 @@ test.describe("Stats page — review charts", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Stats page — daily activity chart", () => {
+  test("daily activity section renders with empty state for a guest", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // The section heading appears once the page has hydrated past the skeleton.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Daily activity" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // A fresh guest session has no grade log — the empty-state message should
+    // be visible instead of the chart.
+    await expect(
+      page.getByText("No activity recorded yet"),
+    ).toBeVisible();
+  });
+});
