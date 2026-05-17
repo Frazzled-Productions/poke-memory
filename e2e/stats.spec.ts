@@ -118,7 +118,7 @@ test.describe("Stats page — daily activity chart", () => {
 });
 
 test.describe("Stats page — accuracy window tabs", () => {
-  test("switching accuracy windows updates the sparkline label", async ({
+  test("switching accuracy windows updates the selected tab", async ({
     page,
   }) => {
     await page.goto("/stats");
@@ -135,23 +135,30 @@ test.describe("Stats page — accuracy window tabs", () => {
     const tab7d = page.getByRole("tab", { name: "7d" });
     await expect(tab7d).toHaveAttribute("aria-selected", "true");
 
-    // Switch to 30d — the "30d" tab should become selected.
+    // A fresh guest session has no accuracy data — the empty-state message
+    // is shown instead of the sparkline SVG.
+    await expect(
+      page.getByText("No reviews yet in the last 7 days"),
+    ).toBeVisible();
+
+    // Switch to 30d — the "30d" tab should become selected and the 7d tab
+    // deselected. The empty-state message updates to reflect the new window.
     const tab30d = page.getByRole("tab", { name: "30d" });
     await tab30d.click();
     await expect(tab30d).toHaveAttribute("aria-selected", "true");
     await expect(tab7d).toHaveAttribute("aria-selected", "false");
+    await expect(
+      page.getByText("No reviews yet in the last 30 days"),
+    ).toBeVisible();
 
-    // The sparkline SVG label should now reference the 30-day window.
-    await expect(page.getByRole("img", { name: "30-day accuracy sparkline" })).toBeVisible();
-
-    // Switch to 1yr.
+    // Switch to 1yr — same pattern.
     const tab1yr = page.getByRole("tab", { name: "1yr" });
     await tab1yr.click();
     await expect(tab1yr).toHaveAttribute("aria-selected", "true");
     await expect(tab30d).toHaveAttribute("aria-selected", "false");
-
-    // The sparkline SVG label should now reference the 1-year window.
-    await expect(page.getByRole("img", { name: "1-year accuracy sparkline" })).toBeVisible();
+    await expect(
+      page.getByText("No reviews yet in the last year"),
+    ).toBeVisible();
   });
 });
 
