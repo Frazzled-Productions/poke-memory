@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import { seedIdb, seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import {
   SEED_POKEMON_IDS,
   EVOLUTION_CARD_IDS,
@@ -817,8 +817,56 @@ test.describe("Daily summary persistence (#685)", () => {
     // Wait for the complete screen to render.
     await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
 
-    // No daily summary — share button must not be shown.
+    // No daily summary and no grade log — share button must not be shown.
     await expect(page.getByRole("button", { name: "Share today" })).toHaveCount(0);
+  });
+
+  test("'Share today' button reconstructs from the grade log when no daily summary exists (#896)", async ({ page }) => {
+    // Grade-log entries are stamped with a UTC date — match that here.
+    const todayUtc = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "UTC",
+    }).format(new Date());
+
+    // Seed both the completed session and a grade log with today's grades.
+    // No daily-summary record is seeded, so the button can only appear if it
+    // reconstructs today's grade sequence from the durable grade log.
+    await seedIdb(page, {
+      "poke-memory:review-session:v1": JSON.stringify(completedSession),
+      "poke-memory:grade-log:v1": JSON.stringify([
+        { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: 1 },
+        { date: todayUtc, grade: 4, cardType: "name", occurredAt: 200 },
+        { date: todayUtc, grade: 5, cardType: "reverse", occurredAt: 100 },
+      ]),
+    });
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
+
+    // Button is present because today's grades were recovered from the log.
+    await expect(page.getByRole("button", { name: "Share today" })).toBeVisible();
+  });
+});
+
+test.describe("Graduated-cards review queue hint (#880)", () => {
+  const completedSession = buildCompletedSession({
+    pokemonIds: SEED_POKEMON_IDS,
+    evolutionCardIds: EVOLUTION_CARD_IDS,
+  });
+
+  test("explains that the review queue surfaces only graduated cards", async ({ page }) => {
+    // Default settings enable both name and evolution cards (two directions),
+    // so the passive hint is shown beneath the "Done today" counter.
+    await seedSessionIdb(page, completedSession);
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByText(/reviews surface only graduated cards/i),
+    ).toBeVisible();
   });
 });
 

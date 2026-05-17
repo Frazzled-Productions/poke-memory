@@ -36,6 +36,10 @@ const FAKE_USER = { id: "00000000-0000-0000-0000-000000000001" };
 
 vi.mock("@/lib/sync/persistence", () => ({
   markPushSucceeded: vi.fn(),
+  markPushFailed: vi.fn(),
+  savePendingQueue: vi.fn(),
+  clearPendingQueue: vi.fn(),
+  loadPendingQueue: vi.fn(() => []),
 }));
 
 vi.mock("@/lib/sync/settings", () => ({

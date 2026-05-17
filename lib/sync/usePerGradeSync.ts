@@ -1,12 +1,20 @@
 "use client";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
-import { markPushSucceeded, markPushFailed } from "@/lib/sync/persistence";
+import {
+  markPushSucceeded,
+  markPushFailed,
+  savePendingQueue,
+  clearPendingQueue,
+} from "@/lib/sync/persistence";
 
 /** Number of consecutive all-failure drains before the banner is shown. */
 const FAILURE_THRESHOLD = 3;
+
+/** Debounce delay (ms) for writing the pending queue to localStorage (#893). */
+const PERSIST_DEBOUNCE_MS = 500;
 
 /**
  * Debounced per-grade sync hook. Returns { enqueueGrade, flushPending }.
@@ -22,6 +30,12 @@ const FAILURE_THRESHOLD = 3;
  *
  * Guest-mode guard runs on every enqueueGrade call — safe across sign-in
  * state changes mid-session.
+ *
+ * Persisted queue (#893): the pending queue is written to localStorage on a
+ * 500 ms trailing debounce so rapid grading does not thrash storage. The key
+ * is cleared after a fully-successful drain. When client/userId are null (guest
+ * or superuser write-guard), the key is cleared rather than written — a QA
+ * session must never leave fake state behind.
  */
 export function usePerGradeSync(
   client: SupabaseClient | null,
@@ -39,6 +53,30 @@ export function usePerGradeSync(
   // When it reaches FAILURE_THRESHOLD, markPushFailed is called so the banner
   // appears (#606).
   const consecutiveFailuresRef = useRef(0);
+  // Separate debounce timer for localStorage persistence (#893). Using a
+  // longer window (500 ms) than the push debounce (200 ms) so rapid grading
+  // does not thrash storage — a short burst of grades produces at most one
+  // localStorage write.
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Flush the persist debounce on unmount so the last snapshot is written even
+  // if the component tears down before the 500 ms window elapses. Flushing
+  // (synchronous write) is preferable to dropping because the queue represents
+  // grades the user has already submitted — losing the persisted snapshot
+  // between the grade and the network push would silently abandon those cards
+  // if the tab is then force-killed. The existing push-debounce (timerRef) is
+  // left to cancel naturally; it fires async network calls and it is safer to
+  // let those complete or abort on their own rather than interrupting mid-flight.
+  useEffect(() => {
+    return () => {
+      if (persistTimerRef.current !== null) {
+        clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+        // Write the current snapshot synchronously on unmount.
+        savePendingQueue(pendingQueueRef.current);
+      }
+    };
+  }, []);
 
   const drainQueue = useCallback(async () => {
     const c = clientRef.current;
@@ -84,6 +122,15 @@ export function usePerGradeSync(
     if (anySucceeded) {
       consecutiveFailuresRef.current = 0;
       markPushSucceeded();
+      // If the queue is now empty every card made it to the cloud — clear the
+      // persisted queue so stale data does not accumulate (#893).
+      if (pendingQueueRef.current.length === 0) {
+        clearPendingQueue();
+      } else {
+        // Partial success: some cards are still queued. Persist the remaining
+        // set so they survive a force-kill between now and the next drain.
+        savePendingQueue(pendingQueueRef.current);
+      }
     } else {
       // All cards failed this drain. Increment the consecutive-failure counter
       // and surface the banner after FAILURE_THRESHOLD attempts (#606). A single
@@ -98,6 +145,11 @@ export function usePerGradeSync(
       if (consecutiveFailuresRef.current === FAILURE_THRESHOLD) {
         markPushFailed(pendingQueueRef.current.length);
       }
+      // Persist the still-queued cards so they survive a force-kill (#893).
+      // This write runs unconditionally on all-failure — the pending-queue
+      // persistence debounce in enqueueGrade catches the common hot path;
+      // this is the safety-net for the drain's own updated state.
+      savePendingQueue(pendingQueueRef.current);
     }
   }, []);
 
@@ -106,7 +158,15 @@ export function usePerGradeSync(
       // If the user signs out within the 200 ms debounce window the guard exits
       // early and this grade is not synced. The unload safety-net also bails
       // because client/userId are null by then. Accepted best-effort loss.
-      if (!clientRef.current || !userIdRef.current) return;
+      //
+      // When client/userId are null the session is either guest-mode or a
+      // superuser write-guarded session. In either case, clear the persisted
+      // queue rather than writing to it — a QA session must never leave fake
+      // card state behind (#893 superuser guard).
+      if (!clientRef.current || !userIdRef.current) {
+        clearPendingQueue();
+        return;
+      }
 
       // Skip in-step cards entirely — they are not safe to write to the cloud
       // until they graduate (lastReview set). Enqueuing them would cause
@@ -127,6 +187,17 @@ export function usePerGradeSync(
         timerRef.current = null;
         void drainQueue();
       }, 200);
+
+      // Debounced localStorage write (#893). A longer window than the push
+      // debounce so rapid grading produces at most one storage write per burst.
+      // The drain itself also writes (or clears) the key after the network
+      // result is known; this earlier write ensures the key is current even if
+      // the tab is force-killed before the push debounce fires.
+      if (persistTimerRef.current !== null) clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = setTimeout(() => {
+        persistTimerRef.current = null;
+        savePendingQueue(pendingQueueRef.current);
+      }, PERSIST_DEBOUNCE_MS);
     },
     [drainQueue],
   );

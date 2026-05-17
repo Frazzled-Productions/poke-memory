@@ -12,6 +12,8 @@ vi.mock("@/lib/sync/cloud", () => ({
 vi.mock("@/lib/sync/persistence", () => ({
   markPushSucceeded: vi.fn(),
   markPushFailed: vi.fn(),
+  savePendingQueue: vi.fn(),
+  clearPendingQueue: vi.fn(),
 }));
 
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";

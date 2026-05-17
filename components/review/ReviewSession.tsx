@@ -46,7 +46,7 @@ import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { SYNC_PULL_APPLIED_EVENT } from "@/lib/sync/pullAndMerge";
-import { appendGradeEntry, loadGradeLog, removeGradeEntry } from "@/lib/gradelog/persistence";
+import { appendGradeEntry, loadGradeLog, removeGradeEntry, todayGradeSequence } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 import { ShareTodayButton } from "@/components/review/ShareTodayButton";
@@ -176,6 +176,7 @@ type PerTypeTodayCounts = {
   name: { newIntroducedToday: number; reviewsDoneToday: number };
   evolution: { newIntroducedToday: number; reviewsDoneToday: number };
   reverse: { newIntroducedToday: number; reviewsDoneToday: number };
+  cry: { newIntroducedToday: number; reviewsDoneToday: number };
 };
 
 function TodayPill({
@@ -183,12 +184,33 @@ function TodayPill({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
+  cryEnabled,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
+  cryEnabled: boolean;
 }) {
+  // Passive hint (#880): when more than one card direction is enabled, a user
+  // will often see the review queue dominated by a single direction (typically
+  // reverse / sprite-picker). This is correct behaviour - the review queue
+  // surfaces only graduated cards, and recognition cards graduate from the
+  // learning steps sooner than recall cards. Surface a one-line explanation so
+  // the user can discover why without reading the docs. Only shown when 2+
+  // directions are on, since there is nothing to explain with a single one.
+  // The count must include every card direction the user can enable - all five
+  // tracked in ReviewSession (name, evolution, reverse, reverse-evolution, cry).
+  const enabledDirections = [
+    nameEnabled,
+    evolutionEnabled,
+    reverseEnabled,
+    reverseEvolutionEnabled,
+    cryEnabled,
+  ].filter(Boolean).length;
+  const showGraduatedHint = enabledDirections > 1;
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
       <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -230,6 +252,24 @@ function TodayPill({
           </span>
         </p>
       )}
+      {cryEnabled && (
+        <p>
+          <span className="text-zinc-600 dark:text-zinc-300">Cry:</span>{" "}
+          <span className="font-medium text-foreground">
+            {perType.cry.newIntroducedToday} new
+          </span>
+          {" · "}
+          <span className="font-medium text-foreground">
+            {perType.cry.reviewsDoneToday} reviewed
+          </span>
+        </p>
+      )}
+      {showGraduatedHint && (
+        <p className="mt-2 max-w-xs text-[11px] leading-snug text-zinc-400 dark:text-zinc-500">
+          Reviews surface only graduated cards, so one direction can dominate.
+          Cards still in learning steps wait in a separate queue.
+        </p>
+      )}
     </div>
   );
 }
@@ -239,6 +279,8 @@ function SessionCompleteScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
+  cryEnabled,
   shareText,
   dueTomorrow,
   showCardTypesHint,
@@ -247,6 +289,8 @@ function SessionCompleteScreen({
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
+  cryEnabled: boolean;
   /** Pre-formatted share summary; null when the user hasn't graded anything yet. */
   shareText: string | null;
   /** Count of graduated cards whose dueDate falls exactly on tomorrow. 0 hides the teaser. */
@@ -269,7 +313,7 @@ function SessionCompleteScreen({
           {dueTomorrow === 1 ? "1 card" : `${dueTomorrow} cards`} due tomorrow
         </p>
       )}
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
       {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
       {showCardTypesHint && (
         <div className="w-full max-w-xs text-left">
@@ -295,12 +339,16 @@ function ReviewSoftWallScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
+  cryEnabled,
   onKeepReviewing,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
+  cryEnabled: boolean;
   onKeepReviewing: () => void;
 }) {
   return (
@@ -309,7 +357,7 @@ function ReviewSoftWallScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         You have hit a daily review cap. More cards are due. Keep going?
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
       <div className="flex flex-wrap justify-center gap-3">
         <button
           type="button"
@@ -338,11 +386,15 @@ function NewCardsLockedScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
+  cryEnabled,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
+  cryEnabled: boolean;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
@@ -351,7 +403,7 @@ function NewCardsLockedScreen({
         You have hit a daily new-card cap. Come back tomorrow for more; keeping
         this limit prevents tomorrow&apos;s review pile from growing too large.
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
     </div>
   );
 }
@@ -362,12 +414,16 @@ function CountdownScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
+  cryEnabled,
 }: {
   dueAt: number;
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
+  cryEnabled: boolean;
 }) {
   const [remaining, setRemaining] = useState(() => dueAt - Date.now());
 
@@ -392,7 +448,7 @@ function CountdownScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         Hang tight, a learning card will be ready shortly.
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
     </div>
   );
 }
@@ -676,13 +732,30 @@ export function ReviewSession() {
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
 
-      // Hydrate the daily summary from localStorage so the "Share today" button
-      // survives a page reload on the session-complete screen (#685).
+      // Hydrate the daily summary so the "Share today" button survives a page
+      // reload, a navigation away and back, or reopening the app later in the
+      // day (#685, #896). Prefer the persisted daily-summary record — it also
+      // carries the new-card and mastered counts. When that record is absent
+      // (e.g. its best-effort write hit a quota error, or the user finished
+      // their cards in an earlier browsing session), fall back to the grade
+      // log, which is the durable append-only record of every grade. The grade
+      // log lacks new/mastered counts, so those stay at their defaults of 0 in
+      // the fallback path; the grade grid and reviewed total still reconstruct.
       const storedSummary = loadDailySummary(settings.timezone ?? "UTC");
       if (storedSummary !== null) {
         setSessionGradeSeq(storedSummary.gradeSequence);
         setNewCardsThisSession(storedSummary.newCards);
         setMasteredThisSession(storedSummary.mastered);
+      } else if (!superuserGuarded) {
+        // Grade-log entries are stamped with a UTC date (see handleGrade), so
+        // reconstruct against the same UTC day boundary the entries use.
+        // Skipped while a superuser flag is on, mirroring the saveDailySummary
+        // write-guard: a QA session must not drive the Share affordance.
+        const gradeLog = await loadGradeLog();
+        const todaysGrades = todayGradeSequence(gradeLog, today);
+        if (todaysGrades.length > 0) {
+          setSessionGradeSeq(todaysGrades);
+        }
       }
 
       // Initialize the learning queue from persisted learning-step cards.
@@ -1102,7 +1175,7 @@ export function ReviewSession() {
       cryEnabled: cryCardsEnabled,
     };
 
-    function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse"): boolean {
+    function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse" | "cry"): boolean {
       // Mirror the candidate filter in buildSessionQueues — cards in a
       // learning/relearning step are served via the in-memory learning
       // queue, not the review queue, and must not count toward "more due
@@ -1120,7 +1193,7 @@ export function ReviewSession() {
           c.state.lastReview !== today,
       );
     }
-    function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse"): boolean {
+    function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse" | "cry"): boolean {
       // Disabled-type cards must not keep the session in NEW_CARDS_LOCKED
       // after that type is turned off. Check card-type enablement directly
       // rather than eligibleCardIds so alternate-form and scope filters do
@@ -1134,14 +1207,14 @@ export function ReviewSession() {
       );
     }
 
-    const reviewWall = (["name", "evolution", "reverse"] as const).some(
+    const reviewWall = (["name", "evolution", "reverse", "cry"] as const).some(
       (type) =>
         perType[type].reviewsDoneToday >= limits[type].maxReviewsPerDay &&
         hasMoreDueReviewsOf(type),
     );
     if (!extendedReview && reviewWall) return "REVIEW_SOFT_WALL";
 
-    const newWall = (["name", "evolution", "reverse"] as const).some(
+    const newWall = (["name", "evolution", "reverse", "cry"] as const).some(
       (type) =>
         perType[type].newIntroducedToday >= limits[type].maxNewPerDay &&
         hasMoreNewCardsOf(type),
@@ -1178,6 +1251,8 @@ export function ReviewSession() {
               nameEnabled={nameCardsEnabled}
               evolutionEnabled={evolutionCardsEnabled}
               reverseEnabled={reverseEnabled}
+              reverseEvolutionEnabled={reverseEvolutionEnabled}
+              cryEnabled={cryCardsEnabled}
             />
           </div>
         );
@@ -1198,6 +1273,8 @@ export function ReviewSession() {
             nameEnabled={nameCardsEnabled}
             evolutionEnabled={evolutionCardsEnabled}
             reverseEnabled={reverseEnabled}
+            reverseEvolutionEnabled={reverseEvolutionEnabled}
+            cryEnabled={cryCardsEnabled}
             onKeepReviewing={() => setExtendedReview(true)}
           />
           {seenPokemon.length >= 2 && (
@@ -1211,7 +1288,7 @@ export function ReviewSession() {
     if (endState === "NEW_CARDS_LOCKED") {
       return (
         <div className="flex flex-col items-center w-full">
-          <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+          <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
           {seenPokemon.length >= 2 && (
             <HigherOrLowerGame seenPokemon={seenPokemon} />
           )}
@@ -1234,10 +1311,16 @@ export function ReviewSession() {
       tomorrow,
       eligibleCardIds,
     );
+    // The share grid is gated on persisted completion state: `sessionGradeSeq`
+    // is hydrated at mount from the daily-summary record or, failing that, the
+    // grade log (#896), so the button survives a reload or navigation rather
+    // than only appearing in the page-load that graded the final card.
+    // The displayed date uses the user's timezone (a calendar label), while
+    // streak lookup stays on the UTC `today` the streak data is keyed by.
     const shareText =
       sessionGradeSeq.length > 0
         ? formatDailySummary({
-            date: today,
+            date: todayTz,
             streak: computeStreak(loadStreakData(), today),
             reviewed: sessionGradeSeq.length,
             newCards: newCardsThisSession,
@@ -1252,6 +1335,8 @@ export function ReviewSession() {
           nameEnabled={nameCardsEnabled}
           evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
+          reverseEvolutionEnabled={reverseEvolutionEnabled}
+          cryEnabled={cryCardsEnabled}
           shareText={shareText}
           dueTomorrow={dueTomorrow}
           showCardTypesHint={!cardTypesAllOn}
@@ -1814,7 +1899,7 @@ export function ReviewSession() {
             Undo last grade (⌘Z)
           </button>
         )}
-        <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+        <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
         <GradeBreakdownBar
           again={sessionGrades[1]}
           hard={sessionGrades[2]}
@@ -1909,7 +1994,7 @@ export function ReviewSession() {
 
       {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
       <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
-      <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
       <GradeBreakdownBar
         again={sessionGrades[1]}
         hard={sessionGrades[2]}

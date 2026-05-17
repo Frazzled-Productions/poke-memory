@@ -86,10 +86,29 @@ Sync paths to Supabase, in order of how data normally flows:
 
 6. **Force pull from cloud** (Stats page, "Force pull from cloud" button → `pullSession` + `applyCloudAuthoritative`) — destructive recovery path that **replaces local progress with cloud**. Guarded by a `window.confirm` prompt. There is intentionally no inverse "force push from local" button: a stale local state pushing wholesale is exactly the #293 failure mode.
 
+7. **Online-reconnect catch-up** (`useOnlineReconnectSync`, mounted via `OnlineReconnectSync` in the root layout) — fires on the browser `online` event. Performs a full pull-then-push catch-up: (1) `pullAndMerge` brings local state up to date; (2) if `lastPushFailed` is true, re-pushes the card subset selected by the same heuristic as path 5. Unlike path 5, this hook pulls first because it runs automatically on reconnect rather than on explicit user action — the pull guards against the #293 failure mode before any push. See [Offline behaviour and online-reconnect catch-up](#offline-behaviour-and-online-reconnect-catch-up) for the full detail.
+
 - **Unload-time send mechanism:** `useSyncOnUnload` uses `navigator.sendBeacon('/api/sync', blob)` rather than calling the Supabase JS client directly. `sendBeacon` is the W3C-specified mechanism for guaranteed delivery during page hide and carries same-origin cookies automatically — ITP does not affect same-origin requests, so mobile Safari auth cookies are included. The receiver is `app/api/sync/route.ts` — a POST Route Handler that authenticates via session cookie and upserts server-side. `lastPushFailed` in sync status reflects whether the browser accepted the beacon (the synchronous return value of `sendBeacon`), not whether the server upserted.
 - **`pushSession` is the batched-push escape hatch** — `app/auth/callback-complete/page.tsx` invokes it in two places: the first-sign-in path (push local up to seed an empty cloud) and the "Keep local" branch of the conflict picker (push the user's chosen local state up to overwrite cloud). The per-grade and unload paths use `pushSingleCard` instead; nothing else in `app/` or `components/` currently calls `pushSession`.
 - **Volume**: 100 reviews/day → at most 100 single-row upserts (often fewer after debounce coalescing). Well within Supabase free-tier limits.
 - Guest-mode guard runs on every `enqueueGrade` call, not just at mount, so mid-session sign-out is safe.
+
+## Offline behaviour and online-reconnect catch-up
+
+When the device loses connectivity:
+
+- **Per-grade upserts fail silently.** `usePerGradeSync` keeps failed cards in its in-memory `pendingQueueRef`. After three consecutive all-failure drains the `lastPushFailed` flag is set (via `markPushFailed`) and the Stats-page banner appears.
+- **Unload beacon may fail.** `useSyncOnUnload` records `lastPushFailed: true` when `sendBeacon` returns `false` or the `fetch+keepalive` path returns a non-2xx. Failed card count is stored in `failedCardCount`.
+- **The pending queue is persisted to localStorage (#893).** `usePerGradeSync` writes `pendingQueueRef` to `poke-memory:pending-grade-queue:v1` on a 500 ms trailing debounce after each `enqueueGrade` call, and again immediately after each drain (on failure, or on partial success where cards remain). On a fully-successful drain (queue empties to zero), the key is cleared. This means the exact failed-card set survives a tab force-kill — `useOnlineReconnectSync` and `useRetryPush` prefer the persisted queue over the session-card heuristic when it is non-empty. Helpers: `loadPendingQueue` / `savePendingQueue` / `clearPendingQueue` in `lib/sync/persistence.ts`. Superuser guard: when client/userId are null (superuser write-guard or guest), `enqueueGrade` calls `clearPendingQueue` rather than writing — a QA session can never leave fake state in localStorage.
+
+When the device comes back online, **`OnlineReconnectSync`** (`components/sync/OnlineReconnectSync.tsx`) fires via the browser `online` event, driven by `useOnlineReconnectSync` (`lib/sync/useOnlineReconnectSync.ts`):
+
+1. **Pull first** — `pullAndMerge` is called to bring local state up to date. If pull fails, the push leg is skipped: pushing without knowing cloud state is the exact failure mode of #293.
+2. **Push failed cards** — if `lastPushFailed` is true, the hook re-pushes using the persisted queue when it is non-empty (the exact cards `usePerGradeSync` had not yet delivered). When the persisted queue is absent or empty, it falls back to the `failedCardCount` heuristic (same selection logic as `useRetryPush`): today's reviewed cards when `failedCardCount > 0`, all reviewed cards when `failedCardCount` is null. On complete success the persisted queue is cleared; on partial success `lastPushFailed` remains true so the retry banner stays visible.
+
+The reconnect push respects the same superuser write-guard as every other cloud-write path: `OnlineReconnectSync` passes `null` for client and userId when any superuser flag is on, so QA sessions never leak fake state into Supabase.
+
+The `online` event listener is registered once at mount (empty deps, ref-based) so it never needs to be re-registered on re-render — the same pattern as `useVisibilityPull`.
 
 ## Background pull on visibility
 

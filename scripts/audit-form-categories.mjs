@@ -4,7 +4,7 @@
 // PokéAPI and reports entries whose formCategory does not match the expected
 // value derived from the form's form_name.
 //
-// Run with: node scripts/audit-form-categories.mjs
+// Run with: npm run audit:forms  (or: node scripts/audit-form-categories.mjs)
 //
 // Options:
 //   --apply   Overwrite generated.json with the corrected values (dry-run by
@@ -45,7 +45,7 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function fetchWithRetry(url, label) {
+async function fetchWithRetry(url) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const res = await fetch(url);
@@ -130,7 +130,7 @@ async function main() {
   // the expected formCategory from the returned form_name.
   const tasks = candidates.map((p) => async () => {
     const formUrl = `${POKEAPI_BASE}/pokemon-form/${p.id}/`;
-    const result = await fetchWithRetry(formUrl, `form/${p.id}`);
+    const result = await fetchWithRetry(formUrl);
     if (!result.ok) {
       return {
         id: p.id,
@@ -228,6 +228,13 @@ async function main() {
   // Exit with non-zero status when there are unresolved mismatches (dry-run
   // mode) so CI can detect drift after a future seed regeneration.
   if (!applyFix && mismatches.length > 0) {
+    process.exit(1);
+  }
+
+  // Exit non-zero whenever any PokéAPI fetch failed — regardless of --apply or
+  // mismatch count. A partial audit must not report success: unfetched forms
+  // could be hiding real drift, so a clean exit code would mask the gap.
+  if (errors.length > 0) {
     process.exit(1);
   }
 }

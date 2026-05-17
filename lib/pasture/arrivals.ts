@@ -8,7 +8,7 @@
  */
 
 export { isMastered } from "@/lib/stats/derive";
-import { isMastered } from "@/lib/stats/derive";
+import { isMastered, MASTERY_REPETITIONS } from "@/lib/stats/derive";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
@@ -23,12 +23,21 @@ export type ReviewSession = {
 /**
  * Returns true when the card has just crossed the mastery threshold:
  * before the grade it was not mastered, after it is.
+ *
+ * `masteryRepetitions` is the user's configured mastery threshold (from
+ * `loadSettings().masteryRepetitions`). It defaults to `MASTERY_REPETITIONS`
+ * for backward-compatibility, but callers that have the user's settings to
+ * hand must pass it through so the comparison honours a custom threshold.
  */
 export function justBecameMastered(
   before: ReviewState,
   after: ReviewState,
+  masteryRepetitions: number = MASTERY_REPETITIONS,
 ): boolean {
-  return !isMastered(before) && isMastered(after);
+  return (
+    !isMastered(before, masteryRepetitions) &&
+    isMastered(after, masteryRepetitions)
+  );
 }
 
 /**
@@ -39,14 +48,20 @@ export function justBecameMastered(
  * When `forceAllMastered` is true (superuser `pretendAllMastered` flag), the
  * mastery predicate is bypassed and every name-type card flows through. The
  * cardType filter still applies so the pasture stays one entry per species.
+ *
+ * `masteryRepetitions` is the user's configured mastery threshold (from
+ * `loadSettings().masteryRepetitions`). It defaults to `MASTERY_REPETITIONS`
+ * for backward-compatibility, but callers that have the user's settings to
+ * hand must pass it through so the pasture honours a custom threshold.
  */
 export function filterMastered(
   cards: ReviewableCard[],
   forceAllMastered = false,
+  masteryRepetitions: number = MASTERY_REPETITIONS,
 ): ReviewableCard[] {
   return cards.filter((card) => {
     if (card.cardType !== "name") return false;
-    return forceAllMastered || isMastered(card.state);
+    return forceAllMastered || isMastered(card.state, masteryRepetitions);
   });
 }
 
