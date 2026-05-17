@@ -110,6 +110,13 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
     setPair(shufflePair(pickPair(seenPokemon)));
     // pair is in deps so the lint rule is satisfied; the guard above ensures
     // we only act when pair is null (i.e. first mount only).
+    // canPlay, seenPokemon, loadSettings, shufflePair, and pickPair are
+    // intentionally omitted: seenPokemon is stable for the component lifetime
+    // (memoised at the call site), canPlay is derived from it, and the
+    // imported functions are module-level constants — none of them change, so
+    // adding them would not change behaviour but would risk re-triggering the
+    // effect (and therefore clobbering game state) if the reference ever
+    // shifts at the call site.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pair]);
 
