@@ -54,7 +54,7 @@ export default function PokedexFilterBar({
   superuserMasteryLocked = false,
 }: FilterBarProps) {
   return (
-    <div className="sticky top-0 z-10 bg-background py-3 border-b border-zinc-200 dark:border-zinc-800 mb-6">
+    <div className="rounded-b-lg border border-t-0 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-4">
       {/* Search input */}
       <div className="relative mb-3">
         <label htmlFor="pokedex-search" className="sr-only">
