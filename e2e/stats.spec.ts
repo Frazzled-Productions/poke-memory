@@ -41,16 +41,24 @@ test.describe("Stats page — badge gallery", () => {
     await expect(
       page.getByLabel(/Boulder Badge \(locked\):/i).first(),
     ).not.toBeVisible();
-    // The "View all badges" toggle should be present.
-    const toggle = page.getByRole("button", { name: /View all badges/i });
+    // The toggle is initially collapsed — its accessible name includes "View all badges".
+    // Use aria-controls as a stable locator so re-queries survive the name change on expand.
+    const toggle = page.locator('[aria-controls="badge-gallery-locked"]');
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    // Clicking the toggle reveals locked tiles.
+    // Clicking expands the accordion — the button's label changes to "Hide locked badges…"
+    // but the aria-controls attribute remains stable for re-query.
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(
       page.getByLabel(/Boulder Badge \(locked\):/i).first(),
     ).toBeVisible();
+    // Clicking again collapses the accordion and hides locked tiles.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
+    ).not.toBeVisible();
   });
 
   test("pretendAllMastered shows all badges as earned", async ({ page }) => {
