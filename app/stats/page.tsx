@@ -23,7 +23,7 @@ import { pullGradeLog } from "@/lib/sync/gradeLog";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { computeAccuracySparkline, computeRollingAccuracy } from "@/lib/stats/accuracy";
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
-import { computeDirectionBreakdown } from "@/lib/stats/direction-breakdown";
+import { computeDirectionBreakdown, enabledDirectionsFromSettings } from "@/lib/stats/direction-breakdown";
 import { computeDifficultyHistogram, meanDifficulty } from "@/lib/stats/difficulty-histogram";
 import { computeRetentionComparison } from "@/lib/stats/retention";
 import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-distribution";
@@ -732,6 +732,19 @@ export default function StatsPage() {
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
+  const [cardTypeSettings, setCardTypeSettings] = useState<{
+    nameCardsEnabled: boolean;
+    evolutionCardsEnabled: boolean;
+    reverseEvolutionCardsEnabled: boolean;
+    reverseCardsEnabled: boolean;
+    cryCardsEnabled: boolean;
+  }>({
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
+    reverseEvolutionCardsEnabled: false,
+    reverseCardsEnabled: false,
+    cryCardsEnabled: false,
+  });
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
   const [userTimezone, setUserTimezone] = useState("UTC");
   const [userDateFormat, setUserDateFormat] = useState<DateFormat>("dmy");
@@ -761,6 +774,13 @@ export default function StatsPage() {
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
       setNameCardsEnabled(settings.nameCardsEnabled);
+      setCardTypeSettings({
+        nameCardsEnabled: settings.nameCardsEnabled,
+        evolutionCardsEnabled: settings.evolutionCardsEnabled,
+        reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
+        reverseCardsEnabled: settings.reverseCardsEnabled,
+        cryCardsEnabled: settings.cryCardsEnabled,
+      });
       setRetentionTarget(settings.retentionTarget);
       const dates = loadStreakData();
       setStreakDates(dates);
@@ -899,7 +919,10 @@ export default function StatsPage() {
       ? (() => {
           const today = todayString(new Date(), userTimezone);
           return {
-            directionRows: computeDirectionBreakdown(gradeLog),
+            directionRows: computeDirectionBreakdown(
+              gradeLog,
+              enabledDirectionsFromSettings(cardTypeSettings),
+            ),
             retentionComparison: computeRetentionComparison(
               gradeLog,
               today,
