@@ -1090,16 +1090,29 @@ export function ReviewSession() {
     // Compare by limit bucket, not raw cardType — reverse-evolution cards
     // count under "evolution" so the wall-detection matches the per-type
     // counters in `perType`.
+    // Card-type gate for end-state checks: disabled-type cards must never
+    // drive the wall. We check card-type enablement directly — not via
+    // eligibleCardIds — so that alternate-form and scope filters do not
+    // suppress the wall for genuinely-enabled card types (#835).
+    const endStateTypeOpts = {
+      nameEnabled: nameCardsEnabled,
+      evolutionEnabled: evolutionCardsEnabled,
+      reverseEnabled,
+      reverseEvolutionEnabled,
+      cryEnabled: cryCardsEnabled,
+    };
+
     function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse"): boolean {
       // Mirror the candidate filter in buildSessionQueues — cards in a
       // learning/relearning step are served via the in-memory learning
       // queue, not the review queue, and must not count toward "more due
       // reviews exist" or the soft-wall would fire spuriously.
-      // Only consider cards that are currently enabled (in eligibleCardIds) —
-      // disabled-type cards persist in storage but must never drive end-state.
+      // Disabled-type cards must not drive end-state; check card-type enablement
+      // directly rather than eligibleCardIds so alternate-form and scope
+      // filters do not suppress the wall for enabled card types (#835).
       return cards!.some(
         (c) =>
-          eligibleCardIds.has(c.id) &&
+          cardTypeIsEnabled(c, endStateTypeOpts) &&
           limitBucket(c.cardType) === type &&
           c.state.learningStep === null &&
           c.state.lastReview !== null &&
@@ -1108,11 +1121,13 @@ export function ReviewSession() {
       );
     }
     function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse"): boolean {
-      // Only consider enabled cards — a disabled type's new-card pool must not
-      // keep the session in NEW_CARDS_LOCKED after that type is turned off.
+      // Disabled-type cards must not keep the session in NEW_CARDS_LOCKED
+      // after that type is turned off. Check card-type enablement directly
+      // rather than eligibleCardIds so alternate-form and scope filters do
+      // not suppress the wall for enabled card types (#835).
       return cards!.some(
         (c) =>
-          eligibleCardIds.has(c.id) &&
+          cardTypeIsEnabled(c, endStateTypeOpts) &&
           limitBucket(c.cardType) === type &&
           c.state.lastReview === null &&
           c.state.learningStep === null,
