@@ -446,6 +446,9 @@ describe("StatsPage — guest user reads only from local", () => {
       expect(screen.getByTestId("trainer-card")).toBeInTheDocument();
     });
 
+    // The mastery-over-time chart stub should be present in the rendered tree.
+    expect(screen.getByTestId("mastery-over-time-chart")).toBeInTheDocument();
+
     // pullSession must never be called for guests.
     expect(mockPullSession).not.toHaveBeenCalled();
   });

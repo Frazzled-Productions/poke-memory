@@ -787,7 +787,9 @@ export default function StatsPage() {
             // pretendAllMastered (canonical pattern: forceAllMastered goes
             // through to the pure helper as an optional param).
             masteryOverTime: computeMasteryOverTime(
-              cards.filter((c) => c.cardType === "name") as Parameters<typeof computeMasteryOverTime>[0],
+              // nameCards is non-null here: the IIFE is only reached when
+              // cards !== null, which is the same condition that sets nameCards.
+              nameCards!,
               today,
               masteryRepetitions ?? undefined,
               flags.pretendAllMastered,
@@ -869,7 +871,9 @@ export default function StatsPage() {
                 />
                 <MasteryOverTimeChart
                   series={reviewCharts.masteryOverTime}
-                  totalCards={stats?.totalCards ?? 0}
+                  totalCards={stats.totalCards}
+                  dateFormat={userDateFormat}
+                  forceAllMastered={flags.pretendAllMastered}
                 />
               </>
             )}

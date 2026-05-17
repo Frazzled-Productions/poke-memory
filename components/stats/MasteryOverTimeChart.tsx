@@ -9,6 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
+import type { DateFormat } from "@/lib/utils/format-date";
 
 // ---------------------------------------------------------------------------
 // Palette — consistent with other Stats components (zinc/emerald/rose)
@@ -50,12 +51,15 @@ function ChartTooltip({
 }
 
 // ---------------------------------------------------------------------------
-// X-axis tick formatter — show month/year labels sparsely
+// X-axis tick formatter — show date labels sparsely, respecting user format
 // ---------------------------------------------------------------------------
 
-function formatXTick(date: string): string {
+function formatXTick(date: string, fmt: DateFormat): string {
   const [, m, d] = date.split("-");
-  return `${parseInt(m)}/${parseInt(d)}`;
+  if (fmt === "mdy") return `${parseInt(m)}/${parseInt(d)}`;
+  if (fmt === "iso") return `${m}-${d}`;
+  // dmy (default, en-GB)
+  return `${parseInt(d)}/${parseInt(m)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +75,13 @@ type Props = {
   series: readonly MasteryPoint[];
   /** Total name-card count — used in the heading and empty-state copy. */
   totalCards: number;
+  /**
+   * User's preferred date format. Defaults to "dmy" (day-first, en-GB).
+   * Mirrors the `fmt` prop pattern used by `DueForecast`.
+   */
+  dateFormat?: DateFormat;
+  /** When true, the single-point series is a superuser artefact, not sparse history. */
+  forceAllMastered?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,7 +99,7 @@ type Props = {
  * point at today with `count === cards.length`. This chart renders that
  * as a headline number with no trend line (single-point series).
  */
-export function MasteryOverTimeChart({ series, totalCards }: Props) {
+export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", forceAllMastered = false }: Props) {
   const hasData = series.length > 0;
   const latestCount = hasData ? series[series.length - 1].count : 0;
 
@@ -135,7 +146,9 @@ export function MasteryOverTimeChart({ series, totalCards }: Props) {
             {isSinglePoint ? (
               /* Single-point: no trend to draw — just show the headline. */
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Review more cards to see your progress trend.
+                {forceAllMastered
+                  ? "Superuser mode: showing total as of today."
+                  : "Review more cards to see your progress trend."}
               </p>
             ) : (
               <div
@@ -169,7 +182,7 @@ export function MasteryOverTimeChart({ series, totalCards }: Props) {
                     </defs>
                     <XAxis
                       dataKey="date"
-                      tickFormatter={formatXTick}
+                      tickFormatter={(date: string) => formatXTick(date, dateFormat)}
                       tick={{ fontSize: 10, fill: "currentColor" }}
                       className="text-zinc-400 dark:text-zinc-500"
                       axisLine={false}
