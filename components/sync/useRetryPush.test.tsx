@@ -12,6 +12,8 @@ vi.mock("@/lib/sync/cloud", () => ({
 vi.mock("@/lib/sync/persistence", () => ({
   loadSyncStatus: vi.fn(),
   saveSyncStatus: vi.fn(),
+  loadPendingQueue: vi.fn(() => []),
+  clearPendingQueue: vi.fn(),
 }));
 
 vi.mock("@/lib/review/persistence", () => ({
