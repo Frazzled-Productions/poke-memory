@@ -49,6 +49,14 @@ export default defineConfig({
         // Generated seed payload — produced by scripts/seed-pokemon.mjs, not
         // hand-written, so it carries no meaningful coverage signal.
         "lib/pokemon/generated.json",
+        // Service-worker code (#703). The SW source runs in a
+        // ServiceWorkerGlobalScope and the registration component drives the
+        // browser SW lifecycle; neither is meaningfully unit-testable. The
+        // pure, testable half lives in lib/pwa/cacheStrategy.ts, which is
+        // covered. Excluding these keeps them out of the diff-coverage gate.
+        "app/sw.ts",
+        "app/sw/**",
+        "components/pwa/ServiceWorkerProvider.tsx",
         "**/*.d.ts",
         "node_modules/**",
       ],

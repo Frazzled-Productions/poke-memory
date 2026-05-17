@@ -27,6 +27,10 @@ export function ServiceWorkerProvider() {
   const serwistRef = useRef<Serwist | null>(null);
   // Guards the single post-activation reload so an update can't loop reloads.
   const reloadedRef = useRef(false);
+  // Set when the user accepts the update prompt. Only then does the resulting
+  // `controllerchange` warrant a reload — a `controllerchange` from a
+  // first-ever install (via `clientsClaim`) must not reload the page.
+  const updateAcceptedRef = useRef(false);
 
   useEffect(() => {
     if (
@@ -46,12 +50,12 @@ export function ServiceWorkerProvider() {
     const onWaiting = () => setUpdateReady(true);
     serwist.addEventListener("waiting", onWaiting);
 
-    // The new worker has taken control. Reload once so the page runs against
-    // the fresh app shell. `controllerchange` also fires on the very first
-    // registration; `reloadedRef` plus the `updateReady` gate keep that from
-    // triggering an unwanted reload.
+    // A worker has taken control. Reload only when this is the result of the
+    // user accepting the update prompt — `clientsClaim` also fires this event
+    // on a first-ever install, which must not reload the page. `reloadedRef`
+    // additionally guards against a reload loop.
     const onControllerChange = () => {
-      if (reloadedRef.current) return;
+      if (reloadedRef.current || !updateAcceptedRef.current) return;
       reloadedRef.current = true;
       window.location.reload();
     };
@@ -66,8 +70,9 @@ export function ServiceWorkerProvider() {
   }, []);
 
   const handleRefresh = useCallback(() => {
-    // Tell the waiting worker to activate. `controllerchange` then fires and
-    // reloads the page.
+    // Mark this as a user-accepted update so the resulting `controllerchange`
+    // reloads the page, then tell the waiting worker to activate.
+    updateAcceptedRef.current = true;
     serwistRef.current?.messageSkipWaiting();
   }, []);
 
