@@ -6,6 +6,30 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.1] - 2026-05-17
+
+### Changed
+
+- Pokédex filter controls now open in a collapsible panel, collapsed by default, so the Pokémon grid is the first visible content on the page. An active-filter count badge appears on the toggle when filters are set while the panel is closed.
+- Evolution wall on the Journey tab is now collapsed by default, showing only the families-completed summary; the full grid expands on demand via a keyboard-accessible disclosure toggle.
+
+### Fixed
+
+- Fixed an invalid `aria-controls` reference in the badge gallery toggle: the locked-badge list is now always present in the DOM (toggled with the `hidden` attribute) so the ARIA relationship is valid whether the panel is collapsed or expanded.
+- Cry cards now correctly trigger the daily review wall and new-card locked screens when their daily caps are reached; cry progress (new introduced, reviews done) now appears in the end-state summary pill alongside name, evolution, and reverse counts.
+- Pasture and the Pasture navigation links now honour a custom mastery-repetitions setting instead of always using the default threshold.
+- The "new version is ready" banner now re-surfaces after you dismiss it with "Later", so a pending app update is no longer lost until the next full reload.
+- Offline grades now sync automatically when the device reconnects: the app pulls the latest cloud state and then re-pushes any cards that failed while offline, without requiring a manual Retry or page reload.
+- Higher-or-Lower: Pokémon names no longer briefly mismatch their sprites when "Next pair" or "Play again" is clicked, because sprites now render unoptimised so the decode pre-warm covers the exact URL the browser loads.
+- Higher-or-Lower: Tabbing away and back after a loss no longer re-samples a new Pokémon pair, which previously swapped the tiles under the game-over banner.
+- The "Share today" button on the all-caught-up screen now reappears after a reload, after navigating away and back, or when you reopen the app later in the day. It is gated on persisted completion state, reconstructing today's review summary from the durable grade log when the daily-summary record is unavailable.
+- Added a passive hint on the practice screen explaining that the review queue surfaces only graduated cards, so a queue dominated by one card direction is expected behaviour. The hint is shown only when more than one card direction is enabled.
+- Grades submitted while offline now survive a tab force-kill: the pending queue is persisted to localStorage and replayed on the next online reconnect or manual retry, so no reviewed cards are silently abandoned.
+
+### Security
+
+- Forced the build-time PostCSS dependency to 8.5.10 or newer via a package override, resolving a moderate XSS advisory in the copy nested under Next.js.
+
 ## [0.10.0] - 2026-05-17
 
 ### Added
@@ -1132,7 +1156,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.1
 [0.10.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.0
 [0.9.69]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.69
 [0.9.68]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.68
