@@ -361,14 +361,26 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
           />
         </div>
 
-        {/* Hint text */}
-        <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
-          {position === 0
-            ? "Drag left to replay your journey, right to see the forgetting horizon. Double-tap to reset."
-            : isFuture
-              ? "Projected memory decay if no cards are reviewed."
-              : "Replay of your collection as it was built."}
-        </p>
+        {/* Hint text + reset button */}
+        <div className="mt-2 flex items-center justify-center gap-3">
+          <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+            {position === 0
+              ? "Drag left to replay your journey, right to see the forgetting horizon."
+              : isFuture
+                ? "Projected memory decay if no cards are reviewed."
+                : "Replay of your collection as it was built."}
+          </p>
+          {position !== 0 && (
+            <button
+              type="button"
+              onClick={() => setSliderValue(RANGE_CENTRE)}
+              className="shrink-0 rounded px-2 py-0.5 text-xs text-zinc-500 underline-offset-2 hover:underline dark:text-zinc-400"
+              aria-label="Reset timeline to now"
+            >
+              Reset
+            </button>
+          )}
+        </div>
 
         {/* Screen-reader live region */}
         <div

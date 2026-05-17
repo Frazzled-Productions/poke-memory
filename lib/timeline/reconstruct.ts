@@ -26,6 +26,17 @@
 import { nextReview, initialReviewState, type ReviewState, type Grade } from "@/lib/srs/scheduler";
 import { isMastered, MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
+import { computeDecayFactor, generatorParameters } from "ts-fsrs";
+
+// Compute FSRS power-law decay/factor once from the default parameters.
+// `computeDecayFactor` expects the raw weights array (p.w), not the full
+// params object. The result is stable for a given set of weights; per-user
+// optimised weights are not exposed here because the timeline reconstruction
+// uses default weights throughout (see the SRS-expert verdict in the module
+// docstring above).
+const { decay: FSRS_DECAY, factor: FSRS_FACTOR } = computeDecayFactor(
+  generatorParameters().w,
+);
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -257,16 +268,22 @@ function buildPastTimeline(
 // ---------------------------------------------------------------------------
 
 /**
- * FSRS retrievability formula: R(t) = e^(-t / S)
- * where t = elapsed days since last review, S = stability in days.
+ * FSRS power-law retrievability: R(t, S) = (1 + FACTOR * t / S)^DECAY
+ * where t = elapsed days, S = stability, DECAY < 0, FACTOR > 0.
  *
- * Solve for t when R(t) = retentionTarget:
- *   t = -S * ln(retentionTarget)
+ * Invert for t when R(t, S) = retentionTarget:
+ *   retentionTarget = (1 + FACTOR * t / S)^DECAY
+ *   retentionTarget^(1/DECAY) = 1 + FACTOR * t / S
+ *   t = (retentionTarget^(1/DECAY) - 1) / FACTOR * S
+ *
+ * This matches ts-fsrs's own `calculate_interval_modifier` formula.
+ * Note: retentionTarget >= 1 returns Infinity (not 0) — the caller
+ * uses !isFinite to skip those entries.
  */
 function daysUntilForgetting(stability: number, retentionTarget: number): number {
   if (stability <= 0) return 0;
   if (retentionTarget <= 0 || retentionTarget >= 1) return Infinity;
-  return -stability * Math.log(retentionTarget);
+  return (Math.pow(retentionTarget, 1 / FSRS_DECAY) - 1) / FSRS_FACTOR * stability;
 }
 
 /**
@@ -388,12 +405,16 @@ export type BuildTimelineOptions = {
 };
 
 /**
- * Build the full past+future collection timeline. Pure — no I/O.
+ * Build the full past+future collection timeline.
  *
  * The past direction reconstructs per-species firstSeen and masteredAt
  * timestamps by replaying the grade log through the FSRS scheduler.
  * The future direction projects each card's current stability forward to
  * find the day FSRS retrievability is expected to drop below retentionTarget.
+ *
+ * Note: when `nowMs` is omitted the function falls back to `Date.now()`, so
+ * it is not strictly pure — callers that require deterministic output should
+ * always provide an explicit `nowMs`.
  *
  * Returns a `CollectionTimeline` value object ready for the scrubber UI.
  */

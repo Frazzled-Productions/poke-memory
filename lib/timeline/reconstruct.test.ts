@@ -221,7 +221,7 @@ describe("buildCollectionTimeline — future direction", () => {
   });
 
   it("a card with low stability drops out within the horizon", () => {
-    // stability=1 → forgetting in ~-ln(0.9) ≈ 0.1 days, so almost immediately.
+    // stability=1 → power-law inversion gives ~1 day to forget at r=0.9.
     const state = makeState({
       stability: 1,
       lastReview: "2026-02-28",
@@ -229,11 +229,37 @@ describe("buildCollectionTimeline — future direction", () => {
     });
     const cards = new Map([["1", state]]);
     const tl = buildCollectionTimeline(baseOpts({ currentNameCards: cards }));
-    // The card should be forgotten in the first few days of the future.
-    const dayOne = tl.future.find((s) => s.atMs > NOW_MS + 2 * DAY_MS);
-    if (dayOne) {
-      expect(dayOne.mastered).toBe(0);
+    // The card should be forgotten within a couple of days of the future.
+    const dayThree = tl.future.find((s) => s.atMs > NOW_MS + 2 * DAY_MS);
+    if (dayThree) {
+      expect(dayThree.mastered).toBe(0);
     }
+  });
+
+  it("power-law formula: stability=30 at retentionTarget=0.9 is forgotten near day 30, not day ~3", () => {
+    // Regression guard against the exponential formula (R=e^(-t/S)).
+    // The exponential gives ~3.16 days for S=30; the correct FSRS power-law
+    // gives ~30 days. A card should still be retained at day 15 and forgotten
+    // only near day 30.
+    const state = makeState({
+      stability: 30,
+      lastReview: "2026-03-01",
+      dueDate: "2026-03-01", // due now, forgetMs anchored from nowMs
+    });
+    const cards = new Map([["1", state]]);
+    const tl = buildCollectionTimeline(
+      baseOpts({ currentNameCards: cards, retentionTarget: 0.9, horizonDays: 60 }),
+    );
+
+    // At day 15 the card must still be retained.
+    const day15 = tl.future.find((s) => s.atMs >= NOW_MS + 15 * DAY_MS);
+    expect(day15).toBeDefined();
+    expect(day15!.mastered).toBe(1);
+
+    // At day 35 (past the ~30-day horizon) the card must be forgotten.
+    const day35 = tl.future.find((s) => s.atMs >= NOW_MS + 35 * DAY_MS);
+    expect(day35).toBeDefined();
+    expect(day35!.mastered).toBe(0);
   });
 
   it("future snapshots respect horizonDays", () => {
