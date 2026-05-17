@@ -6,6 +6,25 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.9.69] - 2026-05-17
+
+### Added
+
+- Stats: grade distribution chart showing Again/Hard/Good/Easy breakdown overall and weekly volume trend over the last 12 weeks.
+- Stats: mastery over time chart showing cumulative species mastered as a cumulative area chart, with the satisfying "line goes up" view of long-term progress.
+- Stats: added a daily activity chart showing reviews completed and new cards introduced per day over the rolling year.
+- Stats: added a Pokédex completion projection showing an estimated date to master all species, based on the 28-day mastery rate. Requires at least 7 days of mastery history; shows a graceful "not enough data" state until then. Honours the `pretendAllMastered` superuser flag.
+
+### Changed
+
+- Stats: replaced flat mastery and introduced progress bars with animated radial progress rings.
+- Stats: summary stat cards now count up from zero on load.
+- Stats: accuracy sparkline now offers 7-day, 30-day, and 1-year rolling windows.
+
+### Fixed
+
+- `ReviewSession` now catches errors thrown by `nextReview` (e.g. a corrupt grade value) and shows a dismissible error banner rather than freezing the UI with locked grade buttons.
+
 ## [0.9.68] - 2026-05-17
 
 ### Fixed
@@ -1086,7 +1105,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.68...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.69...HEAD
+[0.9.69]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.69
 [0.9.68]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.68
 [0.9.67]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.67
 [0.9.66]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.66
