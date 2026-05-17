@@ -278,6 +278,14 @@ vi.mock("@/lib/stats/records", () => ({
   computeRecords: vi.fn(() => null),
 }));
 
+vi.mock("@/lib/stats/completion-projection", () => ({
+  computeCompletionProjection: vi.fn(() => ({ kind: "insufficient-history" })),
+}));
+
+vi.mock("@/components/stats/CompletionProjection", () => ({
+  CompletionProjection: () => <div data-testid="completion-projection" />,
+}));
+
 vi.mock("@/lib/stats/mastery-over-time", () => ({
   computeMasteryOverTime: vi.fn(() => []),
 }));
@@ -536,5 +544,19 @@ describe("StatsPage — Force pull from cloud button", () => {
     });
 
     confirmSpy.mockRestore();
+  });
+});
+
+describe("StatsPage — CompletionProjection widget", () => {
+  it("renders the completion-projection stub in the page", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<StatsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("completion-projection")).toBeInTheDocument();
+    });
   });
 });
