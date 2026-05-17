@@ -145,10 +145,12 @@ test.describe("StorageQuotaBanner (#766)", () => {
     await expect(gradeGroup).toBeVisible();
     await gradeGroup.getByRole("button", { name: "Good" }).click();
 
-    // The StorageQuotaBanner must appear with its alert role and warning text.
+    // The StorageQuotaBanner must appear with its warning text.
+    // Scoped to the banner's unique text rather than role="alert" to avoid the
+    // Next.js route-announcer <div role="alert"> that is always present in the DOM.
     await expect(
-      page.getByRole("alert"),
-    ).toContainText(/storage is full/i, { timeout: 5_000 });
+      page.getByText(/storage is full/i),
+    ).toBeVisible({ timeout: 5_000 });
 
     // The dismiss button must be present and accessible.
     await expect(
@@ -172,8 +174,10 @@ test.describe("StorageQuotaBanner (#766)", () => {
     await gradeGroup.getByRole("button", { name: "Again" }).click();
 
     // Wait for the banner to appear.
-    const banner = page.getByRole("alert");
-    await expect(banner).toContainText(/progress saving is disabled/i, { timeout: 5_000 });
+    // Scoped to the banner's unique text to avoid the Next.js route-announcer
+    // <div role="alert"> that is always present in the DOM.
+    const banner = page.getByText(/progress saving is disabled/i);
+    await expect(banner).toBeVisible({ timeout: 5_000 });
 
     // Clicking Dismiss must hide the banner.
     await page.getByRole("button", { name: "Dismiss" }).click();

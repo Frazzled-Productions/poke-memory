@@ -178,10 +178,12 @@ test.describe("Backup section — import (#766)", () => {
       buffer: Buffer.from(JSON.stringify({ garbage: true })),
     });
 
-    // An accessible role="alert" error must appear without a confirmation dialog.
+    // An error message must appear without a confirmation dialog.
+    // Scoped to the error text directly to avoid the Next.js route-announcer
+    // <div role="alert"> that is always present in the DOM.
     await expect(
-      page.getByRole("alert"),
-    ).toContainText(/isn't a valid poke-memory backup/i);
+      page.getByText(/isn't a valid poke-memory backup/i),
+    ).toBeVisible();
   });
 });
 

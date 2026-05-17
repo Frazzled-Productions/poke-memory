@@ -30,13 +30,14 @@ test.describe("Reset-progress dialog (#766)", () => {
     await page.getByRole("button", { name: /^reset all progress$/i }).click();
 
     // The dialog element renders with aria-labelledby pointing to the heading.
-    await expect(
-      page.getByRole("dialog", { name: /reset all progress/i }),
-    ).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: /reset all progress/i });
+    await expect(dialog).toBeVisible();
 
     // The dialog must explain the consequence and ask for a typed confirmation.
+    // Scoped within the dialog to avoid the delete-account dialog's similarly
+    // worded description (#delete-account-dialog-desc) which is also in the DOM.
     await expect(
-      page.getByText(/permanently erase.*review history.*cannot be undone/i),
+      dialog.getByText(/permanently erase all your review history/i),
     ).toBeVisible();
 
     // The confirmation input must be present.
