@@ -227,8 +227,9 @@ test.describe("Journey page — evolution wall", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Toggle button must be present and report collapsed state.
-    const toggle = page.getByRole("button", { name: /Expand/i });
+    // Locate the toggle by its stable aria-expanded attribute so the locator
+    // remains valid after the button text flips from "Expand" to "Collapse".
+    const toggle = page.locator('button[aria-expanded]').filter({ hasText: /Expand|Collapse/i });
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     // Filter tabs are not visible while collapsed.
@@ -245,8 +246,9 @@ test.describe("Journey page — evolution wall", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Expand the wall first.
-    await page.getByRole("button", { name: /Expand/i }).click();
+    // Expand the wall first — locate by aria-expanded so the selector is stable
+    // regardless of whether the button currently reads "Expand" or "Collapse".
+    await page.locator('button[aria-expanded]').filter({ hasText: /Expand|Collapse/i }).click();
     // All three filter tabs present.
     await expect(page.getByRole("tab", { name: "All" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "In progress" })).toBeVisible();
@@ -267,8 +269,8 @@ test.describe("Journey page — evolution wall", () => {
     // The summary line is visible without expanding.
     const headline = page.getByText(/Families completed:/i);
     await expect(headline).toBeVisible();
-    // Expand the wall to access the filter tabs and gallery.
-    await page.getByRole("button", { name: /Expand/i }).click();
+    // Expand the wall to access the filter tabs and gallery — stable selector.
+    await page.locator('button[aria-expanded]').filter({ hasText: /Expand|Collapse/i }).click();
     // Switch to "Completed" filter — gallery should be non-empty.
     await page.getByRole("tab", { name: "Completed" }).click();
     await expect(
@@ -283,8 +285,8 @@ test.describe("Journey page — evolution wall", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Expand the wall first.
-    await page.getByRole("button", { name: /Expand/i }).click();
+    // Expand the wall first — stable selector.
+    await page.locator('button[aria-expanded]').filter({ hasText: /Expand|Collapse/i }).click();
     // Switch to "In progress" — fresh guest has no mastered edges.
     await page.getByRole("tab", { name: "In progress" }).click();
     await expect(
