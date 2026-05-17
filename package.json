@@ -12,6 +12,7 @@
     "lint": "eslint && npm run lint:em-dash",
     "lint:em-dash": "node scripts/check-no-em-dash.mjs",
     "seed": "node scripts/seed-pokemon.mjs",
+    "audit:forms": "node scripts/audit-form-categories.mjs",
     "seed:tts": "node --env-file-if-exists=.env.local scripts/seed-tts-audio.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "test": "vitest run",
@@ -36,6 +37,9 @@
     "recharts": "^3.8.1",
     "serwist": "^9.5.11",
     "ts-fsrs": "^5.3.3"
+  },
+  "overrides": {
+    "postcss": ">=8.5.10"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
