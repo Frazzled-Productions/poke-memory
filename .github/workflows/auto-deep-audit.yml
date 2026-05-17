@@ -20,9 +20,15 @@ name: Auto Deep Audit
 # and lives in `settings-coverage-audit.yml` (path filter on `lib/settings/**`
 # and the superuser code paths), per #827's own recommendation.
 #
-# Idempotency: each axis skips silently when a report comment for the current
-# month (`YYYY-MM`) already exists on its umbrella issue — the dated comment
-# marker `<!-- auto-deep-audit:<axis>:<YYYY-MM> -->` is the source of truth.
+# Idempotency: a shell-level pre-flight step (`idempotency`) checks each
+# rotation axis against its umbrella issue and drops any axis whose
+# current-month (`YYYY-MM`) report comment already exists — the dated marker
+# `<!-- auto-deep-audit:<axis>:<YYYY-MM> -->` is the source of truth. Only the
+# remaining axes are passed to Claude; if none remain the Claude step is
+# skipped entirely. This makes a mid-run failure (e.g. report posted but
+# follow-up issues not yet filed) recoverable: a re-run sees the marker, drops
+# the finished axes, and resumes the rest. The in-prompt "Step A" check stays
+# as defence-in-depth for a comment that lands during the run.
 
 on:
   schedule:
@@ -46,7 +52,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
       id-token: write
 
     steps:
@@ -94,12 +99,61 @@ jobs:
           echo "axes=${AXES}" >> "$GITHUB_OUTPUT"
           echo "Month ${MONTH_KEY} rotation: ${AXES}"
 
-      - uses: anthropics/claude-code-action@v1
-        id: claude
+      - name: Idempotency pre-flight — drop axes already done this month
+        id: idempotency
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           MONTH_KEY: ${{ steps.rotation.outputs.month_key }}
           AXES: ${{ steps.rotation.outputs.axes }}
+        run: |
+          set -euo pipefail
+
+          # Per-axis umbrella issue. Keep in sync with the axis table in the
+          # Claude prompt below.
+          umbrella_for() {
+            case "$1" in
+              code-quality)  echo 739 ;;
+              test-coverage) echo 741 ;;
+              workflow)      echo 743 ;;
+              subagent)      echo 744 ;;
+              *) echo "" ;;
+            esac
+          }
+
+          REMAINING=""
+          for AXIS in ${AXES}; do
+            UMBRELLA=$(umbrella_for "${AXIS}")
+            if [ -z "${UMBRELLA}" ]; then
+              echo "Unknown axis '${AXIS}' — skipping (no umbrella issue)." >&2
+              continue
+            fi
+            MARKER="<!-- auto-deep-audit:${AXIS}:${MONTH_KEY} -->"
+            HITS=$(gh issue view "${UMBRELLA}" --json comments \
+              --jq '.comments[].body' | grep -Fc "${MARKER}" || true)
+            if [ "${HITS:-0}" -gt 0 ]; then
+              echo "Axis '${AXIS}' already has a ${MONTH_KEY} report on #${UMBRELLA} — dropping."
+            else
+              echo "Axis '${AXIS}' has no ${MONTH_KEY} report yet — keeping."
+              REMAINING="${REMAINING:+${REMAINING} }${AXIS}"
+            fi
+          done
+
+          if [ -z "${REMAINING}" ]; then
+            echo "All axes for ${MONTH_KEY} already audited — nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "remaining_axes=${REMAINING}" >> "$GITHUB_OUTPUT"
+          echo "Axes to run this invocation: ${REMAINING:-<none>}"
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.idempotency.outputs.skip != 'true'
+        id: claude
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          MONTH_KEY: ${{ steps.rotation.outputs.month_key }}
+          AXES: ${{ steps.idempotency.outputs.remaining_axes }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -108,8 +162,12 @@ jobs:
             You are running this repository's monthly **deep audit** rotation.
 
             Today is the 1st of the month. The month key is **${{ steps.rotation.outputs.month_key }}**.
-            The axes to run this cycle are: **${{ steps.rotation.outputs.axes }}**
+            The axes to run this cycle are: **${{ steps.idempotency.outputs.remaining_axes }}**
             (a space-separated subset of: code-quality test-coverage workflow subagent).
+
+            A shell-level pre-flight guard has already dropped any axis whose
+            `${{ steps.rotation.outputs.month_key }}` report comment already
+            exists — so every axis listed here genuinely needs running.
 
             Run each listed axis **sequentially** (one at a time, never in
             parallel — stay within rate limits). For each axis follow the
@@ -140,9 +198,15 @@ jobs:
 
             ## Per-axis procedure
 
-            For each axis in `${{ steps.rotation.outputs.axes }}`:
+            For each axis in `${{ steps.idempotency.outputs.remaining_axes }}`:
 
-            ### Step A — Idempotency check
+            ### Step A — Idempotency check (defence-in-depth)
+
+            The shell-level pre-flight guard is the **primary** idempotency
+            mechanism — it already dropped any axis with a current-month
+            report comment, so the axis list above is pre-filtered. This
+            in-prompt check is a secondary safety net for the case where a
+            report comment lands *during* this run.
 
             The dated comment marker is `<!-- auto-deep-audit:<axis>:${{ steps.rotation.outputs.month_key }} -->`
             (e.g. `<!-- auto-deep-audit:code-quality:${{ steps.rotation.outputs.month_key }} -->`).
@@ -234,12 +298,16 @@ jobs:
             this month), and how many follow-up issues were filed in total.
 
       - name: Surface tool denials
-        if: always()
+        if: always() && steps.idempotency.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LOG: /home/runner/work/_temp/claude-execution-output.json
+          # Code-quality umbrella (#739) is always part of the rotation, so it
+          # is a stable home for denial reports. Comment there; fall back to
+          # stdout if the comment fails.
+          DENIALS_ISSUE: 739
         run: |
           set -u
           if [ ! -f "$LOG" ]; then exit 0; fi
@@ -265,6 +333,7 @@ jobs:
           ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
 
           {
+            printf '<!-- auto-denials:deep-audit -->\n'
             printf '## %s tool denial(s) during the monthly deep-audit run\n\n' "$DENIAL_COUNT"
             printf 'Claude was blocked from running these tools. Add the missing patterns to `.claude/settings.json` if any of them should be permitted. See [run logs](%s).\n' "$RUN_URL"
             if [ -n "$DENIAL_DETAILS" ]; then
@@ -272,5 +341,10 @@ jobs:
             fi
           } > /tmp/denials.md
 
-          echo "Tool denials detected during the deep-audit run — details logged to stdout."
-          cat /tmp/denials.md
+          echo "Tool denials detected during the deep-audit run."
+          if gh issue comment "$DENIALS_ISSUE" --repo "$REPO" --body-file /tmp/denials.md; then
+            echo "Denial report posted as a comment on #${DENIALS_ISSUE}."
+          else
+            echo "Could not comment on #${DENIALS_ISSUE} — denial details logged to stdout only."
+            cat /tmp/denials.md
+          fi

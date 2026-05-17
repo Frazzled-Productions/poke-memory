@@ -31,9 +31,13 @@ on:
       - 'app/settings/**'
   workflow_dispatch:
 
+# Parameterised per PR so two simultaneous settings-touching PRs each get
+# their own audit run rather than queueing behind a fixed-string group (and
+# then being skidded out by the 20-min timeout). workflow_dispatch runs have
+# no pull_request number, so they fall back to the run id — still unique.
 concurrency:
-  group: settings-coverage-audit
-  cancel-in-progress: false
+  group: settings-coverage-audit-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   audit:
