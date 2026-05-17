@@ -582,74 +582,73 @@ describe("weights option: malformed / short weight vector", () => {
 // Invalid grade at runtime (decoded payload defence)
 // ============================================================
 describe("invalid grade at runtime", () => {
-  // Grade is typed as 1|2|4|5 in TypeScript. These tests document what
-  // actually happens when a decoded payload or persisted blob passes a value
-  // outside the declared union — e.g. 3 (never a valid app grade) or 0.
+  // Grade is typed as 1|2|4|5 in TypeScript. The compile-time constraint does
+  // not protect against a decoded/corrupted payload passing an arbitrary number
+  // at runtime. nextReview now guards this at the top of the function with a
+  // VALID_GRADES set check, throwing a RangeError before any FSRS logic runs.
   //
-  // Key findings:
-  //   - Grade 3 on a graduated card (A4 path): GRADE_TO_RATING[3] is undefined,
-  //     so ts-fsrs receives Rating.undefined and throws "Invalid rating:[undefined]".
-  //     This is an unguarded runtime error — a data-coder guard at the decode
-  //     boundary would prevent it. The test documents current behaviour.
-  //   - Grade 0 on a brand-new card (A1 path): grade 0 matches none of ===5,
-  //     ===1, ===2, ===4 checks inside nextReview (brand-new branch), so the
-  //     function falls through to the `return { ...state, learningStep: 0, … }`
-  //     block — it does NOT call FSRS and therefore does not throw. The returned
-  //     state is structurally valid.
-  //   - Grade 3 on a card in a learning step (B-branch): grade 3 matches none
-  //     of ===1, ===2, ===4 checks, so the B4/Easy path (grade === 5) is taken
-  //     by fall-through (no else-if chain). ts-fsrs is called with Rating.Easy.
-  //     This is unexpected but does not throw.
+  // Design choice — reject (throw) rather than clamp:
+  //   Silently mapping an invalid grade to the nearest valid one would
+  //   mis-schedule the card without any signal to the caller. A RangeError
+  //   surfaces the corruption at the call site, where the caller can skip the
+  //   record and log the error without corrupting scheduling state.
 
-  it("grade 3 on a graduated card throws at the ts-fsrs boundary (GRADE_TO_RATING[3] is undefined)", () => {
-    // Documents a known gap: the A4 branch passes GRADE_TO_RATING[grade] directly
-    // to ts-fsrs without a guard, so an unknown grade causes an FSRS error.
-    // A data-coder guard at the decode/validation boundary should prevent this.
+  it("grade 3 on a graduated card throws a RangeError with a descriptive message", () => {
     const base = graduatedCard();
-    expect(() => nextReview(base, 3 as Grade, NOW)).toThrow();
+    expect(() => nextReview(base, 3 as Grade, NOW)).toThrowError(
+      /nextReview: invalid grade 3/,
+    );
   });
 
-  it("grade 0 on a brand-new card does not throw (falls into A1 branch)", () => {
-    // Grade 0 is not 5 (Easy), so the brand-new card path does NOT graduate.
-    // The A1 "Again/Hard/Good" branch is taken — the function returns a state
-    // with learningStep set, without calling FSRS.
+  it("grade 3 on a graduated card throws a RangeError (not just any error)", () => {
+    const base = graduatedCard();
+    expect(() => nextReview(base, 3 as Grade, NOW)).toThrow(RangeError);
+  });
+
+  it("grade 0 on a brand-new card throws a RangeError", () => {
     const base = newCard();
-    expect(() => nextReview(base, 0 as Grade, NOW)).not.toThrow();
+    expect(() => nextReview(base, 0 as Grade, NOW)).toThrowError(
+      /nextReview: invalid grade 0/,
+    );
   });
 
-  it("grade 0 on a brand-new card produces a structurally valid ReviewState", () => {
-    const base = newCard();
-    const result = nextReview(base, 0 as Grade, NOW);
-    expect(result).toMatchObject({
-      fsrsState: expect.any(String),
-      dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-    });
+  it("grade 0 on a graduated card throws a RangeError", () => {
+    const base = graduatedCard();
+    expect(() => nextReview(base, 0 as Grade, NOW)).toThrowError(
+      /nextReview: invalid grade 0/,
+    );
   });
 
-  it("grade 0 on a brand-new card enters the A1 learning-step path (learningStep=0)", () => {
-    // Confirms A1 is taken: learningStep set, lastReview still null.
-    const base = newCard();
-    const result = nextReview(base, 0 as Grade, NOW);
-    expect(result.learningStep).toBe(0);
-    expect(result.lastReview).toBeNull();
-  });
-
-  it("grade 3 on a card in a learning step takes the B4 (Easy) fall-through path and does not throw", () => {
-    // In the B-branch, grade checks are: ===1 (B1), ===2 (B2), ===4 (B3).
-    // Grade 3 matches none of those, so execution falls to the B4 block (which
-    // does not guard with `if (grade === 5)` — it is the tail branch). ts-fsrs
-    // is called with Rating.Easy. Unexpected but harmless.
+  it("grade 3 on a card in a learning step throws a RangeError", () => {
+    // Previously fell through silently to the B4 (Easy) branch — now rejected.
     const inStep = cardInStep(0);
-    expect(() => nextReview(inStep, 3 as Grade, NOW)).not.toThrow();
+    expect(() => nextReview(inStep, 3 as Grade, NOW)).toThrowError(
+      /nextReview: invalid grade 3/,
+    );
   });
 
-  it("grade 3 on a card in a learning step graduates via the B4 (Easy) fall-through", () => {
-    const inStep = cardInStep(0);
-    const result = nextReview(inStep, 3 as Grade, NOW);
-    // B4 graduates immediately — learningStep cleared, lastReview set.
-    expect(result.learningStep).toBeNull();
-    expect(result.lastReview).toBe(TODAY);
-    expect(result.fsrsState).toBe("review");
+  it("grade -1 throws a RangeError with the invalid value named in the message", () => {
+    const base = newCard();
+    expect(() => nextReview(base, -1 as Grade, NOW)).toThrowError(
+      /nextReview: invalid grade -1/,
+    );
+  });
+
+  // Verify all valid grades are still accepted after the guard is in place.
+  it.each([1, 2, 4, 5] as Grade[])(
+    "valid grade %i does not throw",
+    (grade) => {
+      // Use brand-new card for grades 1/2/4 (A1 path, no FSRS call).
+      // Grade 5 on a brand-new card (A2) and on a graduated card (A4) both
+      // reach FSRS, so we exercise both.
+      const base = newCard();
+      expect(() => nextReview(base, grade, NOW)).not.toThrow();
+    },
+  );
+
+  it("valid grade 5 on a graduated card does not throw", () => {
+    const base = graduatedCard();
+    expect(() => nextReview(base, 5, NOW)).not.toThrow();
   });
 });
 
