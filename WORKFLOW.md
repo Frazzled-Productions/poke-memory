@@ -87,10 +87,10 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 
 | | |
 |---|---|
-| **Trigger** | `pull_request` (any), push to `main` |
+| **Trigger** | `pull_request` (any), push to `main`, `merge_group` (merge queue) |
 | **Jobs** | `changes` (path classification), `test` (`typecheck && build && test`), `e2e-browser` (Playwright matrix — `chromium` + `mobile-safari` legs run in parallel inside the official Playwright container), `e2e` (aggregator over the matrix legs) |
-| **What it does** | `test` runs `npm ci && npm run typecheck && npm run build && npm test`. `e2e-browser` runs the Playwright smoke suite split by browser project so the two projects run as parallel matrix legs (#643). The `changes` job classifies the PR so `test`/`e2e` inner steps no-op on docs-only changes. |
-| **Required checks** | `test` and `e2e` are the required status checks for `main` (not the workflow name `CI`). `e2e` is a thin aggregator over the `e2e-browser` matrix, so the required-check name stays stable when matrix legs are added or renamed. Branch protection enforces strict-up-to-date; the bot app bypasses for auto-merges. |
+| **What it does** | `test` runs `npm ci && npm run typecheck && npm run build && npm test`. `e2e-browser` runs the Playwright smoke suite split by browser project so the two projects run as parallel matrix legs (#643). The `changes` job classifies the PR so `test`/`e2e` inner steps no-op on docs-only changes. A `merge_group` event is treated like a push to main — full suite, no path-based skipping. |
+| **Required checks** | `test` and `e2e` are the required status checks for `main` (not the workflow name `CI`). `e2e` is a thin aggregator over the `e2e-browser` matrix, so the required-check name stays stable when matrix legs are added or renamed. `main` uses a merge queue, so these checks also run on the `merge_group` event; the queue rebases and re-tests each PR against the latest `main` automatically (the bot app still bypasses for the `auto-release` commit). |
 | **Concurrency** | Cancels concurrent runs on the same ref — only the latest push on a branch completes. |
 
 ---
@@ -99,11 +99,11 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 
 | | |
 |---|---|
-| **Trigger** | `pull_request` (opened, synchronize, reopened, labeled, unlabeled) |
+| **Trigger** | `pull_request` (opened, synchronize, reopened, labeled, unlabeled), `merge_group` (merge queue) |
 | **Job** | `gate` |
-| **What it does** | Scans `changelog.d/unreleased/*.md` frontmatter for `kind: minor-bump` or `kind: major-bump`. If found and the PR lacks the `version-bump:approved` label, the job fails. |
+| **What it does** | Scans `changelog.d/unreleased/*.md` frontmatter for `kind: minor-bump` or `kind: major-bump`. If found and the PR lacks the `version-bump:approved` label, the job fails. On a `merge_group` event the job passes trivially — the approval was already enforced when the PR's required checks were green — so it reports the required status without re-scanning. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork contributors cannot apply the label, so running on fork PRs would produce an unresolvable failure). |
-| **Required check** | No — informational. Failure blocks the merge socially but is not enforced by the `main-protection` ruleset. Add `Check version bump approval` to the ruleset to harden. |
+| **Required check** | Yes — `Check version bump approval` is a required status check on the `main-protection` ruleset. Because of that it must also run on `merge_group`, or the merge queue would stall waiting for a check that never reports. |
 | **Concurrency** | Cancels concurrent runs on the same PR. |
 
 ---
@@ -535,10 +535,19 @@ Runs before opening a PR: `npm run typecheck && npm run build && npm test`
 
 ### CI gate (`ci.yml`)
 
-Runs on every `pull_request` event and every push to `main`: the same `typecheck && build && test` triple.
+Runs on every `pull_request` event, every push to `main`, and every `merge_group` (merge-queue) event: the same `typecheck && build && test` triple.
 
 - Named checks: `test` and `e2e` (job IDs). `e2e` aggregates the parallel `e2e-browser` matrix legs into one status so the required-check name is stable. Branch protection requires both by name.
 - Concurrent runs on the same ref are cancelled — only the latest push completes.
+
+### Merge queue
+
+`main` uses a GitHub merge queue (a `merge_queue` rule on the `main-protection` ruleset). The branch is strict-up-to-date, so without a queue every merge forces every other open PR to rebase and re-run CI one at a time. The queue automates that: PRs are merged with `gh pr merge <PR> --squash --auto`, GitHub builds a temporary `gh-readonly-queue/main/*` branch combining `main` + the queued PR(s), runs the required checks against it, and merges in order when green — testing multiple entries speculatively in parallel.
+
+- The three required checks (`test`, `e2e`, `Check version bump approval`) all trigger on the `merge_group` event. **If a required check's workflow does not run on `merge_group`, the queue stalls** waiting for a status that never reports — so any new required check must add a `merge_group` trigger.
+- `ci.yml` treats `merge_group` like a push to main: full `test` + `e2e` suite, no path-based skipping.
+- `version-bump-gate.yml` passes trivially on `merge_group` — the approval was already enforced on the PR.
+- The `poke-memory-bot` App remains a bypass actor for the `auto-release` commit, which still lands on `main` directly without going through the queue.
 
 ---
 

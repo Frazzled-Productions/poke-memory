@@ -14,9 +14,16 @@ name: Version bump gate
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  # `Check version bump approval` is a required status check on the
+  # main-protection ruleset, so it must also report on the merge queue's
+  # `merge_group` commit or the queue stalls. The actual fragment/label check
+  # only runs on `pull_request` (see the per-step `if`s below); on a
+  # merge_group event the gate passes trivially, since approval was already
+  # enforced when the PR's required checks were green.
+  merge_group:
 
 concurrency:
-  group: version-bump-gate-${{ github.event.pull_request.number }}
+  group: version-bump-gate-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,12 +31,20 @@ jobs:
     name: Check version bump approval
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    if: github.event.pull_request.head.repo.fork == false
+    # Run on merge_group (no pull_request context) and on non-fork PRs.
+    if: github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork == false
     permissions:
       contents: read
     steps:
+      - name: Merge queue — approval already enforced at PR stage
+        if: github.event_name == 'merge_group'
+        run: |
+          echo "merge_group event detected. The version-bump approval was already"
+          echo "enforced as a required check on the PR; the gate passes here."
       - uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
       - name: Check for non-patch version bump fragments
+        if: github.event_name == 'pull_request'
         env:
           PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
         run: |
