@@ -98,16 +98,17 @@ For each batch, in order:
 
 Once a batch's PRs are all open and reviewed in-session:
 
-1. **Use the merge queue.** `main` has a GitHub merge queue (set up in #797). For each reviewed PR whose own required checks are green, run `gh pr merge <PR> --squash --auto`. The queue rebases each entry onto the latest `main`, runs the required checks (`test`, `e2e`, `Check version bump approval`) against the speculative merge, and merges entries in order when green — testing several in parallel. Queue **all** of a batch's ready PRs, then wait for the queue to drain. You do **not** `update-branch` or rebase PRs by hand — handing the rebase to the queue is the whole point.
-   - `gh pr checks <PR>` first — a PR's own checks must be green before `--auto` admits it to the queue.
-   - If `Migration drift check` fails, the agent forgot to apply the migration via MCP — apply it now so the check re-runs.
-   - If a PR is **ejected** from the queue (its speculative merge failed CI), that is a real failure against the combined state — investigate, push a fix, and re-queue. Do not blindly re-queue.
+1. **Serial, not parallel.** Pre-emptive parallel rebases — manual or via `@dependabot rebase` fan-out — burn CI because each merge re-invalidates every queued run. (memory: `feedback_pr_queue_serial`.) The loop is:
+   - Pick the next PR in the batch (the **head** of the queue).
+   - `gh pr checks <PR>` — wait for required checks green.
+   - If `Migration drift check` fails, the agent forgot to apply the migration via MCP — apply it now and the check re-runs.
+   - `gh pr merge <PR> --squash --delete-branch`.
+   - Refresh `origin/main`. Rebase **only the next single PR** in the queue onto the fresh `main` with `--force-with-lease`. Do **not** rebase the rest yet — they wait their turn.
+   - Loop until the queue is empty.
 
-2. **Do not pre-emptively rebase.** The merge queue does the rebasing. Manual rebases — or `@dependabot rebase` fan-out — burn CI because each merge re-invalidates queued runs. (memory: `feedback_pr_queue_serial`.) Queue and wait; do not touch the branches.
+2. **The up-to-date cost.** If branch protection requires "branch up to date with base", every PR after the queue head pays a full rebase + CI re-run once the PR ahead of it merges — even when the file trees are disjoint and there is no real conflict. This is unavoidable with that rule and is the dominant time cost of the drain. A GitHub merge queue would remove it, but merge queue is **not available for this repo** — it requires an organisation-owned repository (see #797). A `qa` staging-branch workflow is the planned replacement (#806); until it lands, keep the PR count down by combining tightly-coupled issues (see Planning) and accept the serial cost.
 
-3. **Detached-HEAD noise.** When the session runs from a detached HEAD (the parallel-jobs case), `gh pr merge` prints a harmless `could not determine current branch` notice *after* a successful `--auto` enqueue. Confirm the PR was queued / merged with `gh pr view <PR> --json state` rather than trusting the command's exit code.
-
-4. **Fallback — no merge queue.** If the merge queue is ever disabled, fall back to a strictly serial loop: wait for the head PR's checks, `gh pr merge <PR> --squash --delete-branch`, refresh `origin/main`, then rebase **only the next single PR** onto fresh `main` with `--force-with-lease` — never the whole queue at once. Under strict-up-to-date branch protection this pays a full rebase + CI re-run per PR; that serial cost is exactly what the merge queue exists to remove.
+3. **Detached-HEAD noise.** When the session runs from a detached HEAD (the parallel-jobs case), `gh pr merge` prints a harmless `could not determine current branch` notice *after* a successful merge. Confirm the merge landed with `gh pr view <PR> --json state` rather than trusting the command's exit code.
 
 ## Wrap-up
 

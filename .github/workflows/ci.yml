@@ -3,12 +3,6 @@ on:
   pull_request:
   push:
     branches: [main]
-  # Runs on the merge queue's temporary `gh-readonly-queue/*` ref. Required by
-  # the `merge_queue` rule on the main-protection ruleset: the `test` and `e2e`
-  # checks must report on the merge_group commit or the queue stalls. The
-  # `!= 'pull_request'` branches below already treat a merge_group event like a
-  # push to main — full suite, no path-based skipping.
-  merge_group:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -18,9 +12,8 @@ jobs:
   # Classify the PR by what changed, so test/e2e bodies can skip when irrelevant.
   # The `test` and `e2e` jobs themselves always run (they are required checks),
   # but their inner steps are gated on these outputs and become no-ops when the
-  # changes don't warrant the work. On `push` to main and on `merge_group`
-  # (merge-queue) events, both outputs are forced true so the full suite always
-  # runs as a safety net.
+  # changes don't warrant the work. On `push` to main, both outputs are forced
+  # true so the full suite always runs as a safety net.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -98,7 +91,7 @@ jobs:
         if: needs.changes.outputs.code == 'true'
       - run: npm run build
         if: needs.changes.outputs.code == 'true'
-      - name: Run vitest (changed only on PR, full on push/merge_group)
+      - name: Run vitest (changed only on PR, full on push)
         if: needs.changes.outputs.code == 'true'
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
