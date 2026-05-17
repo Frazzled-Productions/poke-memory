@@ -9,6 +9,7 @@ import { Footer } from "@/components/Footer";
 import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { SignInPull } from "@/components/sync/SignInPull";
 import { AutoSyncOnChange } from "@/components/sync/AutoSyncOnChange";
+import { OnlineReconnectSync } from "@/components/sync/OnlineReconnectSync";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
 import { ThemeWatermark } from "@/components/theme/ThemeWatermark";
@@ -101,6 +102,7 @@ export default function RootLayout({
               </Suspense>
               <SignInPull />
               <AutoSyncOnChange />
+              <OnlineReconnectSync />
               <PwaInstallNudge />
               {/*
                 MobileNavPaddingWrapper adds bottom padding on mobile only when
