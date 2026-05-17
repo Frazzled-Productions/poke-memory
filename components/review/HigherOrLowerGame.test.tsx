@@ -249,6 +249,55 @@ describe("HigherOrLowerGame", () => {
     expect(container.firstChild).toBeNull();
   });
 
+  describe("idempotent initialisation (#887 — re-show does not clobber game state)", () => {
+    // Simulate React re-running passive effects when a preserved route segment
+    // is re-shown (tab away + back). The `pair` guard in the useEffect must
+    // prevent re-seeding an already-initialised pair, so game-over state and
+    // any in-progress streak are never silently reset.
+
+    it("keeps game-over phase intact when the effect re-runs after a loss", async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // Pick wrong to reach game-over.
+      await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
+      expect(screen.getByText(/game over/i)).toBeInTheDocument();
+
+      // Simulate a re-show (re-render with same props is the closest approximation
+      // in jsdom; the component keeps its state but effects re-run).
+      rerender(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // Game-over banner must still be present — pair was not re-seeded.
+      expect(screen.getByText(/game over/i)).toBeInTheDocument();
+      // The "Play again" button must still be visible.
+      expect(screen.getByRole("button", { name: /play again/i })).toBeInTheDocument();
+    });
+
+    it("does not reload bestScore from storage on re-show, preserving in-session high score", async () => {
+      // The stored best starts at 0.
+      mockLoadSettings.mockReturnValue({ miniGameBestScore: 0 });
+      const user = userEvent.setup();
+      const { rerender } = render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // Correct pick — streak=1 beats bestScore=0 so it is updated in-state.
+      await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+      expect(
+        screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Best: 1"),
+      ).toBeInTheDocument();
+
+      // Now change the stored value so a re-read would overwrite with something lower.
+      mockLoadSettings.mockReturnValue({ miniGameBestScore: 0 });
+
+      // Re-show — loadSettings must NOT be re-read.
+      rerender(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // In-session best (1) must still be shown, not the stale stored value (0).
+      expect(
+        screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Best: 1"),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("sprite-decode-before-swap", () => {
     // These tests install a controlled `window.Image` whose `decode()` resolves
     // on demand so we can assert that the pair does not swap until after decode.

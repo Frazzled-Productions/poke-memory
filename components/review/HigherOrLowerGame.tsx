@@ -61,12 +61,16 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
         .join(" ")}
       aria-label={pokemon.name}
     >
+      {/* unoptimized: sprites are self-hosted static PNGs; keeping the URL
+          identical to what decodeSpriteUrls warms means the decode pre-warm
+          prevents names swapping before the sprite has loaded (#879). */}
       <Image
         src={pokemon.spriteUrl}
         alt={pokemon.name}
         width={120}
         height={120}
         className="h-24 w-24 object-contain sm:h-32 sm:w-32"
+        unoptimized
       />
       <p className="text-sm font-semibold capitalize text-foreground">{pokemon.name}</p>
       {phase === "revealed" ? (
@@ -95,13 +99,19 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
 
   useEffect(() => {
     if (!canPlay) return;
+    // Guard against re-running when React re-shows a preserved route segment
+    // (e.g. tab away + back). pair is null only on the very first mount, so
+    // this check makes the initialisation idempotent — an in-progress or
+    // game-over state is never clobbered by a re-show (#887).
+    // bestScore is similarly guarded: re-reading settings on re-show would
+    // overwrite an in-session high score before the user has acknowledged it.
+    if (pair) return;
     setBestScore(loadSettings().miniGameBestScore);
     setPair(shufflePair(pickPair(seenPokemon)));
-    // Mount-only: seenPokemon is a memoised prop from the parent and is stable
-    // for the component's lifetime. Re-running this effect on identity change
-    // would reset the game mid-play.
+    // pair is in deps so the lint rule is satisfied; the guard above ensures
+    // we only act when pair is null (i.e. first mount only).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pair]);
 
   const handlePick = useCallback(
     (side: "left" | "right") => {
