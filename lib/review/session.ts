@@ -224,13 +224,7 @@ export function hydrateSession(
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: {
-    reverseEnabled?: boolean;
-    nameEnabled?: boolean;
-    evolutionEnabled?: boolean;
-    reverseEvolutionEnabled?: boolean;
-    cryEnabled?: boolean;
-  } = {},
+  opts: CardTypeOpts = {},
 ): ReviewableCard[] {
   const {
     reverseEnabled = false,
@@ -252,9 +246,9 @@ export function hydrateSession(
   // All saved cards are kept regardless of whether their type is currently
   // enabled — disabling a type is non-destructive. Seed fields are refreshed
   // on every card so display data stays current.
-  const filteredSaved = saved;
+  const allSaved = saved;
 
-  const refreshed: ReviewableCard[] = filteredSaved.map((card) => {
+  const refreshed: ReviewableCard[] = allSaved.map((card) => {
     if (card.cardType === "evolution") {
       const fresh = evoSeedById.get(card.id);
       if (!fresh) return card;
@@ -305,7 +299,7 @@ export function hydrateSession(
     }
   });
 
-  const savedIds = new Set(filteredSaved.map((c) => c.id));
+  const savedIds = new Set(allSaved.map((c) => c.id));
 
   const nameAdditions: NameReviewCard[] = nameEnabled
     ? seed

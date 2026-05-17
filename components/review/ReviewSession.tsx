@@ -875,7 +875,8 @@ export function ReviewSession() {
     !nameCardsEnabled &&
     !evolutionCardsEnabled &&
     !reverseEnabled &&
-    !reverseEvolutionEnabled
+    !reverseEvolutionEnabled &&
+    !cryCardsEnabled
   ) {
     return (
       <div className="flex flex-col items-center gap-4 text-center">
@@ -1094,8 +1095,11 @@ export function ReviewSession() {
       // learning/relearning step are served via the in-memory learning
       // queue, not the review queue, and must not count toward "more due
       // reviews exist" or the soft-wall would fire spuriously.
+      // Only consider cards that are currently enabled (in eligibleCardIds) —
+      // disabled-type cards persist in storage but must never drive end-state.
       return cards!.some(
         (c) =>
+          eligibleCardIds.has(c.id) &&
           limitBucket(c.cardType) === type &&
           c.state.learningStep === null &&
           c.state.lastReview !== null &&
@@ -1104,8 +1108,11 @@ export function ReviewSession() {
       );
     }
     function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse"): boolean {
+      // Only consider enabled cards — a disabled type's new-card pool must not
+      // keep the session in NEW_CARDS_LOCKED after that type is turned off.
       return cards!.some(
         (c) =>
+          eligibleCardIds.has(c.id) &&
           limitBucket(c.cardType) === type &&
           c.state.lastReview === null &&
           c.state.learningStep === null,
@@ -1210,7 +1217,7 @@ export function ReviewSession() {
     const dueTomorrow = countDueTomorrow(
       cards,
       tomorrow,
-      isScopeEmpty(scope) ? undefined : eligibleCardIds,
+      eligibleCardIds,
     );
     const shareText =
       sessionGradeSeq.length > 0
@@ -1396,7 +1403,7 @@ export function ReviewSession() {
       newCards,
       effectiveLimits,
       today,
-      isScopeEmpty(scope) ? undefined : eligibleCardIds,
+      eligibleCardIds,
     );
 
     // Compute the post-grade learning queue here, mirroring the `setLearningQueue`

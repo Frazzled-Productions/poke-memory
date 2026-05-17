@@ -1396,3 +1396,150 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
     expect(screen.getByText(/this grade could not be saved/i)).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Card-type enable/disable guards (#835, #863)
+// ---------------------------------------------------------------------------
+
+describe("Card-type disable guards (#835)", () => {
+  it("does NOT show 'No card types enabled' when only cry cards are enabled", async () => {
+    // Regression guard for the all-disabled check omitting cryCardsEnabled.
+    // With cry as the only enabled type the session must present a card,
+    // not the "No card types enabled" dead-end.
+    mockSeedPokemon.mockReturnValue([
+      { ...FIXTURE_CARD, cryUrl: "https://example.com/bulbasaur.ogg" },
+    ]);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 10,
+      maxReviewsCryPerDay: 100,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // The cry branch shows a Reveal button — the all-disabled guard must not fire.
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/no card types enabled/i),
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("button", { name: /reveal/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows 'No card types enabled' when every type including cry is off", async () => {
+    // Complementary positive case: all types disabled → dead-end message.
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no card types enabled/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("does not produce NEW_CARDS_LOCKED after a daily new-card cap is hit on a now-disabled type", async () => {
+    // Scenario: name cards have hit their new-card cap (maxNewPerDay: 0 so any
+    // name card in storage would trigger the wall), but the user has since
+    // disabled name cards. Evolution cards are the active type, but the seed
+    // has no evolution cards, so the queue is empty.
+    //
+    // Without the fix: hasMoreNewCardsOf("name") iterates `cards!` without
+    // consulting eligibleCardIds → sees the unseen name card → returns true →
+    // NEW_CARDS_LOCKED fires even though name cards are off.
+    // With the fix: the name card is excluded from eligibleCardIds →
+    // hasMoreNewCardsOf finds nothing → SESSION_COMPLETE.
+    const unseenNameCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      state: {
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "new" as const,
+        dueDate: "1970-01-01",
+        lastReview: null,
+        firstSeen: null,
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([unseenNameCard]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [unseenNameCard],
+      limits: DEFAULT_LIMITS,
+    });
+    // Name cards disabled; evolution cards enabled but seed has none.
+    // maxNewPerDay: 0 ensures name cards would fire the new-card wall if seen.
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 10,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // With the fix, the disabled name card is excluded from eligibleCardIds and
+    // therefore excluded from hasMoreNewCardsOf — SESSION_COMPLETE, not NEW_CARDS_LOCKED.
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/new card limit reached/i),
+    ).not.toBeInTheDocument();
+  });
+});

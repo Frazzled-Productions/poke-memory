@@ -607,18 +607,16 @@ export default function SettingsPage() {
       };
       const targetType = cardTypeForKey[reenableKey];
       if (targetType !== undefined) {
-        void (async () => {
-          const session = await loadSession();
-          if (session !== null) {
-            const now = new Date();
-            const reset = session.cards.map((card) =>
-              card.cardType === targetType
-                ? { ...card, state: initialReviewState(now) }
-                : card,
-            );
-            await saveSession({ ...session, cards: reset });
-          }
-        })();
+        const session = await loadSession();
+        if (session !== null) {
+          const now = new Date();
+          const reset = session.cards.map((card) =>
+            card.cardType === targetType
+              ? { ...card, state: initialReviewState(now) }
+              : card,
+          );
+          await saveSession({ ...session, cards: reset });
+        }
       }
     }
   }
