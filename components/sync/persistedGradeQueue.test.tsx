@@ -277,6 +277,47 @@ describe("usePerGradeSync — persisted queue (#893)", () => {
     expect(vi.mocked(savePendingQueue)).not.toHaveBeenCalled();
     expect(vi.mocked(pushSingleCard)).not.toHaveBeenCalled();
   });
+
+  // ─── Persist-timer cleanup on unmount ────────────────────────────────────────
+  // When the component unmounts with a pending persist debounce, the timer must
+  // be flushed synchronously (writing the current snapshot) rather than dropped
+  // (#893 timer cleanup). This prevents the case where a tab force-kill after
+  // unmount loses the last snapshot.
+
+  it("flushes the persist debounce synchronously on unmount (#893 timer cleanup)", async () => {
+    vi.mocked(pushSingleCard).mockResolvedValue(false);
+
+    const { result, unmount } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      result.current.enqueueGrade(makeCard(1));
+    });
+
+    // Do NOT advance timers — the persist debounce has not fired yet.
+    // Unmounting should flush it synchronously.
+    act(() => {
+      unmount();
+    });
+
+    // savePendingQueue must have been called on unmount with card 1.
+    expect(vi.mocked(savePendingQueue)).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 1 })]),
+    );
+  });
+
+  it("does not call savePendingQueue on unmount when no persist timer is pending", async () => {
+    vi.mocked(pushSingleCard).mockResolvedValue(false);
+
+    const { unmount } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    // Unmount without enqueuing anything.
+    act(() => {
+      unmount();
+    });
+
+    // No timer was pending, so no flush should have occurred.
+    expect(vi.mocked(savePendingQueue)).not.toHaveBeenCalled();
+  });
 });
 
 // ─── Part 2: useRetryPush — persisted queue preferred over heuristic ───────────
@@ -357,6 +398,56 @@ describe("useRetryPush — prefers persisted queue when non-empty (#893)", () =>
     });
 
     expect(vi.mocked(clearPendingQueue)).not.toHaveBeenCalled();
+  });
+
+  it("slims the persisted queue to failed cards only on partial success (#893)", async () => {
+    // Card 1 succeeds, card 2 fails. Only card 2 should remain in the persisted queue.
+    const persistedCard1 = makeCard(1);
+    const persistedCard2 = makeCard(2);
+    vi.mocked(loadPendingQueue).mockReturnValue([persistedCard1, persistedCard2]);
+    vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
+    vi.mocked(pushSingleCard)
+      .mockResolvedValueOnce(true)   // card 1 succeeds
+      .mockResolvedValueOnce(false); // card 2 fails
+
+    const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      result.current.retryNow();
+    });
+
+    await waitFor(() => {
+      expect(result.current.retryState).toBe("error");
+    });
+
+    // savePendingQueue must be called with only the failed card (card 2).
+    expect(vi.mocked(savePendingQueue)).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 2 })]),
+    );
+    const savedArg = vi.mocked(savePendingQueue).mock.calls.at(-1)?.[0] as ReviewableCard[];
+    expect(savedArg).toHaveLength(1);
+    expect(savedArg[0].id).toBe(2);
+  });
+
+  it("does not abandon a non-empty persisted queue when failedCardCount is 0 (#893 defensive guard)", async () => {
+    // failedCardCount === 0 normally triggers a no-op early exit. When the
+    // persisted queue is non-empty those cards must still be pushed.
+    const persistedCard = makeCard(5);
+    vi.mocked(loadPendingQueue).mockReturnValue([persistedCard]);
+    vi.mocked(loadSyncStatus).mockReturnValue({ ...FAILED_STATUS, failedCardCount: 0 });
+    vi.mocked(pushSingleCard).mockResolvedValue(true);
+
+    const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      result.current.retryNow();
+    });
+
+    await waitFor(() => {
+      expect(result.current.retryState).toBe("success");
+    });
+
+    expect(pushSingleCard).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER, persistedCard);
   });
 
   it("falls back to the session-card heuristic when the persisted queue is empty", async () => {
@@ -454,6 +545,38 @@ describe("useOnlineReconnectSync — prefers persisted queue when non-empty (#89
       expect(pushSingleCard).toHaveBeenCalledTimes(2);
     });
 
+    expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+    expect(vi.mocked(clearPendingQueue)).not.toHaveBeenCalled();
+  });
+
+  it("slims the persisted queue to failed cards only on partial success (#893)", async () => {
+    // Card 1 succeeds, card 2 fails. Only card 2 should remain in the queue.
+    vi.mocked(pullAndMerge).mockResolvedValue("ok");
+    vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
+
+    const persistedCard1 = makeCard(1);
+    const persistedCard2 = makeCard(2);
+    vi.mocked(loadPendingQueue).mockReturnValue([persistedCard1, persistedCard2]);
+    vi.mocked(pushSingleCard)
+      .mockResolvedValueOnce(true)   // card 1 succeeds
+      .mockResolvedValueOnce(false); // card 2 fails
+
+    renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => fireOnline());
+
+    await waitFor(() => {
+      expect(pushSingleCard).toHaveBeenCalledTimes(2);
+    });
+
+    // savePendingQueue must be called with only the failed card (card 2).
+    expect(vi.mocked(savePendingQueue)).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 2 })]),
+    );
+    const savedArg = vi.mocked(savePendingQueue).mock.calls.at(-1)?.[0] as ReviewableCard[];
+    expect(savedArg).toHaveLength(1);
+    expect(savedArg[0].id).toBe(2);
+    // Success flag must not be set and the full queue must not be cleared.
     expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
     expect(vi.mocked(clearPendingQueue)).not.toHaveBeenCalled();
   });

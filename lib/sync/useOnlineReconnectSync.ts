@@ -7,6 +7,7 @@ import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
 import {
   loadSyncStatus,
   markPushSucceeded,
+  savePendingQueue,
   loadPendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
@@ -96,11 +97,16 @@ export function useOnlineReconnectSync(
             persistedQueue.map((card) => pushSingleCard(pushClient, pushUid, card)),
           );
 
-          const queueAnyFailed = queueResults.some(
-            (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value),
-          );
+          const failedCards = persistedQueue.filter((_, i) => {
+            const r = queueResults[i];
+            return r.status === "rejected" || (r.status === "fulfilled" && !r.value);
+          });
 
-          if (queueAnyFailed) {
+          if (failedCards.length > 0) {
+            // Partial or total failure: slim the persisted queue to only the
+            // cards that failed so the next retry does not re-push cards that
+            // already reached the cloud (#893 partial-success slimming).
+            savePendingQueue(failedCards);
             console.warn("[online-reconnect] some persisted-queue cards failed to push; will retry on next grade or reconnect");
           } else {
             // All persisted-queue cards succeeded — clear both the failure signal

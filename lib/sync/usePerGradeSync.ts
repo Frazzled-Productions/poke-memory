@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
@@ -58,6 +58,25 @@ export function usePerGradeSync(
   // does not thrash storage — a short burst of grades produces at most one
   // localStorage write.
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Flush the persist debounce on unmount so the last snapshot is written even
+  // if the component tears down before the 500 ms window elapses. Flushing
+  // (synchronous write) is preferable to dropping because the queue represents
+  // grades the user has already submitted — losing the persisted snapshot
+  // between the grade and the network push would silently abandon those cards
+  // if the tab is then force-killed. The existing push-debounce (timerRef) is
+  // left to cancel naturally; it fires async network calls and it is safer to
+  // let those complete or abort on their own rather than interrupting mid-flight.
+  useEffect(() => {
+    return () => {
+      if (persistTimerRef.current !== null) {
+        clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+        // Write the current snapshot synchronously on unmount.
+        savePendingQueue(pendingQueueRef.current);
+      }
+    };
+  }, []);
 
   const drainQueue = useCallback(async () => {
     const c = clientRef.current;

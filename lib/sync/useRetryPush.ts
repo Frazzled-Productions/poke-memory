@@ -6,6 +6,7 @@ import { pushSingleCard } from "@/lib/sync/cloud";
 import {
   loadSyncStatus,
   saveSyncStatus,
+  savePendingQueue,
   loadPendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
@@ -105,8 +106,13 @@ export function useRetryPush(
       });
     }
 
-    // failedCardCount === 0: clear the failed flag without a network call.
-    if (status.failedCardCount === 0) {
+    // failedCardCount === 0: clear the failed flag without a network call —
+    // unless a non-empty persisted queue exists, in which case those cards
+    // must be pushed even though the count signal says zero. The persisted
+    // queue is the authoritative record; never abandon it on a zero-count
+    // short-circuit (#893 defensive guard).
+    const hasPersistedQueue = loadPendingQueue().length > 0;
+    if (status.failedCardCount === 0 && !hasPersistedQueue) {
       const now = new Date().toISOString();
       clearFailedFlag({ lastPushAt: now, lastPushAttemptAt: now });
       setRetryState("success");
@@ -136,13 +142,19 @@ export function useRetryPush(
 
         if (cancelledRef.current) return;
 
-        const anyFailed = results.some(
-          (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value),
-        );
+        // Identify which cards failed so we can slim the persisted queue on
+        // partial success — re-pushing already-synced cards on the next retry
+        // is idempotent but wasteful (#893 partial-success slimming).
+        const failedCards = persistedQueue.filter((_, i) => {
+          const r = results[i];
+          return r.status === "rejected" || (r.status === "fulfilled" && !r.value);
+        });
 
         const attemptAt = new Date().toISOString();
 
-        if (anyFailed) {
+        if (failedCards.length > 0) {
+          // Partial or total failure: persist only the cards that failed.
+          savePendingQueue(failedCards);
           const latest = loadSyncStatus();
           saveSyncStatus({ ...latest, lastPushAttemptAt: attemptAt });
           if (!cancelledRef.current) setRetryState("error");

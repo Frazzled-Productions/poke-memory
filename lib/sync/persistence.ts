@@ -149,12 +149,26 @@ export function loadPendingQueue(): ReviewableCard[] {
     if (raw === null) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    // Keep only entries that look like ReviewableCard (have an `id` field).
-    // A full schema validation is intentionally omitted — the data was written
-    // by this app so heavy validation adds more surface area than safety.
+    // Keep only entries that look like ReviewableCard. Validate the minimum
+    // fields needed to push a card via pushSingleCard: `id` (dedup key),
+    // `cardType` and `subjectKey` (the DB primary key alongside user_id), and
+    // `state` (the FSRS payload). Entries missing any of these are dropped
+    // rather than rejecting the whole array — partial corruption is better
+    // than total loss. A full schema validation is intentionally omitted;
+    // the data was written by this app so the risk is malformed storage,
+    // not adversarial input.
     return parsed.filter(
       (item): item is ReviewableCard =>
-        typeof item === "object" && item !== null && "id" in item,
+        typeof item === "object" &&
+        item !== null &&
+        "id" in item &&
+        "cardType" in item &&
+        typeof (item as Record<string, unknown>).cardType === "string" &&
+        "subjectKey" in item &&
+        typeof (item as Record<string, unknown>).subjectKey === "string" &&
+        "state" in item &&
+        typeof (item as Record<string, unknown>).state === "object" &&
+        (item as Record<string, unknown>).state !== null,
     );
   } catch {
     return [];
