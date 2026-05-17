@@ -29,16 +29,36 @@ test.describe("Stats page — badge gallery", () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("locked badges show hint text", async ({ page }) => {
+  test("locked badges are hidden by default and revealed via toggle", async ({
+    page,
+  }) => {
     await page.goto("/stats");
     await expect(
       page.getByRole("heading", { level: 2, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
-    // A fresh guest session has no earned badges; at least one locked tile
-    // should be present. The Boulder Badge is the first catalog entry.
+    // A fresh guest session has no earned badges. The locked tiles must NOT
+    // be visible until the accordion is opened.
+    await expect(
+      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
+    ).not.toBeVisible();
+    // The toggle is initially collapsed — its accessible name includes "View all badges".
+    // Use aria-controls as a stable locator so re-queries survive the name change on expand.
+    const toggle = page.locator('[aria-controls="badge-gallery-locked"]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // Clicking expands the accordion — the button's label changes to "Hide locked badges…"
+    // but the aria-controls attribute remains stable for re-query.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(
       page.getByLabel(/Boulder Badge \(locked\):/i).first(),
     ).toBeVisible();
+    // Clicking again collapses the accordion and hides locked tiles.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
+    ).not.toBeVisible();
   });
 
   test("pretendAllMastered shows all badges as earned", async ({ page }) => {
