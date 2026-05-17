@@ -320,6 +320,35 @@ describe("computeStats.dueForecast", () => {
     const result = computeStats(cards, TODAY);
     expect(result.dueForecast.every((d) => d.count === 0)).toBe(true);
   });
+
+  it("counts cards due on UTC today even when called with UTC today (not a local-tz behind-UTC date)", () => {
+    // Regression guard for issue #834. Card dueDate values are stored as UTC
+    // by the FSRS scheduler. Callers must pass UTC today so the forecast window
+    // aligns with the queue builder. This test demonstrates the correct
+    // behaviour: a card due on "UTC today" is counted in forecastCounts[0]
+    // when `today` is also UTC today. If the caller mistakenly passed a
+    // behind-UTC local date (e.g. "2026-05-09" when UTC is "2026-05-10"), the
+    // card's dueDate (2026-05-10) > localToday (2026-05-09) and the card would
+    // appear in forecastCounts[1] instead — matching the bug report.
+    const UTC_TODAY = "2026-05-10";
+    const LOCAL_TODAY_BEHIND_UTC = "2026-05-09"; // e.g. user in UTC−8 late at night
+    const cardsDue = [
+      card(1, { lastReview: "2026-05-08", dueDate: UTC_TODAY }),
+      card(2, { lastReview: "2026-05-08", dueDate: UTC_TODAY }),
+    ];
+
+    // Correct: called with UTC today — both cards counted in day 0.
+    const utcResult = computeStats(cardsDue, UTC_TODAY);
+    expect(utcResult.dueForecast[0].count).toBe(2);
+    expect(utcResult.dueForecast[1].count).toBe(0);
+
+    // Wrong (bug): called with behind-UTC local date — cards "miss" today bar
+    // and fall into day 1 instead, producing an empty today bar despite the
+    // Practice screen showing them as reviews due.
+    const localResult = computeStats(cardsDue, LOCAL_TODAY_BEHIND_UTC);
+    expect(localResult.dueForecast[0].count).toBe(0); // today bar empty — the bug
+    expect(localResult.dueForecast[1].count).toBe(2); // shows up tomorrow instead
+  });
 });
 
 // ---------------------------------------------------------------------------
