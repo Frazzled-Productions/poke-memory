@@ -75,11 +75,13 @@ function isoWeekStart(isoDate: string): string {
 
 /**
  * Bucket the grade log into weekly grade-volume trend points, covering the
- * `weeks` most recent complete or in-progress weeks relative to `today`.
+ * `weeks` most recent complete weeks relative to `today`.
  *
- * Weeks are ISO weeks starting on Monday. The current (in-progress) week is
- * always included as the last point. Weeks with no grades are included as
- * zero rows so the chart has a continuous x-axis.
+ * Weeks are ISO weeks starting on Monday. The window covers the `weeks`
+ * complete past weeks (oldest = `currentWeekStart - weeks*7`; newest =
+ * `currentWeekStart - 7`). The current in-progress week is excluded so every
+ * returned bucket represents a full seven-day period. Weeks with no grades
+ * are included as zero rows so the chart has a continuous x-axis.
  *
  * Pure — no I/O. Returns `weeks` entries in ascending `weekStart` order.
  */
@@ -92,8 +94,10 @@ export function computeGradeTrend(
   const currentWeekStart = isoWeekStart(today);
 
   // Pre-build the week-start strings for all requested weeks (oldest first).
+  // i runs from `weeks` down to 1, so the oldest slot is `currentWeekStart -
+  // weeks*7` days back, giving a full `weeks`-week window.
   const weekStarts: string[] = [];
-  for (let i = weeks - 1; i >= 0; i--) {
+  for (let i = weeks; i >= 1; i--) {
     // Each step back is 7 days.
     const [cy, cm, cd] = currentWeekStart.split("-").map(Number);
     const d = new Date(Date.UTC(cy, cm - 1, cd - i * 7));
