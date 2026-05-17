@@ -66,11 +66,6 @@ function sliderToPosition(v: number): number {
   return (v - RANGE_CENTRE) / RANGE_CENTRE;
 }
 
-/** Map position (-1..1) to slider integer value. */
-function positionToSlider(p: number): number {
-  return Math.round(p * RANGE_CENTRE + RANGE_CENTRE);
-}
-
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -166,17 +161,11 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
   const isFuture = position > 0.01;
   const isPast = position < -0.01;
 
-  // Build the gradient for the visual track. Past is blue, future is amber,
-  // centre stripe is emerald.
-  // The thumb is always at 50% of the track width (the centre) at rest;
-  // as the user drags the thumb shifts to show position.
-  const thumbPct = (sliderValue / RANGE_STEPS) * 100;
-  // Gradient: past fill to thumbPct, then future fill from thumbPct.
-  const trackGradient = isFuture
-    ? `linear-gradient(to right, #3b82f6 0%, #3b82f6 50%, #f59e0b ${thumbPct}%, #e5e7eb ${thumbPct}%)`
-    : isPast
-      ? `linear-gradient(to right, #3b82f6 ${thumbPct}%, #e5e7eb ${thumbPct}%, #e5e7eb 50%, #f59e0b 50%, #f59e0b 100%)`
-      : `linear-gradient(to right, #3b82f6 0%, #3b82f6 50%, #f59e0b 50%, #f59e0b 100%)`;
+  // Static two-colour track: blue left half (past), amber right half (future).
+  // The thumb's position on the track communicates which direction the user
+  // has explored; a separate centre notch marks the "now" anchor.
+  const trackGradient =
+    "linear-gradient(to right, #3b82f6 0%, #3b82f6 50%, #f59e0b 50%, #f59e0b 100%)";
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
