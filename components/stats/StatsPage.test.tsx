@@ -272,6 +272,14 @@ vi.mock("@/lib/stats/records", () => ({
   computeRecords: vi.fn(() => null),
 }));
 
+vi.mock("@/lib/stats/completion-projection", () => ({
+  computeCompletionProjection: vi.fn(() => ({ kind: "insufficient-history" })),
+}));
+
+vi.mock("@/components/stats/CompletionProjection", () => ({
+  CompletionProjection: () => <div data-testid="completion-projection" />,
+}));
+
 vi.mock("@/lib/stats/heatmap", () => ({
   computeReviewHeatmap: vi.fn(() => []),
 }));

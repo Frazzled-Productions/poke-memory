@@ -75,3 +75,27 @@ test.describe("Stats page — review charts", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Stats page — Pokédex completion projection", () => {
+  test("the completion projection section is visible for a guest with no history", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // The section always renders (either insufficient-history or projected).
+    // A fresh guest session has no mastery history, so the heading and the
+    // insufficient-history copy should both be present.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Pokédex completion" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Not enough data yet")).toBeVisible();
+  });
+
+  test("pretendAllMastered shows the completion state", async ({ page }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Pokédex completion" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Complete!")).toBeVisible();
+  });
+});

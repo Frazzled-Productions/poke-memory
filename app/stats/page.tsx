@@ -26,6 +26,8 @@ import { computeDirectionBreakdown } from "@/lib/stats/direction-breakdown";
 import { computeDifficultyHistogram, meanDifficulty } from "@/lib/stats/difficulty-histogram";
 import { computeRetentionComparison } from "@/lib/stats/retention";
 import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-distribution";
+import { computeCompletionProjection } from "@/lib/stats/completion-projection";
+import { CompletionProjection } from "@/components/stats/CompletionProjection";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { GradeDistributionChart } from "@/components/stats/GradeDistributionChart";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
@@ -749,6 +751,16 @@ export default function StatsPage() {
         )
       : null;
 
+  const completionProjection =
+    nameCards !== null && masteryRepetitions !== null
+      ? computeCompletionProjection(
+          nameCards,
+          todayString(new Date(), userTimezone),
+          masteryRepetitions,
+          flags.pretendAllMastered,
+        )
+      : null;
+
   // Per-card-direction breakdown (#761) and retention-vs-target (#765) both
   // derive from review history, not mastery state, so neither is affected
   // by the pretendAllMastered superuser flag.
@@ -873,6 +885,13 @@ export default function StatsPage() {
             </OnboardingHint>
             <MasteryBar stats={stats} nameCardsEnabled={nameCardsEnabled} />
             <IntroducedBar stats={stats} />
+            {completionProjection !== null && (
+              <CompletionProjection
+                projection={completionProjection}
+                fmt={userDateFormat}
+                tz={userTimezone}
+              />
+            )}
             <DueForecast stats={stats} fmt={userDateFormat} tz={userTimezone} />
             <GenerationBreakdown stats={stats} />
             <TypeBreakdown perType={stats.perType} />
