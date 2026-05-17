@@ -208,14 +208,15 @@ Do not use em dashes (`—`) in user-facing copy. Restructure the sentence, or r
 
 ### Screenshots
 
-The README shows five screenshots (`docs/screenshots/{practice-front,practice-flipped,pokedex-grid,pasture,stats}.png`), all captured at the **iPhone 17 Pro viewport** (402×874 CSS px @ 3× DPR) so the README grid lines up uniformly. The capture script is `scripts/capture-screenshots.mjs`, wrapped as `npm run screenshots`.
+The README shows six screenshots (`docs/screenshots/{practice-front,practice-flipped,pokedex-grid,pasture,stats,journey}.png`), all captured at the **iPhone 17 Pro viewport** (402×874 CSS px @ 3× DPR) so the README grid lines up uniformly. The capture script is `scripts/capture-screenshots.mjs`, wrapped as `npm run screenshots`.
 
-**Rule.** When a change visibly affects any of those five surfaces — `app/page.tsx` (Practice), `app/pokedex/**`, `app/pasture/**`, `app/stats/**`, or a `components/**` change that the surface renders — regenerate the affected screenshot(s) and commit them in the same PR. **Run locally on macOS only.** CI does not regenerate, because Linux font anti-aliasing differs visibly from macOS Core Text and would clobber every screenshot on every PR.
+**Rule.** When a change visibly affects any of those six surfaces — `app/page.tsx` (Practice), `app/pokedex/**`, `app/pasture/**`, `app/stats/**`, `app/journey/**`, or a `components/**` change that the surface renders — regenerate the affected screenshot(s) and commit them in the same PR. **Run locally on macOS only.** CI does not regenerate, because Linux font anti-aliasing differs visibly from macOS Core Text and would clobber every screenshot on every PR.
 
 ```bash
 npm run dev &                          # in another terminal, or in the background
-npm run screenshots                    # all five
+npm run screenshots                    # all six
 npm run screenshots -- --page=pasture  # one surface
+npm run screenshots -- --page=journey  # journey surface
 ```
 
 The script uses the `pretendAllMastered` superuser flag so renders are deterministic without depending on a particular review history. Don't change the viewport, the device-scale factor, or the surface list without updating every existing screenshot in the same commit — the README layout assumes consistent shape.

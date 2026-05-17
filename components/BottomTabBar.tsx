@@ -113,11 +113,36 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
+function JourneyIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Trophy / award cup shape */}
+      <path d="M6 9H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3" />
+      <path d="M18 9h3a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-3" />
+      <path d="M6 4h12v7a6 6 0 0 1-12 0V4z" />
+      <path d="M12 17v4" />
+      <path d="M8 21h8" />
+    </svg>
+  );
+}
+
 // ─── Static tab definitions ───────────────────────────────────────────────
 
 const STATIC_TABS = [
   { href: "/", label: "Practice", Icon: PracticeIcon },
   { href: "/stats", label: "Stats", Icon: StatsIcon },
+  { href: "/journey", label: "Journey", Icon: JourneyIcon },
   { href: "/pokedex", label: "Pokédex", Icon: PokedexIcon },
   { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ] as const;

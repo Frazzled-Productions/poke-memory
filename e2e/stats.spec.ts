@@ -17,66 +17,8 @@ async function seedSuperuser(
   }, opts);
 }
 
-test.describe("Stats page — badge gallery", () => {
-  test("badge gallery section is visible on the stats page", async ({
-    page,
-  }) => {
-    await page.goto("/stats");
-    // Wait for the page to hydrate past the loading skeleton — the heading
-    // only renders once stats are loaded.
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
-    ).toBeVisible({ timeout: 15_000 });
-  });
-
-  test("locked badges are hidden by default and revealed via toggle", async ({
-    page,
-  }) => {
-    await page.goto("/stats");
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
-    ).toBeVisible({ timeout: 15_000 });
-    // A fresh guest session has no earned badges. The locked tiles must NOT
-    // be visible until the accordion is opened.
-    await expect(
-      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
-    ).not.toBeVisible();
-    // The toggle is initially collapsed — its accessible name includes "View all badges".
-    // Use aria-controls as a stable locator so re-queries survive the name change on expand.
-    const toggle = page.locator('[aria-controls="badge-gallery-locked"]');
-    await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    // Clicking expands the accordion — the button's label changes to "Hide locked badges…"
-    // but the aria-controls attribute remains stable for re-query.
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(
-      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
-    ).toBeVisible();
-    // Clicking again collapses the accordion and hides locked tiles.
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(
-      page.getByLabel(/Boulder Badge \(locked\):/i).first(),
-    ).not.toBeVisible();
-  });
-
-  test("pretendAllMastered shows all badges as earned", async ({ page }) => {
-    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
-    await page.goto("/stats");
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
-    ).toBeVisible({ timeout: 15_000 });
-    // Under the flag every badge tile has ", earned" in its accessible name.
-    // Boulder Badge is the first catalog entry.
-    await expect(
-      page.getByLabel("Boulder Badge, earned"),
-    ).toBeVisible();
-  });
-});
-
 test.describe("Stats page — review charts", () => {
-  test("the three new chart sections render", async ({ page }) => {
+  test("the three analytical chart sections render", async ({ page }) => {
     await page.goto("/stats");
     // The recall-vs-target indicator, per-direction breakdown and difficulty
     // histogram are pure-derive, so they render even for a fresh guest with
@@ -218,5 +160,38 @@ test.describe("Stats page — mastery over time chart", () => {
     await expect(
       page.getByText(/No mastered species yet/i),
     ).not.toBeVisible();
+  });
+});
+
+test.describe("Stats page — section headings", () => {
+  test("analytical section headings are present", async ({ page }) => {
+    await page.goto("/stats");
+    // Wait for hydration.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Accuracy", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Activity", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible();
+  });
+
+  test("celebratory content (trainer card, badge gallery) has moved to Journey", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // Wait for the page to hydrate.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Accuracy", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    // Trainer card and badge gallery must NOT appear on Stats.
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Gym badges" }),
+    ).toHaveCount(0);
   });
 });
