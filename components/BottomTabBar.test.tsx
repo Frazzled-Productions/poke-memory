@@ -60,9 +60,12 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
 
 import type { MobileNav } from "@/lib/settings/persistence";
 
-const mockLoadSettings = vi.fn((): { mobileNav: MobileNav } => ({
-  mobileNav: "bottom",
-}));
+const mockLoadSettings = vi.fn(
+  (): { mobileNav: MobileNav; masteryRepetitions: number } => ({
+    mobileNav: "bottom",
+    masteryRepetitions: 3,
+  }),
+);
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
@@ -77,7 +80,7 @@ import { BottomTabBar } from "@/components/BottomTabBar";
 beforeEach(() => {
   mockPathname.value = "/";
   mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: false } });
-  mockLoadSettings.mockReturnValue({ mobileNav: "bottom" });
+  mockLoadSettings.mockReturnValue({ mobileNav: "bottom", masteryRepetitions: 3 });
 });
 
 describe("BottomTabBar", () => {
@@ -148,7 +151,10 @@ describe("BottomTabBar", () => {
   });
 
   it("renders nothing when mobileNav is 'hamburger'", async () => {
-    mockLoadSettings.mockReturnValue({ mobileNav: "hamburger" as MobileNav });
+    mockLoadSettings.mockReturnValue({
+      mobileNav: "hamburger" as MobileNav,
+      masteryRepetitions: 3,
+    });
 
     const { container } = render(<BottomTabBar />);
 

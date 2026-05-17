@@ -217,6 +217,36 @@ describe("filterMastered", () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe(1);
   });
+
+  it("honours a higher masteryRepetitions threshold", () => {
+    // reps: 3 satisfies the default threshold but not a custom threshold of 5.
+    const cards = [makeCard(1, "name", masteredState)];
+    expect(filterMastered(cards, false, 5)).toHaveLength(0);
+  });
+
+  it("honours a lower masteryRepetitions threshold", () => {
+    // learningState has reps: 2 — not mastered under the default of 3, but
+    // mastered once the threshold drops to 2 (scheduledDays is already >= 21).
+    const lowRepCard = makeCard(
+      1,
+      "name",
+      makeState({
+        reps: 2,
+        scheduledDays: 21,
+        lastReview: "2026-05-01",
+        firstSeen: "2026-04-01",
+        fsrsState: "review",
+      }),
+    );
+    expect(filterMastered([lowRepCard], false)).toHaveLength(0);
+    expect(filterMastered([lowRepCard], false, 2)).toHaveLength(1);
+  });
+
+  it("forceAllMastered overrides a higher masteryRepetitions threshold", () => {
+    const cards = [makeCard(1, "name", learningState)];
+    // Even with a threshold the card cannot meet, forceAllMastered lets it through.
+    expect(filterMastered(cards, true, 10)).toHaveLength(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

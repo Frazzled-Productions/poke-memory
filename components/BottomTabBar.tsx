@@ -179,8 +179,10 @@ function BottomTabBarInner() {
   useEffect(() => {
     async function load() {
       const session = await loadSession();
+      const masteryRepetitions = loadSettings().masteryRepetitions;
       setHasMastered(
-        session !== null && filterMastered(session.cards).length > 0,
+        session !== null &&
+          filterMastered(session.cards, false, masteryRepetitions).length > 0,
       );
     }
     void load();

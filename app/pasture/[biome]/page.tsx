@@ -15,6 +15,7 @@ import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
+import { loadSettings } from "@/lib/settings/persistence";
 
 type Placement = {
   card: NameReviewCard;
@@ -95,8 +96,13 @@ export default function BiomeLandscapePage({
         setMasteredCards(all);
       } else {
         const session = await loadSession();
+        const masteryRepetitions = loadSettings().masteryRepetitions;
         const cards = session
-          ? (filterMastered(session.cards, false) as NameReviewCard[])
+          ? (filterMastered(
+              session.cards,
+              false,
+              masteryRepetitions,
+            ) as NameReviewCard[])
           : [];
         setMasteredCards(cards);
       }

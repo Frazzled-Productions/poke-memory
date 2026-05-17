@@ -57,6 +57,10 @@ vi.mock("@/lib/pasture/arrivals", () => ({
   filterMastered: vi.fn().mockReturnValue([]),
 }));
 
+vi.mock("@/lib/settings/persistence", () => ({
+  loadSettings: vi.fn(() => ({ masteryRepetitions: 3 })),
+}));
+
 vi.mock("@/lib/review/useSessionStorageKey", () => ({
   useSessionStorageKey: vi.fn().mockReturnValue(0),
 }));

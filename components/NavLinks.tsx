@@ -8,6 +8,7 @@ import { loadSession } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { loadSettings } from "@/lib/settings/persistence";
 import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 
 const NAV_LINKS = [
@@ -33,8 +34,10 @@ export function NavLinks() {
   useEffect(() => {
     async function load() {
       const session = await loadSession();
+      const masteryRepetitions = loadSettings().masteryRepetitions;
       setHasMastered(
-        session !== null && filterMastered(session.cards).length > 0,
+        session !== null &&
+          filterMastered(session.cards, false, masteryRepetitions).length > 0,
       );
     }
     void load();
