@@ -47,10 +47,7 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
         {projection.kind === "projected" && (
           <div className="flex flex-col gap-3">
             <div>
-              <p
-                className="text-2xl font-bold tabular-nums text-foreground"
-                aria-label={`Estimated completion date: ${formatDate(projection.projectedDate, fmt, tz)}`}
-              >
+              <p className="text-2xl font-bold tabular-nums text-foreground">
                 {formatDate(projection.projectedDate, fmt, tz)}
               </p>
               <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
@@ -68,7 +65,7 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
                 <span className="font-medium text-foreground">
                   {projection.weeklyRate.toFixed(1)}
                 </span>{" "}
-                mastered per week (28-day average)
+                mastered per week (recent pace)
               </span>
             </div>
           </div>

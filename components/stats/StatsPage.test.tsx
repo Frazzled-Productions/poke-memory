@@ -529,3 +529,17 @@ describe("StatsPage — Force pull from cloud button", () => {
     confirmSpy.mockRestore();
   });
 });
+
+describe("StatsPage — CompletionProjection widget", () => {
+  it("renders the completion-projection stub in the page", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<StatsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("completion-projection")).toBeInTheDocument();
+    });
+  });
+});

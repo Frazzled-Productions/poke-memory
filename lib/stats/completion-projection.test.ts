@@ -155,10 +155,17 @@ describe("insufficient history", () => {
   });
 
   it("returns insufficient-history when history is less than MIN_HISTORY_DAYS old", () => {
-    // Mastered just 3 days ago — not enough history.
-    const cards = [masteredCard(1, MIN_HISTORY_DAYS - 2), lockedCard(2), lockedCard(3)];
+    // Mastered exactly MIN_HISTORY_DAYS - 1 days ago — one day short of the threshold.
+    const cards = [masteredCard(1, MIN_HISTORY_DAYS - 1), lockedCard(2), lockedCard(3)];
     const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
     expect(result.kind).toBe("insufficient-history");
+  });
+
+  it("returns projected when history is exactly MIN_HISTORY_DAYS old", () => {
+    // Mastered exactly MIN_HISTORY_DAYS days ago — the first day it should produce a projection.
+    const cards = [masteredCard(1, MIN_HISTORY_DAYS), lockedCard(2), lockedCard(3)];
+    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    expect(result.kind).toBe("projected");
   });
 
   it("returns insufficient-history when the projected date exceeds MAX_PROJECTION_DAYS", () => {
