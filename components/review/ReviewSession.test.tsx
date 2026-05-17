@@ -701,6 +701,127 @@ describe("Baseline: due review card reveal → grade cycle", () => {
   });
 });
 
+describe("Regression: learning-card displaces current card before Reveal (#839)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps the current card on screen when a learning card becomes due before Reveal is clicked", async () => {
+    // Scenario: the user is looking at a review card on its front face
+    // (Reveal not yet clicked). A learning card's dueAt passes and the
+    // countdown setTimeout fires, triggering a re-render. Without the
+    // displayedCardId lock the learning card would displace the current
+    // card and the user's tap-in-progress would land on the wrong card.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+    const now = Date.now();
+
+    // Review card (due today) — the card currently on screen.
+    const reviewCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      name: "Bulbasaur",
+      state: {
+        stability: 5,
+        difficulty: 1,
+        elapsedDays: 0,
+        scheduledDays: 5,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-17",
+        lastReview: "2026-05-12",
+        firstSeen: "2026-05-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    // Learning card due in 150 ms — will fire its timeout before the user taps Reveal.
+    const learningCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 2,
+      name: "Ivysaur",
+      spriteUrl: "https://example.com/ivysaur.png",
+      state: {
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "new" as const,
+        dueDate: "2026-05-17",
+        lastReview: null,
+        firstSeen: "2026-05-17",
+        learningStep: 0,
+        stepStartedAt: now - (LEARNING_STEPS_MS[0] - 150), // dueAt = now + 150 ms
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([reviewCard, learningCard]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [reviewCard, learningCard],
+      limits: DEFAULT_LIMITS,
+    });
+
+    await act(async () => { render(<ReviewSession />); });
+
+    // Review card is on screen — Reveal button visible, name hidden.
+    const revealBtn = screen.getByRole("button", { name: /reveal/i });
+    expect(revealBtn).toBeInTheDocument();
+
+    // Advance time past the learning card's dueAt WITHOUT clicking Reveal.
+    // This fires the countdown setTimeout and triggers a re-render.
+    await act(async () => { vi.advanceTimersByTime(300); });
+
+    // The Reveal button must still be present — the review card was NOT displaced.
+    expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    // Grade buttons must not be visible — we haven't revealed anything.
+    expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
+
+    // Reveal the card — confirm it is still the review card, not the learning card.
+    act(() => { fireEvent.click(screen.getByRole("button", { name: /reveal/i })); });
+    // The review card's name must be visible after reveal.
+    expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
+    expect(screen.queryByText("Ivysaur")).not.toBeInTheDocument();
+    // Grade buttons must now be present.
+    expect(screen.getByRole("button", { name: /easy/i })).toBeInTheDocument();
+
+    // Grade the review card using the same pattern as the #196 regression test:
+    // click inside fake-timer mode, then switch to real timers so the async
+    // handleGrade microtasks can settle and waitFor can poll.
+    act(() => { fireEvent.click(screen.getByRole("button", { name: /easy/i })); });
+
+    vi.useRealTimers();
+
+    // The review card (id 1) must have been graded after the grade settles.
+    await waitFor(() => {
+      expect(vi.mocked(saveSession)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: expect.arrayContaining([
+            expect.objectContaining({
+              id: 1,
+              state: expect.objectContaining({ lastReview: "2026-05-17" }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    // The learning card (id 2) must remain in its learning step — it was not graded.
+    const lastCallArg = vi.mocked(saveSession).mock.lastCall?.[0] as
+      | { cards: { id: number; state: { learningStep: number | null } }[] }
+      | undefined;
+    const savedLearningCard = lastCallArg?.cards.find((c) => c.id === 2);
+    expect(savedLearningCard?.state.learningStep).toBe(0);
+  });
+});
+
 describe("Regression: learning-queue preemption during grading window (#196)", () => {
   afterEach(() => {
     vi.useRealTimers();

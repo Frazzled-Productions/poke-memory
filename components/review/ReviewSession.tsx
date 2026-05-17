@@ -507,6 +507,11 @@ export function ReviewSession() {
   // Locks the card the user clicked Reveal on so a learning-queue re-render
   // can't swap it out before the user submits a grade.
   const revealedCardId = useRef<number | null>(null);
+  // Locks the card being displayed from the moment it first appears on screen
+  // until the user explicitly advances by grading. Without this lock a learning
+  // card whose dueAt passes mid-render can displace the current card before the
+  // user has had a chance to tap Reveal, causing a mis-click (#839).
+  const displayedCardId = useRef<number | null>(null);
   // Guards against advancing to the next card after the component has unmounted
   // (e.g. the user navigates away during the waitForAudio delay).
   const isMountedRef = useRef(true);
@@ -813,6 +818,7 @@ export function ReviewSession() {
               mastered: undoSnapshot.masteredThisSession,
             });
           }
+          displayedCardId.current = undoSnapshot.cardId;
           revealedCardId.current = undoSnapshot.cardId;
           setRevealed(true);
           // Bump presentation counter so SpritePicker remounts with fresh
@@ -954,15 +960,33 @@ export function ReviewSession() {
   const currentCard =
     currentCardId !== null ? cards.find((c) => c.id === currentCardId) ?? null : null;
 
-  // If the user has clicked Reveal, lock that card for the duration of the
-  // grading window. A learning-queue setTimeout may fire mid-session and flip
-  // currentCardId to the now-due learning card; without this lock the grade
-  // buttons would show for the wrong card.
-  const lockedCard =
+  // Maintain the display lock: once a card is on screen, keep it there until
+  // the user explicitly advances by grading (#839). Setting a ref during render
+  // is safe here — it is always in the same render branch and never triggers a
+  // re-render itself. The lock is cleared at the end of handleGrade.
+  if (currentCard !== null && displayedCardId.current === null) {
+    // A new card just became the current card — lock it in.
+    displayedCardId.current = currentCard.id;
+  } else if (currentCard === null) {
+    // No card left (session complete) — release the lock.
+    displayedCardId.current = null;
+  }
+
+  // Prefer the locked displayed card over the freshly computed one.
+  // This prevents a learning card whose dueAt passes mid-render from
+  // displacing the card the user is currently looking at.
+  const lockedDisplayCard =
+    displayedCardId.current !== null
+      ? (cards.find((c) => c.id === displayedCardId.current) ?? null)
+      : null;
+
+  // If the user has clicked Reveal, additionally lock that card for the
+  // duration of the grading window so the grade buttons act on the right card.
+  const lockedRevealCard =
     revealed && revealedCardId.current !== null
       ? (cards.find((c) => c.id === revealedCardId.current) ?? null)
       : null;
-  const effectiveCard = lockedCard ?? currentCard;
+  const effectiveCard = lockedRevealCard ?? lockedDisplayCard ?? currentCard;
 
   // --- Sprite preloading (#705, extended in #708) ---
   // Warm the browser cache for the current card's reveal-face sprite(s) and
@@ -1199,32 +1223,36 @@ export function ReviewSession() {
   // --- Handlers ---
 
   function handleReveal() {
-    if (currentCard === null) return;
-    if (currentCard.cardType === "name") {
-      const facts = getPokemonFacts(currentCard);
+    // Use effectiveCard rather than currentCard so the reveal always acts on
+    // the card currently displayed (#839). After a learning-queue re-render,
+    // currentCard may have shifted to a newly-due learning card while the
+    // displayedCardId lock keeps effectiveCard pointing to the original card.
+    if (effectiveCard === null) return;
+    if (effectiveCard.cardType === "name") {
+      const facts = getPokemonFacts(effectiveCard);
       setCurrentFact(selectFact(facts));
-    } else if (currentCard.cardType === "evolution") {
-      const evoPokemon = SEED_POKEMON.find((p) => p.id === currentCard.postEvoId);
+    } else if (effectiveCard.cardType === "evolution") {
+      const evoPokemon = SEED_POKEMON.find((p) => p.id === effectiveCard.postEvoId);
       if (evoPokemon) {
         setCurrentFact(selectFact(getPokemonFacts(evoPokemon)));
       } else {
-        console.warn(`[handleReveal] seed data missing for evolution target: ${currentCard.postEvoName}`);
+        console.warn(`[handleReveal] seed data missing for evolution target: ${effectiveCard.postEvoName}`);
         setCurrentFact(null);
       }
-    } else if (currentCard.cardType === "reverse-evolution") {
+    } else if (effectiveCard.cardType === "reverse-evolution") {
       // Reverse direction: the answer is the pre-evo, so surface its facts.
-      const preEvo = SEED_POKEMON.find((p) => p.id === currentCard.preEvoId);
+      const preEvo = SEED_POKEMON.find((p) => p.id === effectiveCard.preEvoId);
       if (preEvo) {
         setCurrentFact(selectFact(getPokemonFacts(preEvo)));
       } else {
-        console.warn(`[handleReveal] seed data missing for reverse-evolution source: ${currentCard.preEvoName}`);
+        console.warn(`[handleReveal] seed data missing for reverse-evolution source: ${effectiveCard.preEvoName}`);
         setCurrentFact(null);
       }
     } else {
       setCurrentFact(null);
     }
     setRevealed(true);
-    revealedCardId.current = currentCard.id;
+    revealedCardId.current = effectiveCard.id;
     const revealSettings = loadSettings();
     const cryOn = revealSettings.playCryOnReveal;
     const speakOn = revealSettings.speakNameOnReveal;
@@ -1233,21 +1261,21 @@ export function ReviewSession() {
     // picker cards never reach handleReveal so they're absent here).
     let nameToSpeak: string | null = null;
     let idToSpeak: number | null = null;
-    if (currentCard.cardType === "name") { nameToSpeak = currentCard.name; idToSpeak = currentCard.id; }
-    else if (currentCard.cardType === "evolution") { nameToSpeak = currentCard.postEvoName; idToSpeak = currentCard.postEvoId; }
-    else if (currentCard.cardType === "reverse-evolution") { nameToSpeak = currentCard.preEvoName; idToSpeak = currentCard.preEvoId; }
-    else if (currentCard.cardType === "cry") { nameToSpeak = currentCard.name; idToSpeak = currentCard.pokemonId; }
+    if (effectiveCard.cardType === "name") { nameToSpeak = effectiveCard.name; idToSpeak = effectiveCard.id; }
+    else if (effectiveCard.cardType === "evolution") { nameToSpeak = effectiveCard.postEvoName; idToSpeak = effectiveCard.postEvoId; }
+    else if (effectiveCard.cardType === "reverse-evolution") { nameToSpeak = effectiveCard.preEvoName; idToSpeak = effectiveCard.preEvoId; }
+    else if (effectiveCard.cardType === "cry") { nameToSpeak = effectiveCard.name; idToSpeak = effectiveCard.pokemonId; }
 
     // Pick the cry URL per direction. Cry cards: the cry was the prompt, so don't
     // replay it on reveal.
     let cryUrlOnReveal: string | null = null;
     if (cryOn) {
-      if (currentCard.cardType === "name") cryUrlOnReveal = currentCard.cryUrl ?? null;
-      else if (currentCard.cardType === "evolution") {
-        const target = SEED_POKEMON.find((p) => p.id === currentCard.postEvoId);
+      if (effectiveCard.cardType === "name") cryUrlOnReveal = effectiveCard.cryUrl ?? null;
+      else if (effectiveCard.cardType === "evolution") {
+        const target = SEED_POKEMON.find((p) => p.id === effectiveCard.postEvoId);
         cryUrlOnReveal = target?.cryUrl ?? null;
-      } else if (currentCard.cardType === "reverse-evolution") {
-        const target = SEED_POKEMON.find((p) => p.id === currentCard.preEvoId);
+      } else if (effectiveCard.cardType === "reverse-evolution") {
+        const target = SEED_POKEMON.find((p) => p.id === effectiveCard.preEvoId);
         cryUrlOnReveal = target?.cryUrl ?? null;
       }
     }
@@ -1258,7 +1286,7 @@ export function ReviewSession() {
     // Branch on whether a cry will play. If yes, chain TTS to fire after `ended`.
     // If no cry (toggle off or no url), fall through to TTS directly so they don't
     // both fire on the same tick.
-    if (cryOn && (currentCard.cardType === "name" || currentCard.cardType === "evolution" || currentCard.cardType === "reverse-evolution")) {
+    if (cryOn && (effectiveCard.cardType === "name" || effectiveCard.cardType === "evolution" || effectiveCard.cardType === "reverse-evolution")) {
       playCry(cryUrlOnReveal, 0.6, speakAfterCry);
     } else if (speakOn && nameToSpeak !== null) {
       speakName(nameToSpeak, idToSpeak);
@@ -1531,6 +1559,9 @@ export function ReviewSession() {
     setCurrentFact(null);
     setRevealed(false);
     revealedCardId.current = null;
+    // Release the display lock so the next card can be picked up on the
+    // following render (#839).
+    displayedCardId.current = null;
     // Advance the presentation counter so the next card (or a replay of this
     // same card) gets a fresh SpritePicker mount with a re-shuffled option
     // grid (#496).
@@ -1568,7 +1599,9 @@ export function ReviewSession() {
       });
     }
     // Make the undone card the current revealed card so the user lands
-    // back on the prompt they just graded.
+    // back on the prompt they just graded. Also reset the display lock so
+    // the undo card is locked in from this point (#839).
+    displayedCardId.current = undoSnapshot.cardId;
     revealedCardId.current = undoSnapshot.cardId;
     setRevealed(true);
     // Bump the presentation counter so SpritePicker remounts with a fresh
