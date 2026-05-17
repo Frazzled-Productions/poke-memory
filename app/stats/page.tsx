@@ -26,8 +26,10 @@ import { computeDirectionBreakdown } from "@/lib/stats/direction-breakdown";
 import { computeDifficultyHistogram, meanDifficulty } from "@/lib/stats/difficulty-histogram";
 import { computeRetentionComparison } from "@/lib/stats/retention";
 import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-distribution";
+import { computeMasteryOverTime } from "@/lib/stats/mastery-over-time";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { GradeDistributionChart } from "@/components/stats/GradeDistributionChart";
+import { MasteryOverTimeChart } from "@/components/stats/MasteryOverTimeChart";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
 import { DirectionBreakdownChart } from "@/components/stats/DirectionBreakdownChart";
 import { DifficultyHistogram } from "@/components/stats/DifficultyHistogram";
@@ -781,6 +783,15 @@ export default function StatsPage() {
             // NOT mastery state, so they are unaffected by pretendAllMastered.
             gradeDistribution: computeGradeDistribution(gradeLog),
             gradeTrend: computeGradeTrend(gradeLog, today, 12),
+            // Mastery over time IS mastery-derived and MUST honour
+            // pretendAllMastered (canonical pattern: forceAllMastered goes
+            // through to the pure helper as an optional param).
+            masteryOverTime: computeMasteryOverTime(
+              cards.filter((c) => c.cardType === "name") as Parameters<typeof computeMasteryOverTime>[0],
+              today,
+              masteryRepetitions ?? undefined,
+              flags.pretendAllMastered,
+            ),
           };
         })()
       : null;
@@ -855,6 +866,10 @@ export default function StatsPage() {
                 <DifficultyHistogram
                   buckets={reviewCharts.difficultyBuckets}
                   mean={reviewCharts.difficultyMean}
+                />
+                <MasteryOverTimeChart
+                  series={reviewCharts.masteryOverTime}
+                  totalCards={stats?.totalCards ?? 0}
                 />
               </>
             )}

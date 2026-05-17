@@ -266,10 +266,20 @@ vi.mock("@/lib/stats/derive", () => ({
       })),
     }),
   ),
+  // `isMastered` and `MASTERY_REPETITIONS` are used by computeMasteryOverTime,
+  // which is called from the stats page's reviewCharts computation.
+  isMastered: vi.fn((state: { reps: number; scheduledDays: number }) =>
+    state.reps >= 3 && state.scheduledDays >= 21,
+  ),
+  MASTERY_REPETITIONS: 3,
 }));
 
 vi.mock("@/lib/stats/records", () => ({
   computeRecords: vi.fn(() => null),
+}));
+
+vi.mock("@/lib/stats/mastery-over-time", () => ({
+  computeMasteryOverTime: vi.fn(() => []),
 }));
 
 vi.mock("@/lib/stats/heatmap", () => ({
@@ -329,6 +339,10 @@ vi.mock("@/components/stats/RecordsCard", () => ({
 
 vi.mock("@/components/stats/ReviewHeatmap", () => ({
   ReviewHeatmap: () => <div data-testid="review-heatmap" />,
+}));
+
+vi.mock("@/components/stats/MasteryOverTimeChart", () => ({
+  MasteryOverTimeChart: () => <div data-testid="mastery-over-time-chart" />,
 }));
 
 vi.mock("@/components/onboarding/OnboardingHint", () => ({
