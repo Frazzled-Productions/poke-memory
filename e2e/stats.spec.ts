@@ -99,3 +99,59 @@ test.describe("Stats page — Pokédex completion projection", () => {
     await expect(page.getByText("Complete!")).toBeVisible();
   });
 });
+
+test.describe("Stats page — daily activity chart", () => {
+  test("daily activity section renders with empty state for a guest", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // The section heading appears once the page has hydrated past the skeleton.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Daily activity" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // A fresh guest session has no grade log — the empty-state message should
+    // be visible instead of the chart.
+    await expect(
+      page.getByText("No activity recorded yet"),
+    ).toBeVisible();
+  });
+});
+
+test.describe("Stats page — mastery over time chart", () => {
+  test("the mastery over time section is visible on a fresh guest session", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // The section heading is always rendered once the stats page hydrates.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Mastery over time" }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("shows the empty state when no species are mastered", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Mastery over time" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // A fresh guest has no mastered cards — the empty state copy should appear.
+    await expect(
+      page.getByText(/No mastered species yet/i),
+    ).toBeVisible();
+  });
+
+  test("pretendAllMastered shows a non-zero mastery count", async ({ page }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Mastery over time" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // Under the flag the headline count is the full species count — non-zero.
+    // We can't assert the exact number without knowing the seed size, so just
+    // confirm the empty-state copy is NOT shown.
+    await expect(
+      page.getByText(/No mastered species yet/i),
+    ).not.toBeVisible();
+  });
+});

@@ -28,8 +28,10 @@ import { computeRetentionComparison } from "@/lib/stats/retention";
 import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-distribution";
 import { computeCompletionProjection } from "@/lib/stats/completion-projection";
 import { CompletionProjection } from "@/components/stats/CompletionProjection";
+import { computeMasteryOverTime } from "@/lib/stats/mastery-over-time";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { GradeDistributionChart } from "@/components/stats/GradeDistributionChart";
+import { MasteryOverTimeChart } from "@/components/stats/MasteryOverTimeChart";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
 import { DirectionBreakdownChart } from "@/components/stats/DirectionBreakdownChart";
 import { DifficultyHistogram } from "@/components/stats/DifficultyHistogram";
@@ -40,6 +42,8 @@ import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { computeRecords, type Records } from "@/lib/stats/records";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
+import { ActivityHistoryChart } from "@/components/stats/ActivityHistoryChart";
+import { computeActivityHistory } from "@/lib/stats/activity-history";
 import { TrainerCard } from "@/components/stats/TrainerCard";
 import { BadgeGallery } from "@/components/badges/BadgeGallery";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -793,6 +797,21 @@ export default function StatsPage() {
             // NOT mastery state, so they are unaffected by pretendAllMastered.
             gradeDistribution: computeGradeDistribution(gradeLog),
             gradeTrend: computeGradeTrend(gradeLog, today, 12),
+            // Activity history — reviews per day and new cards introduced per
+            // day over the rolling year. Derives from review history, NOT
+            // mastery state, so it is unaffected by pretendAllMastered.
+            activityHistory: computeActivityHistory(gradeLog, today, 365),
+            // Mastery over time IS mastery-derived and MUST honour
+            // pretendAllMastered (canonical pattern: forceAllMastered goes
+            // through to the pure helper as an optional param).
+            masteryOverTime: computeMasteryOverTime(
+              // nameCards is non-null here: the IIFE is only reached when
+              // cards !== null, which is the same condition that sets nameCards.
+              nameCards!,
+              today,
+              masteryRepetitions ?? undefined,
+              flags.pretendAllMastered,
+            ),
           };
         })()
       : null;
@@ -868,11 +887,23 @@ export default function StatsPage() {
                   buckets={reviewCharts.difficultyBuckets}
                   mean={reviewCharts.difficultyMean}
                 />
+                <MasteryOverTimeChart
+                  series={reviewCharts.masteryOverTime}
+                  totalCards={stats.totalCards}
+                  dateFormat={userDateFormat}
+                  forceAllMastered={flags.pretendAllMastered}
+                />
               </>
             )}
             <ReviewHeatmap
               columns={computeReviewHeatmap(gradeLog, todayString(new Date(), userTimezone))}
             />
+            {reviewCharts !== null && (
+              <ActivityHistoryChart
+                series={reviewCharts.activityHistory}
+                dateFormat={userDateFormat}
+              />
+            )}
             <OnboardingHint id="statsHintDismissed" title="What &quot;mastered&quot; means">
               <p>
                 A card is mastered once you&apos;ve recalled it correctly{" "}
