@@ -101,6 +101,19 @@ function makeBranchingFamily(completed = false): EvolutionFamily {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Clicks the "Expand" toggle so that the hidden panel becomes visible.
+ * The wall starts collapsed by default; any test that needs to interact
+ * with filter tabs, the gallery, or the legend must call this first.
+ */
+function expandWall() {
+  fireEvent.click(screen.getByRole("button", { name: /Expand/i }));
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -112,7 +125,14 @@ describe("EvolutionWall — basic render", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the families completed headline metric", () => {
+  it("renders the Expand toggle button collapsed by default", () => {
+    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    const btn = screen.getByRole("button", { name: /Expand/i });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("renders the families completed headline metric (visible while collapsed)", () => {
     render(<EvolutionWall families={[makeLinearFamily({})]} />);
     expect(screen.getByText(/Families completed:/i)).toBeInTheDocument();
   });
@@ -135,8 +155,19 @@ describe("EvolutionWall — basic render", () => {
     expect(ones.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("renders the All / In progress / Completed filter tabs", () => {
+  it("Expand toggle shows panel and updates aria-expanded", () => {
     render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    const btn = screen.getByRole("button", { name: /Expand/i });
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+    // Filter tabs are now accessible.
+    expect(screen.getByRole("tab", { name: "All" })).toBeInTheDocument();
+  });
+
+  it("renders the All / In progress / Completed filter tabs (after expanding)", () => {
+    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    expandWall();
     expect(screen.getByRole("tab", { name: "All" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "In progress" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Completed" })).toBeInTheDocument();
@@ -144,6 +175,7 @@ describe("EvolutionWall — basic render", () => {
 
   it("defaults to the All filter (aria-selected=true on All tab)", () => {
     render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    expandWall();
     expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -154,8 +186,9 @@ describe("EvolutionWall — basic render", () => {
     );
   });
 
-  it("renders the legend with all three states", () => {
+  it("renders the legend with all three states (after expanding)", () => {
     render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    expandWall();
     expect(screen.getByText(/Both mastered/i)).toBeInTheDocument();
     expect(screen.getByText(/One direction mastered/i)).toBeInTheDocument();
     expect(screen.getByText(/Not yet mastered/i)).toBeInTheDocument();
@@ -163,14 +196,16 @@ describe("EvolutionWall — basic render", () => {
 });
 
 describe("EvolutionWall — species nodes", () => {
-  it("renders species names for a linear chain", () => {
+  it("renders species names for a linear chain (after expanding)", () => {
     render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    expandWall();
     expect(screen.getByAltText("Bulbasaur")).toBeInTheDocument();
     expect(screen.getByAltText("Ivysaur")).toBeInTheDocument();
   });
 
-  it("renders species names for a branching family", () => {
+  it("renders species names for a branching family (after expanding)", () => {
     render(<EvolutionWall families={[makeBranchingFamily()]} />);
+    expandWall();
     expect(screen.getByAltText("Eevee")).toBeInTheDocument();
     expect(screen.getByAltText("Vaporeon")).toBeInTheDocument();
     expect(screen.getByAltText("Jolteon")).toBeInTheDocument();
@@ -178,10 +213,11 @@ describe("EvolutionWall — species nodes", () => {
 });
 
 describe("EvolutionWall — completed family styling", () => {
-  it("shows a Done badge on completed families", () => {
+  it("shows a Done badge on completed families (after expanding)", () => {
     render(
       <EvolutionWall families={[makeLinearFamily({ edgeMastered: true, completed: true })]} />,
     );
+    expandWall();
     // The "Done" marker is aria-hidden but its text is in the DOM.
     expect(screen.getByText("Done")).toBeInTheDocument();
   });
@@ -225,8 +261,9 @@ describe("EvolutionWall — filter behaviour", () => {
   };
   const allFamilies = [inProgressFamily, untouchedFamily, completedFamily];
 
-  it("shows all families under the All filter", () => {
+  it("shows all families under the All filter (after expanding)", () => {
     render(<EvolutionWall families={allFamilies} />);
+    expandWall();
     expect(screen.getByAltText("Bulbasaur")).toBeInTheDocument();
     expect(screen.getByAltText("Charmander")).toBeInTheDocument();
     expect(screen.getByAltText("Squirtle")).toBeInTheDocument();
@@ -234,6 +271,7 @@ describe("EvolutionWall — filter behaviour", () => {
 
   it("switches to In progress filter and hides completed + untouched families", () => {
     render(<EvolutionWall families={allFamilies} />);
+    expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "In progress" }));
     expect(screen.queryByAltText("Charmander")).not.toBeInTheDocument();
     expect(screen.queryByAltText("Squirtle")).not.toBeInTheDocument();
@@ -242,6 +280,7 @@ describe("EvolutionWall — filter behaviour", () => {
 
   it("switches to Completed filter and shows only completed families", () => {
     render(<EvolutionWall families={allFamilies} />);
+    expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
     expect(screen.queryByAltText("Bulbasaur")).not.toBeInTheDocument();
     expect(screen.queryByAltText("Charmander")).not.toBeInTheDocument();
@@ -250,6 +289,7 @@ describe("EvolutionWall — filter behaviour", () => {
 
   it("shows empty-state message for In progress when nothing is in progress", () => {
     render(<EvolutionWall families={[untouchedFamily, completedFamily]} />);
+    expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "In progress" }));
     expect(
       screen.getByText(/No families in progress yet/i),
@@ -258,6 +298,7 @@ describe("EvolutionWall — filter behaviour", () => {
 
   it("shows empty-state message for Completed when nothing is completed", () => {
     render(<EvolutionWall families={[untouchedFamily, inProgressFamily]} />);
+    expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
     expect(
       screen.getByText(/No families completed yet/i),
@@ -266,6 +307,7 @@ describe("EvolutionWall — filter behaviour", () => {
 
   it("marks the active filter tab as aria-selected=true", () => {
     render(<EvolutionWall families={allFamilies} />);
+    expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
     expect(screen.getByRole("tab", { name: "Completed" })).toHaveAttribute(
       "aria-selected",
@@ -279,6 +321,7 @@ describe("EvolutionWall — filter behaviour", () => {
 
   it("returns to All filter after switching", () => {
     render(<EvolutionWall families={allFamilies} />);
+    expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
     fireEvent.click(screen.getByRole("tab", { name: "All" }));
     expect(screen.getByAltText("Bulbasaur")).toBeInTheDocument();
@@ -288,7 +331,7 @@ describe("EvolutionWall — filter behaviour", () => {
 });
 
 describe("EvolutionWall — edge accessibility labels", () => {
-  it("labels a fully-mastered edge with 'both directions mastered'", () => {
+  it("labels a fully-mastered edge with 'both directions mastered' (after expanding)", () => {
     const family: EvolutionFamily = {
       rootId: 1,
       nodes: [makeNode(1, "Bulbasaur"), makeNode(2, "Ivysaur")],
@@ -296,12 +339,13 @@ describe("EvolutionWall — edge accessibility labels", () => {
       completed: true,
     };
     render(<EvolutionWall families={[family]} />);
+    expandWall();
     expect(
       screen.getByRole("img", { name: /both directions mastered/i }),
     ).toBeInTheDocument();
   });
 
-  it("labels a forward-only mastered edge correctly", () => {
+  it("labels a forward-only mastered edge correctly (after expanding)", () => {
     const family: EvolutionFamily = {
       rootId: 1,
       nodes: [makeNode(1, "Bulbasaur"), makeNode(2, "Ivysaur")],
@@ -309,12 +353,13 @@ describe("EvolutionWall — edge accessibility labels", () => {
       completed: false,
     };
     render(<EvolutionWall families={[family]} />);
+    expandWall();
     expect(
       screen.getByRole("img", { name: /forward mastered, reverse not yet/i }),
     ).toBeInTheDocument();
   });
 
-  it("labels a reverse-only mastered edge correctly", () => {
+  it("labels a reverse-only mastered edge correctly (after expanding)", () => {
     const family: EvolutionFamily = {
       rootId: 1,
       nodes: [makeNode(1, "Bulbasaur"), makeNode(2, "Ivysaur")],
@@ -322,13 +367,15 @@ describe("EvolutionWall — edge accessibility labels", () => {
       completed: false,
     };
     render(<EvolutionWall families={[family]} />);
+    expandWall();
     expect(
       screen.getByRole("img", { name: /reverse mastered, forward not yet/i }),
     ).toBeInTheDocument();
   });
 
-  it("labels an unmastered edge as 'not yet mastered'", () => {
+  it("labels an unmastered edge as 'not yet mastered' (after expanding)", () => {
     render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    expandWall();
     expect(
       screen.getByRole("img", { name: /not yet mastered/i }),
     ).toBeInTheDocument();
