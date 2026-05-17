@@ -41,14 +41,18 @@ concurrency:
 jobs:
   review:
     name: Review
-    # The final `head.ref != 'qa'` clause skips `qa -> main` promotion PRs:
-    # the bundled changes were already reviewed per-PR during the /batch-issues
-    # drain, and a "Needs fixes" verdict here would post `/fix`, committing
-    # onto the `qa` integration branch itself (#806).
+    # Runs on PRs into `qa` (one-off and `auto`-pipeline PRs) and into `main`
+    # (hotfixes). The `head.ref != 'qa'` clause skips the `qa -> main`
+    # promotion PR: its changes were already reviewed per-PR, and a "Needs
+    # fixes" verdict there would post `/fix`, committing onto the `qa`
+    # integration branch itself. `/batch-issues` disables this workflow for
+    # the duration of its drain, so batch PRs into `qa` are gated by the
+    # in-session code-reviewer instead, not a second pass here (#806, #814).
     if: >-
       github.event.pull_request.draft == false
       && github.event.pull_request.head.repo.fork == false
-      && github.event.pull_request.base.ref == 'main'
+      && (github.event.pull_request.base.ref == 'main'
+          || github.event.pull_request.base.ref == 'qa')
       && github.actor != 'dependabot[bot]'
       && !startsWith(github.event.pull_request.title, 'chore(release):')
       && !contains(github.event.pull_request.title, '[skip ci]')
