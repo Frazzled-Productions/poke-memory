@@ -168,6 +168,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
               aria-hidden="true"
               width={150}
               height={150}
+              loading="eager"
               className="object-contain w-[150px] h-[150px]"
             />
             {/* Visually hidden name for screen readers */}
