@@ -1,7 +1,7 @@
 /**
  * Integration test: card_reviews_reject_regression_trigger.
  *
- * Verifies that the DB-level trigger (migration 002, updated in 015/016/017/022)
+ * Verifies that the DB-level trigger (migration 002, updated in 015/016/017/020/021/022)
  * blocks lifecycle-timestamp regressions:
  *   - last_review cannot transition to NULL
  *   - first_seen cannot transition to NULL
