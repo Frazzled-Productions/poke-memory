@@ -7,6 +7,7 @@ import type { UserSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
+import { nextReview } from "@/lib/srs/scheduler";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -182,6 +183,16 @@ vi.mock("@/lib/audio/tts", () => ({
 vi.mock("@/lib/audio/waitForAudio", () => ({
   waitForAudio: vi.fn(() => Promise.resolve()),
 }));
+
+// Spy on nextReview using the real implementation by default — individual tests
+// can override with mockImplementationOnce to inject errors.
+vi.mock("@/lib/srs/scheduler", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/srs/scheduler")>();
+  return {
+    ...actual,
+    nextReview: vi.fn(actual.nextReview),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -1119,5 +1130,44 @@ describe("ReviewSession TTS warm-up (#479)", () => {
     // warmupTts must have been recorded before saveSession is called —
     // it runs synchronously before the first await inside handleGrade.
     expect(callOrder.indexOf("warmupTts")).toBeLessThan(callOrder.indexOf("saveSession"));
+  });
+});
+
+describe("Robustness: corrupt grade in handleGrade (#811)", () => {
+  it("surfaces an error banner and leaves the session recoverable when nextReview throws", async () => {
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    // Simulate a RangeError from nextReview (e.g. corrupt grade payload).
+    vi.mocked(nextReview).mockImplementationOnce(() => {
+      throw new RangeError("nextReview: invalid grade 3. Expected one of 1 (Again), 2 (Hard), 4 (Good), or 5 (Easy).");
+    });
+
+    // Grade buttons must be enabled before the click.
+    const easyBtn = screen.getByRole("button", { name: /easy/i });
+    expect(easyBtn).not.toBeDisabled();
+
+    await user.click(easyBtn);
+
+    // Error banner appears.
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(/this grade could not be saved/i),
+    ).toBeInTheDocument();
+
+    // Grade buttons are re-enabled — session is not frozen.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /easy/i })).not.toBeDisabled(),
+    );
+
+    // The user can dismiss the error (exact label to avoid matching "Dismiss hint" on onboarding hints).
+    const dismissBtn = screen.getByRole("button", { name: "Dismiss" });
+    await user.click(dismissBtn);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

@@ -31,6 +31,7 @@ import {
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useStorageQuota } from "@/lib/review/useStorageQuota";
 import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
+import { GradeErrorBanner } from "@/components/review/GradeErrorBanner";
 import { recordReview } from "@/lib/streak";
 import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
@@ -495,6 +496,11 @@ export function ReviewSession() {
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
 
   const { quotaExceeded, dismiss, notifySaveResult } = useStorageQuota();
+
+  // Non-fatal grade error: set when nextReview throws (e.g. a corrupt grade
+  // value that slips past TypeScript at runtime). The session remains usable —
+  // the corrupt grade is skipped and the user can continue.
+  const [gradeError, setGradeError] = useState<string | null>(null);
 
   // Ref for the timeout that fires when the earliest pending learning card is due.
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1284,10 +1290,23 @@ export function ReviewSession() {
 
     const now = new Date();
     const settings = loadSettings();
-    const nextState = nextReview(effectiveCard.state, grade, now, {
-      retentionTarget: settings.retentionTarget,
-      weights: settings.fsrsWeights,
-    });
+    let nextState: ReturnType<typeof nextReview>;
+    try {
+      nextState = nextReview(effectiveCard.state, grade, now, {
+        retentionTarget: settings.retentionTarget,
+        weights: settings.fsrsWeights,
+      });
+    } catch (err) {
+      // nextReview throws a RangeError for invalid grades (e.g. corrupt
+      // payload or future grade-log replay). Log, surface a non-fatal banner,
+      // and unlock the session so the user can continue.
+      console.error("[handleGrade] nextReview threw — skipping corrupt grade:", err);
+      setGrading(false);
+      setGradeError(
+        "This grade could not be saved due to an unexpected error. Your session is still active, please try again.",
+      );
+      return;
+    }
     const newCards = cards.map((card) =>
       card.id === effectiveCard.id ? { ...card, state: nextState } : card,
     );
@@ -1558,6 +1577,7 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+        {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
         <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
         <div className="flex w-full max-w-xl flex-col gap-2">
           <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
@@ -1661,6 +1681,7 @@ export function ReviewSession() {
     return (
       <div className="flex flex-col items-center gap-3 sm:gap-8">
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+        {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
         <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
         <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
         <SpritePicker
@@ -1713,6 +1734,7 @@ export function ReviewSession() {
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-8">
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+      {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
       <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
       <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
       {effectiveCard.cardType === "evolution" ? (
