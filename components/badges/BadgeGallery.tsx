@@ -90,18 +90,18 @@ export function BadgeGallery({ earnedBadges, forceAllMastered = false }: Props) 
               : `View all badges (${locked.length} locked)`}
           </button>
 
-          {lockedExpanded && (
-            <ul
-              id="badge-gallery-locked"
-              role="list"
-              className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
-              aria-label="Locked gym badges"
-            >
-              {locked.map((badge) => (
-                <BadgeGalleryCard key={badge.id} badge={badge} earned={false} />
-              ))}
-            </ul>
-          )}
+          {/* Always rendered so aria-controls references a real element; hidden attribute hides it when collapsed. */}
+          <ul
+            id="badge-gallery-locked"
+            role="list"
+            hidden={!lockedExpanded}
+            className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
+            aria-label="Locked gym badges"
+          >
+            {locked.map((badge) => (
+              <BadgeGalleryCard key={badge.id} badge={badge} earned={false} />
+            ))}
+          </ul>
         </div>
       )}
     </section>
