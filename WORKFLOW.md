@@ -372,6 +372,22 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `qa-issue-label.yml` — QA Issue Label
+
+| | |
+|---|---|
+| **Trigger** | `pull_request: [closed]`, guarded to merged PRs only |
+| **Job** | `label` (check name `Label referenced issues`) |
+| **What it does** | Bridges the gap left by GitHub auto-closing `closes #N` issues only on the default branch. When a PR merges into `qa`, it parses the PR body and commit messages for `closes/fixes/resolves #N` keywords and adds the `status:in-qa` label to each referenced issue — a board signal that the work is done and staged. When the `qa -> main` promotion PR merges (`base: main`, `head: qa`), GitHub auto-closes those issues on `main`, so this run strips the now-stale `status:in-qa` label for tidiness. |
+| **Label creation** | The `status:in-qa` label (colon-namespaced, consistent with `priority:*`) is created idempotently on first run via `gh label create ... \|\| true`. The workflow owns the label — it is not created by hand. |
+| **Scope** | Label only. Project-board column transitions are deliberately left to `auto-status.yml`; this workflow never touches board columns. |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard — same pattern as `auto-review.yml`; fork PRs run with a read-only token and cannot edit issue labels). |
+| **Idempotency** | `gh label create ... \|\| true` no-ops once the label exists; `--add-label` / `--remove-label` are idempotent by nature, so a re-run changes nothing. |
+| **Required check** | No — board hygiene only, does not gate merge. |
+| **Concurrency** | Serialized per PR (`cancel-in-progress: false`). |
+
+---
+
 ### `pr-check-monitor.yml` — PR Check Monitor
 
 | | |
