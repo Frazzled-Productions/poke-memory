@@ -42,10 +42,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Test-only mock-auth seam (issue #751).
+      #
+      # IMPORTANT: `NEXT_PUBLIC_*` vars are inlined into the client bundle at
+      # BUILD time. The seam therefore activates based on what Vercel inlined
+      # when it built the *preview* deployment — not on anything this CI job
+      # sets. The actual enabler is `NEXT_PUBLIC_E2E_AUTH_MOCK=1` configured in
+      # the Vercel project's **Preview** environment scope (Preview only, never
+      # Production). See WORKFLOW.md → "Mock-auth seam (E2E)".
+      #
+      # The env var below is the runner-side companion: it is harmless on the
+      # Playwright process and documents intent. The signed-in specs in
+      # `e2e/auth.spec.ts` detect at runtime whether the seam is live on the
+      # deployment under test and skip themselves if it is not — so a preview
+      # built without the Preview-scoped var simply skips the auth specs
+      # rather than failing.
+      #
+      # Setting the flag here is safe ONLY because the job-level `if:` already
+      # gates this workflow to non-Production deployments. The seam is provably
+      # unreachable in production: `isMockAuthEnabled()` short-circuits on
+      # `NODE_ENV === "production"` and `next.config.ts` fails the build loudly
+      # if the flag is ever set in a production build.
       - name: Run Playwright tests
         run: npx playwright test --project=chromium --project=mobile-safari
         env:
           PLAYWRIGHT_BASE_URL: ${{ github.event.deployment_status.target_url }}
+          NEXT_PUBLIC_E2E_AUTH_MOCK: "1"
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
