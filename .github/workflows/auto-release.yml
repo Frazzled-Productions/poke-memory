@@ -1,18 +1,26 @@
 name: Auto Release
 
-# Cuts a SemVer release on a daily schedule (and on manual dispatch) when
-# changelog fragments exist under changelog.d/unreleased/. Otherwise the run
-# no-ops. Batching releases on a cron — rather than firing on every push to
-# `main` — keeps Vercel production deploys infrequent and predictable.
+# Cuts a SemVer release when changelog fragments exist under
+# changelog.d/unreleased/ — otherwise the run no-ops.
+#
+# Primary trigger: a merged `qa -> main` promotion PR (the qa staging-branch
+# workflow, #806). The daily 09:00 UTC cron is kept as a safety net — it cuts
+# any fragments a misfired promotion left unreleased. `workflow_dispatch`
+# covers manual cuts.
 #
 # Per AGENTS.md "Versioning":
 #   - kind: minor-bump fragment present  → minor bump (0.N.0 → 0.N+1.0)
 #   - any other non-empty set of fragments → patch bump (0.N.M → 0.N.M+1)
 #
-# Each cron tick (or manual dispatch) → at most one commit, one tag, one
-# GitHub Release. The release commit carries `[skip ci]` as defence in depth
-# against self-triggering loops; the schedule/workflow_dispatch trigger (not
-# push) means a release commit landing on main cannot re-fire this workflow.
+# Each run → at most one commit, one tag, one GitHub Release. The release
+# commit + tag are pushed to `main`; a `push` event does not match this
+# workflow's schedule/workflow_dispatch/pull_request triggers, so the release
+# commit cannot re-fire the workflow. The `[skip ci]` marker on the commit is
+# belt-and-braces for the `push`-triggered workflows (`ci.yml`,
+# `migration-check.yml`).
+#
+# On a `qa -> main` trigger, a final step resets `qa` to `main` so the next
+# batch run starts from a clean integration branch.
 #
 # One-time bootstrap: if no `v0.1.0` tag exists when this workflow first runs,
 # the bootstrap step creates the tag at SHA cddb3a8 (the last commit whose
@@ -25,9 +33,14 @@ name: Auto Release
 # fix.
 
 on:
+  # Primary: a merged `qa -> main` promotion PR. The job `if:` below filters
+  # to merged PRs whose head branch is `qa`.
+  pull_request:
+    types: [closed]
+    branches: [main]
   schedule:
-    # 09:00 UTC daily. Cuts a release containing everything merged in the
-    # previous 24 hours (or no-ops if no fragments exist).
+    # 09:00 UTC daily — safety net. Cuts any fragments a misfired `qa -> main`
+    # promotion left unreleased (no-ops if there are none).
     - cron: "0 9 * * *"
   workflow_dispatch:
 
@@ -40,6 +53,13 @@ jobs:
     name: Cut release
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # On a pull_request trigger, run only for a merged `qa -> main` PR. A
+    # closed-without-merge PR, or a merge from any other branch, is ignored.
+    # schedule and workflow_dispatch always run.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.head.ref == 'qa')
     permissions:
       contents: write
 
@@ -54,6 +74,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           token: ${{ steps.app-token.outputs.token }}
+          # Always operate on `main` itself — for a pull_request trigger the
+          # default ref is the merge ref, not the post-merge branch tip.
+          ref: main
           fetch-depth: 0
 
       - name: Configure git identity
@@ -115,3 +138,19 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --title "v${NEW_VERSION}" \
             --notes-file "${BODY_FILE}"
+
+      - name: Reset qa to main
+        # Only after a `qa -> main` promotion merge. schedule/workflow_dispatch
+        # runs leave `qa` untouched — it may hold in-progress batch work.
+        # HEAD is `main` including the release commit just pushed (if any), so
+        # the next batch run starts from a clean, released integration branch.
+        # Requires poke-memory-bot to be a bypass actor on the `qa` ruleset.
+        # `success() &&` is explicit: a custom `if:` otherwise drops the
+        # implicit success check, which would reset `qa` even after a failed
+        # release push. On failure the reset is skipped and the next
+        # `/batch-issues` pre-flight surfaces the un-reset `qa`.
+        if: success() && github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git push origin "+HEAD:refs/heads/qa"
+          echo "Reset qa to main ($(git rev-parse --short HEAD))."

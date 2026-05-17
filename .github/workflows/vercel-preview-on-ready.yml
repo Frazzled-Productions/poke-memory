@@ -90,6 +90,13 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # A `qa -> main` promotion PR is previewed by the QA Preview Deploy
+          # workflow before the PR is opened — don't double-fire the hook.
+          if [[ "$BRANCH" == "qa" ]]; then
+            echo "Head branch is 'qa' — preview handled by QA Preview Deploy; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "pr=$PR" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"

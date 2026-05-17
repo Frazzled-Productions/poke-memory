@@ -232,7 +232,17 @@ The script uses the `pretendAllMastered` superuser flag so renders are determini
   - Your changelog bullet here.
   ```
   Name the file `<issue-or-pr-number>-<short-slug>.md` and place it under `changelog.d/unreleased/`. See `changelog.d/README.md` for full details.
-- **Prerequisite**: the `poke-memory-bot` App must be configured as a bypass actor on the `main-protection` ruleset (ID 16176438) so its release commit can land on `main` without going through a PR. If `auto-release.yml` ever fails with a protected-branch error on `git push origin main`, that is the missing setup.
+- **Prerequisite**: the `poke-memory-bot` App must be a bypass actor on **both** the `main-protection` ruleset (ID 16176438) — so its release commit can land on `main` without going through a PR — and the `qa-staging` ruleset — so `auto-release.yml`'s post-release step can force-push the `qa` reset. If `auto-release.yml` ever fails with a protected-branch error on a `git push`, a missing bypass entry is the cause.
+
+### Branching model
+
+Two long-lived branches (#806). The full diagram, rulesets, and rationale live in [WORKFLOW.md](WORKFLOW.md) "Branching model"; the rules an implementer needs:
+
+- **`main`** is strict and production-tracked. It accepts PRs **only from `qa`** — the `Restrict main PR source` required check fails any other PR unless it carries the `hotfix` label (owner-applied; the documented bypass for genuine hotfixes).
+- **`qa`** is the integration branch with a relaxed ruleset (required checks `test` + `e2e`, no strict-up-to-date). Batch and feature work PRs into `qa`, not `main`.
+- **`/batch-issues`** drains all batch PRs into `qa` with no rebase tax, fires a `qa` preview deploy, then opens a draft `qa -> main` promotion PR. The maintainer QAs the preview and merges the promotion PR; that merge triggers `auto-release.yml` (release + production deploy) and resets `qa` to `main`.
+- A PR merged into `qa` does **not** auto-close its `closes #N` issue — GitHub auto-closes only on the default branch. The `qa -> main` promotion PR carries the aggregated `Closes #N` lines.
+- A one-off direct change still goes through a PR: either via `qa`, or straight into `main` with the `hotfix` label.
 
 ### Stack decisions
 

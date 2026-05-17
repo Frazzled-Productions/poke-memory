@@ -1,0 +1,39 @@
+name: QA Preview Deploy
+
+# Fires the Vercel Deploy Hook for the `qa` staging branch, creating a preview
+# deployment the maintainer can test before promoting `qa -> main` (#806).
+#
+# `workflow_dispatch` only — invoked by the `/batch-issues` skill at the end
+# of its queue drain, or manually from the Actions tab. Vercel branch
+# auto-deploy is off for every branch except `main` (`vercel.json`
+# `git.deploymentEnabled`), so this hook is the only path that deploys `qa`.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: qa-preview-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Fire qa preview deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Fire Vercel Deploy Hook for qa
+        env:
+          HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$HOOK_URL" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK_URL is not configured; cannot deploy the qa preview."
+            exit 1
+          fi
+          # Hardcode ref=qa: this workflow is dispatched from the default
+          # branch, so github.ref would otherwise resolve to main.
+          RESPONSE=$(curl -fsSL -X POST "${HOOK_URL}?ref=qa")
+          echo "Deploy hook response: $RESPONSE"
+          echo "Vercel preview deploy of 'qa' triggered."

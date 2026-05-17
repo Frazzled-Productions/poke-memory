@@ -1,0 +1,56 @@
+name: Main PR source gate
+
+# Restricts which branches may open a PR into `main`. Under the qa
+# staging-branch workflow (#806), `main` only accepts PRs from the `qa`
+# integration branch: all batch work lands on `qa` first, is QA-tested via a
+# preview deploy, then promoted to `main` in a single `qa -> main` PR.
+#
+# A genuine hotfix or trivial direct change can bypass `qa` by carrying the
+# `hotfix` label — the same approval pattern as `version-bump:approved`. Only
+# the repo owner applies it.
+#
+# This gate is a required status check on the `main-protection` ruleset, so a
+# failing run blocks the merge into `main`.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches: [main]
+
+concurrency:
+  group: main-pr-source-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Restrict main PR source
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    # Fork PRs cannot be labelled by the contributor, so running the gate on
+    # them would produce an unresolvable failure — same guard as
+    # version-bump-gate.yml. This repo does not take fork PRs into `main`.
+    if: github.event.pull_request.head.repo.fork == false
+    permissions:
+      contents: read
+    steps:
+      - name: Check PR head branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -euo pipefail
+
+          if [ "$HEAD_REF" = "qa" ]; then
+            echo "PR head branch is 'qa'; gate passes."
+            exit 0
+          fi
+
+          # jq -e exits non-zero when no element matches; stdout suppressed.
+          if echo "$PR_LABELS" | jq -e '.[] | select(.name == "hotfix")' >/dev/null; then
+            echo "PR carries the 'hotfix' label; gate passes."
+            exit 0
+          fi
+
+          echo "::error::PRs into 'main' must come from the 'qa' staging branch."
+          echo "::error::Land this change on 'qa' (see /batch-issues), or apply the 'hotfix' label to merge it directly."
+          exit 1

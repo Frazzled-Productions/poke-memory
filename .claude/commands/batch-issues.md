@@ -1,15 +1,26 @@
 ---
-description: Plan + implement the open issue backlog in conflict-minimizing batches, with an in-session code-reviewer pass per PR, then cut a release.
+description: Plan + implement the open issue backlog in conflict-minimizing batches, with an in-session code-reviewer pass per PR, draining into the qa staging branch.
 allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, Agent, EnterWorktree, TaskCreate, TaskUpdate, TaskList, mcp__supabase__apply_migration]
 ---
 
 # Batch Issues
 
-End-to-end workflow for draining the open issue backlog. Surveys open issues (ignoring `priority:later`), groups them into batches that minimize merge-conflict risk, implements them in parallel where safe and serially where not, opens PRs with an in-session `code-reviewer` pass on each, drains the PR queue, then triggers `auto-release.yml`.
+End-to-end workflow for draining the open issue backlog. Surveys open issues (ignoring `priority:later`), groups them into batches that minimize merge-conflict risk, implements them in parallel where safe and serially where not, opens PRs with an in-session `code-reviewer` pass on each, drains the PR queue into the `qa` staging branch, fires a `qa` preview deploy, and opens a draft `qa -> main` promotion PR for the maintainer to QA and merge.
 
 ## When to use
 
 User says `/batch-issues`, "work through the backlog", "implement all the open issues", or any variant that asks for a batched pass over the issue tracker.
+
+## The qa staging-branch flow
+
+Batch PRs do **not** target `main`. They target **`qa`**, an integration branch with a relaxed ruleset (#806):
+
+- `qa` requires `test` + `e2e` to pass before merge but **not** strict-up-to-date, so batch PRs merge back-to-back with no rebase tax.
+- `main` keeps its strict ruleset and only accepts PRs from `qa` (the `Restrict main PR source` check enforces this; a `hotfix` label is the documented bypass).
+- After the drain, `/batch-issues` fires a Vercel preview deploy of `qa` and opens a **draft** `qa -> main` PR. The maintainer tests the preview, then marks the PR ready and merges it.
+- Merging `qa -> main` triggers `auto-release.yml`, which cuts the release, deploys production, and resets `qa` to `main`.
+
+See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
 ## Pre-flight
 
@@ -25,15 +36,20 @@ User says `/batch-issues`, "work through the backlog", "implement all the open i
 
    If the result is empty, stop and tell the user there is nothing to do.
 
-2. **Disable Auto Review** so per-PR runs don't burn CI minutes while we batch-implement. This is a deliberate global mutation per the user's standing ask — paired with the re-enable step in Wrap-up and a matching re-enable in the graceful-exit guardrail so a halted run can never leave it disabled.
+2. **Confirm a clean working tree.** If `git status` shows uncommitted changes, surface and stop. Do **not** require being on the `main` branch — under parallel jobs `main` is often checked out by another worktree, leaving this session on a detached HEAD, which is fine. Every implementation agent branches off `origin/qa` in its own worktree regardless.
+
+3. **Sync the `qa` staging branch.** Batch PRs target `qa`. Fetch and inspect it:
 
    ```bash
-   gh workflow disable "Auto Review"
+   git fetch origin --quiet
+   git rev-list --left-right --count origin/main...origin/qa
    ```
 
-   Note this in the run summary so the user sees what we touched. If the disable fails (already disabled, permissions, etc.), surface the error and stop — do not proceed with a half-applied setup.
+   The output is `<behind> <ahead>` — commits on `main` not in `qa`, then commits on `qa` not in `main`.
 
-3. **Confirm a clean working tree.** If `git status` shows uncommitted changes, surface and stop. Do **not** require being on the `main` branch — under parallel jobs `main` is often checked out by another worktree, leaving this session on a detached HEAD, which is fine. Every implementation agent branches off `origin/main` in its own worktree regardless.
+   - **`qa` clean** (`ahead == 0`): no un-promoted work. If `behind > 0` (e.g. a `hotfix` PR landed on `main` since the last reset), fast-forward `qa` to `main` first — `git push origin +origin/main:qa` — so agents branch off the latest state. If `behind == 0`, `qa` already equals `main`. Either way, proceed.
+   - **`qa` ahead** (`ahead > 0`): a previous batch was drained into `qa` but never promoted. Stop and ask the maintainer whether to **promote** (open the `qa -> main` PR for the existing work first) or **discard** (`git push origin +origin/main:qa`) before starting a new batch — do not silently stack a new batch on top.
+   - If `qa` does not exist at all, stop and surface it — the qa staging-branch setup (#806) has not been applied.
 
 4. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
 
@@ -81,66 +97,68 @@ For each batch, in order:
 
 2. **Each agent's prompt must include:**
    - The issue number and full body.
-   - "Rebase your worktree onto the latest `origin/main` before opening the PR." House rule; no exceptions. (memory: `feedback_rebase_before_pr`.)
-   - "Reference the issue in commit messages (`closes #N`)."
-   - "If your change adds a Supabase migration, call `mcp__supabase__apply_migration` with the stripped name (no `0NN_` prefix) **before** opening the PR — the `migration-check.yml` required check fails until file-vs-applied parity holds." (See AGENTS.md "Adding a feature that needs to persist data".)
+   - "Branch off the latest `origin/qa` and open the PR against `qa` — batch work lands on the `qa` staging branch, never `main` directly. (memory: `feedback_rebase_before_pr`.)"
+   - "Reference the issue in commit messages (`closes #N`). Note this does not auto-close the issue on merge into `qa` — the `qa -> main` promotion PR does that — but it keeps the linkage visible."
+   - "If your change adds a Supabase migration, call `mcp__supabase__apply_migration` with the stripped name (no `0NN_` prefix) **before** opening the PR — the `migration-check.yml` check fails until file-vs-applied parity holds." (See AGENTS.md "Adding a feature that needs to persist data".)
    - "Add a `changelog.d/unreleased/<issue-number>-<slug>.md` fragment unless the change is internal-only (agent roster, workflow tweaks not visible to users)."
    - "Run `npm run typecheck && npm run build && npm test` before opening the PR; if anything fails, fix and retry up to twice, then stop and report." (AGENTS.md "Pre-PR build gate".)
    - "If your change alters user-facing copy, ARIA labels, `alt`/`title`/`placeholder` text, or a user flow, grep `e2e/` for assertions that reference it and update those specs too — not just the unit tests. A copy change that leaves a stale `e2e/` assertion fails CI on both browser projects."
    - "Before opening the PR, run the `code-reviewer` sub-agent on your own diff inside your worktree and fold in any blocking fixes. This puts reviewed code in front of CI on the first run, instead of paying an extra rebase + CI cycle for each post-review fix."
    - "Use `npm ci`, not `npm install`, so `package-lock.json` does not drift. Leave the worktree clean — commit only intended files, and remove any stray output files before opening the PR."
-   - "Open the PR via `gh pr create --head <your-branch>` — pass `--head` explicitly so we never inherit the wrong branch." (memory: `feedback_gh_pr_create_head_explicit` — burned us on docs PR #544.)
+   - "Open the PR via `gh pr create --head <your-branch> --base qa` — pass both `--head` and `--base` explicitly so we never inherit the wrong branch or default to `main`." (memory: `feedback_gh_pr_create_head_explicit` — burned us on docs PR #544.)
    - "Do **not** add a `Co-Authored-By` trailer to any commit." House rule; commits go under the user's name only. (memory: `feedback_commits`.)
 
 3. **In-session `code-reviewer` pass per PR.** After each agent's PR is open, run the `code-reviewer` sub-agent against that branch's diff in this session (not a CI run) as a confirmation gate — the agent should already have self-reviewed per step 2, so this pass mostly verifies. Surface findings as a one-line description each — never just counts. (memory: `feedback_review_summaries`.) If a finding is blocking, dispatch a follow-up Agent to fix; non-blocking findings get filed as new issues with the user's existing priority labels, never `priority:now` without direction.
 
+   `auto-review.yml` does **not** run on PRs into `qa` (it only reviews PRs based on `main`), so this in-session pass is the sole review gate during the drain. There is no workflow to disable.
+
 ## PR queue drain
 
-Once a batch's PRs are all open and reviewed in-session:
+Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
-1. **Serial, not parallel.** Pre-emptive parallel rebases — manual or via `@dependabot rebase` fan-out — burn CI because each merge re-invalidates every queued run. (memory: `feedback_pr_queue_serial`.) The loop is:
-   - Pick the next PR in the batch (the **head** of the queue).
-   - `gh pr checks <PR> --watch` — poll until all required checks are green.
+1. **No rebase tax.** The `qa` ruleset does not require strict-up-to-date, so a PR does not need rebasing when a sibling merges ahead of it, and merging one PR does not invalidate another's checks. Merge each PR as soon as its required checks are green — order does not matter:
+   - `gh pr checks <PR>` — wait for required checks (`test`, `e2e`) green.
    - If `Migration drift check` fails, the agent forgot to apply the migration via MCP — apply it now and the check re-runs.
    - `gh pr merge <PR> --squash --delete-branch`.
-   - Run `git fetch origin main` to refresh `origin/main`. Rebase **only the next single PR** in the queue onto the fresh `main`, then push with `git push --force-with-lease`. Do **not** rebase the rest yet — they wait their turn.
-   - Loop until the queue is empty.
+   - Loop until the queue is empty. **No rebase step** between merges — that strict-`main` cost is exactly what the qa flow removes.
 
-2. **The up-to-date cost.** If branch protection requires "branch up to date with base", every PR after the queue head pays a full rebase + CI re-run once the PR ahead of it merges — even when the file trees are disjoint and there is no real conflict. This is unavoidable with that rule and is the dominant time cost of the drain. A GitHub merge queue would remove it, but merge queue is **not available for this repo** — it requires an organisation-owned repository (see #797). A `qa` staging-branch workflow is the planned replacement (#806); until it lands, keep the PR count down by combining tightly-coupled issues (see Planning) and accept the serial cost.
+2. **Real conflicts only.** Disjoint batches almost never conflict. If `gh pr merge` reports a genuine merge conflict (two PRs touched the same lines), rebase *that one PR* onto `origin/qa` with `--force-with-lease`, resolve, push, and retry the merge. This is the rare exception, not the per-PR norm.
 
 3. **Detached-HEAD noise.** When the session runs from a detached HEAD (the parallel-jobs case), `gh pr merge` prints a harmless `could not determine current branch` notice *after* a successful merge. Confirm the merge landed with `gh pr view <PR> --json state` rather than trusting the command's exit code.
 
 ## Wrap-up
 
-After every batch is merged and the queue is drained:
+After every batch is merged into `qa` and the queue is drained:
 
-1. **Re-enable Auto Review:**
-
-   ```bash
-   gh workflow enable "Auto Review"
-   ```
-
-2. **Trigger Auto Release** to cut a SemVer release from the accumulated `changelog.d/unreleased/*.md` fragments:
+1. **Fire the `qa` preview deploy:**
 
    ```bash
-   gh workflow run "Auto Release"
+   gh workflow run "QA Preview Deploy"
    ```
 
-   Watch the run to first-completion:
+   This creates a Vercel preview deployment of the bundled `qa` branch for the maintainer to test. Confirm it dispatched with `gh run list --workflow="QA Preview Deploy" --limit 1`.
+
+2. **Open the `qa -> main` promotion PR as a draft.** A PR merged into `qa` does **not** auto-close its `closes #N` issue — GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved:
 
    ```bash
-   gh run watch $(gh run list --workflow="Auto Release" --limit 1 --json databaseId --jq '.[0].databaseId')
+   gh pr create --base main --head qa --draft \
+     --title "Release: <short summary of the batch>" \
+     --body "<body>"
    ```
 
-   If `Auto Release` no-ops because no fragments were produced (e.g. the whole batch was internal-only), surface that and skip the watch.
+   The body must list `Closes #N` for every issue resolved in the batch (one per line), followed by a one-line summary per merged PR. Merging this PR closes all those issues, triggers `auto-release.yml` (release + production deploy), and resets `qa` to `main`.
 
-3. **Summary to the user.** One block:
-   - Issues closed (numbers).
-   - PRs merged (numbers).
-   - Release tag cut (or "no release — internal-only batch").
+   Leave it as a **draft** — the maintainer marks it ready after QA. Do not merge it yourself.
+
+3. **Hand off to the maintainer.** One summary block:
+   - Issues drained into `qa` (numbers) and the PRs merged (numbers).
+   - The draft `qa -> main` promotion PR number.
+   - Next steps for the maintainer: "Test the `qa` preview deploy. When satisfied, mark draft PR #N ready and merge it — that cuts the release, deploys production, and resets `qa`. If the batch carries a `minor-bump` fragment, apply `version-bump:approved` to the promotion PR first."
    - **Analysis/Exploration** issues run — which umbrella issues got a report comment, and how many follow-up issues each filed (the umbrellas stay open for the user to review and close).
    - Any `[USER-DECISION]` items still awaiting a choice.
    - **Blocked** issues skipped, with the reason.
+
+   `/batch-issues` does **not** trigger `Auto Release` itself — merging the `qa -> main` PR does.
 
 ## Guardrails
 
@@ -148,7 +166,8 @@ After every batch is merged and the queue is drained:
 - **Never** promote issues between priority labels without explicit user direction — the user owns priorities. (See AGENTS.md "Backlog / process".)
 - **Ask before mutating shared GitHub state** outside this skill's documented operations: title/label changes on existing issues, branch ops on someone else's PR, etc. (memory: `feedback_ask_before_mutating_github`.)
 - **Don't rationalize** sub-agent decisions if the user pushes back mid-run; evaluate honestly. (memory: `feedback_dont_rationalize_downstream`.)
-- **Graceful-exit re-enables Auto Review.** If the run halts for any reason — CI failures, user interruption, an unfixable conflict — before reaching Wrap-up, the exit path must:
-  1. Run `gh workflow enable "Auto Review"` so the pre-flight disable is reversed. This is unconditional — even if the disable step itself failed, run the enable defensively.
-  2. Commit any in-progress work as `WIP: halted run on #N` and push, per AGENTS.md "Graceful exit on halt".
-  3. Do not skip hooks (`--no-verify`) or `--force` past failures.
+- **Never merge the `qa -> main` PR yourself.** The maintainer's QA of the preview deploy is the gate between batch work and production. Open it as a draft and stop.
+- **Graceful-exit on halt.** If the run halts for any reason — CI failures, user interruption, an unfixable conflict — before reaching Wrap-up:
+  1. Commit any in-progress work as `WIP: halted run on #N` and push, per AGENTS.md "Graceful exit on halt".
+  2. Do not skip hooks (`--no-verify`) or `--force` past failures.
+  3. Any PRs already merged into `qa` stay there — a later `/batch-issues` run's pre-flight step 3 will detect the un-promoted `qa` and ask how to handle it.
