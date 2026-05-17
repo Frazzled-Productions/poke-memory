@@ -1170,4 +1170,108 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
     await user.click(dismissBtn);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("renders the error banner in the cry-card branch when nextReview throws", async () => {
+    // Set up a session with cry cards enabled and name/evo limits zeroed out so
+    // the cry render branch is the active card. nameCardsEnabled must remain true
+    // so the "no card types enabled" guard does not fire before any card renders.
+    mockSeedPokemon.mockReturnValue([{ ...FIXTURE_CARD, cryUrl: "https://example.com/bulbasaur.ogg" }]);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 10,
+      maxReviewsCryPerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    // Cry branch shows a Reveal button (after the cry play tile).
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    vi.mocked(nextReview).mockImplementationOnce(() => {
+      throw new RangeError("nextReview: invalid grade 3. Expected one of 1 (Again), 2 (Hard), 4 (Good), or 5 (Easy).");
+    });
+
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    // Error banner appears in the cry render branch.
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/this grade could not be saved/i)).toBeInTheDocument();
+
+    // Session is not frozen — grade buttons are re-enabled.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /easy/i })).not.toBeDisabled(),
+    );
+  });
+
+  it("renders the error banner in the reverse-card branch when nextReview throws", async () => {
+    // Set up a session with only reverse cards enabled (name/evo limits zeroed) so
+    // the reverse render branch is the active card.
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: true,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    vi.useFakeTimers();
+    render(<ReviewSession />);
+
+    // Reverse branch shows sprite tile buttons — no Reveal step.
+    await act(async () => { vi.advanceTimersByTime(0); });
+    vi.useRealTimers();
+
+    await waitFor(() => expect(getTileButtons()).toHaveLength(4));
+
+    vi.mocked(nextReview).mockImplementationOnce(() => {
+      throw new RangeError("nextReview: invalid grade 3. Expected one of 1 (Again), 2 (Hard), 4 (Good), or 5 (Easy).");
+    });
+
+    // Click the correct tile — the SpritePicker will call handleGrade(4).
+    const group = screen.getByRole("group");
+    const label = group.getAttribute("aria-label") ?? "";
+    const match = label.match(/Which Pokémon is (.+)\?/);
+    const targetName = match?.[1] ?? "";
+    const correctTile = screen.getByRole("button", { name: targetName });
+
+    vi.useFakeTimers();
+    act(() => { fireEvent.click(correctTile); });
+    await act(async () => { vi.advanceTimersByTime(700); });
+    vi.useRealTimers();
+
+    // Error banner appears in the reverse render branch.
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/this grade could not be saved/i)).toBeInTheDocument();
+  });
 });

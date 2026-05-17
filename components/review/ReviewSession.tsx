@@ -1530,6 +1530,9 @@ export function ReviewSession() {
     // same card) gets a fresh SpritePicker mount with a re-shuffled option
     // grid (#496).
     setCardPresentationCount((n) => n + 1);
+    // Clear any previous grade error — the user has successfully graded a card,
+    // so the "please retry" banner is no longer relevant.
+    setGradeError(null);
     setGrading(false);
   }
 
