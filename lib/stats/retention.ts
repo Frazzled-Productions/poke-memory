@@ -3,9 +3,10 @@ import { computeRollingAccuracy } from "@/lib/stats/accuracy";
 import { isoMinusDays } from "@/lib/stats/date";
 
 /**
- * The grade log is pruned to 365 days (`pruneGradeLog`), so the widest
- * honest accuracy window is one year. The retention indicator frames its
- * figure as a rolling window over this period, never "all-time".
+ * The retention indicator deliberately reports a rolling one-year window
+ * rather than "all-time". The grade log itself retains the full review
+ * history (the IndexedDB store is not pruned); 365 days is a display choice
+ * that keeps the figure recent and comparable, not a storage limit.
  */
 export const RETENTION_WINDOW_DAYS = 365;
 
@@ -31,13 +32,13 @@ export type RetentionComparison = {
   delta: number | null;
   /** Number of reviews counted in the window. */
   reviews: number;
-  /** Window width in days (currently the 365-day grade-log cap). */
+  /** Window width in days (the deliberate 365-day display window). */
   windowDays: number;
 };
 
 /**
  * Compare measured recall against the configured retention target over the
- * grade log's full retained window (365 days). Pure - no I/O.
+ * rolling 365-day display window. Pure - no I/O.
  *
  * `computeRollingAccuracy` already returns `null` for an empty window, which
  * is propagated straight through as the empty state.

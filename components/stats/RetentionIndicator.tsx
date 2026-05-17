@@ -31,8 +31,9 @@ function formatPct(v: number): string {
  * Radial gauge comparing measured recall accuracy against the user's
  * configured FSRS retention target.
  *
- * The grade log is capped at 365 days, so the figure is framed as a rolling
- * window over the past year, never "all-time".
+ * The figure is deliberately framed as a rolling window over the past year,
+ * never "all-time". The grade log retains the full review history; the
+ * 365-day window is a display choice, not a storage limit.
  *
  * Derives from review history (`grade_log`), not mastery state, so it is
  * intentionally unaffected by the `pretendAllMastered` superuser flag.
