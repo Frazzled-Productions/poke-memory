@@ -73,7 +73,7 @@ function ChartTooltip({
             className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
             style={{ backgroundColor: INTRODUCED_COLOUR }}
           />
-          New cards: {d.introduced.toLocaleString("en-GB")}
+          New cards introduced: {d.introduced.toLocaleString("en-GB")}
         </p>
       )}
     </div>
@@ -84,6 +84,8 @@ function ChartTooltip({
 // Custom legend
 // ---------------------------------------------------------------------------
 
+// The legend always shows both series, even on days with zero introductions.
+// This is intentional — the legend describes the chart's series, not the data.
 function ChartLegend() {
   return (
     <div
@@ -164,7 +166,7 @@ export function ActivityHistoryChart({
     ? null
     : [...series].sort((a, b) => b.reviews - a.reviews)[0];
   const ariaLabel = peakDay
-    ? `Daily review and introduction history over the last year. Peak activity: ${peakDay.reviews} reviews on ${peakDay.date}.`
+    ? `Daily review and introduction history over the past year. Peak activity: ${peakDay.reviews} reviews on ${formatXTick(peakDay.date, dateFormat)}.`
     : "Daily review and introduction history: no activity recorded yet.";
 
   return (
@@ -176,8 +178,8 @@ export function ActivityHistoryChart({
         Daily activity
       </h2>
       <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-        Reviews completed and new cards introduced each day over the rolling
-        year. Derived from review history, not mastery.
+        Reviews completed and new cards introduced within the past year. Derived
+        from review history, not mastery.
       </p>
 
       <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">

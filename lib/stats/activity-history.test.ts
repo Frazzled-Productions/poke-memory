@@ -161,6 +161,28 @@ describe("computeActivityHistory", () => {
     expect(result[0].reviews).toBe(1);
     expect(result[0].introduced).toBe(1);
   });
+
+  it("prune boundary: card first seen one day before windowStart is not introduced inside the window", () => {
+    // windowDays = 7, windowStart = 2026-05-11; first-seen = 2026-05-10 (one day before).
+    // Simulates a pruned guest log where the entry on 2026-05-10 is still present
+    // (the pruning caveat doesn't erase the data here, but the guard still holds:
+    // the card's first-seen date falls outside the window, so it must not be
+    // credited as an introduction when it is reviewed inside the window).
+    const windowStart = "2026-05-11"; // isoMinusDays(TODAY, 6)
+    const firstSeen = "2026-05-10";   // one day before windowStart
+    expect(firstSeen < windowStart).toBe(true);
+
+    const log: GradeLog = [
+      entry(firstSeen, "prune-card"),  // first-seen just outside window
+      entry(TODAY, "prune-card"),      // re-reviewed inside window
+    ];
+    const result = computeActivityHistory(log, TODAY, 7);
+    // No day in the window should credit this key as an introduction.
+    const totalIntroduced = result.reduce((sum, p) => sum + p.introduced, 0);
+    expect(totalIntroduced).toBe(0);
+    // The review inside the window is still counted.
+    expect(result.find((p) => p.date === TODAY)!.reviews).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

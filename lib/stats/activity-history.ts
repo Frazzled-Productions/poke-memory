@@ -39,6 +39,16 @@ export type ActivityPoint = {
  * **Guest mode**: an empty `log` returns all-zero rows — the UI renders an
  * empty state when every `reviews` value is 0.
  *
+ * **Guest-mode pruning caveat**: `appendGradeEntry` prunes the local grade log
+ * to the most recent 365 days (`keepDays = 365`). For authenticated users the
+ * cloud log is unbounded, but for guests any entry older than 365 days has
+ * been dropped. As a result, a card first introduced more than a year ago
+ * whose earliest log entry has been pruned will appear to be "introduced"
+ * inside the window the next time it is reviewed. The introduction count is
+ * therefore a best-effort figure for guests: it accurately reflects all cards
+ * first seen within the visible window, but may over-count for very long-
+ * standing guests whose log history predates the retention window.
+ *
  * @param log         The full grade log from `loadGradeLog()`.
  * @param today       YYYY-MM-DD string for the current date (UTC).
  * @param windowDays  Number of days to cover (default 365). Rows are returned
