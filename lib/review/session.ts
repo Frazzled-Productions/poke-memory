@@ -529,8 +529,11 @@ export function buildSessionQueues(
   // per-day ordering within the type), then capped at that type's remaining
   // new-card budget.  We then pull one card at a time from each non-empty
   // type bucket, cycling through the four buckets in order, until all budgets
-  // are exhausted.  This guarantees that on any given day the difference in
-  // new cards introduced between any two enabled directions is at most 1.
+  // are exhausted.  Within a single round-robin cycle the imbalance between
+  // any two directions is at most 1 card.  Directions with different
+  // maxNewPerDay caps (e.g. evolution = 5, name/reverse/cry = 10) will still
+  // end the day at their respective caps — round-robin does not equalise
+  // totals across directions, only interleaves them fairly.
   const newCandidateSlices: Record<CardTypeKey, number[]> = {
     name: stableShuffleForDay(newCandidatesByType.name, today).slice(
       0,
@@ -551,7 +554,7 @@ export function buildSessionQueues(
   };
 
   const newQueue: number[] = [];
-  const bucketOrder: CardTypeKey[] = ["name", "evolution", "reverse", "cry"];
+  const bucketOrder: CardTypeKey[] = ["name", "evolution", "reverse", "cry"] as const;
   let anyAdded = true;
   while (anyAdded) {
     anyAdded = false;
