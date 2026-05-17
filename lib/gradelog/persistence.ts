@@ -269,6 +269,28 @@ export function computeGradeTotals(log: GradeLog): GradeTotals {
   return totals;
 }
 
+/**
+ * Reconstruct the ordered grade sequence for a single day from the grade log.
+ * The grade log is the durable, append-only record of every grade (local-first
+ * for both guest and authenticated users), so it can recover today's sequence
+ * even when the best-effort `daily-summary` record is missing — e.g. after a
+ * QuotaExceededError on its write, or when the user finished cards in an
+ * earlier browsing session.
+ *
+ * Entries are sorted by `occurredAt` so the sequence reflects grade order
+ * regardless of how the log array happens to be laid out after a sync merge.
+ * `today` must be a UTC "YYYY-MM-DD" date string, because `appendGradeEntry`
+ * stamps each entry's `date` with `todayString(now)` in its default (UTC)
+ * mode. Passing a timezone-aware `today` here would fail to match the UTC
+ * entry dates and return an empty sequence.
+ */
+export function todayGradeSequence(log: GradeLog, today: string): Grade[] {
+  return log
+    .filter((entry) => entry.date === today)
+    .sort((a, b) => a.occurredAt - b.occurredAt)
+    .map((entry) => entry.grade);
+}
+
 /** Overwrites the grade log store with the given log. Used by sync after merging. */
 export async function saveGradeLog(log: GradeLog): Promise<void> {
   if (typeof window === "undefined") return;

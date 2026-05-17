@@ -4,6 +4,7 @@ import {
   appendGradeEntry,
   pruneGradeLog,
   computeGradeTotals,
+  todayGradeSequence,
   trimToQuota,
   LS_QUOTA_BYTES,
   type GradeLogEntry,
@@ -232,5 +233,39 @@ describe("computeGradeTotals", () => {
       { date: "2026-05-09", grade: 5, cardType: "name", occurredAt: 4 },
     ];
     expect(computeGradeTotals(log)).toEqual({ 1: 2, 2: 0, 4: 1, 5: 1 });
+  });
+});
+
+describe("todayGradeSequence", () => {
+  it("returns [] for an empty log", () => {
+    expect(todayGradeSequence([], "2026-05-09")).toEqual([]);
+  });
+
+  it("returns [] when no entry matches today", () => {
+    const log: GradeLogEntry[] = [
+      { date: "2026-05-08", grade: 4, cardType: "name", occurredAt: 1 },
+    ];
+    expect(todayGradeSequence(log, "2026-05-09")).toEqual([]);
+  });
+
+  it("returns only today's grades in occurredAt order", () => {
+    const log: GradeLogEntry[] = [
+      { date: "2026-05-08", grade: 1, cardType: "name", occurredAt: 10 },
+      { date: "2026-05-09", grade: 5, cardType: "name", occurredAt: 30 },
+      { date: "2026-05-09", grade: 4, cardType: "reverse", occurredAt: 20 },
+      { date: "2026-05-10", grade: 2, cardType: "name", occurredAt: 40 },
+    ];
+    expect(todayGradeSequence(log, "2026-05-09")).toEqual([4, 5]);
+  });
+
+  it("sorts by occurredAt even when the log array is out of order", () => {
+    // Sync merges can leave the log array in any order; the sequence must
+    // still reflect grade order via occurredAt.
+    const log: GradeLogEntry[] = [
+      { date: "2026-05-09", grade: 5, cardType: "name", occurredAt: 300 },
+      { date: "2026-05-09", grade: 1, cardType: "name", occurredAt: 100 },
+      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 200 },
+    ];
+    expect(todayGradeSequence(log, "2026-05-09")).toEqual([1, 4, 5]);
   });
 });

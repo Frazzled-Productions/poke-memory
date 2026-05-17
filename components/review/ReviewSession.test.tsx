@@ -5,6 +5,8 @@ import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard, CryReviewCard } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
+import { loadGradeLog } from "@/lib/gradelog/persistence";
+import { STORAGE_KEY as DAILY_SUMMARY_KEY } from "@/lib/review/dailySummaryPersistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { CRY_ID_OFFSET } from "@/lib/pokemon/seed";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
@@ -129,12 +131,19 @@ vi.mock("@/lib/review/persistence", () => ({
 
 // Grade log operations are async (IDB-backed). Mock them so tests that use
 // fake timers don't stall waiting for IDB microtasks to settle.
-vi.mock("@/lib/gradelog/persistence", () => ({
-  loadGradeLog: vi.fn().mockResolvedValue([]),
-  appendGradeEntry: vi.fn().mockResolvedValue({ occurredAt: Date.now() }),
-  removeGradeEntry: vi.fn().mockResolvedValue(undefined),
-  GRADE_LOG_APPENDED_EVENT: "poke-memory:grade-log-appended",
-}));
+// `todayGradeSequence` keeps its real implementation — it is a pure helper
+// over whatever array `loadGradeLog` is mocked to resolve, so tests can drive
+// the Share-button reconstruction path (#896) by overriding loadGradeLog only.
+vi.mock("@/lib/gradelog/persistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/gradelog/persistence")>();
+  return {
+    loadGradeLog: vi.fn().mockResolvedValue([]),
+    appendGradeEntry: vi.fn().mockResolvedValue({ occurredAt: Date.now() }),
+    removeGradeEntry: vi.fn().mockResolvedValue(undefined),
+    todayGradeSequence: actual.todayGradeSequence,
+    GRADE_LOG_APPENDED_EVENT: "poke-memory:grade-log-appended",
+  };
+});
 
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
@@ -1733,5 +1742,291 @@ describe("Card-type disable guards (#835)", () => {
     expect(screen.queryByText(/all caught up/i)).not.toBeInTheDocument();
 
     vi.useRealTimers();
+  });
+});
+
+describe("Share today button persistence (#896)", () => {
+  // A name card that has already graduated and is not due again until 2099 —
+  // with no unseen cards in the seed, the session lands on SESSION_COMPLETE.
+  function buildCompletedNameCard(): NameReviewCard {
+    return {
+      ...FIXTURE_CARD,
+      state: {
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 10,
+        scheduledDays: 21,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2099-12-31",
+        lastReview: "2026-01-01",
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+  }
+
+  function todayUtc(): string {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(
+      new Date(),
+    );
+  }
+
+  // jsdom on this Node version does not ship localStorage out of the box, so
+  // install an in-memory stub — matching the pattern in CollapsibleSection.test.tsx.
+  function makeLocalStorage(): Storage {
+    const store = new Map<string, string>();
+    return {
+      get length() {
+        return store.size;
+      },
+      clear: () => store.clear(),
+      getItem: (k) => store.get(k) ?? null,
+      key: (i) => Array.from(store.keys())[i] ?? null,
+      removeItem: (k) => {
+        store.delete(k);
+      },
+      setItem: (k, v) => {
+        store.set(k, String(v));
+      },
+    };
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    delete (window as unknown as { localStorage?: unknown }).localStorage;
+  });
+
+  it("shows the Share today button on a fresh mount when a today-dated daily summary is persisted", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // A persisted daily-summary record dated today — the in-memory
+    // sessionGradeSeq is empty on this fresh mount, so the button can only
+    // appear if it hydrates from this persisted record.
+    localStorage.setItem(
+      DAILY_SUMMARY_KEY,
+      JSON.stringify({
+        date: todayUtc(),
+        gradeSequence: [4, 5, 4],
+        reviewed: 3,
+        newCards: 1,
+        mastered: 0,
+      }),
+    );
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /share today/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("reconstructs the Share today button from the grade log when no daily summary is persisted", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // No daily-summary record — but the durable grade log still has today's
+    // grades, so the button must reconstruct from the log (#896).
+    const today = todayUtc();
+    vi.mocked(loadGradeLog).mockResolvedValue([
+      { date: "2026-01-01", grade: 1, cardType: "name", occurredAt: 1 },
+      { date: today, grade: 4, cardType: "name", occurredAt: 200 },
+      { date: today, grade: 5, cardType: "reverse", occurredAt: 100 },
+    ]);
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /share today/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("does not show the Share today button when neither the daily summary nor the grade log has today's grades", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // Grade log only has entries from a previous day — nothing to share today.
+    vi.mocked(loadGradeLog).mockResolvedValue([
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: 1 },
+    ]);
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("button", { name: /share today/i }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("Graduated-cards review queue hint (#880)", () => {
+  function buildCompletedNameCard(): NameReviewCard {
+    return {
+      ...FIXTURE_CARD,
+      state: {
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 10,
+        scheduledDays: 21,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2099-12-31",
+        lastReview: "2026-01-01",
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+  }
+
+  it("shows the graduated-cards hint when more than one card direction is enabled", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // Default settings enable both name and evolution cards (2 directions).
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/reviews surface only graduated cards/i),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the graduated-cards hint when only one card direction is enabled", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // Only name cards enabled — there is no other direction to explain.
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/reviews surface only graduated cards/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the graduated-cards hint when only reverse-evolution cards are enabled", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // Only the reverse-evolution direction is on — a single direction, so the
+    // hint must stay hidden. This direction was previously omitted from the
+    // count entirely (#880).
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/reviews surface only graduated cards/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the graduated-cards hint when name and reverse-evolution cards are enabled", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // Name plus reverse-evolution is two directions, so the hint must show.
+    // Before the count included reverseEvolutionCardsEnabled this combination
+    // counted as one direction and the hint never appeared (#880).
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/reviews surface only graduated cards/i),
+    ).toBeInTheDocument();
   });
 });
