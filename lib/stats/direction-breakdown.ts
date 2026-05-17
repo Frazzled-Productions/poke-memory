@@ -30,12 +30,15 @@ const PASS_GRADES: ReadonlySet<Grade> = new Set([4, 5]);
  * One row of the per-direction breakdown.
  * `accuracy` is `null` when the direction has zero recorded reviews so the
  * UI can render a gap rather than a misleading 0%.
+ * `disabled` is `true` when the direction is currently turned off in Settings
+ * (only set when `enabledDirections` is passed to `computeDirectionBreakdown`).
  */
 export type DirectionBreakdownRow = {
   direction: CardDirection;
   total: number;
   passes: number;
   accuracy: number | null; // passes / total, or null when total === 0
+  disabled: boolean;
 };
 
 /**
@@ -45,11 +48,18 @@ export type DirectionBreakdownRow = {
  * This derives from review *history* (`grade_log`), not mastery state, so it
  * is intentionally NOT affected by the `pretendAllMastered` superuser flag.
  *
- * Every direction in `CARD_DIRECTIONS` is always present in the output (in
- * display order) so the chart has a stable set of bars even before a user
- * has reviewed every direction.
+ * When `enabledDirections` is supplied (a set of directions the user has
+ * switched on in Settings), each row is annotated with `disabled: true` when
+ * that direction is currently switched off. Directions with zero reviews are
+ * still included so callers can decide whether to show or hide them.
+ *
+ * If `enabledDirections` is omitted, `disabled` defaults to `false` for every
+ * row — backwards-compatible with callers that do not read Settings.
  */
-export function computeDirectionBreakdown(log: GradeLog): DirectionBreakdownRow[] {
+export function computeDirectionBreakdown(
+  log: GradeLog,
+  enabledDirections?: ReadonlySet<CardDirection>,
+): DirectionBreakdownRow[] {
   const tallies = new Map<CardDirection, { total: number; passes: number }>();
   for (const direction of CARD_DIRECTIONS) {
     tallies.set(direction, { total: 0, passes: 0 });
@@ -70,8 +80,30 @@ export function computeDirectionBreakdown(log: GradeLog): DirectionBreakdownRow[
       total: t.total,
       passes: t.passes,
       accuracy: t.total === 0 ? null : t.passes / t.total,
+      disabled: enabledDirections !== undefined && !enabledDirections.has(direction),
     };
   });
+}
+
+/**
+ * Build the set of enabled card directions from the card-type flags in
+ * UserSettings. Extracted here so the Stats page and unit tests can share the
+ * same mapping without importing the full settings module.
+ */
+export function enabledDirectionsFromSettings(settings: {
+  nameCardsEnabled: boolean;
+  evolutionCardsEnabled: boolean;
+  reverseEvolutionCardsEnabled: boolean;
+  reverseCardsEnabled: boolean;
+  cryCardsEnabled: boolean;
+}): ReadonlySet<CardDirection> {
+  const enabled = new Set<CardDirection>();
+  if (settings.nameCardsEnabled) enabled.add("name");
+  if (settings.evolutionCardsEnabled) enabled.add("evolution");
+  if (settings.reverseEvolutionCardsEnabled) enabled.add("reverse-evolution");
+  if (settings.reverseCardsEnabled) enabled.add("reverse");
+  if (settings.cryCardsEnabled) enabled.add("cry");
+  return enabled;
 }
 
 /** Total reviews across every direction. Handy for empty-state checks. */
