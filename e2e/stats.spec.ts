@@ -168,13 +168,13 @@ test.describe("Stats page — section headings", () => {
     await page.goto("/stats");
     // Wait for hydration.
     await expect(
-      page.getByRole("heading", { level: 2, name: "Accuracy" }),
+      page.getByRole("heading", { level: 2, name: "Accuracy", exact: true }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(
-      page.getByRole("heading", { level: 2, name: "Activity" }),
+      page.getByRole("heading", { level: 2, name: "Activity", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { level: 2, name: "Scheduling" }),
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
     ).toBeVisible();
   });
 
@@ -184,7 +184,7 @@ test.describe("Stats page — section headings", () => {
     await page.goto("/stats");
     // Wait for the page to hydrate.
     await expect(
-      page.getByRole("heading", { level: 2, name: "Accuracy" }),
+      page.getByRole("heading", { level: 2, name: "Accuracy", exact: true }),
     ).toBeVisible({ timeout: 15_000 });
     // Trainer card and badge gallery must NOT appear on Stats.
     await expect(

@@ -406,7 +406,7 @@ test.describe("Stats page", () => {
 
     // Analytical section group headings should be present.
     for (const heading of ["Accuracy", "Activity", "Scheduling"]) {
-      await expect(page.getByRole("heading", { name: heading })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible({ timeout: 15_000 });
     }
 
     // SyncNowButton was removed in #396 — assert it is absent in guest mode.
@@ -417,7 +417,7 @@ test.describe("Stats page", () => {
     await page.goto("/stats");
     // Wait for the page to finish loading (skeleton gone).
     await expect(
-      page.getByRole("heading", { name: "Accuracy" }),
+      page.getByRole("heading", { name: "Accuracy", exact: true }),
     ).toBeVisible({ timeout: 10_000 });
     // The section heading must be present.
     await expect(
