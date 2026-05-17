@@ -10,6 +10,9 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { BADGE_CATALOG } from "@/lib/badges/catalog";
+import { checkBadges } from "@/lib/badges/check";
+import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { computeStreak, loadStreakData } from "@/lib/streak";
 import { saveStreakData } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
@@ -436,6 +439,32 @@ export default function StatsPage() {
       setRolling30d(computeRollingAccuracy(log, today, 30));
       setRolling365d(computeRollingAccuracy(log, today, 365));
       setAccuracyPoints365(computeAccuracySparkline(log, today, 365));
+
+      // Retroactive badge award (#420). If a user already meets a badge's
+      // criterion when the feature ships (or after a sync pull), award it
+      // silently — no toast. The reveal toast only fires on the grade event
+      // that crosses the threshold (`ReviewSession.handleGrade`). We never
+      // award retroactively while a superuser flag is on; the catalog-wide
+      // overlay on Journey covers that QA case without touching persisted state.
+      // This check is idempotent: `checkBadges` only returns badges not already
+      // in `earnedIdSet`, so running it on both Stats and Journey is safe.
+      if (!anyFlagOn) {
+        const masteredIds = masteredSpeciesIds(
+          sessionCards,
+          settings.masteryRepetitions,
+          false,
+        );
+        const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
+        const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIdSet);
+        if (newlyEarned.length > 0) {
+          const nowIso = new Date().toISOString();
+          const nextEntries = [
+            ...settings.earnedBadges,
+            ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
+          ];
+          saveSettings({ ...settings, earnedBadges: nextEntries });
+        }
+      }
 
       if (supabase !== null && user !== null && !anyFlagOn) {
         try {
