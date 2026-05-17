@@ -176,6 +176,7 @@ type PerTypeTodayCounts = {
   name: { newIntroducedToday: number; reviewsDoneToday: number };
   evolution: { newIntroducedToday: number; reviewsDoneToday: number };
   reverse: { newIntroducedToday: number; reviewsDoneToday: number };
+  cry: { newIntroducedToday: number; reviewsDoneToday: number };
 };
 
 function TodayPill({
@@ -183,11 +184,13 @@ function TodayPill({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  cryEnabled,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  cryEnabled: boolean;
 }) {
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
@@ -230,6 +233,18 @@ function TodayPill({
           </span>
         </p>
       )}
+      {cryEnabled && (
+        <p>
+          <span className="text-zinc-600 dark:text-zinc-300">Cry:</span>{" "}
+          <span className="font-medium text-foreground">
+            {perType.cry.newIntroducedToday} new
+          </span>
+          {" · "}
+          <span className="font-medium text-foreground">
+            {perType.cry.reviewsDoneToday} reviewed
+          </span>
+        </p>
+      )}
     </div>
   );
 }
@@ -239,6 +254,7 @@ function SessionCompleteScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  cryEnabled,
   shareText,
   dueTomorrow,
   showCardTypesHint,
@@ -247,6 +263,7 @@ function SessionCompleteScreen({
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  cryEnabled: boolean;
   /** Pre-formatted share summary; null when the user hasn't graded anything yet. */
   shareText: string | null;
   /** Count of graduated cards whose dueDate falls exactly on tomorrow. 0 hides the teaser. */
@@ -269,7 +286,7 @@ function SessionCompleteScreen({
           {dueTomorrow === 1 ? "1 card" : `${dueTomorrow} cards`} due tomorrow
         </p>
       )}
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryEnabled} />
       {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
       {showCardTypesHint && (
         <div className="w-full max-w-xs text-left">
@@ -295,12 +312,14 @@ function ReviewSoftWallScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  cryEnabled,
   onKeepReviewing,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  cryEnabled: boolean;
   onKeepReviewing: () => void;
 }) {
   return (
@@ -309,7 +328,7 @@ function ReviewSoftWallScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         You have hit a daily review cap. More cards are due. Keep going?
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryEnabled} />
       <div className="flex flex-wrap justify-center gap-3">
         <button
           type="button"
@@ -338,11 +357,13 @@ function NewCardsLockedScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  cryEnabled,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  cryEnabled: boolean;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
@@ -351,7 +372,7 @@ function NewCardsLockedScreen({
         You have hit a daily new-card cap. Come back tomorrow for more; keeping
         this limit prevents tomorrow&apos;s review pile from growing too large.
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryEnabled} />
     </div>
   );
 }
@@ -362,12 +383,14 @@ function CountdownScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  cryEnabled,
 }: {
   dueAt: number;
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  cryEnabled: boolean;
 }) {
   const [remaining, setRemaining] = useState(() => dueAt - Date.now());
 
@@ -392,7 +415,7 @@ function CountdownScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         Hang tight, a learning card will be ready shortly.
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryEnabled} />
     </div>
   );
 }
@@ -1102,7 +1125,7 @@ export function ReviewSession() {
       cryEnabled: cryCardsEnabled,
     };
 
-    function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse"): boolean {
+    function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse" | "cry"): boolean {
       // Mirror the candidate filter in buildSessionQueues — cards in a
       // learning/relearning step are served via the in-memory learning
       // queue, not the review queue, and must not count toward "more due
@@ -1120,7 +1143,7 @@ export function ReviewSession() {
           c.state.lastReview !== today,
       );
     }
-    function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse"): boolean {
+    function hasMoreNewCardsOf(type: "name" | "evolution" | "reverse" | "cry"): boolean {
       // Disabled-type cards must not keep the session in NEW_CARDS_LOCKED
       // after that type is turned off. Check card-type enablement directly
       // rather than eligibleCardIds so alternate-form and scope filters do
@@ -1134,14 +1157,14 @@ export function ReviewSession() {
       );
     }
 
-    const reviewWall = (["name", "evolution", "reverse"] as const).some(
+    const reviewWall = (["name", "evolution", "reverse", "cry"] as const).some(
       (type) =>
         perType[type].reviewsDoneToday >= limits[type].maxReviewsPerDay &&
         hasMoreDueReviewsOf(type),
     );
     if (!extendedReview && reviewWall) return "REVIEW_SOFT_WALL";
 
-    const newWall = (["name", "evolution", "reverse"] as const).some(
+    const newWall = (["name", "evolution", "reverse", "cry"] as const).some(
       (type) =>
         perType[type].newIntroducedToday >= limits[type].maxNewPerDay &&
         hasMoreNewCardsOf(type),
@@ -1178,6 +1201,7 @@ export function ReviewSession() {
               nameEnabled={nameCardsEnabled}
               evolutionEnabled={evolutionCardsEnabled}
               reverseEnabled={reverseEnabled}
+              cryEnabled={cryCardsEnabled}
             />
           </div>
         );
@@ -1198,6 +1222,7 @@ export function ReviewSession() {
             nameEnabled={nameCardsEnabled}
             evolutionEnabled={evolutionCardsEnabled}
             reverseEnabled={reverseEnabled}
+            cryEnabled={cryCardsEnabled}
             onKeepReviewing={() => setExtendedReview(true)}
           />
           {seenPokemon.length >= 2 && (
@@ -1211,7 +1236,7 @@ export function ReviewSession() {
     if (endState === "NEW_CARDS_LOCKED") {
       return (
         <div className="flex flex-col items-center w-full">
-          <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+          <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryCardsEnabled} />
           {seenPokemon.length >= 2 && (
             <HigherOrLowerGame seenPokemon={seenPokemon} />
           )}
@@ -1252,6 +1277,7 @@ export function ReviewSession() {
           nameEnabled={nameCardsEnabled}
           evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
+          cryEnabled={cryCardsEnabled}
           shareText={shareText}
           dueTomorrow={dueTomorrow}
           showCardTypesHint={!cardTypesAllOn}
@@ -1814,7 +1840,7 @@ export function ReviewSession() {
             Undo last grade (⌘Z)
           </button>
         )}
-        <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+        <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryCardsEnabled} />
         <GradeBreakdownBar
           again={sessionGrades[1]}
           hard={sessionGrades[2]}
@@ -1909,7 +1935,7 @@ export function ReviewSession() {
 
       {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
       <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
-      <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryCardsEnabled} />
       <GradeBreakdownBar
         again={sessionGrades[1]}
         hard={sessionGrades[2]}

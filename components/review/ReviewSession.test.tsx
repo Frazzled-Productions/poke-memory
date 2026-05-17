@@ -1593,4 +1593,68 @@ describe("Card-type disable guards (#835)", () => {
       screen.queryByText(/new card limit reached/i),
     ).not.toBeInTheDocument();
   });
+
+  it("produces NEW_CARDS_LOCKED when cry new-card cap is hit with unseen cry cards remaining (#867)", async () => {
+    // Regression guard for resolveEndState omitting "cry" from the tuple.
+    // With cry cards enabled and maxNewCryPerDay: 0, any unseen cry card should
+    // trigger NEW_CARDS_LOCKED. Without the fix, the tuple ["name", "evolution",
+    // "reverse"] never inspects the cry bucket and the session falls through to
+    // SESSION_COMPLETE ("All caught up!") instead.
+    const unseenCryCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      cryUrl: "https://example.com/bulbasaur.ogg",
+      state: {
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "new" as const,
+        dueDate: "1970-01-01",
+        lastReview: null,
+        firstSeen: null,
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([unseenCryCard]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [unseenCryCard],
+      limits: DEFAULT_LIMITS,
+    });
+    // Cry cards enabled but daily new-cry cap is 0 (already "hit").
+    // Name/evo/reverse all disabled so cry is the only active type.
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 100,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // With "cry" in the resolveEndState tuple, hasMoreNewCardsOf("cry") returns
+    // true and the new-card cap fires correctly — showing the locked screen.
+    await waitFor(() => {
+      expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/all caught up/i)).not.toBeInTheDocument();
+  });
 });
