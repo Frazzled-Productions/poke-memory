@@ -10,7 +10,7 @@
 //   The key only needs Text-to-Speech API access.
 
 import { writeFile, mkdir, rename, access } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 
@@ -276,11 +276,40 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// A seed-output filename is always "<digits>.mp3" — derived from a validated
+// integer species id. Anything else (path separators, "..", unexpected
+// characters) must never reach the filesystem.
+const SAFE_AUDIO_FILENAME = /^[0-9]+\.mp3$/;
+
+/**
+ * Resolve `filename` inside `baseDir` and verify the result stays within
+ * `baseDir`. `filename` must match SAFE_AUDIO_FILENAME — a bare basename with
+ * no path separators — and the resolved path must sit directly under
+ * `baseDir`. Throws on any violation so an unsanitised value derived from the
+ * input data can never become a write target outside the output directory.
+ *
+ * This is the explicit sanitiser for the http-to-file-access path: data read
+ * from generated.json (itself originally HTTP-sourced) is constrained to a
+ * strict allow-list before it is used to build a write path.
+ */
+function resolveSafeOutputPath(baseDir, filename) {
+  if (typeof filename !== "string" || !SAFE_AUDIO_FILENAME.test(filename)) {
+    throw new Error(`unsafe output filename: ${JSON.stringify(filename)}`);
+  }
+  const resolved = resolve(baseDir, filename);
+  const baseWithSep = baseDir.endsWith(sep) ? baseDir : baseDir + sep;
+  if (!resolved.startsWith(baseWithSep)) {
+    throw new Error(`resolved path escapes output directory: ${resolved}`);
+  }
+  return resolved;
+}
+
 /**
  * Write `buffer` to `destPath` atomically: write to a unique sibling temp
  * file first, then rename it into place. rename() on the same filesystem is
  * atomic, so a concurrent reader sees either the old file or the fully-written
- * new one — never a partial write.
+ * new one — never a partial write. `destPath` is expected to have already
+ * passed through resolveSafeOutputPath.
  */
 async function writeFileAtomic(destPath, buffer) {
   const tmpPath = `${destPath}.${randomBytes(6).toString("hex")}.tmp`;
@@ -489,7 +518,21 @@ async function main() {
           done++;
           return;
         }
-        const destPath = resolve(outputDir, `${id}.mp3`);
+        // resolveSafeOutputPath re-validates the derived filename against a
+        // strict allow-list and confirms the resolved path stays inside
+        // outputDir — a second, explicit barrier so no unsanitised input data
+        // can ever reach the file-write sink.
+        let destPath;
+        try {
+          destPath = resolveSafeOutputPath(outputDir, `${id}.mp3`);
+        } catch (pathErr) {
+          process.stderr.write(
+            `[tts] FAIL: unsafe output path for id ${JSON.stringify(id)}: ${pathErr.message}\n`,
+          );
+          failed++;
+          done++;
+          return;
+        }
 
         // Skip-if-exists: resumable.
         if (await fileExists(destPath)) {
