@@ -1213,6 +1213,57 @@ describe("Practice scope (#333)", () => {
   });
 });
 
+describe("Practice scope: Clear scope button (#835)", () => {
+  it("re-computes eligibility including card-type check when scope is cleared", async () => {
+    // Start with a scoped session that shows the empty-state screen. Clicking
+    // "Clear scope" triggers handleScopeChange(EMPTY_SCOPE) with cards loaded,
+    // covering the cardTypeOpts/cardTypeIsEnabled block inside that handler.
+    const user = userEvent.setup();
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      // Scope to Gen IX — Bulbasaur is Gen I, so zero match.
+      practiceScope: { gens: [9], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // Wait for the empty-state screen with the Clear scope button.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no Pok[ée]mon match your scope/i),
+      ).toBeInTheDocument();
+    });
+
+    const clearBtn = screen.getByRole("button", { name: /clear scope/i });
+    expect(clearBtn).toBeInTheDocument();
+
+    // Click Clear scope — this fires handleScopeChange with cards !== null.
+    await user.click(clearBtn);
+
+    // After clearing, the scope is empty and Bulbasaur is eligible again.
+    // The Reveal button should now appear.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /reveal/i }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/no Pok[ée]mon match your scope/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("ReviewSession TTS warm-up (#479)", () => {
   it("calls warmupTts on the first grade button click", async () => {
     const user = userEvent.setup();
