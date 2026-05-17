@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AutoSyncOnChange } from "@/components/sync/AutoSyncOnChange";
 
 // Superuser context: default to no flags on. Tests that exercise the write-guard
-// can override anyFlagOn via vi.mocked(useSuperuser).mockReturnValue(...).
+// can override anyFlagOn via mockUseSuperuser.mockReturnValue(...).
 const mockUseSuperuser = vi.fn(() => ({
   unlocked: false,
   flags: { pretendAllMastered: false },

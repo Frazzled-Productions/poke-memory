@@ -1,7 +1,7 @@
 /**
  * Integration test: card_reviews_reject_regression_trigger.
  *
- * Verifies that the DB-level trigger (migration 002, updated in 015/016/017)
+ * Verifies that the DB-level trigger (migration 002, updated in 015/016/017/020/021/022)
  * blocks lifecycle-timestamp regressions:
  *   - last_review cannot transition to NULL
  *   - first_seen cannot transition to NULL
@@ -406,8 +406,8 @@ describe("regression trigger (integration)", () => {
     const client = await pool.connect();
     try {
       await withUser(client, USER_ID, async (c) => {
-        // stability=0, difficulty=0 are the new-card sentinels — both on the
-        // lower bound; difficulty=10 is the upper bound. All must be accepted.
+        // stability=0 is the lower bound; difficulty=10 is the upper bound.
+        // Both must be accepted.
         await expect(
           c.query(
             `INSERT INTO card_reviews
@@ -418,6 +418,34 @@ describe("regression trigger (integration)", () => {
                 seen_in_pasture, updated_at)
              VALUES ($1, 'name', '304',
                      0.0, 10.0, 1, 3,
+                     2, 0, 'review',
+                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     false, now())`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it("allows INSERT with difficulty = 0 (new-card sentinel, migration 020)", async () => {
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // difficulty=0 is the lower-bound sentinel used for freshly-created
+        // cards before any FSRS grade is applied. The CHECK must accept it.
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '305',
+                     0.0, 0.0, 1, 3,
                      2, 0, 'review',
                      '2026-06-01', '2026-05-20', '2026-05-18',
                      false, now())`,
@@ -491,9 +519,8 @@ describe("regression trigger (integration)", () => {
 
   // ── Migration 022: user_settings last_reset_at tombstone triggers ─────────
 
-  it("blocks INSERT of card_reviews row with first_seen before last_reset_at (migration 022)", async () => {
-    // Write a user_settings row with last_reset_at = today so any card whose
-    // first_seen is before that date is treated as a resurrection of stale data.
+  /** Helper: upsert user_settings with last_reset_at = now() for USER_ID. */
+  async function setLastResetAtNow(): Promise<void> {
     await pool.query(
       `INSERT INTO user_settings (user_id, last_reset_at, updated_at)
        VALUES ($1, now(), now())
@@ -502,6 +529,12 @@ describe("regression trigger (integration)", () => {
              updated_at    = EXCLUDED.updated_at`,
       [USER_ID],
     );
+  }
+
+  it("blocks INSERT of card_reviews row with first_seen before last_reset_at (migration 022)", async () => {
+    // Set last_reset_at = now() so any card whose first_seen is before that
+    // date is treated as a resurrection of stale data.
+    await setLastResetAtNow();
     const client = await pool.connect();
     try {
       await withUser(client, USER_ID, async (c) => {
@@ -529,8 +562,9 @@ describe("regression trigger (integration)", () => {
   });
 
   it("blocks INSERT of a streak_days row with review_date before last_reset_at (migration 022)", async () => {
-    // last_reset_at is already set to now() from the previous test; a
-    // streak_days row dated before that moment must be rejected.
+    // Each migration-022 test sets last_reset_at = now() explicitly so the
+    // assertion does not rely on ordering relative to the card_reviews test.
+    await setLastResetAtNow();
     const client = await pool.connect();
     try {
       await withUser(client, USER_ID, async (c) => {
@@ -548,7 +582,7 @@ describe("regression trigger (integration)", () => {
   });
 
   it("blocks INSERT of a grade_log row with entry_date before last_reset_at (migration 022)", async () => {
-    // last_reset_at is already set to now() from the card_reviews test above.
+    await setLastResetAtNow();
     const client = await pool.connect();
     try {
       await withUser(client, USER_ID, async (c) => {
@@ -567,8 +601,9 @@ describe("regression trigger (integration)", () => {
   });
 
   it("allows INSERT of card_reviews with dates on/after last_reset_at (migration 022)", async () => {
-    // last_reset_at is already set to now(). Inserting a card with today's
-    // dates (on or after the reset boundary) must succeed.
+    // Set last_reset_at = now(). Inserting a card with today's dates (on or
+    // after the reset boundary) must succeed.
+    await setLastResetAtNow();
     const client = await pool.connect();
     try {
       await withUser(client, USER_ID, async (c) => {

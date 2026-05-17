@@ -424,6 +424,22 @@ test.describe("Stats page", () => {
     await expect(page.getByText(/\d+ \/ \d+ mastered · \d+ to Lv \d+/)).toBeVisible();
   });
 
+  test("grade distribution section renders in empty state for a fresh guest (#800)", async ({ page }) => {
+    await page.goto("/stats");
+    // Wait for the page to finish loading (skeleton gone).
+    await expect(
+      page.getByRole("heading", { name: "Current streak" }),
+    ).toBeVisible({ timeout: 10_000 });
+    // The section heading must be present.
+    await expect(
+      page.getByRole("heading", { name: "Grade distribution" }),
+    ).toBeVisible();
+    // Guest with no grades sees the empty-state copy.
+    await expect(
+      page.getByText("No grades recorded yet."),
+    ).toBeVisible();
+  });
+
   // Gym badges (#420) are secret until earned: a fresh guest must see no
   // hint of any badge name on the trainer card. The full superuser overlay
   // path is exercised by component tests; this smoke test guards the

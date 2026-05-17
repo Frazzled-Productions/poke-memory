@@ -266,10 +266,28 @@ vi.mock("@/lib/stats/derive", () => ({
       })),
     }),
   ),
+  // `isMastered` and `MASTERY_REPETITIONS` are used by computeMasteryOverTime,
+  // which is called from the stats page's reviewCharts computation.
+  isMastered: vi.fn((state: { reps: number; scheduledDays: number }) =>
+    state.reps >= 3 && state.scheduledDays >= 21,
+  ),
+  MASTERY_REPETITIONS: 3,
 }));
 
 vi.mock("@/lib/stats/records", () => ({
   computeRecords: vi.fn(() => null),
+}));
+
+vi.mock("@/lib/stats/completion-projection", () => ({
+  computeCompletionProjection: vi.fn(() => ({ kind: "insufficient-history" })),
+}));
+
+vi.mock("@/components/stats/CompletionProjection", () => ({
+  CompletionProjection: () => <div data-testid="completion-projection" />,
+}));
+
+vi.mock("@/lib/stats/mastery-over-time", () => ({
+  computeMasteryOverTime: vi.fn(() => []),
 }));
 
 vi.mock("@/lib/stats/heatmap", () => ({
@@ -329,6 +347,10 @@ vi.mock("@/components/stats/RecordsCard", () => ({
 
 vi.mock("@/components/stats/ReviewHeatmap", () => ({
   ReviewHeatmap: () => <div data-testid="review-heatmap" />,
+}));
+
+vi.mock("@/components/stats/MasteryOverTimeChart", () => ({
+  MasteryOverTimeChart: () => <div data-testid="mastery-over-time-chart" />,
 }));
 
 vi.mock("@/components/onboarding/OnboardingHint", () => ({
@@ -432,6 +454,9 @@ describe("StatsPage — guest user reads only from local", () => {
       expect(screen.getByTestId("trainer-card")).toBeInTheDocument();
     });
 
+    // The mastery-over-time chart stub should be present in the rendered tree.
+    expect(screen.getByTestId("mastery-over-time-chart")).toBeInTheDocument();
+
     // pullSession must never be called for guests.
     expect(mockPullSession).not.toHaveBeenCalled();
   });
@@ -519,5 +544,19 @@ describe("StatsPage — Force pull from cloud button", () => {
     });
 
     confirmSpy.mockRestore();
+  });
+});
+
+describe("StatsPage — CompletionProjection widget", () => {
+  it("renders the completion-projection stub in the page", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<StatsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("completion-projection")).toBeInTheDocument();
+    });
   });
 });

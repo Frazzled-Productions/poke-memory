@@ -1,6 +1,6 @@
 import type { Grade } from "@/lib/srs/scheduler";
 import type { GradeLog } from "@/lib/gradelog/persistence";
-import { isoDate } from "@/lib/utils/format-date";
+import { isoMinusDays } from "@/lib/stats/date";
 
 const PASS_GRADES: ReadonlySet<Grade> = new Set([4, 5]);
 
@@ -17,16 +17,6 @@ export type AccuracyPoint = {
 };
 
 const DAY_MS = 86_400_000;
-
-function isoMinusDays(today: string, n: number): string {
-  // Mirrors `tomorrowString` / `addDaysToIsoDate` in lib/stats/derive.ts:
-  // parse YYYY-MM-DD via `new Date`, increment via local-time `setDate`,
-  // then format via UTC `toISOString`. Same arithmetic across the codebase
-  // so dates line up with the scheduler and the due-forecast.
-  const result = new Date(today);
-  result.setDate(result.getDate() - n);
-  return isoDate(result);
-}
 
 /**
  * Build a per-day accuracy series ending on `today` and stretching back
