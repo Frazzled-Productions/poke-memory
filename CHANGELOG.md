@@ -6,6 +6,33 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.0] - 2026-05-17
+
+### Added
+
+- Offline support. When installed as an app, Poké Memory now caches its pages and Pokémon sprites, so you can run a practice session with no connection. A prompt appears when a new version is ready, so you can refresh to update without being stuck on a stale copy.
+- Collection timeline scrubber on the Journey tab: drag left to replay how your collection was built week by week, drag right to see the projected forgetting horizon showing when each card's memory is expected to fade below your retention target.
+- Evolution wall on the Journey tab: a scrollable gallery of evolution family trees where arrows light up as the corresponding evolution and reverse-evolution cards are mastered. Includes a "families completed: N / M" headline metric and filter tabs (All, In progress, Completed). Branching families such as Eevee and Wurmple render as proper fan-out trees.
+
+### Changed
+
+- Stats page gym-badge gallery now collapses locked badges behind a "View all badges" toggle, so earned badges appear at a glance without ~15 greyscale tiles pushing other content down the page.
+- Weekly volume chart on the Stats page now shows partial history from your first complete week of reviews, rather than waiting for 12 full weeks before rendering anything. The empty-state message is also clearer when no complete weeks exist yet.
+- Pokédex completion projection empty state now explains what is needed to unlock the projection (master a species and wait a week) instead of showing a bare "Not enough data yet" message.
+- Re-enabling a disabled card type now preserves saved progress by default. A prompt lets you choose between resuming where you left off (the default) or starting fresh. Disabling a card type is non-destructive: your progress is kept in storage and ready when you re-enable.
+- Stats: the accuracy-by-direction chart now hides card types with no review history, removing the permanent faint "no reviews" bars for directions you have never used or disabled before reviewing them. A direction that has history but is currently disabled in Settings keeps its bar and is labelled "(disabled)" so the data remains visible.
+- New-card introduction now uses round-robin scheduling across all enabled card directions, so no single direction races ahead of the others day to day.
+- Review history is now kept indefinitely in IndexedDB (no longer hard-trimmed to the last 365 days). Signed-in users already had full history in the cloud; this brings the local store in line. The localStorage fallback applies a quota-aware safety valve instead of a fixed date cut-off.
+- Split the Stats page into two surfaces: **Stats** now shows only the analytical dashboard (accuracy sparkline, grade breakdown, retention indicator, difficulty histogram, due forecast, activity history, heatmap, struggling cards), grouped under clear section headings (Accuracy, Activity, Scheduling). A new **Journey** tab at `/journey` hosts the celebratory and narrative content: trainer card, gym badge gallery, current streak, records card, mastery rings, introduced ring, generation breakdown, and type breakdown.
+
+### Fixed
+
+- Due-forecast chart on the Stats page now correctly counts reviews due today for users whose local timezone is behind UTC. Previously, cards scheduled for "UTC today" appeared in tomorrow's bar instead of today's bar, making today's bar empty despite the Practice screen showing reviews due.
+- Fixed 91 Pokémon alternate forms (including Pumpkaboo size variants, Rotom appliances, Therian formes, and others) that were misclassified as default forms in the Pokédex seed. With "Alternate forms" disabled these entries now stay hidden as expected.
+- Eliminated sprite pop-in after grading: reverse-card picker tiles and the Higher-or-Lower mini-game now GPU-decode the next set of sprites before the transition, matching the instant paint already in place for flip cards (name, cry, evolution, reverse-evolution).
+- Fixed a bug where a learning card whose timer expired mid-render could displace the card on screen before the user tapped Reveal, causing a mis-click on the wrong card.
+- Higher-or-Lower minigame now respects the Alternate Forms setting and the active practice scope (gens, types, presets), so disabling alternate forms removes them from the minigame pool.
+
 ## [0.9.69] - 2026-05-17
 
 ### Added
@@ -1105,7 +1132,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.9.69...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.0
 [0.9.69]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.69
 [0.9.68]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.68
 [0.9.67]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.67
