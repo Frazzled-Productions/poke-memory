@@ -282,7 +282,32 @@ describe("useOnlineReconnectSync", () => {
     expect(markPushSucceeded).not.toHaveBeenCalled();
   });
 
-  // 10. In-flight guard: a second online event before the first handler completes
+  // 10. Partial success: when some cards succeed and some fail, lastPushFailed
+  //     must stay true — markPushSucceeded must NOT be called.
+  it("does not call markPushSucceeded on partial push success (some cards failed)", async () => {
+    vi.mocked(pullAndMerge).mockResolvedValue("ok");
+    vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
+    const card1 = makeCard(1, "2026-05-17");
+    const card2 = makeCard(2, "2026-05-17");
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [card1, card2],
+      limits: LIMITS,
+    });
+    // First card succeeds, second fails — partial success.
+    vi.mocked(pushSingleCard)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => fireOnline());
+
+    await waitFor(() => expect(pushSingleCard).toHaveBeenCalledTimes(2));
+    // The failure signal must survive so the retry banner stays visible.
+    expect(markPushSucceeded).not.toHaveBeenCalled();
+  });
+
+  // 11. In-flight guard: a second online event before the first handler completes
   //     does not start a concurrent run.
   it("ignores a second online event while a catch-up is already in flight", async () => {
     let resolvePull!: (v: "ok") => void;
@@ -303,7 +328,7 @@ describe("useOnlineReconnectSync", () => {
     expect(pullAndMerge).toHaveBeenCalledTimes(1);
   });
 
-  // 11. Listener is removed on unmount — no calls after cleanup.
+  // 12. Listener is removed on unmount — no calls after cleanup.
   it("removes the online listener on unmount", async () => {
     vi.mocked(pullAndMerge).mockResolvedValue("ok");
     vi.mocked(loadSyncStatus).mockReturnValue(NO_FAILURE_STATUS);

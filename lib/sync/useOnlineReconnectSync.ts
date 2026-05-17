@@ -16,11 +16,15 @@ import { todayString } from "@/lib/review/session";
  *   1. `pullAndMerge` — brings local state up to date with cloud.
  *   2. Push any cards that failed the per-grade path while offline.
  *
- * Card selection mirrors `useRetryPush`: when `lastPushFailed` is set and
- * `failedCardCount > 0`, re-push today's reviewed cards (falling back to all
- * reviewed cards when today's filter is empty); when `failedCardCount` is null,
- * push all reviewed cards; when `failedCardCount === 0`, skip the push leg.
- * When `lastPushFailed` is false, only the pull runs.
+ * Card selection and success semantics mirror `useRetryPush` exactly:
+ *   - `lastPushFailed` false → only the pull runs; no push leg.
+ *   - `failedCardCount === 0` → skip the push leg.
+ *   - `failedCardCount > 0` → push today's reviewed cards (falling back to all
+ *     reviewed cards when the today-filter is empty).
+ *   - `failedCardCount` null → push all reviewed cards.
+ * On PARTIAL success (some cards failed), `lastPushFailed` is kept `true` so
+ * the retry banner remains visible — `markPushSucceeded` is only called when
+ * every card push succeeded.
  *
  * The call site is responsible for passing `client=null` / `userId=null` when
  * any superuser flag is on (same contract as `usePerGradeSync` and
@@ -106,18 +110,20 @@ export function useOnlineReconnectSync(
           cardsToRetry.map((card) => pushSingleCard(pushClient, pushUid, card)),
         );
 
-        const anySucceeded = results.some(
-          (r) => r.status === "fulfilled" && r.value === true,
-        );
-        if (anySucceeded) {
-          markPushSucceeded();
-        }
-
         const anyFailed = results.some(
           (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value),
         );
+
         if (anyFailed) {
+          // Keep lastPushFailed true so the retry banner stays visible and the
+          // next reconnect / manual retry attempt can re-push the missing cards.
+          // Mirrors useRetryPush semantics: only clear the flag when every card
+          // succeeded (partial success still means the user's data is not fully
+          // in the cloud).
           console.warn("[online-reconnect] some cards failed to push after reconnect; will retry on next grade or page reload");
+        } else {
+          // All cards succeeded — safe to clear the failure signal.
+          markPushSucceeded();
         }
       } catch (err) {
         // Best-effort — never surface as a user-visible sync error.
