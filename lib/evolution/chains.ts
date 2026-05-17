@@ -181,9 +181,10 @@ export function deriveEvolutionFamilies(
     });
   }
 
-  // Sort: incomplete families with at least one mastered edge first (in progress),
-  // then fully completed, then untouched — so "in progress" floats to the top
-  // for the default view. Within each group, sort by rootId for stability.
+  // Sort: in-progress families first (at least one mastered edge, not completed),
+  // then untouched (nothing mastered yet), then fully completed last — so "still
+  // to do" is never buried behind "done" in the default view. Within each group,
+  // sort by rootId for stability.
   families.sort((a, b) => {
     const aScore = familySortScore(a);
     const bScore = familySortScore(b);
@@ -195,10 +196,10 @@ export function deriveEvolutionFamilies(
 }
 
 function familySortScore(f: EvolutionFamily): number {
-  if (f.completed) return 1;
+  if (f.completed) return 2; // done — sort last
   const anyMastered = f.edges.some((e) => e.forwardMastered || e.reverseMastered);
-  if (anyMastered) return 0; // in progress
-  return 2; // untouched
+  if (anyMastered) return 0; // in progress — sort first
+  return 1; // untouched — sort between in-progress and completed
 }
 
 /** Computes headline stats for the wall. */

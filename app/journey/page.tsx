@@ -404,9 +404,10 @@ export default function JourneyPage() {
     async function load() {
       const settings = loadSettings();
       const saved = await loadSession();
+      const localOpts = seedOptsFromSettings(settings);
       const sessionCards = saved !== null
-        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled })
-        : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled });
+        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts)
+        : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
       setNameCardsEnabled(settings.nameCardsEnabled);

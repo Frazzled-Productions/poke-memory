@@ -208,7 +208,7 @@ function LinearChain({
 
   return (
     <div className="flex items-center gap-1 flex-wrap justify-center">
-      {ordered.map(({ node, edge }, idx) => (
+      {ordered.map(({ node, edge }) => (
         <span key={node.speciesId} className="flex items-center gap-1">
           <SpeciesNode node={node} />
           {edge !== null && (
@@ -301,6 +301,9 @@ function FamilyCard({ family }: { family: EvolutionFamily }) {
         >
           Done
         </span>
+      )}
+      {family.completed && (
+        <span className="sr-only">Completed</span>
       )}
       <FamilyTree family={family} />
     </div>

@@ -232,6 +232,64 @@ describe("deriveEvolutionFamilies", () => {
       }
     }
   });
+
+  it("completed families sort after untouched families", () => {
+    // Fully complete the Bulbasaur chain (both edges, both directions).
+    const cards: ReviewableCard[] = [
+      masteredForward(BULBASAUR_TO_IVYSAUR),
+      masteredReverse(BULBASAUR_TO_IVYSAUR),
+      masteredForward(IVYSAUR_TO_VENUSAUR),
+      masteredReverse(IVYSAUR_TO_VENUSAUR),
+    ];
+    const families = deriveEvolutionFamilies(cards, 3, false);
+    const bulbasaurIdx = families.findIndex((f) => f.rootId === 1);
+    // Bulbasaur is now completed — it must sort after all untouched families.
+    const untouchedFamilies = families.filter(
+      (f) =>
+        !f.completed &&
+        f.edges.every((e) => !e.forwardMastered && !e.reverseMastered),
+    );
+    expect(untouchedFamilies.length).toBeGreaterThan(0);
+    for (const untouched of untouchedFamilies) {
+      const untouchedIdx = families.indexOf(untouched);
+      expect(bulbasaurIdx).toBeGreaterThan(untouchedIdx);
+    }
+  });
+
+  it("sort order is: in-progress, untouched, completed", () => {
+    // Make Bulbasaur in-progress (one forward edge mastered).
+    // Fully complete the Charmander chain (three edges, both directions).
+    const CHARMANDER_TO_CHARMELEON = SEED_EVOLUTION_CARDS.find(
+      (c) => c.preEvoId === 4 && c.postEvoId === 5,
+    )!.id;
+    const CHARMELEON_TO_CHARIZARD = SEED_EVOLUTION_CARDS.find(
+      (c) => c.preEvoId === 5 && c.postEvoId === 6,
+    )!.id;
+    const cards: ReviewableCard[] = [
+      // Bulbasaur in-progress
+      masteredForward(BULBASAUR_TO_IVYSAUR),
+      // Charmander completed
+      masteredForward(CHARMANDER_TO_CHARMELEON),
+      masteredReverse(CHARMANDER_TO_CHARMELEON),
+      masteredForward(CHARMELEON_TO_CHARIZARD),
+      masteredReverse(CHARMELEON_TO_CHARIZARD),
+    ];
+    const families = deriveEvolutionFamilies(cards, 3, false);
+    const bulbasaurIdx = families.findIndex((f) => f.rootId === 1);
+    const charmanderIdx = families.findIndex((f) => f.rootId === 4);
+    // Any untouched family must sit between in-progress and completed.
+    const untouchedFamilies = families.filter(
+      (f) =>
+        !f.completed &&
+        f.edges.every((e) => !e.forwardMastered && !e.reverseMastered),
+    );
+    expect(untouchedFamilies.length).toBeGreaterThan(0);
+    for (const untouched of untouchedFamilies) {
+      const untouchedIdx = families.indexOf(untouched);
+      expect(untouchedIdx).toBeGreaterThan(bulbasaurIdx);
+      expect(charmanderIdx).toBeGreaterThan(untouchedIdx);
+    }
+  });
 });
 
 describe("computeEvolutionWallStats", () => {
