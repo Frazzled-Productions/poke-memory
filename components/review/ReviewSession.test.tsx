@@ -1955,4 +1955,78 @@ describe("Graduated-cards review queue hint (#880)", () => {
       screen.queryByText(/reviews surface only graduated cards/i),
     ).not.toBeInTheDocument();
   });
+
+  it("hides the graduated-cards hint when only reverse-evolution cards are enabled", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // Only the reverse-evolution direction is on — a single direction, so the
+    // hint must stay hidden. This direction was previously omitted from the
+    // count entirely (#880).
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/reviews surface only graduated cards/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the graduated-cards hint when name and reverse-evolution cards are enabled", async () => {
+    const card = buildCompletedNameCard();
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // Name plus reverse-evolution is two directions, so the hint must show.
+    // Before the count included reverseEvolutionCardsEnabled this combination
+    // counted as one direction and the hint never appeared (#880).
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/reviews surface only graduated cards/i),
+    ).toBeInTheDocument();
+  });
 });

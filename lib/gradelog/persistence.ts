@@ -279,8 +279,10 @@ export function computeGradeTotals(log: GradeLog): GradeTotals {
  *
  * Entries are sorted by `occurredAt` so the sequence reflects grade order
  * regardless of how the log array happens to be laid out after a sync merge.
- * `today` must already be the timezone-aware "YYYY-MM-DD" day boundary the
- * caller wants (entry dates are stamped with the user's timezone).
+ * `today` must be a UTC "YYYY-MM-DD" date string, because `appendGradeEntry`
+ * stamps each entry's `date` with `todayString(now)` in its default (UTC)
+ * mode. Passing a timezone-aware `today` here would fail to match the UTC
+ * entry dates and return an empty sequence.
  */
 export function todayGradeSequence(log: GradeLog, today: string): Grade[] {
   return log

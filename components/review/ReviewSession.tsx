@@ -184,12 +184,14 @@ function TodayPill({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
   cryEnabled,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
 }) {
   // Passive hint (#880): when more than one card direction is enabled, a user
@@ -199,10 +201,13 @@ function TodayPill({
   // learning steps sooner than recall cards. Surface a one-line explanation so
   // the user can discover why without reading the docs. Only shown when 2+
   // directions are on, since there is nothing to explain with a single one.
+  // The count must include every card direction the user can enable - all five
+  // tracked in ReviewSession (name, evolution, reverse, reverse-evolution, cry).
   const enabledDirections = [
     nameEnabled,
     evolutionEnabled,
     reverseEnabled,
+    reverseEvolutionEnabled,
     cryEnabled,
   ].filter(Boolean).length;
   const showGraduatedHint = enabledDirections > 1;
@@ -274,6 +279,7 @@ function SessionCompleteScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
   cryEnabled,
   shareText,
   dueTomorrow,
@@ -283,6 +289,7 @@ function SessionCompleteScreen({
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
   /** Pre-formatted share summary; null when the user hasn't graded anything yet. */
   shareText: string | null;
@@ -306,7 +313,7 @@ function SessionCompleteScreen({
           {dueTomorrow === 1 ? "1 card" : `${dueTomorrow} cards`} due tomorrow
         </p>
       )}
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
       {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
       {showCardTypesHint && (
         <div className="w-full max-w-xs text-left">
@@ -332,6 +339,7 @@ function ReviewSoftWallScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
   cryEnabled,
   onKeepReviewing,
 }: {
@@ -339,6 +347,7 @@ function ReviewSoftWallScreen({
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
   onKeepReviewing: () => void;
 }) {
@@ -348,7 +357,7 @@ function ReviewSoftWallScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         You have hit a daily review cap. More cards are due. Keep going?
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
       <div className="flex flex-wrap justify-center gap-3">
         <button
           type="button"
@@ -377,12 +386,14 @@ function NewCardsLockedScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
   cryEnabled,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
 }) {
   return (
@@ -392,7 +403,7 @@ function NewCardsLockedScreen({
         You have hit a daily new-card cap. Come back tomorrow for more; keeping
         this limit prevents tomorrow&apos;s review pile from growing too large.
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
     </div>
   );
 }
@@ -403,6 +414,7 @@ function CountdownScreen({
   nameEnabled,
   evolutionEnabled,
   reverseEnabled,
+  reverseEvolutionEnabled,
   cryEnabled,
 }: {
   dueAt: number;
@@ -410,6 +422,7 @@ function CountdownScreen({
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
+  reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
 }) {
   const [remaining, setRemaining] = useState(() => dueAt - Date.now());
@@ -435,7 +448,7 @@ function CountdownScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         Hang tight, a learning card will be ready shortly.
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
     </div>
   );
 }
@@ -1238,6 +1251,7 @@ export function ReviewSession() {
               nameEnabled={nameCardsEnabled}
               evolutionEnabled={evolutionCardsEnabled}
               reverseEnabled={reverseEnabled}
+              reverseEvolutionEnabled={reverseEvolutionEnabled}
               cryEnabled={cryCardsEnabled}
             />
           </div>
@@ -1259,6 +1273,7 @@ export function ReviewSession() {
             nameEnabled={nameCardsEnabled}
             evolutionEnabled={evolutionCardsEnabled}
             reverseEnabled={reverseEnabled}
+            reverseEvolutionEnabled={reverseEvolutionEnabled}
             cryEnabled={cryCardsEnabled}
             onKeepReviewing={() => setExtendedReview(true)}
           />
@@ -1273,7 +1288,7 @@ export function ReviewSession() {
     if (endState === "NEW_CARDS_LOCKED") {
       return (
         <div className="flex flex-col items-center w-full">
-          <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryCardsEnabled} />
+          <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
           {seenPokemon.length >= 2 && (
             <HigherOrLowerGame seenPokemon={seenPokemon} />
           )}
@@ -1320,6 +1335,7 @@ export function ReviewSession() {
           nameEnabled={nameCardsEnabled}
           evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
+          reverseEvolutionEnabled={reverseEvolutionEnabled}
           cryEnabled={cryCardsEnabled}
           shareText={shareText}
           dueTomorrow={dueTomorrow}
@@ -1883,7 +1899,7 @@ export function ReviewSession() {
             Undo last grade (⌘Z)
           </button>
         )}
-        <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryCardsEnabled} />
+        <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
         <GradeBreakdownBar
           again={sessionGrades[1]}
           hard={sessionGrades[2]}
@@ -1978,7 +1994,7 @@ export function ReviewSession() {
 
       {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
       <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
-      <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} cryEnabled={cryCardsEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
       <GradeBreakdownBar
         again={sessionGrades[1]}
         hard={sessionGrades[2]}
