@@ -15,6 +15,9 @@ import { computeStreak, loadStreakData } from "@/lib/streak";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
 import { buildCollectionTimeline, type CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { CollectionTimeline as CollectionTimelineWidget } from "@/components/journey/CollectionTimeline";
+import { EvolutionWall } from "@/components/journey/EvolutionWall";
+import { deriveEvolutionFamilies, type EvolutionFamily } from "@/lib/evolution/chains";
+import type { ReviewableCard } from "@/lib/review/session";
 import { TrainerCard } from "@/components/stats/TrainerCard";
 import { BadgeGallery } from "@/components/badges/BadgeGallery";
 import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
@@ -81,6 +84,7 @@ function LoadingSkeleton() {
       <SkeletonBlock className="h-20 w-full" />
       {/* Timeline skeleton */}
       <SkeletonBlock className="h-40 w-full" />
+      {/* Evolution wall skeleton */}
       <SkeletonBlock className="h-28 w-full" />
       <SkeletonBlock className="h-12 w-full" />
       <div className="grid grid-cols-2 gap-4">
@@ -394,6 +398,7 @@ export default function JourneyPage() {
   const [gradeLog, setGradeLog] = useState<Awaited<ReturnType<typeof loadGradeLog>>>([]);
   const [earnedBadgeIds, setEarnedBadgeIds] = useState<readonly string[]>([]);
   const [timeline, setTimeline] = useState<CollectionTimeline | null>(null);
+  const [evolutionFamilies, setEvolutionFamilies] = useState<EvolutionFamily[] | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -476,6 +481,14 @@ export default function JourneyPage() {
         forceAllMastered: flags.pretendAllMastered,
       });
       setTimeline(tl);
+
+      // Derive evolution families from the final card set.
+      const evoFamilies = deriveEvolutionFamilies(
+        finalCards as readonly ReviewableCard[],
+        settings.masteryRepetitions,
+        flags.pretendAllMastered,
+      );
+      setEvolutionFamilies(evoFamilies);
     }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -546,6 +559,11 @@ export default function JourneyPage() {
             {/* Collection timeline — the hero scrubber */}
             {timeline !== null && (
               <CollectionTimelineWidget timeline={timeline} />
+            )}
+
+            {/* Evolution wall */}
+            {evolutionFamilies !== null && (
+              <EvolutionWall families={evolutionFamilies} />
             )}
 
             {/* Badges */}
