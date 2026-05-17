@@ -70,7 +70,7 @@ Todo → Planned → In Progress → PR → Ready to merge → Done
 | `/split` | On an issue | Files sub-issues from the planner's **Suggested split** block |
 | `/replan` | On an issue | Re-runs the plan job against the current tree; use after a staleness gate refusal |
 | `/fix` | On a PR | Runs a fix cycle in `auto-pr.yml` (up to 3 cycles per PR) |
-| `/resolve` | On a PR | Merges `origin/main`, resolves conflicts via Claude, runs build gate, pushes (`auto-resolve.yml`) |
+| `/resolve` | On a PR | Merges the PR's base branch (`qa` or `main`), resolves conflicts via Claude, runs build gate, pushes (`auto-resolve.yml`) |
 
 ### Backlog ownership
 
@@ -92,7 +92,7 @@ Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR 
 | Branch | Ruleset | Who PRs into it |
 |---|---|---|
 | `main` | `main-protection` — strict-up-to-date; required checks `test`, `e2e`, `Check version bump approval`, `Restrict main PR source` | Only `qa`. A non-`qa` PR needs the `hotfix` label. |
-| `qa` | `qa-staging` — required checks `test`, `e2e`; **not** strict-up-to-date. Bypass actors: `poke-memory-bot` and the repo admin role. | Any batch / feature branch. |
+| `qa` | `qa-staging` — required checks `test`, `e2e`; **not** strict-up-to-date. Bypass actors: `poke-memory-bot` and the repo admin role. | `/batch-issues`, the `auto` pipeline, and one-off feature branches. |
 
 **Why `qa` exists.** `main`'s strict-up-to-date rule forces every queued PR to rebase + re-run CI one at a time — the serial-rebase tax. A GitHub merge queue would remove it but is unavailable for personal-account repos (#797). `qa` is non-strict, so `/batch-issues` merges PRs back-to-back with no rebase tax, then promotes the bundled result to `main` in a single PR.
 
@@ -265,8 +265,8 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 |---|---|
 | **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) comments `/go` on an open `auto`-labelled issue |
 | **Conflict gate** | Checks for `<!-- overlap-scan:i+j:conflict -->` markers linked to open issues; refuses to proceed if unresolved |
-| **Staleness gate** | Parses `<!-- plan-meta: base=<sha> files=<list> -->` from the most recent `<!-- auto-plan -->` comment; runs `git diff --name-only <base>..origin/main -- <files>`; non-empty intersection → posts a comment naming the conflicting files and the commits that touched them, then exits 1. Missing `plan-meta` (older plans) → warning only, proceeds. Empty `files=` → proceeds. Comment `/replan` to recover. |
-| **What it does** | Runs the orchestration playbook (plan → research → implement → review), pushes a branch, runs the build gate, opens a PR |
+| **Staleness gate** | Parses `<!-- plan-meta: base=<sha> files=<list> -->` from the most recent `<!-- auto-plan -->` comment; runs `git diff --name-only <base>..origin/qa -- <files>` (implement PRs target `qa`); non-empty intersection → posts a comment naming the conflicting files and the commits that touched them, then exits 1. Missing `plan-meta` (older plans) → warning only, proceeds. Empty `files=` → proceeds. Comment `/replan` to recover. |
+| **What it does** | Runs the orchestration playbook (plan → research → implement → review), pushes a branch, runs the build gate, opens a PR **into `qa`** (the staging branch — `main` only takes promotion PRs) |
 | **Build gate** | `npm run typecheck && npm run build && npm test` — up to 2 fix attempts before stopping without a PR |
 | **Git credential** | `claude-code-action` URL-embeds the App installation token (passed via `github_token:`) into the origin remote, so subprocess pushes authenticate as `poke-memory-bot` and CI fires on the resulting `synchronize` events. Do NOT add a `git config --global http.https://github.com/.extraheader` step in front of the action — that layers a Bearer header on top of the URL-embedded Basic auth, GitHub rejects the dual-auth request, and the action's internal `git fetch origin main --depth=1` fails before Claude is invoked. |
 | **Post-step** | Runs `if: always()` — salvages uncommitted edits as a `WIP: halted run on #N` commit, verifies the branch on origin before advertising `/continue`, updates the live status comment |
@@ -297,7 +297,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 |---|---|
 | **Trigger** | Maintainer comments `/replan` on an open `auto`-labelled issue |
 | **What it does** | Mirrors the plan job — invokes `planner`, posts a fresh `<!-- auto-plan -->` comment, moves issue to **Planned** |
-| **Use case** | Recovery after a staleness gate refusal (`/go` blocked because `origin/main` moved into planned files); also useful when scope has changed since the original plan |
+| **Use case** | Recovery after a staleness gate refusal (`/go` blocked because `origin/qa` moved into planned files); also useful when scope has changed since the original plan |
 | **Overlap annotation** | Same as plan job — overlap-scan markers are parsed and passed to the planner, which appends a `**Related issues:**` section to the plan |
 | **Salvage** | Same `if: always()` post-step as the plan job |
 
@@ -326,11 +326,11 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) or `poke-memory-bot` posts `/resolve` on an open PR |
 | **Fork guard** | Fork PRs are excluded — `isCrossRepository` is fetched via `gh pr view` and the job bails early if true |
 | **Pre-flight** | Retries `mergeableState` up to 3× while `UNKNOWN` (posts a warning comment if still `UNKNOWN` after 3 retries); exits with a comment if already `CLEAN` |
-| **Fast-path** | If `git merge origin/main --no-edit` succeeds cleanly, runs the build gate (`typecheck` / `build` / `test`), then pushes and posts `<!-- auto-resolve:N -->` — no Claude invocation |
+| **Fast-path** | If merging the PR's base branch (`origin/<base>`) cleanly succeeds, runs the build gate (`typecheck` / `build` / `test`), then pushes and posts `<!-- auto-resolve:N -->` — no Claude invocation |
 | **Conflict path** | Claude resolves each conflicted file; reads both sides + recent main history per file; bails if any file is under `lib/srs/`, `db/migrations/`, or is `next.config.ts`, or if more than 5 files conflict |
 | **Build gate** | `npm run typecheck && npm run build && npm test` — two attempts. On second failure, posts last 80 lines of output and stops without pushing |
 | **Idempotency** | `<!-- auto-resolve:N -->` marker (N = count of existing resolve comments + 1) is posted in the summary; concurrent `/resolve` comments queue via `cancel-in-progress: false` and the second run finds a clean PR |
-| **What it does** | Merges `origin/main` into the PR branch, resolves conflicts, runs the build gate, pushes, and posts an `<!-- auto-resolve:N -->` summary listing each conflicted file and how it was resolved |
+| **What it does** | Merges the PR's base branch (`qa` for staged work, `main` for hotfixes) into the PR branch, resolves conflicts, runs the build gate, pushes, and posts an `<!-- auto-resolve:N -->` summary listing each conflicted file and how it was resolved |
 
 ---
 
@@ -339,7 +339,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | | |
 |---|---|
 | **Trigger** | `pull_request: [opened, synchronize, reopened, ready_for_review]` |
-| **Gate** | Skip-list (inverted from the earlier allow-list — see #469): drafts, fork PRs (`head.repo.fork == false`), non-`main` base branches, Dependabot PRs, `chore(release):` titles, and `[skip ci]` in the title or body are all skipped. Everything else is reviewed. |
+| **Gate** | Skip-list (inverted from the earlier allow-list — see #469): drafts, fork PRs (`head.repo.fork == false`), base branches other than `main` or `qa`, the `qa -> main` promotion PR (`head.ref == 'qa'`), Dependabot PRs, `chore(release):` titles, and `[skip ci]` in the title or body are all skipped. So it reviews PRs into `qa` (one-off and `auto`-pipeline PRs) and into `main` (hotfixes). `/batch-issues` disables the workflow during its drain, since batch PRs get the in-session `code-reviewer` instead (#814). |
 | **Single review producer** | `auto-review.yml` posts every `auto-review:N` comment — the first review on PR open and every follow-up review after a `/fix` push (which arrives as a `synchronize` event). `auto-pr.yml` only fixes and pushes; it never posts a review. This is the design that removes the duplicate-post race. |
 | **Cycle-aware review** | First review (no prior `auto-review:N` comments) reviews the full diff. A follow-up review of a `/fix` push verifies the prior Blocker/Concern findings are resolved and flags only genuine **new** regressions the fix introduced — it does not re-scan untouched code for fresh nitpicks or escalate severities, so the bar does not drift between cycles. |
 | **Severity calibration** | `Blocker` / `Concern` / `Nit` / `Praise`, calibrated strictly: `Concern` is reserved for real correctness/security/convention problems in the changed code; hypothetical, pre-existing, or stylistic items are `Nit`. A `Needs fixes` verdict needs at least one Blocker or Concern, so over-tagging Nits as Concerns is what burns extra fix cycles. |
@@ -513,6 +513,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 | | |
 |---|---|
+| **Status** | **Disabled** (`disabled_manually`). Under the qa staging flow, QA happens on the bundled `qa` branch via `qa-preview-deploy.yml`, so per-PR previews are redundant and were retired to stay within Vercel's deploy rate limit (#814). Re-enable with `gh workflow enable "Vercel Preview on Ready"` if per-PR previews are wanted again. |
 | **Trigger** | `workflow_run` on `CI` (`completed`); `issue_comment: created` |
 | **Gate** | Fires the Vercel Deploy Hook only when both conditions hold on the same HEAD SHA: the `test` check is `success` AND the latest `<!-- auto-review:N -->` comment scoped to that SHA carries `Verdict: Looks good to me`. The auto-review SHA scope comes from the `<!-- auto-review-sha:<sha> -->` row that `auto-review.yml` writes on every comment. |
 | **Manual override** | A `/preview` PR comment from OWNER / MEMBER / COLLABORATOR bypasses both gates and fires the hook unconditionally — for mid-iteration peeks before LGTM. |

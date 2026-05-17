@@ -1,8 +1,9 @@
 name: Auto Resolve
 
 # Triggered when a maintainer or poke-memory-bot comments `/resolve` on a PR.
-# Merges origin/main into the PR branch, resolves conflicts via Claude,
-# runs the build gate, and pushes. Posts a <!-- auto-resolve:N --> summary.
+# Merges the PR's base branch (`qa` for staged work, `main` for hotfixes)
+# into the PR branch, resolves conflicts via Claude, runs the build gate,
+# and pushes. Posts a <!-- auto-resolve:N --> summary.
 #
 # Fast-path: if the merge is already clean (stale mergeable_state), pushes directly.
 # Conflict path: hands conflict files to Claude for resolution.
@@ -73,9 +74,11 @@ jobs:
             exit 0
           fi
 
-          # Resolve head branch
+          # Resolve head and base branches
           BRANCH=$(gh pr view "$PR" --repo "$REPO" --json headRefName --jq '.headRefName')
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          BASE=$(gh pr view "$PR" --repo "$REPO" --json baseRefName --jq '.baseRefName')
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
 
           # Check mergeable state — retry up to 3x while UNKNOWN
           MERGEABLE="UNKNOWN"
@@ -92,7 +95,7 @@ jobs:
           fi
 
           if [[ "$MERGEABLE" == "CLEAN" ]]; then
-            gh pr comment "$PR" --body $'PR is already up to date with `main` — nothing to resolve.'
+            gh pr comment "$PR" --body "PR is already up to date with its base branch ($BASE) — nothing to resolve."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -129,9 +132,11 @@ jobs:
       - name: Attempt fast-path merge
         id: merge
         if: steps.preflight.outputs.skip == 'false'
+        env:
+          BASE: ${{ steps.preflight.outputs.base }}
         run: |
-          git fetch origin main --quiet
-          if git merge origin/main --no-edit 2>&1; then
+          git fetch origin "$BASE" --quiet
+          if git merge "origin/$BASE" --no-edit 2>&1; then
             echo "clean=true" >> "$GITHUB_OUTPUT"
           else
             git merge --abort 2>/dev/null || true
@@ -158,13 +163,14 @@ jobs:
         if: steps.preflight.outputs.skip == 'false' && steps.merge.outputs.clean == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE: ${{ steps.preflight.outputs.base }}
         run: |
           set -euo pipefail
           git push
           N=${{ steps.markers.outputs.next }}
           PR=${{ github.event.issue.number }}
-          printf '<!-- auto-resolve:%s -->\n## Auto-resolve %s\n\nMerged `origin/main` cleanly (no conflicts). Build gate passed. Merge commit pushed.\n' \
-            "$N" "$N" > /tmp/resolve-body.md
+          printf '<!-- auto-resolve:%s -->\n## Auto-resolve %s\n\nMerged `origin/%s` cleanly (no conflicts). Build gate passed. Merge commit pushed.\n' \
+            "$N" "$N" "$BASE" > /tmp/resolve-body.md
           gh pr comment "$PR" --body-file /tmp/resolve-body.md
 
       - name: Post status comment (conflict path)
@@ -210,7 +216,8 @@ jobs:
             stop — don't push half-done work.
 
             **Context:** The shell fast-path confirmed this PR has merge
-            conflicts with `origin/main`. The working tree is clean (the
+            conflicts with its base branch `origin/${{ steps.preflight.outputs.base }}`.
+            The working tree is clean (the
             failed merge was aborted). Dependencies are pre-installed
             (`npm ci` has already run). You are handling the conflict-resolution
             path.
@@ -218,7 +225,7 @@ jobs:
             **Workflow:**
 
             0. **Before anything else, call `TodoWrite`** with your initial
-               task list — at minimum: "Merge origin/main", "Resolve
+               task list — at minimum: "Merge origin/${{ steps.preflight.outputs.base }}", "Resolve
                conflicts", "Build gate", "Push and summarise". This MUST be
                your first action. The live status comment only updates when
                `TodoWrite` fires, so skipping it leaves the PR showing
@@ -226,7 +233,7 @@ jobs:
                add one item per conflicted file once they are enumerated, and
                update statuses (pending / in_progress / completed).
 
-            1. Run `git fetch origin main --quiet && git merge origin/main --no-edit`.
+            1. Run `git fetch origin ${{ steps.preflight.outputs.base }} --quiet && git merge origin/${{ steps.preflight.outputs.base }} --no-edit`.
 
             2. Enumerate conflicted files: `git diff --name-only --diff-filter=U`.
 
@@ -241,7 +248,7 @@ jobs:
             4. For each remaining conflicted file, resolve it:
                - Read the current working-tree file (contains `<<<<<<< HEAD` markers).
                - Read the incoming side: `git show MERGE_HEAD:<path>`.
-               - Understand what changed on main: `git log origin/main --oneline -10 -- <path>`.
+               - Understand what changed on the base branch: `git log origin/${{ steps.preflight.outputs.base }} --oneline -10 -- <path>`.
                - Write the fully merged file — no conflict markers left.
                - Stage it: `git add <path>`.
                - If the correct resolution is genuinely ambiguous and you cannot
@@ -251,7 +258,7 @@ jobs:
             5. Complete the merge commit:
                `git commit --no-edit`
                (If that fails because the commit message template is missing,
-               use: `git commit -m "Merge origin/main"`)
+               use: `git commit -m "Merge origin/${{ steps.preflight.outputs.base }}"`)
 
             6. **Build gate** (two attempts):
                `(npm run typecheck && npm run build && npm test) 2>&1 | tee /tmp/build-output.txt`
