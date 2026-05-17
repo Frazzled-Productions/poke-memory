@@ -100,10 +100,10 @@ Once a batch's PRs are all open and reviewed in-session:
 
 1. **Serial, not parallel.** Pre-emptive parallel rebases — manual or via `@dependabot rebase` fan-out — burn CI because each merge re-invalidates every queued run. (memory: `feedback_pr_queue_serial`.) The loop is:
    - Pick the next PR in the batch (the **head** of the queue).
-   - `gh pr checks <PR>` — wait for required checks green.
+   - `gh pr checks <PR> --watch` — poll until all required checks are green.
    - If `Migration drift check` fails, the agent forgot to apply the migration via MCP — apply it now and the check re-runs.
    - `gh pr merge <PR> --squash --delete-branch`.
-   - Refresh `origin/main`. Rebase **only the next single PR** in the queue onto the fresh `main` with `--force-with-lease`. Do **not** rebase the rest yet — they wait their turn.
+   - Run `git fetch origin main` to refresh `origin/main`. Rebase **only the next single PR** in the queue onto the fresh `main`, then push with `git push --force-with-lease`. Do **not** rebase the rest yet — they wait their turn.
    - Loop until the queue is empty.
 
 2. **The up-to-date cost.** If branch protection requires "branch up to date with base", every PR after the queue head pays a full rebase + CI re-run once the PR ahead of it merges — even when the file trees are disjoint and there is no real conflict. This is unavoidable with that rule and is the dominant time cost of the drain. A GitHub merge queue would remove it, but merge queue is **not available for this repo** — it requires an organisation-owned repository (see #797). A `qa` staging-branch workflow is the planned replacement (#806); until it lands, keep the PR count down by combining tightly-coupled issues (see Planning) and accept the serial cost.
