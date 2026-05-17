@@ -105,13 +105,45 @@ export const DEFAULT_LIMITS: DailyLimits = {
   cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
-export type BuildSessionOpts = {
-  reverseEnabled?: boolean;
+export type CardTypeOpts = {
   nameEnabled?: boolean;
   evolutionEnabled?: boolean;
+  reverseEnabled?: boolean;
   reverseEvolutionEnabled?: boolean;
   cryEnabled?: boolean;
 };
+
+export type BuildSessionOpts = CardTypeOpts;
+
+/**
+ * Returns true when the card's type is enabled by the given opts.
+ * Used to gate out saved-but-disabled cards from the active queue
+ * without removing them from storage (non-destructive disable).
+ *
+ * Defaults for each type match the historical behaviour:
+ *   name / evolution — enabled by default
+ *   reverse / reverseEvolution / cry — disabled by default
+ */
+export function cardTypeIsEnabled(
+  card: ReviewableCard,
+  opts: CardTypeOpts,
+): boolean {
+  const {
+    nameEnabled = true,
+    evolutionEnabled = true,
+    reverseEnabled = false,
+    reverseEvolutionEnabled = false,
+    cryEnabled = false,
+  } = opts;
+  switch (card.cardType) {
+    case "name": return nameEnabled;
+    case "evolution": return evolutionEnabled;
+    case "reverse": return reverseEnabled;
+    case "reverse-evolution": return reverseEvolutionEnabled;
+    case "cry": return cryEnabled;
+    default: return true;
+  }
+}
 
 export function buildSession(
   seed: readonly SeedPokemon[],
@@ -176,21 +208,23 @@ export function buildSession(
 
 // Merge saved cards with the current seed, refreshing seed fields (e.g. newly
 // added flavorTexts) on existing cards while preserving their SM-2 state.
-// Missing seed entries are appended at initialReviewState — due immediately.
-// When reverseEnabled is false, any persisted reverse cards are filtered out;
-// re-enabling reverse cards starts fresh (no saved state carried over).
+// Missing seed entries for ENABLED types are appended at initialReviewState —
+// due immediately.
+//
+// Saved cards of a disabled type are PRESERVED in the output — they are kept
+// in storage so progress is not lost when a type is re-enabled. The session
+// queue builder filters them out of the active queue via the eligibleCardIds
+// gate; the cards themselves remain intact. New cards of disabled types are
+// NOT added (no point introducing cards that will not be scheduled).
+//
+// To deliberately reset progress for a re-enabled type, callers should reset
+// those card states to initialReviewState before calling hydrateSession.
 export function hydrateSession(
   saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: {
-    reverseEnabled?: boolean;
-    nameEnabled?: boolean;
-    evolutionEnabled?: boolean;
-    reverseEvolutionEnabled?: boolean;
-    cryEnabled?: boolean;
-  } = {},
+  opts: CardTypeOpts = {},
 ): ReviewableCard[] {
   const {
     reverseEnabled = false,
@@ -209,24 +243,12 @@ export function hydrateSession(
     ]),
   );
 
-  // When disabled, drop saved cards of that type so re-enabling starts fresh.
-  let filteredSaved = reverseEnabled
-    ? saved
-    : saved.filter((c) => c.cardType !== "reverse");
-  if (!reverseEvolutionEnabled) {
-    filteredSaved = filteredSaved.filter((c) => c.cardType !== "reverse-evolution");
-  }
-  if (!cryEnabled) {
-    filteredSaved = filteredSaved.filter((c) => c.cardType !== "cry");
-  }
-  if (!nameEnabled) {
-    filteredSaved = filteredSaved.filter((c) => c.cardType !== "name");
-  }
-  if (!evolutionEnabled) {
-    filteredSaved = filteredSaved.filter((c) => c.cardType !== "evolution");
-  }
+  // All saved cards are kept regardless of whether their type is currently
+  // enabled — disabling a type is non-destructive. Seed fields are refreshed
+  // on every card so display data stays current.
+  const allSaved = saved;
 
-  const refreshed: ReviewableCard[] = filteredSaved.map((card) => {
+  const refreshed: ReviewableCard[] = allSaved.map((card) => {
     if (card.cardType === "evolution") {
       const fresh = evoSeedById.get(card.id);
       if (!fresh) return card;
@@ -277,7 +299,7 @@ export function hydrateSession(
     }
   });
 
-  const savedIds = new Set(filteredSaved.map((c) => c.id));
+  const savedIds = new Set(allSaved.map((c) => c.id));
 
   const nameAdditions: NameReviewCard[] = nameEnabled
     ? seed

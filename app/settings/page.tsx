@@ -18,6 +18,7 @@ import { clearLocalProgress } from "@/lib/storage/reset";
 import { resetAllProgressEverywhere } from "@/lib/sync/reset";
 import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
 import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
+import { ReenableCardTypeDialog, type ReenableChoice } from "@/components/settings/ReenableCardTypeDialog";
 import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
 import { signOut } from "@/lib/auth/actions";
 import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
@@ -29,6 +30,7 @@ import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
 import type { ReviewState } from "@/lib/srs/scheduler";
+import { initialReviewState } from "@/lib/srs/scheduler";
 import { countOptimizableReviews } from "@/lib/srs/optimizer";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
 import { IntensityPicker } from "@/components/settings/IntensityPicker";
@@ -348,6 +350,15 @@ const REVERSE_NUMERIC_FIELDS: FieldConfig[] = [
   },
 ];
 
+/** Human-readable names for the card-type settings keys — used in the re-enable dialog. */
+const CARD_TYPE_DISPLAY_NAMES: Partial<Record<keyof UserSettings, string>> = {
+  nameCardsEnabled: "name cards",
+  evolutionCardsEnabled: "evolution cards",
+  reverseCardsEnabled: "reverse cards",
+  reverseEvolutionCardsEnabled: "reverse-evolution cards",
+  cryCardsEnabled: "cry cards",
+};
+
 /** All top-level section ids used on this page — drives hash deep-link detection. */
 const TOP_LEVEL_SECTION_IDS = [
   "appearance-heading",
@@ -413,6 +424,9 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // Re-enable dialog: set when toggling a card type from disabled → enabled.
+  // Holds the settings key being re-enabled so the dialog knows what to label.
+  const [reenableKey, setReenableKey] = useState<keyof UserSettings | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
@@ -542,31 +556,69 @@ export default function SettingsPage() {
       }
     }
 
-    // Confirm dialogs before disabling a card type.
-    if (key === "nameCardsEnabled" && settings.nameCardsEnabled) {
-      if (!window.confirm("Disabling name cards will discard all name-card progress when saved. This cannot be undone. Continue?")) {
+    // Card-type toggles: re-enable prompts and non-destructive disable.
+    //
+    // Disabling is now non-destructive — saved progress is preserved in
+    // storage. When re-enabling, we show a prompt so the user can choose
+    // between resuming saved progress (the default) or starting fresh.
+    const cardTypeKeys = [
+      "nameCardsEnabled",
+      "evolutionCardsEnabled",
+      "reverseCardsEnabled",
+      "reverseEvolutionCardsEnabled",
+      "cryCardsEnabled",
+    ] as const;
+    if ((cardTypeKeys as readonly string[]).includes(key)) {
+      if (!settings[key]) {
+        // Toggling from disabled → enabled: show the reuse-or-reset prompt.
+        setReenableKey(key);
         return;
       }
-    }
-    if (key === "evolutionCardsEnabled" && settings.evolutionCardsEnabled) {
-      if (!window.confirm("Disabling evolution cards will discard all evolution-card progress when saved. This cannot be undone. Continue?")) {
-        return;
-      }
-    }
-    if (key === "reverseCardsEnabled" && settings.reverseCardsEnabled) {
-      if (!window.confirm("Disabling reverse cards will discard all reverse-card progress when saved. This cannot be undone. Continue?")) {
-        return;
-      }
-    }
-    if (key === "reverseEvolutionCardsEnabled" && settings.reverseEvolutionCardsEnabled) {
-      if (!window.confirm("Disabling reverse-evolution cards will discard all their progress when saved. This cannot be undone. Continue?")) {
-        return;
-      }
+      // Toggling from enabled → disabled: non-destructive, no confirm needed.
     }
 
     setToggleError(null);
     setToggleErrorKey(null);
     setSettings({ ...settings, [key]: !settings[key] });
+  }
+
+  /**
+   * Called when the user picks a choice in the re-enable dialog.
+   * "reuse" — enable the type; saved progress is preserved as-is.
+   * "fresh" — enable the type and reset all cards of that type to initialReviewState.
+   */
+  async function handleReenableChoice(choice: ReenableChoice) {
+    if (settings === null || reenableKey === null) return;
+    setReenableKey(null);
+    setToggleError(null);
+    setToggleErrorKey(null);
+
+    // Enable the card type in settings state immediately.
+    setSettings({ ...settings, [reenableKey]: true });
+
+    if (choice === "fresh") {
+      // Reset cards of the re-enabled type to initial state in IDB.
+      const cardTypeForKey: Record<string, string> = {
+        nameCardsEnabled: "name",
+        evolutionCardsEnabled: "evolution",
+        reverseCardsEnabled: "reverse",
+        reverseEvolutionCardsEnabled: "reverse-evolution",
+        cryCardsEnabled: "cry",
+      };
+      const targetType = cardTypeForKey[reenableKey];
+      if (targetType !== undefined) {
+        const session = await loadSession();
+        if (session !== null) {
+          const now = new Date();
+          const reset = session.cards.map((card) =>
+            card.cardType === targetType
+              ? { ...card, state: initialReviewState(now) }
+              : card,
+          );
+          await saveSession({ ...session, cards: reset });
+        }
+      }
+    }
   }
 
 
@@ -665,24 +717,10 @@ export default function SettingsPage() {
       ...numericClamped,
     } as UserSettings;
     saveSettings(clamped);
-    // Filter out disabled card types from the session. Fire-and-forget: the
-    // UI proceeds immediately; the async IDB write completes in the background.
-    void (async () => {
-      const session = await loadSession();
-      if (session !== null) {
-        const filtered = session.cards.filter((card) => {
-          if (card.cardType === "name" && !clamped.nameCardsEnabled) return false;
-          if (card.cardType === "evolution" && !clamped.evolutionCardsEnabled) return false;
-          if (card.cardType === "reverse-evolution" && !clamped.reverseEvolutionCardsEnabled) return false;
-          if (card.cardType === "reverse" && !clamped.reverseCardsEnabled) return false;
-          if (card.cardType === "cry" && !clamped.cryCardsEnabled) return false;
-          return true;
-        });
-        if (filtered.length !== session.cards.length) {
-          await saveSession({ ...session, cards: filtered });
-        }
-      }
-    })();
+    // Disabling a card type is non-destructive: saved cards are kept in
+    // storage so progress is available when the type is re-enabled. The
+    // session queue builder filters them out of the active queue via the
+    // eligibleCardIds gate; we no longer strip them from IDB on save.
     setSettings(clamped);
     setSaved(true);
     if (savedTimeoutRef.current !== null) clearTimeout(savedTimeoutRef.current);
@@ -913,7 +951,7 @@ export default function SettingsPage() {
                           Enable name cards
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Show sprite as prompt; type the name. Re-enabling after disabling will reset name-card progress.
+                          Show sprite as prompt; type the name. Disabling hides these cards without losing your progress.
                         </p>
                       </div>
                       <button
@@ -986,7 +1024,7 @@ export default function SettingsPage() {
                           Enable evolution cards
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Show sprite; identify the evolution chain. Re-enabling after disabling will reset evolution-card progress.
+                          Show sprite; identify the evolution chain. Disabling hides these cards without losing your progress.
                         </p>
                       </div>
                       <button
@@ -1061,7 +1099,7 @@ export default function SettingsPage() {
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                           Quiz the opposite direction of evolution edges (&quot;Which Pokémon evolves into X via Y?&quot;).
                           Shares the same daily new/review budget as forward evolution cards.
-                          Re-enabling after disabling will reset reverse-evolution progress.
+                          Disabling hides these cards without losing your progress.
                         </p>
                       </div>
                       <button
@@ -1135,12 +1173,13 @@ export default function SettingsPage() {
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                           Show the Pokémon&apos;s name as the prompt; identify the sprite on reveal.
-                          Re-enabling after disabling will reset reverse-card progress.
+                          Disabling hides these cards without losing your progress.
                         </p>
                       </div>
                       <button
                         type="button"
                         role="switch"
+                        aria-label="Enable reverse cards"
                         aria-checked={settings.reverseCardsEnabled}
                         onClick={() => handleToggle("reverseCardsEnabled")}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
@@ -1237,7 +1276,7 @@ export default function SettingsPage() {
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                           Audio prompt: hear the cry and name the Pokémon. Species without a cry are skipped automatically.
-                          Re-enabling after disabling will reset cry-card progress.
+                          Disabling hides these cards without losing your progress.
                         </p>
                       </div>
                       <button
@@ -1825,6 +1864,12 @@ export default function SettingsPage() {
               open={deleteOpen}
               onClose={() => setDeleteOpen(false)}
               onConfirm={handleDeleteAccount}
+            />
+            <ReenableCardTypeDialog
+              open={reenableKey !== null}
+              cardTypeName={CARD_TYPE_DISPLAY_NAMES[reenableKey ?? "nameCardsEnabled"] ?? "this card type"}
+              onClose={() => setReenableKey(null)}
+              onChoose={(choice) => { void handleReenableChoice(choice); }}
             />
           </>
         )}

@@ -316,6 +316,122 @@ test.describe("Settings page — search/filter (#662)", () => {
   });
 });
 
+test.describe("Settings — re-enable card type prompt (#835)", () => {
+  test("re-enabling a disabled card type shows the reuse-or-reset dialog", async ({
+    page,
+  }) => {
+    // Pre-seed localStorage so reverse cards are disabled (the default).
+    // Settings start with reverseCardsEnabled: false.
+    await page.goto("/settings");
+
+    // Expand the Practice section.
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    // Reverse cards toggle must be present and off by default.
+    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
+    await expect(reverseToggle).toBeVisible();
+    await expect(reverseToggle).toHaveAttribute("aria-checked", "false");
+
+    // Clicking to enable should show the re-enable dialog, not toggle immediately.
+    await reverseToggle.click();
+
+    // The dialog must appear with the correct heading.
+    await expect(
+      page.getByRole("heading", { name: /re-enable reverse cards/i }),
+    ).toBeVisible();
+
+    // Both choice buttons and a cancel button must be present.
+    await expect(page.getByRole("button", { name: /reuse my saved progress/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /start fresh/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /cancel/i })).toBeVisible();
+  });
+
+  test("choosing 'Reuse my saved progress' closes the dialog and enables the toggle", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
+    await reverseToggle.click();
+
+    // Dialog opens — choose reuse.
+    await page.getByRole("button", { name: /reuse my saved progress/i }).click();
+
+    // Dialog must close and the toggle must be on.
+    await expect(
+      page.getByRole("heading", { name: /re-enable reverse cards/i }),
+    ).not.toBeVisible();
+    await expect(reverseToggle).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("choosing 'Start fresh' closes the dialog and enables the toggle", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
+    await reverseToggle.click();
+
+    // Dialog opens — choose fresh start.
+    await page.getByRole("button", { name: /start fresh/i }).click();
+
+    // Dialog must close and the toggle must be on.
+    await expect(
+      page.getByRole("heading", { name: /re-enable reverse cards/i }),
+    ).not.toBeVisible();
+    await expect(reverseToggle).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("Cancel closes the dialog without changing toggle state", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
+    await reverseToggle.click();
+
+    // Dialog opens — cancel.
+    await page.getByRole("button", { name: /cancel/i }).click();
+
+    // Dialog must close and the toggle must remain off.
+    await expect(
+      page.getByRole("heading", { name: /re-enable reverse cards/i }),
+    ).not.toBeVisible();
+    await expect(reverseToggle).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("disabling an enabled card type does not show a confirm dialog (non-destructive)", async ({
+    page,
+  }) => {
+    // Pre-enable reverse cards via localStorage so we can test disabling.
+    await page.addInitScript(() => {
+      const key = "poke-memory:settings:v1";
+      const raw = window.localStorage.getItem(key);
+      const settings = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      settings.reverseCardsEnabled = true;
+      window.localStorage.setItem(key, JSON.stringify(settings));
+    });
+
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
+    await expect(reverseToggle).toHaveAttribute("aria-checked", "true");
+
+    // Clicking to disable must toggle immediately without any dialog.
+    await reverseToggle.click();
+    await expect(reverseToggle).toHaveAttribute("aria-checked", "false");
+
+    // The re-enable dialog must NOT appear.
+    await expect(
+      page.getByRole("heading", { name: /re-enable reverse cards/i }),
+    ).not.toBeVisible();
+  });
+});
+
 test.describe("Settings — Danger zone (#697)", () => {
   test("danger zone shows Reset all progress; Delete account is hidden for guests", async ({
     page,
