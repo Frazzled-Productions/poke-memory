@@ -2,10 +2,11 @@ import { render, screen, waitFor, act, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
-import type { NameReviewCard } from "@/lib/review/session";
+import type { NameReviewCard, CryReviewCard } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
+import { CRY_ID_OFFSET } from "@/lib/pokemon/seed";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { nextReview } from "@/lib/srs/scheduler";
 
@@ -1600,30 +1601,22 @@ describe("Card-type disable guards (#835)", () => {
     // trigger NEW_CARDS_LOCKED. Without the fix, the tuple ["name", "evolution",
     // "reverse"] never inspects the cry bucket and the session falls through to
     // SESSION_COMPLETE ("All caught up!") instead.
-    const unseenCryCard: NameReviewCard = {
+    //
+    // How the cry card reaches hasMoreNewCardsOf: mockSeedPokemon returns a
+    // species with a non-null cryUrl. Because no saved cry card (id CRY_ID_OFFSET+1)
+    // exists in the stored session, hydrateSession appends a fresh CryReviewCard
+    // via initialReviewState (lastReview: null). That card satisfies
+    // hasMoreNewCardsOf("cry") — the newWall fires.
+    const seedWithCry: NameReviewCard = {
       ...FIXTURE_CARD,
       cryUrl: "https://example.com/bulbasaur.ogg",
-      state: {
-        stability: 0,
-        difficulty: 0,
-        elapsedDays: 0,
-        scheduledDays: 0,
-        reps: 0,
-        lapses: 0,
-        fsrsState: "new" as const,
-        dueDate: "1970-01-01",
-        lastReview: null,
-        firstSeen: null,
-        learningStep: null,
-        stepStartedAt: null,
-        hiddenSince: null,
-        seenInPasture: false,
-      },
     };
 
-    mockSeedPokemon.mockReturnValue([unseenCryCard]);
+    mockSeedPokemon.mockReturnValue([seedWithCry]);
+    // Pass the seed as a saved name card (id 1). hydrateSession will NOT find
+    // a saved cry card (id CRY_ID_OFFSET+1), so it appends a fresh unseen one.
     vi.mocked(loadSession).mockResolvedValueOnce({
-      cards: [unseenCryCard],
+      cards: [seedWithCry],
       limits: DEFAULT_LIMITS,
     });
     // Cry cards enabled but daily new-cry cap is 0 (already "hit").
@@ -1656,5 +1649,89 @@ describe("Card-type disable guards (#835)", () => {
       expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/all caught up/i)).not.toBeInTheDocument();
+  });
+
+  it("produces REVIEW_SOFT_WALL when cry review cap is hit with due cry cards remaining (#867)", async () => {
+    // Regression guard for the reviewWall tuple also including "cry".
+    // With cry enabled and maxReviewsCryPerDay: 0, a cry card that is due for
+    // review (lastReview set, dueDate <= today, learningStep null) must trigger
+    // REVIEW_SOFT_WALL. Without "cry" in the tuple the check is skipped and the
+    // session falls through to SESSION_COMPLETE instead.
+    //
+    // How the due cry card reaches hasMoreDueReviewsOf: we pass a saved
+    // CryReviewCard (id CRY_ID_OFFSET+1) with lastReview set to a past date and
+    // dueDate set to today. hydrateSession finds the matching saved card in
+    // savedIds and refreshes its seed fields while preserving the state, so the
+    // card enters cards[] with the review-due state intact.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seedWithCry: NameReviewCard = {
+      ...FIXTURE_CARD,
+      cryUrl: "https://example.com/bulbasaur.ogg",
+    };
+
+    // A cry card that has been seen before and is due today for review.
+    const dueCryCard: CryReviewCard = {
+      ...seedWithCry,
+      id: CRY_ID_OFFSET + 1,
+      pokemonId: 1,
+      cardType: "cry",
+      subjectKey: "1",
+      state: {
+        stability: 5,
+        difficulty: 1,
+        elapsedDays: 0,
+        scheduledDays: 5,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-17",
+        lastReview: "2026-05-01",
+        firstSeen: "2026-04-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([seedWithCry]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [dueCryCard],
+      limits: DEFAULT_LIMITS,
+    });
+    // maxReviewsCryPerDay: 0 means reviewsDoneToday (0) >= cap (0) is true,
+    // and hasMoreDueReviewsOf("cry") sees dueCryCard — REVIEW_SOFT_WALL fires.
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // With "cry" in the reviewWall tuple, hasMoreDueReviewsOf("cry") returns
+    // true and the review cap fires — showing the soft-wall screen.
+    await waitFor(() => {
+      expect(screen.getByText(/daily review limit reached/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/all caught up/i)).not.toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 });
