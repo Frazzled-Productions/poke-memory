@@ -16,6 +16,7 @@
     "screenshots": "node scripts/capture-screenshots.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "coverage:diff": "git diff origin/qa...HEAD | node scripts/diff-coverage.mjs",
     "test:integration": "VITEST_INTEGRATION=1 vitest run --project integration",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"

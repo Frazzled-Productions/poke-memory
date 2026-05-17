@@ -1,12 +1,17 @@
 name: Coverage
 
-# Non-blocking test-coverage report (#762). Runs `npm run test:coverage` on
+# Test-coverage gate (#762, gated in #824). Runs `npm run test:coverage` on
 # every PR and posts the v8 coverage summary as an idempotent PR comment.
 #
-# This is deliberately NOT a required check: it has no threshold gate and never
-# fails the PR. The intent is to make coverage gaps visible (so audits like
-# #741 become mechanical) without adding merge friction. A threshold gate can
-# be layered on later once a baseline is agreed.
+# Two gates fail the job (#824):
+#   1. Global floor — `coverage.thresholds` in vitest.config.ts. `vitest run
+#      --coverage` exits non-zero if overall coverage regresses below the floor.
+#   2. Diff coverage — scripts/diff-coverage.mjs requires new/changed product
+#      lines in the PR to hit an 80% patch-coverage bar.
+#
+# The PR comment is posted on BOTH pass and fail so the numbers are always
+# visible. Make `coverage` a required check on the qa and main rulesets to
+# enforce the gate at merge time (owner action — not done by this workflow).
 
 on:
   pull_request:
@@ -30,6 +35,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Need the PR base commit so `git diff` can compute changed lines for
+          # the diff-coverage gate. fetch-depth: 0 fetches full history.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -38,18 +47,42 @@ jobs:
 
       - run: npm ci
 
-      # `vitest run --coverage` always exits 0 here — no thresholds are set in
-      # vitest.config.ts — but guard with `continue-on-error` anyway so a flaky
-      # test never turns this informational job red.
+      # `vitest run --coverage` now enforces the global floor in
+      # vitest.config.ts (`coverage.thresholds`) — it exits non-zero if overall
+      # coverage regresses. `continue-on-error` is deliberately NOT set: a
+      # breach must fail the job. `id` + the later `if: always()` steps ensure
+      # the PR comment still posts when this step fails.
       - name: Run coverage
         id: coverage
-        continue-on-error: true
         run: npm run test:coverage
 
+      # Diff-coverage gate: changed product lines must hit the patch bar.
+      # Runs even if the global floor failed (always()) so both gates report.
+      - name: Diff coverage gate
+        id: diffcov
+        if: always() && github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DIFF_COVERAGE_OUT: /tmp/diff-coverage.md
+        run: |
+          set -euo pipefail
+          if [ ! -f coverage/coverage-final.json ]; then
+            echo "coverage/coverage-final.json missing — coverage run failed before producing it."
+            printf '%s\n' \
+              '### Diff coverage' \
+              '' \
+              'Coverage run did not produce `coverage/coverage-final.json`. Check the workflow logs.' \
+              > /tmp/diff-coverage.md
+            exit 1
+          fi
+          git diff "$BASE_SHA...$HEAD_SHA" | node scripts/diff-coverage.mjs
+
       # Build the comment body from coverage/coverage-summary.json (the
-      # `json-summary` reporter configured in vitest.config.ts).
+      # `json-summary` reporter) and the diff-coverage fragment. Runs on both
+      # pass and fail so the numbers are always posted.
       - name: Build coverage summary
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         run: |
           set -euo pipefail
           BODY_FILE=$(mktemp)
@@ -75,7 +108,8 @@ jobs:
                 row("Functions", t.functions),
                 row("Lines", t.lines),
                 "",
-                "_Non-blocking report. No threshold gate is enforced. See the `coverage` workflow._",
+                "_Global floor: Statements 64 / Branches 59 / Functions 55 / Lines 65. " +
+                  "Changed lines must hit an 80% patch-coverage bar. See the `coverage` workflow._",
               ].join("\n"));
             ' > /tmp/coverage-table.md
           else
@@ -92,10 +126,14 @@ jobs:
           {
             echo "$MARKER"
             cat /tmp/coverage-table.md
+            if [ -f /tmp/diff-coverage.md ]; then
+              echo ""
+              cat /tmp/diff-coverage.md
+            fi
           } > "$BODY_FILE"
 
       - name: Post or update coverage comment
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
