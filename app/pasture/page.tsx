@@ -18,7 +18,7 @@ import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
-import { loadSettings } from "@/lib/settings/persistence";
+import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
 type Placement = {
   card: NameReviewCard;
@@ -93,6 +93,18 @@ export default function PasturePage() {
   // via clearLocalProgress). Matches the pattern used by Stats and Pokédex; without
   // this, a reset that does not navigate away from /pasture would leave stale state.
   const storageVersion = useSessionStorageKey();
+  // Re-render when the user saves Settings, so a change to the
+  // masteryRepetitions threshold re-filters the pasture without needing a
+  // session storage bump or a navigation away and back.
+  const [settingsVersion, setSettingsVersion] = useState(0);
+
+  useEffect(() => {
+    function onSaved() {
+      setSettingsVersion((v) => v + 1);
+    }
+    window.addEventListener(SETTINGS_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -105,7 +117,10 @@ export default function PasturePage() {
 
   // The user's configured mastery threshold. loadSettings is synchronous and
   // reads localStorage, so it is safe to call directly in render; it falls
-  // back to the default when no settings blob has been written.
+  // back to the default when no settings blob has been written. Reading
+  // `settingsVersion` here ties the value to the SETTINGS_SAVED_EVENT bump so
+  // a threshold change re-derives the filtered pasture immediately.
+  void settingsVersion;
   const masteryRepetitions = loadSettings().masteryRepetitions;
 
   // Derive mastered count so the reset-on-empty effect below can read it

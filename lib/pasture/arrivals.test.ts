@@ -137,6 +137,30 @@ describe("justBecameMastered", () => {
   it("returns true from brand-new to mastered (Easy-first-grade edge case)", () => {
     expect(justBecameMastered(newState, masteredState)).toBe(true);
   });
+
+  it("honours a higher masteryRepetitions threshold", () => {
+    // masteredState has reps: 3 — mastered under the default but not under a
+    // custom threshold of 5, so the transition no longer counts as a crossing.
+    expect(justBecameMastered(learningState, masteredState, 5)).toBe(false);
+  });
+
+  it("honours a lower masteryRepetitions threshold", () => {
+    // learningState has reps: 2, scheduledDays: 10 — not mastered under any
+    // threshold because scheduledDays < 21. Use a state that crosses only once
+    // the rep threshold drops to 2.
+    const lowRepMastered = makeState({
+      reps: 2,
+      scheduledDays: 21,
+      lastReview: "2026-05-01",
+      firstSeen: "2026-04-01",
+      fsrsState: "review",
+    });
+    // Under the default threshold of 3, lowRepMastered is not mastered, so the
+    // transition from newState is not a crossing.
+    expect(justBecameMastered(newState, lowRepMastered)).toBe(false);
+    // Drop the threshold to 2 and the same transition becomes a crossing.
+    expect(justBecameMastered(newState, lowRepMastered, 2)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

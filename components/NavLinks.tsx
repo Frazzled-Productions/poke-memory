@@ -8,7 +8,7 @@ import { loadSession } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { loadSettings } from "@/lib/settings/persistence";
+import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 
 const NAV_LINKS = [
@@ -30,6 +30,18 @@ export function NavLinks() {
   // events and the synthetic dispatch from pullAndMerge / pasture sparkle
   // clears both flow through this hook.
   const sessionVersion = useSessionStorageKey();
+  // Also re-runs when the user saves Settings, so a change to the
+  // masteryRepetitions threshold re-derives Pasture link visibility without
+  // waiting for an unrelated session storage bump.
+  const [settingsVersion, setSettingsVersion] = useState(0);
+
+  useEffect(() => {
+    function onSaved() {
+      setSettingsVersion((v) => v + 1);
+    }
+    window.addEventListener(SETTINGS_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -41,7 +53,7 @@ export function NavLinks() {
       );
     }
     void load();
-  }, [sessionVersion]);
+  }, [sessionVersion, settingsVersion]);
 
   const showPasture = hasMastered || flags.pretendAllMastered;
 

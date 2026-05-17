@@ -156,6 +156,10 @@ function BottomTabBarInner() {
   // Re-runs the mastery check when the session key changes, matching the logic
   // in NavLinks and NavDrawer.
   const sessionVersion = useSessionStorageKey();
+  // Also re-runs the mastery check when the user saves Settings, so a change
+  // to the masteryRepetitions threshold re-derives Pasture tab visibility
+  // without waiting for an unrelated session storage bump.
+  const [settingsVersion, setSettingsVersion] = useState(0);
   // Track mobileNav setting so the bar disappears immediately when the user
   // switches to hamburger mode on the Settings page.
   //
@@ -171,6 +175,7 @@ function BottomTabBarInner() {
 
     function onSaved() {
       setMobileNav(loadSettings().mobileNav);
+      setSettingsVersion((v) => v + 1);
     }
     window.addEventListener(SETTINGS_SAVED_EVENT, onSaved);
     return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
@@ -186,7 +191,7 @@ function BottomTabBarInner() {
       );
     }
     void load();
-  }, [sessionVersion]);
+  }, [sessionVersion, settingsVersion]);
 
   // Hidden in hamburger mode — the NavDrawer handles navigation instead.
   // While mobileNav is null (pre-mount), render the bottom bar to match the

@@ -7,7 +7,7 @@ import { filterMastered } from "@/lib/pasture/arrivals";
 import { loadSession } from "@/lib/review/persistence";
 import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { loadSettings } from "@/lib/settings/persistence";
+import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 import { AuthButton } from "@/components/auth/AuthButton";
 
@@ -79,10 +79,22 @@ export function NavDrawer() {
   const [open, setOpen] = useState(false);
   const [hasMastered, setHasMastered] = useState(false);
   const sessionVersion = useSessionStorageKey();
+  // Also re-runs when the user saves Settings, so a change to the
+  // masteryRepetitions threshold re-derives Pasture link visibility without
+  // waiting for an unrelated session storage bump.
+  const [settingsVersion, setSettingsVersion] = useState(0);
   const { flags } = useSuperuser();
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onSaved() {
+      setSettingsVersion((v) => v + 1);
+    }
+    window.addEventListener(SETTINGS_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
+  }, []);
 
   // Load mastery state — mirrors the logic in NavLinks.
   useEffect(() => {
@@ -95,7 +107,7 @@ export function NavDrawer() {
       );
     }
     void load();
-  }, [sessionVersion]);
+  }, [sessionVersion, settingsVersion]);
 
   const showPasture = hasMastered || flags.pretendAllMastered;
 

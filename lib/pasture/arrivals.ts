@@ -23,12 +23,21 @@ export type ReviewSession = {
 /**
  * Returns true when the card has just crossed the mastery threshold:
  * before the grade it was not mastered, after it is.
+ *
+ * `masteryRepetitions` is the user's configured mastery threshold (from
+ * `loadSettings().masteryRepetitions`). It defaults to `MASTERY_REPETITIONS`
+ * for backward-compatibility, but callers that have the user's settings to
+ * hand must pass it through so the comparison honours a custom threshold.
  */
 export function justBecameMastered(
   before: ReviewState,
   after: ReviewState,
+  masteryRepetitions: number = MASTERY_REPETITIONS,
 ): boolean {
-  return !isMastered(before) && isMastered(after);
+  return (
+    !isMastered(before, masteryRepetitions) &&
+    isMastered(after, masteryRepetitions)
+  );
 }
 
 /**

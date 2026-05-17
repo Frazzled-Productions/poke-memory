@@ -15,7 +15,7 @@ import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
-import { loadSettings } from "@/lib/settings/persistence";
+import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
 type Placement = {
   card: NameReviewCard;
@@ -78,9 +78,21 @@ export default function BiomeLandscapePage({
     null,
   );
   const storageVersion = useSessionStorageKey();
+  // Re-derive when the user saves Settings, so a change to the
+  // masteryRepetitions threshold re-filters this biome without needing a
+  // session storage bump or a navigation away and back.
+  const [settingsVersion, setSettingsVersion] = useState(0);
 
   // Validate the biome slug against known habitats before loading anything.
   const zone = HABITAT_ZONES.find((z) => z.habitat === biomeSlug);
+
+  useEffect(() => {
+    function onSaved() {
+      setSettingsVersion((v) => v + 1);
+    }
+    window.addEventListener(SETTINGS_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -108,7 +120,7 @@ export default function BiomeLandscapePage({
       }
     }
     void load();
-  }, [storageVersion, flags.pretendAllMastered]);
+  }, [storageVersion, settingsVersion, flags.pretendAllMastered]);
 
   // Not a recognised habitat — render a 404.
   if (!zone) return notFound();
