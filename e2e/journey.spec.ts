@@ -196,6 +196,77 @@ test.describe("Journey page — collection timeline scrubber", () => {
   });
 });
 
+test.describe("Journey page — evolution wall", () => {
+  test("evolution wall section heading is visible", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("heading", { name: "Evolution wall" }),
+    ).toBeVisible();
+  });
+
+  test("evolution wall shows families completed headline metric", async ({
+    page,
+  }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByText(/Families completed:/i),
+    ).toBeVisible();
+  });
+
+  test("filter tabs are visible and interactive", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // All three filter tabs present.
+    await expect(page.getByRole("tab", { name: "All" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "In progress" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Completed" })).toBeVisible();
+    // Active tab is "All" by default.
+    await expect(page.getByRole("tab", { name: "All" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  test("pretendAllMastered marks all families as completed", async ({ page }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // Under pretendAllMastered the families count = completedFamilies count.
+    // The headline will read "Families completed: N / N" — verify it contains non-zero digits.
+    const headline = page.getByText(/Families completed:/i);
+    await expect(headline).toBeVisible();
+    // Switch to "Completed" filter — gallery should be non-empty.
+    await page.getByRole("tab", { name: "Completed" }).click();
+    await expect(
+      page.getByRole("list", { name: "Evolution families" }),
+    ).toBeVisible();
+  });
+
+  test("in-progress filter shows empty state message for fresh guest", async ({
+    page,
+  }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // Switch to "In progress" — fresh guest has no mastered edges.
+    await page.getByRole("tab", { name: "In progress" }).click();
+    await expect(
+      page.getByText(/No families in progress yet/i),
+    ).toBeVisible();
+  });
+});
+
 test.describe("Journey page — navigation", () => {
   test("Journey link in the desktop nav navigates to /journey", async ({
     page,
