@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useCountUp } from "@/lib/stats/useCountUp";
-import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS } from "@/lib/review/session";
+import { buildSession, hydrateSession, todayString } from "@/lib/review/session";
 import { loadSession } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
@@ -12,7 +12,7 @@ import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { computeStreak, loadStreakData } from "@/lib/streak";
-import { loadGradeLog, computeGradeTotals } from "@/lib/gradelog/persistence";
+import { loadGradeLog } from "@/lib/gradelog/persistence";
 import { TrainerCard } from "@/components/stats/TrainerCard";
 import { BadgeGallery } from "@/components/badges/BadgeGallery";
 import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
