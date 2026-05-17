@@ -8,9 +8,10 @@
  * - Clicking the close button inside the drawer closes it
  * - aria-current="page" is set on the active link
  * - Pasture link appears when pretendAllMastered flag is on (hasMastered = false)
+ * - Pasture link re-derives on a SETTINGS_SAVED_EVENT (#868 follow-up)
  */
 
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { act, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -49,12 +50,20 @@ vi.mock("next/link", () => ({
 }));
 
 // lib dependencies used by NavDrawer
+const mockLoadSession = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/review/persistence", () => ({
-  loadSession: vi.fn().mockResolvedValue(null),
+  loadSession: () => mockLoadSession(),
 }));
 
+const mockFilterMastered = vi.fn().mockReturnValue([]);
 vi.mock("@/lib/pasture/arrivals", () => ({
-  filterMastered: vi.fn().mockReturnValue([]),
+  filterMastered: (...args: unknown[]) => mockFilterMastered(...args),
+}));
+
+const mockLoadSettings = vi.fn(() => ({ masteryRepetitions: 3 }));
+vi.mock("@/lib/settings/persistence", () => ({
+  loadSettings: () => mockLoadSettings(),
+  SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
 }));
 
 vi.mock("@/lib/review/useSessionStorageKey", () => ({
@@ -84,6 +93,9 @@ import { NavDrawer } from "@/components/NavDrawer";
 beforeEach(() => {
   mockPathname.value = "/";
   mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: false } });
+  mockLoadSession.mockResolvedValue(null);
+  mockFilterMastered.mockReturnValue([]);
+  mockLoadSettings.mockReturnValue({ masteryRepetitions: 3 });
 });
 
 describe("NavDrawer", () => {
@@ -197,6 +209,34 @@ describe("NavDrawer", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Pasture" })).toBeInTheDocument();
+    });
+  });
+
+  it("re-derives Pasture visibility when SETTINGS_SAVED_EVENT fires", async () => {
+    // A real session exists, but with the default threshold nothing is mastered.
+    mockLoadSession.mockResolvedValue({ cards: [] });
+    mockFilterMastered.mockReturnValue([]);
+
+    const user = userEvent.setup();
+    render(<NavDrawer />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Open navigation menu" }),
+    );
+    expect(screen.queryByRole("link", { name: "Pasture" })).toBeNull();
+
+    // The user lowers the mastery threshold in Settings; now the same session
+    // has a mastered card. A SETTINGS_SAVED_EVENT must re-run the derivation.
+    mockLoadSettings.mockReturnValue({ masteryRepetitions: 1 });
+    mockFilterMastered.mockReturnValue([{ id: 1 }]);
+    act(() => {
+      window.dispatchEvent(new Event("poke-memory:settings-saved"));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("link", { name: "Pasture" }),
+      ).toBeInTheDocument();
     });
   });
 });

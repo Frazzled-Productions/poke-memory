@@ -6,10 +6,11 @@
  *   - Active tab carries aria-current="page".
  *   - Pasture tab appears when pretendAllMastered flag is on.
  *   - Pasture tab hidden when hasMastered=false and flag is off.
+ *   - Pasture tab re-derives on a SETTINGS_SAVED_EVENT (#868 follow-up).
  *   - The bar is hidden in hamburger mode.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -41,12 +42,14 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+const mockLoadSession = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/review/persistence", () => ({
-  loadSession: vi.fn().mockResolvedValue(null),
+  loadSession: () => mockLoadSession(),
 }));
 
+const mockFilterMastered = vi.fn().mockReturnValue([]);
 vi.mock("@/lib/pasture/arrivals", () => ({
-  filterMastered: vi.fn().mockReturnValue([]),
+  filterMastered: (...args: unknown[]) => mockFilterMastered(...args),
 }));
 
 vi.mock("@/lib/review/useSessionStorageKey", () => ({
@@ -60,9 +63,12 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
 
 import type { MobileNav } from "@/lib/settings/persistence";
 
-const mockLoadSettings = vi.fn((): { mobileNav: MobileNav } => ({
-  mobileNav: "bottom",
-}));
+const mockLoadSettings = vi.fn(
+  (): { mobileNav: MobileNav; masteryRepetitions: number } => ({
+    mobileNav: "bottom",
+    masteryRepetitions: 3,
+  }),
+);
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
@@ -77,7 +83,9 @@ import { BottomTabBar } from "@/components/BottomTabBar";
 beforeEach(() => {
   mockPathname.value = "/";
   mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: false } });
-  mockLoadSettings.mockReturnValue({ mobileNav: "bottom" });
+  mockLoadSettings.mockReturnValue({ mobileNav: "bottom", masteryRepetitions: 3 });
+  mockLoadSession.mockResolvedValue(null);
+  mockFilterMastered.mockReturnValue([]);
 });
 
 describe("BottomTabBar", () => {
@@ -147,8 +155,43 @@ describe("BottomTabBar", () => {
     });
   });
 
+  it("re-derives Pasture visibility when SETTINGS_SAVED_EVENT fires", async () => {
+    // A real session exists, but with the default threshold nothing is mastered.
+    mockLoadSession.mockResolvedValue({ cards: [] });
+    mockFilterMastered.mockReturnValue([]);
+
+    render(<BottomTabBar />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("link", { name: "Practice" }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "Pasture" })).toBeNull();
+
+    // The user lowers the mastery threshold in Settings; now the same session
+    // has a mastered card. A SETTINGS_SAVED_EVENT must re-run the derivation.
+    mockLoadSettings.mockReturnValue({
+      mobileNav: "bottom",
+      masteryRepetitions: 1,
+    });
+    mockFilterMastered.mockReturnValue([{ id: 1 }]);
+    act(() => {
+      window.dispatchEvent(new Event("poke-memory:settings-saved"));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("link", { name: "Pasture" }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("renders nothing when mobileNav is 'hamburger'", async () => {
-    mockLoadSettings.mockReturnValue({ mobileNav: "hamburger" as MobileNav });
+    mockLoadSettings.mockReturnValue({
+      mobileNav: "hamburger" as MobileNav,
+      masteryRepetitions: 3,
+    });
 
     const { container } = render(<BottomTabBar />);
 
