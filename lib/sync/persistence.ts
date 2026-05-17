@@ -1,4 +1,19 @@
+import type { ReviewableCard } from "@/lib/review/session";
+
 export const STORAGE_KEY = "poke-memory:sync-status:v1";
+/**
+ * localStorage key for the persisted pending-grade queue (#893).
+ *
+ * Stores the exact set of `ReviewableCard` objects that `usePerGradeSync` has
+ * not yet successfully pushed to the cloud. Written on every debounce cycle
+ * (with a trailing debounce so rapid grading does not thrash storage) and
+ * cleared after a fully-successful drain so stale data does not accumulate.
+ *
+ * Only written when a real (non-superuser) session is active — a null
+ * client/userId in `usePerGradeSync` causes the queue to be cleared rather
+ * than persisted, ensuring a QA session never leaves fake state behind.
+ */
+export const PENDING_QUEUE_KEY = "poke-memory:pending-grade-queue:v1";
 
 export type SyncStatus = {
   lastPushAt: string | null;
@@ -111,5 +126,63 @@ export function saveSyncStatus(status: SyncStatus): void {
     // Older browsers / non-standard envs without a StorageEvent constructor.
     // The native cross-tab event still fires; same-tab callers can fall back
     // to polling if they need to.
+  }
+}
+
+// ─── Persisted pending-grade queue (#893) ─────────────────────────────────────
+//
+// `usePerGradeSync` writes the in-memory `pendingQueueRef` here on every
+// debounce cycle so that the exact failed-card set survives a tab force-kill.
+// The key is cleared after a fully-successful drain and is never written during
+// a superuser session (null client/userId → clear instead of persist).
+
+/**
+ * Loads the persisted pending-grade queue from localStorage.
+ * Returns an empty array when the key is absent, malformed, or not an array.
+ * Individual entries that are not plain objects are dropped rather than
+ * rejecting the whole array — partial corruption is better than total loss.
+ */
+export function loadPendingQueue(): ReviewableCard[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PENDING_QUEUE_KEY);
+    if (raw === null) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    // Keep only entries that look like ReviewableCard (have an `id` field).
+    // A full schema validation is intentionally omitted — the data was written
+    // by this app so heavy validation adds more surface area than safety.
+    return parsed.filter(
+      (item): item is ReviewableCard =>
+        typeof item === "object" && item !== null && "id" in item,
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Persists the pending-grade queue to localStorage. Best-effort — storage
+ * errors are swallowed so a quota-full condition never interrupts the review.
+ */
+export function savePendingQueue(queue: ReviewableCard[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
+  } catch {
+    // Storage full or unavailable — best effort.
+  }
+}
+
+/**
+ * Removes the persisted pending-grade queue from localStorage.
+ * Call this after a fully-successful push so stale data does not accumulate.
+ */
+export function clearPendingQueue(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(PENDING_QUEUE_KEY);
+  } catch {
+    // Best effort.
   }
 }

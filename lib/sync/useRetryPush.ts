@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pushSingleCard } from "@/lib/sync/cloud";
-import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
+import {
+  loadSyncStatus,
+  saveSyncStatus,
+  loadPendingQueue,
+  clearPendingQueue,
+} from "@/lib/sync/persistence";
 import { loadSession } from "@/lib/review/persistence";
 import { todayString } from "@/lib/review/session";
 
@@ -13,17 +18,15 @@ export type RetryState = "idle" | "retrying" | "success" | "error";
  * Push-only retry hook for recovering from a failed unload beacon.
  *
  * When lastPushFailed is true in SyncStatus, retryNow() re-pushes the
- * subset of cards that failed — approximated from failedCardCount and the
- * local session — without pulling from cloud first. Pull-before-push is the
- * failure mode (#293) we are moving away from; this hook is deliberately
- * push-only.
+ * subset of cards that failed — without pulling from cloud first.
+ * Pull-before-push is the failure mode (#293) we are moving away from;
+ * this hook is deliberately push-only.
  *
- * Card selection:
- *   - failedCardCount > 0  → push today's reviewed cards (those with
- *     lastReview === today). Approximates the cards the unload beacon missed.
- *   - failedCardCount null → push all reviewed cards (lastReview !== null).
- *     Covers legacy records and full-session beacon failures.
- *   - failedCardCount === 0 → no-op success (clear the failed flag).
+ * Card selection (in priority order, #893):
+ *   1. Persisted queue present → push those exact cards (most precise).
+ *   2. failedCardCount > 0    → push today's reviewed cards (approximation).
+ *   3. failedCardCount null   → push all reviewed cards (legacy fallback).
+ *   4. failedCardCount === 0  → no-op success (clear the failed flag).
  *
  * The call site is responsible for passing client=null / userId=null when any
  * superuser flag is on (same contract as usePerGradeSync), so this hook does
@@ -117,6 +120,43 @@ export function useRetryPush(
     const capturedUserId = userId;
 
     async function run() {
+      // Prefer the persisted queue when it is non-empty (#893). The persisted
+      // queue contains the exact set of cards that `usePerGradeSync` had not
+      // yet delivered when the tab was last closed, so it is always more
+      // precise than the session-card heuristic below.
+      const persistedQueue = loadPendingQueue();
+      if (persistedQueue.length > 0) {
+        if (cancelledRef.current) return;
+
+        const results = await Promise.allSettled(
+          persistedQueue.map((card) =>
+            pushSingleCard(capturedClient, capturedUserId, card),
+          ),
+        );
+
+        if (cancelledRef.current) return;
+
+        const anyFailed = results.some(
+          (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value),
+        );
+
+        const attemptAt = new Date().toISOString();
+
+        if (anyFailed) {
+          const latest = loadSyncStatus();
+          saveSyncStatus({ ...latest, lastPushAttemptAt: attemptAt });
+          if (!cancelledRef.current) setRetryState("error");
+        } else {
+          clearFailedFlag({ lastPushAt: attemptAt, lastPushAttemptAt: attemptAt });
+          clearPendingQueue();
+          if (!cancelledRef.current) setRetryState("success");
+        }
+
+        scheduleReset();
+        return;
+      }
+
+      // No persisted queue: fall back to the session-card heuristic.
       const session = await loadSession();
       const today = todayString(new Date());
       const allReviewed = (session?.cards ?? []).filter(

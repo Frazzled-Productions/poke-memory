@@ -4,7 +4,12 @@ import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
-import { loadSyncStatus, markPushSucceeded } from "@/lib/sync/persistence";
+import {
+  loadSyncStatus,
+  markPushSucceeded,
+  loadPendingQueue,
+  clearPendingQueue,
+} from "@/lib/sync/persistence";
 import { loadSession } from "@/lib/review/persistence";
 import { todayString } from "@/lib/review/session";
 
@@ -16,8 +21,9 @@ import { todayString } from "@/lib/review/session";
  *   1. `pullAndMerge` — brings local state up to date with cloud.
  *   2. Push any cards that failed the per-grade path while offline.
  *
- * Card selection and success semantics mirror `useRetryPush` exactly:
+ * Card selection and success semantics mirror `useRetryPush` exactly (#893):
  *   - `lastPushFailed` false → only the pull runs; no push leg.
+ *   - Persisted queue non-empty → push those exact cards (most precise).
  *   - `failedCardCount === 0` → skip the push leg.
  *   - `failedCardCount > 0` → push today's reviewed cards (falling back to all
  *     reviewed cards when the today-filter is empty).
@@ -75,6 +81,37 @@ export function useOnlineReconnectSync(
           return;
         }
 
+        // Re-read client/userId from refs so a sign-out that races with this
+        // async run uses current values.
+        const pushClient = clientRef.current;
+        const pushUid = userIdRef.current;
+        if (!pushClient || !pushUid) return;
+
+        // Prefer the persisted queue when it is non-empty (#893). The persisted
+        // queue contains the exact cards `usePerGradeSync` had not yet delivered,
+        // so it is always more precise than the session-card heuristic below.
+        const persistedQueue = loadPendingQueue();
+        if (persistedQueue.length > 0) {
+          const queueResults = await Promise.allSettled(
+            persistedQueue.map((card) => pushSingleCard(pushClient, pushUid, card)),
+          );
+
+          const queueAnyFailed = queueResults.some(
+            (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value),
+          );
+
+          if (queueAnyFailed) {
+            console.warn("[online-reconnect] some persisted-queue cards failed to push; will retry on next grade or reconnect");
+          } else {
+            // All persisted-queue cards succeeded — clear both the failure signal
+            // and the persisted queue so stale data does not accumulate.
+            markPushSucceeded();
+            clearPendingQueue();
+          }
+          return;
+        }
+
+        // No persisted queue: fall back to the session-card heuristic.
         const session = await loadSession();
         const allReviewed = (session?.cards ?? []).filter(
           (card) => card.state.lastReview !== null && isSyncSafe(card),
@@ -99,12 +136,6 @@ export function useOnlineReconnectSync(
         }
 
         if (cardsToRetry.length === 0) return;
-
-        // Re-read client/userId from refs so a sign-out that races with this
-        // async run uses current values.
-        const pushClient = clientRef.current;
-        const pushUid = userIdRef.current;
-        if (!pushClient || !pushUid) return;
 
         const results = await Promise.allSettled(
           cardsToRetry.map((card) => pushSingleCard(pushClient, pushUid, card)),
