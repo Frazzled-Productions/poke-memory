@@ -23,15 +23,18 @@
   },
   "dependencies": {
     "@open-spaced-repetition/binding": "^0.3.0",
+    "@serwist/turbopack": "^9.5.11",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "esbuild-wasm": "^0.28.0",
     "idb": "^8.0.3",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "recharts": "^3.8.1",
+    "serwist": "^9.5.11",
     "ts-fsrs": "^5.3.3"
   },
   "devDependencies": {

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSerwist } from "@serwist/turbopack";
 import pkg from "./package.json";
 import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 
@@ -48,4 +49,8 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// `withSerwist` keeps Next.js 16's default Turbopack in place (no `--webpack`
+// regression) and marks the esbuild bundler used by the service-worker route
+// (`app/sw/[path]/route.ts`) as server-external so Turbopack does not try to
+// bundle it. Offline support for the installed PWA — see issue #703.
+export default withSerwist(nextConfig);
