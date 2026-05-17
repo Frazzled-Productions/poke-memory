@@ -47,7 +47,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
    The output is `<behind> <ahead>` — commits on `main` not in `qa`, then commits on `qa` not in `main`.
 
-   - **`qa` clean** (`ahead == 0`): no un-promoted work. If `behind > 0` (e.g. a `hotfix` PR landed on `main` since the last reset), fast-forward `qa` to `main` first — `git push origin +origin/main:qa` — so agents branch off the latest state. If `behind == 0`, `qa` already equals `main`. Either way, proceed.
+   - **`qa` clean** (`ahead == 0`): no un-promoted work. If `behind > 0` (e.g. a `hotfix` PR landed on `main` since the last reset), fast-forward `qa` to `main` first — `git push origin +origin/main:qa` — so agents branch off the latest state. (The repo admin is a bypass actor on the `qa-staging` ruleset, so this direct push is allowed.) If `behind == 0`, `qa` already equals `main`. Either way, proceed.
    - **`qa` ahead** (`ahead > 0`): a previous batch was drained into `qa` but never promoted. Stop and ask the maintainer whether to **promote** (open the `qa -> main` PR for the existing work first) or **discard** (`git push origin +origin/main:qa`) before starting a new batch — do not silently stack a new batch on top.
    - If `qa` does not exist at all, stop and surface it — the qa staging-branch setup (#806) has not been applied.
 

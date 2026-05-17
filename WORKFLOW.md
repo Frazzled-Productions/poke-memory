@@ -92,7 +92,7 @@ Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR 
 | Branch | Ruleset | Who PRs into it |
 |---|---|---|
 | `main` | `main-protection` — strict-up-to-date; required checks `test`, `e2e`, `Check version bump approval`, `Restrict main PR source` | Only `qa`. A non-`qa` PR needs the `hotfix` label. |
-| `qa` | `qa-staging` — required checks `test`, `e2e`; **not** strict-up-to-date | Any batch / feature branch. |
+| `qa` | `qa-staging` — required checks `test`, `e2e`; **not** strict-up-to-date. Bypass actors: `poke-memory-bot` and the repo admin role. | Any batch / feature branch. |
 
 **Why `qa` exists.** `main`'s strict-up-to-date rule forces every queued PR to rebase + re-run CI one at a time — the serial-rebase tax. A GitHub merge queue would remove it but is unavailable for personal-account repos (#797). `qa` is non-strict, so `/batch-issues` merges PRs back-to-back with no rebase tax, then promotes the bundled result to `main` in a single PR.
 
@@ -104,6 +104,8 @@ Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR 
 4. The merge triggers `auto-release.yml`: it cuts the release, pushes the `[skip ci]` release commit to `main` (Vercel deploys production), then resets `qa` to `main` so the next batch starts clean.
 
 **Hotfix bypass.** A genuine hotfix can skip `qa` by opening a PR straight into `main` with the `hotfix` label — `main-pr-source-gate.yml` checks for it. Only the repo owner applies the label.
+
+**Managing `qa`.** `qa` is the loose branch: the repo admin role and `poke-memory-bot` are bypass actors on the `qa-staging` ruleset, so the owner can fast-forward or reset `qa` directly (the `/batch-issues` pre-flight relies on this) and `auto-release.yml` can force-push the post-release reset. `main-protection` has no owner bypass — `main` stays strict for everyone.
 
 **Note on `closes #N`.** GitHub auto-closes a linked issue only when the PR merges into the *default* branch. A batch PR merged into `qa` does not close its issue; the `qa -> main` promotion PR carries the aggregated `Closes #N` lines and closes them all on merge.
 
