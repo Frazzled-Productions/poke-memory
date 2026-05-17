@@ -87,7 +87,7 @@ test.describe("Stats page — Pokédex completion projection", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Pokédex completion" }),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("Not enough data yet")).toBeVisible();
+    await expect(page.getByText("Projection not available yet")).toBeVisible();
   });
 
   test("pretendAllMastered shows the completion state", async ({ page }) => {

@@ -35,11 +35,12 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
         {projection.kind === "insufficient-history" && (
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-foreground">
-              Not enough data yet
+              Projection not available yet
             </p>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Keep reviewing and a completion estimate will appear once you have
-              at least a week of mastery history.
+              Available once you have mastered at least one species and kept it
+              up for a week. Master a species by reviewing it until it is
+              scheduled at least 21 days ahead, then come back after 7 days.
             </p>
           </div>
         )}
