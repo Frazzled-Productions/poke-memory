@@ -1,5 +1,10 @@
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import type { ReviewableCard } from "@/lib/review/session";
+import {
+  EMPTY_SCOPE,
+  seedPokemonIsEligible,
+  type PracticeScope,
+} from "@/lib/review/scope";
 
 export type StatKey =
   | "hp"
@@ -90,7 +95,8 @@ export function scoreGuess(
 
 /**
  * Returns the subset of `seedPokemon` that the user has seen (at least one
- * card graded), deduped by Pokémon ID.
+ * card graded), deduped by Pokémon ID, and filtered to match the current
+ * settings scope.
  *
  * Card type to Pokémon ID mapping:
  *   - "name"               → card.id  (NameReviewCard extends SeedPokemon, so id === pokemonId)
@@ -98,10 +104,19 @@ export function scoreGuess(
  *   - "cry"                → card.pokemonId
  *   - "evolution"          → card.preEvoId and card.postEvoId
  *   - "reverse-evolution"  → card.preEvoId and card.postEvoId (same edge, prompt flipped)
+ *
+ * The same two-tier gate used by `cardIsEligible` is applied to the seed pool:
+ *   1. Master alternate-forms toggle (`alternateFormsEnabled`).
+ *   2. Gens / types / presets scope (`scope`).
+ *
+ * Both parameters default to permissive values so existing callers and tests
+ * that do not yet pass them see the previous behaviour (all seen Pokémon included).
  */
 export function getSeenPokemon(
   cards: ReviewableCard[],
   seedPokemon: readonly SeedPokemon[],
+  alternateFormsEnabled: boolean = true,
+  scope: PracticeScope = EMPTY_SCOPE,
 ): SeedPokemon[] {
   const seenIds = new Set<number>();
 
@@ -121,5 +136,7 @@ export function getSeenPokemon(
     }
   }
 
-  return seedPokemon.filter((p) => seenIds.has(p.id));
+  return seedPokemon.filter(
+    (p) => seenIds.has(p.id) && seedPokemonIsEligible(p, scope, alternateFormsEnabled),
+  );
 }
