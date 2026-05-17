@@ -1,5 +1,78 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+
+// ---------------------------------------------------------------------------
+// Helper — expand the filter disclosure before interacting with filter controls.
+// The disclosure is collapsed by default (#865).
+// ---------------------------------------------------------------------------
+
+async function expandFilters(page: Page): Promise<void> {
+  const toggle = page.getByRole("button", { name: /^Filters/ });
+  const isExpanded = await toggle.getAttribute("aria-expanded");
+  if (isExpanded !== "true") {
+    await toggle.click();
+  }
+}
+
+test.describe("Pokédex filter disclosure (#865)", () => {
+  test("filter controls are collapsed by default", async ({ page }) => {
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    const toggle = page.getByRole("button", { name: /^Filters/ });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    // Filter groups should not be interactable while collapsed (panel is hidden).
+    await expect(
+      page.getByRole("group", { name: "Filter by type" }),
+    ).not.toBeVisible();
+  });
+
+  test("clicking the toggle expands the filter panel", async ({ page }) => {
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    const toggle = page.getByRole("button", { name: /^Filters/ });
+    await toggle.click();
+
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      page.getByRole("group", { name: "Filter by type" }),
+    ).toBeVisible();
+  });
+
+  test("active filter count badge appears when filters are set while disclosure is collapsed", async ({
+    page,
+  }) => {
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    // Expand and select a type filter.
+    await expandFilters(page);
+    await page
+      .getByRole("group", { name: "Filter by type" })
+      .getByRole("button", { name: "Fire" })
+      .click();
+    await page.waitForURL(/type=fire/);
+
+    // Collapse the disclosure.
+    const toggle = page.getByRole("button", { name: /^Filters/ });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    // The badge showing active filter count should be visible.
+    await expect(
+      toggle.getByText("1"),
+    ).toBeVisible();
+  });
+});
 
 test.describe("Pokédex detail — Hear name button", () => {
   test("Hear name button appears on a non-locked Pokédex entry", async ({ page }) => {
@@ -100,6 +173,9 @@ test.describe("Pokédex type filter — intersection", () => {
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();
 
+    // Filter controls are collapsed by default — expand before interacting (#865).
+    await expandFilters(page);
+
     const fireButton = page
       .getByRole("group", { name: "Filter by type" })
       .getByRole("button", { name: "Fire" });
@@ -113,6 +189,9 @@ test.describe("Pokédex type filter — intersection", () => {
 
   test("Fire + Flying returns fewer results than Fire alone", async ({ page }) => {
     await page.goto("/pokedex");
+
+    // Filter controls are collapsed by default — expand before interacting (#865).
+    await expandFilters(page);
 
     const typeGroup = page.getByRole("group", { name: "Filter by type" });
     // Scope to the Pokémon grid lists to exclude any nav/other <li> elements
@@ -138,6 +217,9 @@ test.describe("Pokédex type filter — intersection", () => {
     // This relies on the seeded dataset: no Pokémon has Fire + Flying + Water
     // simultaneously. The filter logic itself is unit-tested in filter.test.ts.
     await page.goto("/pokedex");
+
+    // Filter controls are collapsed by default — expand before interacting (#865).
+    await expandFilters(page);
 
     const typeGroup = page.getByRole("group", { name: "Filter by type" });
     // Wait for each URL update before the next click — handleTypeToggle reads
@@ -304,6 +386,9 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
     const pokemonLists = page.getByRole("list", { name: /Pokémon/ });
     await expect(pokemonLists.first()).toBeVisible();
 
+    // Filter controls are collapsed by default — expand before interacting (#865).
+    await expandFilters(page);
+
     // Count all Grass-type tiles.
     const typeGroup = page.getByRole("group", { name: "Filter by type" });
     await typeGroup.getByRole("button", { name: "Grass" }).click();
@@ -329,6 +414,10 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();
 
+    // When active filters are present on load, expand the disclosure to inspect
+    // the filter controls (#865).
+    await expandFilters(page);
+
     // The "Mastered" chip should be pressed.
     const masteryGroup = page.getByRole("group", { name: "Filter by mastery" });
     await expect(
@@ -345,6 +434,9 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();
+
+    // Filter controls are collapsed by default — expand before interacting (#865).
+    await expandFilters(page);
 
     // Type "alolan" into the search box.
     const searchInput = page.getByLabel("Search Pokémon");
@@ -391,6 +483,9 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
     const tilesBefore = allLists.getByRole("listitem");
     const countBefore = await tilesBefore.count();
     expect(countBefore).toBeGreaterThan(0);
+
+    // Filter controls are collapsed by default — expand before interacting (#865).
+    await expandFilters(page);
 
     // Click the "Has alternate forms" chip.
     const chip = page
