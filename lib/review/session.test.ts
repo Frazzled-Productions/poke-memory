@@ -17,6 +17,7 @@ import {
 import type { EvolutionCard, SeedPokemon } from '@/lib/pokemon/seed';
 import {
   REVERSE_ID_OFFSET,
+  CRY_ID_OFFSET,
   REVERSE_EDGE_ID_BASE,
   reverseEdgeIdFor,
   isReverseEdgeId,
@@ -844,6 +845,182 @@ describe('buildSessionQueues (per-type budgets)', () => {
     expect(queues.reviewQueue).toEqual([]);
     expect(queues.newQueue).toEqual([]);
     expect(queues.perType.name.newIntroducedToday).toBe(1);
+  });
+});
+
+describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
+  const TODAY = '2026-05-09';
+  const highLimits: DailyLimits = {
+    name:      { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    reverse:   { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    cry:       { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  function nameCard(id: number): NameReviewCard {
+    return {
+      ...makeSeedPokemon(id),
+      cardType: 'name',
+      subjectKey: String(id),
+      state: initialReviewState(NOW),
+    };
+  }
+  function reverseCard(pokemonId: number): ReverseReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId),
+      id: REVERSE_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'reverse',
+      subjectKey: String(pokemonId),
+      state: initialReviewState(NOW),
+    };
+  }
+  function cryCard(pokemonId: number): CryReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId, { cryUrl: `https://example.com/${pokemonId}.ogg` }),
+      id: CRY_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'cry',
+      subjectKey: String(pokemonId),
+      state: initialReviewState(NOW),
+    };
+  }
+
+  it('balances new cards across name and reverse directions (difference <= 1)', () => {
+    // 5 name candidates, 5 reverse candidates, both caps = 10
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3), nameCard(4), nameCard(5),
+      reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4), reverseCard(5),
+    ];
+    const queues = buildSessionQueues(cards, highLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    const nameCt  = byType['name']    ?? 0;
+    const revCt   = byType['reverse'] ?? 0;
+    // All 5 of each should be present — both below their cap
+    expect(nameCt).toBe(5);
+    expect(revCt).toBe(5);
+  });
+
+  it('no direction exceeds its per-type cap even with round-robin active', () => {
+    const tightLimits: DailyLimits = {
+      name:      { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 2, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+    };
+    // Provide more candidates than each cap
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3), nameCard(4), nameCard(5),
+      reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4),
+      cryCard(1), cryCard(2), cryCard(3), cryCard(4),
+    ];
+    const queues = buildSessionQueues(cards, tightLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(byType['name']    ?? 0).toBeLessThanOrEqual(3);
+    expect(byType['reverse'] ?? 0).toBeLessThanOrEqual(3);
+    expect(byType['cry']     ?? 0).toBeLessThanOrEqual(3);
+  });
+
+  it('difference between any two enabled directions is at most 1 when same cap and many candidates', () => {
+    const equalLimits: DailyLimits = {
+      name:      { maxNewPerDay: 4, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 4, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 4, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 4, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3), nameCard(4), nameCard(5),
+      reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4), reverseCard(5),
+      cryCard(1), cryCard(2), cryCard(3), cryCard(4), cryCard(5),
+    ];
+    const queues = buildSessionQueues(cards, equalLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    const nameCt = byType['name']    ?? 0;
+    const revCt  = byType['reverse'] ?? 0;
+    const cryCt  = byType['cry']     ?? 0;
+    // Each cap is 4 and there are 5 candidates — all 4 slots should be filled
+    expect(nameCt).toBe(4);
+    expect(revCt).toBe(4);
+    expect(cryCt).toBe(4);
+    // Difference between any two directions is at most 1
+    expect(Math.abs(nameCt - revCt)).toBeLessThanOrEqual(1);
+    expect(Math.abs(nameCt - cryCt)).toBeLessThanOrEqual(1);
+    expect(Math.abs(revCt  - cryCt)).toBeLessThanOrEqual(1);
+  });
+
+  it('handles one direction exhausted before another — remaining direction still fills its cap', () => {
+    const limits: DailyLimits = {
+      name:      { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+    };
+    // 2 name candidates, 5 reverse candidates — name bucket drains first
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2),
+      reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4), reverseCard(5),
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    // name has only 2 candidates — all introduced
+    expect(byType['name']    ?? 0).toBe(2);
+    // reverse has 5 candidates and a cap of 5 — all introduced
+    expect(byType['reverse'] ?? 0).toBe(5);
+  });
+
+  it('per-type daily cap applied before round-robin honours existing newIntroducedToday', () => {
+    // Simulate a day where 3 name cards were already introduced (cap = 5 → 2 remaining)
+    const limits: DailyLimits = {
+      name:      { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      // Already introduced today:
+      { ...nameCard(1), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
+      { ...nameCard(2), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
+      { ...nameCard(3), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
+      // Remaining new candidates:
+      nameCard(4), nameCard(5), nameCard(6),
+      reverseCard(1), reverseCard(2), reverseCard(3),
+    ];
+    const queues = buildSessionQueues(cards, limits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    // name has 3 already introduced → 2 remaining slots; 3 candidates → 2 new
+    expect(byType['name']    ?? 0).toBe(2);
+    // reverse has 0 introduced → 5 slots; 3 candidates → 3 new
+    expect(byType['reverse'] ?? 0).toBe(3);
+  });
+
+  it('newQueue is still deterministically ordered (same result on repeated calls with same today)', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3),
+      reverseCard(1), reverseCard(2), reverseCard(3),
+    ];
+    const first  = buildSessionQueues(cards, highLimits, TODAY).newQueue;
+    const second = buildSessionQueues(cards, highLimits, TODAY).newQueue;
+    expect(first).toEqual(second);
   });
 });
 

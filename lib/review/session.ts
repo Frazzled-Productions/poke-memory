@@ -511,7 +511,6 @@ export function buildSessionQueues(
   }
 
   const reviewQueue: number[] = [];
-  const newQueue: number[] = [];
 
   for (const type of ["name", "evolution", "reverse", "cry"] as const) {
     const reviewSlots = Math.max(
@@ -521,13 +520,48 @@ export function buildSessionQueues(
     reviewQueue.push(
       ...stableShuffleForDay(reviewCandidatesByType[type], today).slice(0, reviewSlots),
     );
-    const newSlots = Math.max(
+  }
+
+  // Build the new-card queue with round-robin interleaving across enabled
+  // directions so no single type races ahead of the others day after day.
+  //
+  // Each type's candidates are stable-shuffled independently (deterministic
+  // per-day ordering within the type), then capped at that type's remaining
+  // new-card budget.  We then pull one card at a time from each non-empty
+  // type bucket, cycling through the four buckets in order, until all budgets
+  // are exhausted.  This guarantees that on any given day the difference in
+  // new cards introduced between any two enabled directions is at most 1.
+  const newCandidateSlices: Record<CardTypeKey, number[]> = {
+    name: stableShuffleForDay(newCandidatesByType.name, today).slice(
       0,
-      limits[type].maxNewPerDay - perType[type].newIntroducedToday,
-    );
-    newQueue.push(
-      ...stableShuffleForDay(newCandidatesByType[type], today).slice(0, newSlots),
-    );
+      Math.max(0, limits.name.maxNewPerDay - perType.name.newIntroducedToday),
+    ),
+    evolution: stableShuffleForDay(newCandidatesByType.evolution, today).slice(
+      0,
+      Math.max(0, limits.evolution.maxNewPerDay - perType.evolution.newIntroducedToday),
+    ),
+    reverse: stableShuffleForDay(newCandidatesByType.reverse, today).slice(
+      0,
+      Math.max(0, limits.reverse.maxNewPerDay - perType.reverse.newIntroducedToday),
+    ),
+    cry: stableShuffleForDay(newCandidatesByType.cry, today).slice(
+      0,
+      Math.max(0, limits.cry.maxNewPerDay - perType.cry.newIntroducedToday),
+    ),
+  };
+
+  const newQueue: number[] = [];
+  const bucketOrder: CardTypeKey[] = ["name", "evolution", "reverse", "cry"];
+  let anyAdded = true;
+  while (anyAdded) {
+    anyAdded = false;
+    for (const type of bucketOrder) {
+      const slice = newCandidateSlices[type];
+      if (slice.length > 0) {
+        newQueue.push(slice.shift()!);
+        anyAdded = true;
+      }
+    }
   }
 
   // Reshuffle the merged per-type slices so name, evolution, and reverse
