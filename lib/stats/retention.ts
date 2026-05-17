@@ -1,5 +1,6 @@
 import type { GradeLog } from "@/lib/gradelog/persistence";
 import { computeRollingAccuracy } from "@/lib/stats/accuracy";
+import { isoMinusDays } from "@/lib/stats/date";
 
 /**
  * The grade log is pruned to 365 days (`pruneGradeLog`), so the widest
@@ -67,13 +68,3 @@ export function computeRetentionComparison(
   };
 }
 
-/**
- * Local copy of the date arithmetic used across `lib/stats` - parse a
- * YYYY-MM-DD string, step back `n` days, reformat. Kept in sync with
- * `lib/stats/accuracy.ts`.
- */
-function isoMinusDays(today: string, n: number): string {
-  const result = new Date(today);
-  result.setDate(result.getDate() - n);
-  return result.toISOString().slice(0, 10);
-}
