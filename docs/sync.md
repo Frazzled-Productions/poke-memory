@@ -91,6 +91,23 @@ Sync paths to Supabase, in order of how data normally flows:
 - **Volume**: 100 reviews/day → at most 100 single-row upserts (often fewer after debounce coalescing). Well within Supabase free-tier limits.
 - Guest-mode guard runs on every `enqueueGrade` call, not just at mount, so mid-session sign-out is safe.
 
+## Offline behaviour and online-reconnect catch-up
+
+When the device loses connectivity:
+
+- **Per-grade upserts fail silently.** `usePerGradeSync` keeps failed cards in its in-memory `pendingQueueRef`. After three consecutive all-failure drains the `lastPushFailed` flag is set (via `markPushFailed`) and the Stats-page banner appears.
+- **Unload beacon may fail.** `useSyncOnUnload` records `lastPushFailed: true` when `sendBeacon` returns `false` or the `fetch+keepalive` path returns a non-2xx. Failed card count is stored in `failedCardCount`.
+- **The in-memory queue is not persisted across tab closes.** Cards in `pendingQueueRef` that have not yet reached the unload path are lost if the tab is force-killed. The `lastPushFailed` / `failedCardCount` fields in `sync-status:v1` survive because they are written to `localStorage`; the queue contents themselves do not. Queue persistence is tracked in a follow-up issue (#875).
+
+When the device comes back online, **`OnlineReconnectSync`** (`components/sync/OnlineReconnectSync.tsx`) fires via the browser `online` event, driven by `useOnlineReconnectSync` (`lib/sync/useOnlineReconnectSync.ts`):
+
+1. **Pull first** — `pullAndMerge` is called to bring local state up to date. If pull fails, the push leg is skipped: pushing without knowing cloud state is the exact failure mode of #293.
+2. **Push failed cards** — if `lastPushFailed` is true, the hook re-pushes the card set that matches the `failedCardCount` heuristic (same selection logic as `useRetryPush`): today's reviewed cards when `failedCardCount > 0`, all reviewed cards when `failedCardCount` is null. On partial success, `markPushSucceeded` advances the "Last synced" timestamp.
+
+The reconnect push respects the same superuser write-guard as every other cloud-write path: `OnlineReconnectSync` passes `null` for client and userId when any superuser flag is on, so QA sessions never leak fake state into Supabase.
+
+The `online` event listener is registered once at mount (empty deps, ref-based) so it never needs to be re-registered on re-render — the same pattern as `useVisibilityPull`.
+
 ## Background pull on visibility
 
 When a signed-in tab regains focus after being hidden ≥ 30 seconds, `useVisibilityPull` (mounted via `SyncOnVisible` in the root layout) silently calls `pullAndMerge`, which pulls all cloud rows and merges them into `localStorage`.
