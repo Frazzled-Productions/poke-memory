@@ -23,6 +23,7 @@ import {
   hydrateSession,
   limitBucket,
   todayString,
+  cardTypeIsEnabled,
   type DailyLimits,
   type ReviewableCard,
   type Grade,
@@ -408,6 +409,7 @@ export function ReviewSession() {
   const [reverseEvolutionEnabled, setReverseEvolutionEnabled] = useState(false);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
+  const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
   // Onboarding nudges (#702). `audioFeaturesOff` is true when the user has no
   // audio behaviour switched on at all (no cry playback, no spoken names, no
@@ -473,12 +475,19 @@ export function ReviewSession() {
     if (cards !== null) {
       const today = todayString(new Date());
       reconcileHiddenState(cards, next, today);
-      // `alternateFormsEnabled` is captured from component state set at mount.
-      // The Settings page triggers a full page reload when toggling card-type
-      // gates, so the state is always current here.
+      // `alternateFormsEnabled` and the card-type flags are captured from
+      // component state set at mount. The Settings page triggers a full page
+      // reload when toggling card-type gates, so the state is always current.
+      const cardTypeOpts = {
+        nameEnabled: nameCardsEnabled,
+        evolutionEnabled: evolutionCardsEnabled,
+        reverseEnabled,
+        reverseEvolutionEnabled,
+        cryEnabled: cryCardsEnabled,
+      };
       const eligibleIds = new Set(
         cards
-          .filter((c) => cardIsEligible(c, next, alternateFormsEnabled))
+          .filter((c) => cardTypeIsEnabled(c, cardTypeOpts) && cardIsEligible(c, next, alternateFormsEnabled))
           .map((c) => c.id),
       );
       setEligibleCardIds(eligibleIds);
@@ -626,11 +635,19 @@ export function ReviewSession() {
       const formsEnabled = settings.alternateFormsEnabled;
       const today = todayString(now);
       reconcileHiddenState(sessionCards, persistedScope, today);
-      // Two-tier eligibility: `alternateFormsEnabled` gate first, then scope
-      // filter (#658). `cardIsEligible` encapsulates both checks.
+      // Three-tier eligibility: card-type-enabled gate, then
+      // `alternateFormsEnabled` gate, then scope filter (#658, #835).
+      // `cardIsEligible` encapsulates the second and third checks.
+      const cardTypeOpts = {
+        nameEnabled,
+        evolutionEnabled,
+        reverseEnabled: enabled,
+        reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
+        cryEnabled,
+      };
       const eligibleIds = new Set(
         sessionCards
-          .filter((c) => cardIsEligible(c, persistedScope, formsEnabled))
+          .filter((c) => cardTypeIsEnabled(c, cardTypeOpts) && cardIsEligible(c, persistedScope, formsEnabled))
           .map((c) => c.id),
       );
       // Persist whenever scope is active so reconciliation results survive a
@@ -644,6 +661,7 @@ export function ReviewSession() {
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
       setNameCardsEnabled(nameEnabled);
       setEvolutionCardsEnabled(evolutionEnabled);
+      setCryCardsEnabled(cryEnabled);
       setAlternateFormsEnabled(formsEnabled);
       // Onboarding nudges (#702): derive once from the same settings read.
       setAudioFeaturesOff(
@@ -914,11 +932,15 @@ export function ReviewSession() {
   // changing scope mid-day cannot reset daily caps (#333). Out-of-scope cards
   // are snoozed by `reconcileHiddenState` at session-load time, so their
   // dueDate doesn't drift while they're hidden.
+  //
+  // `eligibleCardIds` also gates out disabled-type cards (#835): saved progress
+  // is preserved in storage but excluded from the active queue. We always pass
+  // the set (even when scope is empty) so that disabled types are never queued.
   const { reviewQueue, newQueue, perType, learningCardIds, outOfScopeLearningIds } = buildSessionQueues(
     cards,
     effectiveLimits,
     today,
-    isScopeEmpty(scope) ? undefined : eligibleCardIds,
+    eligibleCardIds,
   );
 
   // Cards that are mid-learning-step but fall outside the active scope.
