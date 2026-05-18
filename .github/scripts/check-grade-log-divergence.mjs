@@ -68,9 +68,33 @@ const WINDOW_DAYS = 2;
 // Starts from grade_log so users with grade_log activity but zero
 // card_reviews rows in the window are surfaced (gap = distinct_subjects).
 // This is the #584 signature we most want to catch.
+//
+// card_type normalisation (#970)
+// ------------------------------
+// grade_log and card_reviews use different card_type conventions for
+// evolution-stream cards. The grade_log write path (lib/sync/gradeLog.ts)
+// stores the raw app type — 'evolution' / 'reverse-evolution' — while the
+// card_reviews push path runs appTypeToDbType (lib/sync/cloud.ts), which
+// rewrites those to the '-edge' suffixed forms 'evolution-edge' /
+// 'reverse-evolution-edge'. Counting raw grade_log card_types would make
+// every evolution-stream card look "missing" from card_reviews and inflate
+// the gap, producing false #584-shape alerts. The CASE below replicates
+// appTypeToDbType on the grade_log side so the DISTINCT subject count is
+// expressed in the same card_type vocabulary as card_reviews. All other
+// card types (name / reverse / cry) are identical across both tables and
+// pass through unchanged.
 const DIVERGENCE_QUERY = `
 WITH gl AS (
-  SELECT user_id, COUNT(DISTINCT (card_type, subject_key))::int AS distinct_subjects
+  SELECT
+    user_id,
+    COUNT(DISTINCT (
+      CASE card_type
+        WHEN 'evolution' THEN 'evolution-edge'
+        WHEN 'reverse-evolution' THEN 'reverse-evolution-edge'
+        ELSE card_type
+      END,
+      subject_key
+    ))::int AS distinct_subjects
   FROM grade_log
   WHERE entry_date >= (CURRENT_DATE - INTERVAL '${WINDOW_DAYS} days')::date
   GROUP BY user_id
@@ -148,7 +172,11 @@ function formatMarkdownReport(rows, threshold) {
   lines.push("");
   lines.push("The query below collapses that replay ratio by counting");
   lines.push("**DISTINCT `(card_type, subject_key)` tuples** in grade_log, so");
-  lines.push("the two numbers should match closely in the steady state. A");
+  lines.push("the two numbers should match closely in the steady state. The");
+  lines.push("grade_log `card_type` is first normalised to the `card_reviews`");
+  lines.push("vocabulary (`evolution` → `evolution-edge`, `reverse-evolution`");
+  lines.push("→ `reverse-evolution-edge`) so evolution-stream cards are not");
+  lines.push("falsely counted as missing (#970). A");
   lines.push("small gap (≤ 5) is legitimate (cards first-seen on prior days");
   lines.push("being re-graded inside the window). A large gap — especially");
   lines.push("`gap == distinct_subjects` (zero card_reviews) — is the #584");
