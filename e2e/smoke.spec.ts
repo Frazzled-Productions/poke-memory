@@ -395,6 +395,102 @@ test.describe("Practice page", () => {
     );
     expect(overflowAfter).toBeLessThanOrEqual(8);
   });
+
+  test("queue state badge shows 'New' on a never-reviewed name card", async ({ page }) => {
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await expect(
+      page.getByRole("status", { name: "Card queue state: New" }),
+    ).toBeVisible();
+  });
+
+  test("queue state badge shows 'Review' on a graduated name card", async ({ page }) => {
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 10,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 7,
+            reps: 3,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2026-01-01",
+            lastReview: "2026-01-01",
+            firstSeen: "2026-01-01",
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    if (!(await reveal.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await expect(
+      page.getByRole("status", { name: "Card queue state: Review" }),
+    ).toBeVisible();
+  });
 });
 
 test.describe("Stats page", () => {

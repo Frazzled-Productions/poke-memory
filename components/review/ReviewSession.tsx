@@ -10,6 +10,7 @@ import { SpritePreloader, type SizedSpriteUrl } from "@/components/sprites/Sprit
 import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites";
 import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
+import { QueueStateBadge } from "@/components/review/QueueStateBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
@@ -1786,6 +1787,7 @@ export function ReviewSession() {
         <div className="flex w-full max-w-xl flex-col gap-2">
           <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
         </div>
+        <QueueStateBadge state={effectiveCard.state} />
         {revealed ? (
           <PokemonCard
             spriteUrl={effectiveCard.spriteUrl}
@@ -1889,6 +1891,7 @@ export function ReviewSession() {
         {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
         <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
         <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
+        <QueueStateBadge state={effectiveCard.state} />
         <SpritePicker
           key={`${effectiveCard.id}-${cardPresentationCount}`}
           targetPokemon={reverseTarget}
@@ -1942,6 +1945,7 @@ export function ReviewSession() {
       {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
       <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
       <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
+      <QueueStateBadge state={effectiveCard.state} />
       {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard
           preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
