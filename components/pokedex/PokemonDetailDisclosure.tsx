@@ -14,6 +14,7 @@ import { CryButton } from "@/components/pokedex/CryButton";
 import { SpritePreloader } from "@/components/sprites/SpritePreloader";
 import {
   POKEDEX_DETAIL_SPRITE_SIZE,
+  POKEDEX_FORM_SPRITE_SIZE,
   POKEDEX_NODE_SPRITE_SIZE,
 } from "@/lib/sprites/sizes";
 
@@ -153,8 +154,8 @@ function FormBlock({ form }: { form: SeedPokemon }) {
           <Image
             src={`/sprites/pokemon/${form.id}.png`}
             alt={form.displayName}
-            width={POKEDEX_DETAIL_SPRITE_SIZE}
-            height={POKEDEX_DETAIL_SPRITE_SIZE}
+            width={POKEDEX_FORM_SPRITE_SIZE}
+            height={POKEDEX_FORM_SPRITE_SIZE}
             className="h-28 w-28 object-contain"
           />
         </div>
@@ -222,10 +223,16 @@ export function PokemonDetailDisclosure({
   // Collect evo-chain sprite URLs (excluding the current Pokémon, which is
   // already the main visible image) and warm them in the background so nodes
   // render without pop-in when the chain section scrolls into view.
-  const evoNodeUrls = evolutionChain
-    .filter((node) => node.speciesId !== id)
-    .map((node) => SPRITE_BY_ID[node.speciesId])
-    .filter((url): url is string => Boolean(url));
+  // Only preload when the Evolution Chain section will actually render — if
+  // the card is not mastered or there are no multi-stage siblings, the section
+  // is hidden and pre-fetching those sprites would waste bytes.
+  const evoNodeUrls =
+    isMasteredCard && showEvolution
+      ? evolutionChain
+          .filter((node) => node.speciesId !== id)
+          .map((node) => SPRITE_BY_ID[node.speciesId])
+          .filter((url): url is string => Boolean(url))
+      : [];
 
   return (
     <>
@@ -246,6 +253,7 @@ export function PokemonDetailDisclosure({
           alt={isLocked ? `#${zeroPad(id)} (locked)` : name}
           width={POKEDEX_DETAIL_SPRITE_SIZE}
           height={POKEDEX_DETAIL_SPRITE_SIZE}
+          priority
           className={[
             "h-48 w-48 object-contain",
             isLocked ? "brightness-0" : isLearning ? "grayscale opacity-60" : "",

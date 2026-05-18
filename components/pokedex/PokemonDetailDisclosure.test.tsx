@@ -266,6 +266,7 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
 
 import {
   POKEDEX_DETAIL_SPRITE_SIZE,
+  POKEDEX_FORM_SPRITE_SIZE,
   POKEDEX_NODE_SPRITE_SIZE,
 } from "@/lib/sprites/sizes";
 
@@ -301,15 +302,15 @@ describe("PokemonDetailDisclosure — sprite sizes (#931)", () => {
     expect(thumbnail).toHaveAttribute("height", String(POKEDEX_NODE_SPRITE_SIZE));
   });
 
-  it("alt-form full sprite in FormBlock renders at POKEDEX_DETAIL_SPRITE_SIZE", () => {
+  it("alt-form full sprite in FormBlock renders at POKEDEX_FORM_SPRITE_SIZE", () => {
     const pokemon = makePokemon({ cryUrl: null });
     const form = makeAltForm({ displayName: "Alolan Raichu" });
     render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
 
     const fullSprite = screen.getAllByRole("img", { name: "Alolan Raichu" }).find(
-      (el) => el.getAttribute("width") === String(POKEDEX_DETAIL_SPRITE_SIZE),
+      (el) => el.getAttribute("width") === String(POKEDEX_FORM_SPRITE_SIZE),
     );
     expect(fullSprite).toBeTruthy();
-    expect(fullSprite).toHaveAttribute("height", String(POKEDEX_DETAIL_SPRITE_SIZE));
+    expect(fullSprite).toHaveAttribute("height", String(POKEDEX_FORM_SPRITE_SIZE));
   });
 });
