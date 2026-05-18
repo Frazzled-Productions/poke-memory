@@ -607,8 +607,8 @@ test.describe("Pasture page — type filter", () => {
     // Generation filter group with All + at least Gen I
     const genGroup = page.getByRole("group", { name: "Filter by generation" });
     await expect(genGroup).toBeVisible();
-    await expect(genGroup.getByRole("button", { name: "All" })).toBeVisible();
-    await expect(genGroup.getByRole("button", { name: "Gen I" })).toBeVisible();
+    await expect(genGroup.getByRole("button", { name: "All", exact: true })).toBeVisible();
+    await expect(genGroup.getByRole("button", { name: "Gen I", exact: true })).toBeVisible();
   });
 
   test("selecting a type hides Pokémon of other types", async ({ page }) => {
@@ -671,7 +671,7 @@ test.describe("Pasture page — generation filter", () => {
     await awaitSeedIdb(page);
 
     const genGroup = page.getByRole("group", { name: "Filter by generation" });
-    await genGroup.getByRole("button", { name: "Gen II" }).click();
+    await genGroup.getByRole("button", { name: "Gen II", exact: true }).click();
 
     // Chikorita (Gen II) should remain
     await expect(page.getByRole("button", { name: /Chikorita/ })).toBeVisible();
@@ -684,10 +684,10 @@ test.describe("Pasture page — generation filter", () => {
     await awaitSeedIdb(page);
 
     const genGroup = page.getByRole("group", { name: "Filter by generation" });
-    await genGroup.getByRole("button", { name: "Gen II" }).click();
+    await genGroup.getByRole("button", { name: "Gen II", exact: true }).click();
     await expect(page.getByRole("button", { name: /Caterpie/ })).not.toBeVisible();
 
-    await genGroup.getByRole("button", { name: "All" }).click();
+    await genGroup.getByRole("button", { name: "All", exact: true }).click();
     await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Chikorita/ })).toBeVisible();
   });
