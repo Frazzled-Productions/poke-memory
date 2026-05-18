@@ -36,6 +36,8 @@ const PAD = 54;
 const DISC_R = 172;
 const DISC_FILL = "#111113";
 const RING_WIDTH = 4;
+// Maximum hero-label character count before falling back to a generic string (fits disc at 23 px).
+const DISC_LABEL_MAX_LEN = 20;
 
 // ---------------------------------------------------------------------------
 // Colour helpers
@@ -148,12 +150,14 @@ function makeBackgroundGradient(
   w: number,
   h: number,
 ): CanvasGradient {
-  // 150° linear gradient: secondary at 0%, primary at 48%, darken(primary,0.6) at 100%.
-  // Canvas gradient is defined by start/end points that span the full diagonal at that angle.
+  // 150° linear gradient: secondary at the bright corner, primary at 48%, darken(primary,0.6) at the dark corner.
+  // len is the half-span of card-corner projections onto the gradient axis, so stop 0 lands
+  // exactly at the bright card corner and stop 1 at the dark corner.
   const angle = (150 * Math.PI) / 180;
   const cx = w / 2;
   const cy = h / 2;
-  const len = Math.sqrt(w * w + h * h) / 2;
+  const len =
+    (Math.abs(w * Math.cos(angle)) + Math.abs(h * Math.sin(angle))) / 2;
   const x0 = cx - Math.cos(angle) * len;
   const y0 = cy - Math.sin(angle) * len;
   const x1 = cx + Math.cos(angle) * len;
@@ -199,9 +203,9 @@ function ringColourHex(ring: string): string {
   if (!m) return "#FFFFFF";
   return (
     "#" +
-    parseInt(m[1]).toString(16).padStart(2, "0") +
-    parseInt(m[2]).toString(16).padStart(2, "0") +
-    parseInt(m[3]).toString(16).padStart(2, "0")
+    parseInt(m[1], 10).toString(16).padStart(2, "0") +
+    parseInt(m[2], 10).toString(16).padStart(2, "0") +
+    parseInt(m[3], 10).toString(16).padStart(2, "0")
   );
 }
 
@@ -338,7 +342,9 @@ function paintDisc(
   ctx.font = `600 23px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   ctx.textBaseline = "top";
   ctx.textAlign = "center";
-  ctx.fillText(heroLabel, cx, numBaselineY + 12);
+  // Scale the gap proportionally so it stays clear of the number at all font sizes.
+  const labelGap = Math.max(12, numFontSize * 0.1);
+  ctx.fillText(heroLabel, cx, numBaselineY + labelGap);
 }
 
 function paintDivider(
@@ -556,7 +562,9 @@ export async function generateMilestoneShareImage(
   const heroNumber = match ? match[0] : "★";
   // Disc label: upper-case the full label when short enough; otherwise "MILESTONE".
   const heroLabel =
-    data.label.length <= 20 ? data.label.toUpperCase() : "MILESTONE";
+    data.label.length <= DISC_LABEL_MAX_LEN
+      ? data.label.toUpperCase()
+      : "MILESTONE";
 
   paintCardInternal({
     ctx,

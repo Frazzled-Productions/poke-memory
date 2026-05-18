@@ -114,7 +114,7 @@ describe("generateDailyShareImage", () => {
     expect(result).toBeNull();
   });
 
-  it("accepts an empty gradeSequence without throwing", async () => {
+  it("renders with zero streak and all-zero stats without throwing", async () => {
     const expectedBlob = new Blob(["png"], { type: "image/png" });
     mockCanvasToBlob(expectedBlob);
 
