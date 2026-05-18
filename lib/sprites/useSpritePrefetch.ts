@@ -4,12 +4,6 @@ import { useCallback } from "react";
 import { decodeSpriteUrls } from "@/lib/sprites/decode";
 
 /**
- * A sprite URL paired with the CSS pixel size it will be rendered at.
- * Used by `useSpritePrefetch` and `SpritePreloader`.
- */
-export type SizedSpriteUrl = { src: string; width: number };
-
-/**
  * Generic sprite prefetch hook.
  *
  * Exposes a `decodeAhead` callback that callers invoke just before a state

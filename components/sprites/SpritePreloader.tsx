@@ -1,7 +1,8 @@
 import Image from "next/image";
 import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
-export type { SizedSpriteUrl } from "@/lib/sprites/useSpritePrefetch";
+/** A sprite URL paired with the CSS pixel size it will be rendered at. */
+export type SizedSpriteUrl = { src: string; width: number };
 
 type Props = {
   /**
