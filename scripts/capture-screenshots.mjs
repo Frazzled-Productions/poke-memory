@@ -4,10 +4,10 @@
  * Usage:
  *   npx playwright install --with-deps chromium   # first time only
  *   npm run dev &                                  # background dev server
- *   npm run screenshots                            # captures all five
+ *   npm run screenshots                            # captures all six
  *   npm run screenshots -- --page=practice         # capture one surface
  *
- * Outputs five PNGs into docs/screenshots/, all captured at the same
+ * Outputs six PNGs into docs/screenshots/, all captured at the same
  * iPhone 17 Pro viewport (402×874 CSS px @ 3x DPR) so the README layout
  * lines up cleanly:
  *
