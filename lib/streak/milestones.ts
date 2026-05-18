@@ -10,8 +10,32 @@ export const STREAK_MILESTONES: readonly number[] = [
   3, 7, 14, 30, 60, 100, 150, 200, 250, 365,
 ];
 
+/**
+ * Celebration tier for a streak milestone. Controls confetti density,
+ * banner styling, and copy.
+ *
+ * - `light`    — 3, 7, 14: early hook milestones, gentle celebration.
+ * - `standard` — 30, 60, 100, 150, 200, 250: consistent-user milestones.
+ * - `major`    — 365 and every post-365 milestone (465, 565, …): rare,
+ *               maximum celebration.
+ */
+export type MilestoneTier = "light" | "standard" | "major";
+
 /** The interval (days) between auto-generated milestones beyond 365. */
-const POST_365_INTERVAL = 100;
+export const POST_365_INTERVAL = 100;
+
+/**
+ * Returns the celebration tier for a given milestone day count.
+ *
+ * - 3 / 7 / 14 → `light`
+ * - 30 / 60 / 100 / 150 / 200 / 250 → `standard`
+ * - 365 and every post-365 milestone → `major`
+ */
+export function tierForMilestone(milestone: number): MilestoneTier {
+  if (milestone < 30) return "light";
+  if (milestone < 365) return "standard";
+  return "major";
+}
 
 /**
  * Smallest milestone <= `streak` that the user has not yet celebrated.

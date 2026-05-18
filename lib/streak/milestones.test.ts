@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { STREAK_MILESTONES, findPendingMilestone } from "./milestones";
+import {
+  STREAK_MILESTONES,
+  findPendingMilestone,
+  tierForMilestone,
+} from "./milestones";
 
 describe("STREAK_MILESTONES", () => {
   it("is sorted ascending", () => {
@@ -113,5 +117,29 @@ describe("findPendingMilestone", () => {
     // With all static milestones seen and streak = MAX_SAFE_INTEGER, should
     // return 465 (the first post-365 milestone).
     expect(findPendingMilestone(Number.MAX_SAFE_INTEGER, allStatic)).toBe(465);
+  });
+});
+
+describe("tierForMilestone", () => {
+  it("returns 'light' for early milestones (3, 7, 14)", () => {
+    expect(tierForMilestone(3)).toBe("light");
+    expect(tierForMilestone(7)).toBe("light");
+    expect(tierForMilestone(14)).toBe("light");
+  });
+
+  it("returns 'standard' for mid-range milestones (30 through 250)", () => {
+    for (const m of [30, 60, 100, 150, 200, 250]) {
+      expect(tierForMilestone(m)).toBe("standard");
+    }
+  });
+
+  it("returns 'major' for 365", () => {
+    expect(tierForMilestone(365)).toBe("major");
+  });
+
+  it("returns 'major' for post-365 milestones", () => {
+    expect(tierForMilestone(465)).toBe("major");
+    expect(tierForMilestone(565)).toBe("major");
+    expect(tierForMilestone(1000)).toBe("major");
   });
 });
