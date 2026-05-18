@@ -159,8 +159,8 @@ Three tests are in scope: `apply-migrations.test.ts` (all `db/migrations/*.sql` 
 
 `npm run test:coverage` runs the fast suite under the v8 coverage provider. Two gates apply:
 
-- **Global floor.** `coverage.thresholds` in `vitest.config.ts` (Statements 64 / Branches 59 / Functions 55 / Lines 65) is a regression guard set just below the measured baseline. `vitest run --coverage` exits non-zero if overall coverage drops below the floor. Ratchet the floor *upward* as coverage improves — never lower it to make a red build pass.
-- **Diff coverage.** `scripts/diff-coverage.mjs` cross-references the lines a PR adds/changes against the v8 per-statement hit counts in `coverage/coverage-final.json` (the `json` reporter) and requires changed product lines to hit an 80% patch-coverage bar. Lines in test files, the generated seed payload, and non-product directories are excluded; a PR that changes no instrumented product lines skips the gate.
+- **Global floor.** `coverage.thresholds` in `vitest.config.ts` (Statements 74 / Branches 69 / Functions 66 / Lines 76) is a regression guard set just below the measured baseline. `vitest run --coverage` exits non-zero if overall coverage drops below the floor. Ratchet the floor *upward* as coverage improves — never lower it to make a red build pass.
+- **Diff coverage.** `scripts/diff-coverage.mjs` cross-references the lines a PR adds/changes against the v8 per-statement hit counts in `coverage/coverage-final.json` (the `json` reporter) and requires changed product lines to hit a 90% patch-coverage bar. Lines in test files, the generated seed payload, and non-product directories are excluded; a PR that changes no instrumented product lines skips the gate.
 
 Both gates run in the `coverage` workflow on every PR (see WORKFLOW.md "Build gates"). The coverage step no longer carries `continue-on-error`, so a breach fails the job. The PR comment posts on both pass and fail.
 

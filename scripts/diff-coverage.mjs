@@ -3,7 +3,7 @@
 //
 // Cross-references the lines a PR adds/changes against the v8 per-statement
 // hit counts in coverage/coverage-final.json, and fails when patch coverage
-// for the changed product code falls below a bar (default 80%).
+// for the changed product code falls below a bar (default 90%).
 //
 // This is the "quality push" half of the coverage gate: the global floor in
 // vitest.config.ts stops overall coverage regressing, this script stops new
@@ -14,7 +14,7 @@
 //   A unified diff on stdin        — typically `git diff <base>...<head>`.
 //
 // Env (optional):
-//   DIFF_COVERAGE_MIN   — patch-coverage bar as a percentage (default 80).
+//   DIFF_COVERAGE_MIN   — patch-coverage bar as a percentage (default 90).
 //   DIFF_COVERAGE_OUT   — path to write a Markdown summary fragment.
 //
 // Exit codes:
@@ -29,7 +29,7 @@ import { dirname, join, relative, resolve } from "node:path";
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const COVERAGE_FILE = join(REPO_ROOT, "coverage", "coverage-final.json");
 
-const MIN_PCT = Number(process.env.DIFF_COVERAGE_MIN ?? "80");
+const MIN_PCT = Number(process.env.DIFF_COVERAGE_MIN ?? "90");
 const OUT_FILE = process.env.DIFF_COVERAGE_OUT;
 
 // Only product code carries a coverage signal. Mirror the include globs in
