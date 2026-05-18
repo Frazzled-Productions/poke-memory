@@ -4,6 +4,12 @@ import type { GenerationStats } from "@/lib/stats/derive";
 // Milestone kinds and thresholds
 // ---------------------------------------------------------------------------
 
+// NOTE: 1025 is included for completeness but is intentionally unreachable as a
+// "mastery-count" milestone. `detectTopMilestone` checks the "all-mastered"
+// branch (totalMastered >= 1025) first and returns early, so the count
+// threshold for 1025 is never reached. The entry is kept so the list reads as
+// a clean sequence of round numbers and documents 1025 as the total species
+// count without requiring a separate constant.
 export const MASTERY_COUNT_MILESTONES = [
   10, 25, 50, 100, 151, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000,
   1025,

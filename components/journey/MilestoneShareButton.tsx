@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Milestone } from "@/lib/journey/milestones";
 
 type Props = {
@@ -22,6 +22,16 @@ type Props = {
  */
 export function MilestoneShareButton({ milestone }: Props) {
   const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending timeout on unmount to avoid state updates after unmount.
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Nothing to show — either no milestone reached, or suppressed by
   // the superuser guard.
@@ -30,6 +40,10 @@ export function MilestoneShareButton({ milestone }: Props) {
   const { label, shareText } = milestone;
 
   async function handleShare() {
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     setStatus("idle");
     const canShare =
       typeof navigator !== "undefined" &&
@@ -46,13 +60,18 @@ export function MilestoneShareButton({ milestone }: Props) {
         // Share sheet dismissed or unavailable — fall through to clipboard.
       }
     }
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      setStatus("error");
+      timeoutRef.current = setTimeout(() => setStatus("idle"), 2000);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(shareText);
       setStatus("copied");
-      setTimeout(() => setStatus("idle"), 2000);
+      timeoutRef.current = setTimeout(() => setStatus("idle"), 2000);
     } catch {
       setStatus("error");
-      setTimeout(() => setStatus("idle"), 2000);
+      timeoutRef.current = setTimeout(() => setStatus("idle"), 2000);
     }
   }
 

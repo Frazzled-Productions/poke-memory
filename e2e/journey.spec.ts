@@ -327,6 +327,9 @@ test.describe("Journey page — milestone share card", () => {
     page,
   }) => {
     // Seed 10 mastered name cards into localStorage before the page loads.
+    // The storage key must match STORAGE_KEY in lib/review/persistence.ts.
+    // Each card requires `name` and `spriteUrl` to pass isReviewCardShaped
+    // validation; `loadSession` falls back to localStorage when IDB is empty.
     await page.addInitScript(() => {
       // Mastery requires reps >= 3 AND scheduledDays >= 21.
       const cards = Array.from({ length: 10 }, (_, i) => ({
@@ -334,6 +337,9 @@ test.describe("Journey page — milestone share card", () => {
         speciesId: i + 1,
         cardType: "name",
         subjectKey: String(i + 1),
+        name: `Pokemon ${i + 1}`,
+        spriteUrl: `/sprites/pokemon/${i + 1}.png`,
+        types: ["normal"],
         state: {
           stability: 30,
           difficulty: 5,
@@ -352,7 +358,7 @@ test.describe("Journey page — milestone share card", () => {
         },
       }));
       window.localStorage.setItem(
-        "poke-memory:session:v1",
+        "poke-memory:review-session:v1",
         JSON.stringify({ cards, limits: {} }),
       );
     });
