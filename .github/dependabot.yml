@@ -2,6 +2,9 @@ version: 2
 updates:
   - package-ecosystem: "npm"
     directory: "/"
+    # Open PRs against the qa integration branch, not main. All PR-producing
+    # paths target qa; dependency PRs ride the qa -> main promotion PR.
+    target-branch: "qa"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -28,6 +31,7 @@ updates:
         patterns: ["*"]
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "qa"
     schedule:
       interval: "weekly"
       day: "monday"
