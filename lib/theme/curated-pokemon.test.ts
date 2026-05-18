@@ -88,4 +88,12 @@ describe("BRAND_DEFAULT_COLORS", () => {
   it("fgOnPrimary is white (for contrast on the primary colour)", () => {
     expect(BRAND_DEFAULT_COLORS.fgOnPrimary).toBe("#FFFFFF");
   });
+
+  it("secondary is the soft pink (#FF9DA6)", () => {
+    expect(BRAND_DEFAULT_COLORS.secondary).toBe("#FF9DA6");
+  });
+
+  it("accent is the deeper red (#C2162A)", () => {
+    expect(BRAND_DEFAULT_COLORS.accent).toBe("#C2162A");
+  });
 });

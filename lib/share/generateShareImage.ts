@@ -180,9 +180,10 @@ function makeBackgroundGradient(
  * for graphical elements and large text; anything below this is effectively
  * invisible against the disc and falls back to white.
  *
- * Dark mascot accents (deep purples, navies) sit below the bar and use the
- * white ring; bright accents (golds, light tints) clear it easily and keep
- * their colour.
+ * The brand default accent #C2162A scores ≈3.1:1 and just clears the floor,
+ * rendering a coloured red ring. Dark mascot accents sit well below — e.g.
+ * Mewtwo's deep-purple #4A2E7A at ≈1.8:1 — and fall back to white. Bright
+ * accents (Umbreon gold #FFD700 at ≈13.5:1) clear the floor easily.
  */
 const RING_MIN_CONTRAST = 3;
 

@@ -130,9 +130,11 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
  * selected any favourite. Poké-ball red with warm complementary tones —
  * gives baseline mode visible accent without being loud.
  *
- * Contrast verified against both the off-white light body (#fafafa) and the
- * deep dark body (#0f0f0f): primary and accent both exceed 4.5:1 for AA on
- * the relevant backgrounds.
+ * These reds are used as background/fill colours, not as foreground text on
+ * the page body. White fgOnPrimary achieves ≈4.8:1 on the primary, meeting
+ * WCAG AA. Do not use primary or accent as text on dark surfaces — primary
+ * (#E01B2E) scores ≈4.0:1 and accent (#C2162A) scores ≈3.1:1 against
+ * #0f0f0f, both below the 4.5:1 AA threshold.
  */
 export const BRAND_DEFAULT_COLORS: ThemeColors = {
   primary: "#E01B2E",   // Poké-ball red
