@@ -8,6 +8,16 @@ name: Cron Health Monitor
 # each monitored workflow, checks that (a) there has been at least one run
 # within the expected interval and (b) the most recent run did not fail.
 # On a stale or failing workflow it opens or updates a tracking issue.
+#
+# Two refinements (#971) keep the monitor from raising healthy or
+# newly-added workflows:
+#   1. A workflow whose file was committed more recently than the most
+#      recent expected cron tick cannot have run on schedule yet, so the
+#      "no scheduled run found" alert is suppressed for it.
+#   2. Run-conclusion health is judged from the most recent run across ALL
+#      triggers (schedule + workflow_dispatch), so a green manual dispatch
+#      after a fix marks the workflow healthy even if the last *scheduled*
+#      run predates the fix.
 
 on:
   schedule:
@@ -29,6 +39,14 @@ jobs:
       issues: write
 
     steps:
+      # Full history is required so `git log --diff-filter=A` can find the
+      # commit that first added each workflow file (Fix 1, #971). The
+      # default shallow checkout would not contain that commit.
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Check cron workflows and open/update tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -65,54 +83,102 @@ jobs:
 
             echo "::group::$FILE"
 
-            # Most recent run on the default branch, schedule-triggered.
-            # --json gives status/conclusion/createdAt for the latest run.
+            # --- Fetch run history ---------------------------------------
+            # Two queries are needed:
+            #  * RUN_ANY  — the latest run across ALL triggers (schedule +
+            #    workflow_dispatch). Its conclusion is what we judge run
+            #    health on (Fix 2, #971): a green dispatch run after a fix
+            #    should clear the alert even though the last *scheduled*
+            #    run predates the fix.
+            #  * RUN_SCHED — the latest *schedule*-triggered run only. Its
+            #    age is what the staleness check uses, because only a
+            #    scheduled run proves the cron itself is still firing; a
+            #    manual dispatch says nothing about the schedule.
             # Capture the exit status separately so a real API failure
             # (network blip, rate limit, GitHub outage) is not confused
             # with a genuine empty result. On an API error we skip this
             # workflow rather than treat the error as evidence of
             # staleness — otherwise a transient outage would spam a
             # tracking issue for every monitored workflow at once.
+            DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+
             RUN_EXIT=0
-            RUN=$(gh run list \
+            RUN_ANY=$(gh run list \
+              --repo "$REPO" \
+              --workflow "$FILE" \
+              --branch "$DEFAULT_BRANCH" \
+              --limit 1 \
+              --json status,conclusion,createdAt,databaseId,event) || RUN_EXIT=$?
+
+            if [ "$RUN_EXIT" -ne 0 ]; then
+              echo "::warning::$FILE: 'gh run list' (all events) failed (exit $RUN_EXIT) — likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
+              echo "::endgroup::"
+              continue
+            fi
+
+            RUN_EXIT=0
+            RUN_SCHED=$(gh run list \
               --repo "$REPO" \
               --workflow "$FILE" \
               --event schedule \
-              --branch "${{ github.event.repository.default_branch }}" \
+              --branch "$DEFAULT_BRANCH" \
               --limit 1 \
               --json status,conclusion,createdAt,databaseId) || RUN_EXIT=$?
 
             if [ "$RUN_EXIT" -ne 0 ]; then
-              echo "::warning::$FILE: 'gh run list' failed (exit $RUN_EXIT) — likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
+              echo "::warning::$FILE: 'gh run list' (schedule) failed (exit $RUN_EXIT) — likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
               echo "::endgroup::"
               continue
             fi
 
             PROBLEM=""
 
-            COUNT=$(echo "$RUN" | jq 'length')
-            if [ "$COUNT" -eq 0 ]; then
-              # No scheduled run has ever been recorded — either the
-              # workflow is brand new or it has never fired on cron.
-              PROBLEM="No scheduled run found for \`$FILE\`. The workflow may be newly added, disabled, or its \`schedule:\` trigger may be malformed."
-            else
-              STATUS=$(echo "$RUN" | jq -r '.[0].status')
-              CONCLUSION=$(echo "$RUN" | jq -r '.[0].conclusion')
-              CREATED_AT=$(echo "$RUN" | jq -r '.[0].createdAt')
-              RUN_ID=$(echo "$RUN" | jq -r '.[0].databaseId')
-
-              RUN_TIME=$(date -u -d "$CREATED_AT" +%s 2>/dev/null \
-                || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null \
+            # --- Fix 1: suppress "no scheduled run" for too-new files -----
+            # The most recent expected cron tick is at most MAX_AGE_HOURS
+            # ago (MAX_AGE_HOURS is the cron cadence plus headroom). If the
+            # workflow file was first committed more recently than that, it
+            # cannot have completed a scheduled run yet, so the absence of
+            # one is expected rather than a fault. FILE_ADDED is the ISO
+            # date of the commit that first added the file; an empty value
+            # (file not found in history) falls through to the normal
+            # check rather than silently suppressing.
+            # `head -n1` can SIGPIPE `git log`; the `|| true` keeps that
+            # from tripping `set -o pipefail` on this assignment.
+            FILE_ADDED=$( { git log --diff-filter=A --format=%aI --reverse -- ".github/workflows/$FILE" 2>/dev/null || true; } | head -n1)
+            FILE_ADDED_TS=0
+            if [ -n "$FILE_ADDED" ]; then
+              FILE_ADDED_TS=$(date -u -d "$FILE_ADDED" +%s 2>/dev/null \
+                || date -u -j -f "%Y-%m-%dT%H:%M:%S%z" "$FILE_ADDED" +%s 2>/dev/null \
                 || echo 0)
+            fi
 
-              if [ "$RUN_TIME" -eq 0 ]; then
-                echo "$FILE: malformed timestamp '$CREATED_AT', skipping"
-                echo "::endgroup::"
-                continue
+            SCHED_COUNT=$(echo "$RUN_SCHED" | jq 'length')
+            ANY_COUNT=$(echo "$RUN_ANY" | jq 'length')
+
+            if [ "$SCHED_COUNT" -eq 0 ]; then
+              # No scheduled run has ever been recorded.
+              FILE_AGE=$(( NOW - FILE_ADDED_TS ))
+              if [ "$FILE_ADDED_TS" -ne 0 ] && [ "$FILE_AGE" -lt "$MAX_AGE" ]; then
+                # The file is newer than the most recent expected cron
+                # tick — it simply has not had a chance to run yet.
+                FILE_AGE_HOURS=$(( FILE_AGE / 3600 ))
+                echo "$FILE: no scheduled run yet, but the file was added only ${FILE_AGE_HOURS}h ago (< ${MAX_AGE_HOURS}h cadence) — too new to have fired, not flagging."
+              else
+                # Either the file is old enough that a scheduled run was
+                # expected, or its add-date could not be determined.
+                PROBLEM="No scheduled run found for \`$FILE\`. The workflow may be disabled, or its \`schedule:\` trigger may be malformed."
               fi
+            fi
 
-              AGE=$(( NOW - RUN_TIME ))
-              AGE_HOURS=$(( AGE / 3600 ))
+            # --- Fix 2: judge run health across all triggers --------------
+            # Evaluate the latest run regardless of trigger event. A green
+            # workflow_dispatch run after a fix is treated as healthy even
+            # if the newest scheduled run predates the fix.
+            if [ -z "$PROBLEM" ] && [ "$ANY_COUNT" -gt 0 ]; then
+              STATUS=$(echo "$RUN_ANY" | jq -r '.[0].status')
+              CONCLUSION=$(echo "$RUN_ANY" | jq -r '.[0].conclusion')
+              EVENT=$(echo "$RUN_ANY" | jq -r '.[0].event')
+              RUN_ID=$(echo "$RUN_ANY" | jq -r '.[0].databaseId')
 
               # Only completed runs carry a conclusion. Treat an in-flight
               # run (status != completed) as healthy — it has not failed.
@@ -123,14 +189,36 @@ jobs:
               if [ "$STATUS" = "completed" ] \
                 && [ "$CONCLUSION" != "success" ] \
                 && [ "$CONCLUSION" != "skipped" ]; then
-                PROBLEM="The most recent scheduled run of \`$FILE\` did not succeed (conclusion: \`$CONCLUSION\`) ([run #$RUN_ID](https://github.com/$REPO/actions/runs/$RUN_ID))."
-              elif [ "$AGE" -gt "$MAX_AGE" ]; then
-                PROBLEM="The most recent scheduled run of \`$FILE\` is **${AGE_HOURS}h old** (expected at most ${MAX_AGE_HOURS}h between runs). The workflow may have been disabled after 60 days of repo inactivity, or its \`schedule:\` trigger may be malformed."
+                PROBLEM="The most recent run of \`$FILE\` (event: \`$EVENT\`) did not succeed (conclusion: \`$CONCLUSION\`) ([run #$RUN_ID](https://github.com/$REPO/actions/runs/$RUN_ID))."
               fi
+            fi
 
-              if [ -z "$PROBLEM" ]; then
-                echo "$FILE: healthy (last run ${AGE_HOURS}h ago, conclusion=$CONCLUSION)"
+            # --- Staleness check (schedule-triggered runs only) -----------
+            # Only a scheduled run proves the cron is still firing, so the
+            # age check stays on RUN_SCHED. Skipped when an earlier check
+            # already found a problem, or when there is no scheduled run
+            # (handled by Fix 1 above).
+            if [ -z "$PROBLEM" ] && [ "$SCHED_COUNT" -gt 0 ]; then
+              CREATED_AT=$(echo "$RUN_SCHED" | jq -r '.[0].createdAt')
+              SCHED_RUN_ID=$(echo "$RUN_SCHED" | jq -r '.[0].databaseId')
+
+              RUN_TIME=$(date -u -d "$CREATED_AT" +%s 2>/dev/null \
+                || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null \
+                || echo 0)
+
+              if [ "$RUN_TIME" -eq 0 ]; then
+                echo "$FILE: malformed timestamp '$CREATED_AT', skipping staleness check"
+              else
+                AGE=$(( NOW - RUN_TIME ))
+                AGE_HOURS=$(( AGE / 3600 ))
+                if [ "$AGE" -gt "$MAX_AGE" ]; then
+                  PROBLEM="The most recent scheduled run of \`$FILE\` is **${AGE_HOURS}h old** (expected at most ${MAX_AGE_HOURS}h between runs). The workflow may have been disabled after 60 days of repo inactivity, or its \`schedule:\` trigger may be malformed."
+                fi
               fi
+            fi
+
+            if [ -z "$PROBLEM" ]; then
+              echo "$FILE: healthy"
             fi
 
             # HTML marker keyed by workflow file so each workflow has its

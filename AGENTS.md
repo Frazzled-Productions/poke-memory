@@ -174,7 +174,7 @@ Playwright smoke tests live in `e2e/` and run against Vercel preview deployments
 - **Run locally**: `npm run test:e2e` (requires `npx playwright install` first).
 - **Node version**: your local Node must match CI's, or the e2e suite produces local-only failures — running under Node 26 is a known source of these. CI runs inside `mcr.microsoft.com/playwright:v1.60.0-noble`, which ships **Node 24**, so the repo ships an `.nvmrc` pinned to `24`; run `nvm use` (or `nvm install 24`) locally before running the suite. Note that `.nvmrc` pins the *recommended* e2e Node version (24), while `package.json` `engines.node` is a deliberately looser hard floor (`>=20`) so CI jobs that run `npm ci` under Node 20 do not emit engine-unsupported warnings — the two intentionally differ. (Originally investigated in #657.)
 - **Selectors**: prefer `getByRole`, `getByText`, and `getByLabel` over CSS selectors or test IDs. Match the accessible names already in the markup (ARIA labels, headings, button text).
-- **When to add E2E tests**: any change that adds a new page, a new interactive flow, or modifies an existing user-facing flow should include or update an E2E test in `e2e/`. The bar is smoke-level coverage — verify the happy path loads and key interactions work, not exhaustive edge cases.
+- **When to add E2E tests**: any change that adds a new page, a new interactive flow, or modifies an existing user-facing flow should include or update an E2E test in `e2e/`. The bar is smoke-level coverage — verify the happy path loads and key interactions work, not exhaustive edge cases. Absence-only test suites do not satisfy this requirement: a suite that only asserts the feature is hidden, disabled, or absent under various conditions leaves a rendering regression undetected. At least one test must assert the feature actually renders and its core interaction succeeds in the happy path.
 - **File naming**: one spec file per feature area (e.g. `e2e/smoke.spec.ts` for cross-cutting smoke tests, `e2e/pokedex.spec.ts` for Pokédex-specific flows).
 
 ### Local development gotchas
@@ -284,6 +284,8 @@ The backlog lives on GitHub Issues, labelled `priority:now` / `priority:next` / 
 When a change closes an issue, reference it in the commit message (`closes #N`) so it auto-closes on push.
 
 **Pre-PR build gate.** After pushing a branch, run `npm run typecheck && npm run build && npm test`. If any step fails, apply a targeted fix and retry — up to two attempts. After the second failure, post a comment with the last 80 lines of build output and stop without opening a PR.
+
+**Pre-push spelling check.** Before pushing, spell-check all prose, code comments, and UI strings against the British-English convention (see "Spelling" above) — `optimise`, `colour`, `behaviour`, etc. Catch this in the first commit, not a follow-up: a second commit just to fix `optimize` → `optimise` is a recurring, trivially avoidable pattern.
 
 **Graceful exit on halt.** If the implement run halts, the post-step commits any uncommitted edits as `WIP: halted run on #N` and pushes to origin, so `/continue` always has a branch to resume from. On resume, check `git log -1 --format=%s` — if the subject starts with `WIP:`, inspect `git diff HEAD~1` and amend or revert before continuing.
 

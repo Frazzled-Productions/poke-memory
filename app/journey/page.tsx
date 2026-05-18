@@ -569,14 +569,39 @@ export default function JourneyPage() {
               }
             />
 
-            {/* Collection timeline — the hero scrubber */}
-            {timeline !== null && (
+            {/* Collection timeline — the hero scrubber.
+                Show a placeholder while the cloud pull is in flight so the
+                section's layout slot is reserved and nothing shifts when the
+                data lands (fixes #961). */}
+            {timeline !== null ? (
               <CollectionTimelineWidget timeline={timeline} />
+            ) : (
+              <section aria-labelledby="timeline-skeleton-heading" aria-busy="true">
+                <h2
+                  id="timeline-skeleton-heading"
+                  className="mb-4 text-lg font-semibold text-foreground"
+                >
+                  Collection timeline
+                </h2>
+                <SkeletonBlock className="h-[200px] w-full" />
+              </section>
             )}
 
-            {/* Evolution wall */}
-            {evolutionFamilies !== null && (
+            {/* Evolution wall.
+                Same per-section skeleton approach to avoid layout shift
+                while evolutionFamilies is still null (fixes #961). */}
+            {evolutionFamilies !== null ? (
               <EvolutionWall families={evolutionFamilies} />
+            ) : (
+              <section aria-labelledby="evo-wall-skeleton-heading" aria-busy="true">
+                <h2
+                  id="evo-wall-skeleton-heading"
+                  className="mb-3 text-base font-semibold text-foreground"
+                >
+                  Evolution wall
+                </h2>
+                <SkeletonBlock className="h-10 w-full" />
+              </section>
             )}
 
             {/* Badges */}

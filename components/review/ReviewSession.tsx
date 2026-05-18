@@ -56,7 +56,7 @@ import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
-import { formatDailySummary } from "@/lib/review/share";
+import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
   loadDailySummary,
   saveDailySummary,
@@ -299,6 +299,7 @@ function EndOfSessionScreen({
   reverseEvolutionEnabled,
   cryEnabled,
   shareText,
+  shareParts,
   dueTomorrow,
   showCardTypesHint,
 }: {
@@ -311,6 +312,8 @@ function EndOfSessionScreen({
   cryEnabled: boolean;
   /** Pre-formatted share summary; null when the user has not graded anything today. */
   shareText: string | null;
+  /** Structured parts for image card generation; always present when shareText is not null. */
+  shareParts: DailySummaryParts | null;
   /** Count of graduated cards whose dueDate falls exactly on tomorrow. 0 hides the teaser. */
   dueTomorrow: number;
   /**
@@ -360,7 +363,9 @@ function EndOfSessionScreen({
         reverseEvolutionEnabled={reverseEvolutionEnabled}
         cryEnabled={cryEnabled}
       />
-      {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
+      {shareText !== null && shareParts !== null ? (
+        <ShareTodayButton parts={shareParts} text={shareText} />
+      ) : null}
       {variant.kind === "review-wall" && (
         <div className="flex flex-wrap justify-center gap-3">
           <button
@@ -1280,17 +1285,18 @@ export function ReviewSession() {
     // than only appearing in the page-load that graded the final card.
     // The displayed date uses the user's timezone (a calendar label), while
     // streak lookup stays on the UTC `today` the streak data is keyed by.
-    const shareText =
+    const shareParts: DailySummaryParts | null =
       sessionGradeSeq.length > 0
-        ? formatDailySummary({
+        ? {
             date: todayTz,
             streak: computeStreak(loadStreakData(), today),
             reviewed: sessionGradeSeq.length,
             newCards: newCardsThisSession,
             mastered: masteredThisSession,
             gradeSequence: sessionGradeSeq,
-          })
+          }
         : null;
+    const shareText = shareParts !== null ? formatDailySummary(shareParts) : null;
     const variant: EndOfSessionVariant =
       endState === "REVIEW_SOFT_WALL"
         ? { kind: "review-wall", onKeepReviewing: () => setExtendedReview(true) }
@@ -1308,6 +1314,7 @@ export function ReviewSession() {
           reverseEvolutionEnabled={reverseEvolutionEnabled}
           cryEnabled={cryCardsEnabled}
           shareText={shareText}
+          shareParts={shareParts}
           dueTomorrow={dueTomorrow}
           showCardTypesHint={!cardTypesAllOn}
         />

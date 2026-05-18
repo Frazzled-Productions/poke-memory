@@ -2424,4 +2424,177 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
 
     vi.useRealTimers();
   });
+
+  it("shows the Share today button on the REVIEW_SOFT_WALL variant when a today-dated summary is persisted (#952)", async () => {
+    // One card due for review (lastReview set to a past date, dueDate <= today)
+    // with maxReviewsPerDay: 0 — the cap is already hit at 0, reviewsDoneToday
+    // starts at 0 (0 >= 0), and hasMoreDueReviewsOf sees the due card, so the
+    // session lands on REVIEW_SOFT_WALL. A persisted daily summary triggers the
+    // share button.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const dueReviewCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      name: "Bulbasaur",
+      displayName: "Bulbasaur",
+      subjectKey: "1",
+      state: {
+        stability: 5,
+        difficulty: 5,
+        elapsedDays: 5,
+        scheduledDays: 5,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-17",
+        lastReview: "2026-05-01",
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+    mockSeedPokemon.mockReturnValue([dueReviewCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [dueReviewCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+    // Seed a persisted daily summary so `sessionGradeSeq` hydrates at mount.
+    localStorage.setItem(
+      DAILY_SUMMARY_KEY,
+      JSON.stringify({
+        date: "2026-05-17",
+        gradeSequence: [4, 5, 4],
+        reviewed: 3,
+        newCards: 1,
+        mastered: 0,
+      }),
+    );
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/daily review limit reached/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /share today/i }),
+      ).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("shows the due-tomorrow teaser on the REVIEW_SOFT_WALL variant when cards are due tomorrow (#952)", async () => {
+    // Fix "today" to 2026-05-17 UTC so "tomorrow" is 2026-05-18.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    // A card due for review today — triggers hasMoreDueReviewsOf with the
+    // review cap at 0, landing on REVIEW_SOFT_WALL.
+    const dueReviewCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      name: "Bulbasaur",
+      displayName: "Bulbasaur",
+      subjectKey: "1",
+      state: {
+        stability: 5,
+        difficulty: 5,
+        elapsedDays: 5,
+        scheduledDays: 5,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-17",
+        lastReview: "2026-05-01",
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+    // A second card due tomorrow — makes dueTomorrow === 1.
+    const dueTomorrowCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 2,
+      name: "Ivysaur",
+      displayName: "Ivysaur",
+      subjectKey: "2",
+      state: {
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 10,
+        scheduledDays: 21,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-18",
+        lastReview: "2026-04-27",
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+    mockSeedPokemon.mockReturnValue([dueReviewCard, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [dueReviewCard, dueTomorrowCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/daily review limit reached/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/1 card due tomorrow/i)).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
 });

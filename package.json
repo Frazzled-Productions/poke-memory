@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@open-spaced-repetition/binding": "^0.3.0",
+    "@open-spaced-repetition/binding": "^0.3.1",
     "@serwist/turbopack": "^9.5.11",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
@@ -36,7 +36,7 @@
     "react-dom": "19.2.6",
     "recharts": "^3.8.1",
     "serwist": "^9.5.11",
-    "ts-fsrs": "^5.3.3"
+    "ts-fsrs": "^5.4.0"
   },
   "overrides": {
     "postcss": ">=8.5.10"

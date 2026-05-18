@@ -3,6 +3,13 @@ import { render, screen, act, fireEvent } from "@testing-library/react";
 import { MilestoneShareButton } from "./MilestoneShareButton";
 import type { Milestone } from "@/lib/journey/milestones";
 
+// Mock the image generator — canvas is not available in jsdom.
+vi.mock("@/lib/share/generateShareImage", () => ({
+  generateMilestoneShareImage: vi.fn().mockResolvedValue(null),
+}));
+
+import { generateMilestoneShareImage } from "@/lib/share/generateShareImage";
+
 // ---------------------------------------------------------------------------
 // Fixtures — use the flat Milestone shape produced by detectTopMilestone.
 // ---------------------------------------------------------------------------
@@ -139,5 +146,168 @@ describe("MilestoneShareButton — clipboard fallback", () => {
     });
 
     expect(screen.getByText(/Couldn't copy/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Web Share API file path (Path 1)
+// ---------------------------------------------------------------------------
+
+describe("MilestoneShareButton — Web Share API file path", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // Remove navigator properties set via Object.defineProperty.
+    for (const prop of ["canShare", "share"] as const) {
+      try {
+        Object.defineProperty(navigator, prop, {
+          value: undefined,
+          configurable: true,
+          writable: true,
+        });
+      } catch {
+        // ignore — may not be configurable on all jsdom versions
+      }
+    }
+  });
+
+  it("calls navigator.share with a File when canShare({ files }) returns true", async () => {
+    const mockBlob = new Blob(["png"], { type: "image/png" });
+    vi.mocked(generateMilestoneShareImage).mockResolvedValueOnce(mockBlob);
+
+    const shareFn = vi.fn().mockResolvedValue(undefined);
+    const canShareFn = vi.fn().mockReturnValue(true);
+    Object.defineProperty(navigator, "canShare", {
+      value: canShareFn,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(navigator, "share", {
+      value: shareFn,
+      configurable: true,
+      writable: true,
+    });
+
+    render(<MilestoneShareButton milestone={countMilestone} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
+    });
+
+    expect(shareFn).toHaveBeenCalledOnce();
+    const arg = shareFn.mock.calls[0][0] as { files?: File[] };
+    expect(Array.isArray(arg.files)).toBe(true);
+    expect(arg.files![0]).toBeInstanceOf(File);
+    expect(arg.files![0].name).toBe("poke-memory.png");
+    // No status message because share succeeded.
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("does NOT open a second share sheet when the user dismisses Path 1 (AbortError)", async () => {
+    const mockBlob = new Blob(["png"], { type: "image/png" });
+    vi.mocked(generateMilestoneShareImage).mockResolvedValueOnce(mockBlob);
+
+    const abortError = new DOMException("Share cancelled", "AbortError");
+    const shareFn = vi.fn().mockRejectedValue(abortError);
+    const canShareFn = vi.fn().mockReturnValue(true);
+    Object.defineProperty(navigator, "canShare", {
+      value: canShareFn,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(navigator, "share", {
+      value: shareFn,
+      configurable: true,
+      writable: true,
+    });
+
+    render(<MilestoneShareButton milestone={countMilestone} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
+    });
+
+    // share was called exactly once (Path 1 only) and no second sheet was opened.
+    expect(shareFn).toHaveBeenCalledOnce();
+    // No status shown — treated as a user cancellation, not an error.
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("falls back to text share when canShare({ files }) returns false", async () => {
+    const shareFn = vi.fn().mockResolvedValue(undefined);
+    const canShareFn = vi.fn().mockReturnValue(false);
+    Object.defineProperty(navigator, "canShare", {
+      value: canShareFn,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(navigator, "share", {
+      value: shareFn,
+      configurable: true,
+      writable: true,
+    });
+
+    render(<MilestoneShareButton milestone={countMilestone} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
+    });
+
+    // share called with text, not files.
+    expect(shareFn).toHaveBeenCalledOnce();
+    const arg = shareFn.mock.calls[0][0] as { text?: string; files?: File[] };
+    expect(arg.text).toBe(countMilestone.shareText);
+    expect(arg.files).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PNG download fallback (Path 3)
+// ---------------------------------------------------------------------------
+
+describe("MilestoneShareButton — PNG download fallback", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("triggers a PNG download when the image rendered but Share API is absent", async () => {
+    const mockBlob = new Blob(["png"], { type: "image/png" });
+    vi.mocked(generateMilestoneShareImage).mockResolvedValueOnce(mockBlob);
+
+    // No navigator.share or navigator.canShare — fall through to Path 3.
+    const mockUrl = "blob:mock-url";
+    const createObjectURL = vi.fn().mockReturnValue(mockUrl);
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      value: createObjectURL,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: revokeObjectURL,
+      configurable: true,
+      writable: true,
+    });
+
+    const anchorClickFn = vi.fn();
+    const mockAnchor = {
+      href: "",
+      download: "",
+      click: anchorClickFn,
+    } as unknown as HTMLAnchorElement;
+    // Save the real createElement before wrapping so the fallback does not
+    // recurse infinitely into the spy.
+    const realCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag === "a") return mockAnchor;
+      return realCreateElement(tag);
+    });
+
+    render(<MilestoneShareButton milestone={countMilestone} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
+    });
+
+    expect(createObjectURL).toHaveBeenCalledWith(mockBlob);
+    expect(mockAnchor.download).toBe("poke-memory.png");
+    expect(anchorClickFn).toHaveBeenCalledOnce();
+    // No status message on a successful download.
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });
