@@ -6,6 +6,18 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.3] - 2026-05-18
+
+### Changed
+
+- "Share today" and journey milestone shares now generate a polished PNG image card (branded header, date, streak, stat counts, and a colour-coded grade grid) and share it via the Web Share API files support where available, with a PNG download and clipboard-text copy as fallbacks.
+- Streak milestones revised so no gap between celebrations exceeds ~115 days: the set is now 3, 7, 14, 30, 60, 100, 150, 200, 250, and 365, then every 100 days beyond 365 (465, 565, ...) so consistent users are always celebrated.
+- Streak milestone celebrations now scale with how rare the milestone is: light (3/7/14 days) shows a gentle amber burst, standard (30 to 250) a deeper amber banner, and major (365 and beyond) a gold gradient with a glow ring, more confetti, and milestone-specific copy (e.g. "One year." at 365).
+
+### Fixed
+
+- Fixed layout shift on the Journey tab where the collection timeline and evolution wall sections appeared blank then popped in after a cloud sync, pushing the badges section down.
+
 ## [0.10.2] - 2026-05-18
 
 ### Added
@@ -1176,7 +1188,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.3
 [0.10.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.2
 [0.10.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.1
 [0.10.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.0
