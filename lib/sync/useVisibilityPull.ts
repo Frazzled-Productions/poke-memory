@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
+import { useLatestRef } from "@/lib/hooks/useLatestRef";
 
 // Routes where an in-progress review session makes a mid-visit pull confusing.
 const BLOCKED_ROUTES = ["/"];
@@ -24,14 +25,9 @@ export function useVisibilityPull(
   pathname: string,
 ): void {
   const hiddenAtRef = useRef<number | null>(null);
-  const clientRef = useRef(client);
-  const userIdRef = useRef(userId);
-  const pathnameRef = useRef(pathname);
-
-  // Keep refs current on every render without re-registering the listener.
-  clientRef.current = client;
-  userIdRef.current = userId;
-  pathnameRef.current = pathname;
+  const clientRef = useLatestRef(client);
+  const userIdRef = useLatestRef(userId);
+  const pathnameRef = useLatestRef(pathname);
 
   useEffect(() => {
     function handleVisibilityChange() {
