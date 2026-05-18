@@ -7,7 +7,7 @@ import {
   CRY_ID_OFFSET,
   reverseEdgeIdFor,
 } from "@/lib/pokemon/seed";
-import { FNV_PRIME, FNV_OFFSET, fnv1a } from "@/lib/utils/fnv1a";
+import { fnv1a, fnv1aUint32 } from "@/lib/utils/fnv1a";
 import { Subject, appTypeToDbType } from "@/lib/cards/subjectKey";
 import { todayInTimezone } from "@/lib/utils/format-date";
 
@@ -387,26 +387,10 @@ export function stableShuffleForDay(
 ): number[] {
   const daySalt = fnv1a(today);
 
-  const keyed = ids.map((id) => {
-    let hash = FNV_OFFSET;
-    hash ^= id & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (id >>> 8) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (id >>> 16) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (id >>> 24) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= daySalt & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (daySalt >>> 8) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (daySalt >>> 16) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (daySalt >>> 24) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    return { id, key: hash };
-  });
+  const keyed = ids.map((id) => ({
+    id,
+    key: fnv1aUint32(daySalt, fnv1aUint32(id)),
+  }));
 
   keyed.sort((a, b) => a.key - b.key || a.id - b.id);
   return keyed.map((item) => item.id);
