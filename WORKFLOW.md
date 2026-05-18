@@ -41,10 +41,6 @@ Standard flow for non-trivial work:
 4. **E2E** — if the change is user-facing, invoke `playwright` to add or update E2E smoke tests. Pass the diff summary and affected pages.
 5. **Review** — invoke `code-reviewer` at the end. Iterate on its punch list.
 
-When *not* to use a sub-agent: small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value.
-
-**Hard rule — `workflow-expert` before writing GitHub Actions.** For any change to `.github/workflows/**` that involves marker-based dedup (HTML-comment idempotency markers) or GitHub search-index lookups, invoke `workflow-expert` **before** writing the change, not only as a reviewer afterwards. This is mandatory, not advisory: GitHub's search index strips HTML comments, so a `<!-- marker -->` dedup that relies on search to find prior comments silently fails — exactly the platform quirk a `workflow-expert` design-time pass surfaces before it costs a fix commit at auto-review time.
-
 **When to skip the planner.** Step 1 is skippable. Skip the `planner` invocation when *all* of the following hold:
 
 - the issue body names the **exact files** to change;
@@ -53,6 +49,10 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 - there are **zero open design questions** — nothing the planner would tag `[EXPERT-RESEARCH]`, `[USER-DECISION]`, or `[USER-DECISION + RESEARCH]`.
 
 When every box is ticked the issue *is* the plan and a planner round-trip would return precisely what the issue already says — validated by 25+ consecutive retros. If any box is unticked (a file is unnamed, an outcome is fuzzy, a design choice is open), run the planner. Implement directly only against an issue that meets the full checklist.
+
+When *not* to use a sub-agent: small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value.
+
+**Hard rule — `workflow-expert` before writing GitHub Actions.** For any change to `.github/workflows/**` that involves marker-based dedup (HTML-comment idempotency markers) or GitHub search-index lookups, invoke `workflow-expert` **before** writing the change, not only as a reviewer afterwards. GitHub's search index strips HTML comments, so a `<!-- marker -->` dedup that relies on search to find prior comments silently fails — exactly the platform quirk a `workflow-expert` design-time pass surfaces before it costs a fix commit at auto-review time.
 
 ---
 
@@ -114,7 +114,12 @@ Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR 
 3. The maintainer tests the preview, marks the draft ready, and merges `qa -> main`. The full required suite runs against strict `main`.
 4. The merge triggers `auto-release.yml`: it cuts the release, pushes the `[skip ci]` release commit to `main` (Vercel deploys production), then resets `qa` to `main` so the next batch starts clean.
 
-**Batch-drain pre-flight: aggregate coverage check.** Diff coverage is gated per-PR, but a set of PRs that each clear the 90% patch bar individually can still leave the *aggregate* `qa -> main` diff below the bar — a UI-heavy PR with E2E but thin unit coverage is the usual culprit. This surfaces as a failed `qa -> main` promotion needing a dedicated catch-up PR. To catch it before the drain rather than after: **before initiating a batch drain, run `npm run test:coverage` against the full `origin/main...origin/qa` diff** and fold any patch-coverage gap into the batch as an extra test-only change. Do this at drain start, not at promotion time.
+**Batch-drain pre-flight: aggregate coverage check.** Diff coverage is gated per-PR, but a set of PRs that each clear the 90% patch bar individually can still leave the *aggregate* `qa -> main` diff below the bar — a UI-heavy PR with E2E but thin unit coverage is the usual culprit. This surfaces as a failed `qa -> main` promotion needing a dedicated catch-up PR. To catch it before the drain rather than after, run the diff-coverage gate against the whole `qa`-vs-`main` diff before initiating a batch drain:
+
+1. Run `npm run test:coverage` once to produce `coverage/coverage-final.json` (the `json` reporter). The script reads this file; it does not run the suite itself.
+2. Pipe the aggregate diff into the gate: `git diff origin/main...origin/qa | node scripts/diff-coverage.mjs`. The script reads a unified diff on **stdin** — it has no diff-range argument. (`npm run coverage:diff` is the per-PR shortcut and hard-codes `origin/qa...HEAD`, so it is not the right invocation for the aggregate check.)
+
+A non-zero exit means the aggregate patch coverage is below the 90% bar; fold the gap into the batch as an extra test-only change. Do this at drain start, not at promotion time.
 
 **Hotfix bypass.** A genuine hotfix can skip `qa` by opening a PR straight into `main` with the `hotfix` label — `main-pr-source-gate.yml` checks for it. Only the repo owner applies the label.
 
