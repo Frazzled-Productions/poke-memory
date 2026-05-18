@@ -11,12 +11,15 @@ import { getPrimaryNavContainer } from "./helpers/navHelpers";
  *
  * Mastery predicate: reps >= 3 AND scheduledDays >= 21 (AGENTS.md / derive.ts).
  * `seenInPasture` defaults to false (new arrival).
+ * `extras` accepts optional `types` and `speciesId` fields required by the
+ * type/generation filter tests; omit for tests that only exercise display.
  */
 function masteredCard(
   id: number,
   name: string,
   habitat: string,
   seenInPasture = false,
+  extras: { types?: string[]; speciesId?: number } = {},
 ) {
   return {
     id,
@@ -24,6 +27,7 @@ function masteredCard(
     name,
     spriteUrl: `/sprites/pokemon/${id}.png`,
     habitat,
+    ...extras,
     state: {
       stability: 30,
       difficulty: 5,
@@ -567,5 +571,124 @@ test.describe("Pasture page — reacts to clearLocalProgress storage event", () 
     await expect(
       page.getByRole("button", { name: /Caterpie/ }),
     ).not.toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pasture filter strip (type + generation)
+// ---------------------------------------------------------------------------
+
+test.describe("Pasture page — type filter", () => {
+  // Seed three Pokémon with distinct types for filtering:
+  //   Caterpie   (id=10,  Bug,   Gen I,  forest)
+  //   Charmander (id=4,   Fire,  Gen I,  mountain)
+  //   Chikorita  (id=152, Grass, Gen II, grassland)
+  test.beforeEach(async ({ page }) => {
+    await seedSessionIdb(
+      page,
+      buildSession([
+        masteredCard(10,  "Caterpie",   "forest",    false, { types: ["bug"],   speciesId: 10  }),
+        masteredCard(4,   "Charmander", "mountain",  false, { types: ["fire"],  speciesId: 4   }),
+        masteredCard(152, "Chikorita",  "grassland", false, { types: ["grass"], speciesId: 152 }),
+      ]),
+    );
+  });
+
+  test("filter strip renders type buttons and generation pills", async ({ page }) => {
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    // Type filter group
+    const typeGroup = page.getByRole("group", { name: "Filter by type" });
+    await expect(typeGroup).toBeVisible();
+    await expect(typeGroup.getByRole("button", { name: "Bug" })).toBeVisible();
+    await expect(typeGroup.getByRole("button", { name: "Fire" })).toBeVisible();
+
+    // Generation filter group with All + at least Gen I
+    const genGroup = page.getByRole("group", { name: "Filter by generation" });
+    await expect(genGroup).toBeVisible();
+    await expect(genGroup.getByRole("button", { name: "All", exact: true })).toBeVisible();
+    await expect(genGroup.getByRole("button", { name: "Gen I", exact: true })).toBeVisible();
+  });
+
+  test("selecting a type hides Pokémon of other types", async ({ page }) => {
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    const typeGroup = page.getByRole("group", { name: "Filter by type" });
+    await typeGroup.getByRole("button", { name: "Bug" }).click();
+
+    // Caterpie (Bug) should remain visible
+    await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
+    // Charmander (Fire) should be hidden
+    await expect(page.getByRole("button", { name: /Charmander/ })).not.toBeVisible();
+    // Chikorita (Grass) should be hidden
+    await expect(page.getByRole("button", { name: /Chikorita/ })).not.toBeVisible();
+  });
+
+  test("de-selecting a type restores all Pokémon", async ({ page }) => {
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    const typeGroup = page.getByRole("group", { name: "Filter by type" });
+    const bugButton = typeGroup.getByRole("button", { name: "Bug" });
+
+    // Select then de-select
+    await bugButton.click();
+    await expect(page.getByRole("button", { name: /Charmander/ })).not.toBeVisible();
+    await bugButton.click();
+
+    await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Charmander/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Chikorita/ })).toBeVisible();
+  });
+
+  test("no matches shows the no-results message", async ({ page }) => {
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    const typeGroup = page.getByRole("group", { name: "Filter by type" });
+    // Select "Dragon" — none of the seeded cards are Dragon type
+    await typeGroup.getByRole("button", { name: "Dragon" }).click();
+
+    await expect(page.getByText(/No Pokémon match your filters/i)).toBeVisible();
+  });
+});
+
+test.describe("Pasture page — generation filter", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedSessionIdb(
+      page,
+      buildSession([
+        masteredCard(10,  "Caterpie",  "forest",    false, { types: ["bug"],   speciesId: 10  }),
+        masteredCard(152, "Chikorita", "grassland", false, { types: ["grass"], speciesId: 152 }),
+      ]),
+    );
+  });
+
+  test("selecting Gen II hides Gen I Pokémon", async ({ page }) => {
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    const genGroup = page.getByRole("group", { name: "Filter by generation" });
+    await genGroup.getByRole("button", { name: "Gen II", exact: true }).click();
+
+    // Chikorita (Gen II) should remain
+    await expect(page.getByRole("button", { name: /Chikorita/ })).toBeVisible();
+    // Caterpie (Gen I) should be hidden
+    await expect(page.getByRole("button", { name: /Caterpie/ })).not.toBeVisible();
+  });
+
+  test("selecting All restores both generations", async ({ page }) => {
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    const genGroup = page.getByRole("group", { name: "Filter by generation" });
+    await genGroup.getByRole("button", { name: "Gen II", exact: true }).click();
+    await expect(page.getByRole("button", { name: /Caterpie/ })).not.toBeVisible();
+
+    await genGroup.getByRole("button", { name: "All", exact: true }).click();
+    await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Chikorita/ })).toBeVisible();
   });
 });

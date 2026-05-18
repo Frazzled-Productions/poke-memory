@@ -139,12 +139,17 @@ vi.mock("@/components/pasture/PastureZone", () => ({
 }));
 
 vi.mock("@/components/pasture/PastureSearchBar", () => ({
-  PastureSearchBar: ({ onChange }: { onChange: (q: string) => void }) => (
+  PastureSearchBar: ({
+    onQueryChange,
+  }: {
+    onQueryChange: (q: string) => void;
+  }) => (
     <input
       aria-label="search pasture"
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => onQueryChange(e.target.value)}
     />
   ),
+  PASTURE_FILTERS_DEFAULT: { query: "", types: [], gen: null },
 }));
 
 // ---------------------------------------------------------------------------
