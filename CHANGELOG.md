@@ -6,6 +6,26 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.2] - 2026-05-18
+
+### Added
+
+- Pasture: compact filter strip lets you narrow mastered Pokémon by type and by generation, matching the Pokédex filter conventions.
+- The installed PWA app icon now shows a badge with the number of cards due today on supporting browsers (Chrome, Edge, Safari 16.4+).
+- Journey page: milestone share card. When mastery crosses a round-number threshold or a generation is fully mastered, a banner appears below the Trainer Card with a one-tap Share button that uses the Web Share API (or clipboard fallback). Hidden during superuser sessions so fake mastery cannot produce a real share.
+- Settings: signed-in users can download their full review history as a CSV file (date, Pokémon, card type, grade) via the Account & Data section. Satisfies GDPR right to data portability.
+
+### Changed
+
+- The three end-of-session screens (all caught up, new cards locked, daily review limit) are now a single unified component. The "Share today" button, "N cards due tomorrow" teaser, and card-types onboarding nudge now appear on every end state when applicable, not just the rarely-reached "all caught up" screen (#926, #914).
+- When multiple card directions (name, reverse, cry) are enabled for the same species and both are still unintroduced, they are now introduced on the same day rather than independently consuming their per-type daily caps. This keeps directions in sync from day one and prevents the review queue from drifting unevenly across directions over time.
+- Pokédex detail panel and Pasture sprite tiles now use the shared `next/image` sprite primitive with named size constants, giving them the same preload and decode-ahead benefits as the review flow.
+
+### Fixed
+
+- FSRS optimiser "Optimise now" button now shows a clear, actionable error message when the native optimiser cannot fit your data (keep studying and try again later), when your reviews haven't fully synced yet (sync first), or when saving the result fails - rather than the generic "Couldn't optimise. Try again later."
+- Evolution and reverse-evolution card reveals no longer show a brief sprite pop-in. `handleReveal()` now runs a GPU decode step on the reveal-face sprite before flipping the card, matching the decode-ahead that `handleGrade()` already performs.
+
 ## [0.10.1] - 2026-05-17
 
 ### Changed
@@ -1156,7 +1176,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.2
 [0.10.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.1
 [0.10.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.0
 [0.9.69]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.9.69
