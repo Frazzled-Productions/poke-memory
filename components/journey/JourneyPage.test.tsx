@@ -620,3 +620,89 @@ describe("JourneyPage — retroactive badge award", () => {
     expect(settingsMod.saveSettings).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Layout-shift fix (#961) — per-section skeleton placeholders
+// ---------------------------------------------------------------------------
+
+describe("JourneyPage — timeline and evolution wall layout placeholders (#961)", () => {
+  it("shows timeline and evolution wall skeleton headings while cloud pull is in flight", async () => {
+    // Hold the cloud pull open so we can inspect the intermediate render state
+    // where stats/currentStreak are ready but timeline/evolutionFamilies are null.
+    let resolvePull!: (value: null) => void;
+    mockPullSession.mockReturnValue(
+      new Promise<null>((resolve) => {
+        resolvePull = resolve;
+      }),
+    );
+    mockAuthValue.user = mockSuiteUser;
+    mockAuthValue.supabase = { auth: {} };
+
+    render(<JourneyPage />);
+
+    // Wait until the primary skeleton is gone (stats + currentStreak are ready).
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Loading journey")).not.toBeInTheDocument();
+    });
+
+    // The section headings must be present even before the pull resolves,
+    // so the layout slots are held and there is no content shift.
+    expect(
+      screen.getByRole("heading", { name: "Collection timeline" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Evolution wall" }),
+    ).toBeInTheDocument();
+
+    // The badge gallery must also be in place (not pushed below missing sections).
+    expect(screen.getByTestId("badge-gallery")).toBeInTheDocument();
+
+    // Let the pull resolve so the test cleans up without hanging.
+    resolvePull(null);
+  });
+
+  it("replaces the timeline skeleton with the real widget once data lands", async () => {
+    // Resolve pull immediately — no cards from cloud, so local path is used.
+    mockPullSession.mockResolvedValue(null);
+    mockAuthValue.user = mockSuiteUser;
+    mockAuthValue.supabase = { auth: {} };
+
+    render(<JourneyPage />);
+
+    // After the load effect completes, both headings must be present AND the
+    // aria-busy skeleton sections must be gone — verifying the swap happened,
+    // not just that a heading (which also exists in the skeleton) is present.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Collection timeline" }),
+      ).toBeInTheDocument();
+      // aria-busy sections are only present while the skeleton placeholders are
+      // showing; absence confirms the real widgets have replaced them.
+      expect(
+        document.querySelector('[aria-busy="true"]'),
+      ).not.toBeInTheDocument();
+    });
+
+    // The evolution wall heading must be present too.
+    expect(
+      screen.getByRole("heading", { name: "Evolution wall" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows timeline and evolution wall headings even for a guest (no cloud pull)", async () => {
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<JourneyPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Collection timeline" }),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("heading", { name: "Evolution wall" }),
+    ).toBeInTheDocument();
+  });
+});
