@@ -114,7 +114,7 @@ describe("generateDailyShareImage", () => {
     expect(result).toBeNull();
   });
 
-  it("accepts an empty gradeSequence without throwing", async () => {
+  it("renders with zero streak and all-zero stats without throwing", async () => {
     const expectedBlob = new Blob(["png"], { type: "image/png" });
     mockCanvasToBlob(expectedBlob);
 
@@ -243,5 +243,88 @@ describe("generateMilestoneShareImage", () => {
     expect(capturedCanvas!.width).toBe(1200);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     expect(capturedCanvas!.height).toBe(1440);
+  });
+
+  it("strips leading number so fillText receives 'POKÉMON MASTERED', not '100 POKÉMON MASTERED'", async () => {
+    const expectedBlob = new Blob(["png"], { type: "image/png" });
+    const originalCreate = document.createElement.bind(document);
+    let capturedCtx: ReturnType<typeof makeCtxStub> | null = null;
+
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = originalCreate(tag);
+      if (tag === "canvas") {
+        const canvas = el as HTMLCanvasElement;
+        capturedCtx = makeCtxStub();
+        canvas.getContext = (() =>
+          capturedCtx) as unknown as typeof canvas.getContext;
+        canvas.toBlob = (cb: (b: Blob | null) => void) => {
+          Promise.resolve().then(() => cb(expectedBlob));
+        };
+      }
+      return el;
+    });
+
+    await generateMilestoneShareImage({
+      label: "100 Pokémon mastered",
+      shareText: "I've mastered 100 Pokémon!",
+    });
+
+    expect(capturedCtx).not.toBeNull();
+    const textArgs = capturedCtx!.fillText.mock.calls.map(
+      (c: unknown[]) => c[0]
+    );
+    expect(textArgs).toContain("POKÉMON MASTERED");
+    expect(textArgs).not.toContain("100 POKÉMON MASTERED");
+  });
+
+  it("renders without error when accent has low contrast (covers rgba ring-colour path)", async () => {
+    // When the accent colour has contrast < 3:1 vs DISC_FILL (#111113),
+    // ringColour() returns "rgba(255,255,255,0.92)" instead of the accent.
+    // ringColourHex() then parses the rgba components (lines 206–208).
+    vi.spyOn(window, "getComputedStyle").mockReturnValue({
+      getPropertyValue: (name: string) =>
+        name === "--theme-accent" ? "#050505" : "",
+    } as unknown as CSSStyleDeclaration);
+
+    const expectedBlob = new Blob(["png"], { type: "image/png" });
+    mockCanvasToBlob(expectedBlob);
+
+    const result = await generateMilestoneShareImage({
+      label: "50 Pokémon mastered",
+      shareText: "Mastered 50!",
+    });
+    expect(result).toBe(expectedBlob);
+  });
+
+  it("handles comma-formatted milestone numbers (e.g. '1,000 Pokémon mastered')", async () => {
+    const expectedBlob = new Blob(["png"], { type: "image/png" });
+    const originalCreate = document.createElement.bind(document);
+    let capturedCtx: ReturnType<typeof makeCtxStub> | null = null;
+
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = originalCreate(tag);
+      if (tag === "canvas") {
+        const canvas = el as HTMLCanvasElement;
+        capturedCtx = makeCtxStub();
+        canvas.getContext = (() =>
+          capturedCtx) as unknown as typeof canvas.getContext;
+        canvas.toBlob = (cb: (b: Blob | null) => void) => {
+          Promise.resolve().then(() => cb(expectedBlob));
+        };
+      }
+      return el;
+    });
+
+    await generateMilestoneShareImage({
+      label: "1,000 Pokémon mastered",
+      shareText: "I've mastered 1,000 Pokémon!",
+    });
+
+    expect(capturedCtx).not.toBeNull();
+    const textArgs = capturedCtx!.fillText.mock.calls.map(
+      (c: unknown[]) => c[0]
+    );
+    expect(textArgs).toContain("1,000");
+    expect(textArgs).toContain("POKÉMON MASTERED");
   });
 });
