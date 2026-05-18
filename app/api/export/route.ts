@@ -67,9 +67,10 @@ function resolveLabel(cardType: string, subjectKey: string | null): string {
 function csvField(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
   const str = String(value);
-  // Wrap in double-quotes when the field contains a comma, double-quote, or
-  // newline; escape inner double-quotes by doubling them (RFC 4180).
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+  // Wrap in double-quotes when the field contains a comma, double-quote,
+  // newline, or carriage return; escape inner double-quotes by doubling them
+  // (RFC 4180).
+  if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
@@ -92,7 +93,14 @@ const GRADE_LABELS: Record<number, string> = {
 };
 
 export async function GET(): Promise<NextResponse> {
-  const supabase = (await createClient()) as unknown as SupabaseClient;
+  let supabase: SupabaseClient;
+  try {
+    supabase = (await createClient()) as unknown as SupabaseClient;
+  } catch (err) {
+    console.error("[/api/export] Supabase client construction failed", err);
+    return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
+  }
+
   const {
     data: { user },
     error: authError,
@@ -155,7 +163,9 @@ export async function GET(): Promise<NextResponse> {
     );
   }
 
-  const csv = lines.join("\r\n");
+  // Prepend a UTF-8 BOM so that spreadsheet applications (e.g. Excel) correctly
+  // detect the encoding and render accented Pokémon names (Flabébé, Nidoran ♀/♂).
+  const csv = "﻿" + lines.join("\r\n");
 
   // ISO date stamp in the filename so saved files are easy to distinguish.
   const dateStamp = new Date().toISOString().slice(0, 10);

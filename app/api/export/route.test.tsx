@@ -276,4 +276,45 @@ describe("GET /api/export", () => {
     // The field with a double-quote must be wrapped and inner quotes doubled.
     expect(lines[1]).toContain('"say ""hello"""');
   });
+
+  it("escapes a field value that contains a carriage return (RFC 4180)", async () => {
+    makeSupabaseMock({
+      gradeLogData: makeGradeLogRows([
+        { card_type: "name", subject_key: "foo\rbar" },
+      ]),
+    });
+
+    const response = await GET();
+    const lines = await csvLines(response);
+
+    // A field with \r must be wrapped in double-quotes per RFC 4180.
+    expect(lines[1]).toContain('"foo\rbar"');
+  });
+
+  it("prepends a UTF-8 BOM to the CSV output", async () => {
+    makeSupabaseMock({ gradeLogData: [] });
+
+    const response = await GET();
+
+    // Read as raw bytes: UTF-8 BOM is the three-byte sequence EF BB BF.
+    // response.text() strips the BOM per the Encoding spec, so we check
+    // the ArrayBuffer directly.
+    const buf = await response.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    expect(bytes[0]).toBe(0xef);
+    expect(bytes[1]).toBe(0xbb);
+    expect(bytes[2]).toBe(0xbf);
+  });
+
+  it("returns 503 when Supabase client construction fails", async () => {
+    (createClient as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("Your project's URL and Key are required"),
+    );
+
+    const response = await GET();
+
+    expect(response.status).toBe(503);
+    const body = await response.json() as { error: string };
+    expect(body.error).toBe("service_unavailable");
+  });
 });
