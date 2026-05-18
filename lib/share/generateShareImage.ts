@@ -2,7 +2,10 @@
  * Client-side canvas image generator for share cards.
  *
  * All rendering is spoiler-safe — no Pokémon names or sprites appear.
- * The card shows: wordmark, date, streak/milestone number, and stat counts.
+ * The card shows: a wordmark and date in the top row; a centred disc
+ * containing a hero number (streak, reviewed count, or milestone) with a
+ * label below it; and an optional three-column stat row (reviewed / new /
+ * mastered) separated by a divider at the bottom.
  *
  * Runs only in a browser context (needs `document.createElement`).
  */
@@ -38,6 +41,11 @@ const RING_WIDTH = 4;
 // Colour helpers
 // ---------------------------------------------------------------------------
 
+/** Return true when value is a valid 6-digit hex colour string. */
+function isHex(value: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
 /** Multiply each RGB channel by factor f (0–1) to darken a hex colour. */
 function darken(hex: string, f: number): string {
   const n = parseInt(hex.replace("#", ""), 16);
@@ -60,7 +68,6 @@ function hexAlpha(hex: string, a: number): string {
 
 /**
  * Compute WCAG relative luminance for a hex colour.
- * Used to decide whether the accent ring is readable against the near-black disc.
  */
 function relativeLuminance(hex: string): number {
   const n = parseInt(hex.replace("#", ""), 16);
@@ -72,6 +79,18 @@ function relativeLuminance(hex: string): number {
   const G = toLinear((n >> 8) & 255);
   const B = toLinear(n & 255);
   return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+}
+
+/**
+ * Compute the WCAG contrast ratio between two hex colours.
+ * Returns a value between 1 (identical) and 21 (black on white).
+ */
+function contrastRatio(hex1: string, hex2: string): number {
+  const l1 = relativeLuminance(hex1);
+  const l2 = relativeLuminance(hex2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,11 +116,24 @@ function readThemeTokens(): ThemeTokens {
   const style = getComputedStyle(document.documentElement);
   const read = (prop: string) => style.getPropertyValue(prop).trim();
 
-  const primary = read("--theme-primary") || FALLBACK_TOKENS.primary;
-  const secondary = read("--theme-secondary") || FALLBACK_TOKENS.secondary;
-  const accent = read("--theme-accent") || FALLBACK_TOKENS.accent;
-  const fgOnPrimary =
-    read("--theme-fg-on-primary") || FALLBACK_TOKENS.fgOnPrimary;
+  /**
+   * Read a CSS custom property and validate it is a #rrggbb hex colour.
+   * If the value is absent or not a valid hex string (e.g. a CSS rgb(...)
+   * value from a preprocessor), fall back to the default palette colour so
+   * the rest of the code can safely call parseInt on every token.
+   */
+  const readHex = (prop: string, fallback: string): string => {
+    const raw = read(prop);
+    return isHex(raw) ? raw : fallback;
+  };
+
+  const primary = readHex("--theme-primary", FALLBACK_TOKENS.primary);
+  const secondary = readHex("--theme-secondary", FALLBACK_TOKENS.secondary);
+  const accent = readHex("--theme-accent", FALLBACK_TOKENS.accent);
+  const fgOnPrimary = readHex(
+    "--theme-fg-on-primary",
+    FALLBACK_TOKENS.fgOnPrimary,
+  );
 
   return { primary, secondary, accent, fgOnPrimary };
 }
@@ -135,17 +167,24 @@ function makeBackgroundGradient(
 }
 
 // ---------------------------------------------------------------------------
-// Ring colour: use accent if luminance is sufficient, otherwise white
+// Ring colour: use accent if contrast is sufficient, otherwise white
 // ---------------------------------------------------------------------------
 
 /**
- * Luminance threshold below which the accent colour would not visually
- * separate from the near-black (#111113) disc background.
+ * Minimum WCAG contrast ratio required for the accent ring to be visibly
+ * distinct from the near-black disc (#111113). 3:1 is the WCAG AA threshold
+ * for graphical elements and large text; anything below this is effectively
+ * invisible against the disc.
+ *
+ * The default Poké Ball accent #B82838 has a contrast ratio of ~2.4:1 against
+ * #111113, which falls below this threshold and correctly falls back to white.
+ * Bright accents (gold #FFD700 ~13:1, light blue #D4E8FF ~16:1) easily clear
+ * the bar and keep their accent colour.
  */
-const RING_LUMINANCE_THRESHOLD = 0.08;
+const RING_MIN_CONTRAST = 3;
 
 function ringColour(accent: string): string {
-  return relativeLuminance(accent) >= RING_LUMINANCE_THRESHOLD
+  return contrastRatio(accent, DISC_FILL) >= RING_MIN_CONTRAST
     ? accent
     : "rgba(255,255,255,0.92)";
 }
@@ -423,9 +462,13 @@ function formatDateDisplay(isoDate: string): string {
   const parts = isoDate.split("-");
   if (parts.length !== 3) return isoDate;
   const year = parts[0];
-  const month = parseInt(parts[1], 10) - 1;
+  const monthIdx = parseInt(parts[1], 10) - 1;
   const day = parseInt(parts[2], 10);
-  return `${day} ${MONTHS[month] ?? ""} ${year}`;
+  const monthName = MONTHS[monthIdx];
+  // Guard against an out-of-range month index rather than producing a
+  // double-spaced string like "18  2026".
+  if (!monthName) return isoDate;
+  return `${day} ${monthName} ${year}`;
 }
 
 function todayDisplay(): string {
@@ -458,11 +501,18 @@ export async function generateDailyShareImage(
 
   const tokens = readThemeTokens();
 
+  // When the streak is 0, showing "0 DAY STREAK" as the hero is misleading.
+  // Show the reviewed count with "CARDS TODAY" instead so the card always
+  // leads with a meaningful number.
+  const heroNumber =
+    data.streak > 0 ? String(data.streak) : String(data.reviewed);
+  const heroLabel = data.streak > 0 ? "DAY STREAK" : "CARDS TODAY";
+
   paintCardInternal({
     ctx,
     tokens,
-    heroNumber: String(data.streak),
-    heroLabel: "DAY STREAK",
+    heroNumber,
+    heroLabel,
     dateStr: formatDateDisplay(data.date),
     stats: {
       reviewed: data.reviewed,

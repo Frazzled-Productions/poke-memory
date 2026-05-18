@@ -129,6 +129,23 @@ describe("generateDailyShareImage", () => {
     expect(result).toBe(expectedBlob);
   });
 
+  it("streak 0: does not throw and produces a Blob", async () => {
+    // When streak is 0 the hero switches to reviewed count + "CARDS TODAY".
+    // Verify the generator completes without error.
+    const expectedBlob = new Blob(["png"], { type: "image/png" });
+    mockCanvasToBlob(expectedBlob);
+
+    const result = await generateDailyShareImage({
+      date: "2026-05-18",
+      streak: 0,
+      reviewed: 12,
+      newCards: 3,
+      mastered: 1,
+      gradeSequence: [4, 4, 5],
+    });
+    expect(result).toBe(expectedBlob);
+  });
+
   it("produces a canvas sized 1200×1440 (600×720 logical at 2×)", async () => {
     const expectedBlob = new Blob(["png"], { type: "image/png" });
     const originalCreate = document.createElement.bind(document);
