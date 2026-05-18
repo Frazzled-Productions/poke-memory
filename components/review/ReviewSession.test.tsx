@@ -2030,3 +2030,205 @@ describe("Graduated-cards review queue hint (#880)", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("EndOfSessionScreen unification — share button and due-tomorrow on every variant (#926 #914)", () => {
+  // A graduated name card that is not due until 2099 — safe base for all variants.
+  function buildCompletedCard(): NameReviewCard {
+    return {
+      ...FIXTURE_CARD,
+      state: {
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 10,
+        scheduledDays: 21,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2099-12-31",
+        lastReview: "2026-01-01",
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+  }
+
+  function todayUtc(): string {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(
+      new Date(),
+    );
+  }
+
+  function makeLocalStorage(): Storage {
+    const store = new Map<string, string>();
+    return {
+      get length() {
+        return store.size;
+      },
+      clear: () => store.clear(),
+      getItem: (k) => store.get(k) ?? null,
+      key: (i) => Array.from(store.keys())[i] ?? null,
+      removeItem: (k) => { store.delete(k); },
+      setItem: (k, v) => { store.set(k, String(v)); },
+    };
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    delete (window as unknown as { localStorage?: unknown }).localStorage;
+  });
+
+  it("shows the Share today button on the NEW_CARDS_LOCKED variant when a today-dated summary is persisted (#926)", async () => {
+    // One completed card (Bulbasaur) + one unseen card (Ivysaur). With
+    // maxNewPerDay: 0 the new card is locked, landing on NEW_CARDS_LOCKED.
+    const completed = buildCompletedCard();
+    const unseen: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 2,
+      name: "Ivysaur",
+      displayName: "Ivysaur",
+      subjectKey: "2",
+      state: {
+        ...FIXTURE_CARD.state,
+        lastReview: null,
+        firstSeen: null,
+      },
+    };
+    mockSeedPokemon.mockReturnValue([completed, unseen]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [completed, unseen],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+    // Seed a persisted daily summary so `sessionGradeSeq` hydrates at mount.
+    localStorage.setItem(
+      DAILY_SUMMARY_KEY,
+      JSON.stringify({
+        date: todayUtc(),
+        gradeSequence: [4, 5, 4],
+        reviewed: 3,
+        newCards: 1,
+        mastered: 0,
+      }),
+    );
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /share today/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows the due-tomorrow teaser on the NEW_CARDS_LOCKED variant when cards are due tomorrow (#914)", async () => {
+    // Only fake Date — leaving setTimeout/setInterval real so waitFor works.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // Fix "today" to 2026-05-17 UTC so "tomorrow" is 2026-05-18.
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const completed = buildCompletedCard();
+    // A second card due tomorrow (2026-05-18) — makes dueTomorrow === 1.
+    const dueTomorrowCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 2,
+      name: "Ivysaur",
+      displayName: "Ivysaur",
+      subjectKey: "2",
+      state: {
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 10,
+        scheduledDays: 21,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-18",
+        lastReview: "2026-04-27",
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+    // Third card unseen — drives NEW_CARDS_LOCKED when new cap is 0.
+    const unseen: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 3,
+      name: "Venusaur",
+      displayName: "Venusaur",
+      subjectKey: "3",
+      state: {
+        ...FIXTURE_CARD.state,
+        lastReview: null,
+        firstSeen: null,
+      },
+    };
+    mockSeedPokemon.mockReturnValue([completed, dueTomorrowCard, unseen]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [completed, dueTomorrowCard, unseen],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/1 card due tomorrow/i)).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+});

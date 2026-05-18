@@ -849,6 +849,80 @@ test.describe("Daily summary persistence (#685)", () => {
   });
 });
 
+test.describe("EndOfSessionScreen unification — share button on NEW_CARDS_LOCKED (#926)", () => {
+  // All known species pre-seeded as reviewed, PLUS one extra unseen name card
+  // (id 99999) not in SEED_POKEMON_IDS. With maxNewPerDay: 0, hydrateSession
+  // adds the unseen card but it cannot enter the new queue — landing on NEW_CARDS_LOCKED.
+  const EXTRA_UNSEEN_ID = 99999;
+  const completedSession = buildCompletedSession({
+    pokemonIds: SEED_POKEMON_IDS,
+    evolutionCardIds: EVOLUTION_CARD_IDS,
+  });
+  const sessionWithUnseen = {
+    ...completedSession,
+    cards: [
+      ...completedSession.cards,
+      {
+        id: EXTRA_UNSEEN_ID,
+        name: "pokemon-" + EXTRA_UNSEEN_ID,
+        spriteUrl: "/sprites/pokemon/" + EXTRA_UNSEEN_ID + ".png",
+        cardType: "name",
+        state: {
+          stability: 0,
+          difficulty: 0,
+          elapsedDays: 0,
+          scheduledDays: 0,
+          reps: 0,
+          lapses: 0,
+          fsrsState: "new",
+          dueDate: "1970-01-01",
+          lastReview: null,
+          firstSeen: null,
+          learningStep: null,
+          stepStartedAt: null,
+        },
+      },
+    ],
+    limits: {
+      name: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 0, maxReviewsPerDay: 50 },
+      reverse: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+    },
+  };
+
+  test("shows 'Share today' button on the NEW_CARDS_LOCKED variant when a today-dated summary is persisted", async ({ page }) => {
+    await seedSessionIdb(page, sessionWithUnseen);
+
+    await page.addInitScript(() => {
+      // Override settings to cap new cards at 0 so we land on NEW_CARDS_LOCKED.
+      const settings = JSON.parse(localStorage.getItem("poke-memory:settings:v1") ?? "{}");
+      localStorage.setItem("poke-memory:settings:v1", JSON.stringify({
+        ...settings,
+        maxNewPerDay: 0,
+        maxNewEvolutionPerDay: 0,
+        maxNewReversePerDay: 0,
+        maxNewCryPerDay: 0,
+      }));
+      // Seed a today-dated daily summary so the Share button hydrates.
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
+      localStorage.setItem("poke-memory:daily-summary:v1", JSON.stringify({
+        date: today,
+        gradeSequence: [4, 5, 4],
+        reviewed: 3,
+        newCards: 1,
+        mastered: 0,
+      }));
+    });
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    await expect(page.getByText("New cards locked for today")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Share today" })).toBeVisible();
+  });
+});
+
 test.describe("Graduated-cards review queue hint (#880)", () => {
   const completedSession = buildCompletedSession({
     pokemonIds: SEED_POKEMON_IDS,
