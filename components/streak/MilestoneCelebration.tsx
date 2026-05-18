@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { tierForMilestone, type MilestoneTier } from "@/lib/streak/milestones";
 import styles from "./MilestoneCelebration.module.css";
 
 type Props = {
@@ -8,10 +9,20 @@ type Props = {
   onDismiss: () => void;
 };
 
-// Twelve confetti pieces — each gets a deterministic angle so the burst feels
-// even but doesn't require runtime randomness (which would cause hydration
-// mismatch warnings under React strict-mode).
-const CONFETTI_COUNT = 12;
+// Confetti piece counts by tier — more pieces for rarer milestones.
+const CONFETTI_COUNT: Record<MilestoneTier, number> = {
+  light: 8,
+  standard: 14,
+  major: 22,
+};
+
+// Burst radius by tier — majors scatter further.
+const BURST_RADIUS: Record<MilestoneTier, number> = {
+  light: 110,
+  standard: 140,
+  major: 180,
+};
+
 const COLORS = [
   "#f97316", // orange-500
   "#ef4444", // red-500
@@ -21,9 +32,50 @@ const COLORS = [
   "#a855f7", // purple-500
 ];
 
-const DISMISS_MS = 3500;
+// Warm golden palette for major milestones — richer than the standard burst.
+const MAJOR_COLORS = [
+  "#fbbf24", // amber-400
+  "#f59e0b", // amber-500
+  "#f97316", // orange-500
+  "#ef4444", // red-500
+  "#fde047", // yellow-300
+  "#fb923c", // orange-400
+];
+
+const DISMISS_MS = 4500;
+
+// Sub-copy keyed by milestone value; falls back to the tier default.
+const MILESTONE_SUB: Partial<Record<number, string>> = {
+  365: "One full year of practice.",
+  465: "Over a year and counting.",
+  565: "Pushing eighteen months.",
+};
+
+const TIER_SUB: Record<MilestoneTier, string> = {
+  light: "Keep it up!",
+  standard: "You are on a roll.",
+  major: "That is seriously impressive.",
+};
+
+// Headline copy — majors get a custom line; others use the numeric default.
+const MILESTONE_HEADLINE: Partial<Record<number, string>> = {
+  365: "One year.",
+};
+
+function headline(milestone: number): string {
+  return MILESTONE_HEADLINE[milestone] ?? `${milestone}-day streak!`;
+}
+
+function subCopy(milestone: number, tier: MilestoneTier): string {
+  return MILESTONE_SUB[milestone] ?? TIER_SUB[tier];
+}
 
 export function MilestoneCelebration({ milestone, onDismiss }: Props) {
+  const tier = tierForMilestone(milestone);
+  const count = CONFETTI_COUNT[tier];
+  const radius = BURST_RADIUS[tier];
+  const palette = tier === "major" ? MAJOR_COLORS : COLORS;
+
   useEffect(() => {
     const id = window.setTimeout(onDismiss, DISMISS_MS);
     return () => window.clearTimeout(id);
@@ -31,19 +83,18 @@ export function MilestoneCelebration({ milestone, onDismiss }: Props) {
 
   return (
     <div
-      className={styles.overlay}
+      className={`${styles.overlay} ${styles[`overlay--${tier}`]}`}
       role="status"
       aria-live="polite"
       aria-label={`${milestone}-day streak reached`}
       onClick={onDismiss}
     >
-      {Array.from({ length: CONFETTI_COUNT }, (_, i) => {
-        const angle = (i / CONFETTI_COUNT) * Math.PI * 2;
-        const distance = 140;
-        const dx = Math.cos(angle) * distance;
-        const dy = Math.sin(angle) * distance;
+      {Array.from({ length: count }, (_, i) => {
+        const angle = (i / count) * Math.PI * 2;
+        const dx = Math.cos(angle) * radius;
+        const dy = Math.sin(angle) * radius;
         const rot = 180 + (i * 47) % 360;
-        const color = COLORS[i % COLORS.length];
+        const color = palette[i % palette.length];
         return (
           <span
             key={i}
@@ -51,7 +102,7 @@ export function MilestoneCelebration({ milestone, onDismiss }: Props) {
             style={
               {
                 background: color,
-                animationDelay: `${i * 25}ms`,
+                animationDelay: `${i * 20}ms`,
                 ["--dx" as string]: `${dx}px`,
                 ["--dy" as string]: `${dy}px`,
                 ["--rot" as string]: `${rot}deg`,
@@ -60,11 +111,9 @@ export function MilestoneCelebration({ milestone, onDismiss }: Props) {
           />
         );
       })}
-      <div className={styles.banner}>
-        <span className={styles.headline}>
-          {milestone}-day streak!
-        </span>
-        <span className={styles.sub}>Keep it going.</span>
+      <div className={`${styles.banner} ${styles[`banner--${tier}`]}`}>
+        <span className={styles.headline}>{headline(milestone)}</span>
+        <span className={styles.sub}>{subCopy(milestone, tier)}</span>
       </div>
     </div>
   );
