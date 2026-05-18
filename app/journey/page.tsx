@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useCountUp } from "@/lib/stats/useCountUp";
 import { buildSession, hydrateSession, todayString } from "@/lib/review/session";
-import { loadSession } from "@/lib/review/persistence";
+import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
@@ -24,7 +24,7 @@ import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
 import { RecordsCard } from "@/components/stats/RecordsCard";
 import { computeRecords, type Records } from "@/lib/stats/records";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
@@ -389,7 +389,7 @@ function GenerationBreakdown({ stats }: { stats: StatsResult }) {
 export default function JourneyPage() {
   const { user, supabase } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
-  const storageVersion = useSessionStorageKey();
+  const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<Awaited<ReturnType<typeof buildSession>> | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);

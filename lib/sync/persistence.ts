@@ -110,7 +110,7 @@ export function saveSyncStatus(status: SyncStatus): void {
     return;
   }
 
-  // Same-tab subscribers (useSyncStatusKey) require a synthetic StorageEvent —
+  // Same-tab subscribers (useLocalStorageKey) require a synthetic StorageEvent —
   // the browser only fires the native event in *other* tabs. Centralising the
   // dispatch here means every writer satisfies the invariant without remembering
   // it explicitly. Mirrors the saveSession pattern in lib/review/persistence.ts.

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
-import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
+import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
@@ -45,7 +45,7 @@ import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
-import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
@@ -383,7 +383,7 @@ export default function StatsPage() {
   const client = anyFlagOn ? null : supabase;
   const userId = anyFlagOn ? null : (user?.id ?? null);
   const { retryState, retryNow } = useRetryPush(client, userId);
-  const storageVersion = useSessionStorageKey();
+  const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [cardTypeSettings, setCardTypeSettings] = useState<{

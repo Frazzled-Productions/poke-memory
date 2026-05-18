@@ -3,14 +3,14 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
-import { loadSession } from "@/lib/review/persistence";
+import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
 import { assignAnchors } from "@/lib/pasture/assign";
 import { biomeStats } from "@/lib/pasture/stats";
 import { PastureZone } from "@/components/pasture/PastureZone";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
@@ -77,7 +77,7 @@ export default function BiomeLandscapePage({
   const [masteredCards, setMasteredCards] = useState<NameReviewCard[] | null>(
     null,
   );
-  const storageVersion = useSessionStorageKey();
+  const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   // Re-derive when the user saves Settings, so a change to the
   // masteryRepetitions threshold re-filters this biome without needing a
   // session storage bump or a navigation away and back.
