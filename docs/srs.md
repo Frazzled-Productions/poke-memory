@@ -56,6 +56,19 @@ Two queues — review (`lastReview !== null && dueDate <= today && lastReview !=
 
 10 new cards/day (hard wall — exceeding inflates tomorrow's review queue), 100 reviews/day (soft wall with "Keep reviewing" override). Counters: `newIntroducedToday = firstSeen === today`; `reviewsDoneToday = lastReview === today && firstSeen !== today`.
 
+## Species-grouped new-card introduction (#928)
+
+When a species has new-card candidates across multiple enabled directions (e.g. `name` and `reverse` both enabled, both still unintroduced), `buildSessionQueues` admits all of them on the same day or none. This prevents directions from drifting out of sync when a user enables multiple directions from the start.
+
+**Algorithm** (in `buildSessionQueues`):
+
+1. Each direction's candidates are pre-sliced to its remaining daily budget via `stableShuffleForDay(...).slice(0, remainingBudget)`. A direction with zero remaining budget contributes an empty slice.
+2. `groupNewCandidatesBySpecies` groups the sliced candidates by speciesId into a `Map<speciesId, {name?, reverse?, cry?}>`. A direction only appears in a species entry if it was in the budget slice.
+3. Species IDs are stable-shuffled for the day. Each species is admitted only if every direction present in its group still has remaining budget. Budgets are consumed atomically: all directions of a species are admitted together, or none are.
+4. Evolution cards are edge-keyed (not species-keyed) and use their own independent budget pass, unchanged.
+
+**No-regression guarantee**: cards with `lastReview !== null` (already introduced on a prior day) are never in `newCandidatesByType`, so they never appear in any species group. A species whose reverse was introduced before its name was enabled will have the reverse as a solo entry — admitted freely with no name partner to block it. No persisted card state is touched; the change is confined to new-card introduction ordering.
+
 ## Persisted session shape
 
 `{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` runs `migrateReviewState` on every card — including the SM-2 → FSRS conversion for any legacy persisted state — so the migration is idempotent and runs once per device automatically.

@@ -7,6 +7,7 @@ import {
   countDueTomorrow,
   limitBucket,
   cardTypeIsEnabled,
+  groupNewCandidatesBySpecies,
   type DailyLimits,
   type EvolutionReviewCard,
   type NameReviewCard,
@@ -984,8 +985,19 @@ describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
     expect(byType['reverse'] ?? 0).toBe(5);
   });
 
-  it('per-type daily cap applied before round-robin honours existing newIntroducedToday', () => {
-    // Simulate a day where 3 name cards were already introduced (cap = 5 → 2 remaining)
+  it('per-type daily cap applied before species-grouped admission honours existing newIntroducedToday', () => {
+    // Simulate a day where 3 name cards were already graduated on a prior day
+    // (lastReview !== null) so their reverse partners are solo new candidates
+    // with no matching name entry in the new pool.
+    //
+    // Species 1–3: name already graduated (firstSeen=TODAY triggers counter,
+    //              lastReview=YESTERDAY excludes from new-candidate pool),
+    //              reverse still new → admitted as solo.
+    // Species 4–6: name is new (no reverse partner) → admitted as solo.
+    //
+    // name: newIntroducedToday=3 → 2 remaining slots; 3 candidates → 2 new.
+    // reverse: 5 slots; 3 solo candidates → 3 new.
+    const YESTERDAY = '2026-05-08';
     const limits: DailyLimits = {
       name:      { maxNewPerDay: 5, maxReviewsPerDay: 100 },
       evolution: { maxNewPerDay: 5, maxReviewsPerDay: 100 },
@@ -993,12 +1005,14 @@ describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
       cry:       { maxNewPerDay: 5, maxReviewsPerDay: 100 },
     };
     const cards: ReviewableCard[] = [
-      // Already introduced today:
-      { ...nameCard(1), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
-      { ...nameCard(2), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
-      { ...nameCard(3), state: { ...initialReviewState(NOW), firstSeen: TODAY } },
-      // Remaining new candidates:
+      // Already graduated: firstSeen=TODAY drives newIntroducedToday; lastReview≠null
+      // keeps them out of the new-candidate pool.
+      { ...nameCard(1), state: { ...initialReviewState(NOW), firstSeen: TODAY, lastReview: YESTERDAY, reps: 1, dueDate: '2026-05-16' } },
+      { ...nameCard(2), state: { ...initialReviewState(NOW), firstSeen: TODAY, lastReview: YESTERDAY, reps: 1, dueDate: '2026-05-16' } },
+      { ...nameCard(3), state: { ...initialReviewState(NOW), firstSeen: TODAY, lastReview: YESTERDAY, reps: 1, dueDate: '2026-05-16' } },
+      // Remaining new name candidates (no reverse partners):
       nameCard(4), nameCard(5), nameCard(6),
+      // Reverse candidates whose name partner is already graduated (solo entries):
       reverseCard(1), reverseCard(2), reverseCard(3),
     ];
     const queues = buildSessionQueues(cards, limits, TODAY);
@@ -1007,9 +1021,9 @@ describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
       acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
       return acc;
     }, {});
-    // name has 3 already introduced → 2 remaining slots; 3 candidates → 2 new
+    // name: firstSeen=TODAY on 1–3 → newIntroducedToday=3 → 2 slots; 3 candidates → 2 new
     expect(byType['name']    ?? 0).toBe(2);
-    // reverse has 0 introduced → 5 slots; 3 candidates → 3 new
+    // reverse: solo entries (no name partner in new pool) → all 3 admitted
     expect(byType['reverse'] ?? 0).toBe(3);
   });
 
@@ -1021,6 +1035,270 @@ describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
     const first  = buildSessionQueues(cards, highLimits, TODAY).newQueue;
     const second = buildSessionQueues(cards, highLimits, TODAY).newQueue;
     expect(first).toEqual(second);
+  });
+});
+
+describe('buildSessionQueues (species-grouped new-card introduction, #928)', () => {
+  const TODAY = '2026-05-09';
+  const highLimits: DailyLimits = {
+    name:      { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    reverse:   { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    cry:       { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  function nameCard(id: number): NameReviewCard {
+    return {
+      ...makeSeedPokemon(id),
+      cardType: 'name',
+      subjectKey: String(id),
+      state: initialReviewState(NOW),
+    };
+  }
+  function reverseCard(pokemonId: number): ReverseReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId),
+      id: REVERSE_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'reverse',
+      subjectKey: String(pokemonId),
+      state: initialReviewState(NOW),
+    };
+  }
+  function cryCard(pokemonId: number): CryReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId, { cryUrl: `https://example.com/${pokemonId}.ogg` }),
+      id: CRY_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'cry',
+      subjectKey: String(pokemonId),
+      state: initialReviewState(NOW),
+    };
+  }
+
+  // (a) All directions admitted together on day 1 when all are new
+  it('admits all enabled directions for a species on the same day when all are new', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2),
+      reverseCard(1), reverseCard(2),
+    ];
+    const queues = buildSessionQueues(cards, highLimits, TODAY);
+    const newIds = new Set(queues.newQueue);
+    expect(newIds.size).toBe(4);
+    expect(newIds.has(1)).toBe(true);
+    expect(newIds.has(REVERSE_ID_OFFSET + 1)).toBe(true);
+    expect(newIds.has(2)).toBe(true);
+    expect(newIds.has(REVERSE_ID_OFFSET + 2)).toBe(true);
+  });
+
+  it('admits name, reverse, and cry directions together for the same species on day 1', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1), reverseCard(1), cryCard(1),
+      nameCard(2), reverseCard(2), cryCard(2),
+    ];
+    const queues = buildSessionQueues(cards, highLimits, TODAY);
+    const newIds = new Set(queues.newQueue);
+    expect(newIds.size).toBe(6);
+    expect(newIds.has(1)).toBe(true);
+    expect(newIds.has(REVERSE_ID_OFFSET + 1)).toBe(true);
+    expect(newIds.has(CRY_ID_OFFSET + 1)).toBe(true);
+  });
+
+  // (b) Partial-introduction — one direction already seen → admitted alone
+  it('admits a direction alone when its partner was introduced on a prior day', () => {
+    const PREV_DAY = '2026-05-08';
+    const cards: ReviewableCard[] = [
+      // Name for species 1 already graduated — reverse is solo
+      { ...nameCard(1), state: { ...initialReviewState(NOW), lastReview: PREV_DAY, firstSeen: PREV_DAY, reps: 1, dueDate: '2026-05-15' } },
+      reverseCard(1),
+      nameCard(2), reverseCard(2),
+    ];
+    const queues = buildSessionQueues(cards, highLimits, TODAY);
+    const newIds = new Set(queues.newQueue);
+    // Reverse for species 1 admitted alone — name partner already graduated
+    expect(newIds.has(REVERSE_ID_OFFSET + 1)).toBe(true);
+    // Species 2: name + reverse admitted together
+    expect(newIds.has(2)).toBe(true);
+    expect(newIds.has(REVERSE_ID_OFFSET + 2)).toBe(true);
+    // Graduated name card not in newQueue
+    expect(newIds.has(1)).toBe(false);
+  });
+
+  // (c) Budget boundary: when both directions of a species fall within budget,
+  //     they are admitted together.  When one direction is over-budget (not in
+  //     the pre-sliced candidate list), that species' other direction is
+  //     admitted as a solo entry.
+  it('admits the within-budget species as a pair; over-budget species becomes a solo reverse', () => {
+    // name cap = 1: only 1 name card enters the candidate slice.
+    // 2 species each have name + reverse.
+    // Expected: the 1 within-budget name card is admitted paired with its reverse.
+    //           The second species' reverse is admitted as a solo (name wasn't in the budget slice).
+    const tightLimits: DailyLimits = {
+      name:      { maxNewPerDay: 1, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2),
+      reverseCard(1), reverseCard(2),
+    ];
+    const queues = buildSessionQueues(cards, tightLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    // 1 name slot: 1 name admitted.
+    expect(byType['name']    ?? 0).toBe(1);
+    // Both reverses admitted: one paired with its name, one as a solo entry.
+    expect(byType['reverse'] ?? 0).toBe(2);
+    // The admitted name and its paired reverse must be for the same species.
+    const nameId    = queues.newQueue.find((id) => cards.find((c) => c.id === id)?.cardType === 'name')!;
+    const pairedRev = cards.find((c) => c.cardType === 'reverse' && (c as ReverseReviewCard).pokemonId === nameId);
+    expect(pairedRev).toBeDefined();
+    expect(queues.newQueue).toContain(pairedRev!.id);
+  });
+
+  it('solo-direction species (reverse only) admitted freely when name budget exhausted', () => {
+    const PREV_DAY = '2026-05-08';
+    const zeroBudgetNameLimits: DailyLimits = {
+      name:      { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 5, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      { ...nameCard(10), state: { ...initialReviewState(NOW), lastReview: PREV_DAY, firstSeen: PREV_DAY, reps: 1, dueDate: '2026-05-15' } },
+      { ...nameCard(11), state: { ...initialReviewState(NOW), lastReview: PREV_DAY, firstSeen: PREV_DAY, reps: 1, dueDate: '2026-05-15' } },
+      { ...nameCard(12), state: { ...initialReviewState(NOW), lastReview: PREV_DAY, firstSeen: PREV_DAY, reps: 1, dueDate: '2026-05-15' } },
+      reverseCard(10), reverseCard(11), reverseCard(12),
+    ];
+    const queues = buildSessionQueues(cards, zeroBudgetNameLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(byType['reverse'] ?? 0).toBe(3);
+    expect(byType['name']    ?? 0).toBe(0);
+  });
+
+  it('evolution cards are scheduled independently and unaffected by species grouping', () => {
+    function evoCardFn(id: number): EvolutionReviewCard {
+      const preEvoId = id - 1_500_000;
+      const postEvoId = id - 1_500_000 + 100_000;
+      return {
+        ...makeEvoEdge({ id, preEvoId, postEvoId }),
+        subjectKey: `${preEvoId}>>>${postEvoId}`,
+        state: initialReviewState(NOW),
+      };
+    }
+    const tightLimits: DailyLimits = {
+      name:      { maxNewPerDay: 1, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+      reverse:   { maxNewPerDay: 1, maxReviewsPerDay: 100 },
+      cry:       { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    };
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2),
+      reverseCard(1), reverseCard(2),
+      evoCardFn(1_500_001), evoCardFn(1_500_002), evoCardFn(1_500_003), evoCardFn(1_500_004),
+    ];
+    const queues = buildSessionQueues(cards, tightLimits, TODAY);
+    const byType = queues.newQueue.reduce<Record<string, number>>((acc, id) => {
+      const card = cards.find((c) => c.id === id)!;
+      acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(byType['evolution'] ?? 0).toBe(3);
+    expect(byType['name']    ?? 0).toBe(1);
+    expect(byType['reverse'] ?? 0).toBe(1);
+  });
+
+  it('newQueue remains deterministic across repeated calls (species-grouped)', () => {
+    const cards: ReviewableCard[] = [
+      nameCard(1), nameCard(2), nameCard(3),
+      reverseCard(1), reverseCard(2), reverseCard(3),
+      cryCard(1), cryCard(2), cryCard(3),
+    ];
+    const first  = buildSessionQueues(cards, highLimits, TODAY).newQueue;
+    const second = buildSessionQueues(cards, highLimits, TODAY).newQueue;
+    expect(first).toEqual(second);
+  });
+});
+
+describe('groupNewCandidatesBySpecies', () => {
+  it('maps name cards to their speciesId', () => {
+    const cards: ReviewableCard[] = [
+      { ...makeSeedPokemon(1), cardType: 'name', subjectKey: '1', state: initialReviewState(NOW) },
+    ];
+    const groups = groupNewCandidatesBySpecies({ name: [1], reverse: [], cry: [] }, cards);
+    expect(groups.get(1)).toEqual({ name: 1 });
+  });
+
+  it('maps reverse cards to their pokemonId (speciesId)', () => {
+    const cards: ReviewableCard[] = [
+      {
+        ...makeSeedPokemon(1),
+        id: REVERSE_ID_OFFSET + 1,
+        pokemonId: 1,
+        cardType: 'reverse',
+        subjectKey: '1',
+        state: initialReviewState(NOW),
+      },
+    ];
+    const groups = groupNewCandidatesBySpecies({ name: [], reverse: [REVERSE_ID_OFFSET + 1], cry: [] }, cards);
+    expect(groups.get(1)).toEqual({ reverse: REVERSE_ID_OFFSET + 1 });
+  });
+
+  it('merges name and reverse candidates for the same species into one group', () => {
+    const cards: ReviewableCard[] = [
+      { ...makeSeedPokemon(1), cardType: 'name', subjectKey: '1', state: initialReviewState(NOW) },
+      {
+        ...makeSeedPokemon(1),
+        id: REVERSE_ID_OFFSET + 1,
+        pokemonId: 1,
+        cardType: 'reverse',
+        subjectKey: '1',
+        state: initialReviewState(NOW),
+      },
+    ];
+    const groups = groupNewCandidatesBySpecies({ name: [1], reverse: [REVERSE_ID_OFFSET + 1], cry: [] }, cards);
+    expect(groups.size).toBe(1);
+    expect(groups.get(1)).toEqual({ name: 1, reverse: REVERSE_ID_OFFSET + 1 });
+  });
+
+  it('creates separate entries for different species', () => {
+    const cards: ReviewableCard[] = [
+      { ...makeSeedPokemon(1), cardType: 'name', subjectKey: '1', state: initialReviewState(NOW) },
+      { ...makeSeedPokemon(2), cardType: 'name', subjectKey: '2', state: initialReviewState(NOW) },
+    ];
+    const groups = groupNewCandidatesBySpecies({ name: [1, 2], reverse: [], cry: [] }, cards);
+    expect(groups.size).toBe(2);
+    expect(groups.get(1)).toEqual({ name: 1 });
+    expect(groups.get(2)).toEqual({ name: 2 });
+  });
+
+  it('includes cry cards in the species group', () => {
+    const cards: ReviewableCard[] = [
+      { ...makeSeedPokemon(1), cardType: 'name', subjectKey: '1', state: initialReviewState(NOW) },
+      {
+        ...makeSeedPokemon(1, { cryUrl: 'cry.ogg' }),
+        id: CRY_ID_OFFSET + 1,
+        pokemonId: 1,
+        cardType: 'cry',
+        subjectKey: '1',
+        state: initialReviewState(NOW),
+      },
+    ];
+    const groups = groupNewCandidatesBySpecies({ name: [1], reverse: [], cry: [CRY_ID_OFFSET + 1] }, cards);
+    expect(groups.get(1)).toEqual({ name: 1, cry: CRY_ID_OFFSET + 1 });
+  });
+
+  it('returns empty map when all candidate lists are empty', () => {
+    const groups = groupNewCandidatesBySpecies({ name: [], reverse: [], cry: [] }, []);
+    expect(groups.size).toBe(0);
   });
 });
 
