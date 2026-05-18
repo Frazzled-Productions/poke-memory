@@ -396,6 +396,70 @@ export function stableShuffleForDay(
   return keyed.map((item) => item.id);
 }
 
+/**
+ * Species-keyed view of new-card candidates for the three species-aligned
+ * directions (name, reverse, cry).  Evolution cards are edge-keyed and are
+ * handled separately — they are not included here.
+ *
+ * Each entry maps a speciesId to the card IDs for each direction that still
+ * has a new candidate.  A direction is absent from the entry when it has no
+ * new candidate (either never enabled, already introduced, or in a learning
+ * step).
+ */
+export type SpeciesNewGroup = {
+  name?: number;
+  reverse?: number;
+  cry?: number;
+};
+
+/**
+ * Builds a `speciesId → SpeciesNewGroup` map from pre-collected per-type
+ * new-candidate lists.  Only species-aligned card types (name, reverse, cry)
+ * are handled here; evolution candidates are unaffected.
+ *
+ * A card's speciesId is its `id` for name cards, and `pokemonId` for reverse
+ * and cry cards.
+ *
+ * Pure — no I/O.
+ */
+export function groupNewCandidatesBySpecies(
+  newCandidatesByType: Pick<Record<CardTypeKey, number[]>, "name" | "reverse" | "cry">,
+  cards: readonly ReviewableCard[],
+): Map<number, SpeciesNewGroup> {
+  const cardById = new Map<number, ReviewableCard>(cards.map((c) => [c.id, c]));
+  const groups = new Map<number, SpeciesNewGroup>();
+
+  for (const id of newCandidatesByType.name) {
+    const card = cardById.get(id);
+    if (!card) continue;
+    // Name cards: speciesId === card.id (SeedPokemon.id is the speciesId)
+    const speciesId = (card as NameReviewCard).id;
+    const entry = groups.get(speciesId) ?? {};
+    entry.name = id;
+    groups.set(speciesId, entry);
+  }
+
+  for (const id of newCandidatesByType.reverse) {
+    const card = cardById.get(id);
+    if (!card || card.cardType !== "reverse") continue;
+    const speciesId = (card as ReverseReviewCard).pokemonId;
+    const entry = groups.get(speciesId) ?? {};
+    entry.reverse = id;
+    groups.set(speciesId, entry);
+  }
+
+  for (const id of newCandidatesByType.cry) {
+    const card = cardById.get(id);
+    if (!card || card.cardType !== "cry") continue;
+    const speciesId = (card as CryReviewCard).pokemonId;
+    const entry = groups.get(speciesId) ?? {};
+    entry.cry = id;
+    groups.set(speciesId, entry);
+  }
+
+  return groups;
+}
+
 export type PerTypeCounters = {
   newIntroducedToday: number;
   reviewsDoneToday: number;
@@ -506,52 +570,92 @@ export function buildSessionQueues(
     );
   }
 
-  // Build the new-card queue with round-robin interleaving across enabled
-  // directions so no single type races ahead of the others day after day.
+  // Build the new-card queue with species-grouped introduction for species-aligned
+  // directions (name, reverse, cry) and independent scheduling for evolution cards.
   //
-  // Each type's candidates are stable-shuffled independently (deterministic
-  // per-day ordering within the type), then capped at that type's remaining
-  // new-card budget.  We then pull one card at a time from each non-empty
-  // type bucket, cycling through the four buckets in order, until all budgets
-  // are exhausted.  Within a single round-robin cycle the imbalance between
-  // any two directions is at most 1 card.  Directions with different
-  // maxNewPerDay caps (e.g. evolution = 5, name/reverse/cry = 10) will still
-  // end the day at their respective caps — round-robin does not equalise
-  // totals across directions, only interleaves them fairly.
-  const newCandidateSlices: Record<CardTypeKey, number[]> = {
-    name: stableShuffleForDay(newCandidatesByType.name, today).slice(
-      0,
-      Math.max(0, limits.name.maxNewPerDay - perType.name.newIntroducedToday),
-    ),
-    evolution: stableShuffleForDay(newCandidatesByType.evolution, today).slice(
-      0,
-      Math.max(0, limits.evolution.maxNewPerDay - perType.evolution.newIntroducedToday),
-    ),
-    reverse: stableShuffleForDay(newCandidatesByType.reverse, today).slice(
-      0,
-      Math.max(0, limits.reverse.maxNewPerDay - perType.reverse.newIntroducedToday),
-    ),
-    cry: stableShuffleForDay(newCandidatesByType.cry, today).slice(
-      0,
-      Math.max(0, limits.cry.maxNewPerDay - perType.cry.newIntroducedToday),
-    ),
+  // Species-grouped introduction (#928): when a species has new-card candidates
+  // across multiple enabled directions, all of those directions are admitted on
+  // the same day or none are.  This prevents directions from drifting apart over
+  // many days when both are enabled from the start.
+  //
+  // A species is admitted when every direction that still has a new candidate
+  // for it can fit within its remaining daily budget.  If any direction's budget
+  // is exhausted, the species is skipped entirely for today.
+  //
+  // A species whose other direction was already introduced on a prior day is
+  // unaffected: that card no longer has lastReview === null, so it never
+  // appears in newCandidatesByType.  The remaining direction therefore has no
+  // partner in the group and is admitted alone as a "solo" species entry.
+  //
+  // A direction whose budget is zero contributes no candidates to the groups,
+  // so its cards never form multi-direction groups that would block other
+  // directions.  Cry or reverse cards for species whose name budget is already
+  // spent are admitted as solo entries up to their own remaining budget.
+  //
+  // Evolution cards are edge-keyed rather than species-keyed.  They continue to
+  // use their own independent budget via the existing slice-and-cap pass below.
+
+  // Remaining budgets (mutable across the two passes below)
+  const remainingNew: Record<CardTypeKey, number> = {
+    name: Math.max(0, limits.name.maxNewPerDay - perType.name.newIntroducedToday),
+    evolution: Math.max(0, limits.evolution.maxNewPerDay - perType.evolution.newIntroducedToday),
+    reverse: Math.max(0, limits.reverse.maxNewPerDay - perType.reverse.newIntroducedToday),
+    cry: Math.max(0, limits.cry.maxNewPerDay - perType.cry.newIntroducedToday),
   };
 
-  const newQueue: number[] = [];
-  const bucketOrder: CardTypeKey[] = ["name", "evolution", "reverse", "cry"] as const;
-  let anyAdded = true;
-  while (anyAdded) {
-    anyAdded = false;
-    for (const type of bucketOrder) {
-      const slice = newCandidateSlices[type];
-      if (slice.length > 0) {
-        newQueue.push(slice.shift()!);
-        anyAdded = true;
-      }
-    }
+  // --- Pass 1: species-grouped admission for name / reverse / cry ---
+  //
+  // Pre-slice each direction to its budget so only candidates that could ever
+  // be admitted this day enter the species groups.  A direction with
+  // remainingNew = 0 contributes an empty slice, which means its cards never
+  // appear in any species group — cry or reverse candidates for those species
+  // then form "solo" entries and are admitted freely up to their own budget.
+  //
+  // After grouping, stable-shuffle species IDs and admit each species whose
+  // every present direction still has budget remaining.  Budgets are consumed
+  // atomically per species: either all directions of a species are admitted, or
+  // none are.
+  const nameCandidates    = stableShuffleForDay(newCandidatesByType.name,    today).slice(0, remainingNew.name);
+  const reverseCandidates = stableShuffleForDay(newCandidatesByType.reverse, today).slice(0, remainingNew.reverse);
+  const cryCandidates     = stableShuffleForDay(newCandidatesByType.cry,     today).slice(0, remainingNew.cry);
+
+  const speciesGroups = groupNewCandidatesBySpecies(
+    { name: nameCandidates, reverse: reverseCandidates, cry: cryCandidates },
+    cards,
+  );
+
+  // Stable-shuffle species IDs so day-to-day ordering within the admitted set
+  // is deterministic and rotates daily.
+  const shuffledSpeciesIds = stableShuffleForDay([...speciesGroups.keys()], today);
+
+  const speciesNewIds: number[] = [];
+
+  for (const speciesId of shuffledSpeciesIds) {
+    const group = speciesGroups.get(speciesId)!;
+
+    // Check whether all directions present in this group still have budget.
+    // (A group entry only exists for directions within the pre-sliced list, so
+    // the initial budget check is always true here — but the mutable
+    // `remainingNew` counter may have been reduced by prior species.)
+    if (group.name    !== undefined && remainingNew.name    < 1) continue;
+    if (group.reverse !== undefined && remainingNew.reverse < 1) continue;
+    if (group.cry     !== undefined && remainingNew.cry     < 1) continue;
+
+    // Atomically admit all directions for this species.
+    if (group.name    !== undefined) { speciesNewIds.push(group.name);    remainingNew.name    -= 1; }
+    if (group.reverse !== undefined) { speciesNewIds.push(group.reverse); remainingNew.reverse -= 1; }
+    if (group.cry     !== undefined) { speciesNewIds.push(group.cry);     remainingNew.cry     -= 1; }
   }
 
-  // Reshuffle the merged per-type slices so name, evolution, and reverse
+  // --- Pass 2: evolution cards (unchanged) ---
+  const evolutionSlice = stableShuffleForDay(newCandidatesByType.evolution, today).slice(
+    0,
+    remainingNew.evolution,
+  );
+
+  const newQueue: number[] = [...speciesNewIds, ...evolutionSlice];
+
+  // Reshuffle the merged new-card queue so species pairs and evolution cards
   // interleave deterministically rather than appearing in contiguous blocks.
   const shuffledReviewQueue = stableShuffleForDay(reviewQueue, today);
   const shuffledNewQueue = stableShuffleForDay(newQueue, today);
