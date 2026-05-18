@@ -28,7 +28,7 @@ jobs:
       - name: Detect changed paths
         id: filter
         if: github.event_name == 'pull_request'
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           # `code` matches any changed file that isn't in the docs/agents/changelog
           # ignore list. dorny/paths-filter uses picomatch — a `!`-prefixed pattern
