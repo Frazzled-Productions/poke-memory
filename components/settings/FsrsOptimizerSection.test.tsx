@@ -233,7 +233,7 @@ describe("FsrsOptimizerSection", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/srs/optimize", { method: "POST" });
     });
 
-    it("shows error text when the POST fails", async () => {
+    it("shows generic error text for an unrecognised 500", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
@@ -251,7 +251,115 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimize. Try again later.",
+          "Couldn't optimise. Try again later.",
+        );
+      });
+    });
+
+    it("shows save-failed message for 500 save_failed error code", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          json: async () => ({ error: "save_failed" }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Optimisation succeeded but couldn't be saved. Try again.",
+        );
+      });
+    });
+
+    it("shows reviews-unavailable message for 503", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 503,
+          json: async () => ({ error: "reviews_unavailable" }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Couldn't load your reviews. Check your connection and try again.",
+        );
+      });
+    });
+
+    it("shows degenerate-data message with count for 422 degenerate_data", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 422,
+          json: async () => ({ error: "degenerate_data", reviewCount: 215 }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Not enough variety in your 215 reviews yet.",
+        );
+      });
+    });
+
+    it("shows degenerate-data message without count when reviewCount absent", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 422,
+          json: async () => ({ error: "degenerate_data" }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Not enough review variety yet.",
         );
       });
     });
@@ -325,7 +433,7 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimize. Try again later.",
+          "Couldn't optimise. Try again later.",
         );
       });
     });

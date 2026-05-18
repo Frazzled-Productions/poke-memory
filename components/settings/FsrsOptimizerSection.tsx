@@ -67,30 +67,41 @@ export function FsrsOptimizerSection({
       const res = await fetch("/api/srs/optimize", { method: "POST" });
       if (!res.ok) {
         setOptimizerState("error");
-        // The local count (subjectKey-tagged grade-log entries) can outrun the
-        // cloud count (rows that have synced). When the server gates us out,
-        // surface its count instead of the generic try-again message.
-        if (res.status === 422) {
-          const body = (await res.json().catch(() => null)) as
-            | { reviewCount?: number }
-            | null;
+        const body = (await res.json().catch(() => null)) as
+          | { error?: string; reviewCount?: number; retryAfterMs?: number }
+          | null;
+        const errorCode = body?.error;
+
+        if (res.status === 422 && errorCode === "not_enough_reviews") {
+          // The local count (subjectKey-tagged grade-log entries) can outrun the
+          // cloud count (rows that have synced). Surface the server's count.
           const synced = body?.reviewCount;
           setErrorMsg(
             typeof synced === "number"
               ? `Only ${synced} reviews synced. Sync first, then try again.`
               : "Sync your reviews first, then try again.",
           );
+        } else if (res.status === 422 && errorCode === "degenerate_data") {
+          // The native binding rejected the data distribution — reviews exist
+          // but aren't spread enough for the optimiser yet.
+          const count = body?.reviewCount;
+          setErrorMsg(
+            typeof count === "number"
+              ? `Not enough variety in your ${count} reviews yet. Keep studying and try again in a few weeks.`
+              : "Not enough review variety yet. Keep studying and try again in a few weeks.",
+          );
         } else if (res.status === 429) {
-          const body = (await res.json().catch(() => null)) as
-            | { retryAfterMs?: number }
-            | null;
           const days =
             typeof body?.retryAfterMs === "number"
               ? Math.max(1, Math.ceil(body.retryAfterMs / MS_PER_DAY))
               : 7;
           setErrorMsg(`Try again in ${days} day${days === 1 ? "" : "s"}.`);
+        } else if (res.status === 503 || errorCode === "reviews_unavailable") {
+          setErrorMsg("Couldn't load your reviews. Check your connection and try again.");
+        } else if (errorCode === "save_failed") {
+          setErrorMsg("Optimisation succeeded but couldn't be saved. Try again.");
         } else {
-          setErrorMsg("Couldn't optimize. Try again later.");
+          setErrorMsg("Couldn't optimise. Try again later.");
         }
         return;
       }
@@ -111,7 +122,7 @@ export function FsrsOptimizerSection({
       onOptimized(data.optimizedAt, data.weights);
     } catch {
       setOptimizerState("error");
-      setErrorMsg("Couldn't optimize. Try again later.");
+      setErrorMsg("Couldn't optimise. Try again later.");
     }
   }
 
