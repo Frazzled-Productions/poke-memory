@@ -359,7 +359,15 @@ test.describe("Journey page — milestone share card", () => {
       }));
       window.localStorage.setItem(
         "poke-memory:review-session:v1",
-        JSON.stringify({ cards, limits: {} }),
+        JSON.stringify({
+          cards,
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
       );
     });
     await page.goto("/journey");
