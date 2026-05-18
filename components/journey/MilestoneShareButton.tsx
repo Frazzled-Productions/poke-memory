@@ -69,6 +69,10 @@ export function MilestoneShareButton({ milestone }: Props) {
     const nav = typeof navigator !== "undefined" ? navigator : null;
 
     // --- Path 1: Web Share API with PNG file ---
+    // Tracks whether the file-share capability was present. When true, we
+    // attempted a share sheet — any error (including user dismissal) must
+    // not open a second sheet via Path 2.
+    let triedFileShare = false;
     if (file !== null && nav !== null) {
       const navExt = nav as Navigator & {
         canShare?: (data: unknown) => boolean;
@@ -79,17 +83,25 @@ export function MilestoneShareButton({ milestone }: Props) {
         navExt.canShare({ files: [file] }) &&
         typeof navExt.share === "function"
       ) {
+        triedFileShare = true;
         try {
           await navExt.share({ files: [file] });
           return;
-        } catch {
-          // Share sheet dismissed or unavailable — fall through.
+        } catch (err) {
+          // User dismissed the sheet — stop here; do not open another sheet.
+          if (err instanceof Error && err.name === "AbortError") return;
+          // Any other error (e.g. OS-level failure): fall through to
+          // download/clipboard, but do NOT open a second share sheet.
         }
       }
     }
 
     // --- Path 2: Web Share API text only ---
-    if (nav !== null) {
+    // Only reached when the file-share capability was absent (canShare returned
+    // false or canShare/share were not available) — i.e. a genuine capability
+    // miss. If Path 1 was attempted (triedFileShare) we skip here to avoid
+    // opening a second share sheet.
+    if (!triedFileShare && nav !== null) {
       const navExt = nav as Navigator & {
         share?: (data: { text: string }) => Promise<void>;
       };

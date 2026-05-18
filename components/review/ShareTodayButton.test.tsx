@@ -185,4 +185,33 @@ describe("ShareTodayButton — Web Share API file path", () => {
     expect(arg.text).toBe(TEXT);
     expect(arg.files).toBeUndefined();
   });
+
+  it("does NOT open a second share sheet when the user dismisses Path 1 (AbortError)", async () => {
+    const mockBlob = new Blob(["png"], { type: "image/png" });
+    vi.mocked(generateDailyShareImage).mockResolvedValueOnce(mockBlob);
+
+    const abortError = new DOMException("Share cancelled", "AbortError");
+    const shareFn = vi.fn().mockRejectedValue(abortError);
+    const canShareFn = vi.fn().mockReturnValue(true);
+    Object.defineProperty(navigator, "canShare", {
+      value: canShareFn,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(navigator, "share", {
+      value: shareFn,
+      configurable: true,
+      writable: true,
+    });
+
+    render(<ShareTodayButton parts={PARTS} text={TEXT} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /share today/i }));
+    });
+
+    // share was called exactly once (Path 1 only) and no second sheet was opened.
+    expect(shareFn).toHaveBeenCalledOnce();
+    // No status shown — treated as a user cancellation, not an error.
+    expect(screen.queryByRole("status")).toBeNull();
+  });
 });

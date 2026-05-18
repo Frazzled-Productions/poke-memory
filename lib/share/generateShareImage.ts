@@ -9,25 +9,7 @@
  */
 
 import type { Grade } from "@/lib/srs/scheduler";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type DailyShareData = {
-  /** Local date string (e.g. "2026-05-12"). */
-  date: string;
-  /** Current streak length. 0 omits the streak line. */
-  streak: number;
-  /** Total grades recorded today. */
-  reviewed: number;
-  /** Cards introduced for the first time today. */
-  newCards: number;
-  /** Cards that crossed the mastery threshold today. */
-  mastered: number;
-  /** Ordered grade sequence used to draw the grid. */
-  gradeSequence: readonly Grade[];
-};
+import type { DailySummaryParts } from "@/lib/review/share";
 
 export type MilestoneShareData = {
   /** Human-readable milestone label, e.g. "100 Pokémon mastered". */
@@ -35,6 +17,9 @@ export type MilestoneShareData = {
   /** Pre-formatted plain share text (kept for the text-only fallback path). */
   shareText: string;
 };
+
+// Re-export DailySummaryParts so callers can use a single import path.
+export type { DailySummaryParts };
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -101,8 +86,6 @@ type PaintOptions = {
   ctx: CanvasRenderingContext2D;
   w: number;
   h: number;
-  /** Whether to use a dark background. Defaults to false (light). */
-  dark?: boolean;
   /** Top heading line (app name). */
   heading: string;
   /** Second line — date or milestone label. */
@@ -120,7 +103,6 @@ function paintCard(opts: PaintOptions): void {
     ctx,
     w,
     h,
-    dark = false,
     heading,
     subheading,
     statsLine,
@@ -131,12 +113,13 @@ function paintCard(opts: PaintOptions): void {
   // Scale for high-DPI
   ctx.scale(SCALE, SCALE);
 
-  const bgColour = dark ? "#18181b" : "#ffffff";
-  const borderColour = dark ? "#3f3f46" : "#e4e4e7";
-  const headingColour = dark ? "#f4f4f5" : "#18181b";
-  const subColour = dark ? "#a1a1aa" : "#71717a";
-  const statsColour = dark ? "#f4f4f5" : "#18181b";
-  const streakColour = dark ? "#fbbf24" : "#d97706"; // amber
+  // Cards are always light-themed (dark support removed — see #962).
+  const bgColour = "#ffffff";
+  const borderColour = "#e4e4e7";
+  const headingColour = "#18181b";
+  const subColour = "#71717a";
+  const statsColour = "#18181b";
+  const streakColour = "#d97706"; // amber
   const brandColour = "#e11d48"; // rose-600 (matches site logo)
 
   // --- Background card ---
@@ -220,8 +203,7 @@ function paintCard(opts: PaintOptions): void {
  * Returns `null` if canvas is not available (SSR / restricted environment).
  */
 export async function generateDailyShareImage(
-  data: DailyShareData,
-  dark = false,
+  data: DailySummaryParts,
 ): Promise<Blob | null> {
   if (typeof document === "undefined") return null;
 
@@ -241,7 +223,6 @@ export async function generateDailyShareImage(
     ctx,
     w: CARD_W,
     h,
-    dark,
     heading: "poke-memory",
     subheading: data.date,
     streakLine,
@@ -260,7 +241,6 @@ export async function generateDailyShareImage(
  */
 export async function generateMilestoneShareImage(
   data: MilestoneShareData,
-  dark = false,
 ): Promise<Blob | null> {
   if (typeof document === "undefined") return null;
 
@@ -276,7 +256,6 @@ export async function generateMilestoneShareImage(
     ctx,
     w: CARD_W,
     h,
-    dark,
     heading: "poke-memory",
     subheading: data.label,
   });
