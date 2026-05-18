@@ -363,6 +363,21 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `auto-retro-harvest.yml` — Auto Retro Harvest
+
+| | |
+|---|---|
+| **Trigger** | Weekly cron Monday 10:00 UTC + `workflow_dispatch` |
+| **Inputs** | Every `<!-- auto-retro -->` comment posted by `auto-retro.yml` across closed issues. Purely additive — does not change `auto-retro.yml`'s per-issue behaviour. |
+| **Output 1 — digest** | Regenerates `docs/retros.md` wholesale, aggregating every retro most-recent-first, and commits it to `qa` (`docs(retros): refresh retrospectives digest [skip ci]`). Regenerating the whole file each run is the idempotency mechanism — no per-entry markers, a no-op commit is skipped via `git diff --cached --quiet`. |
+| **Output 2 — recurring-pattern auto-file** | When the *same concrete problem* recurs across **≥ 3 distinct retros**, files exactly one tracking issue for that pattern. Behavioural-rule lessons (reusable conventions) are not filed — they stay in the digest only. There is deliberately no per-lesson filer. |
+| **Idempotency key** | Per-pattern body marker `<!-- auto-retro-pattern:<slug> -->`. A pattern with an open marker-carrying issue — or a closed one within the last 60 days — is not re-filed. The slug is derived from the concrete problem, not the contributing issues, so it is stable across runs. |
+| **Issue-filing rules** | Auto-filed issues are `priority:later` only — never `auto`, never `priority:now`/`priority:next`. The user owns promotion. One issue per cluster; contributing retro comments linked as evidence. |
+| **No-op** | Zero retros found → writes nothing, files nothing. No cluster reaching 3 → digest still refreshed, no issues filed. |
+| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; `permissions` `contents: write` (commit the digest) + `issues: write` (file tracking issues), rest read |
+
+---
+
 ### `auto-status.yml` — Auto Status
 
 | | |
@@ -750,4 +765,11 @@ After each merged PR, `auto-retro.yml` posts a `<!-- auto-retro -->` comment on 
 - **What didn't / overhead** — where a round-trip cost more than it returned
 - **Lesson** — one transferable rule for future changes
 
-Retros are process reflection only — no code change recommendations. Aggregating patterns across retros into convention (promoting to `AGENTS.md`) is left manual; if a lesson recurs across several retros, add it to `AGENTS.md` by hand.
+Retros are process reflection only — no code change recommendations.
+
+A single retro comment on a closed issue is effectively write-once and unread. `auto-retro-harvest.yml` (weekly cron) closes that loop:
+
+- **Digest** — it regenerates [`docs/retros.md`](docs/retros.md), one most-recent-first surface aggregating every retro, and commits it to `qa`. That is the place to read retros in bulk.
+- **Recurring-pattern auto-file** — when the *same concrete problem* recurs across **≥ 3 retros**, it files one `priority:later` tracking issue for that pattern (idempotent on a `<!-- auto-retro-pattern:<slug> -->` marker). So "several retros independently grumbled about this" becomes a tracked backlog item instead of being lost.
+
+Behavioural-rule lessons (reusable conventions, not specific defects) are still promoted to `AGENTS.md` by hand — the harvest job deliberately does not file issues for them, since they are not issue-shaped.
