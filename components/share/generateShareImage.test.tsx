@@ -244,4 +244,68 @@ describe("generateMilestoneShareImage", () => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     expect(capturedCanvas!.height).toBe(1440);
   });
+
+  it("strips leading number so fillText receives 'POKÉMON MASTERED', not '100 POKÉMON MASTERED'", async () => {
+    const expectedBlob = new Blob(["png"], { type: "image/png" });
+    const originalCreate = document.createElement.bind(document);
+    let capturedCtx: ReturnType<typeof makeCtxStub> | null = null;
+
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = originalCreate(tag);
+      if (tag === "canvas") {
+        const canvas = el as HTMLCanvasElement;
+        capturedCtx = makeCtxStub();
+        canvas.getContext = (() =>
+          capturedCtx) as unknown as typeof canvas.getContext;
+        canvas.toBlob = (cb: (b: Blob | null) => void) => {
+          Promise.resolve().then(() => cb(expectedBlob));
+        };
+      }
+      return el;
+    });
+
+    await generateMilestoneShareImage({
+      label: "100 Pokémon mastered",
+      shareText: "I've mastered 100 Pokémon!",
+    });
+
+    expect(capturedCtx).not.toBeNull();
+    const textArgs = capturedCtx!.fillText.mock.calls.map(
+      (c: unknown[]) => c[0]
+    );
+    expect(textArgs).toContain("POKÉMON MASTERED");
+    expect(textArgs).not.toContain("100 POKÉMON MASTERED");
+  });
+
+  it("handles comma-formatted milestone numbers (e.g. '1,000 Pokémon mastered')", async () => {
+    const expectedBlob = new Blob(["png"], { type: "image/png" });
+    const originalCreate = document.createElement.bind(document);
+    let capturedCtx: ReturnType<typeof makeCtxStub> | null = null;
+
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = originalCreate(tag);
+      if (tag === "canvas") {
+        const canvas = el as HTMLCanvasElement;
+        capturedCtx = makeCtxStub();
+        canvas.getContext = (() =>
+          capturedCtx) as unknown as typeof canvas.getContext;
+        canvas.toBlob = (cb: (b: Blob | null) => void) => {
+          Promise.resolve().then(() => cb(expectedBlob));
+        };
+      }
+      return el;
+    });
+
+    await generateMilestoneShareImage({
+      label: "1,000 Pokémon mastered",
+      shareText: "I've mastered 1,000 Pokémon!",
+    });
+
+    expect(capturedCtx).not.toBeNull();
+    const textArgs = capturedCtx!.fillText.mock.calls.map(
+      (c: unknown[]) => c[0]
+    );
+    expect(textArgs).toContain("1,000");
+    expect(textArgs).toContain("POKÉMON MASTERED");
+  });
 });

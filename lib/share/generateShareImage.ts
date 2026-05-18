@@ -342,7 +342,8 @@ function paintDisc(
   ctx.font = `600 23px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   ctx.textBaseline = "top";
   ctx.textAlign = "center";
-  // Scale the gap proportionally so it stays clear of the number at all font sizes.
+  // Gap scales across three discrete font-size bands: 208 → 20.8 px, 160 → 16 px,
+  // 140 → 14 px. The Math.max floor of 12 px is never reached at any band.
   const labelGap = Math.max(12, numFontSize * 0.1);
   ctx.fillText(heroLabel, cx, numBaselineY + labelGap);
 }
@@ -556,9 +557,9 @@ export async function generateMilestoneShareImage(
 
   const tokens = readThemeTokens();
 
-  // Extract a leading number from the label ("100 Pokémon mastered" → "100").
-  // Fall back to a star character for non-numeric milestones.
-  const match = data.label.match(/\d+/);
+  // Extract a leading number from the label ("100 Pokémon mastered" → "100",
+  // "1,000 Pokémon mastered" → "1,000"). Fall back to a star for non-numeric milestones.
+  const match = data.label.match(/[\d,]+/);
   const heroNumber = match ? match[0] : "★";
   // Strip a leading number from the label so it is not repeated beneath the
   // hero number ("100 Pokémon mastered" → "POKÉMON MASTERED"). Upper-case the
