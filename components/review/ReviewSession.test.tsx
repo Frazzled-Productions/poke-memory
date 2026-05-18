@@ -464,6 +464,45 @@ describe("handleReveal decode-ahead (#930)", () => {
       expect(screen.getByRole("button", { name: /again/i })).toBeInTheDocument();
     });
   });
+
+  it("does not reveal the answer while decodeSpriteUrls is still pending", async () => {
+    // Use a deferred promise so we can verify setRevealed has NOT fired while
+    // the decode-ahead is still in flight, then resolve and confirm it fires.
+    let resolveDecode: (() => void) | undefined;
+    const decodePromise = new Promise<void>((resolve) => {
+      resolveDecode = resolve;
+    });
+    mockDecodeSpriteUrls.mockImplementationOnce(() => decodePromise);
+
+    const user = userEvent.setup();
+    mockSeedPokemon.mockReturnValue([]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [EVO_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue(settingsForEvoOnly());
+
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    // Fire the click without awaiting — the decode promise is still pending.
+    const clickPromise = user.click(revealBtn);
+
+    // Wait for decodeSpriteUrls to actually be called (handleReveal has started
+    // and is awaiting the decode), then assert setRevealed has not fired yet.
+    await waitFor(() => {
+      expect(mockDecodeSpriteUrls).toHaveBeenCalledWith(["/sprites/pokemon/2.png"]);
+    });
+    expect(screen.queryByRole("button", { name: /again/i })).not.toBeInTheDocument();
+
+    // Resolve the decode and wait for the full reveal flow to complete.
+    await act(async () => { resolveDecode!(); });
+    await clickPromise;
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /again/i })).toBeInTheDocument();
+    });
+  });
 });
 
 describe("ReviewSession onboarding nudges (#702)", () => {
@@ -1422,12 +1461,19 @@ describe("Practice scope: Clear scope button (#835)", () => {
 });
 
 describe("ReviewSession TTS warm-up (#479)", () => {
-  it("calls warmupTts on the first grade button click", async () => {
+  it("calls warmupTts on the reveal button click and again on the grade button click", async () => {
     const user = userEvent.setup();
     render(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
+
+    // warmupTts fires on the reveal gesture too (gesture-context warm-up must
+    // happen synchronously before any await in handleReveal, same as in
+    // handleGrade — see fix for #946).
+    expect(mockWarmupTts).toHaveBeenCalledOnce();
+
+    mockWarmupTts.mockClear();
 
     const easyBtn = screen.getByRole("button", { name: /easy/i });
     await user.click(easyBtn);

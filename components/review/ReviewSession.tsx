@@ -1327,6 +1327,15 @@ export function ReviewSession() {
     // currentCard may have shifted to a newly-due learning card while the
     // displayedCardId lock keeps effectiveCard pointing to the original card.
     if (effectiveCard === null || revealing) return;
+
+    // Warm up speechSynthesis synchronously inside the gesture handler. This
+    // must run before any `await` — after the first await the browser's gesture
+    // context is lost and warmupTts() would not count for Chromium / WebKit,
+    // causing speakNameOnReveal to silently fail on the very first Reveal of a
+    // session (before any card has been graded via handleGrade). Mirror of the
+    // same call in handleGrade (#479).
+    warmupTts();
+
     if (effectiveCard.cardType === "name") {
       const facts = getPokemonFacts(effectiveCard);
       setCurrentFact(selectFact(facts));
@@ -1379,6 +1388,12 @@ export function ReviewSession() {
         setRevealing(false);
       }
     }
+
+    // Guard against running side-effects after the component has unmounted
+    // (e.g. the user navigated away while the decode-ahead was in flight).
+    // Symmetrical to the guard in handleGrade (~line 1598). The `finally`
+    // above already cleared `revealing`, so we can safely return here.
+    if (!isMountedRef.current) return;
 
     setRevealed(true);
     revealedCardId.current = effectiveCard.id;
