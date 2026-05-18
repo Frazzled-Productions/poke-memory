@@ -81,8 +81,8 @@ describe("BRAND_DEFAULT_COLORS", () => {
     }
   });
 
-  it("primary is the Poké-ball red (#D8334A)", () => {
-    expect(BRAND_DEFAULT_COLORS.primary).toBe("#D8334A");
+  it("primary is the Poké-ball red (#E01B2E)", () => {
+    expect(BRAND_DEFAULT_COLORS.primary).toBe("#E01B2E");
   });
 
   it("fgOnPrimary is white (for contrast on the primary colour)", () => {
