@@ -75,9 +75,16 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
             />
           )}
 
-          {/* Sprite — using a plain <img> rather than next/image because we render
-              1025 of these at fixed 64×64 sizes, where next/image's automatic
-              sizing wrapper adds DOM overhead per cell with no responsive benefit. */}
+          {/* Sprite — deliberate exemption from the "default to next/image" rule
+              (#932; see docs/sprites.md "The Pokédex grid exemption"). We render
+              ~1025 of these at a fixed 64×64 size, where next/image's automatic
+              sizing wrapper adds per-cell DOM overhead with no responsive benefit.
+              A plain `loading="lazy"` <img> gives exactly the by-design pop-in we
+              want for off-screen tiles, and a blanket preload of the full set
+              would be counter-productive. The size literal below is intentionally
+              kept inline rather than using POKEDEX_GRID_SPRITE_SIZE — this surface
+              opts out of next/image entirely, so it does not participate in the
+              optimiser-variant cache that the shared size constants exist for. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={spriteUrl}

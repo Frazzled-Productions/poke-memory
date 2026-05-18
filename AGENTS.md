@@ -115,6 +115,16 @@ Two things to remember at runtime without leaving AGENTS.md:
 - **Evolution chains are trees**, not lists — `evolves_to[]` may have multiple entries (Eevee → 8 forms). Walk recursively.
 - **Rate limit**: ~100/min advised. Seed scripts should cap concurrency at ~20–30 and not aggressively retry on 429.
 
+### Sprite rendering
+
+The canonical reference — `next/image` vs. plain `<img>`, when `priority` / `loading` apply, the `lib/sprites/sizes.ts` size constants, when to use `SpritePreloader` / `decodeSpriteUrls` / `useSpritePrefetch`, and the deliberate Pokédex-grid exemption — lives in **[docs/sprites.md](docs/sprites.md)**. Read it before adding a sprite-rendering surface or touching `lib/sprites/` or `components/sprites/`.
+
+Headline rules:
+
+- **Default to `next/image`.** The only exemption is the Pokédex grid (`PokedexGrid.tsx`), which keeps a plain lazy `<img>` to avoid per-cell wrapper overhead across ~1025 tiles — documented inline and in docs/sprites.md.
+- **Sprite sizes are named constants in `lib/sprites/sizes.ts`.** Never inline a sprite pixel literal; the size must match the painted CSS size or the optimiser serves an uncached variant.
+- **`priority` is for the above-the-fold focal sprite only.** Off-screen / list-tile sprites stay lazy; decorative chrome is explicitly `priority={false}`.
+
 ### Spaced repetition
 
 The full reference — FSRS algorithm + per-user weights (#268), the Anki-style learning-steps layer with difficulty-based bands, `ReviewState` shape, queue policy, daily limits, card directions (`name` / `reverse` / `cry` / evolution streams), practice scope (`practiceScope` on `UserSettings`), undo, and mastery — lives in **[docs/srs.md](docs/srs.md)**. Read it before touching `lib/srs/`.
@@ -188,6 +198,7 @@ Two card-mix shapes specifically look "broken" on a fresh dev session but aren't
   - [docs/sync.md](docs/sync.md) — sync invariants, the four sync paths, per-card conflict rule, regression trigger.
   - [docs/persistence.md](docs/persistence.md) — adding new persisted data: JSONB field vs. column vs. new table, RLS template, migration timing.
   - [docs/srs.md](docs/srs.md) — FSRS scheduler, learning-step bands, `ReviewState`, queue policy, mastery.
+  - [docs/sprites.md](docs/sprites.md) — sprite render conventions: `next/image` vs. `<img>`, `priority`/`loading`, size constants, preload/decode-ahead, the Pokédex-grid exemption.
   Update the topic file in the same commit that changes its subsystem; the pointer in AGENTS.md stays short.
 - **All of these are updated inline in the commit that lands the change** — no separate docs-only commit, no specialist agent.
 
