@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import Image from "next/image";
 import type { NameReviewCard } from "@/lib/review/session";
 import { ArrivalSparkle } from "./ArrivalSparkle";
 import styles from "./Pasture.module.css";
+import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 type Props = {
   card: NameReviewCard;
@@ -174,12 +176,11 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
         className="relative flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
         style={{ touchAction: "manipulation" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={card.spriteUrl}
           alt={card.name}
-          width={56}
-          height={56}
+          width={PASTURE_SPRITE_SIZE}
+          height={PASTURE_SPRITE_SIZE}
           className={[
             "h-14 w-14 object-contain select-none",
             spriteClass,
