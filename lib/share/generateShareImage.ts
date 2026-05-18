@@ -560,10 +560,15 @@ export async function generateMilestoneShareImage(
   // Fall back to a star character for non-numeric milestones.
   const match = data.label.match(/\d+/);
   const heroNumber = match ? match[0] : "★";
-  // Disc label: upper-case the full label when short enough; otherwise "MILESTONE".
+  // Strip a leading number from the label so it is not repeated beneath the
+  // hero number ("100 Pokémon mastered" → "POKÉMON MASTERED"). Upper-case the
+  // remainder when short enough; otherwise fall back to "MILESTONE".
+  const labelText = match
+    ? data.label.replace(/^\s*[\d,]+\s*/, "").trim()
+    : data.label;
   const heroLabel =
-    data.label.length <= DISC_LABEL_MAX_LEN
-      ? data.label.toUpperCase()
+    labelText.length > 0 && labelText.length <= DISC_LABEL_MAX_LEN
+      ? labelText.toUpperCase()
       : "MILESTONE";
 
   paintCardInternal({
