@@ -277,6 +277,25 @@ describe("generateMilestoneShareImage", () => {
     expect(textArgs).not.toContain("100 POKÉMON MASTERED");
   });
 
+  it("renders without error when accent has low contrast (covers rgba ring-colour path)", async () => {
+    // When the accent colour has contrast < 3:1 vs DISC_FILL (#111113),
+    // ringColour() returns "rgba(255,255,255,0.92)" instead of the accent.
+    // ringColourHex() then parses the rgba components (lines 206–208).
+    vi.spyOn(window, "getComputedStyle").mockReturnValue({
+      getPropertyValue: (name: string) =>
+        name === "--theme-accent" ? "#050505" : "",
+    } as unknown as CSSStyleDeclaration);
+
+    const expectedBlob = new Blob(["png"], { type: "image/png" });
+    mockCanvasToBlob(expectedBlob);
+
+    const result = await generateMilestoneShareImage({
+      label: "50 Pokémon mastered",
+      shareText: "Mastered 50!",
+    });
+    expect(result).toBe(expectedBlob);
+  });
+
   it("handles comma-formatted milestone numbers (e.g. '1,000 Pokémon mastered')", async () => {
     const expectedBlob = new Blob(["png"], { type: "image/png" });
     const originalCreate = document.createElement.bind(document);
