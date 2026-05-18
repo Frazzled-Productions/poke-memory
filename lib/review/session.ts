@@ -634,9 +634,9 @@ export function buildSessionQueues(
     const group = speciesGroups.get(speciesId)!;
 
     // Check whether all directions present in this group still have budget.
-    // (A group entry only exists for directions within the pre-sliced list, so
-    // the initial budget check is always true here — but the mutable
-    // `remainingNew` counter may have been reduced by prior species.)
+    // The pre-slice limits how many candidates can ever be admitted, but when
+    // multiple species share the same budget and an earlier species consumed
+    // it, later species in the shuffle may find the budget at zero.
     if (group.name    !== undefined && remainingNew.name    < 1) continue;
     if (group.reverse !== undefined && remainingNew.reverse < 1) continue;
     if (group.cry     !== undefined && remainingNew.cry     < 1) continue;
