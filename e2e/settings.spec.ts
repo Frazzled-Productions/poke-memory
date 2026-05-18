@@ -432,6 +432,35 @@ test.describe("Settings — re-enable card type prompt (#835)", () => {
   });
 });
 
+test.describe("Settings — CSV review history export (#918)", () => {
+  test("Download CSV link is not visible for guests (no session)", async ({
+    page,
+  }) => {
+    // The CSV export control is gated on a signed-in session. E2E runs in
+    // guest mode only, so the link must not render.
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /account & data/i }).click();
+
+    await expect(
+      page.getByRole("link", { name: /download csv/i }),
+    ).toHaveCount(0);
+  });
+
+  test("GET /api/export rejects an unauthenticated request (401 or 503)", async ({
+    page,
+  }) => {
+    // Verify the endpoint is guarded — an unauthenticated request must never
+    // receive a CSV. In a fully-configured environment the route returns 401
+    // (no session). In the CI e2e environment where Supabase env vars are
+    // absent the client construction fails and the route returns 503 instead.
+    // Both are acceptable: the endpoint is guarded and the caller does not get
+    // the CSV.
+    const response = await page.request.get("/api/export");
+    expect(response.ok()).toBeFalsy();
+    expect([401, 503]).toContain(response.status());
+  });
+});
+
 test.describe("Settings — Danger zone (#697)", () => {
   test("danger zone shows Reset all progress; Delete account is hidden for guests", async ({
     page,

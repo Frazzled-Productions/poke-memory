@@ -9,6 +9,7 @@ import {
   savePendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
+import { useLatestRef } from "@/lib/hooks/useLatestRef";
 
 /** Number of consecutive all-failure drains before the banner is shown. */
 const FAILURE_THRESHOLD = 3;
@@ -45,10 +46,8 @@ export function usePerGradeSync(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Keep latest client/userId accessible inside the debounce closure without
   // adding them as effect dependencies.
-  const clientRef = useRef(client);
-  const userIdRef = useRef(userId);
-  clientRef.current = client;
-  userIdRef.current = userId;
+  const clientRef = useLatestRef(client);
+  const userIdRef = useLatestRef(userId);
   // Counts consecutive all-failure drains. Reset to 0 on any partial success.
   // When it reaches FAILURE_THRESHOLD, markPushFailed is called so the banner
   // appears (#606).

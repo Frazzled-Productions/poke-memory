@@ -1,22 +1,8 @@
 import type { ReviewableCard } from "@/lib/review/session";
 
-/**
- * The render width (and height) in CSS px that the practice flip cards
- * pass to `next/image`. `SpritePreloader` must use the same value so the
- * optimiser produces the identical variant URL and the real card is then
- * served from cache. Kept here as the single source of truth shared by
- * `PokemonCard`, `EvolutionCard`, `ReverseEvolutionCard`, and the
- * preloader.
- */
-export const PRACTICE_SPRITE_SIZE = 320;
-
-/**
- * The render width (and height) in CSS px that `SpritePicker` passes to
- * each tile `<Image>`. Preloading reverse-card sprites must use this value
- * so the Next.js image optimiser produces the same variant URL — a 320 px
- * preload would fetch a different variant and produce no cache benefit.
- */
-export const PICKER_SPRITE_SIZE = 150;
+// Re-export the two review-specific size constants from the canonical location
+// so existing review importers need not change their import path.
+export { PRACTICE_SPRITE_SIZE, PICKER_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 /**
  * Sprite URLs worth preloading for a card, across its front and reveal

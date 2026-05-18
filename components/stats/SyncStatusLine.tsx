@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { loadSyncStatus } from "@/lib/sync/persistence";
-import { useSyncStatusKey } from "@/lib/sync/useSyncStatusKey";
+import { loadSyncStatus, STORAGE_KEY as SYNC_STATUS_KEY } from "@/lib/sync/persistence";
+import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import type { RetryState } from "@/lib/sync/useRetryPush";
 
 type SyncState = { text: string; errorDetail: string | null; failed: boolean };
@@ -17,7 +17,7 @@ export function SyncStatusLine({
   retryNow,
   superuserPaused = false,
 }: Props) {
-  const syncStatusVersion = useSyncStatusKey();
+  const syncStatusVersion = useLocalStorageKey(SYNC_STATUS_KEY);
   const [state, setState] = useState<SyncState | null>(null);
 
   useEffect(() => {

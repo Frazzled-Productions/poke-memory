@@ -1,0 +1,433 @@
+name: Auto Retro Harvest
+
+# Weekly cron that harvests every `<!-- auto-retro -->` retrospective comment
+# posted by `auto-retro.yml` across closed issues, then produces two outputs:
+#
+#   1. DIGEST — regenerates `docs/retros.md` wholesale: one readable,
+#      most-recent-first surface aggregating every retro. Committed straight
+#      to `qa` by the bot App. Regenerating the whole file each run (rather
+#      than editing in place) is what makes the digest idempotent — there is
+#      no per-entry marker bookkeeping to drift.
+#
+#   2. RECURRING-PATTERN AUTO-FILE — when the SAME concrete problem recurs
+#      across >= 3 retros, files exactly ONE tracking issue for that pattern
+#      so "several retros independently grumbled about this" becomes a tracked
+#      backlog item. Behavioural rules ("skip the planner when ...") are NOT
+#      filed — they belong in AGENTS.md/WORKFLOW.md and stay in the digest
+#      only. There is deliberately NO per-lesson filer.
+#
+# Auto-filed issues:
+#   - label `priority:later` ONLY — never `auto` (the user owns priority
+#     promotion and pipeline dispatch).
+#   - idempotent: a `<!-- auto-retro-pattern:<slug> -->` marker in the issue
+#     body dedupes, so a pattern that already has an open (or recently-closed,
+#     within 60 days) auto-filed issue is never re-filed.
+#   - link the contributing retro comments as evidence.
+#
+# This workflow is purely additive — it does NOT change `auto-retro.yml`'s
+# existing per-issue behaviour. It only reads the comments that workflow
+# posts.
+#
+# Idempotency overall:
+#   - The digest is regenerated wholesale, so a re-run simply rewrites the
+#     same file (a no-op commit is skipped via `git diff --quiet`).
+#   - The pattern auto-file dedupes on the slug marker. A shell pre-flight
+#     step (`patterns`) enumerates every existing `<!-- auto-retro-pattern:* -->`
+#     issue and passes the slugs to the LLM so a recurring problem reuses its
+#     existing slug rather than minting a drifted one. The in-prompt Step 4a
+#     check then scans candidate issue bodies for the literal marker with a
+#     `contains()` substring match (NOT `gh issue list --search`, whose index
+#     strips HTML-comment tokens), so a re-run re-files nothing.
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'   # Monday 10:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: auto-retro-harvest
+  cancel-in-progress: false
+
+jobs:
+  harvest:
+    name: Weekly Retro Harvest
+    if: github.repository == 'fraserbrookhouse/poke-memory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write       # commit docs/retros.md to qa
+      issues: write         # file recurring-pattern tracking issues
+
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          ref: qa
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Compute today date
+        id: date
+        run: echo "date=$(date -u +"%Y-%m-%d")" >> "$GITHUB_OUTPUT"
+
+      - name: Enumerate existing auto-retro-pattern issues
+        id: patterns
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # GitHub's search index strips HTML-comment tokens, so an
+          # `in:body` search for the `<!-- auto-retro-pattern:<slug> -->`
+          # marker never matches. Instead, enumerate every issue's body and
+          # scan it for the literal marker with grep -F. This is the same
+          # pattern auto-deep-audit.yml uses for its dated markers.
+          #
+          # The output is a newline-delimited list of `<slug>\t<state>\t<number>`
+          # rows for every already-filed pattern issue (open and closed). It
+          # is passed to Claude so the LLM can reuse an existing slug for a
+          # recurring problem instead of minting a fresh one — without this,
+          # phrasing drift between runs would defeat the dedup entirely.
+          ROWS=$(gh issue list --repo "$REPO" --state all --limit 400 \
+            --json number,state,body \
+            --jq '.[]
+                  | . as $i
+                  | ($i.body // "")
+                  | capture("<!-- auto-retro-pattern:(?<slug>[a-z0-9-]+) -->"; "g")
+                  | "\(.slug)\t\($i.state)\t\($i.number)"' \
+            2>/dev/null | sort -u || true)
+
+          if [ -z "$ROWS" ]; then
+            echo "No existing auto-retro-pattern issues found."
+          else
+            echo "Existing auto-retro-pattern issues:"
+            echo "$ROWS"
+          fi
+
+          # Multi-line value — use a heredoc delimiter for GITHUB_OUTPUT.
+          {
+            echo "rows<<PATTERN_ROWS_EOF"
+            echo "$ROWS"
+            echo "PATTERN_ROWS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        id: claude
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 60 --disable-slash-commands --disallowed-tools Skill
+          prompt: |
+            You are harvesting this repository's retrospective comments into a
+            digest and detecting recurring problems worth tracking.
+
+            Today is ${{ steps.date.outputs.date }}. The checkout is on the
+            `qa` branch — all file edits land on `qa`.
+
+            ## Background
+
+            `auto-retro.yml` posts one `<!-- auto-retro -->` comment per closed
+            issue. Each comment has this shape:
+
+                <!-- auto-retro -->
+                ## Retrospective
+                **Agents used:** ...
+                **What worked:** ...
+                **What didn't / overhead:** ...
+                **Lesson:** <single transferable rule>
+
+            These comments are write-once and effectively unread. Your job is
+            to aggregate them and surface recurring problems.
+
+            ## Step 1 — Gather every auto-retro comment
+
+            Closed issues with retros are the source. List them and extract
+            each retro comment with its issue number, issue title, and the
+            comment's `created_at` timestamp:
+
+            ```bash
+            # All closed issues, newest first.
+            gh issue list --state closed --limit 400 \
+              --json number,title,closedAt --jq '.[] | "\(.number)\t\(.title)"'
+            ```
+
+            For each closed issue, fetch its comments and keep only the one
+            whose body starts with `<!-- auto-retro -->`:
+
+            ```bash
+            gh api "repos/${{ github.repository }}/issues/<N>/comments" --paginate \
+              --jq '.[] | select(.body | startswith("<!-- auto-retro -->"))
+                          | {created_at, html_url, body}'
+            ```
+
+            Iterating ~400 issues is acceptable. If an issue has no auto-retro
+            comment, skip it silently. Collect every retro found into a list,
+            each carrying: issue number, issue title, retro comment URL,
+            comment `created_at`, and the parsed fields (Agents used / What
+            worked / What didn't / Lesson).
+
+            If you find ZERO retro comments, write nothing, file nothing, and
+            exit cleanly with a note to stdout.
+
+            ## Step 2 — Regenerate the digest (`docs/retros.md`)
+
+            Regenerate the file WHOLESALE from the list gathered in Step 1 —
+            do not try to edit it in place. Order entries MOST-RECENT-FIRST by
+            the retro comment's `created_at`.
+
+            Write `docs/retros.md` in exactly this shape:
+
+            ```markdown
+            # Retrospectives digest
+
+            <!-- GENERATED FILE — do not edit by hand. -->
+            <!-- Regenerated weekly by .github/workflows/auto-retro-harvest.yml. -->
+
+            Aggregates every `<!-- auto-retro -->` comment posted by
+            `auto-retro.yml` across closed issues, most recent first. Last
+            harvested ${{ steps.date.outputs.date }} — <COUNT> retros.
+
+            ---
+
+            ## #<N> — <issue title>
+
+            _Retro posted YYYY-MM-DD · [comment](<retro comment html_url>)_
+
+            **Agents used:** <verbatim from the retro>
+
+            **What worked:** <verbatim>
+
+            **What didn't / overhead:** <verbatim>
+
+            **Lesson:** <verbatim>
+
+            ---
+
+            ## #<N> — <issue title>
+            ...
+            ```
+
+            Rules for the digest:
+            - Reproduce the retro fields verbatim — do not summarise or
+              rewrite them. You are aggregating, not editorialising.
+            - `<COUNT>` is the total number of retros included.
+            - British English in any prose you add (headers, the intro line).
+            - If a retro comment is malformed (missing a field), include what
+              is present and leave the missing field as `_(not recorded)_`.
+
+            ## Step 3 — Detect recurring concrete problems
+
+            Read the **Lesson** line and the **What didn't / overhead** bullets
+            of every retro. Each Lesson is one of two kinds:
+
+            - **Behavioural rule** — a reusable convention, e.g. "skip the
+              planner when the issue names the exact file/line", "spy on the
+              effect's side-effects rather than rerender()". These belong in
+              AGENTS.md/WORKFLOW.md as conventions. They are NOT issue-shaped.
+              Do NOT file issues for them — they stay in the digest only.
+
+            - **Recurring concrete problem** — a specific, actionable defect
+              in the process or tooling that keeps biting, e.g. "run coverage
+              against the full origin/main...origin/qa diff before the drain".
+
+            Cluster the retros by the concrete problem they describe. A cluster
+            is a recurring problem ONLY when the SAME concrete problem appears
+            in **3 or more distinct retros** (distinct issue numbers). Be
+            strict: vague thematic similarity is not a cluster. The problem
+            must be genuinely the same actionable thing.
+
+            For each cluster of >= 3, you must settle on a stable slug
+            (lowercase, hyphenated, e.g. `coverage-full-diff-before-drain`).
+            The slug must be deterministic for the problem so re-runs dedupe
+            correctly. Because the slug is derived by you (an LLM), phrasing
+            drift between runs could otherwise mint two different slugs for
+            the same recurring problem and defeat the dedup. To prevent that:
+
+            **Already-filed patterns (reuse their slugs).** The workflow has
+            pre-enumerated every existing `<!-- auto-retro-pattern:<slug> -->`
+            tracking issue. Each row below is `<slug>` TAB `<state>` TAB
+            `<issue-number>`:
+
+            ```
+            ${{ steps.patterns.outputs.rows }}
+            ```
+
+            (If that block is empty, no pattern issues have ever been filed.)
+
+            For every cluster you detect, compare it against this list:
+
+            - If the cluster describes the SAME concrete problem as an
+              already-filed pattern, **reuse that issue's existing slug** —
+              do not invent a new one — and let the Step 4a idempotency check
+              decide whether to re-file. Never mint a fresh slug for a problem
+              that already has a tracking issue.
+            - Only mint a brand-new slug for a genuinely new concrete problem
+              not present in the list above. Base a new slug on the concrete
+              problem itself, not on which issues happened to be in the
+              cluster this week.
+
+            If NO cluster reaches 3 retros, file nothing — proceed to Step 5.
+
+            ## Step 4 — Auto-file ONE issue per recurring cluster
+
+            For each cluster of >= 3 retros:
+
+            ### 4a. Idempotency check
+
+            The marker is `<!-- auto-retro-pattern:<slug> -->`. Do NOT use
+            `gh issue list --search '... in:body'` — GitHub's search index
+            strips HTML-comment tokens, so that query never matches and the
+            dedup silently fails.
+
+            Instead, enumerate candidate issues and scan their bodies for the
+            literal marker with `grep -F` — the same approach
+            `auto-deep-audit.yml` uses. Find any issue whose body contains the
+            exact marker line:
+
+            ```bash
+            # List all issues (open + closed) with body + state + closedAt,
+            # then keep only those whose body contains the literal marker.
+            gh issue list --state all --limit 400 \
+              --json number,state,closedAt,body \
+              --jq '.[] | select(.body | contains("<!-- auto-retro-pattern:<slug> -->"))
+                          | {number, state, closedAt}'
+            ```
+
+            Substitute the actual slug into both occurrences of `<slug>`.
+            `contains(...)` does a literal substring match — equivalent to
+            `grep -F` — so it is immune to the search-index stripping.
+
+            Skip filing this cluster if EITHER:
+            - an OPEN issue with that marker exists, OR
+            - a CLOSED issue with that marker was closed within the last 60
+              days (recently closed — do not re-file a freshly-resolved
+              pattern). Compare `closedAt` against 60 days before
+              ${{ steps.date.outputs.date }}.
+
+            A closed issue with that marker older than 60 days does NOT block
+            re-filing — the pattern has resurfaced and is worth re-tracking.
+
+            ### 4b. File the issue
+
+            Write the body to `/tmp/pattern-<slug>.md`:
+
+            ```markdown
+            <!-- auto-retro-pattern:<slug> -->
+            ## Recurring pattern surfaced by retrospectives
+
+            <One-paragraph description of the concrete recurring problem.>
+
+            This concrete problem was independently flagged in **<count>**
+            separate retrospectives:
+
+            - #<N1> — <issue title> — [retro](<comment url>)
+            - #<N2> — <issue title> — [retro](<comment url>)
+            - #<N3> — <issue title> — [retro](<comment url>)
+
+            Filed automatically by `auto-retro-harvest.yml` because the same
+            problem recurred across >= 3 retros. See the
+            [retrospectives digest](https://github.com/fraserbrookhouse/poke-memory/blob/qa/docs/retros.md).
+            ```
+
+            Then create the issue:
+
+            ```bash
+            gh issue create \
+              --title "Recurring retro pattern: <short human title>" \
+              --body-file /tmp/pattern-<slug>.md \
+              --label "priority:later"
+            ```
+
+            HARD RULES for these issues:
+            - Label **`priority:later`** ONLY. **NEVER** the `auto` label.
+              **NEVER** `priority:now` / `priority:next`. The user owns
+              priority promotion and pipeline dispatch.
+            - If `priority:later` does not exist, create it first
+              (`gh label create "priority:later" --color "ededed"`), but it
+              should already exist.
+            - One issue per cluster — never batch multiple clusters into one.
+            - The marker line MUST be the first line of the body.
+
+            ## Step 5 — Commit the digest
+
+            Stage and commit `docs/retros.md` only. If `qa` advanced during
+            the run, rebase onto it before pushing so a concurrent merge is
+            not clobbered:
+
+            ```bash
+            git config user.name "poke-memory-bot[bot]"
+            git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
+            git add docs/retros.md
+            if git diff --cached --quiet; then
+              echo "docs/retros.md unchanged — nothing to commit."
+            else
+              git commit -m "docs(retros): refresh retrospectives digest [skip ci]"
+              # qa may have advanced while this run was working — rebase the
+              # single digest commit onto the latest qa before pushing.
+              git fetch origin qa
+              git rebase origin/qa
+              git push origin HEAD:qa
+            fi
+            ```
+
+            Commit ONLY `docs/retros.md`. Do not stage anything else. The
+            `[skip ci]` marker keeps the commit from re-triggering push-based
+            workflows. If the rebase hits a conflict (it should not — only
+            this workflow writes `docs/retros.md`), abort the rebase, leave
+            the digest uncommitted, and report the conflict to stdout — the
+            next weekly run regenerates the digest from scratch anyway.
+
+            ## Closing
+
+            Write a one-paragraph summary to stdout: how many retros were
+            harvested, whether the digest changed, how many recurring clusters
+            were detected, and how many tracking issues were filed vs. skipped
+            as already-tracked.
+
+      - name: Surface tool denials
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: /home/runner/work/_temp/claude-execution-output.json
+        run: |
+          set -u
+          if [ ! -f "$LOG" ]; then exit 0; fi
+
+          DENIAL_COUNT=$(jq -rs 'map(select(.type == "result")) | last | (.permission_denials_count // 0) | tostring' "$LOG" 2>/dev/null || echo 0)
+          if [ "$DENIAL_COUNT" = "0" ] || [ -z "$DENIAL_COUNT" ]; then
+            echo "No tool denials."
+            exit 0
+          fi
+
+          DENIAL_DETAILS=$(jq -r '
+            def text_of:
+              if type == "string" then .
+              elif type == "array" then map(.text // "" | tostring) | join(" ")
+              else tostring end;
+            select(.type == "user")
+            | .message.content[]?
+            | select(.type == "tool_result")
+            | select((.is_error // false) == true)
+            | (.content | text_of) as $c
+            | select($c | test("permission|denied|not allowed"; "i"))
+            | $c | gsub("\\s+"; " ") | .[0:240]
+          ' "$LOG" 2>/dev/null | sort -u | head -20 || true)
+
+          {
+            printf '%s tool denial(s) during the weekly retro-harvest run.\n' "$DENIAL_COUNT"
+            printf 'Claude was blocked from running these tools. Add the missing patterns to .claude/settings.json if any of them should be permitted. See run logs: %s\n' "$RUN_URL"
+            if [ -n "$DENIAL_DETAILS" ]; then
+              printf '\n%s\n' "$DENIAL_DETAILS"
+            fi
+          } >&2

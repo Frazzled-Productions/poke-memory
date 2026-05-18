@@ -19,6 +19,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
 import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
+import { PwaBadge } from "@/components/pwa/PwaBadge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -125,6 +126,8 @@ export default function RootLayout({
         <IdbMigration />
         {/* Registers the offline service worker and surfaces the update prompt (#703). */}
         <ServiceWorkerProvider />
+        {/* Syncs the installed-PWA app icon badge with cards due today (#916). */}
+        <PwaBadge />
         <Analytics />
         <SpeedInsights />
       </body>

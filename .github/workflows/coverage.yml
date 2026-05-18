@@ -7,7 +7,7 @@ name: Coverage
 #   1. Global floor — `coverage.thresholds` in vitest.config.ts. `vitest run
 #      --coverage` exits non-zero if overall coverage regresses below the floor.
 #   2. Diff coverage — scripts/diff-coverage.mjs requires new/changed product
-#      lines in the PR to hit an 80% patch-coverage bar.
+#      lines in the PR to hit a 90% patch-coverage bar.
 #
 # The PR comment is posted on BOTH pass and fail so the numbers are always
 # visible. Make `coverage` a required check on the qa and main rulesets to
@@ -108,8 +108,8 @@ jobs:
                 row("Functions", t.functions),
                 row("Lines", t.lines),
                 "",
-                "_Global floor: Statements 64 / Branches 59 / Functions 55 / Lines 65. " +
-                  "Changed lines must hit an 80% patch-coverage bar. See the `coverage` workflow._",
+                "_Global floor: Statements 74 / Branches 69 / Functions 66 / Lines 76. " +
+                  "Changed lines must hit a 90% patch-coverage bar. See the `coverage` workflow._",
               ].join("\n"));
             ' > /tmp/coverage-table.md
           else

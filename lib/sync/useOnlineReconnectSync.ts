@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
+import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
 import {
   loadSyncStatus,
@@ -46,10 +47,8 @@ export function useOnlineReconnectSync(
 ): void {
   // Use refs so the event handler always sees the latest values without
   // needing to be re-registered on every re-render.
-  const clientRef = useRef(client);
-  const userIdRef = useRef(userId);
-  clientRef.current = client;
-  userIdRef.current = userId;
+  const clientRef = useLatestRef(client);
+  const userIdRef = useLatestRef(userId);
 
   // In-flight guard: prevents concurrent reconnect handlers from running
   // simultaneously (e.g. rapid on/off/on network flaps).

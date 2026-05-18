@@ -40,7 +40,7 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
  * — does not trigger an unwanted reload that would discard in-flight
  * grades or interrupt a card the user is currently looking at.
  *
- * Same-tab `useSessionStorageKey` subscribers (Stats, Pasture, Pokédex,
+ * Same-tab `useLocalStorageKey` subscribers (Stats, Pasture, Pokédex,
  * NavLinks) already react to `saveSession`'s synthetic StorageEvent — this
  * event is the targeted notification for the one surface that can't subscribe
  * to that channel without re-firing on every grade.
@@ -280,7 +280,7 @@ export async function pullAndMerge(
             // StreakBadge listens to this event directly.
             window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
           }
-          // Stats reads streakDates inside its useSessionStorageKey-gated
+          // Stats reads streakDates inside its useLocalStorageKey-gated
           // effect, which does NOT listen to STREAK_UPDATED_EVENT. Bump the
           // session-key so an open Stats mount re-runs and picks up the new
           // dates this cycle, mirroring the grade-log path in #575. Without
@@ -300,7 +300,7 @@ export async function pullAndMerge(
     // rolling-7-day on Stats are local-only and never see grades from another
     // device.
     //
-    // Stats reads gradeLog inside an effect gated by `useSessionStorageKey`
+    // Stats reads gradeLog inside an effect gated by `useLocalStorageKey`
     // (the SESSION_STORAGE_KEY of `poke-memory:review-session:v1`). To wake
     // an open Stats mount after the merge we dispatch a synthetic storage
     // event for that key — the same channel `saveSession` already uses
@@ -319,7 +319,7 @@ export async function pullAndMerge(
         if (mergedLog.length !== localLog.length) {
           await saveGradeLog(mergedLog);
           // Re-fire saveSession's notification channel so an open Stats mount
-          // re-runs its useSessionStorageKey effect and reads the freshly-
+          // re-runs its useLocalStorageKey effect and reads the freshly-
           // written grade_log without waiting for the next pull cycle.
           bumpSessionStorageKey();
         }

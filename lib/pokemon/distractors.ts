@@ -1,5 +1,5 @@
 import type { SeedPokemon } from "@/lib/pokemon/seed";
-import { FNV_PRIME, fnv1a } from "@/lib/utils/fnv1a";
+import { fnv1a, fnv1aUint32 } from "@/lib/utils/fnv1a";
 
 /**
  * Returns `count` deterministic distractors from `pool`, excluding `targetId`.
@@ -22,18 +22,10 @@ export function pickDistractors(
 
   const seedHash = fnv1a(seed + String(targetId));
 
-  const keyed = candidates.map((p) => {
-    let hash = seedHash;
-    hash ^= p.id & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (p.id >>> 8) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (p.id >>> 16) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    hash ^= (p.id >>> 24) & 0xff;
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    return { p, key: hash };
-  });
+  const keyed = candidates.map((p) => ({
+    p,
+    key: fnv1aUint32(p.id, seedHash),
+  }));
 
   keyed.sort((a, b) => a.key - b.key || a.p.id - b.p.id);
   return keyed.slice(0, count).map((k) => k.p);

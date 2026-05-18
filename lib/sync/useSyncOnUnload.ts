@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
+import { useLatestRef } from "@/lib/hooks/useLatestRef";
 
 /**
  * Registers visibilitychange and pagehide listeners that push any unsynced
@@ -37,10 +38,8 @@ export function useSyncOnUnload(
   // Use refs for all values read inside handleUnload so the handler always sees
   // the latest values even if sign-out races with a visibilitychange/pagehide
   // event before the effect cleanup can remove the listeners.
-  const userIdRef = useRef(userId);
-  userIdRef.current = userId;
-  const getUnsyncedRef = useRef(getUnsynced);
-  getUnsyncedRef.current = getUnsynced;
+  const userIdRef = useLatestRef(userId);
+  const getUnsyncedRef = useLatestRef(getUnsynced);
 
   useEffect(() => {
     if (!client || !userId) return;

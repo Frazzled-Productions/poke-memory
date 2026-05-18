@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { decodeSpriteUrls, DECODE_TIMEOUT_MS } from "@/lib/review/decode";
+import { decodeSpriteUrls, DECODE_TIMEOUT_MS } from "@/lib/sprites/decode";
 
 // ---------------------------------------------------------------------------
 // Helpers

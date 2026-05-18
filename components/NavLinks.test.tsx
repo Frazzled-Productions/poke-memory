@@ -45,6 +45,7 @@ vi.mock("next/link", () => ({
 const mockLoadSession = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: () => mockLoadSession(),
+  STORAGE_KEY: "poke-memory:review-session:v1",
 }));
 
 const mockFilterMastered = vi.fn().mockReturnValue([]);
@@ -58,8 +59,8 @@ vi.mock("@/lib/settings/persistence", () => ({
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
 }));
 
-vi.mock("@/lib/review/useSessionStorageKey", () => ({
-  useSessionStorageKey: vi.fn().mockReturnValue(0),
+vi.mock("@/lib/hooks/useLocalStorageKey", () => ({
+  useLocalStorageKey: vi.fn().mockReturnValue(0),
 }));
 
 const mockUseSuperuser = vi.fn(() => ({ flags: { pretendAllMastered: false } }));

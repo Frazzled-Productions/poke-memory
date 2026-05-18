@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthButton } from "@/components/auth/AuthButton";
-import { loadSession } from "@/lib/review/persistence";
+import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
-import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
@@ -29,7 +29,7 @@ export function NavLinks() {
   // Re-runs the mastery check when the session key changes — native cross-tab
   // events and the synthetic dispatch from pullAndMerge / pasture sparkle
   // clears both flow through this hook.
-  const sessionVersion = useSessionStorageKey();
+  const sessionVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   // Also re-runs when the user saves Settings, so a change to the
   // masteryRepetitions threshold re-derives Pasture link visibility without
   // waiting for an unrelated session storage bump.

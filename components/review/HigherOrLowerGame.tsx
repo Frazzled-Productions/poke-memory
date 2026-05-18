@@ -10,7 +10,7 @@ import {
   type StatKey,
 } from "@/lib/minigame/higherOrLower";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
-import { decodeSpriteUrls } from "@/lib/review/decode";
+import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 
 type Phase = "picking" | "revealed";

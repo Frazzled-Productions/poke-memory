@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { loadSession, saveSession } from "@/lib/review/persistence";
+import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import type { SavedSession } from "@/lib/review/persistence";
 import { filterMastered, markSeenInPasture } from "@/lib/pasture/arrivals";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
@@ -9,16 +9,21 @@ import { assignAnchors } from "@/lib/pasture/assign";
 import { biomeStats } from "@/lib/pasture/stats";
 import type { BiomeStats } from "@/lib/pasture/stats";
 import { PastureZone } from "@/components/pasture/PastureZone";
-import { PastureSearchBar } from "@/components/pasture/PastureSearchBar";
+import {
+  PastureSearchBar,
+  PASTURE_FILTERS_DEFAULT,
+} from "@/components/pasture/PastureSearchBar";
+import type { PastureFilters } from "@/components/pasture/PastureSearchBar";
 import { pushSingleCard } from "@/lib/sync/cloud";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
+import { generationOf } from "@/lib/stats/derive";
 
 type Placement = {
   card: NameReviewCard;
@@ -83,16 +88,52 @@ function buildZoneData(
   return result;
 }
 
+/**
+ * Applies name search, type, and generation filters to the mastered card set.
+ * Stats remain computed from the full mastered set, independent of this filter.
+ */
+function applyFilters(
+  cards: NameReviewCard[],
+  filters: PastureFilters,
+): NameReviewCard[] {
+  return cards.filter((card) => {
+    if (filters.query !== "") {
+      const q = filters.query.trim().toLowerCase();
+      if (!card.name.toLowerCase().includes(q)) return false;
+    }
+
+    if (filters.types.length > 0) {
+      if (!filters.types.every((t) => card.types.includes(t))) return false;
+    }
+
+    if (filters.gen !== null) {
+      const speciesId = card.speciesId ?? card.id;
+      if (generationOf(speciesId) !== filters.gen) return false;
+    }
+
+    return true;
+  });
+}
+
+/** Returns true when any filter deviates from the default (unfiltered) state. */
+function isFiltered(filters: PastureFilters): boolean {
+  return (
+    filters.query.trim() !== "" ||
+    filters.types.length > 0 ||
+    filters.gen !== null
+  );
+}
+
 export default function PasturePage() {
   const { user, supabase } = useAuth();
   const { flags } = useSuperuser();
   const [session, setSession] = useState<SavedSession | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<PastureFilters>(PASTURE_FILTERS_DEFAULT);
   // Re-load when the session localStorage key changes (post-grade sync, post-reset
   // via clearLocalProgress). Matches the pattern used by Stats and Pokédex; without
   // this, a reset that does not navigate away from /pasture would leave stale state.
-  const storageVersion = useSessionStorageKey();
+  const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   // Re-render when the user saves Settings, so a change to the
   // masteryRepetitions threshold re-filters the pasture without needing a
   // session storage bump or a navigation away and back.
@@ -133,19 +174,36 @@ export default function PasturePage() {
         ? filterMastered(session.cards, false, masteryRepetitions).length
         : 0;
 
-  // Reset the search query whenever the mastered set transitions to empty
+  // Reset filters whenever the mastered set transitions to empty
   // (e.g. storage clear, sign-out triggering a reload). Guard on `loaded` so
-  // we never clear a query on the initial render before data arrives, and
-  // guard on `searchQuery` so we skip the effect when there is nothing to
+  // we never clear filters on the initial render before data arrives, and
+  // guard on `isFiltered` so we skip the effect when there is nothing to
   // clear (avoids unnecessary state updates).
   useEffect(() => {
-    if (loaded && masteredCount === 0 && searchQuery !== "") {
-      setSearchQuery("");
+    if (loaded && masteredCount === 0 && isFiltered(filters)) {
+      setFilters(PASTURE_FILTERS_DEFAULT);
     }
-    // masteredCount and loaded are the meaningful signals; searchQuery is read
+    // masteredCount and loaded are the meaningful signals; filters is read
     // for the guard but should not re-trigger the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, masteredCount]);
+
+  const handleQueryChange = useCallback((q: string) => {
+    setFilters((prev) => ({ ...prev, query: q }));
+  }, []);
+
+  const handleTypeToggle = useCallback((type: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      types: prev.types.includes(type)
+        ? prev.types.filter((t) => t !== type)
+        : [...prev.types, type],
+    }));
+  }, []);
+
+  const handleGenChange = useCallback((gen: number | null) => {
+    setFilters((prev) => ({ ...prev, gen }));
+  }, []);
 
   const handleMarkSeen = useCallback(
     async (cardId: number) => {
@@ -154,7 +212,7 @@ export default function PasturePage() {
       const partialUpdated = markSeenInPasture(cardId, session);
       const updated: SavedSession = { ...session, cards: partialUpdated.cards };
       // saveSession dispatches the synthetic StorageEvent for same-tab
-      // subscribers (useSessionStorageKey).
+      // subscribers (useLocalStorageKey).
       await saveSession(updated);
       setSession(updated);
 
@@ -213,14 +271,15 @@ export default function PasturePage() {
     );
   }
 
-  // Filter by search query — case-insensitive substring match on display name.
-  const trimmed = searchQuery.trim().toLowerCase();
-  const visibleCards =
-    trimmed === ""
-      ? masteredCards
-      : masteredCards.filter((c) => c.name.toLowerCase().includes(trimmed));
+  const visibleCards = applyFilters(masteredCards, filters);
 
-  const zones = buildZoneData(visibleCards, masteredCards, flags.pretendAllMastered);
+  const zones = buildZoneData(
+    visibleCards,
+    masteredCards,
+    flags.pretendAllMastered,
+  );
+
+  const filtered = isFiltered(filters);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
@@ -231,11 +290,16 @@ export default function PasturePage() {
         </span>
       </h1>
 
-      <PastureSearchBar query={searchQuery} onChange={setSearchQuery} />
+      <PastureSearchBar
+        filters={filters}
+        onQueryChange={handleQueryChange}
+        onTypeToggle={handleTypeToggle}
+        onGenChange={handleGenChange}
+      />
 
-      {zones.length === 0 && trimmed !== "" ? (
+      {zones.length === 0 && filtered ? (
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
-          No Pokémon match &ldquo;{searchQuery.trim()}&rdquo;.
+          No Pokémon match your filters.
         </p>
       ) : (
         <div className="flex flex-col gap-8">

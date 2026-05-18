@@ -1465,6 +1465,26 @@ export default function SettingsPage() {
                     </button>
                   </div>
 
+                  {/* Review history CSV export — authenticated users only (#918) */}
+                  {user && (
+                    <>
+                      <hr className="border-zinc-200 dark:border-zinc-800" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Download review history</p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Downloads your full review history as a CSV file (date, Pokémon, card type, grade). Useful for personal analysis and satisfies GDPR data portability.
+                        </p>
+                        <a
+                          href="/api/export"
+                          download
+                          className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                        >
+                          Download CSV
+                        </a>
+                      </div>
+                    </>
+                  )}
+
                   <hr className="border-zinc-200 dark:border-zinc-800" />
 
                   <div>

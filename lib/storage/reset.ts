@@ -4,7 +4,6 @@ import { idbDelete, MIGRATION_FLAG_KEY } from "@/lib/idb/db";
 //   lib/review/persistence.ts     (STORAGE_KEY)
 //   lib/gradelog/persistence.ts   (STORAGE_KEY)
 //   lib/idb/db.ts                 (SESSION_LS_KEY, GRADE_LOG_LS_KEY)
-//   lib/review/useSessionStorageKey.ts (SESSION_STORAGE_KEY)
 // They are duplicated here because importing those modules would create a
 // dependency cycle: persistence layers also depend on the reset function
 // indirectly via shared utilities.

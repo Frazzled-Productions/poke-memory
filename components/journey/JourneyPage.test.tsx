@@ -154,6 +154,7 @@ vi.mock("@/lib/review/persistence", () => ({
   loadSession: mockLoadSession,
   saveSession: vi.fn().mockResolvedValue({ ok: true }),
   bumpSessionStorageKey: vi.fn(),
+  STORAGE_KEY: "poke-memory:review-session:v1",
 }));
 
 vi.mock("@/lib/pokemon/seed", () => ({
@@ -236,8 +237,8 @@ vi.mock("@/lib/sync/cloud", () => ({
   ),
 }));
 
-vi.mock("@/lib/review/useSessionStorageKey", () => ({
-  useSessionStorageKey: vi.fn(() => 0),
+vi.mock("@/lib/hooks/useLocalStorageKey", () => ({
+  useLocalStorageKey: vi.fn(() => 0),
 }));
 
 vi.mock("@/lib/superuser/SuperuserContext", () => ({

@@ -214,7 +214,7 @@ in-memory fixture.
 | **Trigger** | `pull_request` (any), `workflow_dispatch` |
 | **Job** | `coverage` |
 | **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), enforces two coverage gates, then posts the coverage summary (statements / branches / functions / lines) plus the diff-coverage result as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). The comment posts on both pass and fail. |
-| **Gates (#824)** | **Global floor** — `coverage.thresholds` in `vitest.config.ts` (Statements 64 / Branches 59 / Functions 55 / Lines 65, just below the measured baseline). `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** — `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit an 80% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. |
+| **Gates (#824)** | **Global floor** — `coverage.thresholds` in `vitest.config.ts` (Statements 74 / Branches 69 / Functions 66 / Lines 76, just below the measured baseline). `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** — `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit a 90% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork PRs run with a read-only token and cannot post comments). |
 | **Required check** | Not yet — the gates fail the job, but `coverage` must still be added as a required check on the `qa` and `main` rulesets (owner action) before a breach blocks merge. Until then the job goes red without blocking. (Originally non-blocking by design under #762; gated under #824.) |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
@@ -360,6 +360,21 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Skips** | Issues closed as `not_planned`; issues with no linked merged PR; issues already having an `<!-- auto-retro -->` comment |
 | **What it does** | Fetches the PR diff and metadata; posts a single `<!-- auto-retro -->` comment on the closed issue covering: which sub-agents ran, what worked, what was overhead, and one transferable lesson |
 | **Scope** | Process reflection only — no code change recommendations |
+
+---
+
+### `auto-retro-harvest.yml` — Auto Retro Harvest
+
+| | |
+|---|---|
+| **Trigger** | Weekly cron Monday 10:00 UTC + `workflow_dispatch` |
+| **Inputs** | Every `<!-- auto-retro -->` comment posted by `auto-retro.yml` across closed issues. Purely additive — does not change `auto-retro.yml`'s per-issue behaviour. |
+| **Output 1 — digest** | Regenerates `docs/retros.md` wholesale, aggregating every retro most-recent-first, and commits it to `qa` (`docs(retros): refresh retrospectives digest [skip ci]`). Regenerating the whole file each run is the idempotency mechanism — no per-entry markers, a no-op commit is skipped via `git diff --cached --quiet`. |
+| **Output 2 — recurring-pattern auto-file** | When the *same concrete problem* recurs across **≥ 3 distinct retros**, files exactly one tracking issue for that pattern. Behavioural-rule lessons (reusable conventions) are not filed — they stay in the digest only. There is deliberately no per-lesson filer. |
+| **Idempotency key** | Per-pattern body marker `<!-- auto-retro-pattern:<slug> -->`. A pattern with an open marker-carrying issue — or a closed one within the last 60 days — is not re-filed. The slug is derived from the concrete problem, not the contributing issues, so it is stable across runs. |
+| **Issue-filing rules** | Auto-filed issues are `priority:later` only — never `auto`, never `priority:now`/`priority:next`. The user owns promotion. One issue per cluster; contributing retro comments linked as evidence. |
+| **No-op** | Zero retros found → writes nothing, files nothing. No cluster reaching 3 → digest still refreshed, no issues filed. |
+| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; `permissions` `contents: write` (commit the digest) + `issues: write` (file tracking issues), rest read |
 
 ---
 
@@ -648,7 +663,7 @@ Runs on every `pull_request` event and every push to `main`: the same `typecheck
 
 ### Coverage gate (`coverage.yml`)
 
-Runs on every `pull_request` event. Fails the `coverage` job on either a global-floor breach (`coverage.thresholds` in `vitest.config.ts`) or a diff-coverage breach (`scripts/diff-coverage.mjs`, 80% patch bar). See the `coverage.yml` catalog entry above for detail. Not yet a required check — owner must add `coverage` to the `qa` and `main` rulesets to block merge on a breach.
+Runs on every `pull_request` event. Fails the `coverage` job on either a global-floor breach (`coverage.thresholds` in `vitest.config.ts`) or a diff-coverage breach (`scripts/diff-coverage.mjs`, 90% patch bar). See the `coverage.yml` catalog entry above for detail. Not yet a required check — owner must add `coverage` to the `qa` and `main` rulesets to block merge on a breach.
 
 ---
 
@@ -750,4 +765,11 @@ After each merged PR, `auto-retro.yml` posts a `<!-- auto-retro -->` comment on 
 - **What didn't / overhead** — where a round-trip cost more than it returned
 - **Lesson** — one transferable rule for future changes
 
-Retros are process reflection only — no code change recommendations. Aggregating patterns across retros into convention (promoting to `AGENTS.md`) is left manual; if a lesson recurs across several retros, add it to `AGENTS.md` by hand.
+Retros are process reflection only — no code change recommendations.
+
+A single retro comment on a closed issue is effectively write-once and unread. `auto-retro-harvest.yml` (weekly cron) closes that loop:
+
+- **Digest** — it regenerates [`docs/retros.md`](docs/retros.md), one most-recent-first surface aggregating every retro, and commits it to `qa`. That is the place to read retros in bulk.
+- **Recurring-pattern auto-file** — when the *same concrete problem* recurs across **≥ 3 retros**, it files one `priority:later` tracking issue for that pattern (idempotent on a `<!-- auto-retro-pattern:<slug> -->` marker). So "several retros independently grumbled about this" becomes a tracked backlog item instead of being lost.
+
+Behavioural-rule lessons (reusable conventions, not specific defects) are still promoted to `AGENTS.md` by hand — the harvest job deliberately does not file issues for them, since they are not issue-shaped.

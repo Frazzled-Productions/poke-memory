@@ -6,9 +6,9 @@ import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
-import { SpritePreloader, type SizedSpriteUrl } from "@/components/review/SpritePreloader";
+import { SpritePreloader, type SizedSpriteUrl } from "@/components/sprites/SpritePreloader";
 import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites";
-import { decodeSpriteUrls } from "@/lib/review/decode";
+import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { GradeButtons } from "@/components/review/GradeButtons";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -274,7 +274,24 @@ function TodayPill({
   );
 }
 
-function SessionCompleteScreen({
+// ---------------------------------------------------------------------------
+// Unified end-of-session screen (#926)
+// ---------------------------------------------------------------------------
+
+type EndOfSessionVariant =
+  | { kind: "complete" }
+  | { kind: "new-locked" }
+  | { kind: "review-wall"; onKeepReviewing: () => void };
+
+/**
+ * Single component that covers all three end-of-session states:
+ * "all caught up" (SESSION_COMPLETE), "new cards locked" (NEW_CARDS_LOCKED),
+ * and "daily review limit reached" (REVIEW_SOFT_WALL). Shared affordances —
+ * the "N cards due tomorrow" teaser (#914), the TodayPill, the Share button,
+ * and the card-types onboarding nudge — render on every variant when applicable.
+ */
+function EndOfSessionScreen({
+  variant,
   perType,
   nameEnabled,
   evolutionEnabled,
@@ -285,13 +302,14 @@ function SessionCompleteScreen({
   dueTomorrow,
   showCardTypesHint,
 }: {
+  variant: EndOfSessionVariant;
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
   evolutionEnabled: boolean;
   reverseEnabled: boolean;
   reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
-  /** Pre-formatted share summary; null when the user hasn't graded anything yet. */
+  /** Pre-formatted share summary; null when the user has not graded anything today. */
   shareText: string | null;
   /** Count of graduated cards whose dueDate falls exactly on tomorrow. 0 hides the teaser. */
   dueTomorrow: number;
@@ -304,17 +322,66 @@ function SessionCompleteScreen({
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
-      <p className="text-2xl font-semibold text-foreground">All caught up!</p>
-      <p className="text-zinc-500 dark:text-zinc-400">
-        No more cards due today. Come back tomorrow to keep going.
-      </p>
+      {variant.kind === "complete" && (
+        <>
+          <p className="text-2xl font-semibold text-foreground">All caught up!</p>
+          <p className="text-zinc-500 dark:text-zinc-400">
+            No more cards due today. Come back tomorrow to keep going.
+          </p>
+        </>
+      )}
+      {variant.kind === "new-locked" && (
+        <>
+          <p className="text-2xl font-semibold text-foreground">New cards locked for today</p>
+          <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
+            You have hit a daily new-card cap. Come back tomorrow for more; keeping
+            this limit prevents tomorrow&apos;s review pile from growing too large.
+          </p>
+        </>
+      )}
+      {variant.kind === "review-wall" && (
+        <>
+          <p className="text-2xl font-semibold text-foreground">Daily review limit reached</p>
+          <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
+            You have hit a daily review cap. More cards are due. Keep going?
+          </p>
+        </>
+      )}
       {dueTomorrow > 0 && (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {dueTomorrow === 1 ? "1 card" : `${dueTomorrow} cards`} due tomorrow
         </p>
       )}
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
+      <TodayPill
+        perType={perType}
+        nameEnabled={nameEnabled}
+        evolutionEnabled={evolutionEnabled}
+        reverseEnabled={reverseEnabled}
+        reverseEvolutionEnabled={reverseEvolutionEnabled}
+        cryEnabled={cryEnabled}
+      />
       {shareText !== null ? <ShareTodayButton text={shareText} /> : null}
+      {variant.kind === "review-wall" && (
+        <div className="flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            className="min-h-[44px] rounded-lg bg-zinc-100 px-8 py-2 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+            onClick={() => {
+              // "Done for today" — reload the page so the session resets cleanly.
+              window.location.reload();
+            }}
+          >
+            Done for today
+          </button>
+          <button
+            type="button"
+            className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+            onClick={variant.onKeepReviewing}
+          >
+            Keep reviewing
+          </button>
+        </div>
+      )}
       {showCardTypesHint && (
         <div className="w-full max-w-xs text-left">
           <OnboardingHint
@@ -330,80 +397,6 @@ function SessionCompleteScreen({
           </OnboardingHint>
         </div>
       )}
-    </div>
-  );
-}
-
-function ReviewSoftWallScreen({
-  perType,
-  nameEnabled,
-  evolutionEnabled,
-  reverseEnabled,
-  reverseEvolutionEnabled,
-  cryEnabled,
-  onKeepReviewing,
-}: {
-  perType: PerTypeTodayCounts;
-  nameEnabled: boolean;
-  evolutionEnabled: boolean;
-  reverseEnabled: boolean;
-  reverseEvolutionEnabled: boolean;
-  cryEnabled: boolean;
-  onKeepReviewing: () => void;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-6 text-center">
-      <p className="text-2xl font-semibold text-foreground">Daily review limit reached</p>
-      <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-        You have hit a daily review cap. More cards are due. Keep going?
-      </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
-      <div className="flex flex-wrap justify-center gap-3">
-        <button
-          type="button"
-          className="min-h-[44px] rounded-lg bg-zinc-100 px-8 py-2 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
-          onClick={() => {
-            // "Done for today" — reload the page so the session resets cleanly.
-            window.location.reload();
-          }}
-        >
-          Done for today
-        </button>
-        <button
-          type="button"
-          className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
-          onClick={onKeepReviewing}
-        >
-          Keep reviewing
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function NewCardsLockedScreen({
-  perType,
-  nameEnabled,
-  evolutionEnabled,
-  reverseEnabled,
-  reverseEvolutionEnabled,
-  cryEnabled,
-}: {
-  perType: PerTypeTodayCounts;
-  nameEnabled: boolean;
-  evolutionEnabled: boolean;
-  reverseEnabled: boolean;
-  reverseEvolutionEnabled: boolean;
-  cryEnabled: boolean;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-4 text-center">
-      <p className="text-2xl font-semibold text-foreground">New cards locked for today</p>
-      <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-        You have hit a daily new-card cap. Come back tomorrow for more; keeping
-        this limit prevents tomorrow&apos;s review pile from growing too large.
-      </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
     </div>
   );
 }
@@ -475,6 +468,9 @@ export function ReviewSession() {
   const [audioFeaturesOff, setAudioFeaturesOff] = useState(false);
   const [cardTypesAllOn, setCardTypesAllOn] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  // True while decode-ahead is running for an evolution/reverse-evolution
+  // reveal flip. Guards against double-taps during the brief async window.
+  const [revealing, setRevealing] = useState(false);
   const [grading, setGrading] = useState(false);
   // Transient flag: user chose "Keep reviewing" at the soft wall.
   // Not persisted — resets on every page load by design.
@@ -596,10 +592,11 @@ export function ReviewSession() {
   const { enqueueGrade, flushPending } = usePerGradeSync(syncClient, syncUserId);
   useSyncOnUnload(syncClient, syncUserId, flushPending);
 
-  // Derive seen Pokémon for the mini-game on the SESSION_COMPLETE screen.
-  // Apply the same two-tier gate as the practice session: alternate-forms
-  // toggle first, then the gens/types/presets scope. Must stay unconditional
-  // (hooks rule).
+  // Derive seen Pokémon for the Higher-or-Lower mini-game. Rendered on every
+  // end-of-session variant (not just SESSION_COMPLETE) alongside the unified
+  // EndOfSessionScreen. Apply the same two-tier gate as the practice session:
+  // alternate-forms toggle first, then the gens/types/presets scope. Must stay
+  // unconditional (hooks rule).
   const seenPokemon = useMemo(
     () =>
       cards !== null
@@ -1265,52 +1262,18 @@ export function ReviewSession() {
 
     const endState = resolveEndState();
 
-    if (endState === "REVIEW_SOFT_WALL") {
-      return (
-        <div className="flex flex-col items-center w-full">
-          <ReviewSoftWallScreen
-            perType={perType}
-            nameEnabled={nameCardsEnabled}
-            evolutionEnabled={evolutionCardsEnabled}
-            reverseEnabled={reverseEnabled}
-            reverseEvolutionEnabled={reverseEvolutionEnabled}
-            cryEnabled={cryCardsEnabled}
-            onKeepReviewing={() => setExtendedReview(true)}
-          />
-          {seenPokemon.length >= 2 && (
-            <HigherOrLowerGame seenPokemon={seenPokemon} />
-          )}
-          {badgeToastSlot}
-        </div>
-      );
-    }
-
-    if (endState === "NEW_CARDS_LOCKED") {
-      return (
-        <div className="flex flex-col items-center w-full">
-          <NewCardsLockedScreen perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
-          {seenPokemon.length >= 2 && (
-            <HigherOrLowerGame seenPokemon={seenPokemon} />
-          )}
-          {badgeToastSlot}
-        </div>
-      );
-    }
-
     // today is UTC (scheduler-internal — card dues, streak); tomorrow uses the
     // user's timezone (state var loaded from settings) because it is a calendar
     // label for a user-facing count. Derive tomorrow from the tz-aware calendar
     // date rather than adding 86 400 s, which is wrong on DST-change nights.
+    // Hoisted so every end-of-session variant (#926) can show the teaser and
+    // share button, not just SESSION_COMPLETE.
     const today = todayString(new Date());
     const todayTz = todayString(new Date(), timezone);
     const tomorrowDate = new Date(todayTz + "T12:00:00Z");
     tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
     const tomorrow = todayString(tomorrowDate, timezone);
-    const dueTomorrow = countDueTomorrow(
-      cards,
-      tomorrow,
-      eligibleCardIds,
-    );
+    const dueTomorrow = countDueTomorrow(cards, tomorrow, eligibleCardIds);
     // The share grid is gated on persisted completion state: `sessionGradeSeq`
     // is hydrated at mount from the daily-summary record or, failing that, the
     // grade log (#896), so the button survives a reload or navigation rather
@@ -1328,9 +1291,16 @@ export function ReviewSession() {
             gradeSequence: sessionGradeSeq,
           })
         : null;
+    const variant: EndOfSessionVariant =
+      endState === "REVIEW_SOFT_WALL"
+        ? { kind: "review-wall", onKeepReviewing: () => setExtendedReview(true) }
+        : endState === "NEW_CARDS_LOCKED"
+          ? { kind: "new-locked" }
+          : { kind: "complete" };
     return (
       <div className="flex flex-col items-center w-full">
-        <SessionCompleteScreen
+        <EndOfSessionScreen
+          variant={variant}
           perType={perType}
           nameEnabled={nameCardsEnabled}
           evolutionEnabled={evolutionCardsEnabled}
@@ -1351,12 +1321,21 @@ export function ReviewSession() {
 
   // --- Handlers ---
 
-  function handleReveal() {
+  async function handleReveal() {
     // Use effectiveCard rather than currentCard so the reveal always acts on
     // the card currently displayed (#839). After a learning-queue re-render,
     // currentCard may have shifted to a newly-due learning card while the
     // displayedCardId lock keeps effectiveCard pointing to the original card.
-    if (effectiveCard === null) return;
+    if (effectiveCard === null || revealing) return;
+
+    // Warm up speechSynthesis synchronously inside the gesture handler. This
+    // must run before any `await` — after the first await the browser's gesture
+    // context is lost and warmupTts() would not count for Chromium / WebKit,
+    // causing speakNameOnReveal to silently fail on the very first Reveal of a
+    // session (before any card has been graded via handleGrade). Mirror of the
+    // same call in handleGrade (#479).
+    warmupTts();
+
     if (effectiveCard.cardType === "name") {
       const facts = getPokemonFacts(effectiveCard);
       setCurrentFact(selectFact(facts));
@@ -1380,6 +1359,42 @@ export function ReviewSession() {
     } else {
       setCurrentFact(null);
     }
+
+    // Decode-ahead: for evolution and reverse-evolution cards, the reveal flip
+    // shows a sprite that `SpritePreloader` has already warmed into the network
+    // cache but that the browser has not yet decoded into a GPU bitmap. Decoding
+    // before `setRevealed(true)` eliminates the pop-in that would otherwise be
+    // visible while the browser decodes on the render thread (#930).
+    //
+    // evolution:         hiddenSide="post" → reveal shows postEvoSpriteUrl
+    // reverse-evolution: hiddenSide="pre"  → reveal shows preEvoSpriteUrl
+    //
+    // Audio (cry + TTS) is triggered below, after `setRevealed`, so this await
+    // does not delay or reorder audio — it only defers the state swap briefly.
+    // The 500 ms safety valve in `decodeSpriteUrls` ensures the UI is never
+    // stuck even on a slow or absent decode path (e.g. test environments).
+    if (
+      effectiveCard.cardType === "evolution" ||
+      effectiveCard.cardType === "reverse-evolution"
+    ) {
+      const revealUrl =
+        effectiveCard.cardType === "evolution"
+          ? effectiveCard.postEvoSpriteUrl
+          : effectiveCard.preEvoSpriteUrl;
+      setRevealing(true);
+      try {
+        await decodeSpriteUrls([revealUrl]);
+      } finally {
+        setRevealing(false);
+      }
+    }
+
+    // Guard against running side-effects after the component has unmounted
+    // (e.g. the user navigated away while the decode-ahead was in flight).
+    // Symmetrical to the guard in handleGrade (~line 1598). The `finally`
+    // above already cleared `revealing`, so we can safely return here.
+    if (!isMountedRef.current) return;
+
     setRevealed(true);
     revealedCardId.current = effectiveCard.id;
     const revealSettings = loadSettings();
@@ -1810,7 +1825,8 @@ export function ReviewSession() {
           <button
             type="button"
             onClick={handleReveal}
-            className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+            disabled={revealing}
+            className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
           >
             Reveal
           </button>
@@ -1986,7 +2002,8 @@ export function ReviewSession() {
         <button
           type="button"
           onClick={handleReveal}
-          className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+          disabled={revealing}
+          className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           Reveal
         </button>
