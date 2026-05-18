@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCardClass } from "@/lib/review/useCardClass";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
@@ -10,6 +11,11 @@ import type { CardClassOrPending } from "@/lib/review/useCardClass";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import { CryButton } from "@/components/pokedex/CryButton";
+import { SpritePreloader } from "@/components/sprites/SpritePreloader";
+import {
+  POKEDEX_DETAIL_SPRITE_SIZE,
+  POKEDEX_NODE_SPRITE_SIZE,
+} from "@/lib/sprites/sizes";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -63,12 +69,11 @@ function EvolutionChainNode({ node }: { node: EvolutionNode }) {
       className="flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
     >
       {nodeSprite ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={nodeSprite}
           alt={nodeLocked ? `#${zeroPad(node.speciesId)} (locked)` : node.name}
-          width={40}
-          height={40}
+          width={POKEDEX_NODE_SPRITE_SIZE}
+          height={POKEDEX_NODE_SPRITE_SIZE}
           className={[
             "h-10 w-10 object-contain",
             nodeLocked ? "brightness-0" : nodeLearning ? "grayscale opacity-60" : "",
@@ -115,12 +120,11 @@ function FormBlock({ form }: { form: SeedPokemon }) {
     <details className="group rounded-lg border border-zinc-200 dark:border-zinc-800">
       <summary className="flex cursor-pointer select-none list-none items-center gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded-lg">
         {/* Sprite thumbnail */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={`/sprites/pokemon/${form.id}.png`}
           alt={form.displayName}
-          width={40}
-          height={40}
+          width={POKEDEX_NODE_SPRITE_SIZE}
+          height={POKEDEX_NODE_SPRITE_SIZE}
           className="h-10 w-10 object-contain"
         />
         <span className="flex-1 text-sm font-medium text-foreground">
@@ -146,12 +150,11 @@ function FormBlock({ form }: { form: SeedPokemon }) {
       <div className="border-t border-zinc-200 px-4 pb-4 pt-3 dark:border-zinc-800">
         {/* Full sprite */}
         <div className="mb-3 flex justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={`/sprites/pokemon/${form.id}.png`}
             alt={form.displayName}
-            width={120}
-            height={120}
+            width={POKEDEX_DETAIL_SPRITE_SIZE}
+            height={POKEDEX_DETAIL_SPRITE_SIZE}
             className="h-28 w-28 object-contain"
           />
         </div>
@@ -216,18 +219,33 @@ export function PokemonDetailDisclosure({
     );
   }
 
+  // Collect evo-chain sprite URLs (excluding the current Pokémon, which is
+  // already the main visible image) and warm them in the background so nodes
+  // render without pop-in when the chain section scrolls into view.
+  const evoNodeUrls = evolutionChain
+    .filter((node) => node.speciesId !== id)
+    .map((node) => SPRITE_BY_ID[node.speciesId])
+    .filter((url): url is string => Boolean(url));
+
   return (
     <>
+      {evoNodeUrls.length > 0 && (
+        <SpritePreloader
+          sizedUrls={evoNodeUrls.map((src) => ({
+            src,
+            width: POKEDEX_NODE_SPRITE_SIZE,
+          }))}
+        />
+      )}
       <div className="flex flex-col items-center gap-4">
         <p className="text-sm font-mono text-zinc-400 dark:text-zinc-500">
           #{zeroPad(id)}
         </p>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={spriteUrl}
           alt={isLocked ? `#${zeroPad(id)} (locked)` : name}
-          width={192}
-          height={192}
+          width={POKEDEX_DETAIL_SPRITE_SIZE}
+          height={POKEDEX_DETAIL_SPRITE_SIZE}
           className={[
             "h-48 w-48 object-contain",
             isLocked ? "brightness-0" : isLearning ? "grayscale opacity-60" : "",

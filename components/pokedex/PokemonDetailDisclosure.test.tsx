@@ -3,6 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
+// Mock next/image — renders as a plain img so alt/src/width assertions work
+// ---------------------------------------------------------------------------
+
+vi.mock("next/image", () => ({
+  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    <img {...props} />
+  ),
+}));
+
+// ---------------------------------------------------------------------------
 // Mocks for audio modules
 // ---------------------------------------------------------------------------
 
@@ -246,5 +257,59 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
     // We check it's at most 1 occurrence (the main heading)
     expect(formHeadings.length).toBeLessThanOrEqual(1);
     expect(summaries.length).toBeLessThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — sprite sizes (#931: shared primitive adoption)
+// ---------------------------------------------------------------------------
+
+import {
+  POKEDEX_DETAIL_SPRITE_SIZE,
+  POKEDEX_NODE_SPRITE_SIZE,
+} from "@/lib/sprites/sizes";
+
+describe("PokemonDetailDisclosure — sprite sizes (#931)", () => {
+  beforeEach(() => {
+    mockCardClass.value = "mastered";
+    mockPretendAllMastered.value = false;
+  });
+
+  it("main sprite renders at POKEDEX_DETAIL_SPRITE_SIZE", () => {
+    const pokemon = makePokemon({ spriteUrl: "/sprites/pokemon/1.png" });
+    render(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    const img = screen.getByRole("img", { name: "Bulbasaur" });
+    expect(img).toHaveAttribute("width", String(POKEDEX_DETAIL_SPRITE_SIZE));
+    expect(img).toHaveAttribute("height", String(POKEDEX_DETAIL_SPRITE_SIZE));
+  });
+
+  it("alt-form thumbnail in FormBlock renders at POKEDEX_NODE_SPRITE_SIZE", () => {
+    const pokemon = makePokemon({ cryUrl: null });
+    const form = makeAltForm({ displayName: "Alolan Raichu" });
+    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+
+    // The thumbnail img inside the FormBlock summary is the one that comes
+    // before the span text; query by alt to target it specifically.
+    const thumbnails = screen.getAllByRole("img", { name: "Alolan Raichu" });
+    // Two images: the summary thumbnail and the full-size sprite inside the
+    // expanded block. Both should exist; check the thumbnail (smaller width).
+    const thumbnail = thumbnails.find(
+      (el) => el.getAttribute("width") === String(POKEDEX_NODE_SPRITE_SIZE),
+    );
+    expect(thumbnail).toBeTruthy();
+    expect(thumbnail).toHaveAttribute("height", String(POKEDEX_NODE_SPRITE_SIZE));
+  });
+
+  it("alt-form full sprite in FormBlock renders at POKEDEX_DETAIL_SPRITE_SIZE", () => {
+    const pokemon = makePokemon({ cryUrl: null });
+    const form = makeAltForm({ displayName: "Alolan Raichu" });
+    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+
+    const fullSprite = screen.getAllByRole("img", { name: "Alolan Raichu" }).find(
+      (el) => el.getAttribute("width") === String(POKEDEX_DETAIL_SPRITE_SIZE),
+    );
+    expect(fullSprite).toBeTruthy();
+    expect(fullSprite).toHaveAttribute("height", String(POKEDEX_DETAIL_SPRITE_SIZE));
   });
 });
