@@ -432,6 +432,29 @@ test.describe("Settings — re-enable card type prompt (#835)", () => {
   });
 });
 
+test.describe("Settings — CSV review history export (#918)", () => {
+  test("Download CSV link is not visible for guests (no session)", async ({
+    page,
+  }) => {
+    // The CSV export control is gated on a signed-in session. E2E runs in
+    // guest mode only, so the link must not render.
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /account & data/i }).click();
+
+    await expect(
+      page.getByRole("link", { name: /download csv/i }),
+    ).toHaveCount(0);
+  });
+
+  test("GET /api/export returns 401 for an unauthenticated request", async ({
+    page,
+  }) => {
+    // Verify the endpoint exists and guards against unauthenticated access.
+    const response = await page.request.get("/api/export");
+    expect(response.status()).toBe(401);
+  });
+});
+
 test.describe("Settings — Danger zone (#697)", () => {
   test("danger zone shows Reset all progress; Delete account is hidden for guests", async ({
     page,
