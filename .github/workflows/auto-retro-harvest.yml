@@ -31,8 +31,13 @@ name: Auto Retro Harvest
 # Idempotency overall:
 #   - The digest is regenerated wholesale, so a re-run simply rewrites the
 #     same file (a no-op commit is skipped via `git diff --quiet`).
-#   - The pattern auto-file dedupes on the slug marker, so a re-run within
-#     the same week re-files nothing.
+#   - The pattern auto-file dedupes on the slug marker. A shell pre-flight
+#     step (`patterns`) enumerates every existing `<!-- auto-retro-pattern:* -->`
+#     issue and passes the slugs to the LLM so a recurring problem reuses its
+#     existing slug rather than minting a drifted one. The in-prompt Step 4a
+#     check then scans candidate issue bodies for the literal marker with a
+#     `contains()` substring match (NOT `gh issue list --search`, whose index
+#     strips HTML-comment tokens), so a re-run re-files nothing.
 
 on:
   schedule:
@@ -52,8 +57,6 @@ jobs:
     permissions:
       contents: write       # commit docs/retros.md to qa
       issues: write         # file recurring-pattern tracking issues
-      pull-requests: read
-      id-token: write
 
     steps:
       - name: Mint App installation token
@@ -72,6 +75,48 @@ jobs:
       - name: Compute today date
         id: date
         run: echo "date=$(date -u +"%Y-%m-%d")" >> "$GITHUB_OUTPUT"
+
+      - name: Enumerate existing auto-retro-pattern issues
+        id: patterns
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # GitHub's search index strips HTML-comment tokens, so an
+          # `in:body` search for the `<!-- auto-retro-pattern:<slug> -->`
+          # marker never matches. Instead, enumerate every issue's body and
+          # scan it for the literal marker with grep -F. This is the same
+          # pattern auto-deep-audit.yml uses for its dated markers.
+          #
+          # The output is a newline-delimited list of `<slug>\t<state>\t<number>`
+          # rows for every already-filed pattern issue (open and closed). It
+          # is passed to Claude so the LLM can reuse an existing slug for a
+          # recurring problem instead of minting a fresh one — without this,
+          # phrasing drift between runs would defeat the dedup entirely.
+          ROWS=$(gh issue list --repo "$REPO" --state all --limit 400 \
+            --json number,state,body \
+            --jq '.[]
+                  | . as $i
+                  | ($i.body // "")
+                  | capture("<!-- auto-retro-pattern:(?<slug>[a-z0-9-]+) -->"; "g")
+                  | "\(.slug)\t\($i.state)\t\($i.number)"' \
+            2>/dev/null | sort -u || true)
+
+          if [ -z "$ROWS" ]; then
+            echo "No existing auto-retro-pattern issues found."
+          else
+            echo "Existing auto-retro-pattern issues:"
+            echo "$ROWS"
+          fi
+
+          # Multi-line value — use a heredoc delimiter for GITHUB_OUTPUT.
+          {
+            echo "rows<<PATTERN_ROWS_EOF"
+            echo "$ROWS"
+            echo "PATTERN_ROWS_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: anthropics/claude-code-action@v1
         id: claude
@@ -200,11 +245,35 @@ jobs:
             strict: vague thematic similarity is not a cluster. The problem
             must be genuinely the same actionable thing.
 
-            For each cluster of >= 3, derive a short stable slug (lowercase,
-            hyphenated, e.g. `coverage-full-diff-before-drain`). The slug must
-            be deterministic for the problem so re-runs dedupe correctly —
-            base it on the concrete problem, not on which issues happened to
-            be in the cluster this week.
+            For each cluster of >= 3, you must settle on a stable slug
+            (lowercase, hyphenated, e.g. `coverage-full-diff-before-drain`).
+            The slug must be deterministic for the problem so re-runs dedupe
+            correctly. Because the slug is derived by you (an LLM), phrasing
+            drift between runs could otherwise mint two different slugs for
+            the same recurring problem and defeat the dedup. To prevent that:
+
+            **Already-filed patterns (reuse their slugs).** The workflow has
+            pre-enumerated every existing `<!-- auto-retro-pattern:<slug> -->`
+            tracking issue. Each row below is `<slug>` TAB `<state>` TAB
+            `<issue-number>`:
+
+            ```
+            ${{ steps.patterns.outputs.rows }}
+            ```
+
+            (If that block is empty, no pattern issues have ever been filed.)
+
+            For every cluster you detect, compare it against this list:
+
+            - If the cluster describes the SAME concrete problem as an
+              already-filed pattern, **reuse that issue's existing slug** —
+              do not invent a new one — and let the Step 4a idempotency check
+              decide whether to re-file. Never mint a fresh slug for a problem
+              that already has a tracking issue.
+            - Only mint a brand-new slug for a genuinely new concrete problem
+              not present in the list above. Base a new slug on the concrete
+              problem itself, not on which issues happened to be in the
+              cluster this week.
 
             If NO cluster reaches 3 retros, file nothing — proceed to Step 5.
 
@@ -214,20 +283,35 @@ jobs:
 
             ### 4a. Idempotency check
 
-            The marker is `<!-- auto-retro-pattern:<slug> -->`. Search for an
-            existing auto-filed issue carrying it:
+            The marker is `<!-- auto-retro-pattern:<slug> -->`. Do NOT use
+            `gh issue list --search '... in:body'` — GitHub's search index
+            strips HTML-comment tokens, so that query never matches and the
+            dedup silently fails.
+
+            Instead, enumerate candidate issues and scan their bodies for the
+            literal marker with `grep -F` — the same approach
+            `auto-deep-audit.yml` uses. Find any issue whose body contains the
+            exact marker line:
 
             ```bash
-            gh issue list --state all --limit 200 \
-              --search '"<!-- auto-retro-pattern:<slug> -->" in:body' \
-              --json number,state,closedAt
+            # List all issues (open + closed) with body + state + closedAt,
+            # then keep only those whose body contains the literal marker.
+            gh issue list --state all --limit 400 \
+              --json number,state,closedAt,body \
+              --jq '.[] | select(.body | contains("<!-- auto-retro-pattern:<slug> -->"))
+                          | {number, state, closedAt}'
             ```
+
+            Substitute the actual slug into both occurrences of `<slug>`.
+            `contains(...)` does a literal substring match — equivalent to
+            `grep -F` — so it is immune to the search-index stripping.
 
             Skip filing this cluster if EITHER:
             - an OPEN issue with that marker exists, OR
             - a CLOSED issue with that marker was closed within the last 60
               days (recently closed — do not re-file a freshly-resolved
-              pattern).
+              pattern). Compare `closedAt` against 60 days before
+              ${{ steps.date.outputs.date }}.
 
             A closed issue with that marker older than 60 days does NOT block
             re-filing — the pattern has resurfaced and is worth re-tracking.
@@ -251,7 +335,7 @@ jobs:
 
             Filed automatically by `auto-retro-harvest.yml` because the same
             problem recurred across >= 3 retros. See the
-            [retrospectives digest](../blob/qa/docs/retros.md).
+            [retrospectives digest](https://github.com/fraserbrookhouse/poke-memory/blob/qa/docs/retros.md).
             ```
 
             Then create the issue:
