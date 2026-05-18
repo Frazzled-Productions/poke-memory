@@ -48,7 +48,7 @@ const DISMISS_MS = 4500;
 const MILESTONE_SUB: Partial<Record<number, string>> = {
   365: "One full year of practice.",
   465: "Over a year and counting.",
-  565: "Pushing eighteen months.",
+  565: "Nearly nineteen months.",
 };
 
 const TIER_SUB: Record<MilestoneTier, string> = {

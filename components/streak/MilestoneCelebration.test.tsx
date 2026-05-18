@@ -38,6 +38,13 @@ describe("MilestoneCelebration — copy", () => {
     expect(screen.getByText("Over a year and counting.")).toBeInTheDocument();
   });
 
+  it("falls back to the major-tier sub-copy for a major milestone with no keyed copy", () => {
+    // 665 is major-tier but has no entry in MILESTONE_SUB — exercises the fallback.
+    render(<MilestoneCelebration milestone={665} onDismiss={() => {}} />);
+    expect(screen.getByText("665-day streak!")).toBeInTheDocument();
+    expect(screen.getByText("That is seriously impressive.")).toBeInTheDocument();
+  });
+
   it("has the correct accessible aria-label", () => {
     render(<MilestoneCelebration milestone={30} onDismiss={() => {}} />);
     expect(

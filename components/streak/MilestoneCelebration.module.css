@@ -15,6 +15,12 @@
   z-index: 50;
 }
 
+/* Tier modifiers on the overlay — light and standard carry no extra overlay
+ * styling beyond their banner variants, but these rules must exist so the
+ * CSS-module object resolves the keys (avoids class="... undefined" in prod). */
+.overlay--light {}
+.overlay--standard {}
+
 /* ---------------------------------------------------------------------------
  * Banner — base + tier variants
  * --------------------------------------------------------------------------- */
