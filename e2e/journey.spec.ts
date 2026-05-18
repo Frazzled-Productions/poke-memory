@@ -295,6 +295,77 @@ test.describe("Journey page — evolution wall", () => {
   });
 });
 
+test.describe("Journey page — milestone share card", () => {
+  test("banner is absent on a fresh guest session (no mastered Pokémon)", async ({
+    page,
+  }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // No mastered Pokémon on a fresh guest — banner must not be present.
+    await expect(
+      page.getByTestId("milestone-share-banner"),
+    ).toHaveCount(0);
+  });
+
+  test("banner is absent when pretendAllMastered superuser flag is on", async ({
+    page,
+  }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // Superuser guard must suppress the banner even though mastery is faked.
+    await expect(
+      page.getByTestId("milestone-share-banner"),
+    ).toHaveCount(0);
+  });
+
+  test("banner appears when mastery crosses a count threshold", async ({
+    page,
+  }) => {
+    // Seed 10 mastered name cards into localStorage before the page loads.
+    await page.addInitScript(() => {
+      // Mastery requires reps >= 3 AND scheduledDays >= 21.
+      const cards = Array.from({ length: 10 }, (_, i) => ({
+        id: i + 1,
+        speciesId: i + 1,
+        cardType: "name",
+        subjectKey: String(i + 1),
+        state: {
+          stability: 30,
+          difficulty: 5,
+          elapsedDays: 0,
+          scheduledDays: 21,
+          reps: 3,
+          lapses: 0,
+          fsrsState: "review",
+          dueDate: "2099-01-01",
+          lastReview: "2025-01-01",
+          firstSeen: "2024-12-01",
+          learningStep: null,
+          stepStartedAt: null,
+          hiddenSince: null,
+          seenInPasture: false,
+        },
+      }));
+      window.localStorage.setItem(
+        "poke-memory:session:v1",
+        JSON.stringify({ cards, limits: {} }),
+      );
+    });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByTestId("milestone-share-banner"),
+    ).toBeVisible();
+  });
+});
+
 test.describe("Journey page — navigation", () => {
   test("Journey link in the desktop nav navigates to /journey", async ({
     page,
