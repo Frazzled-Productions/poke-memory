@@ -468,6 +468,9 @@ export function ReviewSession() {
   const [audioFeaturesOff, setAudioFeaturesOff] = useState(false);
   const [cardTypesAllOn, setCardTypesAllOn] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  // True while decode-ahead is running for an evolution/reverse-evolution
+  // reveal flip. Guards against double-taps during the brief async window.
+  const [revealing, setRevealing] = useState(false);
   const [grading, setGrading] = useState(false);
   // Transient flag: user chose "Keep reviewing" at the soft wall.
   // Not persisted — resets on every page load by design.
@@ -1318,12 +1321,12 @@ export function ReviewSession() {
 
   // --- Handlers ---
 
-  function handleReveal() {
+  async function handleReveal() {
     // Use effectiveCard rather than currentCard so the reveal always acts on
     // the card currently displayed (#839). After a learning-queue re-render,
     // currentCard may have shifted to a newly-due learning card while the
     // displayedCardId lock keeps effectiveCard pointing to the original card.
-    if (effectiveCard === null) return;
+    if (effectiveCard === null || revealing) return;
     if (effectiveCard.cardType === "name") {
       const facts = getPokemonFacts(effectiveCard);
       setCurrentFact(selectFact(facts));
@@ -1347,6 +1350,36 @@ export function ReviewSession() {
     } else {
       setCurrentFact(null);
     }
+
+    // Decode-ahead: for evolution and reverse-evolution cards, the reveal flip
+    // shows a sprite that `SpritePreloader` has already warmed into the network
+    // cache but that the browser has not yet decoded into a GPU bitmap. Decoding
+    // before `setRevealed(true)` eliminates the pop-in that would otherwise be
+    // visible while the browser decodes on the render thread (#930).
+    //
+    // evolution:         hiddenSide="post" → reveal shows postEvoSpriteUrl
+    // reverse-evolution: hiddenSide="pre"  → reveal shows preEvoSpriteUrl
+    //
+    // Audio (cry + TTS) is triggered below, after `setRevealed`, so this await
+    // does not delay or reorder audio — it only defers the state swap briefly.
+    // The 500 ms safety valve in `decodeSpriteUrls` ensures the UI is never
+    // stuck even on a slow or absent decode path (e.g. test environments).
+    if (
+      effectiveCard.cardType === "evolution" ||
+      effectiveCard.cardType === "reverse-evolution"
+    ) {
+      const revealUrl =
+        effectiveCard.cardType === "evolution"
+          ? effectiveCard.postEvoSpriteUrl
+          : effectiveCard.preEvoSpriteUrl;
+      setRevealing(true);
+      try {
+        await decodeSpriteUrls([revealUrl]);
+      } finally {
+        setRevealing(false);
+      }
+    }
+
     setRevealed(true);
     revealedCardId.current = effectiveCard.id;
     const revealSettings = loadSettings();
@@ -1777,7 +1810,8 @@ export function ReviewSession() {
           <button
             type="button"
             onClick={handleReveal}
-            className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+            disabled={revealing}
+            className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
           >
             Reveal
           </button>
@@ -1953,7 +1987,8 @@ export function ReviewSession() {
         <button
           type="button"
           onClick={handleReveal}
-          className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+          disabled={revealing}
+          className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           Reveal
         </button>

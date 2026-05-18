@@ -194,6 +194,17 @@ vi.mock("@/lib/audio/waitForAudio", () => ({
   waitForAudio: vi.fn(() => Promise.resolve()),
 }));
 
+// decodeSpriteUrls resolves immediately in the test environment (jsdom has no
+// HTMLImageElement.decode). Mocking it here lets individual tests spy on calls
+// without relying on the graceful-fallback path in the real implementation.
+const { mockDecodeSpriteUrls } = vi.hoisted(() => ({
+  mockDecodeSpriteUrls: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@/lib/sprites/decode", () => ({
+  decodeSpriteUrls: mockDecodeSpriteUrls,
+  DECODE_TIMEOUT_MS: 500,
+}));
+
 // Spy on nextReview using the real implementation by default — individual tests
 // can override with mockImplementationOnce to inject errors.
 vi.mock("@/lib/srs/scheduler", async (importOriginal) => {
@@ -226,6 +237,8 @@ function getTileButtons(): HTMLElement[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Restore default implementations that vi.clearAllMocks() wipes.
+  mockDecodeSpriteUrls.mockResolvedValue(undefined);
   mockSeedPokemon.mockReturnValue([FIXTURE_CARD]);
   mockLoadSettings.mockReturnValue({
     masteryRepetitions: 3,
@@ -316,6 +329,140 @@ describe("ReviewSession reveal flow", () => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
     );
     expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("handleReveal decode-ahead (#930)", () => {
+  /** Minimal EvolutionReviewCard fixture injected via loadSession. */
+  const EVO_CARD = {
+    cardType: "evolution" as const,
+    id: 1_500_001,
+    subjectKey: "1:2",
+    preEvoId: 1,
+    preEvoName: "Bulbasaur",
+    preEvoSpriteUrl: "/sprites/pokemon/1.png",
+    postEvoId: 2,
+    postEvoName: "Ivysaur",
+    postEvoSpriteUrl: "/sprites/pokemon/2.png",
+    triggerPhrase: "at level 16",
+    state: {
+      stability: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      scheduledDays: 0,
+      reps: 0,
+      lapses: 0,
+      fsrsState: "new" as const,
+      dueDate: "1970-01-01",
+      lastReview: null,
+      firstSeen: null,
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    },
+  };
+
+  const REVERSE_EVO_CARD = {
+    ...EVO_CARD,
+    cardType: "reverse-evolution" as const,
+    id: 2_500_001,
+  };
+
+  function settingsForEvoOnly() {
+    return {
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    };
+  }
+
+  it("calls decodeSpriteUrls with the post-evo sprite URL before revealing an evolution card", async () => {
+    const user = userEvent.setup();
+    mockSeedPokemon.mockReturnValue([]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [EVO_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue(settingsForEvoOnly());
+
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    // decodeSpriteUrls should have been called with only the revealed (post-evo)
+    // sprite, not the pre-evo sprite that is always visible.
+    expect(mockDecodeSpriteUrls).toHaveBeenCalledWith(["/sprites/pokemon/2.png"]);
+  });
+
+  it("calls decodeSpriteUrls with the pre-evo sprite URL before revealing a reverse-evolution card", async () => {
+    const user = userEvent.setup();
+    mockSeedPokemon.mockReturnValue([]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [REVERSE_EVO_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...settingsForEvoOnly(),
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: true,
+    });
+
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    // Reverse-evolution: hiddenSide="pre", so the pre-evo sprite is revealed.
+    expect(mockDecodeSpriteUrls).toHaveBeenCalledWith(["/sprites/pokemon/1.png"]);
+  });
+
+  it("does not call decodeSpriteUrls on reveal for a name card", async () => {
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    // decodeSpriteUrls should not be called during the reveal of a name card —
+    // there is no hidden sprite flip, so no decode-ahead is needed.
+    expect(mockDecodeSpriteUrls).not.toHaveBeenCalled();
+  });
+
+  it("reveals the answer after decode-ahead completes for an evolution card", async () => {
+    const user = userEvent.setup();
+    mockSeedPokemon.mockReturnValue([]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [EVO_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue(settingsForEvoOnly());
+
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+
+    // Grade buttons must appear after the reveal — confirming that setRevealed
+    // was called after the decode-ahead resolved.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /again/i })).toBeInTheDocument();
+    });
   });
 });
 
