@@ -137,14 +137,38 @@ describe("POST /api/srs/optimize — persistWeights via RPC", () => {
     });
   });
 
-  it("returns 500 when rpc returns an error", async () => {
+  it("returns 500 with save_failed when rpc returns an error", async () => {
     makeSupabaseMock({ rpcError: new Error("db error") });
 
     const response = await POST();
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body.error).toBe("optimization_failed");
+    expect(body.error).toBe("save_failed");
+  });
+
+  it("returns 422 with degenerate_data and reviewCount when computeParameters throws", async () => {
+    makeSupabaseMock();
+    (computeParameters as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("not enough data for optimization"),
+    );
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error).toBe("degenerate_data");
+    expect(typeof body.reviewCount).toBe("number");
+  });
+
+  it("returns 503 with reviews_unavailable when grade log fetch returns null", async () => {
+    makeSupabaseMock({ gradeLogError: new Error("connection refused") });
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe("reviews_unavailable");
   });
 
   it("returns 401 when the user is not authenticated", async () => {

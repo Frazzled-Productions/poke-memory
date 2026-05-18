@@ -166,10 +166,19 @@ export async function POST(): Promise<NextResponse> {
   // Fetch grade log from Supabase.
   const entries = await fetchGradeLog(supabase, user.id);
   if (entries === null) {
-    return NextResponse.json({ error: "optimization_failed" }, { status: 500 });
+    // Supabase fetch failed — the client's reviews may not have synced yet.
+    return NextResponse.json(
+      { error: "reviews_unavailable" },
+      { status: 503 },
+    );
   }
 
   // Gate on minimum review count.
+  // NOTE: the eligibility button on the Settings page counts the *local*
+  // grade log (IDB-backed), whereas this route counts the *cloud* grade_log
+  // table. A user mid-sync can therefore pass the client-side gate but fail
+  // here with not_enough_reviews. The component maps that 422 to "sync first,
+  // then try again", which is the correct recovery action.
   const reviewCount = countOptimizableReviews(entries);
   if (reviewCount < MIN_REVIEWS_FOR_OPTIMIZATION) {
     return NextResponse.json(
@@ -191,7 +200,12 @@ export async function POST(): Promise<NextResponse> {
     weights = await computeParameters(bindingItems, { enableShortTerm: true });
   } catch (err) {
     console.error("[/api/srs/optimize] computeParameters failed", err);
-    return NextResponse.json({ error: "optimization_failed" }, { status: 500 });
+    // The native binding throws on degenerate or insufficient data distributions.
+    // Return 422 (client-fixable: keep studying) rather than a generic 500.
+    return NextResponse.json(
+      { error: "degenerate_data", reviewCount },
+      { status: 422 },
+    );
   }
 
   // Persist the new weights atomically via the merge_user_settings RPC.
@@ -204,7 +218,7 @@ export async function POST(): Promise<NextResponse> {
   );
   if (!persisted) {
     console.error("[/api/srs/optimize] failed to persist weights for user", user.id);
-    return NextResponse.json({ error: "optimization_failed" }, { status: 500 });
+    return NextResponse.json({ error: "save_failed" }, { status: 500 });
   }
 
   return NextResponse.json({ weights, optimizedAt, reviewCount });
