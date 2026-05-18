@@ -109,7 +109,7 @@ describe("FsrsOptimizerSection", () => {
         );
         const button = screen.getByTestId("fsrs-optimize-button");
         expect(button).not.toBeDisabled();
-        expect(button).toHaveTextContent("Optimize now");
+        expect(button).toHaveTextContent("Optimise now");
       } finally {
         vi.useRealTimers();
       }
@@ -128,7 +128,7 @@ describe("FsrsOptimizerSection", () => {
       );
       const button = screen.getByTestId("fsrs-optimize-button");
       expect(button).not.toBeDisabled();
-      expect(button).toHaveTextContent("Optimize now");
+      expect(button).toHaveTextContent("Optimise now");
     });
   });
 
@@ -161,7 +161,7 @@ describe("FsrsOptimizerSection", () => {
   });
 
   describe("signed in — enough reviews", () => {
-    it("renders an enabled Optimize now button", () => {
+    it("renders an enabled Optimise now button", () => {
       render(
         <FsrsOptimizerSection
           {...defaultProps}
@@ -171,7 +171,7 @@ describe("FsrsOptimizerSection", () => {
       );
       const button = screen.getByTestId("fsrs-optimize-button");
       expect(button).not.toBeDisabled();
-      expect(button).toHaveTextContent("Optimize now");
+      expect(button).toHaveTextContent("Optimise now");
     });
 
     it("shows last-optimized timestamp when fsrsWeightsOptimizedAt is set", () => {
@@ -306,6 +306,33 @@ describe("FsrsOptimizerSection", () => {
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
           "Couldn't load your reviews. Check your connection and try again.",
+        );
+      });
+    });
+
+    it("shows service-unavailable message for 503 service_unavailable error code", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 503,
+          json: async () => ({ error: "service_unavailable" }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Couldn't load your settings. Check your connection and try again.",
         );
       });
     });

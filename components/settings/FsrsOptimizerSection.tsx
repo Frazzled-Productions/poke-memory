@@ -96,8 +96,10 @@ export function FsrsOptimizerSection({
               ? Math.max(1, Math.ceil(body.retryAfterMs / MS_PER_DAY))
               : 7;
           setErrorMsg(`Try again in ${days} day${days === 1 ? "" : "s"}.`);
-        } else if (res.status === 503 || errorCode === "reviews_unavailable") {
+        } else if (errorCode === "reviews_unavailable") {
           setErrorMsg("Couldn't load your reviews. Check your connection and try again.");
+        } else if (errorCode === "service_unavailable") {
+          setErrorMsg("Couldn't load your settings. Check your connection and try again.");
         } else if (errorCode === "save_failed") {
           setErrorMsg("Optimisation succeeded but couldn't be saved. Try again.");
         } else {
@@ -171,7 +173,7 @@ export function FsrsOptimizerSection({
               data-testid="fsrs-optimize-button"
               className="mt-2 inline-flex items-center gap-2 min-h-[44px] rounded-lg bg-zinc-200 text-zinc-500 px-6 py-2 text-sm font-semibold dark:bg-zinc-800 dark:text-zinc-400"
             >
-              Optimize now
+              Optimise now
             </button>
             <p
               data-testid="fsrs-optimize-help"
@@ -234,8 +236,8 @@ export function FsrsOptimizerSection({
                   />
                 )}
                 {optimizerState === "running"
-                  ? "Optimizing… this may take a moment."
-                  : "Optimize now"}
+                  ? "Optimising… this may take a moment."
+                  : "Optimise now"}
               </button>
               {optimizerState === "error" && errorMsg !== null && (
                 <p
