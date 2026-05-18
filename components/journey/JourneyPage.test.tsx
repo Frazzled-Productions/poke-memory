@@ -669,12 +669,18 @@ describe("JourneyPage — timeline and evolution wall layout placeholders (#961)
 
     render(<JourneyPage />);
 
-    // After the load effect completes, the Collection timeline heading must be
-    // visible via the real CollectionTimeline widget (which also renders the heading).
+    // After the load effect completes, both headings must be present AND the
+    // aria-busy skeleton sections must be gone — verifying the swap happened,
+    // not just that a heading (which also exists in the skeleton) is present.
     await waitFor(() => {
       expect(
         screen.getByRole("heading", { name: "Collection timeline" }),
       ).toBeInTheDocument();
+      // aria-busy sections are only present while the skeleton placeholders are
+      // showing; absence confirms the real widgets have replaced them.
+      expect(
+        document.querySelector('[aria-busy="true"]'),
+      ).not.toBeInTheDocument();
     });
 
     // The evolution wall heading must be present too.

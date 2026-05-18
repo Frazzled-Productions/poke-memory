@@ -68,17 +68,10 @@ function useReducedMotion(): boolean {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SkeletonBlock({
-  className,
-  "aria-label": ariaLabel,
-}: {
-  className: string;
-  "aria-label"?: string;
-}) {
+function SkeletonBlock({ className }: { className: string }) {
   return (
     <div
       className={`animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800 ${className}`}
-      aria-label={ariaLabel}
     />
   );
 }
@@ -607,7 +600,7 @@ export default function JourneyPage() {
                 >
                   Evolution wall
                 </h2>
-                <SkeletonBlock className="h-[112px] w-full" />
+                <SkeletonBlock className="h-10 w-full" />
               </section>
             )}
 
