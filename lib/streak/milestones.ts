@@ -2,9 +2,9 @@
  * Streak milestone days (in calendar days reviewed in-a-row).
  *
  * The early ramp hooks new users quickly (3, 7, 14, 30). Gaps are then
- * capped at ~100 days so consistent users stay celebrated (60, 100, 150,
- * 200, 250, 365). After 365, a milestone fires every 100 days (465, 565, …)
- * so the tail is unbounded and no gap exceeds 100 days.
+ * kept to ~115 days or fewer so consistent users stay celebrated (60, 100,
+ * 150, 200, 250, 365). After 365, a milestone fires every 100 days (465,
+ * 565, …) so the tail is unbounded and no gap exceeds ~115 days.
  */
 export const STREAK_MILESTONES: readonly number[] = [
   3, 7, 14, 30, 60, 100, 150, 200, 250, 365,
