@@ -1,0 +1,264 @@
+/**
+ * Component tests for usePwaBadge (issue #916).
+ *
+ * Covers:
+ *   - Sets badge to the sum of new + learning + review cards when due count > 0.
+ *   - Clears badge when there are no due cards.
+ *   - Clears badge when session is null.
+ *   - Is a no-op when the Web Badging API is unavailable.
+ *   - Re-syncs when the session storage key changes (card graded).
+ *   - Re-syncs when SETTINGS_SAVED_EVENT fires (e.g. timezone changed).
+ *   - Clears badge on unmount.
+ */
+
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
+
+const mockLoadSession = vi.fn().mockResolvedValue(null);
+vi.mock("@/lib/review/persistence", () => ({
+  loadSession: () => mockLoadSession(),
+  STORAGE_KEY: "poke-memory:review-session:v1",
+}));
+
+const mockLoadSettings = vi.fn().mockReturnValue({ timezone: "UTC" });
+vi.mock("@/lib/settings/persistence", () => ({
+  loadSettings: () => mockLoadSettings(),
+  SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
+}));
+
+// buildQueueCounters and todayString are tested separately; mock them here to
+// keep usePwaBadge tests isolated from the SRS scheduler.
+const mockBuildQueueCounters = vi.fn().mockReturnValue({
+  newCount: 0,
+  learningCount: 0,
+  reviewCount: 0,
+});
+vi.mock("@/lib/review/session", () => ({
+  buildQueueCounters: (...args: unknown[]) => mockBuildQueueCounters(...args),
+  todayString: vi.fn().mockReturnValue("2026-05-18"),
+}));
+
+let sessionVersion = 0;
+vi.mock("@/lib/hooks/useLocalStorageKey", () => ({
+  useLocalStorageKey: vi.fn(() => sessionVersion),
+}));
+
+// ---------------------------------------------------------------------------
+
+import { usePwaBadge } from "./usePwaBadge";
+
+// ---------------------------------------------------------------------------
+// Badge API mocks
+// ---------------------------------------------------------------------------
+
+const mockSetAppBadge = vi.fn().mockResolvedValue(undefined);
+const mockClearAppBadge = vi.fn().mockResolvedValue(undefined);
+
+function installBadgeApi() {
+  Object.defineProperty(navigator, "setAppBadge", {
+    value: mockSetAppBadge,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(navigator, "clearAppBadge", {
+    value: mockClearAppBadge,
+    configurable: true,
+    writable: true,
+  });
+}
+
+function removeBadgeApi() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic prototype manipulation in tests
+  delete (navigator as any).setAppBadge;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete (navigator as any).clearAppBadge;
+}
+
+// ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  mockSetAppBadge.mockClear();
+  mockClearAppBadge.mockClear();
+  mockLoadSession.mockResolvedValue(null);
+  mockLoadSettings.mockReturnValue({ timezone: "UTC" });
+  mockBuildQueueCounters.mockReturnValue({
+    newCount: 0,
+    learningCount: 0,
+    reviewCount: 0,
+  });
+  sessionVersion = 0;
+  installBadgeApi();
+});
+
+afterEach(() => {
+  removeBadgeApi();
+});
+
+// ---------------------------------------------------------------------------
+
+describe("usePwaBadge", () => {
+  it("clears badge when session is null", async () => {
+    mockLoadSession.mockResolvedValue(null);
+
+    renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockClearAppBadge).toHaveBeenCalledTimes(1);
+    });
+    expect(mockSetAppBadge).not.toHaveBeenCalled();
+  });
+
+  it("clears badge when there are no due cards", async () => {
+    mockLoadSession.mockResolvedValue({
+      cards: [{ id: 1 }],
+      limits: {},
+    });
+    mockBuildQueueCounters.mockReturnValue({
+      newCount: 0,
+      learningCount: 0,
+      reviewCount: 0,
+    });
+
+    renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockClearAppBadge).toHaveBeenCalledTimes(1);
+    });
+    expect(mockSetAppBadge).not.toHaveBeenCalled();
+  });
+
+  it("sets badge to total due count (new + learning + review)", async () => {
+    mockLoadSession.mockResolvedValue({
+      cards: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }],
+      limits: {},
+    });
+    mockBuildQueueCounters.mockReturnValue({
+      newCount: 2,
+      learningCount: 1,
+      reviewCount: 3,
+    });
+
+    renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockSetAppBadge).toHaveBeenCalledWith(6);
+    });
+    expect(mockClearAppBadge).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op when the Web Badging API is unavailable", async () => {
+    removeBadgeApi();
+
+    mockLoadSession.mockResolvedValue({
+      cards: [{ id: 1 }],
+      limits: {},
+    });
+    mockBuildQueueCounters.mockReturnValue({
+      newCount: 1,
+      learningCount: 0,
+      reviewCount: 0,
+    });
+
+    // Should not throw.
+    const { unmount } = renderHook(() => usePwaBadge());
+
+    // Wait a tick to ensure async path has run.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    expect(mockSetAppBadge).not.toHaveBeenCalled();
+    expect(mockClearAppBadge).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("re-syncs when the session storage key increments", async () => {
+    // First render: no cards due.
+    mockLoadSession.mockResolvedValue(null);
+    const { rerender } = renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockClearAppBadge).toHaveBeenCalledTimes(1);
+    });
+
+    // Simulate a card review: session key bumps, session now has due cards.
+    sessionVersion = 1;
+    mockLoadSession.mockResolvedValue({
+      cards: [{ id: 1 }],
+      limits: {},
+    });
+    mockBuildQueueCounters.mockReturnValue({
+      newCount: 0,
+      learningCount: 0,
+      reviewCount: 2,
+    });
+
+    rerender();
+
+    await waitFor(() => {
+      expect(mockSetAppBadge).toHaveBeenCalledWith(2);
+    });
+  });
+
+  it("re-syncs when SETTINGS_SAVED_EVENT fires", async () => {
+    mockLoadSession.mockResolvedValue({
+      cards: [{ id: 1 }],
+      limits: {},
+    });
+    mockBuildQueueCounters.mockReturnValue({
+      newCount: 1,
+      learningCount: 0,
+      reviewCount: 0,
+    });
+
+    renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockSetAppBadge).toHaveBeenCalledWith(1);
+    });
+
+    // Settings change (e.g. timezone) — should re-sync.
+    mockBuildQueueCounters.mockReturnValue({
+      newCount: 1,
+      learningCount: 2,
+      reviewCount: 0,
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event("poke-memory:settings-saved"));
+    });
+
+    await waitFor(() => {
+      expect(mockSetAppBadge).toHaveBeenCalledWith(3);
+    });
+  });
+
+  it("clears badge on unmount", async () => {
+    mockLoadSession.mockResolvedValue({
+      cards: [{ id: 1 }],
+      limits: {},
+    });
+    mockBuildQueueCounters.mockReturnValue({
+      newCount: 1,
+      learningCount: 0,
+      reviewCount: 0,
+    });
+
+    const { unmount } = renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockSetAppBadge).toHaveBeenCalledWith(1);
+    });
+
+    mockClearAppBadge.mockClear();
+    unmount();
+
+    await waitFor(() => {
+      expect(mockClearAppBadge).toHaveBeenCalledTimes(1);
+    });
+  });
+});
