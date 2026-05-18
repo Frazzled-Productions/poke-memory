@@ -3,20 +3,20 @@
 import { useEffect, useState, Suspense } from "react";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
-import { loadSession } from "@/lib/review/persistence";
+import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { classifyCard } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
-import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { LoadingSkeleton } from "@/components/pokedex/PokedexGrid";
 import PokedexFiltered from "@/components/pokedex/PokedexFiltered";
 
 export default function PokedexPage() {
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
-  const storageVersion = useSessionStorageKey();
+  const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
 
   useEffect(() => {
     async function load() {

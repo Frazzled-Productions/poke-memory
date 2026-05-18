@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { loadSession, saveSession } from "@/lib/review/persistence";
+import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import type { SavedSession } from "@/lib/review/persistence";
 import { filterMastered, markSeenInPasture } from "@/lib/pasture/arrivals";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
@@ -13,7 +13,7 @@ import { PastureSearchBar } from "@/components/pasture/PastureSearchBar";
 import { pushSingleCard } from "@/lib/sync/cloud";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { useSessionStorageKey } from "@/lib/review/useSessionStorageKey";
+import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
@@ -92,7 +92,7 @@ export default function PasturePage() {
   // Re-load when the session localStorage key changes (post-grade sync, post-reset
   // via clearLocalProgress). Matches the pattern used by Stats and Pokédex; without
   // this, a reset that does not navigate away from /pasture would leave stale state.
-  const storageVersion = useSessionStorageKey();
+  const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   // Re-render when the user saves Settings, so a change to the
   // masteryRepetitions threshold re-filters the pasture without needing a
   // session storage bump or a navigation away and back.
@@ -154,7 +154,7 @@ export default function PasturePage() {
       const partialUpdated = markSeenInPasture(cardId, session);
       const updated: SavedSession = { ...session, cards: partialUpdated.cards };
       // saveSession dispatches the synthetic StorageEvent for same-tab
-      // subscribers (useSessionStorageKey).
+      // subscribers (useLocalStorageKey).
       await saveSession(updated);
       setSession(updated);
 

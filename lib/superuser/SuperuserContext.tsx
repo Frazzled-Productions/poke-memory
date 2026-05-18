@@ -176,7 +176,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
               ? { lastSettingsPullAt: pulledSettings.updatedAt }
               : {}),
           });
-          // Synthetic StorageEvent: same-tab subscribers (useSessionStorageKey)
+          // Synthetic StorageEvent: same-tab subscribers (useLocalStorageKey)
           // only re-render on this event. Dispatch ONLY when we actually wrote
           // fresh data — pullSession returns null on error (not "no rows"; an
           // empty dataset returns []), so dispatching in the null branch would
