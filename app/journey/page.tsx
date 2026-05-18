@@ -16,6 +16,7 @@ import { loadGradeLog } from "@/lib/gradelog/persistence";
 import { buildCollectionTimeline, type CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { CollectionTimeline as CollectionTimelineWidget } from "@/components/journey/CollectionTimeline";
 import { EvolutionWall } from "@/components/journey/EvolutionWall";
+import { MilestoneShareButton } from "@/components/journey/MilestoneShareButton";
 import { deriveEvolutionFamilies, type EvolutionFamily } from "@/lib/evolution/chains";
 import type { ReviewableCard } from "@/lib/review/session";
 import { TrainerCard } from "@/components/stats/TrainerCard";
@@ -28,6 +29,7 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
+import { detectTopMilestone } from "@/lib/journey/milestones";
 import Link from "next/link";
 
 // ---------------------------------------------------------------------------
@@ -555,6 +557,16 @@ export default function JourneyPage() {
               totalMastered={stats.mastered}
               perGeneration={stats.perGeneration}
               earnedBadges={badgesToShow}
+            />
+
+            {/* Milestone share — hidden during superuser sessions so fake
+                mastery cannot produce a real share card (#917). */}
+            <MilestoneShareButton
+              milestone={
+                anyFlagOn
+                  ? null
+                  : detectTopMilestone(stats.mastered, stats.perGeneration)
+              }
             />
 
             {/* Collection timeline — the hero scrubber */}
