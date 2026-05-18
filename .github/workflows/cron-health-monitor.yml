@@ -50,6 +50,7 @@ jobs:
             "auto-codequality-suggest.yml|Auto Code-Quality Suggest|240"
             "auto-app-suggest.yml|Auto App Suggest|240"
             "auto-backlog-groom.yml|Auto Backlog Groom|240"
+            "auto-retro-harvest.yml|Auto Retro Harvest|240"
             "auto-deep-audit.yml|Auto Deep Audit|840"
           )
 
