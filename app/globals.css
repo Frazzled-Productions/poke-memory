@@ -9,9 +9,9 @@
      OKLCH interpolation between a saturated mascot (e.g. brown / green) and a
      neutral slate can travel through a muddy purple intermediate. srgb stays
      on a direct numeric path and produces predictable results across mascots. */
-  --theme-primary: #D8334A;
-  --theme-secondary: #F4B6C0;
-  --theme-accent: #B82838;
+  --theme-primary: #E01B2E;
+  --theme-secondary: #FF9DA6;
+  --theme-accent: #C2162A;
   --theme-fg-on-primary: #FFFFFF;
 
   /* Light-mode baseline. Surfaces carry a faint mascot wash so a chosen
