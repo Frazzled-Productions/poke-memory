@@ -1,6 +1,6 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeSky } from "./BiomeSky";
+import { BiomeFloor } from "./BiomeFloor";
 
 /**
  * Rough Terrain habitat backdrop — sunset over orange mesas with cracked
@@ -9,18 +9,8 @@ import styles from "./Biome.module.css";
  */
 export function RoughTerrainBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
-        <linearGradient id="rt-sky" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"  stopColor="#f4a058" />
-          <stop offset="50%" stopColor="#f6c478" />
-          <stop offset="100%" stopColor="#fde3a8" />
-        </linearGradient>
         <linearGradient id="rt-mesa-back" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#c6764a" />
           <stop offset="100%" stopColor="#a05832" />
@@ -32,7 +22,14 @@ export function RoughTerrainBiome() {
       </defs>
 
       {/* Sunset sky */}
-      <rect width="1600" height="600" fill="url(#rt-sky)" />
+      <BiomeSky
+        gradientId="rt-sky"
+        stops={[
+          { offset: "0%",   stopColor: "#f4a058" },
+          { offset: "50%",  stopColor: "#f6c478" },
+          { offset: "100%", stopColor: "#fde3a8" },
+        ]}
+      />
 
       {/* Sun */}
       <circle cx="780" cy="300" r="100" fill="#ffd060" opacity="0.45" />
@@ -60,13 +57,11 @@ export function RoughTerrainBiome() {
       </g>
 
       {/* Foreground rough ground */}
-      <path
-        d="M0,500 C200,488 400,510 700,495 C1000,484 1300,512 1600,490 L1600,600 L0,600 Z"
+      <BiomeFloor
+        curvePath="M0,500 C200,488 400,510 700,495 C1000,484 1300,512 1600,490"
         fill="url(#rt-ground)"
-      />
-      <path
-        d="M0,500 C200,488 400,510 700,495 C1000,484 1300,512 1600,490"
-        stroke="#7a3e1c" strokeWidth="3" fill="none" opacity="0.65"
+        strokeColour="#7a3e1c"
+        strokeOpacity={0.65}
       />
 
       {/* Cracked earth lines */}
@@ -146,6 +141,6 @@ export function RoughTerrainBiome() {
         <path d="M400,200 q5,-6 10,0 q5,-6 10,0" />
         <path d="M1240,170 q5,-6 10,0 q5,-6 10,0" />
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }

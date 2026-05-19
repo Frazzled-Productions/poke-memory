@@ -1,6 +1,6 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeSky } from "./BiomeSky";
+import { BiomeFloor } from "./BiomeFloor";
 
 /**
  * Wildlands (null-habitat) backdrop — a wide sunset panorama with many
@@ -10,19 +10,8 @@ import styles from "./Biome.module.css";
  */
 export function WildlandsBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
-        <linearGradient id="wl-sky" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"  stopColor="#3a4a78" />
-          <stop offset="35%" stopColor="#a86fa0" />
-          <stop offset="70%" stopColor="#f0a55c" />
-          <stop offset="100%" stopColor="#fde3a8" />
-        </linearGradient>
         <linearGradient id="wl-foreground" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#4a6a3a" />
           <stop offset="100%" stopColor="#2a4a22" />
@@ -35,7 +24,15 @@ export function WildlandsBiome() {
       </defs>
 
       {/* Sky */}
-      <rect width="1600" height="600" fill="url(#wl-sky)" />
+      <BiomeSky
+        gradientId="wl-sky"
+        stops={[
+          { offset: "0%",   stopColor: "#3a4a78" },
+          { offset: "35%",  stopColor: "#a86fa0" },
+          { offset: "70%",  stopColor: "#f0a55c" },
+          { offset: "100%", stopColor: "#fde3a8" },
+        ]}
+      />
 
       {/* Sun on horizon */}
       <circle cx="800" cy="290" r="120" fill="url(#wl-sundisk)" />
@@ -101,13 +98,11 @@ export function WildlandsBiome() {
       </g>
 
       {/* Foreground grassland */}
-      <path
-        d="M0,520 C200,500 400,524 700,508 C1000,496 1300,524 1600,504 L1600,600 L0,600 Z"
+      <BiomeFloor
+        curvePath="M0,520 C200,500 400,524 700,508 C1000,496 1300,524 1600,504"
         fill="url(#wl-foreground)"
-      />
-      <path
-        d="M0,520 C200,500 400,524 700,508 C1000,496 1300,524 1600,504"
-        stroke="#1a2a14" strokeWidth="3" fill="none" opacity="0.65"
+        strokeColour="#1a2a14"
+        strokeOpacity={0.65}
       />
 
       {/* Bushes / scrub in foreground */}
@@ -152,6 +147,6 @@ export function WildlandsBiome() {
           <circle key={i} cx={f.x} cy={585} r="2.5" fill={f.c} />
         ))}
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }

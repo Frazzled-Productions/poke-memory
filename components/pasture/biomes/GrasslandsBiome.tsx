@@ -1,6 +1,6 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeSky } from "./BiomeSky";
+import { BiomeFloor } from "./BiomeFloor";
 
 /**
  * Illustrated backdrop for the Grasslands habitat zone. Layered SVG scene
@@ -14,19 +14,8 @@ import styles from "./Biome.module.css";
  */
 export function GrasslandsBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
-        <linearGradient id="grasslands-sky" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"  stopColor="#7cc8ff" />
-          <stop offset="55%" stopColor="#c2e6ff" />
-          <stop offset="100%" stopColor="#fff6b3" />
-        </linearGradient>
-
         <radialGradient id="grasslands-sun" cx="0.5" cy="0.5">
           <stop offset="0%"  stopColor="#fff8c8" />
           <stop offset="55%" stopColor="#ffd84a" stopOpacity="0.85" />
@@ -40,7 +29,14 @@ export function GrasslandsBiome() {
       </defs>
 
       {/* Sky */}
-      <rect width="1600" height="600" fill="url(#grasslands-sky)" />
+      <BiomeSky
+        gradientId="grasslands-sky"
+        stops={[
+          { offset: "0%",   stopColor: "#7cc8ff" },
+          { offset: "55%",  stopColor: "#c2e6ff" },
+          { offset: "100%", stopColor: "#fff6b3" },
+        ]}
+      />
 
       {/* Sun: soft halo + bright core */}
       <circle cx="1340" cy="130" r="140" fill="url(#grasslands-sun)" />
@@ -94,13 +90,12 @@ export function GrasslandsBiome() {
       />
 
       {/* Foreground ground — main playing field */}
-      <path
-        d="M0,470 C200,450 400,478 700,462 C1000,448 1300,478 1600,458 L1600,600 L0,600 Z"
+      <BiomeFloor
+        curvePath="M0,470 C200,450 400,478 700,462 C1000,448 1300,478 1600,458"
         fill="#5dba4f"
-      />
-      <path
-        d="M0,470 C200,450 400,478 700,462 C1000,448 1300,478 1600,458"
-        stroke="#3a8f30" strokeWidth="3.5" fill="none" opacity="0.7"
+        strokeColour="#3a8f30"
+        strokeWidth={3.5}
+        strokeOpacity={0.7}
       />
 
       {/* Foreground ground highlight band — adds painterly depth */}
@@ -242,6 +237,6 @@ export function GrasslandsBiome() {
           </g>
         ))}
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }

@@ -1,27 +1,19 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeSky } from "./BiomeSky";
 
 /**
  * Urban habitat backdrop — dusk city skyline with windows lit, foreground
  * sidewalk with a street lamp and a Pokémon Center sign. Anchor bands
  * cluster sprites along the sidewalk and city park strip in front of the
  * buildings.
+ *
+ * The foreground is a pair of flat rectangular bands (sidewalk + street)
+ * rather than the shared wavy curve, so BiomeFloor does not apply.
  */
 export function UrbanBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
-        <linearGradient id="urban-sky" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"  stopColor="#3a4a72" />
-          <stop offset="60%" stopColor="#8c7298" />
-          <stop offset="100%" stopColor="#f0a55c" />
-        </linearGradient>
         <linearGradient id="urban-street" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#5a5a66" />
           <stop offset="100%" stopColor="#2e2e3a" />
@@ -29,7 +21,14 @@ export function UrbanBiome() {
       </defs>
 
       {/* Dusk sky */}
-      <rect width="1600" height="600" fill="url(#urban-sky)" />
+      <BiomeSky
+        gradientId="urban-sky"
+        stops={[
+          { offset: "0%",   stopColor: "#3a4a72" },
+          { offset: "60%",  stopColor: "#8c7298" },
+          { offset: "100%", stopColor: "#f0a55c" },
+        ]}
+      />
 
       {/* Distant stars */}
       <g fill="#ffffff">
@@ -85,7 +84,7 @@ export function UrbanBiome() {
         ))}
       </g>
 
-      {/* Sidewalk + street */}
+      {/* Sidewalk + street — flat rectangular bands, bespoke to this biome */}
       <path
         d="M0,475 L1600,475 L1600,520 L0,520 Z"
         fill="#3a3a48"
@@ -159,6 +158,6 @@ export function UrbanBiome() {
         <ellipse cx="800"  cy="540" rx="100" ry="8" />
         <ellipse cx="1441" cy="540" rx="60" ry="6" />
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }
