@@ -1,10 +1,9 @@
 import { idbDelete, MIGRATION_FLAG_KEY } from "@/lib/idb/db";
 import { KEY_REVIEW_SESSION, KEY_GRADE_LOG } from "@/lib/storage/keys";
 
-// SESSION_IDB_KEY and GRADE_LOG_IDB_KEY now come from the shared key registry
-// (lib/storage/keys.ts), which eliminates the old duplication note. The IDB
-// layer (lib/idb/db.ts) still has its own inline copies — see the comment in
-// that file for why.
+// Local aliases so the idbDelete calls below read like named store handles
+// rather than raw key strings. Both constants are sourced from the shared
+// key registry (lib/storage/keys.ts) — lib/idb/db.ts does the same.
 const SESSION_IDB_KEY = KEY_REVIEW_SESSION;
 const GRADE_LOG_IDB_KEY = KEY_GRADE_LOG;
 
