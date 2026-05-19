@@ -315,7 +315,57 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
   test("preset renders in the scope picker and is selectable", async ({
     page,
   }) => {
-    await page.addInitScript(() => localStorage.clear());
+    // Seed a mastered evolution edge so the incomplete-chain set is non-empty
+    // when this test selects the preset. Without any review state the set is
+    // empty, the preset matches 0 Pokémon, and ReviewSession early-returns the
+    // "No Pokémon match" UI — unmounting #scope-panel and the pill with it.
+    // Seeding edgeId 1500001 (Bulbasaur → Ivysaur, reps ≥ 3 + scheduledDays ≥
+    // 21) puts the Bulbasaur family into incomplete chains (forward edge
+    // mastered, reverse edge unseen), keeping the panel mounted after selection.
+    await page.addInitScript(() => {
+      localStorage.clear();
+      window.localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards: [
+            {
+              id: 1500001,
+              cardType: "evolution",
+              subjectKey: "1:2",
+              preEvoId: 1,
+              postEvoId: 2,
+              preEvoName: "bulbasaur",
+              postEvoName: "ivysaur",
+              preEvoSpriteUrl: "/sprites/pokemon/1.png",
+              postEvoSpriteUrl: "/sprites/pokemon/2.png",
+              triggerPhrase: "at level 16",
+              state: {
+                stability: 30,
+                difficulty: 5,
+                elapsedDays: 0,
+                scheduledDays: 21,
+                reps: 3,
+                lapses: 0,
+                fsrsState: "review",
+                dueDate: "2099-01-01",
+                lastReview: "2025-01-01",
+                firstSeen: "2024-12-01",
+                learningStep: null,
+                stepStartedAt: null,
+                hiddenSince: null,
+                seenInPasture: false,
+              },
+            },
+          ],
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
     await page.goto("/");
 
     // Open the Scope panel.
@@ -334,7 +384,10 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     await expect(presetPill).toBeVisible();
     await expect(presetPill).toHaveAttribute("aria-pressed", "false");
 
-    // Selecting it toggles aria-pressed and updates the scope label.
+    // Selecting it toggles aria-pressed. The panel stays mounted because the
+    // seeded review state puts Bulbasaur's family into the incomplete-chain
+    // set, so the preset matches > 0 Pokémon and ReviewSession does not
+    // early-return the no-match UI.
     await presetPill.click();
     await expect(presetPill).toHaveAttribute("aria-pressed", "true");
     const scopeHeader = page
