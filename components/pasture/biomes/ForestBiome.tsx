@@ -1,6 +1,6 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeSky } from "./BiomeSky";
+import { BiomeFloor } from "./BiomeFloor";
 
 /**
  * Forest habitat backdrop — dappled canopy overhead, receding tree trunks,
@@ -10,18 +10,8 @@ import styles from "./Biome.module.css";
  */
 export function ForestBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
-        <linearGradient id="forest-air" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"  stopColor="#1f5a3a" />
-          <stop offset="40%" stopColor="#3a8c5b" />
-          <stop offset="100%" stopColor="#5fa874" />
-        </linearGradient>
         <linearGradient id="forest-floor" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#6b4a2a" />
           <stop offset="100%" stopColor="#3f2c18" />
@@ -33,7 +23,14 @@ export function ForestBiome() {
       </defs>
 
       {/* Air / dappled background */}
-      <rect width="1600" height="600" fill="url(#forest-air)" />
+      <BiomeSky
+        gradientId="forest-air"
+        stops={[
+          { offset: "0%",   stopColor: "#1f5a3a" },
+          { offset: "40%",  stopColor: "#3a8c5b" },
+          { offset: "100%", stopColor: "#5fa874" },
+        ]}
+      />
 
       {/* God-rays through canopy */}
       <ellipse cx="400" cy="0"  rx="200" ry="400" fill="url(#forest-godray)" />
@@ -89,13 +86,11 @@ export function ForestBiome() {
       </g>
 
       {/* Forest floor */}
-      <path
-        d="M0,440 C200,420 400,448 700,432 C1000,418 1300,448 1600,428 L1600,600 L0,600 Z"
+      <BiomeFloor
+        curvePath="M0,440 C200,420 400,448 700,432 C1000,418 1300,448 1600,428"
         fill="url(#forest-floor)"
-      />
-      <path
-        d="M0,445 C200,425 400,453 700,437 C1000,423 1300,453 1600,433"
-        stroke="#2a1a08" strokeWidth="3" fill="none" opacity="0.55"
+        strokeColor="#2a1a08"
+        strokeOpacity={0.55}
       />
 
       {/* Mossy patches on forest floor */}
@@ -174,6 +169,6 @@ export function ForestBiome() {
         <circle cx="1060" cy="240" r="3" opacity="0.85" />
         <circle cx="1240" cy="300" r="2" opacity="0.7" />
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }

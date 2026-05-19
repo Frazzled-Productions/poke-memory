@@ -1,26 +1,20 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeSky } from "./BiomeSky";
 
 /**
  * Mountain habitat backdrop — snow-capped peaks against a crisp sky,
  * rocky slopes descending to a foreground ridge with pines and boulders.
  * Anchor bands cluster sprites on the mid and lower slopes; the back
  * band sits just below the summit ridge.
+ *
+ * The foreground ridge is an irregular polygon with explicit vertex
+ * co-ordinates rather than the shared wavy curve — extracting it into
+ * BiomeFloor would alter the shape, so it remains bespoke.
  */
 export function MountainBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
-        <linearGradient id="mountain-sky" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#7fc1e8" />
-          <stop offset="100%" stopColor="#dcefff" />
-        </linearGradient>
         <linearGradient id="mountain-rock" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#7a7e8c" />
           <stop offset="100%" stopColor="#4c5060" />
@@ -32,7 +26,13 @@ export function MountainBiome() {
       </defs>
 
       {/* Sky */}
-      <rect width="1600" height="600" fill="url(#mountain-sky)" />
+      <BiomeSky
+        gradientId="mountain-sky"
+        stops={[
+          { offset: "0%",   stopColor: "#7fc1e8" },
+          { offset: "100%", stopColor: "#dcefff" },
+        ]}
+      />
 
       {/* Distant peaks (palest) */}
       <g>
@@ -59,7 +59,7 @@ export function MountainBiome() {
         <polygon points="1338,308 1360,280 1382,308 1370,322 1360,314 1350,322" fill="#ffffff" />
       </g>
 
-      {/* Foreground rocky ridge */}
+      {/* Foreground rocky ridge — irregular polygon, bespoke to this biome */}
       <path
         d="M-50,490 L0,470 L80,500 L180,460 L300,495 L420,470 L560,495 L700,465 L850,495 L1000,470 L1140,500 L1280,460 L1420,495 L1550,475 L1700,485 L1700,600 L-50,600 Z"
         fill="url(#mountain-foreground)"
@@ -152,6 +152,6 @@ export function MountainBiome() {
           </g>
         ))}
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }

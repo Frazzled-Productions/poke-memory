@@ -1,26 +1,20 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeSky } from "./BiomeSky";
+import { BiomeFloor } from "./BiomeFloor";
 
 /**
  * Cave habitat backdrop — dark rock interior with stalactites overhead,
  * stalagmites underfoot, glowing crystal clusters, and a small dim pool.
  * Anchor bands cluster sprites on the cavern floor with one row further
  * back near the crystal hollow.
+ *
+ * The stalactites, crystal clusters, pool, and stalagmites are bespoke to
+ * this biome and are not shared with the other floor/sky helpers.
  */
 export function CaveBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
-        <linearGradient id="cave-air" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#15121e" />
-          <stop offset="100%" stopColor="#2a2438" />
-        </linearGradient>
         <linearGradient id="cave-floor" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#3a3445" />
           <stop offset="100%" stopColor="#1c1827" />
@@ -36,7 +30,13 @@ export function CaveBiome() {
       </defs>
 
       {/* Cavern interior */}
-      <rect width="1600" height="600" fill="url(#cave-air)" />
+      <BiomeSky
+        gradientId="cave-air"
+        stops={[
+          { offset: "0%",   stopColor: "#15121e" },
+          { offset: "100%", stopColor: "#2a2438" },
+        ]}
+      />
 
       {/* Distant rock wall texture (irregular shading) */}
       <g fill="#1e1a28">
@@ -100,13 +100,11 @@ export function CaveBiome() {
       </g>
 
       {/* Cavern floor */}
-      <path
-        d="M0,470 C200,450 400,478 700,460 C1000,448 1300,478 1600,458 L1600,600 L0,600 Z"
+      <BiomeFloor
+        curvePath="M0,470 C200,450 400,478 700,460 C1000,448 1300,478 1600,458"
         fill="url(#cave-floor)"
-      />
-      <path
-        d="M0,470 C200,450 400,478 700,460 C1000,448 1300,478 1600,458"
-        stroke="#0a0814" strokeWidth="3" fill="none" opacity="0.7"
+        strokeColor="#0a0814"
+        strokeOpacity={0.7}
       />
 
       {/* Dim pool — front-left */}
@@ -149,6 +147,6 @@ export function CaveBiome() {
         <polygon points="880,585 886,570 892,585" fill="#9b6cff" />
         <polygon points="1240,580 1246,565 1252,580" fill="#ff8edc" />
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }

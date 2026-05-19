@@ -1,20 +1,18 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeFloor } from "./BiomeFloor";
 
 /**
  * Open Sea habitat backdrop — sky horizon at top, sunlit water column,
  * sandy seafloor with coral and kelp at the bottom. Anchor bands span
  * surface → reef → deep so water Pokémon distribute through the column.
+ *
+ * The sky here is only a 100 px band at the top rather than the full-bleed
+ * background used by other biomes, so BiomeSky does not apply — the sky
+ * rect and gradient are defined inline. BiomeFloor handles the seafloor.
  */
 export function SeaBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
         <linearGradient id="sea-sky" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#9ddcff" />
@@ -35,7 +33,7 @@ export function SeaBiome() {
         </radialGradient>
       </defs>
 
-      {/* Sky band */}
+      {/* Sky band — 100 px only; the rest is water, so BiomeSky does not apply */}
       <rect width="1600" height="100" fill="url(#sea-sky)" />
       {/* Sun on horizon */}
       <circle cx="1320" cy="70" r="80" fill="url(#sea-sundisk)" />
@@ -77,13 +75,11 @@ export function SeaBiome() {
       </g>
 
       {/* Sandy seafloor */}
-      <path
-        d="M0,510 C200,490 400,520 700,500 C1000,484 1300,520 1600,498 L1600,600 L0,600 Z"
+      <BiomeFloor
+        curvePath="M0,510 C200,490 400,520 700,500 C1000,484 1300,520 1600,498"
         fill="url(#sea-sand)"
-      />
-      <path
-        d="M0,510 C200,490 400,520 700,500 C1000,484 1300,520 1600,498"
-        stroke="#a07832" strokeWidth="3" fill="none" opacity="0.55"
+        strokeColor="#a07832"
+        strokeOpacity={0.55}
       />
 
       {/* Kelp forest — back row */}
@@ -156,6 +152,6 @@ export function SeaBiome() {
         <circle cx="900" cy="556" r="5" fill="#e8d2a0" stroke="#9c7a3a" strokeWidth="1.2" />
         <circle cx="1080" cy="558" r="4" fill="#c8a878" stroke="#9c7a3a" strokeWidth="1.2" />
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }
