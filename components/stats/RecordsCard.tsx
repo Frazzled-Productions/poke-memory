@@ -1,6 +1,8 @@
 "use client";
 
 import type { Records } from "@/lib/stats/records";
+import { cn } from "@/lib/utils/cn";
+import { cardPanel } from "@/lib/utils/class-names";
 
 type Props = { records: Records };
 
@@ -41,7 +43,7 @@ export function RecordsCard({ records }: Props) {
       >
         Records
       </h2>
-      <div className="grid grid-cols-2 gap-4 rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800 sm:grid-cols-4">
+      <div className={cn("grid grid-cols-2 gap-4 sm:grid-cols-4", cardPanel)}>
         <Stat
           label={records.longestStreak === 1 ? "day longest streak" : "days longest streak"}
           value={records.longestStreak.toString()}

@@ -47,6 +47,7 @@ import {
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import type { CloudRow } from "@/lib/sync/cloud";
 import type { ReviewableCard } from "@/lib/review/session";
+import { cn } from "@/lib/utils/cn";
 import { mutedText } from "@/lib/utils/class-names";
 
 type ConflictData = {
@@ -387,7 +388,7 @@ export default function CallbackCompletePage() {
     <div className="flex flex-1 items-center justify-center px-4 py-8">
       <div className="w-full max-w-3xl">
         <h1 className="text-2xl font-bold text-foreground text-center">Sync conflict</h1>
-        <p className="mt-2 text-center text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
+        <p className={cn("mt-2 text-center max-w-md mx-auto", mutedText)}>
           You have progress on this device and in the cloud. Picking a side replaces
           the other for all synced data: cards, settings, streak, and grade history.
         </p>
@@ -444,7 +445,7 @@ function SideCard({
   return (
     <div className="rounded-xl border border-zinc-200 bg-background p-6 dark:border-zinc-800">
       <h2 className="text-base font-semibold text-foreground">{heading}</h2>
-      <ul className="mt-2 space-y-1 text-sm text-zinc-500 dark:text-zinc-400">
+      <ul className={cn("mt-2 space-y-1", mutedText)}>
         <li>
           {cardCount} card{cardCount !== 1 ? "s" : ""} reviewed
         </li>
