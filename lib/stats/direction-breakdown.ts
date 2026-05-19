@@ -110,3 +110,40 @@ export function enabledDirectionsFromSettings(settings: {
 export function totalDirectionReviews(rows: readonly DirectionBreakdownRow[]): number {
   return rows.reduce((sum, row) => sum + row.total, 0);
 }
+
+/**
+ * Per-direction tally as accumulated during a live review session.
+ * Keyed by `CardDirection`; only directions that received at least one grade
+ * are present in the map.
+ */
+export type SessionDirectionTally = Map<CardDirection, { total: number; passes: number }>;
+
+/**
+ * Derive per-direction accuracy rows from an in-session tally.
+ *
+ * Unlike `computeDirectionBreakdown` (which reads the persisted grade log),
+ * this operates on the in-memory tally accumulated by `ReviewSession` during
+ * the current page load. Only directions present in the map (i.e. those that
+ * received at least one grade this session) are returned, in `CARD_DIRECTIONS`
+ * display order. Accuracy is `passes / total` (Good + Easy as a share of all
+ * grades). Returns an empty array when no grades have been recorded.
+ *
+ * Pure — no I/O.
+ */
+export function computeSessionDirectionAccuracy(
+  tally: SessionDirectionTally,
+): DirectionBreakdownRow[] {
+  return CARD_DIRECTIONS.flatMap((direction) => {
+    const entry = tally.get(direction);
+    if (!entry || entry.total === 0) return [];
+    return [
+      {
+        direction,
+        total: entry.total,
+        passes: entry.passes,
+        accuracy: entry.passes / entry.total,
+        disabled: false,
+      },
+    ];
+  });
+}

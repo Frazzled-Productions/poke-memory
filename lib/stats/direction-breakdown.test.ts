@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   CARD_DIRECTIONS,
   computeDirectionBreakdown,
+  computeSessionDirectionAccuracy,
   enabledDirectionsFromSettings,
   totalDirectionReviews,
   type CardDirection,
+  type SessionDirectionTally,
 } from "./direction-breakdown";
 import type { GradeLog } from "@/lib/gradelog/persistence";
 
@@ -100,6 +102,59 @@ describe("computeDirectionBreakdown", () => {
       const zero = rows.filter((r) => r.total === 0);
       expect(zero).toHaveLength(CARD_DIRECTIONS.length);
     });
+  });
+});
+
+describe("computeSessionDirectionAccuracy", () => {
+  it("returns an empty array for an empty tally", () => {
+    const tally: SessionDirectionTally = new Map();
+    expect(computeSessionDirectionAccuracy(tally)).toEqual([]);
+  });
+
+  it("returns only directions present in the tally, in display order", () => {
+    const tally: SessionDirectionTally = new Map([
+      ["cry", { total: 2, passes: 1 }],
+      ["name", { total: 3, passes: 3 }],
+    ]);
+    const rows = computeSessionDirectionAccuracy(tally);
+    // Display order: name before cry (CARD_DIRECTIONS order: name, reverse, cry, ...)
+    expect(rows.map((r) => r.direction)).toEqual(["name", "cry"]);
+  });
+
+  it("computes accuracy as passes / total", () => {
+    const tally: SessionDirectionTally = new Map([
+      ["name", { total: 4, passes: 3 }],
+    ]);
+    const rows = computeSessionDirectionAccuracy(tally);
+    expect(rows[0].accuracy).toBeCloseTo(0.75);
+    expect(rows[0].total).toBe(4);
+    expect(rows[0].passes).toBe(3);
+  });
+
+  it("omits a direction whose total is 0", () => {
+    const tally: SessionDirectionTally = new Map([
+      ["name", { total: 0, passes: 0 }],
+      ["evolution", { total: 2, passes: 1 }],
+    ]);
+    const rows = computeSessionDirectionAccuracy(tally);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].direction).toBe("evolution");
+  });
+
+  it("all directions present are returned in CARD_DIRECTIONS order", () => {
+    const tally: SessionDirectionTally = new Map(
+      CARD_DIRECTIONS.map((d) => [d, { total: 1, passes: 1 }]),
+    );
+    const rows = computeSessionDirectionAccuracy(tally);
+    expect(rows.map((r) => r.direction)).toEqual([...CARD_DIRECTIONS]);
+  });
+
+  it("disabled is always false (session tally has no settings context)", () => {
+    const tally: SessionDirectionTally = new Map([
+      ["cry", { total: 1, passes: 0 }],
+    ]);
+    const rows = computeSessionDirectionAccuracy(tally);
+    expect(rows[0].disabled).toBe(false);
   });
 });
 

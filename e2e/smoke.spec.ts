@@ -1169,3 +1169,86 @@ test.describe("PWA / offline support", () => {
     expect(await registered.jsonValue()).toBeTruthy();
   });
 });
+
+test.describe("Per-direction accuracy breakdown on session-end screen (#994)", () => {
+  // Build a completed session where all cards are in the future EXCEPT one
+  // name card (Bulbasaur, id=1) which is due today. After grading that card,
+  // the session reaches SESSION_COMPLETE and the direction accuracy row should
+  // appear showing the Name direction with the grade we submitted.
+  const baseSession = buildCompletedSession({
+    pokemonIds: SEED_POKEMON_IDS,
+    evolutionCardIds: EVOLUTION_CARD_IDS,
+  });
+
+  // Override Bulbasaur to be a review-due card (past dueDate, lastReview not today).
+  const sessionWithOneDueCard = {
+    ...baseSession,
+    cards: (baseSession.cards as Array<{ id: number; [key: string]: unknown }>).map((c) =>
+      c.id === 1
+        ? {
+            ...c,
+            state: {
+              stability: 10,
+              difficulty: 5,
+              elapsedDays: 10,
+              scheduledDays: 10,
+              reps: 3,
+              lapses: 0,
+              fsrsState: "review",
+              dueDate: "2026-01-01",
+              lastReview: "2026-04-01",
+              firstSeen: "2026-03-01",
+              learningStep: null,
+              stepStartedAt: null,
+            },
+          }
+        : c,
+    ),
+    limits: {
+      name: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    },
+  };
+
+  test("direction accuracy row appears after grading a card and reaching the completion screen", async ({ page }) => {
+    await seedSessionIdb(page, sessionWithOneDueCard);
+    // Cap all new-card limits to 0 so only the one review-due name card appears.
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "poke-memory:user-settings:v1",
+        JSON.stringify({
+          maxNewPerDay: 0,
+          maxNewEvolutionPerDay: 0,
+          maxNewReversePerDay: 0,
+          maxNewCryPerDay: 0,
+          evolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+        }),
+      );
+    });
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // The one review-due name card should appear.
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    await expect(reveal).toBeVisible({ timeout: 10_000 });
+    await reveal.click();
+
+    // Grade the card as Good — passes accuracy.
+    const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
+    await expect(gradeGroup).toBeVisible();
+    await gradeGroup.getByRole("button", { name: "Good" }).click();
+
+    // After grading the only due card, the session should be complete.
+    await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
+
+    // The per-direction accuracy row should now be visible with "Name 100%".
+    await expect(
+      page.getByText(/Name 100%/i),
+    ).toBeVisible();
+  });
+});
