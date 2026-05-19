@@ -244,7 +244,7 @@ function BottomTabBarInner() {
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-inset",
                   isActive
                     ? "text-theme-fg-on-primary"
-                    : "text-theme-fg-on-primary opacity-55 hover:opacity-80",
+                    : "text-theme-fg-on-primary opacity-55 [@media(hover:hover)]:hover:opacity-80",
                 ].join(" ")}
               >
                 <Icon

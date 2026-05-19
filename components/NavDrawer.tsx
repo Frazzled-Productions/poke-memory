@@ -20,7 +20,7 @@ const NAV_LINKS = [
 ] as const;
 
 const LINK_BASE =
-  "block rounded px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2";
+  "block rounded px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 [@media(hover:hover)]:hover:bg-white/20";
 
 /** Hamburger icon — three horizontal bars. */
 function HamburgerIcon({ className }: { className?: string }) {

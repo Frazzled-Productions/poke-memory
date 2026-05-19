@@ -48,11 +48,12 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
         <div
           className={[
             "relative flex h-20 w-full items-center justify-center rounded-xl border transition-colors",
+            "[@media(hover:hover)]:hover:ring-2 [@media(hover:hover)]:hover:ring-offset-1",
             isMastered
-              ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
+              ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40 [@media(hover:hover)]:hover:bg-emerald-100 [@media(hover:hover)]:hover:ring-emerald-400 dark:[@media(hover:hover)]:hover:bg-emerald-900/60 dark:[@media(hover:hover)]:hover:ring-emerald-600"
               : isLearning
-                ? "border-amber-200 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30"
-                : "border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900",
+                ? "border-amber-200 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30 [@media(hover:hover)]:hover:bg-amber-100 [@media(hover:hover)]:hover:ring-amber-300 dark:[@media(hover:hover)]:hover:bg-amber-900/40 dark:[@media(hover:hover)]:hover:ring-amber-700"
+                : "border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 [@media(hover:hover)]:hover:bg-zinc-200 [@media(hover:hover)]:hover:ring-zinc-400 dark:[@media(hover:hover)]:hover:bg-zinc-800 dark:[@media(hover:hover)]:hover:ring-zinc-600",
           ].join(" ")}
         >
           {/* Mastered checkmark badge */}

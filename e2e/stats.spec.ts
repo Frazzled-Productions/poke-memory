@@ -195,3 +195,25 @@ test.describe("Stats page — section headings", () => {
     ).toHaveCount(0);
   });
 });
+
+test.describe("Stats page — heatmap hover tooltip", () => {
+  test("hovering a heatmap cell shows a tooltip with the date and review count", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+
+    // Wait for the heatmap section to be present.
+    const heatmapSvg = page.getByRole("img", { name: /heatmap/i });
+    await expect(heatmapSvg).toBeVisible({ timeout: 15_000 });
+
+    // Locate the first rect cell in the heatmap SVG and hover it.
+    const firstCell = heatmapSvg.locator("rect").first();
+    await firstCell.hover();
+
+    // The tooltip should appear with a date and review count.
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeVisible();
+    // Tooltip format: "<weekday>, <day> <Month> <year> - N review(s)"
+    await expect(tooltip).toContainText(/review/i);
+  });
+});
