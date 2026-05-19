@@ -14,10 +14,15 @@ vi.mock("@/lib/audio/tts", () => ({ speakName: vi.fn() }));
 const PRE_SPRITE = "https://example.com/charmander.png";
 const POST_SPRITE = "https://example.com/charmeleon.png";
 
-describe("EvolutionCard", () => {
+// ---------------------------------------------------------------------------
+// direction="evolution" (forward — "What does X evolve into?")
+// ---------------------------------------------------------------------------
+
+describe('EvolutionCard direction="evolution"', () => {
   it("shows the pre-evolution sprite plus a ? placeholder before reveal", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="charmander"
         postEvoName="charmeleon"
@@ -36,6 +41,7 @@ describe("EvolutionCard", () => {
   it("shows the post-evolution sprite after reveal alongside the pre-evolution", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="charmander"
         postEvoName="charmeleon"
@@ -53,6 +59,7 @@ describe("EvolutionCard", () => {
   it("renders sprites at intrinsic 320px", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="charmander"
         postEvoName="charmeleon"
@@ -70,6 +77,7 @@ describe("EvolutionCard", () => {
   it("interpolates the trigger phrase into the prompt", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="eevee"
         postEvoName="jolteon"
@@ -86,6 +94,7 @@ describe("EvolutionCard", () => {
   it("falls back to the bare prompt when triggerPhrase is null", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="kadabra"
         postEvoName="alakazam"
@@ -101,6 +110,7 @@ describe("EvolutionCard", () => {
   it("shows the direction badge", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="charmander"
         postEvoName="charmeleon"
@@ -118,6 +128,7 @@ describe("EvolutionCard", () => {
 
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="charmander"
         postEvoName="charmeleon"
@@ -135,6 +146,7 @@ describe("EvolutionCard", () => {
   it("does not show fact when fact prop is omitted", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="charmander"
         postEvoName="charmeleon"
@@ -151,6 +163,7 @@ describe("EvolutionCard", () => {
   it("renders an inline TTS button for the pre-evo name in the prompt", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="charmander"
         postEvoName="charmeleon"
@@ -166,6 +179,7 @@ describe("EvolutionCard", () => {
   it("renders a reveal TTS button for the post-evo name after reveal", () => {
     render(
       <EvolutionCard
+        direction="evolution"
         preEvoSpriteUrl={PRE_SPRITE}
         preEvoName="charmander"
         postEvoName="charmeleon"
@@ -176,5 +190,151 @@ describe("EvolutionCard", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Hear charmeleon" })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// direction="reverse-evolution" (reverse — "Which Pokémon evolves into X?")
+// Migrated from ReverseEvolutionCard.test.tsx (#1007).
+// ---------------------------------------------------------------------------
+
+const REV_PRE_SPRITE = "https://example.com/eevee.png";
+const REV_POST_SPRITE = "https://example.com/jolteon.png";
+
+describe('EvolutionCard direction="reverse-evolution"', () => {
+  it("shows the post-evolution sprite plus a ? placeholder before reveal", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="eevee"
+        preEvoSpriteUrl={REV_PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={REV_POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={false}
+      />,
+    );
+
+    expect(screen.getByAltText("jolteon")).toHaveAttribute("src", REV_POST_SPRITE);
+    expect(screen.queryByAltText("eevee")).not.toBeInTheDocument();
+    expect(screen.getByText("???")).toBeInTheDocument();
+    expect(screen.getByText("?")).toBeInTheDocument();
+  });
+
+  it("shows the pre-evolution sprite (answer) alongside the post-evolution after reveal", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="eevee"
+        preEvoSpriteUrl={REV_PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={REV_POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={true}
+      />,
+    );
+
+    expect(screen.getByAltText("eevee")).toHaveAttribute("src", REV_PRE_SPRITE);
+    expect(screen.getByAltText("jolteon")).toHaveAttribute("src", REV_POST_SPRITE);
+    expect(screen.queryByText("???")).not.toBeInTheDocument();
+  });
+
+  it("shows the direction badge", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="eevee"
+        preEvoSpriteUrl={REV_PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={REV_POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={false}
+      />,
+    );
+
+    expect(screen.getByText("Pre-evolution")).toBeInTheDocument();
+  });
+
+  it("phrases the prompt as 'Which Pokémon evolves into …'", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="eevee"
+        preEvoSpriteUrl={REV_PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={REV_POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={false}
+      />,
+    );
+
+    expect(screen.getByText(/Which Pokémon evolves into/)).toBeInTheDocument();
+    expect(screen.getByText(/if you use a Thunder Stone/)).toBeInTheDocument();
+  });
+
+  it("falls back to the bare prompt when triggerPhrase is null", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="kadabra"
+        preEvoSpriteUrl={REV_PRE_SPRITE}
+        postEvoName="alakazam"
+        postEvoSpriteUrl={REV_POST_SPRITE}
+        triggerPhrase={null}
+        revealed={false}
+      />,
+    );
+
+    expect(screen.getByText(/evolves into.*\?/)).toBeInTheDocument();
+  });
+
+  it("shows fact label + value after reveal", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="eevee"
+        preEvoSpriteUrl={REV_PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={REV_POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={true}
+        fact={{ label: "Type", value: "Normal" }}
+      />,
+    );
+
+    expect(screen.getByText("Type")).toBeInTheDocument();
+    expect(screen.getByText("Normal")).toBeInTheDocument();
+  });
+
+  it("renders an inline TTS button for the post-evo name in the prompt", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="eevee"
+        preEvoSpriteUrl={REV_PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={REV_POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={false}
+        postEvoId={135}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hear jolteon" })).toBeInTheDocument();
+  });
+
+  it("renders a reveal TTS button for the pre-evo name (answer) after reveal", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="eevee"
+        preEvoSpriteUrl={REV_PRE_SPRITE}
+        postEvoName="jolteon"
+        postEvoSpriteUrl={REV_POST_SPRITE}
+        triggerPhrase="if you use a Thunder Stone"
+        revealed={true}
+        preEvoId={133}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hear eevee" })).toBeInTheDocument();
   });
 });

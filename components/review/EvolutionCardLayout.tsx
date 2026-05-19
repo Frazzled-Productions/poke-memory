@@ -35,9 +35,9 @@ type Props = {
 };
 
 /**
- * Shared layout for `EvolutionCard` and `ReverseEvolutionCard`.
+ * Shared layout for both directions of `EvolutionCard`.
  *
- * Both cards are identical except for:
+ * Both directions are identical except for:
  *   - The prompt sentence (passed as `prompt`).
  *   - The direction badge (`direction`).
  *   - Which side of the arrow holds the hidden/revealed sprite (`hiddenSide`).
