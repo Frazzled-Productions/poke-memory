@@ -35,8 +35,13 @@
  *    card_types are stored as entirely independent rows in the composite PK.
  *
  * All writes use direct SQL via pg (no Supabase JS client). The ON CONFLICT clause
- * matches what pushSingleCard / pushSession use in production:
- *   ON CONFLICT (user_id, card_type, subject_key) DO UPDATE SET …
+ * is written to match the pushSingleCard / pushSession production paths (lib/sync/cloud.ts),
+ * which always include both `hidden_since` and `seen_in_pasture` in every upsert.
+ * Note: the beacon route (app/api/sync/route.ts) takes a slightly different approach —
+ * it always writes `hidden_since` but conditionally omits `seen_in_pasture` when the
+ * field is null, so that a missing value on the wire does not clobber an existing true.
+ * The helper here matches the pushSingleCard / pushSession shape; the trigger-rejection
+ * tests for the one-way `seen_in_pasture` invariant remain valid regardless.
  *
  * Write helpers commit their transactions so subsequent reads via readCard see the
  * persisted state. Tests that seed initial rows for rejection scenarios use the
@@ -69,9 +74,10 @@ const T2 = "2026-05-10T12:00:00.000Z"; // newer
  * Upserts a card_reviews row and COMMITS the transaction so subsequent
  * `readCard` calls can see the persisted state.
  *
- * The ON CONFLICT clause matches what pushSingleCard / pushSession use in
- * production. `set_config('request.jwt.claims', ...)` makes `auth.uid()`
- * return the given userId, satisfying RLS policies.
+ * The ON CONFLICT clause matches the pushSingleCard / pushSession production
+ * paths: `hidden_since` is always written (coalescing absent values to null),
+ * and `seen_in_pasture` is always written. `set_config('request.jwt.claims', …)`
+ * makes `auth.uid()` return the given userId, satisfying RLS policies.
  */
 async function upsertAndCommit(
   pool: pg.Pool,
@@ -89,6 +95,7 @@ async function upsertAndCommit(
     dueDate?: string;
     lastReview?: string | null;
     firstSeen?: string | null;
+    hiddenSince?: string | null;
     seenInPasture?: boolean;
     updatedAt?: string;
   },
@@ -106,6 +113,7 @@ async function upsertAndCommit(
     dueDate = "2026-06-01",
     lastReview = "2026-05-20",
     firstSeen = "2026-05-18",
+    hiddenSince = null,
     seenInPasture = false,
     updatedAt = T1,
   } = opts;
@@ -121,12 +129,12 @@ async function upsertAndCommit(
           stability, difficulty, elapsed_days, scheduled_days,
           reps, lapses, fsrs_state,
           due_date, last_review, first_seen,
-          seen_in_pasture, updated_at)
+          hidden_since, seen_in_pasture, updated_at)
        VALUES ($1, $2, $3,
                $4, $5, $6, $7,
                $8, $9, $10,
                $11, $12, $13,
-               $14, $15)
+               $14, $15, $16)
        ON CONFLICT (user_id, card_type, subject_key) DO UPDATE SET
          stability       = EXCLUDED.stability,
          difficulty      = EXCLUDED.difficulty,
@@ -138,6 +146,7 @@ async function upsertAndCommit(
          due_date        = EXCLUDED.due_date,
          last_review     = EXCLUDED.last_review,
          first_seen      = EXCLUDED.first_seen,
+         hidden_since    = EXCLUDED.hidden_since,
          seen_in_pasture = EXCLUDED.seen_in_pasture,
          updated_at      = EXCLUDED.updated_at`,
       [
@@ -154,6 +163,7 @@ async function upsertAndCommit(
         dueDate,
         lastReview,
         firstSeen,
+        hiddenSince,
         seenInPasture,
         updatedAt,
       ],
@@ -347,7 +357,7 @@ describe("updated_at as merge-rule anchor (integration)", () => {
     // T1 must compare correctly against itself. The merge rule checks
     // `row.updated_at > lastPullAt` — a pull anchored at T1 would see this row
     // as "not newer" (T1 is not > T1) and would keep local state.
-    expect(firstAt <= T1).toBe(true);
+    expect(firstAt).toBe(T1);
 
     await upsertAndCommit(pool, USER_A, {
       subjectKey: "3001",
