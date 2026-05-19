@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import type { Grade } from "@/lib/review/session";
-import { triggerHaptic, supportsSwitchHaptic } from "@/lib/review/haptic";
+import { triggerHaptic } from "@/lib/review/haptic";
+import { useHapticSwitch } from "@/components/review/useHapticSwitch";
 
 type Props = {
   onGrade: (grade: Grade) => void;
@@ -185,13 +186,7 @@ export function GradeButtons({
   // haptic on iOS 17.4+ (Mobile Safari supports `<input switch>`). Fully inert
   // to keyboard and assistive tech via aria-hidden + tabIndex={-1}.
   const hapticSwitchId = useId();
-  const hapticLabelRef = useRef<HTMLLabelElement>(null);
-  // Feature-detect once at render time (client-side); safe to call on server
-  // (returns false). The ref will only be exercised when supported.
-  const iosSwitchSupported = typeof window !== "undefined" && supportsSwitchHaptic();
-  const triggerIosHaptic = iosSwitchSupported
-    ? () => { hapticLabelRef.current?.click(); }
-    : null;
+  const { labelRef: hapticLabelRef, triggerIosHaptic } = useHapticSwitch();
 
   const isControlled = showShortcutsControlled !== undefined;
   const overlayOpen = isControlled ? showShortcutsControlled : showShortcutsLocal;
@@ -281,11 +276,12 @@ export function GradeButtons({
           aria-hidden, tabIndex={-1}, positioned off-screen. Rendered
           unconditionally so the label ref is always valid; the trigger function
           is only called when `supportsSwitchHaptic()` is true. */}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- `switch` is an iOS-only non-standard attribute not yet in React's type definitions */}
+      {/* `switch` is an iOS-only non-standard attribute not yet in React's type
+          definitions — cast through unknown to avoid the no-explicit-any rule. */}
       <input
         id={hapticSwitchId}
         type="checkbox"
-        {...({ switch: "" } as any)}
+        {...({ switch: "" } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
         aria-hidden="true"
         tabIndex={-1}
         readOnly

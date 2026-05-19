@@ -1,39 +1,59 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { supportsSwitchHaptic } from "@/lib/review/haptic";
 
 /**
- * Returns a ref for the hidden iOS haptic label and a trigger function.
+ * Provides the wiring needed to trigger iOS-style haptic feedback via the
+ * hidden-switch technique (iOS 17.4+, Mobile Safari).
  *
- * The caller must render:
+ * The caller must render a hidden `<input type="checkbox" switch>` and
+ * `<label>`, attaching `labelRef` to the label. For example:
  *
  * ```tsx
+ * const { labelRef, triggerIosHaptic } = useHapticSwitch();
+ * const switchId = useId();
+ *
+ * // In JSX:
  * <>
  *   <input
- *     ref={switchRef}
+ *     id={switchId}
  *     type="checkbox"
  *     {...({ switch: "" } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
  *     aria-hidden="true"
  *     tabIndex={-1}
- *     className="sr-only pointer-events-none"
+ *     readOnly
+ *     className="absolute -left-[9999px] pointer-events-none opacity-0"
  *   />
- *   <label ref={labelRef} htmlFor={switchId} aria-hidden="true" className="sr-only pointer-events-none" />
+ *   <label
+ *     ref={labelRef}
+ *     htmlFor={switchId}
+ *     aria-hidden="true"
+ *     className="absolute -left-[9999px] pointer-events-none opacity-0"
+ *   />
  * </>
  * ```
  *
- * Toggling the label programmatically via `triggerIosHaptic()` makes iOS 17.4+
- * play a system haptic. When the `switch` attribute is not supported the
- * function is a no-op.
+ * Pass `triggerIosHaptic` to `triggerHaptic(grade, triggerIosHaptic)`.
+ * When the `switch` attribute is not supported, `triggerIosHaptic` is `null`
+ * and `triggerHaptic` will silently skip the iOS path.
+ *
+ * `supported` is memoised — `supportsSwitchHaptic()` (which allocates a DOM
+ * element) runs only once per component mount.
  */
 export function useHapticSwitch() {
   const labelRef = useRef<HTMLLabelElement>(null);
-  const supported = typeof window !== "undefined" && supportsSwitchHaptic();
+  // Memoised so supportsSwitchHaptic() (which creates a temporary DOM element)
+  // runs only once per component mount, not on every render.
+  const supported = useMemo(
+    () => typeof window !== "undefined" && supportsSwitchHaptic(),
+    [],
+  );
 
   function triggerIosHaptic() {
     if (!supported) return;
     labelRef.current?.click();
   }
 
-  return { labelRef, triggerIosHaptic: supported ? triggerIosHaptic : null };
+  return { labelRef, triggerIosHaptic: supported ? triggerIosHaptic : null, supported };
 }

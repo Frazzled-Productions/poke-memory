@@ -60,6 +60,7 @@ import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
+import { triggerHaptic } from "@/lib/review/haptic";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
   loadDailySummary,
@@ -1120,6 +1121,10 @@ export function ReviewSession() {
         const grade = GRADE_MAP[e.key];
         if (grade !== undefined) {
           e.preventDefault();
+          // Fire haptic on keyboard-driven grades. The iOS switch technique
+          // is omitted here (null) — keyboard users are on desktop and the
+          // Vibration API path covers Android/Chromium where it applies.
+          triggerHaptic(grade, null);
           void handleGradeRef.current(grade);
         }
       }
