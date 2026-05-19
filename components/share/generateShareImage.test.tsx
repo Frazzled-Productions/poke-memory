@@ -37,6 +37,10 @@ function makeCtxStub() {
     stroke: vi.fn(),
     fillRect: vi.fn(),
     fillText: vi.fn(),
+    // paintDisc() calls measureText to read actualBoundingBoxAscent as the
+    // cap height of the hero number glyph. Returning 0 triggers the calibrated
+    // fallback (0.72 x numFontSize) inside paintDisc().
+    measureText: vi.fn().mockReturnValue({ actualBoundingBoxAscent: 0 }),
     createLinearGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
     save: vi.fn(),
     restore: vi.fn(),
@@ -178,6 +182,136 @@ describe("generateDailyShareImage", () => {
     expect(capturedCanvas!.width).toBe(1200);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     expect(capturedCanvas!.height).toBe(1440);
+  });
+
+  // -------------------------------------------------------------------------
+  // Vertical centring tests.
+  //
+  // paintDisc() centres the combined number+label block on disc centre cy.
+  // When measureText returns 0, the fallback cap-height ratio is used:
+  //   capHeight = numFontSize * 0.72
+  //
+  // Disc centre (daily card, stats present):
+  //   cy = ((54+23+16+12) + (720-(1.5+28+60+22+54))) / 2 = 329.75
+  //
+  // Expected fillText Y coords:
+  //   numBaseline = cy - (capHeight + labelGap + 23) / 2 + capHeight
+  //   labelTop    = numBaseline + labelGap
+  // -------------------------------------------------------------------------
+  it.each([
+    ["7", 208],
+    ["42", 208],
+    ["100", 160],
+    ["1000", 140],
+  ] as [string, number][])(
+    "hero '%s' (numFontSize=%i): number+label block is vertically centred on disc cy",
+    async (heroNumber: string, numFontSize: number) => {
+      const expectedBlob = new Blob(["png"], { type: "image/png" });
+      const originalCreate = document.createElement.bind(document);
+      let capturedCtx: ReturnType<typeof makeCtxStub> | null = null;
+
+      vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+        const el = originalCreate(tag);
+        if (tag === "canvas") {
+          const canvas = el as HTMLCanvasElement;
+          capturedCtx = makeCtxStub(); // measureText returns 0 -> fallback ratio
+          canvas.getContext = (() =>
+            capturedCtx) as unknown as typeof canvas.getContext;
+          canvas.toBlob = (cb: (b: Blob | null) => void) => {
+            Promise.resolve().then(() => cb(expectedBlob));
+          };
+        }
+        return el;
+      });
+
+      await generateDailyShareImage({
+        date: "2026-05-12",
+        streak: Number(heroNumber),
+        reviewed: 10,
+        newCards: 2,
+        mastered: 1,
+        gradeSequence: [],
+      });
+
+      expect(capturedCtx).not.toBeNull();
+
+      const cy = 329.75;
+      const capHeight = numFontSize * 0.72;
+      const labelGap = Math.max(12, numFontSize * 0.1);
+      const labelH = 23;
+      const blockHeight = capHeight + labelGap + labelH;
+      const expectedNumBaseline = cy - blockHeight / 2 + capHeight;
+      const expectedLabelTop = expectedNumBaseline + labelGap;
+
+      const calls = capturedCtx!.fillText.mock.calls as [
+        string,
+        number,
+        number,
+      ][];
+      const numCall = calls.find((c) => c[0] === heroNumber);
+      const labelCall = calls.find((c) => c[0] === "DAY STREAK");
+
+      expect(numCall).toBeDefined();
+      expect(labelCall).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      expect(numCall![2]).toBeCloseTo(expectedNumBaseline, 0);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      expect(labelCall![2]).toBeCloseTo(expectedLabelTop, 0);
+    },
+  );
+
+  it("hero number uses measured cap height when measureText returns non-zero actualBoundingBoxAscent", async () => {
+    const measuredCapHeight = 140;
+    const expectedBlob = new Blob(["png"], { type: "image/png" });
+    const originalCreate = document.createElement.bind(document);
+    let capturedCtx: ReturnType<typeof makeCtxStub> | null = null;
+
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = originalCreate(tag);
+      if (tag === "canvas") {
+        const canvas = el as HTMLCanvasElement;
+        capturedCtx = makeCtxStub();
+        capturedCtx.measureText.mockReturnValue({
+          actualBoundingBoxAscent: measuredCapHeight,
+        });
+        canvas.getContext = (() =>
+          capturedCtx) as unknown as typeof canvas.getContext;
+        canvas.toBlob = (cb: (b: Blob | null) => void) => {
+          Promise.resolve().then(() => cb(expectedBlob));
+        };
+      }
+      return el;
+    });
+
+    await generateDailyShareImage({
+      date: "2026-05-12",
+      streak: 7,
+      reviewed: 10,
+      newCards: 2,
+      mastered: 1,
+      gradeSequence: [],
+    });
+
+    expect(capturedCtx).not.toBeNull();
+
+    const cy = 329.75;
+    const numFontSize = 208;
+    const labelGap = Math.max(12, numFontSize * 0.1);
+    const labelH = 23;
+    const blockHeight = measuredCapHeight + labelGap + labelH;
+    const expectedNumBaseline = cy - blockHeight / 2 + measuredCapHeight;
+    const expectedLabelTop = expectedNumBaseline + labelGap;
+
+    const calls = capturedCtx!.fillText.mock.calls as [string, number, number][];
+    const numCall = calls.find((c) => c[0] === "7");
+    const labelCall = calls.find((c) => c[0] === "DAY STREAK");
+
+    expect(numCall).toBeDefined();
+    expect(labelCall).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    expect(numCall![2]).toBeCloseTo(expectedNumBaseline, 0);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    expect(labelCall![2]).toBeCloseTo(expectedLabelTop, 0);
   });
 });
 
