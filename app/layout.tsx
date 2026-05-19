@@ -20,6 +20,7 @@ import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
 import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
 import { PwaBadge } from "@/components/pwa/PwaBadge";
+import { DocumentTitleBadge } from "@/components/pwa/DocumentTitleBadge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -128,6 +129,8 @@ export default function RootLayout({
         <ServiceWorkerProvider />
         {/* Syncs the installed-PWA app icon badge with cards due today (#916). */}
         <PwaBadge />
+        {/* Prefixes the browser tab title with a due-card count for desktop users (#1062). */}
+        <DocumentTitleBadge />
         <Analytics />
         <SpeedInsights />
       </body>

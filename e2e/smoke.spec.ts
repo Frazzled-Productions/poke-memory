@@ -1252,3 +1252,82 @@ test.describe("Per-direction accuracy breakdown on session-end screen (#994)", (
     ).toBeVisible();
   });
 });
+
+test.describe("Document title due-count badge (#1062)", () => {
+  test("document.title shows no prefix on a fresh guest session", async ({ page }) => {
+    await page.goto("/");
+    // Allow the DocumentTitleBadge hook to settle (async IDB read).
+    await page.waitForLoadState("networkidle");
+    const title = await page.title();
+    expect(title).not.toMatch(/^\(\d+\)/);
+  });
+
+  test("document.title shows a (N) prefix when cards are due and clears at zero", async ({
+    page,
+  }) => {
+    // Seed one name card due for review (past due date, has prior reviews).
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 10,
+            difficulty: 5,
+            elapsedDays: 10,
+            scheduledDays: 10,
+            reps: 3,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2026-01-01",
+            lastReview: "2026-04-01",
+            firstSeen: "2026-03-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // Wait for the DocumentTitleBadge hook to apply the prefix.
+    await page.waitForFunction(
+      () => /^\(\d+\)/.test(document.title),
+      { timeout: 10_000 },
+    );
+
+    const titleWithBadge = await page.title();
+    expect(titleWithBadge).toMatch(/^\(\d+\)/);
+    // The base title must still be present after the prefix.
+    expect(titleWithBadge).toContain("Poké Memory");
+
+    // Grade the card — this should clear the prefix.
+    const reveal = page.getByRole("button", { name: "Reveal" });
+    await expect(reveal).toBeVisible({ timeout: 5_000 });
+    await reveal.click();
+
+    const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
+    await expect(gradeGroup).toBeVisible();
+    await gradeGroup.getByRole("button", { name: "Good" }).click();
+
+    // After grading the only due card the count drops to zero; prefix must clear.
+    await page.waitForFunction(
+      () => !/^\(\d+\)/.test(document.title),
+      { timeout: 10_000 },
+    );
+
+    const titleAfterGrade = await page.title();
+    expect(titleAfterGrade).not.toMatch(/^\(\d+\)/);
+    expect(titleAfterGrade).toContain("Poké Memory");
+  });
+});
