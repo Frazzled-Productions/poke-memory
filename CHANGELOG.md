@@ -6,6 +6,32 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.8] - 2026-05-19
+
+### Added
+
+- Card grading now triggers brief haptic feedback on Android (Vibration API) and iOS 17.4+ (system haptic via the checkbox switch technique). Feedback is skipped when the OS reduced-motion preference is active, and no-ops cleanly on browsers that support neither path.
+- Swipe-to-grade gestures on the review card: swipe right for Good, left for Again, up for Easy, down for Hard. The card follows the finger with a visual drag affordance and a directional hint label; a snap-back animation cancels gestures that fall below the commit threshold. Gesture motion respects `prefers-reduced-motion`. Grade buttons remain the accessible fallback and are unaffected.
+- Offline grades now replay via the Background Sync API on supporting browsers (Chromium on Android), so grades made offline are pushed to the cloud even if the app is closed before connectivity returns.
+- Guest users now see a dismissible notice explaining that progress is stored in their browser only and how to protect it (add to Home Screen or sign in). The app also requests persistent storage to help prevent 7-day ITP eviction in iOS Safari.
+- iOS PWA: branded splash screens now appear on cold launch instead of a blank white flash, covering all current iPhone sizes in portrait and landscape.
+- Keyboard-driven review for desktop: Space or Enter reveals a card; 1/2/4/5 grade Again/Hard/Good/Easy; press `?` to open a discoverable shortcuts overlay.
+- Wide-viewport layouts at `lg:`/`xl:` breakpoints: the Practice page gains a session-progress sidebar (grades reviewed today, accuracy, recent grade dots); the Stats page shows Accuracy and Activity sections side by side; the Pokédex grid adds a tenth column at `xl:`.
+- Browser tab title now shows a `(N)` due-card count prefix when cards are due, updating live as cards are graded and clearing to the plain title at zero.
+
+### Changed
+
+- Stats page charts (Recharts) are now code-split and loaded lazily, reducing the initial JS bundle for users who never visit Stats.
+- Desktop hover affordances: grade buttons, nav links, Pokédex grid tiles, and the review heatmap now have deliberate pointer-device hover feedback. Heatmap cells show a tooltip with the date and review count on hover. All hover styles are scoped to `@media (hover: hover)` to prevent sticky-hover artefacts on touch screens.
+
+### Fixed
+
+- Fixed iOS safe-area insets being ignored: added `viewport-fit=cover` to the viewport meta tag so `env(safe-area-inset-*)` resolves correctly on notched iPhones and iPads. The bottom tab bar and page padding now respect the home-indicator strip, and the Nav header now clears the status bar and Dynamic Island in standalone PWA mode, so no content sits under the status bar overlay.
+- Suppress the native iOS grey tap-flash on touch (the app provides its own active/focus feedback).
+- Pin rendered text size to authored size on iOS Safari, preventing landscape text inflation.
+- Remove the double-tap-to-zoom delay on interactive elements; pinch-zoom is unaffected.
+- Prevent iOS rubber-band pull-to-refresh when grading cards on the practice surface.
+
 ## [0.10.7] - 2026-05-19
 
 ### Fixed
@@ -1227,7 +1253,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.7...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.8...HEAD
+[0.10.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.8
 [0.10.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.7
 [0.10.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.6
 [0.10.5]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.5
