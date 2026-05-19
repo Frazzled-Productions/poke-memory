@@ -31,6 +31,8 @@ import { pullSession, applyCloudAuthoritative } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { detectTopMilestone } from "@/lib/journey/milestones";
 import Link from "next/link";
+import { cn } from "@/lib/utils/cn";
+import { cardPanel, cardPanelPadded, mutedText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -110,14 +112,14 @@ function StatCard({
 }) {
   const animated = useCountUp(value);
   return (
-    <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+    <div className={cardPanelPadded}>
       <p
         className={`text-2xl font-bold tabular-nums ${accent ?? "text-foreground"}`}
         aria-label={`${value.toLocaleString("en-GB")} ${label}`}
       >
         {animated.toLocaleString("en-GB")}
       </p>
-      <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
+      <p className={cn("mt-0.5", mutedText)}>{label}</p>
     </div>
   );
 }
@@ -295,7 +297,7 @@ function IntroducedRing({ stats }: { stats: StatsResult }) {
       >
         Introduced
       </h2>
-      <div className="flex items-center gap-5 rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cn("flex items-center gap-5", cardPanel)}>
         <div className="shrink-0" aria-hidden="true">
           <RadialRing
             pct={introPct}
@@ -314,7 +316,7 @@ function IntroducedRing({ stats }: { stats: StatsResult }) {
               {" / "}{totalCards.toLocaleString("en-GB")}
             </span>
           </p>
-          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={cn("mt-0.5", mutedText)}>
             species seen at least once
           </p>
         </div>
@@ -631,7 +633,7 @@ export default function JourneyPage() {
                   accent="text-amber-500 dark:text-amber-400"
                 />
               ) : (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className={mutedText}>
                   No active streak. Review some cards to start one!
                 </p>
               )}

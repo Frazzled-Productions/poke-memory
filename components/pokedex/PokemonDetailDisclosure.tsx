@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCardClass } from "@/lib/review/useCardClass";
 import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
+import { colStack } from "@/lib/utils/class-names";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { getPokemonFacts } from "@/lib/pokemon/facts";
@@ -324,7 +325,7 @@ export function PokemonDetailDisclosure({
           >
             Base Stats
           </h2>
-          <dl className="flex flex-col gap-2">
+          <dl className={colStack}>
             {STAT_ORDER.map((key: StatKey) => {
               const value = stats[key];
               const pct = Math.min((value / 255) * 100, 100);
@@ -361,7 +362,7 @@ export function PokemonDetailDisclosure({
           >
             Facts
           </h2>
-          <dl className="flex flex-col gap-2">
+          <dl className={colStack}>
             {facts.map((fact, i) => (
               <div key={i} className="flex gap-3 text-sm">
                 <dt className="w-32 shrink-0 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 pt-0.5">
@@ -412,7 +413,7 @@ export function PokemonDetailDisclosure({
           >
             Forms
           </h2>
-          <div className="flex flex-col gap-2">
+          <div className={colStack}>
             {forms.map((form) => (
               <FormBlock key={form.id} form={form} />
             ))}

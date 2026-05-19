@@ -14,6 +14,7 @@ import {
   totalDirectionReviews,
   type DirectionBreakdownRow,
 } from "@/lib/stats/direction-breakdown";
+import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
 
 type Props = {
   /** One row per card direction, from `computeDirectionBreakdown`. */
@@ -102,9 +103,9 @@ export function DirectionBreakdownChart({ rows }: Props) {
         How your recall compares across name, reverse, cry and evolution cards.
       </p>
 
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         {total === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={mutedText}>
             No reviews recorded yet. Grade some cards to see your breakdown.
           </p>
         ) : (
@@ -134,7 +135,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
                     domain={[0, 100]}
                     tickFormatter={(v: number) => `${v}%`}
                     tick={{ fontSize: 11, fill: "currentColor" }}
-                    className="text-zinc-400 dark:text-zinc-500"
+                    className={chartTickText}
                     axisLine={false}
                     tickLine={false}
                   />

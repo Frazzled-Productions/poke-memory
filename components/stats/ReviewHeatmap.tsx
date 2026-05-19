@@ -2,6 +2,7 @@
 
 import type { HeatmapCell } from "@/lib/stats/heatmap";
 import { intensityBucket } from "@/lib/stats/heatmap";
+import { cardPanel } from "@/lib/utils/class-names";
 
 type Props = {
   /** 53 columns × 7 rows, oldest column first; today is in the rightmost column. */
@@ -47,7 +48,7 @@ export function ReviewHeatmap({ columns }: Props) {
       >
         Review activity
       </h2>
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
           {total.toLocaleString('en-GB')} review{total === 1 ? "" : "s"} in the last year
         </p>

@@ -78,6 +78,7 @@ import { ScopeControl } from "@/components/review/ScopeControl";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
+import { mutedText } from "@/lib/utils/class-names";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
@@ -403,7 +404,7 @@ function EndOfSessionScreen({
         </>
       )}
       {dueTomorrow > 0 && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={mutedText}>
           {dueTomorrow === 1 ? "1 card" : `${dueTomorrow} cards`} due tomorrow
         </p>
       )}

@@ -11,6 +11,7 @@ import {
 import type { ActivityPoint } from "@/lib/stats/activity-history";
 import { isActivityHistoryEmpty } from "@/lib/stats/activity-history";
 import type { DateFormat } from "@/lib/utils/format-date";
+import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette — consistent with other Stats components (zinc/emerald/rose)
@@ -182,9 +183,9 @@ export function ActivityHistoryChart({
         from review history, not mastery.
       </p>
 
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         {isEmpty ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={mutedText}>
             No activity recorded yet. Start a review session to see your
             daily history here.
           </p>
@@ -204,7 +205,7 @@ export function ActivityHistoryChart({
                       formatXTick(date, dateFormat)
                     }
                     tick={{ fontSize: 10, fill: "currentColor" }}
-                    className="text-zinc-400 dark:text-zinc-500"
+                    className={chartTickText}
                     axisLine={false}
                     tickLine={false}
                     interval={interval}
@@ -212,7 +213,7 @@ export function ActivityHistoryChart({
                   <YAxis
                     allowDecimals={false}
                     tick={{ fontSize: 10, fill: "currentColor" }}
-                    className="text-zinc-400 dark:text-zinc-500"
+                    className={chartTickText}
                     width={32}
                     axisLine={false}
                     tickLine={false}

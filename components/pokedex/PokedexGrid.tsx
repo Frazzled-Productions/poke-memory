@@ -4,6 +4,7 @@ import Link from "next/link";
 import { GEN_RANGES, generationOf } from "@/lib/stats/derive";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { mutedText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -213,7 +214,7 @@ export default function PokedexGrid({ pokemon, activeGen }: PokedexGridProps) {
   if (pokemon.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={mutedText}>
           No Pokémon match your filters.
         </p>
         <Link

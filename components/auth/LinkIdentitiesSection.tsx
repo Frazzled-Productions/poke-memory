@@ -14,6 +14,8 @@
 import { useState } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { AuthProvider } from "@/lib/auth/types";
+import { cn } from "@/lib/utils/cn";
+import { cardPanelPadded, colStack, mutedText } from "@/lib/utils/class-names";
 
 /** Human-readable display names for each provider. */
 const PROVIDER_LABELS: Record<AuthProvider, string> = {
@@ -153,7 +155,7 @@ export function LinkIdentitiesSection({ user, supabase }: Props) {
   return (
     <div
       id="linked-accounts-heading"
-      className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+      className={cardPanelPadded}
     >
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         Sign-in methods
@@ -179,11 +181,11 @@ export function LinkIdentitiesSection({ user, supabase }: Props) {
 
       {/* Linkable providers */}
       {linkable.length > 0 ? (
-        <div className="mt-3 flex flex-col gap-2" aria-live="polite">
+        <div className={cn("mt-3", colStack)} aria-live="polite">
           <p className="text-sm text-foreground">
             Connect another sign-in method to access your account from multiple providers.
           </p>
-          <div className="mt-1 flex flex-col gap-2">
+          <div className={cn("mt-1", colStack)}>
             {linkable.map((provider) => (
               <LinkProviderRow
                 key={provider}
@@ -220,7 +222,7 @@ export function LinkIdentitiesSection({ user, supabase }: Props) {
           )}
         </div>
       ) : (
-        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={cn("mt-3", mutedText)}>
           All available sign-in methods are already connected.
         </p>
       )}
