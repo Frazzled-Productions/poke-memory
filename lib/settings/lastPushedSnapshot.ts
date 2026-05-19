@@ -1,4 +1,6 @@
 import type { UserSettings } from "./persistence";
+import { KEY_SETTINGS_LAST_PUSHED } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 
 /**
  * Tracks the settings object this device last successfully pushed to cloud,
@@ -16,17 +18,10 @@ import type { UserSettings } from "./persistence";
  * floor.
  */
 
-const KEY = "poke-memory:settings:last-pushed:v1";
+const KEY = KEY_SETTINGS_LAST_PUSHED;
 
 export function loadLastPushedSettings(): UserSettings | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw === null) return null;
-    return JSON.parse(raw) as UserSettings;
-  } catch {
-    return null;
-  }
+  return readLocalStorage(KEY, (raw) => JSON.parse(raw) as UserSettings, null);
 }
 
 export function saveLastPushedSettings(settings: UserSettings): void {

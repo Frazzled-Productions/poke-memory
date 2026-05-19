@@ -1,6 +1,7 @@
 import type { StreakData } from "./types";
+import { KEY_STREAK } from "@/lib/storage/keys";
 
-const STREAK_KEY = "poke-memory:streak:v1";
+const STREAK_KEY = KEY_STREAK;
 export const STREAK_UPDATED_EVENT = "poke-memory:streak-updated";
 
 // Minimum graded cards in a day for the day to count toward the streak.

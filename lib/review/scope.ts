@@ -2,6 +2,7 @@ import type { ReviewableCard } from "@/lib/review/session";
 import { generationOf } from "@/lib/stats/derive";
 import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
+import { KEY_LEGACY_PRACTICE_SCOPE } from "@/lib/storage/keys";
 
 export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains";
 
@@ -72,7 +73,7 @@ export const EMPTY_SCOPE: PracticeScope = {
  * once by `loadSettings` on first run after deploy and then cleared — see
  * `readLegacyScope` / `clearLegacyScope` below.
  */
-const LEGACY_SCOPE_KEY = "poke-memory:practice-scope:v1";
+const LEGACY_SCOPE_KEY = KEY_LEGACY_PRACTICE_SCOPE;
 
 const STARTER_IDS: ReadonlySet<number> = new Set([
   1, 4, 7,

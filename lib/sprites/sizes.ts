@@ -16,7 +16,7 @@
 /**
  * Render width (and height) in CSS px for flip-card sprites (name, cry,
  * evolution, reverse-evolution). Shared by `PokemonCard`, `EvolutionCard`,
- * `ReverseEvolutionCard`, and `SpritePreloader`.
+ * and `SpritePreloader`.
  */
 export const PRACTICE_SPRITE_SIZE = 320;
 

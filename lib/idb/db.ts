@@ -1,4 +1,5 @@
 import { openDB, type IDBPDatabase } from "idb";
+import { KEY_REVIEW_SESSION, KEY_GRADE_LOG } from "@/lib/storage/keys";
 
 // Module-level availability flag. Set to false on the first open() failure
 // so subsequent calls fall back to localStorage gracefully.
@@ -94,8 +95,8 @@ export async function __resetForTests(): Promise<void> {
 }
 
 export const MIGRATION_FLAG_KEY = "migration_done_v1";
-const SESSION_LS_KEY = "poke-memory:review-session:v1";
-const GRADE_LOG_LS_KEY = "poke-memory:grade-log:v1";
+const SESSION_LS_KEY = KEY_REVIEW_SESSION;
+const GRADE_LOG_LS_KEY = KEY_GRADE_LOG;
 
 /**
  * One-time migration from localStorage to IndexedDB. Idempotent: checks

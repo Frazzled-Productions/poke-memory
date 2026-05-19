@@ -9,6 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { GradeDistribution, GradeTrendPoint } from "@/lib/stats/grade-distribution";
+import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Colour palette — consistent with GradeBreakdownBar and the Stats accent vocabulary
@@ -178,9 +179,9 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
         Easy and Good share shows the cards are sticking.
       </p>
 
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         {distribution.total === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={mutedText}>
             No grades recorded yet. Start a review session to see your grade
             breakdown here.
           </p>
@@ -213,7 +214,7 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
                     <XAxis
                       dataKey="weekLabel"
                       tick={{ fontSize: 10, fill: "currentColor" }}
-                      className="text-zinc-400 dark:text-zinc-500"
+                      className={chartTickText}
                       axisLine={false}
                       tickLine={false}
                       interval={2}
@@ -221,7 +222,7 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
                     <YAxis
                       allowDecimals={false}
                       tick={{ fontSize: 10, fill: "currentColor" }}
-                      className="text-zinc-400 dark:text-zinc-500"
+                      className={chartTickText}
                       width={32}
                       axisLine={false}
                       tickLine={false}

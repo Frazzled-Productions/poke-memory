@@ -7,6 +7,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { RetentionComparison } from "@/lib/stats/retention";
+import { cardPanel, mutedText } from "@/lib/utils/class-names";
 
 type Props = {
   /** Actual-vs-target comparison from `computeRetentionComparison`. */
@@ -54,9 +55,9 @@ export function RetentionIndicator({ comparison }: Props) {
         retention target the scheduler aims for.
       </p>
 
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         {actual === null || delta === null ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={mutedText}>
             No reviews recorded in the past year. Grade some cards to see how
             your recall tracks against target.
           </p>

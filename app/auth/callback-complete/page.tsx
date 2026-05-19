@@ -47,7 +47,6 @@ import {
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import type { CloudRow } from "@/lib/sync/cloud";
 import type { ReviewableCard } from "@/lib/review/session";
-
 type ConflictData = {
   localCards: ReviewableCard[];
   cloudCards: CloudRow[];

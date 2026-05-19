@@ -182,6 +182,96 @@ describe("buildCollectionTimeline — past direction", () => {
     expect(tl.nowMs).toBe(NOW_MS);
     expect(tl.totalSpecies).toBe(42);
   });
+
+  // -------------------------------------------------------------------------
+  // Missing scenarios from issue #1018
+  // -------------------------------------------------------------------------
+
+  it("single-entry log: produces exactly one introduced species", () => {
+    // A log with a single valid name entry should yield introduced=1.
+    const log = [makeEntry("1", 4, 0)];
+    const tl = buildCollectionTimeline(baseOpts({ log, totalSpecies: 5 }));
+    expect(tl.past.length).toBeGreaterThan(0);
+    const last = tl.past[tl.past.length - 1];
+    expect(last.introduced).toBe(1);
+    expect(tl.totalSpecies).toBe(5);
+  });
+
+  it("log with date gaps: weekly checkpoints bridge the gap correctly", () => {
+    // Two species introduced 5 weeks apart — the checkpoints between them
+    // must show introduced=1, not 0 or 2.
+    const earlyMs = NOW_MS - 35 * DAY_MS; // 5 weeks ago
+    const lateMs = NOW_MS - 7 * DAY_MS;   // 1 week ago
+
+    const log: GradeLogEntry[] = [
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: earlyMs, subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: lateMs,  subjectKey: "2" },
+    ];
+    const tl = buildCollectionTimeline(baseOpts({ log }));
+
+    // Find a checkpoint between earlyMs and lateMs.
+    const midSnap = tl.past.find(
+      (s) => s.atMs > earlyMs && s.atMs < lateMs,
+    );
+    expect(midSnap).toBeDefined();
+    // Only species "1" was introduced before the gap — species "2" comes later.
+    expect(midSnap!.introduced).toBe(1);
+
+    // The final snapshot must show both species.
+    const last = tl.past[tl.past.length - 1];
+    expect(last.introduced).toBe(2);
+  });
+
+  it("duplicate same-day entries for a species count as one introduction", () => {
+    // Multiple entries for the same species on the same day should not
+    // inflate the introduced count beyond 1.
+    const sameTime = NOW_MS - 10 * DAY_MS;
+    const log: GradeLogEntry[] = [
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: sameTime,     subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: sameTime + 1, subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: sameTime + 2, subjectKey: "1" },
+    ];
+    const tl = buildCollectionTimeline(baseOpts({ log }));
+    const last = tl.past[tl.past.length - 1];
+    expect(last.introduced).toBe(1);
+  });
+
+  it("mastery achieved then lapsed: mastered status is not revoked in reconstruction", () => {
+    // After a card reaches mastery, the source documents an explicit design
+    // decision: once masteredAtMs is set it is never cleared, even if a
+    // subsequent Again grade causes a lapse (relearning). This mirrors the
+    // `replayLog` comment "Once mastered, we do not un-master".
+    //
+    // We use the same graduation sequence that the "reconstructs mastery
+    // crossing" test above already verifies produces mastered=1, then append
+    // an Again (grade=1) lapse and confirm the count is still 1.
+    const baseTime = NOW_MS - 50 * DAY_MS;
+    const log: GradeLogEntry[] = [
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime,                subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime + DAY_MS,       subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime + 2 * DAY_MS,   subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime + 9 * DAY_MS,   subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime + 20 * DAY_MS,  subjectKey: "1" },
+    ];
+
+    // Verify this sequence achieves mastery before appending the lapse.
+    const tlBeforeLapse = buildCollectionTimeline(baseOpts({ log }));
+    const lastBeforeLapse = tlBeforeLapse.past[tlBeforeLapse.past.length - 1];
+    expect(lastBeforeLapse.mastered).toBe(1);
+
+    // Append a lapse (Again) after mastery.
+    const logWithLapse: GradeLogEntry[] = [
+      ...log,
+      { date: "2026-01-01", grade: 1, cardType: "name", occurredAt: baseTime + 25 * DAY_MS, subjectKey: "1" },
+    ];
+
+    const tlAfterLapse = buildCollectionTimeline(baseOpts({ log: logWithLapse }));
+    const lastAfterLapse = tlAfterLapse.past[tlAfterLapse.past.length - 1];
+
+    // Mastery must not be revoked by the lapse.
+    expect(lastAfterLapse.introduced).toBe(1);
+    expect(lastAfterLapse.mastered).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

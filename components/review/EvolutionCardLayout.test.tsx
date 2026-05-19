@@ -3,8 +3,8 @@
  *
  * These tests exercise the shared layout directly, verifying the sprite/arrow
  * row, the hidden-side logic, the reveal state, and the fact block. The
- * per-card wrapper tests (EvolutionCard.test.tsx / ReverseEvolutionCard.test.tsx)
- * cover the prompt sentence and badge in context.
+ * per-direction wrapper tests in EvolutionCard.test.tsx cover the prompt
+ * sentence and badge in context.
  */
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";

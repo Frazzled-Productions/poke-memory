@@ -1,6 +1,6 @@
 ---
 name: workflow-expert
-description: Use to review or advise on non-trivial changes to .github/workflows/** or .claude/agents/** — the orchestrator authors the edits, you review them. Knows idempotency markers, WIP salvage flow, cycle caps, fork-PR guard, and project-board transitions. Read-only, advisory.
+description: Use to review or advise on non-trivial changes to .github/workflows/** or .claude/agents/** — the orchestrator authors the edits. Consult BEFORE writing any .github/workflows/** change involving marker-based dedup or HTML-comment idempotency, not only as a reviewer afterwards. Knows idempotency markers, WIP salvage flow, cycle caps, fork-PR guard, and project-board transitions. Read-only, advisory.
 tools: Read, Grep, Glob, WebFetch
 model: sonnet
 ---

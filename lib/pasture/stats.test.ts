@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { biomeStats } from "./stats";
+import { filterMastered } from "./arrivals";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import type { NameReviewCard } from "@/lib/review/session";
 
@@ -31,6 +32,21 @@ function makeState(overrides: Partial<ReviewState> = {}): ReviewState {
 function masteredState(firstSeen = "2026-04-01"): ReviewState {
   return makeState({
     reps: 3,
+    scheduledDays: 21,
+    lastReview: "2026-05-01",
+    firstSeen,
+    fsrsState: "review",
+  });
+}
+
+/**
+ * A state mastered at threshold 2 but not at threshold 3.
+ * reps=2, scheduledDays=21 — passes filterMastered(masteryRepetitions=2),
+ * but would fail isMastered() with the default MASTERY_REPETITIONS=3.
+ */
+function masteredAtThreshold2State(firstSeen = "2026-04-01"): ReviewState {
+  return makeState({
+    reps: 2,
     scheduledDays: 21,
     lastReview: "2026-05-01",
     firstSeen,
@@ -127,13 +143,15 @@ describe("biomeStats", () => {
     expect(stats.capturedPercent).toBe(0);
   });
 
-  it("does not include non-mastered cards in the count", () => {
+  it("counts all cards passed in allMasteredCards (caller pre-filters mastery)", () => {
+    // biomeStats trusts the caller to pass only mastered cards — it does not
+    // re-apply an isMastered() predicate. Both cards are counted.
     const cards = [
       makeCard(10, "Caterpie", "forest", masteredState()),
-      makeCard(11, "Metapod", "forest", learningState()),
+      makeCard(11, "Metapod", "forest", masteredState()),
     ];
     const stats = biomeStats("forest", cards);
-    expect(stats.masteredCount).toBe(1);
+    expect(stats.masteredCount).toBe(2);
   });
 
   it("returns the most recently firstSeen card as latestAddition", () => {
@@ -169,6 +187,53 @@ describe("biomeStats", () => {
     expect(stats.masteredCount).toBe(1);
     // capturedPercent must stay ≤ 100.
     expect(stats.capturedPercent).toBeLessThanOrEqual(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// biomeStats — masteryRepetitions below default (regression: #1013)
+// ---------------------------------------------------------------------------
+
+describe("biomeStats — masteryRepetitions < 3 (regression #1013)", () => {
+  it("counts a card with reps=2 when the caller pre-filters at masteryRepetitions=2", () => {
+    // This is the exact scenario that was broken: a user sets masteryRepetitions=2.
+    // filterMastered passes the card (reps >= 2 && scheduledDays >= 21).
+    // biomeStats must count it — not silently drop it via a hardcoded isMastered() re-check.
+    const allCards: NameReviewCard[] = [
+      makeCard(1, "Bulbasaur", "grassland", masteredAtThreshold2State()),
+    ];
+    // Simulate what the caller does: pre-filter at masteryRepetitions=2.
+    const preFiltered = filterMastered(allCards, false, 2) as NameReviewCard[];
+    expect(preFiltered.length).toBe(1); // confirm the pre-filter passes the card
+
+    const stats = biomeStats("grassland", preFiltered);
+    expect(stats.masteredCount).toBe(1);
+  });
+
+  it("counts a card with reps=1 when the caller pre-filters at masteryRepetitions=1", () => {
+    const cardAt1Rep: NameReviewCard = makeCard(
+      4,
+      "Charmander",
+      "mountain",
+      makeState({ reps: 1, scheduledDays: 21, firstSeen: "2026-04-01", fsrsState: "review" }),
+    );
+    const preFiltered = filterMastered([cardAt1Rep], false, 1) as NameReviewCard[];
+    expect(preFiltered.length).toBe(1);
+
+    const stats = biomeStats("mountain", preFiltered);
+    expect(stats.masteredCount).toBe(1);
+  });
+
+  it("returns zero masteredCount for a card excluded by the caller's pre-filter (interval too short)", () => {
+    // scheduledDays < 21 means the card is not mastered regardless of masteryRepetitions.
+    // filterMastered at masteryRepetitions=2 should exclude it, so biomeStats
+    // sees an empty input and returns masteredCount=0.
+    const card = makeCard(10, "Caterpie", "forest", learningState()); // reps=2, scheduledDays=10
+    const preFiltered = filterMastered([card], false, 2) as NameReviewCard[];
+    expect(preFiltered.length).toBe(0);
+
+    const stats = biomeStats("forest", preFiltered);
+    expect(stats.masteredCount).toBe(0);
   });
 });
 

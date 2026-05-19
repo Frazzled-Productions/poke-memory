@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { BadgeGalleryCard } from "@/components/badges/BadgeGalleryCard";
+import { cn } from "@/lib/utils/cn";
+import { mutedText } from "@/lib/utils/class-names";
 
 type Props = {
   /**
@@ -105,7 +107,7 @@ export function BadgeGallery({
       {nextBadge !== null && (
         <p
           data-testid="next-badge-hint"
-          className="mb-3 text-sm text-zinc-500 dark:text-zinc-400"
+          className={cn("mb-3", mutedText)}
         >
           <span className="font-medium text-foreground">Next badge:</span>{" "}
           {nextBadge.badge.name},{" "}
@@ -126,7 +128,7 @@ export function BadgeGallery({
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={mutedText}>
           No badges earned yet. Keep mastering Pokémon to unlock your first gym badge!
         </p>
       )}

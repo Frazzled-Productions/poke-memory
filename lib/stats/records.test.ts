@@ -101,6 +101,12 @@ describe("computeBestReviewDay", () => {
     ];
     expect(computeBestReviewDay(log)).toBe(3);
   });
+
+  it("single-day log — all reviews on one day — returns that day's count", () => {
+    // Issue #1019 scenario: single-day log behaves correctly.
+    const log: GradeLog = [entry("2026-05-12"), entry("2026-05-12")];
+    expect(computeBestReviewDay(log)).toBe(2);
+  });
 });
 
 describe("computeRecords", () => {
@@ -140,6 +146,21 @@ describe("computeRecords", () => {
     ];
     const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
     expect(r.avgDaysToMastery).toBe(15);
+  });
+
+  it("avgDaysToMastery is 0 when firstSeen === lastReview on all mastered cards", () => {
+    // Edge: a card mastered on the same day it was first seen contributes 0 to
+    // the average rather than being filtered out.
+    const cards = [
+      card(1, {
+        reps: MASTERY_REPETITIONS,
+        scheduledDays: MASTERY_INTERVAL_DAYS,
+        firstSeen: "2026-05-12",
+        lastReview: "2026-05-12",
+      }),
+    ];
+    const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    expect(r.avgDaysToMastery).toBe(0);
   });
 
   it("mostMasteredIn7d finds the densest 7-day window of lastReview dates", () => {

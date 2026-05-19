@@ -1,3 +1,5 @@
+import { mutedText } from "@/lib/utils/class-names";
+
 type Props = {
   again: number;
   hard: number;
@@ -41,7 +43,7 @@ export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegm
       </h2>
 
       {total === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">No grades yet.</p>
+        <p className={mutedText}>No grades yet.</p>
       ) : (
         <>
           {/* Stacked bar */}

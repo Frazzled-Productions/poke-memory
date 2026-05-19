@@ -3,6 +3,7 @@
 import type { CompletionProjection } from "@/lib/stats/completion-projection";
 import type { DateFormat } from "@/lib/utils/format-date";
 import { formatDate } from "@/lib/utils/format-date";
+import { cardPanel, mutedText } from "@/lib/utils/class-names";
 
 type Props = {
   projection: CompletionProjection;
@@ -20,13 +21,13 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
         Pokédex completion
       </h2>
 
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         {projection.kind === "complete" && (
           <div className="flex flex-col gap-1">
             <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               Complete!
             </p>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className={mutedText}>
               You have mastered every species. Congratulations!
             </p>
           </div>
@@ -37,7 +38,7 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
             <p className="text-sm font-medium text-foreground">
               Projection not available yet
             </p>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className={mutedText}>
               Available once you have mastered at least one species and kept it
               up for a week. Master a species by reviewing it until it is
               scheduled at least 21 days ahead, then come back after 7 days.

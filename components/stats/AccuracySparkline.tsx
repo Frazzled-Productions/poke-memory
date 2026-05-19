@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
+import { cn } from "@/lib/utils/cn";
+import { cardPanel, mutedText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Window options
@@ -143,7 +145,7 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cn("flex items-center gap-4", cardPanel)}>
         <div className="flex flex-col">
           <span className="text-2xl font-semibold tabular-nums text-foreground">
             {rollingValue === null ? "—" : formatPct(rollingValue)}
@@ -185,7 +187,7 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
             ))}
           </svg>
         ) : (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={mutedText}>
             No reviews yet in the last {activeWindow === 365 ? "year" : `${activeWindow} days`}.
           </p>
         )}

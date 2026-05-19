@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { loadSyncStatus, STORAGE_KEY as SYNC_STATUS_KEY } from "@/lib/sync/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import type { RetryState } from "@/lib/sync/useRetryPush";
+import { mutedText } from "@/lib/utils/class-names";
 
 type SyncState = { text: string; errorDetail: string | null; failed: boolean };
 
@@ -67,7 +68,7 @@ export function SyncStatusLine({
   // While retrying, always show "Retrying…" regardless of stored status.
   if (retryState === "retrying") {
     return (
-      <div className="text-sm text-zinc-500 dark:text-zinc-400" aria-live="polite">
+      <div className={mutedText} aria-live="polite">
         <span>Retrying…</span>
       </div>
     );
@@ -79,7 +80,7 @@ export function SyncStatusLine({
   if (retryState === "error") {
     const isDisabled = superuserPaused;
     return (
-      <div className="text-sm text-zinc-500 dark:text-zinc-400" aria-live="polite">
+      <div className={mutedText} aria-live="polite">
         <button
           type="button"
           onClick={retryNow}
@@ -104,7 +105,7 @@ export function SyncStatusLine({
       : undefined;
 
     return (
-      <div className="text-sm text-zinc-500 dark:text-zinc-400" aria-live="polite">
+      <div className={mutedText} aria-live="polite">
         <button
           type="button"
           onClick={retryNow}
@@ -119,7 +120,7 @@ export function SyncStatusLine({
   }
 
   return (
-    <div className="text-sm text-zinc-500 dark:text-zinc-400">
+    <div className={mutedText}>
       <span>{state.text}</span>
     </div>
   );

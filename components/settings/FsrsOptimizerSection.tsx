@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
+import { cardPanelPadded, colStack, colStackLg, mutedText } from "@/lib/utils/class-names";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -129,25 +130,25 @@ export function FsrsOptimizerSection({
   }
 
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="optimizer-heading">
+    <section className={colStackLg} aria-labelledby="optimizer-heading">
       <h2
         id="optimizer-heading"
         className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
       >
         Personalize my schedule
       </h2>
-      <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+      <div className={cardPanelPadded}>
         {!isSignedIn ? (
           /* Guest state */
           <p
             data-testid="fsrs-optimize-help"
-            className="text-sm text-zinc-500 dark:text-zinc-400"
+            className={mutedText}
           >
             Sign in to enable personalized scheduling.
           </p>
         ) : superuserPaused ? (
           /* Superuser flag(s) on — paused style */
-          <div className="flex flex-col gap-2">
+          <div className={colStack}>
             <p className="text-sm text-foreground">
               Tune scheduling to your memory using your full review history.
             </p>
@@ -163,7 +164,7 @@ export function FsrsOptimizerSection({
           </div>
         ) : optimizableReviewCount < MIN_REVIEWS_FOR_OPTIMIZATION ? (
           /* Not enough reviews yet */
-          <div className="flex flex-col gap-2">
+          <div className={colStack}>
             <p className="text-sm text-foreground">
               We need enough review history to tune the weights meaningfully.
             </p>
@@ -184,7 +185,7 @@ export function FsrsOptimizerSection({
           </div>
         ) : cooldown !== null ? (
           /* Cooldown active — show when next optimization is available */
-          <div className="flex flex-col gap-2">
+          <div className={colStack}>
             <p className="text-sm text-foreground">
               Tune scheduling to your memory using your full review history.
             </p>
@@ -210,7 +211,7 @@ export function FsrsOptimizerSection({
           </div>
         ) : (
           /* Ready to optimize */
-          <div className="flex flex-col gap-2">
+          <div className={colStack}>
             <p className="text-sm text-foreground">
               Tune scheduling to your memory using your full review history.
             </p>

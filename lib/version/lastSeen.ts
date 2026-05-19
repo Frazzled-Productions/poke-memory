@@ -1,4 +1,6 @@
-export const LAST_SEEN_VERSION_KEY = "poke-memory:last-seen-version:v1";
+import { KEY_LAST_SEEN_VERSION } from "@/lib/storage/keys";
+
+export const LAST_SEEN_VERSION_KEY = KEY_LAST_SEEN_VERSION;
 
 export function readLastSeenVersion(): string | null {
   if (typeof window === "undefined") return null;

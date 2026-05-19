@@ -1,6 +1,6 @@
 ---
 name: pokeapi-expert
-description: Use for any task involving PokéAPI (pokeapi.co) — choosing endpoints, understanding response schemas, designing caching strategies, handling evolution chains and sprite URLs. Use BEFORE writing PokéAPI integration code, not after.
+description: Use only when changing the seed script or adding a new PokéAPI data category — choosing endpoints, response schemas, caching strategy, evolution chains, sprite URLs. Skip for runtime feature work that only reads the pre-seeded store (Pokédex, practice, stats surfaces). Use BEFORE writing seed/integration code, not after.
 tools: Read, WebFetch, Grep, Glob, Bash
 model: sonnet
 ---

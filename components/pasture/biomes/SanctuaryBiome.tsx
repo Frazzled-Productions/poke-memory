@@ -1,6 +1,6 @@
-"use client";
-
-import styles from "./Biome.module.css";
+import { BiomeSvg } from "./BiomeSvg";
+import { BiomeSky } from "./BiomeSky";
+import { BiomeFloor } from "./BiomeFloor";
 
 /**
  * Sanctuary (rare-habitat) backdrop — a starlit twilight sky with aurora
@@ -9,18 +9,8 @@ import styles from "./Biome.module.css";
  */
 export function SanctuaryBiome() {
   return (
-    <svg
-      className={styles.biome}
-      viewBox="0 0 1600 600"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
+    <BiomeSvg>
       <defs>
-        <linearGradient id="sanc-sky" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"  stopColor="#1a1442" />
-          <stop offset="50%" stopColor="#3a2470" />
-          <stop offset="100%" stopColor="#6a3aa0" />
-        </linearGradient>
         <radialGradient id="sanc-moon" cx="0.5" cy="0.5">
           <stop offset="0%"  stopColor="#ffffff" />
           <stop offset="70%" stopColor="#dcd1ff" stopOpacity="0.8" />
@@ -43,7 +33,14 @@ export function SanctuaryBiome() {
       </defs>
 
       {/* Sky */}
-      <rect width="1600" height="600" fill="url(#sanc-sky)" />
+      <BiomeSky
+        gradientId="sanc-sky"
+        stops={[
+          { offset: "0%",   stopColor: "#1a1442" },
+          { offset: "50%",  stopColor: "#3a2470" },
+          { offset: "100%", stopColor: "#6a3aa0" },
+        ]}
+      />
 
       {/* Aurora ribbons */}
       <path d="M0,180 Q400,140 800,200 T1600,180 L1600,250 Q1200,210 800,270 T0,250 Z" fill="url(#sanc-aurora-a)" />
@@ -117,13 +114,11 @@ export function SanctuaryBiome() {
       </g>
 
       {/* Sanctuary floor */}
-      <path
-        d="M0,460 C200,440 400,468 700,452 C1000,438 1300,468 1600,448 L1600,600 L0,600 Z"
+      <BiomeFloor
+        curvePath="M0,460 C200,440 400,468 700,452 C1000,438 1300,468 1600,448"
         fill="url(#sanc-floor)"
-      />
-      <path
-        d="M0,460 C200,440 400,468 700,452 C1000,438 1300,468 1600,448"
-        stroke="#1a0e3a" strokeWidth="3" fill="none" opacity="0.7"
+        strokeColour="#1a0e3a"
+        strokeOpacity={0.7}
       />
 
       {/* Glowing runes on the floor */}
@@ -145,6 +140,6 @@ export function SanctuaryBiome() {
         <polygon points="980,548 986,530 992,548" fill="#ff8edc" stroke="#a23e8e" strokeWidth="1.5" />
         <polygon points="1280,548 1286,530 1292,548" fill="#ffd060" stroke="#a07020" strokeWidth="1.5" />
       </g>
-    </svg>
+    </BiomeSvg>
   );
 }

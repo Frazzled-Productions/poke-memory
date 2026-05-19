@@ -1,5 +1,6 @@
 import type { ReviewableCard, DailyLimits } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { isBaseCardShaped, isNonNullObject } from "@/lib/review/card-shape";
 
 // Increment when the shape of BackupFile changes incompatibly.
 export const BACKUP_VERSION = 1 as const;
@@ -19,91 +20,55 @@ export type BackupFile = {
 //   legacy per-pre-evo shape are accepted; the import pipeline strips legacy
 //   evolution cards before hydration (#262 — there is no 1:N mapping from a
 //   legacy card to the new edge cards).
-function isMinimalCardShaped(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  if (typeof v.id !== "number") return false;
-  if (typeof v.state !== "object" || v.state === null) return false;
-  if (typeof (v.state as Record<string, unknown>).dueDate !== "string") return false;
-  if (
-    v.cardType !== undefined &&
-    v.cardType !== "name" &&
-    v.cardType !== "evolution" &&
-    v.cardType !== "reverse-evolution" &&
-    v.cardType !== "reverse" &&
-    v.cardType !== "cry"
-  ) {
-    return false;
-  }
-  if (v.cardType === "evolution") {
-    // New edge shape: requires postEvoId (the discriminator that distinguishes
-    // edge cards from legacy per-pre-evo cards). Other edge fields are
-    // refreshed from seed on hydrate, so they're not validated here.
-    if (typeof v.postEvoId === "number") return true;
-    // Legacy shape: evolvesInto: { name, spriteUrl }[] OR evolvesIntoNames.
-    // The import pipeline drops these; we accept them here so the file as a
-    // whole still validates.
-    if (
-      Array.isArray(v.evolvesInto) &&
-      v.evolvesInto.every(
-        (e: unknown) =>
-          typeof e === "object" &&
-          e !== null &&
-          typeof (e as Record<string, unknown>).name === "string" &&
-          typeof (e as Record<string, unknown>).spriteUrl === "string",
-      )
-    ) {
-      return true;
-    }
-    if (
-      Array.isArray(v.evolvesIntoNames) &&
-      v.evolvesIntoNames.every((n: unknown) => typeof n === "string")
-    ) {
-      return true;
-    }
-    return false;
-  }
-  return true;
+//
+// Uses isBaseCardShaped from lib/review/card-shape.ts for the shared core;
+// no extra strictness is layered on top here because hydrateSession refreshes
+// the fields that isReviewCardShaped additionally validates.
+//
+// Returns `value is Record<string, unknown>` (not `value is ReviewableCard`)
+// because isBaseCardShaped only validates the minimal shared invariants — it
+// does not check reverse-evolution preEvoId/postEvoId, name, spriteUrl, etc.
+// Claiming ReviewableCard here would be unsound.  The outer isBackupFile
+// predicate is what narrows the whole blob to BackupFile; this helper only
+// gates the per-element array check.
+function isMinimalCardShaped(value: unknown): value is Record<string, unknown> {
+  return isBaseCardShaped(value);
 }
 
 function isPerTypeLimitsShaped(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
+  if (!isNonNullObject(value)) return false;
   return (
-    typeof v.maxNewPerDay === "number" &&
-    typeof v.maxReviewsPerDay === "number"
+    typeof value.maxNewPerDay === "number" &&
+    typeof value.maxReviewsPerDay === "number"
   );
 }
 
 function isLimitsShaped(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
+  if (!isNonNullObject(value)) return false;
   // `reverse` is optional — existing exports don't have it; loadSession in lib/review/persistence.ts backfills.
-  return isPerTypeLimitsShaped(v.name) && isPerTypeLimitsShaped(v.evolution);
+  return isPerTypeLimitsShaped(value.name) && isPerTypeLimitsShaped(value.evolution);
 }
 
 function isSettingsShaped(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
+  if (!isNonNullObject(value)) return false;
   // reverseCardsEnabled and maxNew/ReviewsReversePerDay are optional —
   // loadSettings backfills them on import so existing exports remain valid.
   return (
-    typeof v.masteryRepetitions === "number" &&
-    typeof v.maxNewPerDay === "number" &&
-    typeof v.maxReviewsPerDay === "number" &&
-    typeof v.maxNewEvolutionPerDay === "number" &&
-    typeof v.maxReviewsEvolutionPerDay === "number"
+    typeof value.masteryRepetitions === "number" &&
+    typeof value.maxNewPerDay === "number" &&
+    typeof value.maxReviewsPerDay === "number" &&
+    typeof value.maxNewEvolutionPerDay === "number" &&
+    typeof value.maxReviewsEvolutionPerDay === "number"
   );
 }
 
 export function isBackupFile(value: unknown): value is BackupFile {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  if (v.version !== BACKUP_VERSION) return false;
-  if (typeof v.exportedAt !== "string") return false;
-  if (!Array.isArray(v.cards)) return false;
-  if (!v.cards.every(isMinimalCardShaped)) return false;
-  if (!isLimitsShaped(v.limits)) return false;
-  if (!isSettingsShaped(v.settings)) return false;
+  if (!isNonNullObject(value)) return false;
+  if (value.version !== BACKUP_VERSION) return false;
+  if (typeof value.exportedAt !== "string") return false;
+  if (!Array.isArray(value.cards)) return false;
+  if (!value.cards.every(isMinimalCardShaped)) return false;
+  if (!isLimitsShaped(value.limits)) return false;
+  if (!isSettingsShaped(value.settings)) return false;
   return true;
 }

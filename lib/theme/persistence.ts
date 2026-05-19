@@ -7,13 +7,14 @@ import {
 } from "@/lib/settings/persistence";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { isMastered } from "@/lib/stats/derive";
+import { KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
 
 // Legacy localStorage key. The favourite theme used to live here standalone;
 // since #307 the canonical store is `user_settings.settings.favouriteTheme`
 // so it syncs to the cloud alongside other settings. `loadFavourite` runs a
 // one-time migration that copies any pre-existing legacy value into settings
 // and removes the legacy key.
-const LEGACY_STORAGE_KEY = "poke-memory:favourite:v1";
+const LEGACY_STORAGE_KEY = KEY_LEGACY_FAVOURITE_THEME;
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 export type StoredFavourite = StoredFavouriteTheme;

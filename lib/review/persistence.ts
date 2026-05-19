@@ -2,6 +2,8 @@ import type { ReviewableCard, DailyLimits, PerTypeLimits } from "@/lib/review/se
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { Subject } from "@/lib/cards/subjectKey";
 import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
+import { KEY_REVIEW_SESSION } from "@/lib/storage/keys";
+import { isBaseCardShaped, isNonNullObject } from "@/lib/review/card-shape";
 
 export type { DailyLimits };
 
@@ -10,65 +12,42 @@ export type SavedSession = {
   limits: DailyLimits;
 };
 
-export const STORAGE_KEY = "poke-memory:review-session:v1";
+export const STORAGE_KEY = KEY_REVIEW_SESSION;
 
+// Stricter than isMinimalCardShaped in backup/schema.ts:
+//   - Validates the reverse-evolution edge shape (preEvoId + postEvoId).
+//   - Requires name + spriteUrl on non-evolution cards so the legacy
+//     migration path can backfill cardType="name" safely.
+//
+// Uses isBaseCardShaped from lib/review/card-shape.ts for the shared core,
+// then layers the extra checks on top.
+//
+// Returns boolean (not a type predicate) because the checks here do not cover
+// every field required to soundly narrow to ReviewableCard — subjectKey,
+// flavorTexts, evolutionChain, pokemonId, and others are absent.  A
+// type-predicate return would be a lie the compiler would trust.  The single
+// authoritative cast lives in parseSession, at the point where the validated
+// + migrated array is first used as ReviewableCard[].
 function isReviewCardShaped(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  if (typeof v.id !== "number") return false;
-  if (typeof v.state !== "object" || v.state === null) return false;
-  if (typeof (v.state as Record<string, unknown>).dueDate !== "string") return false;
-  // Reject unknown cardType values — undefined is allowed (legacy migration
-  // backfills it to "name") but any explicit value other than the known
-  // discriminants indicates corruption or a forward-incompatible schema.
-  if (
-    v.cardType !== undefined &&
-    v.cardType !== "name" &&
-    v.cardType !== "evolution" &&
-    v.cardType !== "reverse-evolution" &&
-    v.cardType !== "reverse" &&
-    v.cardType !== "cry"
-  ) {
-    return false;
-  }
-  if (v.cardType === "evolution") {
-    // New edge shape (#262): postEvoId-keyed. Other edge fields are refreshed
-    // from seed on hydrate, so they're not validated here.
-    if (typeof v.postEvoId === "number") return true;
-    // Legacy per-pre-evo shapes (evolvesInto or evolvesIntoNames). Accepted
-    // here so the whole session still validates; isLegacyEvolutionCard()
-    // filters them out before hydration — there's no 1:N mapping from a
-    // legacy card to the new edge cards (#262 plan, resolved decision 2).
-    if (
-      Array.isArray(v.evolvesInto) &&
-      v.evolvesInto.every(
-        (e: unknown) =>
-          typeof e === "object" &&
-          e !== null &&
-          typeof (e as Record<string, unknown>).name === "string" &&
-          typeof (e as Record<string, unknown>).spriteUrl === "string",
-      )
-    ) {
-      return true;
-    }
-    if (
-      Array.isArray(v.evolvesIntoNames) &&
-      v.evolvesIntoNames.every((n: unknown) => typeof n === "string")
-    ) {
-      return true;
-    }
-    return false;
-  }
-  if (v.cardType === "reverse-evolution") {
+  if (!isBaseCardShaped(value)) return false;
+  // isBaseCardShaped narrows value to Record<string, unknown> and guarantees a
+  // valid cardType, state.dueDate, id, and — for evolution cards — a recognised
+  // evolution shape.  We only need to add the extra checks below.
+
+  // Evolution cards were fully validated by isBaseCardShaped.
+  if (value.cardType === "evolution") return true;
+
+  if (value.cardType === "reverse-evolution") {
     // Edge card derived 1:1 from a forward EvolutionCard (#343). Shares the
     // postEvoId-keyed shape and is refreshed from seed on hydrate — no
     // name/spriteUrl is ever serialised for edge cards.
-    return typeof v.preEvoId === "number" && typeof v.postEvoId === "number";
+    return typeof value.preEvoId === "number" && typeof value.postEvoId === "number";
   }
+
   // Non-evolution cards still need name + spriteUrl present so the legacy
   // migration path can backfill cardType="name" safely.
-  if (typeof v.name !== "string") return false;
-  if (typeof v.spriteUrl !== "string") return false;
+  if (typeof value.name !== "string") return false;
+  if (typeof value.spriteUrl !== "string") return false;
   return true;
 }
 
@@ -76,61 +55,57 @@ function isReviewCardShaped(value: unknown): boolean {
 // retired by #262. Used to drop these from the loaded session on first read
 // post-upgrade.
 function isLegacyEvolutionCard(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  if (v.cardType !== "evolution") return false;
-  return typeof v.postEvoId !== "number";
+  if (!isNonNullObject(value)) return false;
+  if (value.cardType !== "evolution") return false;
+  return typeof value.postEvoId !== "number";
 }
 
 function isPerTypeLimitsShaped(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
+  if (!isNonNullObject(value)) return false;
   return (
-    typeof v.maxNewPerDay === "number" &&
-    typeof v.maxReviewsPerDay === "number"
+    typeof value.maxNewPerDay === "number" &&
+    typeof value.maxReviewsPerDay === "number"
   );
 }
 
 function isDailyLimitsShaped(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
+  if (!isNonNullObject(value)) return false;
   // Current shape: per-type limits. `reverse` is optional for existing sessions.
-  if (isPerTypeLimitsShaped(v.name) && isPerTypeLimitsShaped(v.evolution)) {
+  if (isPerTypeLimitsShaped(value.name) && isPerTypeLimitsShaped(value.evolution)) {
     return true;
   }
   // Legacy flat shape: { maxNewPerDay, maxReviewsPerDay }. Accepted for
   // migration; loadSession promotes it into the per-type shape on read.
   return (
-    typeof v.maxNewPerDay === "number" &&
-    typeof v.maxReviewsPerDay === "number"
+    typeof value.maxNewPerDay === "number" &&
+    typeof value.maxReviewsPerDay === "number"
   );
 }
 
 function migrateDailyLimits(raw: unknown): DailyLimits {
-  if (typeof raw !== "object" || raw === null) return DEFAULT_LIMITS;
-  const v = raw as Record<string, unknown>;
-  if (isPerTypeLimitsShaped(v.name) && isPerTypeLimitsShaped(v.evolution)) {
+  if (!isNonNullObject(raw)) return DEFAULT_LIMITS;
+  if (isPerTypeLimitsShaped(raw.name) && isPerTypeLimitsShaped(raw.evolution)) {
     return {
-      name: v.name as PerTypeLimits,
-      evolution: v.evolution as PerTypeLimits,
+      name: raw.name as PerTypeLimits,
+      evolution: raw.evolution as PerTypeLimits,
       // `reverse` and `cry` are optional in persisted sessions; backfill with defaults.
-      reverse: isPerTypeLimitsShaped(v.reverse)
-        ? (v.reverse as PerTypeLimits)
+      reverse: isPerTypeLimitsShaped(raw.reverse)
+        ? (raw.reverse as PerTypeLimits)
         : { ...DEFAULT_LIMITS.reverse },
-      cry: isPerTypeLimitsShaped(v.cry)
-        ? (v.cry as PerTypeLimits)
+      cry: isPerTypeLimitsShaped(raw.cry)
+        ? (raw.cry as PerTypeLimits)
         : { ...DEFAULT_LIMITS.cry },
     };
   }
   // Legacy flat shape — promote to name limits, the rest get defaults.
   if (
-    typeof v.maxNewPerDay === "number" &&
-    typeof v.maxReviewsPerDay === "number"
+    typeof raw.maxNewPerDay === "number" &&
+    typeof raw.maxReviewsPerDay === "number"
   ) {
     return {
       name: {
-        maxNewPerDay: v.maxNewPerDay,
-        maxReviewsPerDay: v.maxReviewsPerDay,
+        maxNewPerDay: raw.maxNewPerDay,
+        maxReviewsPerDay: raw.maxReviewsPerDay,
       },
       evolution: { ...DEFAULT_LIMITS.evolution },
       reverse: { ...DEFAULT_LIMITS.reverse },
@@ -264,9 +239,17 @@ function parseSession(raw: string): SavedSession | null {
       for (const card of parsed) {
         migrateReviewCard(card);
       }
-      const filtered = parsed.filter((c) => !isLegacyEvolutionCard(c));
+      // isReviewCardShaped validates the shape but returns boolean (not a type
+      // predicate) because it cannot soundly check every ReviewableCard field.
+      // The every() guard above confirmed all elements pass validation, and
+      // migrateReviewCard has backfilled any missing state fields, so a single
+      // localised cast here is the honest narrowing point.
+      const validated = parsed as ReviewableCard[];
+      // isLegacyEvolutionCard identifies legacy cards to drop; it is not a type
+      // predicate, so we use a plain boolean filter — no inline type assertion needed.
+      const filtered = validated.filter((c) => !isLegacyEvolutionCard(c));
       return {
-        cards: filtered as ReviewableCard[],
+        cards: filtered,
         limits: DEFAULT_LIMITS,
       };
     }
@@ -283,9 +266,12 @@ function parseSession(raw: string): SavedSession | null {
         for (const card of obj.cards) {
           migrateReviewCard(card);
         }
-        const filtered = obj.cards.filter((c) => !isLegacyEvolutionCard(c));
+        // Same rationale as the array branch above: every() + migrate guarantees
+        // the shape; a single cast is the honest narrowing point.
+        const validated = obj.cards as ReviewableCard[];
+        const filtered = validated.filter((c) => !isLegacyEvolutionCard(c));
         return {
-          cards: filtered as ReviewableCard[],
+          cards: filtered,
           limits: migrateDailyLimits(obj.limits),
         };
       }

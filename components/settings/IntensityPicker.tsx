@@ -1,6 +1,7 @@
 "use client";
 
 import type { ThemeIntensity } from "@/lib/settings/persistence";
+import { colStack, colStackLg } from "@/lib/utils/class-names";
 
 type Option = {
   value: ThemeIntensity;
@@ -33,7 +34,7 @@ type Props = {
 
 export function IntensityPicker({ value, onChange }: Props) {
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="intensity-heading">
+    <section className={colStackLg} aria-labelledby="intensity-heading">
       <h2
         id="intensity-heading"
         className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
@@ -43,7 +44,7 @@ export function IntensityPicker({ value, onChange }: Props) {
       <div
         role="radiogroup"
         aria-labelledby="intensity-heading"
-        className="flex flex-col gap-2"
+        className={colStack}
       >
         {OPTIONS.map((opt) => {
           const checked = value === opt.value;

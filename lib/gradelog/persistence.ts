@@ -1,5 +1,6 @@
 import type { Grade } from "@/lib/srs/scheduler";
 import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
+import { KEY_GRADE_LOG } from "@/lib/storage/keys";
 
 export type GradeLogEntry = {
   date: string;
@@ -26,7 +27,7 @@ export type GradeLog = GradeLogEntry[];
 
 export type GradeTotals = Record<Grade, number>;
 
-const STORAGE_KEY = "poke-memory:grade-log:v1";
+const STORAGE_KEY = KEY_GRADE_LOG;
 
 /**
  * Fires on every successful `appendGradeEntry`. The detail is the stamped

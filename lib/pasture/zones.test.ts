@@ -221,3 +221,118 @@ describe("HABITAT_ZONES — per-zone spot checks", () => {
     expect(maxY - minY).toBeGreaterThan(0.3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Sub-region ordering and depth conventions
+// ---------------------------------------------------------------------------
+
+describe("HABITAT_ZONES — sub-region ordering and depth", () => {
+  // Ground-based biomes stack sub-regions top-to-bottom (increasing y).
+  // The first sub-region should have a lower median y than the last, reflecting
+  // the "distant hills / far bank → foreground" layering described in the
+  // zone definitions.
+  it.each([
+    "grassland",
+    "forest",
+    "cave",
+    "mountain",
+    "urban",
+    "waters-edge",
+    "rough-terrain",
+    "rare",
+  ] as const)("%s: first sub-region has lower median y than last sub-region", (habitat) => {
+    const zone = zoneFor(habitat);
+    const first = zone.subRegions[0];
+    const last = zone.subRegions[zone.subRegions.length - 1];
+
+    const median = (slots: typeof first.anchorSlots) => {
+      const sorted = [...slots.map((s) => s.y)].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0
+        ? (sorted[mid - 1] + sorted[mid]) / 2
+        : sorted[mid];
+    };
+
+    expect(median(first.anchorSlots)).toBeLessThan(median(last.anchorSlots));
+  });
+
+  it("wildlands-very-front slots are all clamped to the y-ceiling (0.97)", () => {
+    // This sub-region's bounding box (y0=0.985, y1=0.995) lies entirely above
+    // the gridSlots clamp ceiling of 0.97, so every generated slot should land
+    // at exactly 0.97 after clamping.
+    const unknown = zoneFor("unknown");
+    const veryFront = unknown.subRegions.find(
+      (sr) => sr.id === "wildlands-very-front",
+    );
+    expect(veryFront).toBeDefined();
+    for (const slot of veryFront!.anchorSlots) {
+      expect(slot.y).toBe(0.97);
+    }
+  });
+
+  it("sea zone first sub-region (Surface Waters) has lower y than last (Seafloor)", () => {
+    // Explicit directional check: surface should be above seafloor.
+    const seaZone = zoneFor("sea");
+    const [surface, , , seafloor] = seaZone.subRegions;
+    const surfaceMaxY = Math.max(...surface.anchorSlots.map((s) => s.y));
+    const seafloorMinY = Math.min(...seafloor.anchorSlots.map((s) => s.y));
+    expect(surfaceMaxY).toBeLessThan(seafloorMinY);
+  });
+
+  it("sub-region IDs follow a kebab-case '<zone>-<descriptor>' naming pattern", () => {
+    // Each sub-region id must contain a hyphen (e.g. 'grassland-meadow',
+    // 'wildlands-far-ridge'). The 'unknown' zone uses 'wildlands-*' rather
+    // than 'unknown-*', so this test deliberately does not assert the prefix.
+    for (const zone of HABITAT_ZONES) {
+      for (const sr of zone.subRegions) {
+        expect(sr.id).toMatch(/-/);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Exact slot counts (per the comments in zones.ts)
+// ---------------------------------------------------------------------------
+
+describe("HABITAT_ZONES — exact slot counts from source comments", () => {
+  it("grassland has exactly 90 slots (14+16+18+20+22)", () => {
+    expect(totalSlots("grassland")).toBe(90);
+  });
+
+  it("forest has exactly 80 slots (12+14+16+18+20)", () => {
+    expect(totalSlots("forest")).toBe(80);
+  });
+
+  it("sea has exactly 44 slots (10+12+12+10)", () => {
+    expect(totalSlots("sea")).toBe(44);
+  });
+
+  it("cave has exactly 41 slots (8+10+11+12)", () => {
+    expect(totalSlots("cave")).toBe(41);
+  });
+
+  it("mountain has exactly 44 slots (8+10+12+14)", () => {
+    expect(totalSlots("mountain")).toBe(44);
+  });
+
+  it("urban has exactly 46 slots (9+11+13+13)", () => {
+    expect(totalSlots("urban")).toBe(46);
+  });
+
+  it("waters-edge has exactly 48 slots (9+11+13+15)", () => {
+    expect(totalSlots("waters-edge")).toBe(48);
+  });
+
+  it("rough-terrain has exactly 37 slots (7+9+10+11)", () => {
+    expect(totalSlots("rough-terrain")).toBe(37);
+  });
+
+  it("rare has exactly 15 slots (3+4+4+4)", () => {
+    expect(totalSlots("rare")).toBe(15);
+  });
+
+  it("unknown has exactly 240 slots (24+28+32+36+40+40+40)", () => {
+    expect(totalSlots("unknown")).toBe(240);
+  });
+});
