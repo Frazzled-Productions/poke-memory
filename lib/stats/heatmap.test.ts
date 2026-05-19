@@ -56,3 +56,40 @@ describe("intensityBucket", () => {
     expect(intensityBucket(1000)).toBe(4);
   });
 });
+
+describe("computeReviewHeatmap — all grades on one day (high density)", () => {
+  it("accumulates 50 reviews on the same date into a single cell with count 50", () => {
+    // Scenario from issue #1019: all grades on one day should accumulate
+    // correctly rather than being capped or deduplicated.
+    const log = Array.from({ length: 50 }, () => entry(TODAY));
+    const columns = computeReviewHeatmap(log, TODAY);
+    const todayCell = columns.flat().find((c) => c.date === TODAY);
+    expect(todayCell?.count).toBe(50);
+    // The resulting density is in the mid bucket (50..99 → 3).
+    expect(intensityBucket(todayCell!.count)).toBe(3);
+  });
+
+  it("accumulates 100 reviews on the same date — saturates at bucket 4", () => {
+    const log = Array.from({ length: 100 }, () => entry(TODAY));
+    const columns = computeReviewHeatmap(log, TODAY);
+    const todayCell = columns.flat().find((c) => c.date === TODAY);
+    expect(todayCell?.count).toBe(100);
+    expect(intensityBucket(todayCell!.count)).toBe(4);
+  });
+});
+
+describe("computeReviewHeatmap — weekStart=1 (Monday-start)", () => {
+  it("still returns 53 columns of 7 cells when weekStart=1", () => {
+    const columns = computeReviewHeatmap([], TODAY, 1);
+    expect(columns).toHaveLength(53);
+    expect(columns.every((c) => c.length === 7)).toBe(true);
+  });
+
+  it("today still appears exactly once in the grid when weekStart=1", () => {
+    const log = [entry(TODAY)];
+    const columns = computeReviewHeatmap(log, TODAY, 1);
+    const todayCells = columns.flat().filter((c) => c.date === TODAY);
+    expect(todayCells).toHaveLength(1);
+    expect(todayCells[0].count).toBe(1);
+  });
+});

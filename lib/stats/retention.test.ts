@@ -60,4 +60,14 @@ describe("computeRetentionComparison", () => {
     expect(result.windowDays).toBe(7);
     expect(result.reviews).toBe(1);
   });
+
+  it("single review in window — zero Again grades — actual is 1.0", () => {
+    // Single-day log with one passing grade: reviews=1, actual=1.0.
+    // This is the "retention with zero Again grades" scenario from issue #1019.
+    const log: GradeLog = [entry("2026-05-12", 5)];
+    const result = computeRetentionComparison(log, TODAY, 0.9);
+    expect(result.reviews).toBe(1);
+    expect(result.actual).toBe(1);
+    expect(result.delta).toBeCloseTo(0.1);
+  });
 });
