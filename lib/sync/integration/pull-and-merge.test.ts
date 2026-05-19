@@ -39,9 +39,9 @@
  *   ON CONFLICT (user_id, card_type, subject_key) DO UPDATE SET …
  *
  * Write helpers commit their transactions so subsequent reads via readCard see the
- * persisted state. The `withUser` helper from setup.ts always rolls back and is
- * used only where the test intentionally verifies a rejection (the transaction
- * never reaches COMMIT).
+ * persisted state. Tests that seed initial rows for rejection scenarios use the
+ * pool directly (superuser connection, bypasses RLS) so the seed data is committed
+ * before the failing upsert is attempted.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
