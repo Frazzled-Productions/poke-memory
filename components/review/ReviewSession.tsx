@@ -11,6 +11,8 @@ import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { QueueStateBadge } from "@/components/review/QueueStateBadge";
 import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/GradeButtons";
+import { useSwipeGrade } from "@/components/review/useSwipeGrade";
+import { SwipeHint } from "@/components/review/SwipeHint";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
@@ -662,6 +664,11 @@ export function ReviewSession() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
+
+  // Ref attached to the swipeable card container. Swipe-to-grade is active
+  // only for flip-card types (name / evolution / cry) — reverse cards use
+  // SpritePicker and have their own tap interaction (#1052).
+  const cardRef = useRef<HTMLDivElement | null>(null);
   // Stable refs to the latest handleReveal / handleGrade so the keyboard
   // keydown effect never captures stale closures. handleReveal and handleGrade
   // are function-declarations (hoisted), so they can be referenced here even
@@ -1064,6 +1071,20 @@ export function ReviewSession() {
   handleRevealRef.current = handleReveal;
   // eslint-disable-next-line @typescript-eslint/no-use-before-define
   handleGradeRef.current = handleGrade;
+
+  // Swipe-to-grade: active only after the card is revealed and not mid-grade.
+  // The hook attaches pointer listeners to `cardRef` which wraps the card
+  // display for flip-card types (name / evolution / cry). `handleGrade` is
+  // accessed via a stable ref (handleGradeRef) inside useSwipeGrade so the
+  // listener never captures stale closures.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const { swipeState } = useSwipeGrade({
+    targetRef: cardRef,
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+    onGrade: handleGrade,
+    enabled: revealed,
+    grading,
+  });
 
   // Space/Enter → reveal; 1/2/4/5 → grade; ? → open shortcut overlay.
   // Deps: only the state values used as guards inside the handler (`revealed`,
@@ -2018,31 +2039,37 @@ export function ReviewSession() {
           />
         </div>
         <QueueStateBadge state={effectiveCard.state} />
-        {revealed ? (
-          <PokemonCard
-            spriteUrl={effectiveCard.spriteUrl}
-            name={effectiveCard.displayName}
-            revealed
-            fact={currentFact}
-            direction="cry"
-            id={effectiveCard.pokemonId}
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-4">
-            <DirectionBadge direction="cry" />
-            <button
-              type="button"
-              onClick={() => playCry(effectiveCard.cryUrl ?? null)}
-              className="flex h-40 w-40 items-center justify-center rounded-full border-2 border-zinc-300 bg-zinc-50 text-5xl transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:border-zinc-700 dark:bg-zinc-900"
-              aria-label="Play cry"
-            >
-              🔊
-            </button>
-            <p className="text-base font-semibold text-foreground">
-              Name this Pokémon from its cry
-            </p>
-          </div>
-        )}
+        {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
+        <div ref={cardRef} className="relative">
+          {revealed ? (
+            <>
+              <PokemonCard
+                spriteUrl={effectiveCard.spriteUrl}
+                name={effectiveCard.displayName}
+                revealed
+                fact={currentFact}
+                direction="cry"
+                id={effectiveCard.pokemonId}
+              />
+              <SwipeHint swipeState={swipeState} />
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <DirectionBadge direction="cry" />
+              <button
+                type="button"
+                onClick={() => playCry(effectiveCard.cryUrl ?? null)}
+                className="flex h-40 w-40 items-center justify-center rounded-full border-2 border-zinc-300 bg-zinc-50 text-5xl transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:border-zinc-700 dark:bg-zinc-900"
+                aria-label="Play cry"
+              >
+                🔊
+              </button>
+              <p className="text-base font-semibold text-foreground">
+                Name this Pokémon from its cry
+              </p>
+            </div>
+          )}
+        </div>
 
         {revealed ? (
           <>
@@ -2198,29 +2225,33 @@ export function ReviewSession() {
         incompleteChainSpeciesIds={incompleteChains}
       />
       <QueueStateBadge state={effectiveCard.state} />
-      {effectiveCard.cardType === "evolution" ||
-      effectiveCard.cardType === "reverse-evolution" ? (
-        <EvolutionCard
-          direction={effectiveCard.cardType}
-          preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
-          preEvoName={effectiveCard.preEvoName}
-          postEvoName={effectiveCard.postEvoName}
-          postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
-          triggerPhrase={effectiveCard.triggerPhrase}
-          revealed={revealed}
-          fact={currentFact}
-          preEvoId={effectiveCard.preEvoId}
-          postEvoId={effectiveCard.postEvoId}
-        />
-      ) : (
-        <PokemonCard
-          spriteUrl={effectiveCard.spriteUrl}
-          name={effectiveCard.displayName}
-          revealed={revealed}
-          fact={currentFact}
-          id={effectiveCard.id}
-        />
-      )}
+      {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
+      <div ref={cardRef} className="relative">
+        {effectiveCard.cardType === "evolution" ||
+        effectiveCard.cardType === "reverse-evolution" ? (
+          <EvolutionCard
+            direction={effectiveCard.cardType}
+            preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
+            preEvoName={effectiveCard.preEvoName}
+            postEvoName={effectiveCard.postEvoName}
+            postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
+            triggerPhrase={effectiveCard.triggerPhrase}
+            revealed={revealed}
+            fact={currentFact}
+            preEvoId={effectiveCard.preEvoId}
+            postEvoId={effectiveCard.postEvoId}
+          />
+        ) : (
+          <PokemonCard
+            spriteUrl={effectiveCard.spriteUrl}
+            name={effectiveCard.displayName}
+            revealed={revealed}
+            fact={currentFact}
+            id={effectiveCard.id}
+          />
+        )}
+        <SwipeHint swipeState={swipeState} />
+      </div>
 
       {revealed ? (
         <>
