@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     title: "Poké Memory",
     statusBarStyle: "black-translucent",
     startupImage: [
-      // iPhone 16 Pro Max  (430 × 932 logical, 3×)
+      // iPhone 16 Pro Max  (440 × 956 logical, 3×)
       {
         url: "/splash/iphone16promax-portrait.png",
         media:
