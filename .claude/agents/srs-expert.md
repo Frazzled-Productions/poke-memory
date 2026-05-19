@@ -1,6 +1,6 @@
 ---
 name: srs-expert
-description: Use for designing or implementing the spaced-repetition scheduler — choosing the algorithm, designing the per-card review-state schema, computing next-review intervals, and reviewing scheduler code. The deepest domain expert in the roster.
+description: Use for designing the spaced-repetition scheduler — choosing the algorithm, designing the per-card review-state shape, computing next-review intervals, and reviewing scheduler code. srs-expert designs and reviews; data-coder implements and persists (see the AGENTS.md file-ownership table). The deepest domain expert in the roster.
 tools: Read, Edit, Write, Bash, Grep, Glob
 model: sonnet
 ---
