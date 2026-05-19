@@ -3,7 +3,28 @@ import { generationOf } from "@/lib/stats/derive";
 import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
 
-export type PracticeScopePreset = "starters" | "legendaries";
+export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains";
+
+/**
+ * Runtime context the scope matcher needs for presets that depend on the
+ * user's review progress rather than a static id list.
+ *
+ * Today only `incomplete-chains` needs this: an "incomplete evolution chain"
+ * is a chain the user has started but not finished mastering, so its member
+ * species can only be known by inspecting the current card set (see
+ * `incompleteChainSpeciesIds` in `lib/evolution/chains.ts`).
+ *
+ * Callers that do not use a progress-dependent preset can omit the context
+ * entirely — `speciesMatchesScope` treats a missing set as empty, so an
+ * `incomplete-chains` scope with no context simply matches nothing.
+ */
+export type ScopeMatchContext = {
+  /**
+   * Species ids that belong to an incomplete evolution chain. Recomputed by
+   * the caller (`ReviewSession`) whenever the card set changes.
+   */
+  incompleteChainSpeciesIds?: ReadonlySet<number>;
+};
 
 /**
  * Controls which alternate-form cards surface in practice sessions.
@@ -107,6 +128,9 @@ export function isScopeEmpty(scope: PracticeScope): boolean {
  * @param isDefaultForm  Whether this is the primary form of its species.
  *   Defaults to `true` (safe fallback for seeds that pre-date #445).
  * @param formCategory   The broad category of the form. Defaults to `"default"`.
+ * @param context        Runtime data for progress-dependent presets. When the
+ *   `incomplete-chains` preset is active, `context.incompleteChainSpeciesIds`
+ *   supplies the species in incomplete chains; a missing set matches nothing.
  */
 function speciesMatchesScope(
   speciesId: number,
@@ -114,6 +138,7 @@ function speciesMatchesScope(
   scope: PracticeScope,
   isDefaultForm: boolean = true,
   formCategory: FormCategory = "default",
+  context: ScopeMatchContext = {},
 ): boolean {
   // ── formCategories gate (hard filter applied before the OR axes) ───────
   // When mode !== 'all', a form that fails the gate is excluded regardless of
@@ -142,6 +167,11 @@ function speciesMatchesScope(
   }
   if (scope.presets.includes("starters") && STARTER_IDS.has(speciesId)) return true;
   if (scope.presets.includes("legendaries") && getLegendaryIds().has(speciesId)) return true;
+  if (
+    scope.presets.includes("incomplete-chains") &&
+    (context.incompleteChainSpeciesIds?.has(speciesId) ?? false)
+  )
+    return true;
   return false;
 }
 
@@ -172,7 +202,11 @@ function getSeedById(): Map<number, SeedPokemon> {
   return _seedById;
 }
 
-export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): boolean {
+export function cardMatchesScope(
+  card: ReviewableCard,
+  scope: PracticeScope,
+  context: ScopeMatchContext = {},
+): boolean {
   if (isScopeEmpty(scope)) return true;
   // Evolution edge cards filter on the pre-evo's species ID (the card is
   // "about" the pre-evolution — Bulbasaur → Ivysaur is a Gen 1 / Starters card
@@ -210,7 +244,7 @@ export function cardMatchesScope(card: ReviewableCard, scope: PracticeScope): bo
       ? "default"
       : (card as { formCategory?: FormCategory }).formCategory ?? "default";
 
-  return speciesMatchesScope(pokemonId, types, scope, isDefaultForm, formCategory);
+  return speciesMatchesScope(pokemonId, types, scope, isDefaultForm, formCategory, context);
 }
 
 /**
@@ -235,6 +269,7 @@ export function cardIsEligible(
   card: ReviewableCard,
   scope: PracticeScope,
   alternateFormsEnabled: boolean,
+  context: ScopeMatchContext = {},
 ): boolean {
   // Gate: exclude all form cards when the master toggle is off.
   // A card is only gated OUT when it is *definitely* a non-default form —
@@ -250,7 +285,7 @@ export function cardIsEligible(
     }
   }
   if (isScopeEmpty(scope)) return true;
-  return cardMatchesScope(card, scope);
+  return cardMatchesScope(card, scope, context);
 }
 
 /**
@@ -268,6 +303,7 @@ export function seedPokemonIsEligible(
   p: SeedPokemon,
   scope: PracticeScope,
   alternateFormsEnabled: boolean = true,
+  context: ScopeMatchContext = {},
 ): boolean {
   const isDefaultForm = (p as { isDefaultForm?: boolean }).isDefaultForm ?? true;
 
@@ -278,7 +314,7 @@ export function seedPokemonIsEligible(
 
   const resolvedId = (p as { speciesId?: number }).speciesId ?? p.id;
   const formCategory = (p as { formCategory?: FormCategory }).formCategory ?? "default";
-  return speciesMatchesScope(resolvedId, p.types, scope, isDefaultForm, formCategory);
+  return speciesMatchesScope(resolvedId, p.types, scope, isDefaultForm, formCategory, context);
 }
 
 /**
@@ -303,6 +339,7 @@ export function countMatchingSpecies(
   seed: readonly SeedPokemon[],
   scope: PracticeScope,
   alternateFormsEnabled: boolean = true,
+  context: ScopeMatchContext = {},
 ): number {
   let count = 0;
   for (const s of seed) {
@@ -325,7 +362,8 @@ export function countMatchingSpecies(
     const resolvedId = (s as { speciesId?: number }).speciesId ?? s.id;
     // formCategory may be absent in a pre-#445 seed; fall back to 'default'.
     const formCategory = (s as { formCategory?: FormCategory }).formCategory ?? "default";
-    if (speciesMatchesScope(resolvedId, s.types, scope, isDefaultForm, formCategory)) count += 1;
+    if (speciesMatchesScope(resolvedId, s.types, scope, isDefaultForm, formCategory, context))
+      count += 1;
   }
   return count;
 }
@@ -377,7 +415,8 @@ function parseScopeShape(value: unknown): PracticeScope | null {
     : [];
   const presets = Array.isArray(obj.presets)
     ? (obj.presets as unknown[]).filter(
-        (v): v is PracticeScopePreset => v === "starters" || v === "legendaries",
+        (v): v is PracticeScopePreset =>
+          v === "starters" || v === "legendaries" || v === "incomplete-chains",
       )
     : [];
   // formCategories: absent in pre-#450 persisted scopes → default to {mode:'all'}.
@@ -471,6 +510,7 @@ export function scopeLabel(scope: PracticeScope): string {
   }
   if (scope.presets.includes("starters")) parts.push("Starters");
   if (scope.presets.includes("legendaries")) parts.push("Legendaries");
+  if (scope.presets.includes("incomplete-chains")) parts.push("Incomplete chains");
   const fc = scope.formCategories ?? { mode: "all" };
   if (fc.mode === "default-only") parts.push("Default forms only");
   else if (fc.mode === "include" && fc.categories.length > 0) {

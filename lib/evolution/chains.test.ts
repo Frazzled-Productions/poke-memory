@@ -10,6 +10,8 @@ import { describe, it, expect } from "vitest";
 import {
   deriveEvolutionFamilies,
   computeEvolutionWallStats,
+  familyInProgress,
+  incompleteChainSpeciesIds,
   type EvolutionFamily,
 } from "./chains";
 import { SEED_EVOLUTION_CARDS, REVERSE_EDGE_ID_BASE, EDGE_ID_BASE } from "@/lib/pokemon/seed";
@@ -318,5 +320,91 @@ describe("computeEvolutionWallStats", () => {
     const stats = computeEvolutionWallStats(families);
     expect(stats.completedFamilies).toBe(1);
     expect(stats.totalFamilies).toBeGreaterThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// familyInProgress + incompleteChainSpeciesIds (#995)
+// ---------------------------------------------------------------------------
+
+describe("familyInProgress", () => {
+  it("is false for an untouched family (no mastered edges)", () => {
+    const families = deriveEvolutionFamilies([], 3, false);
+    const family = families.find((f) => f.rootId === 1)!;
+    expect(familyInProgress(family)).toBe(false);
+  });
+
+  it("is true when one edge has a mastered direction but the family is not complete", () => {
+    // Bulbasaur → Ivysaur forward mastered; Ivysaur → Venusaur untouched.
+    const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
+    const families = deriveEvolutionFamilies(cards, 3, false);
+    const family = families.find((f) => f.rootId === 1)!;
+    expect(family.completed).toBe(false);
+    expect(familyInProgress(family)).toBe(true);
+  });
+
+  it("is false for a fully completed family", () => {
+    const cards: ReviewableCard[] = [
+      masteredForward(BULBASAUR_TO_IVYSAUR),
+      masteredReverse(BULBASAUR_TO_IVYSAUR),
+      masteredForward(IVYSAUR_TO_VENUSAUR),
+      masteredReverse(IVYSAUR_TO_VENUSAUR),
+    ];
+    const families = deriveEvolutionFamilies(cards, 3, false);
+    const family = families.find((f) => f.rootId === 1)!;
+    expect(family.completed).toBe(true);
+    expect(familyInProgress(family)).toBe(false);
+  });
+});
+
+describe("incompleteChainSpeciesIds", () => {
+  it("is empty when no cards are mastered (nothing started)", () => {
+    expect(incompleteChainSpeciesIds([], 3, false).size).toBe(0);
+  });
+
+  it("includes every member of a started-but-not-finished chain", () => {
+    // Only the Bulbasaur → Ivysaur forward edge is mastered. The Bulbasaur
+    // family (Bulbasaur 1, Ivysaur 2, Venusaur 3) is in progress, so all
+    // three species are in the set.
+    const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
+    const ids = incompleteChainSpeciesIds(cards, 3, false);
+    expect(ids.has(1)).toBe(true);
+    expect(ids.has(2)).toBe(true);
+    expect(ids.has(3)).toBe(true);
+  });
+
+  it("excludes a fully completed chain", () => {
+    const cards: ReviewableCard[] = [
+      masteredForward(BULBASAUR_TO_IVYSAUR),
+      masteredReverse(BULBASAUR_TO_IVYSAUR),
+      masteredForward(IVYSAUR_TO_VENUSAUR),
+      masteredReverse(IVYSAUR_TO_VENUSAUR),
+    ];
+    const ids = incompleteChainSpeciesIds(cards, 3, false);
+    expect(ids.has(1)).toBe(false);
+    expect(ids.has(2)).toBe(false);
+    expect(ids.has(3)).toBe(false);
+  });
+
+  it("matches the Evolution Wall 'In progress' filter exactly", () => {
+    // Cross-check: the set is the union of all families that familyInProgress
+    // accepts. Any drift between the preset and the wall would fail here.
+    const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
+    const families = deriveEvolutionFamilies(cards, 3, false);
+    const expected = new Set<number>();
+    for (const family of families) {
+      if (!familyInProgress(family)) continue;
+      for (const node of family.nodes) expected.add(node.speciesId);
+    }
+    expect([...incompleteChainSpeciesIds(cards, 3, false)].sort((a, b) => a - b)).toEqual(
+      [...expected].sort((a, b) => a - b),
+    );
+  });
+
+  it("returns an empty set under forceAllMastered (every chain is completed)", () => {
+    // Superuser pretendAllMastered: every edge is mastered, so every family is
+    // completed and none is in progress. The preset legitimately matches nothing.
+    const ids = incompleteChainSpeciesIds([], 3, true);
+    expect(ids.size).toBe(0);
   });
 });

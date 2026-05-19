@@ -304,3 +304,141 @@ test.describe("Practice scope (#333)", () => {
     }
   });
 });
+
+// E2E smoke for #995 "Incomplete evolution chains" practice preset.
+//
+// The preset targets evolution families the user has started but not finished
+// mastering — the same set the Journey tab's Evolution Wall "In progress"
+// filter shows. Membership is computed from review state, so the tests seed a
+// session to control which chains are in progress.
+test.describe("Practice scope — Incomplete evolution chains preset (#995)", () => {
+  test("preset renders in the scope picker and is selectable", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.clear());
+    await page.goto("/");
+
+    // Open the Scope panel.
+    const scopeToggle = page
+      .getByRole("button", { expanded: false })
+      .filter({ hasText: /scope/i })
+      .first();
+    await scopeToggle.click();
+    const scopePanel = page.locator("#scope-panel");
+    await expect(scopePanel).toBeVisible();
+
+    // The new preset pill renders in the "Groups" fieldset.
+    const presetPill = scopePanel.getByRole("button", {
+      name: "Incomplete evolution chains",
+    });
+    await expect(presetPill).toBeVisible();
+    await expect(presetPill).toHaveAttribute("aria-pressed", "false");
+
+    // Selecting it toggles aria-pressed and updates the scope label.
+    await presetPill.click();
+    await expect(presetPill).toHaveAttribute("aria-pressed", "true");
+    const scopeHeader = page
+      .getByRole("button", { expanded: true })
+      .filter({ hasText: /incomplete chains/i })
+      .first();
+    await expect(scopeHeader).toBeVisible();
+  });
+
+  test("happy path: an in-progress chain starts a session under the preset", async ({
+    page,
+  }) => {
+    // Seed a session where the Bulbasaur → Ivysaur forward evolution edge
+    // (edgeId 1500001) is mastered. With the reverse edge unmastered, the
+    // Bulbasaur family is "in progress", so Bulbasaur (1), Ivysaur (2) and
+    // Venusaur (3) belong to the incomplete-chain set. Their name cards stay
+    // unseen (firstSeen: null) so they queue as new cards. The
+    // "Incomplete evolution chains" scope is pre-selected via settings.
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards: [
+            {
+              id: 1500001,
+              cardType: "evolution",
+              subjectKey: "1:2",
+              preEvoId: 1,
+              postEvoId: 2,
+              preEvoName: "bulbasaur",
+              postEvoName: "ivysaur",
+              preEvoSpriteUrl: "/sprites/pokemon/1.png",
+              postEvoSpriteUrl: "/sprites/pokemon/2.png",
+              triggerPhrase: "at level 16",
+              state: {
+                stability: 30,
+                difficulty: 5,
+                elapsedDays: 0,
+                scheduledDays: 21,
+                reps: 3,
+                lapses: 0,
+                fsrsState: "review",
+                dueDate: "2099-01-01",
+                lastReview: "2025-01-01",
+                firstSeen: "2024-12-01",
+                learningStep: null,
+                stepStartedAt: null,
+                hiddenSince: null,
+                seenInPasture: false,
+              },
+            },
+          ],
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
+    await page.addInitScript(
+      ({ key }) => {
+        const settings = {
+          masteryRepetitions: 3,
+          maxNewPerDay: 10,
+          maxReviewsPerDay: 100,
+          maxNewEvolutionPerDay: 5,
+          maxReviewsEvolutionPerDay: 50,
+          nameCardsEnabled: true,
+          evolutionCardsEnabled: true,
+          reverseCardsEnabled: false,
+          maxNewReversePerDay: 10,
+          maxReviewsReversePerDay: 100,
+          playCryOnReveal: false,
+          cryCardsEnabled: false,
+          maxNewCryPerDay: 10,
+          maxReviewsCryPerDay: 100,
+          favouriteTheme: null,
+          retentionTarget: 0.9,
+          practiceScope: {
+            gens: [],
+            types: [],
+            presets: ["incomplete-chains"],
+          },
+        };
+        localStorage.setItem(key, JSON.stringify(settings));
+      },
+      { key: SETTINGS_STORAGE_KEY },
+    );
+
+    await page.goto("/");
+
+    // A practice card should render — the in-progress Bulbasaur family means
+    // the preset's computed set is non-empty, so the session is not the
+    // no-match empty state.
+    const reveal = page.getByRole("button", { name: /reveal/i });
+    const noMatch = page.getByText(/no Pok[ée]mon match your scope/i);
+    await expect(reveal).toBeVisible({ timeout: 15_000 });
+    await expect(noMatch).not.toBeVisible();
+
+    // The scope chip reflects the active preset.
+    await expect(
+      page.getByText("Incomplete chains", { exact: true }),
+    ).toBeVisible();
+  });
+});
