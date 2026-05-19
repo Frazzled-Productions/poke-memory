@@ -77,3 +77,12 @@ export const KEY_LEGACY_FAVOURITE_THEME = "poke-memory:favourite:v1";
  * Read once on first load for migration, then removed.
  */
 export const KEY_LEGACY_PRACTICE_SCOPE = "poke-memory:practice-scope:v1";
+
+// ─── Storage-persistence request ──────────────────────────────────────────────
+
+/**
+ * Flag written after `navigator.storage.persist()` has been called at least
+ * once in this browser. Used to avoid calling it on every page load — one
+ * successful request is sufficient to lock the permission in.
+ */
+export const KEY_PERSIST_REQUESTED = "poke-memory:storage-persist-requested:v1";

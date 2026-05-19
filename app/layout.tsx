@@ -18,7 +18,9 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
+import { GuestStorageNotice } from "@/components/onboarding/GuestStorageNotice";
 import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
+import { StoragePersistenceRequester } from "@/components/pwa/StoragePersistenceRequester";
 import { PwaBadge } from "@/components/pwa/PwaBadge";
 
 const geistSans = Geist({
@@ -106,6 +108,12 @@ export default function RootLayout({
               <OnlineReconnectSync />
               <PwaInstallNudge />
               {/*
+                GuestStorageNotice informs signed-out users that their progress
+                is device-local and how to protect it (#1057). Renders nothing
+                for authenticated users.
+              */}
+              <GuestStorageNotice />
+              {/*
                 MobileNavPaddingWrapper adds bottom padding on mobile only when
                 the bottom tab bar is active, so the fixed bar never overlaps content.
                 The padding is removed automatically when the user switches to the
@@ -124,6 +132,8 @@ export default function RootLayout({
           </SuperuserProvider>
         </AuthProvider>
         <IdbMigration />
+        {/* Requests persistent storage to protect against 7-day ITP eviction (#1057). */}
+        <StoragePersistenceRequester />
         {/* Registers the offline service worker and surfaces the update prompt (#703). */}
         <ServiceWorkerProvider />
         {/* Syncs the installed-PWA app icon badge with cards due today (#916). */}
