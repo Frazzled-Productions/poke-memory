@@ -18,6 +18,7 @@ import {
   GRADE_LOG_APPENDED_EVENT,
   type GradeLog,
 } from "@/lib/gradelog/persistence";
+import { KEY_GRADE_LOG } from "@/lib/storage/keys";
 import { todayString } from "@/lib/review/session";
 import { cardPanel } from "@/lib/utils/class-names";
 
@@ -98,8 +99,21 @@ export function PracticeSidebar() {
       void refresh();
     }
     window.addEventListener(GRADE_LOG_APPENDED_EVENT, handleGradeAppended);
+
+    // Re-read when reset-all-progress wipes the grade log. reset.ts dispatches
+    // a synthetic StorageEvent keyed to KEY_GRADE_LOG so same-tab listeners
+    // pick up the cleared state without a full reload — mirror the pattern in
+    // ReviewSession.tsx and Stats/Pasture/Pokédex pages.
+    function handleStorage(e: StorageEvent) {
+      if (e.key === KEY_GRADE_LOG) {
+        void refresh();
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+
     return () => {
       window.removeEventListener(GRADE_LOG_APPENDED_EVENT, handleGradeAppended);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 

@@ -14,10 +14,10 @@ test.describe("Practice page — session-progress sidebar (lg: layout)", () => {
   // uses Desktop Chrome (1280px), so this runs as expected.
   test("session progress sidebar is visible on desktop", async ({ page }, testInfo) => {
     // This layout is desktop-only; skip on the mobile project.
-    if (testInfo.project.name !== "chromium") {
-      test.skip();
-      return;
-    }
+    test.skip(
+      testInfo.project.name !== "chromium",
+      "sidebar is desktop-only (lg: breakpoint); mobile-safari uses a narrow viewport",
+    );
 
     await page.goto("/");
 
@@ -35,10 +35,10 @@ test.describe("Practice page — session-progress sidebar (lg: layout)", () => {
   });
 
   test("session progress sidebar is hidden on mobile", async ({ page }, testInfo) => {
-    if (testInfo.project.name !== "mobile-safari") {
-      test.skip();
-      return;
-    }
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "mobile-visibility check only applies on the narrow mobile-safari project",
+    );
 
     await page.goto("/");
 
@@ -82,9 +82,11 @@ test.describe("Pokédex grid — xl: column layout", () => {
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible({ timeout: 10_000 });
 
-    // At least one generation section should be present.
+    // At least one generation section should be present. Use `.first()` because
+    // the regex /Generation I/ also matches Generation II, III, IV and IX —
+    // strict mode would otherwise fail on multiple resolved elements.
     await expect(
-      page.getByRole("heading", { level: 2, name: /Generation I/ }),
+      page.getByRole("heading", { level: 2, name: /Generation I/ }).first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 });
