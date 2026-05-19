@@ -3,8 +3,9 @@ import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
-import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
+import { loadSyncStatus, saveSyncStatus, clearPendingQueue } from "@/lib/sync/persistence";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
+import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
 /**
  * Registers visibilitychange and pagehide listeners that push any unsynced
@@ -27,6 +28,14 @@ import { useLatestRef } from "@/lib/hooks/useLatestRef";
  *
  * Both paths are fire-and-forget from the caller's perspective: navigation
  * is never blocked.
+ *
+ * Background Sync fallback (#1054): when a push fails (sendBeacon rejected by
+ * the browser, or the fetch+keepalive path returned a non-2xx), this hook
+ * registers the `poke-memory:grade-sync` Background Sync tag. On supporting
+ * browsers (Chromium on Android), the service worker will replay the persisted
+ * queue when connectivity returns — even if every app tab has been closed by
+ * then. On unsupported browsers this registration is a no-op; the existing
+ * `useOnlineReconnectSync` on-reconnect path remains the fallback.
  */
 export function useSyncOnUnload(
   client: SupabaseClient | null,
@@ -75,6 +84,20 @@ export function useSyncOnUnload(
           failedCardCount: queued ? 0 : unsynced.length,
           ...(queued && { lastPushAt: now }),
         });
+        if (queued) {
+          // Beacon accepted by the browser — clear the IDB mirror so the SW
+          // does not re-push grades that already left this device (#1072 concern).
+          // Best-effort: fire and forget. The IDB mirror is only a safety-net for
+          // the all-tabs-closed path; the sendBeacon response is not observable,
+          // so we trust the browser's "queued" boolean here.
+          clearPendingQueue();
+        } else {
+          // When the beacon could not be queued (offline or SW declined), register
+          // a Background Sync tag so the SW can replay the persisted queue after
+          // the app is closed and connectivity is restored. Best-effort: fire and
+          // forget, never block unload.
+          void registerBackgroundSync();
+        }
         pushingRef.current = false;
         return;
       }
@@ -96,6 +119,15 @@ export function useSyncOnUnload(
             failedCardCount: ok ? 0 : unsynced.length,
             ...(ok && { lastPushAt: now }),
           });
+          if (ok) {
+            // Successful fetch — clear the IDB mirror so the SW does not
+            // re-push grades that are already in the cloud (#1072 concern).
+            clearPendingQueue();
+          } else {
+            // Register Background Sync when the fetch failed so the SW can
+            // replay once connectivity is restored (even if the tab is then closed).
+            void registerBackgroundSync();
+          }
         } catch {
           // Network blip, abort, or page torn down before fetch resolved.
           // Treat as failure so the next page mount retries.
@@ -105,6 +137,8 @@ export function useSyncOnUnload(
             lastPushFailed: true,
             failedCardCount: unsynced.length,
           });
+          // Register Background Sync for the catch path (network offline).
+          void registerBackgroundSync();
         } finally {
           pushingRef.current = false;
         }

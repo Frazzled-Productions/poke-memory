@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* Mobile browser hardening
+   -------------------------
+   #1050: Pin rendered text size to authored size; stops iOS Safari landscape
+          text inflation without disabling accessibility zoom.
+   #1059: Suppress the native iOS grey tap-flash; the app provides its own
+          touch feedback via active:scale-95 and focus-visible rings.
+   These two are on `html` (not body) so they cascade from the root. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
 :root {
   /* Brand-default mascot palette (Poké-ball red) — overridden by the inline
      <head> script in app/layout.tsx when a favourite is saved. Defined first
@@ -90,4 +103,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* #1055: Remove the 300 ms double-tap-to-zoom delay on interactive elements
+     across the whole app. Pinch-zoom is unaffected. Applied on body so every
+     button, card, and nav link inherits it without per-component changes. */
+  touch-action: manipulation;
+  /* #1051: Prevent iOS rubber-band / pull-to-refresh when grading cards on the
+     practice surface. In-page scrolling on longer surfaces (Stats, Pokédex) is
+     unaffected because overscroll-behavior: contain only blocks the scroll
+     chain propagating beyond the body — it does not restrict content scrolling
+     within a child overflow container. */
+  overscroll-behavior: contain;
 }

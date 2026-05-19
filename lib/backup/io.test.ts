@@ -78,6 +78,7 @@ const VALID_SETTINGS: UserSettings = {
     installNudgeDismissed: false,
     audioHintDismissed: false,
     cardTypesHintDismissed: false,
+    guestStorageNoticeDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

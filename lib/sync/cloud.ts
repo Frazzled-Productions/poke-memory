@@ -102,6 +102,19 @@ function toCloudRow(card: ReviewableCard): CloudRow {
 }
 
 /**
+ * Projects an array of ReviewableCards to CloudRow[] (snake_case, with
+ * appTypeToDbType applied). Skips cards that violate the isSyncSafe invariant
+ * (firstSeen set but lastReview null — in-step cards).
+ *
+ * Exported so callers that need the cloud-row shape without constructing a
+ * Blob (e.g. the IDB mirror written by savePendingQueue for the service worker)
+ * can use the same projection as buildBeaconPayload without re-implementing it.
+ */
+export function toCloudRows(cards: ReviewableCard[]): CloudRow[] {
+  return cards.filter(isSyncSafe).map(toCloudRow);
+}
+
+/**
  * Pushes the full local session to the cloud via batched upserts.
  * Returns true if all batches succeeded, false if any batch failed.
  * learningStep and stepStartedAt are in-memory only and are not persisted.

@@ -40,12 +40,17 @@ vi.mock("@/lib/review/session", () => ({
   todayString: vi.fn(() => "2026-05-17"),
 }));
 
+vi.mock("@/lib/sync/backgroundSync", () => ({
+  SW_REPLAY_MESSAGE: "BACKGROUND_SYNC_REPLAY",
+}));
+
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
 import { loadSyncStatus, markPushSucceeded } from "@/lib/sync/persistence";
 import { loadSession } from "@/lib/review/persistence";
 import type { SyncStatus } from "@/lib/sync/persistence";
 import { useOnlineReconnectSync } from "@/lib/sync/useOnlineReconnectSync";
+import { SW_REPLAY_MESSAGE } from "@/lib/sync/backgroundSync";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -343,6 +348,110 @@ describe("useOnlineReconnectSync", () => {
     act(() => fireOnline());
     await Promise.resolve();
 
+    expect(pullAndMerge).not.toHaveBeenCalled();
+  });
+
+  // ─── Background Sync SW message listener (#1054) ───────────────────────────
+  //
+  // When the SW fires a `sync` event while the app is open, it posts a
+  // BACKGROUND_SYNC_REPLAY message to delegate the push to the running hook
+  // (so the pull-before-push invariant is respected and no concurrent push
+  // occurs from both the SW and the app).
+  //
+  // jsdom does not expose `navigator.serviceWorker`, so each test stubs it with
+  // a real EventTarget so `addEventListener` / `removeEventListener` work.
+});
+
+describe("useOnlineReconnectSync — Background Sync SW message listener (#1054)", () => {
+  // jsdom does not have navigator.serviceWorker; stub a real EventTarget so
+  // the hook can attach its message listener.
+  let swTarget: EventTarget;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(isSyncSafe).mockReturnValue(true);
+    swTarget = new EventTarget();
+    Object.defineProperty(navigator, "serviceWorker", {
+      value: swTarget,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "serviceWorker", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    vi.clearAllMocks();
+  });
+
+  it("responds to BACKGROUND_SYNC_REPLAY message from the SW the same way as an online event", async () => {
+    vi.mocked(pullAndMerge).mockResolvedValue("ok");
+    vi.mocked(loadSyncStatus).mockReturnValue(NO_FAILURE_STATUS);
+    vi.mocked(loadSession).mockResolvedValue(null);
+
+    renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      swTarget.dispatchEvent(new MessageEvent("message", {
+        data: { type: SW_REPLAY_MESSAGE },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER);
+    });
+  });
+
+  it("ignores SW messages with unknown type", async () => {
+    vi.mocked(pullAndMerge).mockResolvedValue("ok");
+    vi.mocked(loadSyncStatus).mockReturnValue(NO_FAILURE_STATUS);
+
+    renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      swTarget.dispatchEvent(new MessageEvent("message", {
+        data: { type: "UNKNOWN_MESSAGE" },
+      }));
+    });
+
+    await Promise.resolve();
+    expect(pullAndMerge).not.toHaveBeenCalled();
+  });
+
+  it("ignores SW messages with non-object data", async () => {
+    vi.mocked(pullAndMerge).mockResolvedValue("ok");
+    vi.mocked(loadSyncStatus).mockReturnValue(NO_FAILURE_STATUS);
+
+    renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      swTarget.dispatchEvent(new MessageEvent("message", { data: "BACKGROUND_SYNC_REPLAY" }));
+    });
+
+    await Promise.resolve();
+    expect(pullAndMerge).not.toHaveBeenCalled();
+  });
+
+  it("removes the SW message listener on unmount", async () => {
+    vi.mocked(pullAndMerge).mockResolvedValue("ok");
+    vi.mocked(loadSyncStatus).mockReturnValue(NO_FAILURE_STATUS);
+
+    const { unmount } = renderHook(() =>
+      useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER),
+    );
+
+    unmount();
+
+    act(() => {
+      swTarget.dispatchEvent(new MessageEvent("message", {
+        data: { type: SW_REPLAY_MESSAGE },
+      }));
+    });
+
+    await Promise.resolve();
     expect(pullAndMerge).not.toHaveBeenCalled();
   });
 });

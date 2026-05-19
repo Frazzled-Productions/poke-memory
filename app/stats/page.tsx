@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
@@ -32,16 +33,10 @@ import { computeCompletionProjection } from "@/lib/stats/completion-projection";
 import { CompletionProjection } from "@/components/stats/CompletionProjection";
 import { computeMasteryOverTime } from "@/lib/stats/mastery-over-time";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
-import { GradeDistributionChart } from "@/components/stats/GradeDistributionChart";
-import { MasteryOverTimeChart } from "@/components/stats/MasteryOverTimeChart";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
-import { DirectionBreakdownChart } from "@/components/stats/DirectionBreakdownChart";
-import { DifficultyHistogram } from "@/components/stats/DifficultyHistogram";
-import { RetentionIndicator } from "@/components/stats/RetentionIndicator";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
-import { ActivityHistoryChart } from "@/components/stats/ActivityHistoryChart";
 import { computeActivityHistory } from "@/lib/stats/activity-history";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
@@ -51,6 +46,54 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
+
+// ---------------------------------------------------------------------------
+// Lazily-loaded Recharts chart components.
+//
+// `ssr: false` is valid here because this file is a Client Component
+// (`"use client"` directive above). Recharts is excluded from the initial
+// JS bundle and fetched only when the Stats page is first visited.
+// ---------------------------------------------------------------------------
+
+/** Shared placeholder rendered while a chart chunk is downloading. */
+function ChartPlaceholder() {
+  return (
+    <div
+      className="animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800 h-32 w-full"
+      aria-hidden="true"
+    />
+  );
+}
+
+const GradeDistributionChart = dynamic(
+  () => import("@/components/stats/GradeDistributionChart").then((m) => m.GradeDistributionChart),
+  { ssr: false, loading: () => <ChartPlaceholder /> },
+);
+
+const MasteryOverTimeChart = dynamic(
+  () => import("@/components/stats/MasteryOverTimeChart").then((m) => m.MasteryOverTimeChart),
+  { ssr: false, loading: () => <ChartPlaceholder /> },
+);
+
+const DirectionBreakdownChart = dynamic(
+  () => import("@/components/stats/DirectionBreakdownChart").then((m) => m.DirectionBreakdownChart),
+  { ssr: false, loading: () => <ChartPlaceholder /> },
+);
+
+const DifficultyHistogram = dynamic(
+  () => import("@/components/stats/DifficultyHistogram").then((m) => m.DifficultyHistogram),
+  { ssr: false, loading: () => <ChartPlaceholder /> },
+);
+
+const RetentionIndicator = dynamic(
+  () => import("@/components/stats/RetentionIndicator").then((m) => m.RetentionIndicator),
+  { ssr: false, loading: () => <ChartPlaceholder /> },
+);
+
+const ActivityHistoryChart = dynamic(
+  () => import("@/components/stats/ActivityHistoryChart").then((m) => m.ActivityHistoryChart),
+  { ssr: false, loading: () => <ChartPlaceholder /> },
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -550,7 +593,7 @@ export default function StatsPage() {
 
   return (
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-3xl lg:max-w-6xl">
         <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
           Stats
         </h1>
@@ -569,66 +612,74 @@ export default function StatsPage() {
         ) : (
           <div className="flex flex-col gap-10">
 
-            {/* Accuracy section */}
-            <section aria-labelledby="accuracy-section-heading" className="flex flex-col gap-6">
-              <SectionHeading>
-                <span id="accuracy-section-heading">Accuracy</span>
-              </SectionHeading>
-              <GradeBreakdownBar
-                again={gradeTotals[1]}
-                hard={gradeTotals[2]}
-                good={gradeTotals[4]}
-                easy={gradeTotals[5]}
-                label="All-time grade breakdown"
-              />
-              <AccuracySparkline
-                points={accuracyPoints}
-                rolling7d={rolling7d}
-                rolling30d={rolling30d}
-                rolling365d={rolling365d}
-                points365={accuracyPoints365}
-              />
-              {reviewCharts !== null && (
-                <>
-                  <GradeDistributionChart
-                    distribution={reviewCharts.gradeDistribution}
-                    trend={reviewCharts.gradeTrend}
-                  />
-                  <RetentionIndicator comparison={reviewCharts.retentionComparison} />
-                  <DirectionBreakdownChart rows={reviewCharts.directionRows} />
-                  <DifficultyHistogram
-                    buckets={reviewCharts.difficultyBuckets}
-                    mean={reviewCharts.difficultyMean}
-                  />
-                </>
-              )}
-            </section>
+            {/*
+              At lg: the Accuracy and Activity sections sit side-by-side in a
+              2-column grid. On smaller screens they stack vertically as before.
+            */}
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-start">
 
-            {/* Activity section */}
-            <section aria-labelledby="activity-section-heading" className="flex flex-col gap-6">
-              <SectionHeading>
-                <span id="activity-section-heading">Activity</span>
-              </SectionHeading>
-              <ReviewHeatmap
-                columns={computeReviewHeatmap(gradeLog, todayString(new Date(), userTimezone))}
-              />
-              {reviewCharts !== null && (
-                <>
-                  <ActivityHistoryChart
-                    series={reviewCharts.activityHistory}
-                    dateFormat={userDateFormat}
-                  />
-                  <MasteryOverTimeChart
-                    series={reviewCharts.masteryOverTime}
-                    totalCards={stats.totalCards}
-                    dateFormat={userDateFormat}
-                    forceAllMastered={flags.pretendAllMastered}
-                  />
-                </>
-              )}
-            </section>
+              {/* Accuracy section */}
+              <section aria-labelledby="accuracy-section-heading" className="flex flex-col gap-6">
+                <SectionHeading>
+                  <span id="accuracy-section-heading">Accuracy</span>
+                </SectionHeading>
+                <GradeBreakdownBar
+                  again={gradeTotals[1]}
+                  hard={gradeTotals[2]}
+                  good={gradeTotals[4]}
+                  easy={gradeTotals[5]}
+                  label="All-time grade breakdown"
+                />
+                <AccuracySparkline
+                  points={accuracyPoints}
+                  rolling7d={rolling7d}
+                  rolling30d={rolling30d}
+                  rolling365d={rolling365d}
+                  points365={accuracyPoints365}
+                />
+                {reviewCharts !== null && (
+                  <>
+                    <GradeDistributionChart
+                      distribution={reviewCharts.gradeDistribution}
+                      trend={reviewCharts.gradeTrend}
+                    />
+                    <RetentionIndicator comparison={reviewCharts.retentionComparison} />
+                    <DirectionBreakdownChart rows={reviewCharts.directionRows} />
+                    <DifficultyHistogram
+                      buckets={reviewCharts.difficultyBuckets}
+                      mean={reviewCharts.difficultyMean}
+                    />
+                  </>
+                )}
+              </section>
 
-            {/* Scheduling section */}
+              {/* Activity section */}
+              <section aria-labelledby="activity-section-heading" className="flex flex-col gap-6">
+                <SectionHeading>
+                  <span id="activity-section-heading">Activity</span>
+                </SectionHeading>
+                <ReviewHeatmap
+                  columns={computeReviewHeatmap(gradeLog, todayString(new Date(), userTimezone))}
+                />
+                {reviewCharts !== null && (
+                  <>
+                    <ActivityHistoryChart
+                      series={reviewCharts.activityHistory}
+                      dateFormat={userDateFormat}
+                    />
+                    <MasteryOverTimeChart
+                      series={reviewCharts.masteryOverTime}
+                      totalCards={stats.totalCards}
+                      dateFormat={userDateFormat}
+                      forceAllMastered={flags.pretendAllMastered}
+                    />
+                  </>
+                )}
+              </section>
+
+            </div>
+
+            {/* Scheduling section — full width on all breakpoints */}
             <section aria-labelledby="scheduling-section-heading" className="flex flex-col gap-6">
               <SectionHeading>
                 <span id="scheduling-section-heading">Scheduling</span>

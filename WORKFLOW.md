@@ -196,6 +196,23 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 | **Concurrency** | Serialized per deployment ID (`cancel-in-progress: false`) |
 | **Scope** | Guest-mode flows, plus signed-in UI flows via the mock-auth seam (see below). Page loads, navigation, card flip, grade buttons, key sections on Stats / Pokédex / Settings; the signed-in avatar / sign-out / nav, the conflict picker, and the superuser cloud-write-guard surfaces. |
 
+The functional Playwright projects are `chromium`, `mobile-safari`, `desktop-webkit`, and `mobile-chrome` (see `playwright.config.ts`). `ci.yml`'s `e2e-browser` matrix runs `chromium` + `mobile-safari`; `desktop-webkit` and `mobile-chrome` widen local and dispatch coverage for Safari-desktop and Chrome-mobile quirks. All four functional projects ignore `e2e/visual.spec.ts`, and `npm run test:e2e` names the four functional projects explicitly — so a developer run on macOS never compares against Linux-generated baselines. The visual snapshot spec runs only under the `visual-chromium` / `visual-webkit` projects via `npm run test:visual`, driven by `visual-regression.yml` below.
+
+---
+
+### `visual-regression.yml` — Visual Regression
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`) and `workflow_dispatch` |
+| **Gate** | A `decide` job runs on every PR and sets `run=true` when `dorny/paths-filter` matches `components/**`, `app/**/*.tsx`, `app/globals.css`, `e2e/visual.spec.ts`, `playwright.config.ts`, or the workflow file itself — OR the PR carries the `visual-regression` label (escape hatch). `workflow_dispatch` always runs. Mirrors `integration-tests.yml`'s decide-job pattern. |
+| **Job** | `decide` (path/label gate), `visual` (snapshot compare) |
+| **What it does** | Builds the app and serves it, then runs `e2e/visual.spec.ts` under the `visual-chromium` + `visual-webkit` projects (`npm run test:visual`). The spec asserts `toHaveScreenshot()` for the two deterministic README surfaces (Stats, Journey) at a mobile and a desktop viewport. Practice, Pasture and Pokédex are excluded because their renders are not pixel-stable across runs (random card pick, `Math.random()` facts, and lazy sprite-decode races under the parallel worker pool) — see `e2e/visual.spec.ts` for the per-surface rationale. Committed baselines under `e2e/__screenshots__/` are compared with a fuzzy tolerance (`threshold: 0.25`, `maxDiffPixelRatio: 0.02` in `playwright.config.ts`), not byte-for-byte; on a mismatch the HTML report (expected/actual/diff) is uploaded as an artifact. |
+| **Why a dedicated workflow** | Snapshot baselines are platform-sensitive. macOS Core Text and Linux font anti-aliasing differ visibly (the reason README screenshots are macOS-only — see AGENTS.md → "Screenshots"). The job runs inside the pinned `mcr.microsoft.com/playwright:v1.60.0-noble` Docker image so baselines are generated AND compared in the same deterministic Linux environment. The image tag MUST track the `@playwright/test` version in `package-lock.json`. |
+| **Required check** | No — non-blocking, and a non-matching PR does not run it at all. |
+| **Concurrency** | Per-ref, `cancel-in-progress: true`. |
+| **Updating baselines** | When a UI change intentionally alters a surface, regenerate baselines inside the Docker image — never from macOS. From the repo root: `docker run --rm -v "$(pwd)":/work -w /work mcr.microsoft.com/playwright:v1.60.0-noble bash -c 'npm ci && npm run build && (npm start &) && npx wait-on http://localhost:3000 && npm run test:visual -- --update-snapshots'` — then commit the changed PNGs under `e2e/__screenshots__/`. |
+
 #### Mock-auth seam (E2E)
 
 `e2e/auth.spec.ts` exercises the **signed-in** UI in a real browser without a
@@ -682,6 +699,10 @@ Runs on every `pull_request` event and every push to `main`: the same `typecheck
 ### Coverage gate (`coverage.yml`)
 
 Runs on every `pull_request` event. Fails the `coverage` job on either a global-floor breach (`coverage.thresholds` in `vitest.config.ts`) or a diff-coverage breach (`scripts/diff-coverage.mjs`, 90% patch bar). See the `coverage.yml` catalog entry above for detail. Not yet a required check — owner must add `coverage` to the `qa` and `main` rulesets to block merge on a breach.
+
+### Visual-regression gate (`visual-regression.yml`)
+
+Runs on PRs that touch rendered UI (`components/**`, `app/**/*.tsx`, `app/globals.css`) or carry the `visual-regression` label. Compares committed Playwright screenshot baselines (`e2e/__screenshots__/`) against a fresh render of the two deterministic README surfaces (Stats, Journey) at a mobile and a desktop viewport, across the Chromium and WebKit engines. Practice, Pasture and Pokédex are excluded because their renders are not pixel-stable across runs (see `e2e/visual.spec.ts`). The job runs inside the pinned `mcr.microsoft.com/playwright` Docker image so Linux font rendering is deterministic; baselines are generated AND compared in the same image. A mismatch fails the `visual` job and uploads an expected/actual/diff report. Not a required check, and a non-matching PR does not run it. When a UI change is an intended visual update, regenerate baselines inside the Docker image (see the `visual-regression.yml` catalog entry above) and commit the changed PNGs in the same PR. See the `visual-regression.yml` catalog entry for the exact `docker run` command.
 
 ---
 

@@ -222,3 +222,79 @@ test.describe("PWA install nudge (#701)", () => {
     expect(stored?.onboarding?.installNudgeDismissed).toBe(false);
   });
 });
+
+test.describe("Guest storage-persistence notice (#1057)", () => {
+  test("notice appears for a guest user on a fresh visit", async ({ page }) => {
+    await page.goto("/");
+
+    const notice = page.getByRole("note", {
+      name: /your progress is saved on this device/i,
+    });
+    await expect(notice).toBeVisible();
+
+    // Key content must be present.
+    await expect(notice.getByText(/stored in your browser/i)).toBeVisible();
+  });
+
+  test("notice can be dismissed and stays dismissed after reload", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const notice = page.getByRole("note", {
+      name: /your progress is saved on this device/i,
+    });
+    await expect(notice).toBeVisible();
+
+    await notice.getByRole("button", { name: /dismiss hint/i }).click();
+    await expect(notice).toHaveCount(0);
+
+    // Verify the flag is persisted to localStorage.
+    const stored = await page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    }, SETTINGS_KEY);
+    expect(
+      (stored?.onboarding as Record<string, unknown> | undefined)
+        ?.guestStorageNoticeDismissed,
+    ).toBe(true);
+
+    // Notice must not reappear after reload.
+    await page.reload();
+    await expect(
+      page.getByRole("note", { name: /your progress is saved on this device/i }),
+    ).toHaveCount(0);
+  });
+
+  test("notice is absent when already dismissed in settings", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            welcomeDismissed: false,
+            practiceHintDismissed: false,
+            statsHintDismissed: false,
+            settingsHintDismissed: false,
+            installNudgeDismissed: false,
+            audioHintDismissed: false,
+            cardTypesHintDismissed: false,
+            guestStorageNoticeDismissed: true,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    await expect(
+      page.getByRole("note", { name: /your progress is saved on this device/i }),
+    ).toHaveCount(0);
+  });
+});

@@ -10,7 +10,9 @@ import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites"
 import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { QueueStateBadge } from "@/components/review/QueueStateBadge";
-import { GradeButtons } from "@/components/review/GradeButtons";
+import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/GradeButtons";
+import { useSwipeGrade } from "@/components/review/useSwipeGrade";
+import { SwipeHint } from "@/components/review/SwipeHint";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
@@ -60,6 +62,7 @@ import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
+import { triggerHaptic } from "@/lib/review/haptic";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
   loadDailySummary,
@@ -540,6 +543,11 @@ export function ReviewSession() {
   // Not persisted — resets on every page load by design.
   const [extendedReview, setExtendedReview] = useState(false);
 
+  // Keyboard shortcuts overlay — opened by the `?` key or the `?` hint button
+  // on the GradeButtons panel. Controlled here so the keydown handler can open
+  // it without going through a ref or event bus.
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+
   // Fact shown after card reveal — randomised on each reveal.
   const [currentFact, setCurrentFact] = useState<PokemonFact | null>(null);
 
@@ -656,6 +664,20 @@ export function ReviewSession() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
+
+  // Ref attached to the swipeable card container. Swipe-to-grade is active
+  // only for flip-card types (name / evolution / cry) — reverse cards use
+  // SpritePicker and have their own tap interaction (#1052).
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  // Stable refs to the latest handleReveal / handleGrade so the keyboard
+  // keydown effect never captures stale closures. handleReveal and handleGrade
+  // are function-declarations (hoisted), so they can be referenced here even
+  // though they appear lower in the file. The refs are updated synchronously
+  // every render — no effect needed.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const handleRevealRef = useRef<() => Promise<void>>(handleReveal);
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const handleGradeRef = useRef<(grade: Grade) => Promise<void>>(handleGrade);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
   const { user, supabase } = useAuth();
   const { anyFlagOn: superuserGuarded, flags: superuserFlags } = useSuperuser();
@@ -1041,6 +1063,102 @@ export function ReviewSession() {
     // stable — the dep is needed so the persist call sees the real timezone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undoSnapshot, grading, limits, timezone]);
+
+  // Update stable callback refs every render so the keyboard handler below
+  // always dispatches to the latest handleReveal / handleGrade without needing
+  // to re-register the listener on every render.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  handleRevealRef.current = handleReveal;
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  handleGradeRef.current = handleGrade;
+
+  // Swipe-to-grade: active only after the card is revealed and not mid-grade.
+  // The hook attaches pointer listeners to `cardRef` which wraps the card
+  // display for flip-card types (name / evolution / cry). `handleGrade` is
+  // accessed via a stable ref (handleGradeRef) inside useSwipeGrade so the
+  // listener never captures stale closures.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const { swipeState } = useSwipeGrade({
+    targetRef: cardRef,
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+    onGrade: handleGrade,
+    enabled: revealed,
+    grading,
+  });
+
+  // Space/Enter → reveal; 1/2/4/5 → grade; ? → open shortcut overlay.
+  // Deps: only the state values used as guards inside the handler (`revealed`,
+  // `grading`, `revealing`). handleReveal / handleGrade are accessed via stable
+  // refs (updated every render above) so adding them here would cause a new
+  // listener registration on every render without any benefit.
+  useEffect(() => {
+    function isTextInputFocused(): boolean {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = (el as HTMLElement).tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return true;
+      if ((el as HTMLElement).isContentEditable) return true;
+      return false;
+    }
+
+    function onKey(e: KeyboardEvent) {
+      // Never fire while a text field is focused (superuser chord, sign-in
+      // fields, search boxes, etc.).
+      if (isTextInputFocused()) return;
+
+      // Escape closes the shortcut overlay.
+      if (e.key === "Escape") {
+        setShowKeyboardShortcuts(false);
+        return;
+      }
+
+      // ? opens the shortcut overlay (Shift+/ on US-ANSI). Guard against
+      // modifier combos that use ? (e.g. Shift+? still fires "?" as e.key).
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowKeyboardShortcuts(true);
+        return;
+      }
+
+      // Space / Enter → reveal the current card (only when not yet revealed).
+      if ((e.key === " " || e.key === "Enter") && !revealed && !revealing) {
+        // Prevent the default scroll-on-space behaviour.
+        e.preventDefault();
+        void handleRevealRef.current();
+        return;
+      }
+
+      // 1/2/4/5 → grade Again/Hard/Good/Easy. Only active after reveal and
+      // while not mid-grade. Also accept 3 as an alias for 4 (Good) to support
+      // the common 1/2/3/4 muscle memory from other SRS apps.
+      if (revealed && !grading) {
+        const GRADE_MAP: Record<string, Grade> = {
+          "1": 1,
+          "2": 2,
+          "3": 4,
+          "4": 4,
+          "5": 5,
+        };
+        const grade = GRADE_MAP[e.key];
+        if (grade !== undefined) {
+          e.preventDefault();
+          // Fire haptic on keyboard-driven grades. The iOS switch technique
+          // is omitted here (null) — keyboard users are on desktop and the
+          // Vibration API path covers Android/Chromium where it applies.
+          triggerHaptic(grade, null);
+          void handleGradeRef.current(grade);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // handleReveal / handleGrade are accessed via stable refs (updated every
+    // render above) so they do not belong in deps. Only the state values used
+    // as guards inside the handler — `revealed`, `grading`, `revealing` — need
+    // to be listed so the listener is re-registered when those values change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealed, grading, revealing]);
 
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
@@ -1921,31 +2039,37 @@ export function ReviewSession() {
           />
         </div>
         <QueueStateBadge state={effectiveCard.state} />
-        {revealed ? (
-          <PokemonCard
-            spriteUrl={effectiveCard.spriteUrl}
-            name={effectiveCard.displayName}
-            revealed
-            fact={currentFact}
-            direction="cry"
-            id={effectiveCard.pokemonId}
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-4">
-            <DirectionBadge direction="cry" />
-            <button
-              type="button"
-              onClick={() => playCry(effectiveCard.cryUrl ?? null)}
-              className="flex h-40 w-40 items-center justify-center rounded-full border-2 border-zinc-300 bg-zinc-50 text-5xl transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:border-zinc-700 dark:bg-zinc-900"
-              aria-label="Play cry"
-            >
-              🔊
-            </button>
-            <p className="text-base font-semibold text-foreground">
-              Name this Pokémon from its cry
-            </p>
-          </div>
-        )}
+        {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
+        <div ref={cardRef} className="relative" data-testid="swipe-card">
+          {revealed ? (
+            <>
+              <PokemonCard
+                spriteUrl={effectiveCard.spriteUrl}
+                name={effectiveCard.displayName}
+                revealed
+                fact={currentFact}
+                direction="cry"
+                id={effectiveCard.pokemonId}
+              />
+              <SwipeHint swipeState={swipeState} />
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <DirectionBadge direction="cry" />
+              <button
+                type="button"
+                onClick={() => playCry(effectiveCard.cryUrl ?? null)}
+                className="flex h-40 w-40 items-center justify-center rounded-full border-2 border-zinc-300 bg-zinc-50 text-5xl transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:border-zinc-700 dark:bg-zinc-900"
+                aria-label="Play cry"
+              >
+                🔊
+              </button>
+              <p className="text-base font-semibold text-foreground">
+                Name this Pokémon from its cry
+              </p>
+            </div>
+          )}
+        </div>
 
         {revealed ? (
           <>
@@ -1961,6 +2085,9 @@ export function ReviewSession() {
               onGrade={handleGrade}
               disabled={grading}
               previews={gradePreviewsOrNull ?? undefined}
+              showShortcuts={showKeyboardShortcuts}
+              onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+              onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
             />
           </>
         ) : (
@@ -1972,6 +2099,15 @@ export function ReviewSession() {
           >
             Reveal
           </button>
+        )}
+
+        {/* Keyboard shortcuts overlay — rendered outside the revealed/unrevealed
+            conditional so pressing `?` works at any point in the review cycle,
+            including before the card has been flipped. */}
+        {showKeyboardShortcuts && (
+          <KeyboardShortcutsOverlay
+            onClose={() => setShowKeyboardShortcuts(false)}
+          />
         )}
 
         {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
@@ -2089,29 +2225,33 @@ export function ReviewSession() {
         incompleteChainSpeciesIds={incompleteChains}
       />
       <QueueStateBadge state={effectiveCard.state} />
-      {effectiveCard.cardType === "evolution" ||
-      effectiveCard.cardType === "reverse-evolution" ? (
-        <EvolutionCard
-          direction={effectiveCard.cardType}
-          preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
-          preEvoName={effectiveCard.preEvoName}
-          postEvoName={effectiveCard.postEvoName}
-          postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
-          triggerPhrase={effectiveCard.triggerPhrase}
-          revealed={revealed}
-          fact={currentFact}
-          preEvoId={effectiveCard.preEvoId}
-          postEvoId={effectiveCard.postEvoId}
-        />
-      ) : (
-        <PokemonCard
-          spriteUrl={effectiveCard.spriteUrl}
-          name={effectiveCard.displayName}
-          revealed={revealed}
-          fact={currentFact}
-          id={effectiveCard.id}
-        />
-      )}
+      {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
+      <div ref={cardRef} className="relative" data-testid="swipe-card">
+        {effectiveCard.cardType === "evolution" ||
+        effectiveCard.cardType === "reverse-evolution" ? (
+          <EvolutionCard
+            direction={effectiveCard.cardType}
+            preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
+            preEvoName={effectiveCard.preEvoName}
+            postEvoName={effectiveCard.postEvoName}
+            postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
+            triggerPhrase={effectiveCard.triggerPhrase}
+            revealed={revealed}
+            fact={currentFact}
+            preEvoId={effectiveCard.preEvoId}
+            postEvoId={effectiveCard.postEvoId}
+          />
+        ) : (
+          <PokemonCard
+            spriteUrl={effectiveCard.spriteUrl}
+            name={effectiveCard.displayName}
+            revealed={revealed}
+            fact={currentFact}
+            id={effectiveCard.id}
+          />
+        )}
+        {revealed && <SwipeHint swipeState={swipeState} />}
+      </div>
 
       {revealed ? (
         <>
@@ -2140,6 +2280,9 @@ export function ReviewSession() {
             onGrade={handleGrade}
             disabled={grading}
             previews={gradePreviewsOrNull ?? undefined}
+            showShortcuts={showKeyboardShortcuts}
+            onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+            onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
           />
         </>
       ) : (
@@ -2151,6 +2294,14 @@ export function ReviewSession() {
         >
           Reveal
         </button>
+      )}
+
+      {/* Keyboard shortcuts overlay — rendered outside the revealed/unrevealed
+          conditional so pressing `?` works at any point in the review cycle. */}
+      {showKeyboardShortcuts && (
+        <KeyboardShortcutsOverlay
+          onClose={() => setShowKeyboardShortcuts(false)}
+        />
       )}
 
       {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}

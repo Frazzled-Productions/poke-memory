@@ -18,8 +18,11 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
+import { GuestStorageNotice } from "@/components/onboarding/GuestStorageNotice";
 import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
+import { StoragePersistenceRequester } from "@/components/pwa/StoragePersistenceRequester";
 import { PwaBadge } from "@/components/pwa/PwaBadge";
+import { DocumentTitleBadge } from "@/components/pwa/DocumentTitleBadge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,6 +42,74 @@ export const metadata: Metadata = {
   appleWebApp: {
     title: "Poké Memory",
     statusBarStyle: "black-translucent",
+    startupImage: [
+      // iPhone 16 Pro Max  (440 × 956 logical, 3×)
+      {
+        url: "/splash/iphone16promax-portrait.png",
+        media:
+          "(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone16promax-landscape.png",
+        media:
+          "(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 — see iphone16 entry)
+      {
+        url: "/splash/iphone16pro-portrait.png",
+        media:
+          "(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone16pro-landscape.png",
+        media:
+          "(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone 16 Plus / 15 Plus / 14 Plus  (430 × 932 logical, 3×)
+      {
+        url: "/splash/iphone16plus-portrait.png",
+        media:
+          "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone16plus-landscape.png",
+        media:
+          "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone 16 / 15 / 14  (393 × 852 logical, 3×)
+      {
+        url: "/splash/iphone16-portrait.png",
+        media:
+          "(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone16-landscape.png",
+        media:
+          "(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone 13 mini / 12 mini  (375 × 812 logical, 3×)
+      {
+        url: "/splash/iphone13mini-portrait.png",
+        media:
+          "(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone13mini-landscape.png",
+        media:
+          "(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone SE (3rd gen) / SE (2nd gen) / iPhone 8  (375 × 667 logical, 2×)
+      {
+        url: "/splash/iphoneSE-portrait.png",
+        media:
+          "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphoneSE-landscape.png",
+        media:
+          "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)",
+      },
+    ],
   },
   openGraph: {
     title: "Poké Memory",
@@ -63,6 +134,11 @@ export const viewport: Viewport = {
   colorScheme: "light dark",
   maximumScale: 1,
   userScalable: false,
+  // Required for env(safe-area-inset-*) to resolve to non-zero values on iOS.
+  // Without this, safe-area insets in BottomTabBar and MobileNavPaddingWrapper
+  // collapse to zero, and the status-bar overlay set by black-translucent has
+  // no corresponding top inset to push content clear of the Dynamic Island.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -106,6 +182,12 @@ export default function RootLayout({
               <OnlineReconnectSync />
               <PwaInstallNudge />
               {/*
+                GuestStorageNotice informs signed-out users that their progress
+                is device-local and how to protect it (#1057). Renders nothing
+                for authenticated users.
+              */}
+              <GuestStorageNotice />
+              {/*
                 MobileNavPaddingWrapper adds bottom padding on mobile only when
                 the bottom tab bar is active, so the fixed bar never overlaps content.
                 The padding is removed automatically when the user switches to the
@@ -124,10 +206,14 @@ export default function RootLayout({
           </SuperuserProvider>
         </AuthProvider>
         <IdbMigration />
+        {/* Requests persistent storage to protect against 7-day ITP eviction (#1057). */}
+        <StoragePersistenceRequester />
         {/* Registers the offline service worker and surfaces the update prompt (#703). */}
         <ServiceWorkerProvider />
         {/* Syncs the installed-PWA app icon badge with cards due today (#916). */}
         <PwaBadge />
+        {/* Prefixes the browser tab title with a due-card count for desktop users (#1062). */}
+        <DocumentTitleBadge />
         <Analytics />
         <SpeedInsights />
       </body>

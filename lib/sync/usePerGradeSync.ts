@@ -10,6 +10,7 @@ import {
   clearPendingQueue,
 } from "@/lib/sync/persistence";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
+import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
 /** Number of consecutive all-failure drains before the banner is shown. */
 const FAILURE_THRESHOLD = 3;
@@ -143,6 +144,12 @@ export function usePerGradeSync(
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current === FAILURE_THRESHOLD) {
         markPushFailed(pendingQueueRef.current.length);
+        // Register a Background Sync tag so the SW can replay the persisted
+        // queue when connectivity is restored, even if the user closes every
+        // tab before the online-reconnect hook fires (#1072 concern). The
+        // persisted queue is already up to date (the savePendingQueue call
+        // below follows). Best-effort: fire and forget.
+        void registerBackgroundSync();
       }
       // Persist the still-queued cards so they survive a force-kill (#893).
       // This write runs unconditionally on all-failure — the pending-queue
