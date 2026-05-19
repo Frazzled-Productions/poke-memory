@@ -18,7 +18,10 @@ name: Settings Coverage Audit
 # (`YYYY-MM`) already exists on #738 — the marker
 # `<!-- settings-coverage-audit:<YYYY-MM> -->` is the source of truth. A
 # month with several settings PRs therefore triggers the audit once, not
-# once per PR.
+# once per PR. A manual workflow_dispatch run bypasses the monthly
+# duplicate check and always runs; only the PR-triggered runs are guarded.
+# Re-running manually in a month that already has a report may therefore
+# post a second report comment — that is intended.
 
 on:
   pull_request:
@@ -75,8 +78,14 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           MONTH_KEY: ${{ steps.month.outputs.key }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual run (workflow_dispatch) — bypassing idempotency check."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           MARKER="<!-- settings-coverage-audit:${MONTH_KEY} -->"
           HITS=$(gh issue view 738 --json comments \
             --jq '.comments[].body' | grep -Fc "${MARKER}" || true)
@@ -93,6 +102,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           MONTH_KEY: ${{ steps.month.outputs.key }}
+          EVENT_NAME: ${{ github.event_name }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -141,10 +151,19 @@ jobs:
 
             ## Idempotency
 
-            The pre-flight check already confirmed no report exists for
-            ${{ steps.month.outputs.key }} on #738. Still, if you discover a
-            comment carrying `<!-- settings-coverage-audit:${{ steps.month.outputs.key }} -->`,
+            The shell pre-flight is the primary idempotency guard. For a
+            scheduled / PR-triggered run it confirmed no report exists for
+            ${{ steps.month.outputs.key }} on #738; as a backstop, if you
+            discover a comment carrying
+            `<!-- settings-coverage-audit:${{ steps.month.outputs.key }} -->`,
             stop and exit cleanly.
+
+            **Exception — manual dispatch.** If the `EVENT_NAME` environment
+            variable is `workflow_dispatch`, this is a deliberate manual
+            re-run: do NOT apply the marker re-check above. Run the audit and
+            post the report even if a report for ${{ steps.month.outputs.key }}
+            already exists. Apply the marker re-check only when `EVENT_NAME`
+            is not `workflow_dispatch`.
 
             ## Output — dated report comment on #738
 
