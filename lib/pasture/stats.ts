@@ -7,7 +7,6 @@
  */
 
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
-import { isMastered } from "@/lib/stats/derive";
 import type { NameReviewCard } from "@/lib/review/session";
 
 /** Total species count per habitat, derived once from the seed data. */
@@ -77,11 +76,13 @@ export function biomeStats(
   // Guard to isDefaultForm so the numerator matches BIOME_TOTALS' denominator,
   // which only counts default-form species. Without this guard, alternate formes
   // and regional variants would inflate masteredCount above totalCount.
+  //
+  // No isMastered() re-check here: callers pre-filter via filterMastered() with
+  // the user's configured masteryRepetitions before passing allMasteredCards in.
+  // Re-applying the default threshold (3) would silently undercount for users
+  // who set masteryRepetitions below 3 (e.g. 1 or 2). Trust the caller contract.
   const biomeCards = allMasteredCards.filter(
-    (c) =>
-      (c.habitat ?? "unknown") === habitatKey &&
-      c.isDefaultForm &&
-      isMastered(c.state),
+    (c) => (c.habitat ?? "unknown") === habitatKey && c.isDefaultForm,
   );
 
   const masteredCount = biomeCards.length;
