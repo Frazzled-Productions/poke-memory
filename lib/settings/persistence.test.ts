@@ -308,6 +308,22 @@ describe('loadSettings: practiceScope (#333)', () => {
     });
   });
 
+  it('preserves the incomplete-chains preset literal (#995)', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        practiceScope: { gens: [], types: [], presets: ['incomplete-chains'] },
+      }),
+    );
+    expect(loadSettings().practiceScope).toEqual({
+      gens: [],
+      types: [],
+      presets: ['incomplete-chains'],
+      formCategories: { mode: 'all' },
+    });
+  });
+
   it('accepts permissive type strings — UI restricts inputs, validator does not', () => {
     mockLocalStorage.setItem(
       STORAGE_KEY,

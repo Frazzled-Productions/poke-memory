@@ -51,6 +51,12 @@ vi.mock("@/lib/pokemon/facts", () => ({
   getPokemonFacts: () => [],
 }));
 
+// useNextReviewDate — default to "not-started" so it never renders review-date
+// copy in unrelated tests.
+vi.mock("@/lib/review/useNextReviewDate", () => ({
+  useNextReviewDate: () => ({ status: "not-started" }),
+}));
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------

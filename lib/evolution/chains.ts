@@ -211,3 +211,49 @@ export function computeEvolutionWallStats(
     completedFamilies: families.filter((f) => f.completed).length,
   };
 }
+
+/**
+ * True when an evolution family is "in progress": at least one edge has a
+ * mastered direction (forward or reverse) but not every edge is fully
+ * mastered. This is the exact predicate the Evolution Wall's "In progress"
+ * filter uses (`matchesFilter` in `components/journey/EvolutionWall.tsx`) —
+ * keeping it here lets the "Incomplete evolution chains" practice preset
+ * (#995) reuse the same definition so the wall and the preset never drift.
+ */
+export function familyInProgress(family: EvolutionFamily): boolean {
+  if (family.completed) return false;
+  return family.edges.some((e) => e.forwardMastered || e.reverseMastered);
+}
+
+/**
+ * Species ids that belong to an "incomplete evolution chain" — a chain the
+ * user has started but not finished mastering. Drives the "Incomplete
+ * evolution chains" practice-scope preset (#995).
+ *
+ * The set is computed from the same `deriveEvolutionFamilies` output the
+ * Journey tab's Evolution Wall renders, filtered by `familyInProgress`, so
+ * the preset's membership matches the wall's "In progress" tab exactly.
+ *
+ * Membership is dynamic: as the user masters more edges a family flips from
+ * untouched → in progress → completed, so this must be recomputed from the
+ * current card set rather than baked in as a static id list.
+ *
+ * @param cards               The user's full ReviewableCard array.
+ * @param masteryRepetitions  The user's mastery-repetitions setting (default 3).
+ * @param forceAllMastered    Honour the `pretendAllMastered` superuser flag.
+ *   When true every edge is mastered, so every family is `completed` and none
+ *   is in progress — the returned set is empty by design.
+ */
+export function incompleteChainSpeciesIds(
+  cards: readonly ReviewableCard[],
+  masteryRepetitions = 3,
+  forceAllMastered = false,
+): Set<number> {
+  const families = deriveEvolutionFamilies(cards, masteryRepetitions, forceAllMastered);
+  const ids = new Set<number>();
+  for (const family of families) {
+    if (!familyInProgress(family)) continue;
+    for (const node of family.nodes) ids.add(node.speciesId);
+  }
+  return ids;
+}

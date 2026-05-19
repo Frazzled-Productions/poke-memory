@@ -17,20 +17,61 @@ type Props = {
    * per the AGENTS.md superuser-mode convention.
    */
   forceAllMastered?: boolean;
+  /**
+   * The set of species IDs the user has currently mastered (name-card
+   * mastery). Used to compute the "Next badge" proximity hint. When omitted
+   * or when `forceAllMastered` is true, no hint is rendered.
+   */
+  masteredSpeciesIds?: ReadonlySet<number>;
 };
 
 /**
- * Gym-badge gallery for the Stats page (#539, #830). Earned badges are shown
- * by default; locked ones are hidden behind a "View all badges" toggle so the
- * gallery does not crowd out the mastery rings and charts further down the page.
+ * Returns the unearned badge closest to being unlocked and how many more
+ * species the user needs to master. Picks the badge with the fewest
+ * remaining species; ties are broken by catalog order (first wins).
+ *
+ * Returns `null` when all badges are earned or no catalog entries exist.
+ */
+function findNextBadge(
+  catalog: readonly BadgeDefinition[],
+  earnedIds: ReadonlySet<string>,
+  mastered: ReadonlySet<number>,
+): { badge: BadgeDefinition; remaining: number } | null {
+  let best: { badge: BadgeDefinition; remaining: number } | null = null;
+  for (const badge of catalog) {
+    if (earnedIds.has(badge.id)) continue;
+    const remaining = badge.criterion.speciesIds.filter(
+      (id) => !mastered.has(id),
+    ).length;
+    if (remaining === 0) continue; // about to be awarded — skip
+    if (best === null || remaining < best.remaining) {
+      best = { badge, remaining };
+    }
+  }
+  return best;
+}
+
+/**
+ * Gym-badge gallery for the Journey page (#539, #830, #993). Earned badges
+ * are shown by default; locked ones are hidden behind a "View all badges"
+ * toggle so the gallery does not crowd out the mastery rings and charts
+ * further down the page.
  *
  * When `forceAllMastered` is true every badge renders as earned and no locked
  * section exists, so the toggle is hidden.
  *
+ * When `masteredSpeciesIds` is provided (and `forceAllMastered` is false), a
+ * proximity hint is shown above the badge grid naming the nearest unearned
+ * badge and how many more Pokémon need to be mastered to unlock it.
+ *
  * Accessible: the toggle button carries aria-expanded and aria-controls so
  * screen readers can track the collapsed/expanded state.
  */
-export function BadgeGallery({ earnedBadges, forceAllMastered = false }: Props) {
+export function BadgeGallery({
+  earnedBadges,
+  forceAllMastered = false,
+  masteredSpeciesIds,
+}: Props) {
   const [lockedExpanded, setLockedExpanded] = useState(false);
 
   const earnedSet = new Set(earnedBadges.map((b) => b.id));
@@ -45,6 +86,13 @@ export function BadgeGallery({ earnedBadges, forceAllMastered = false }: Props) 
 
   const hasLocked = locked.length > 0;
 
+  // Proximity hint: only when the caller provides mastered species data and
+  // the superuser flag is off (forceAllMastered would make all badges earned).
+  const nextBadge =
+    !forceAllMastered && masteredSpeciesIds !== undefined
+      ? findNextBadge(BADGE_CATALOG, earnedSet, masteredSpeciesIds)
+      : null;
+
   return (
     <section aria-labelledby="badge-gallery-heading">
       <h2
@@ -53,6 +101,19 @@ export function BadgeGallery({ earnedBadges, forceAllMastered = false }: Props) 
       >
         Gym badges
       </h2>
+
+      {nextBadge !== null && (
+        <p
+          data-testid="next-badge-hint"
+          className="mb-3 text-sm text-zinc-500 dark:text-zinc-400"
+        >
+          <span className="font-medium text-foreground">Next badge:</span>{" "}
+          {nextBadge.badge.name},{" "}
+          {nextBadge.remaining === 1
+            ? "1 more Pokémon to master"
+            : `${nextBadge.remaining} more Pokémon to master`}
+        </p>
+      )}
 
       {earned.length > 0 ? (
         <ul

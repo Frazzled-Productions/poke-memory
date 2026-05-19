@@ -12,6 +12,7 @@ import {
   type FormCategoryFilter,
   type PracticeScope,
   type PracticeScopePreset,
+  type ScopeMatchContext,
 } from "@/lib/review/scope";
 
 type Props = {
@@ -23,6 +24,13 @@ type Props = {
    * filter is rendered as normal (#658).
    */
   alternateFormsEnabled?: boolean;
+  /**
+   * Species ids in an incomplete evolution chain (#995). Supplied by
+   * `ReviewSession` so the live "X of N match" count is accurate when the
+   * "Incomplete evolution chains" preset is selected. When omitted, an
+   * `incomplete-chains` scope counts as matching nothing.
+   */
+  incompleteChainSpeciesIds?: ReadonlySet<number>;
 };
 
 const GENS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -33,6 +41,7 @@ const ROMAN: Record<number, string> = {
 const PRESETS: { key: PracticeScopePreset; label: string }[] = [
   { key: "starters", label: "Starters" },
   { key: "legendaries", label: "Legendaries" },
+  { key: "incomplete-chains", label: "Incomplete evolution chains" },
 ];
 
 function toggleNum(arr: number[], v: number): number[] {
@@ -74,12 +83,28 @@ const SELECTED_ACCENT = "border-rose-500 bg-rose-500 text-white";
 const PILL_BASE =
   "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors";
 
-export function ScopeControl({ scope, onChange, alternateFormsEnabled = false }: Props) {
+export function ScopeControl({
+  scope,
+  onChange,
+  alternateFormsEnabled = false,
+  incompleteChainSpeciesIds,
+}: Props) {
   const [open, setOpen] = useState(false);
   const active = !isScopeEmpty(scope);
+  // Context for the "Incomplete evolution chains" preset (#995): the live
+  // count must consult the same incomplete-chain species set the session uses.
+  const scopeContext: ScopeMatchContext = useMemo(
+    () => ({ incompleteChainSpeciesIds }),
+    [incompleteChainSpeciesIds],
+  );
   // When the forms gate is off, alternate-form entries are excluded from the
   // count so the "X of N" display is consistent with what the session builds.
-  const matchCount = countMatchingSpecies(SEED_POKEMON, scope, alternateFormsEnabled);
+  const matchCount = countMatchingSpecies(
+    SEED_POKEMON,
+    scope,
+    alternateFormsEnabled,
+    scopeContext,
+  );
   const totalCount = countMatchingSpecies(SEED_POKEMON, EMPTY_SCOPE, alternateFormsEnabled);
   const availableFormCategories = useMemo(() => presentFormCategories(SEED_POKEMON), []);
 

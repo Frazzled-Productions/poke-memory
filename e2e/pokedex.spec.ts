@@ -546,3 +546,110 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
     await expect(alolanSummary).toBeVisible();
   });
 });
+
+test.describe("Pokédex detail — next review date (#992)", () => {
+  test("shows 'Due today' for a Pokémon whose review is overdue", async ({ page }) => {
+    // Seed Bulbasaur (id=1) with a dueDate in the past so it is overdue.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2020-01-01",
+            lastReview: "2019-12-31",
+            firstSeen: "2019-12-31",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+    await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
+
+    // The review-date line should appear with "Due today" for an overdue card.
+    await expect(page.getByText("Due today")).toBeVisible();
+  });
+
+  test("shows 'Next review: in N days' for a Pokémon with a future due date", async ({ page }) => {
+    // Seed Bulbasaur with a far-future dueDate.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 30,
+            difficulty: 4,
+            elapsedDays: 1,
+            scheduledDays: 30,
+            reps: 3,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-19",
+            firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+    await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
+
+    // The review-date line should appear with "Next review: in N days" for a future card.
+    await expect(page.getByText(/Next review: in \d+ days?/)).toBeVisible();
+  });
+
+  test("review date is absent for a locked (never-started) Pokémon", async ({ page }) => {
+    // Empty session — Bulbasaur is locked.
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+
+    // Locked Pokémon shows "???" — no review-date line.
+    await expect(
+      page.getByRole("heading", { level: 1, name: "???" }),
+    ).toBeVisible();
+    await expect(page.getByText("Due today")).not.toBeVisible();
+    await expect(page.getByText(/Next review:/)).not.toBeVisible();
+  });
+});

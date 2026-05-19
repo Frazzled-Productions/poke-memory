@@ -49,6 +49,10 @@ import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { SYNC_PULL_APPLIED_EVENT } from "@/lib/sync/pullAndMerge";
 import { appendGradeEntry, loadGradeLog, removeGradeEntry, todayGradeSequence } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
+import {
+  computeSessionDirectionAccuracy,
+  type SessionDirectionTally,
+} from "@/lib/stats/direction-breakdown";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 import { ShareTodayButton } from "@/components/review/ShareTodayButton";
 import { previewIntervals } from "@/lib/srs/intervalPreview";
@@ -69,10 +73,12 @@ import {
   cardMatchesScope,
   isScopeEmpty,
   type PracticeScope,
+  type ScopeMatchContext,
 } from "@/lib/review/scope";
 import { ScopeControl } from "@/components/review/ScopeControl";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
+import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
@@ -94,6 +100,7 @@ type UndoSnapshot = {
   cards: ReviewableCard[];
   sessionGrades: Record<Grade, number>;
   sessionGradeSeq: Grade[];
+  sessionDirectionGrades: SessionDirectionTally;
   newCardsThisSession: number;
   masteredThisSession: number;
   learningQueue: LearningQueueEntry[];
@@ -276,6 +283,48 @@ function TodayPill({
 }
 
 // ---------------------------------------------------------------------------
+// Per-direction accuracy row (#994)
+// ---------------------------------------------------------------------------
+
+/**
+ * A compact inline row showing session accuracy per card direction, e.g.
+ * "Name 91% · Evo 74% · Cry 58%". Only directions that received at least one
+ * grade this session are shown. Omitted when the tally is empty (the user
+ * graded nothing, so there is nothing to show).
+ *
+ * Accuracy is defined as the share of grades that were Good (4) or Easy (5)
+ * — the same pass/fail convention used in `computeDirectionBreakdown` on the
+ * Stats page, so both surfaces are consistent.
+ */
+function DirectionAccuracyRow({ tally }: { tally: SessionDirectionTally }) {
+  const rows = computeSessionDirectionAccuracy(tally);
+  if (rows.length === 0) return null;
+
+  /** Short display label for each direction. */
+  const shortLabel: Record<string, string> = {
+    name: "Name",
+    reverse: "Reverse",
+    cry: "Cry",
+    evolution: "Evo",
+    "reverse-evolution": "Reverse evo",
+  };
+
+  const parts = rows.map((row) => {
+    const pct = Math.round((row.accuracy ?? 0) * 100);
+    return `${shortLabel[row.direction] ?? row.direction} ${pct}%`;
+  });
+
+  return (
+    <p
+      className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums"
+      aria-label={`Session accuracy by direction: ${parts.join(", ")}`}
+    >
+      {parts.join(" · ")}
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Unified end-of-session screen (#926)
 // ---------------------------------------------------------------------------
 
@@ -303,6 +352,7 @@ function EndOfSessionScreen({
   shareParts,
   dueTomorrow,
   showCardTypesHint,
+  directionGrades,
 }: {
   variant: EndOfSessionVariant;
   perType: PerTypeTodayCounts;
@@ -323,6 +373,8 @@ function EndOfSessionScreen({
    * still self-suppresses once dismissed via `OnboardingFlags`.
    */
   showCardTypesHint: boolean;
+  /** Per-direction grade tally from the current session, for the accuracy row. */
+  directionGrades: SessionDirectionTally;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
@@ -364,6 +416,7 @@ function EndOfSessionScreen({
         reverseEvolutionEnabled={reverseEvolutionEnabled}
         cryEnabled={cryEnabled}
       />
+      <DirectionAccuracyRow tally={directionGrades} />
       {shareText !== null && shareParts !== null ? (
         <ShareTodayButton parts={shareParts} text={shareText} />
       ) : null}
@@ -466,6 +519,11 @@ export function ReviewSession() {
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
+  // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
+  // "Incomplete evolution chains" scope preset derives chain progress against
+  // the same mastery threshold the rest of the app uses. Defaults to 3 (the
+  // settings default) until the session load effect reads the real value.
+  const [masteryRepetitions, setMasteryRepetitions] = useState(3);
   // Onboarding nudges (#702). `audioFeaturesOff` is true when the user has no
   // audio behaviour switched on at all (no cry playback, no spoken names, no
   // cry cards) — only then does the audio hint at card reveal make sense.
@@ -492,6 +550,9 @@ export function ReviewSession() {
   // Live session grade tally — resets on page navigation by design. Labelled
   // "this session" in the UI to set expectations.
   const [sessionGrades, setSessionGrades] = useState<Record<Grade, number>>({ 1: 0, 2: 0, 4: 0, 5: 0 });
+  // Per-direction grade tally for the session-end accuracy breakdown row.
+  // Only directions that received at least one grade appear in this map.
+  const [sessionDirectionGrades, setSessionDirectionGrades] = useState<SessionDirectionTally>(new Map());
   // Per-card grade history for the daily share card. Wiped on session
   // reload; not persisted (the share is a one-tap end-of-session affordance).
   const [sessionGradeSeq, setSessionGradeSeq] = useState<Grade[]>([]);
@@ -543,9 +604,18 @@ export function ReviewSession() {
         reverseEvolutionEnabled,
         cryEnabled: cryCardsEnabled,
       };
+      // Context for the "Incomplete evolution chains" preset (#995): the
+      // incomplete-chain set is derived from the current card set, which has
+      // not changed here (only the scope did), so `incompleteChains` is current.
       const eligibleIds = new Set(
         cards
-          .filter((c) => cardTypeIsEnabled(c, cardTypeOpts) && cardIsEligible(c, next, alternateFormsEnabled))
+          .filter(
+            (c) =>
+              cardTypeIsEnabled(c, cardTypeOpts) &&
+              cardIsEligible(c, next, alternateFormsEnabled, {
+                incompleteChainSpeciesIds: incompleteChains,
+              }),
+          )
           .map((c) => c.id),
       );
       setEligibleCardIds(eligibleIds);
@@ -588,7 +658,7 @@ export function ReviewSession() {
   }, []);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
   const { user, supabase } = useAuth();
-  const { anyFlagOn: superuserGuarded } = useSuperuser();
+  const { anyFlagOn: superuserGuarded, flags: superuserFlags } = useSuperuser();
   // When any superuser flag is on, suppress cloud writes by treating sync as
   // signed-out. Per-grade enqueue, debounced drain, and unload sendBeacon all
   // short-circuit on null client/userId. Background pulls (SyncOnVisible /
@@ -598,6 +668,28 @@ export function ReviewSession() {
   const { enqueueGrade, flushPending } = usePerGradeSync(syncClient, syncUserId);
   useSyncOnUnload(syncClient, syncUserId, flushPending);
 
+  // Runtime context for the "Incomplete evolution chains" scope preset (#995).
+  // An incomplete chain is one the user has started but not finished mastering;
+  // membership shifts as progress is made, so it is recomputed from the current
+  // card set rather than stored as a static id list. Reuses the exact predicate
+  // the Journey tab's Evolution Wall "In progress" filter uses, so the preset
+  // and the wall always agree.
+  //
+  // Superuser: under `pretendAllMastered` every edge counts as mastered, so
+  // every family is `completed` and the set is empty — the preset legitimately
+  // matches nothing. `incompleteChainSpeciesIds` threads the flag through.
+  const incompleteChains = useMemo(
+    () =>
+      cards !== null
+        ? incompleteChainSpeciesIds(
+            cards,
+            masteryRepetitions,
+            superuserFlags.pretendAllMastered,
+          )
+        : new Set<number>(),
+    [cards, masteryRepetitions, superuserFlags.pretendAllMastered],
+  );
+
   // Derive seen Pokémon for the Higher-or-Lower mini-game. Rendered on every
   // end-of-session variant (not just SESSION_COMPLETE) alongside the unified
   // EndOfSessionScreen. Apply the same two-tier gate as the practice session:
@@ -606,9 +698,11 @@ export function ReviewSession() {
   const seenPokemon = useMemo(
     () =>
       cards !== null
-        ? getSeenPokemon(cards, SEED_POKEMON, alternateFormsEnabled, scope)
+        ? getSeenPokemon(cards, SEED_POKEMON, alternateFormsEnabled, scope, {
+            incompleteChainSpeciesIds: incompleteChains,
+          })
         : [],
-    [cards, alternateFormsEnabled, scope],
+    [cards, alternateFormsEnabled, scope, incompleteChains],
   );
 
   const cardMap = useMemo(
@@ -704,9 +798,24 @@ export function ReviewSession() {
         reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
         cryEnabled,
       };
+      // Context for the "Incomplete evolution chains" preset (#995): derive
+      // chain progress from the freshly-built/hydrated card set. The
+      // `scopeContext` memo cannot be used here — it depends on `cards` state
+      // which has not been set yet at this point in the load effect.
+      const loadScopeContext: ScopeMatchContext = {
+        incompleteChainSpeciesIds: incompleteChainSpeciesIds(
+          sessionCards,
+          settings.masteryRepetitions,
+          superuserFlags.pretendAllMastered,
+        ),
+      };
       const eligibleIds = new Set(
         sessionCards
-          .filter((c) => cardTypeIsEnabled(c, cardTypeOpts) && cardIsEligible(c, persistedScope, formsEnabled))
+          .filter(
+            (c) =>
+              cardTypeIsEnabled(c, cardTypeOpts) &&
+              cardIsEligible(c, persistedScope, formsEnabled, loadScopeContext),
+          )
           .map((c) => c.id),
       );
       // Persist whenever scope is active so reconciliation results survive a
@@ -732,6 +841,7 @@ export function ReviewSession() {
         enabled && reverseEvolutionEnabledLocal && formsEnabled,
       );
       setScope(persistedScope);
+      setMasteryRepetitions(settings.masteryRepetitions);
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
 
@@ -892,6 +1002,7 @@ export function ReviewSession() {
           setCards(undoSnapshot.cards);
           setSessionGrades(undoSnapshot.sessionGrades);
           setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
+          setSessionDirectionGrades(undoSnapshot.sessionDirectionGrades);
           setNewCardsThisSession(undoSnapshot.newCardsThisSession);
           setMasteredThisSession(undoSnapshot.masteredThisSession);
           setLearningQueue(undoSnapshot.learningQueue);
@@ -1318,6 +1429,7 @@ export function ReviewSession() {
           shareParts={shareParts}
           dueTomorrow={dueTomorrow}
           showCardTypesHint={!cardTypesAllOn}
+          directionGrades={sessionDirectionGrades}
         />
         {seenPokemon.length >= 2 && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />
@@ -1466,6 +1578,7 @@ export function ReviewSession() {
       cards,
       sessionGrades,
       sessionGradeSeq,
+      sessionDirectionGrades,
       newCardsThisSession,
       masteredThisSession,
       learningQueue,
@@ -1626,6 +1739,20 @@ export function ReviewSession() {
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
     setSessionGradeSeq((prev) => [...prev, grade]);
+    // Update the per-direction tally. Good (4) and Easy (5) count as passes;
+    // Again (1) and Hard (2) do not. Only directions that receive at least one
+    // grade appear in the map, so the session-end row omits directions with no
+    // history — matching the convention in computeDirectionBreakdown.
+    setSessionDirectionGrades((prev) => {
+      const dir = effectiveCard.cardType;
+      const existing = prev.get(dir) ?? { total: 0, passes: 0 };
+      const next = new Map(prev);
+      next.set(dir, {
+        total: existing.total + 1,
+        passes: existing.passes + (grade === 4 || grade === 5 ? 1 : 0),
+      });
+      return next;
+    });
     // Track new / mastered transitions for the daily share card. Uses
     // `isMastered` against the current mastery threshold.
     if (wasNew && nextState.firstSeen !== null) {
@@ -1742,6 +1869,7 @@ export function ReviewSession() {
     setCards(undoSnapshot.cards);
     setSessionGrades(undoSnapshot.sessionGrades);
     setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
+    setSessionDirectionGrades(undoSnapshot.sessionDirectionGrades);
     setNewCardsThisSession(undoSnapshot.newCardsThisSession);
     setMasteredThisSession(undoSnapshot.masteredThisSession);
     setLearningQueue(undoSnapshot.learningQueue);
@@ -1785,7 +1913,12 @@ export function ReviewSession() {
         {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
         <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
         <div className="flex w-full max-w-xl flex-col gap-2">
-          <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
+          <ScopeControl
+            scope={scope}
+            onChange={handleScopeChange}
+            alternateFormsEnabled={alternateFormsEnabled}
+            incompleteChainSpeciesIds={incompleteChains}
+          />
         </div>
         <QueueStateBadge state={effectiveCard.state} />
         {revealed ? (
@@ -1890,7 +2023,12 @@ export function ReviewSession() {
         {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
         {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
         <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
-        <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
+        <ScopeControl
+          scope={scope}
+          onChange={handleScopeChange}
+          alternateFormsEnabled={alternateFormsEnabled}
+          incompleteChainSpeciesIds={incompleteChains}
+        />
         <QueueStateBadge state={effectiveCard.state} />
         <SpritePicker
           key={`${effectiveCard.id}-${cardPresentationCount}`}
@@ -1944,7 +2082,12 @@ export function ReviewSession() {
       {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
       {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
       <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
-      <ScopeControl scope={scope} onChange={handleScopeChange} alternateFormsEnabled={alternateFormsEnabled} />
+      <ScopeControl
+        scope={scope}
+        onChange={handleScopeChange}
+        alternateFormsEnabled={alternateFormsEnabled}
+        incompleteChainSpeciesIds={incompleteChains}
+      />
       <QueueStateBadge state={effectiveCard.state} />
       {effectiveCard.cardType === "evolution" ? (
         <EvolutionCard

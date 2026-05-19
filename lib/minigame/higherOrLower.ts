@@ -4,6 +4,7 @@ import {
   EMPTY_SCOPE,
   seedPokemonIsEligible,
   type PracticeScope,
+  type ScopeMatchContext,
 } from "@/lib/review/scope";
 
 export type StatKey =
@@ -109,14 +110,21 @@ export function scoreGuess(
  *   1. Master alternate-forms toggle (`alternateFormsEnabled`).
  *   2. Gens / types / presets scope (`scope`).
  *
- * Both parameters default to permissive values so existing callers and tests
- * that do not yet pass them see the previous behaviour (all seen Pokémon included).
+ * `context` carries runtime data for progress-dependent presets (the
+ * "Incomplete evolution chains" preset, #995). Passing it keeps the minigame
+ * pool consistent with the practice session's scope filter; omitting it makes
+ * an `incomplete-chains` scope match nothing here.
+ *
+ * `alternateFormsEnabled`, `scope`, and `context` default to permissive values
+ * so existing callers and tests that do not pass them see the previous
+ * behaviour (all seen Pokémon included).
  */
 export function getSeenPokemon(
   cards: ReviewableCard[],
   seedPokemon: readonly SeedPokemon[],
   alternateFormsEnabled: boolean = true,
   scope: PracticeScope = EMPTY_SCOPE,
+  context: ScopeMatchContext = {},
 ): SeedPokemon[] {
   const seenIds = new Set<number>();
 
@@ -137,6 +145,6 @@ export function getSeenPokemon(
   }
 
   return seedPokemon.filter(
-    (p) => seenIds.has(p.id) && seedPokemonIsEligible(p, scope, alternateFormsEnabled),
+    (p) => seenIds.has(p.id) && seedPokemonIsEligible(p, scope, alternateFormsEnabled, context),
   );
 }
