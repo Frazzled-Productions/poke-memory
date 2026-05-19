@@ -333,18 +333,38 @@ function paintDisc(
   ctx.font = `800 ${numFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "center";
-  // Place baseline slightly below disc centre (line-height ≈ 0.86 of font size).
-  const numBaselineY = cy + numFontSize * 0.12;
+
+  // Measure the actual cap height via canvas metrics. actualBoundingBoxAscent
+  // is the distance from the alphabetic baseline to the top of the rendered
+  // glyph bounding box, which closely approximates the cap height of digit
+  // glyphs. When the context stub or platform does not implement extended
+  // TextMetrics, fall back to a calibrated ratio: cap height ~ 0.72 * em for
+  // the system sans-serif stack across all three font-size bands.
+  const numMetrics = ctx.measureText(heroNumber);
+  const capHeight =
+    numMetrics.actualBoundingBoxAscent > 0
+      ? numMetrics.actualBoundingBoxAscent
+      : numFontSize * 0.72;
+
+  // Gap between the alphabetic baseline and the label top edge.
+  // Scales across the three bands: 208->20.8 px, 160->16 px, 140->14 px.
+  const labelGap = Math.max(12, numFontSize * 0.1);
+
+  // Label font size (px) - constant across all bands.
+  const labelFontSize = 23;
+
+  // Centre the combined block (cap height + gap + label height) on cy.
+  //   blockTop    = cy - blockHeight / 2
+  //   numBaseline = blockTop + capHeight   (alphabetic baseline)
+  const blockHeight = capHeight + labelGap + labelFontSize;
+  const numBaselineY = cy - blockHeight / 2 + capHeight;
   ctx.fillText(heroNumber, cx, numBaselineY);
 
   // --- Label below the number ---
   ctx.fillStyle = "rgba(255,255,255,0.62)";
-  ctx.font = `600 23px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  ctx.font = `600 ${labelFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   ctx.textBaseline = "top";
   ctx.textAlign = "center";
-  // Gap scales across three discrete font-size bands: 208 → 20.8 px, 160 → 16 px,
-  // 140 → 14 px. The Math.max floor of 12 px is never reached at any band.
-  const labelGap = Math.max(12, numFontSize * 0.1);
   ctx.fillText(heroLabel, cx, numBaselineY + labelGap);
 }
 
