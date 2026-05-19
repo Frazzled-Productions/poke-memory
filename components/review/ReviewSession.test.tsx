@@ -2598,3 +2598,153 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
     vi.useRealTimers();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts (#1060)
+// ---------------------------------------------------------------------------
+
+describe("Keyboard shortcuts (#1060)", () => {
+  // Helper: fire a keydown event on document (bubbles up to window listeners).
+  function pressKey(key: string, extras?: Partial<KeyboardEventInit>) {
+    fireEvent.keyDown(document, { key, bubbles: true, ...extras });
+  }
+
+  it("Space reveals the card when no text input is focused", async () => {
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    pressKey(" ");
+
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: /grade your answer/i })).toBeInTheDocument();
+    });
+  });
+
+  it("Enter reveals the card when no text input is focused", async () => {
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    pressKey("Enter");
+
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: /grade your answer/i })).toBeInTheDocument();
+    });
+  });
+
+  it("grade key 1 (Again) is ignored before reveal", async () => {
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    pressKey("1");
+
+    // Grade buttons must not appear.
+    expect(screen.queryByRole("group", { name: /grade your answer/i })).not.toBeInTheDocument();
+    // Reveal button is still present.
+    expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+  });
+
+  it("grade key 1 (Again) fires after reveal", async () => {
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    // Reveal via Space.
+    pressKey(" ");
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: /grade your answer/i })).toBeInTheDocument();
+    });
+
+    // Press 1 — Again grades the card.
+    pressKey("1");
+
+    await waitFor(() => {
+      // Again re-queues the card in learning; Reveal reappears.
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+  });
+
+  it("grade key 5 (Easy) fires after reveal and completes the session", async () => {
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    pressKey(" ");
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: /grade your answer/i })).toBeInTheDocument();
+    });
+
+    // Grade Easy (5) — for a brand-new card Easy graduates immediately with no
+    // learning step, so the session completes after the only card is graded.
+    pressKey("5");
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+  });
+
+  it("Space is ignored while an <input> element is focused", async () => {
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    // Inject a text input and focus it (simulates a search or settings field).
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+
+    pressKey(" ");
+
+    // Grade group must NOT appear because isTextInputFocused() returns true.
+    expect(screen.queryByRole("group", { name: /grade your answer/i })).not.toBeInTheDocument();
+
+    document.body.removeChild(input);
+  });
+
+  it("? key opens the keyboard shortcuts overlay", async () => {
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    pressKey("?");
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    });
+  });
+
+  it("? key opens overlay before card is revealed", async () => {
+    // The overlay must be accessible at any point in the review cycle, not only
+    // after the card has been flipped (regression guard for the fix in #1069).
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+    // Card is NOT yet revealed.
+    expect(screen.queryByRole("group", { name: /grade your answer/i })).not.toBeInTheDocument();
+
+    pressKey("?");
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    });
+  });
+
+  it("Escape closes the keyboard shortcuts overlay", async () => {
+    render(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    pressKey("?");
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    });
+
+    pressKey("Escape");
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /keyboard shortcuts/i })).not.toBeInTheDocument();
+    });
+  });
+});

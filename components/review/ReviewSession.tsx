@@ -10,7 +10,7 @@ import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites"
 import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { QueueStateBadge } from "@/components/review/QueueStateBadge";
-import { GradeButtons } from "@/components/review/GradeButtons";
+import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/GradeButtons";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
@@ -540,6 +540,11 @@ export function ReviewSession() {
   // Not persisted — resets on every page load by design.
   const [extendedReview, setExtendedReview] = useState(false);
 
+  // Keyboard shortcuts overlay — opened by the `?` key or the `?` hint button
+  // on the GradeButtons panel. Controlled here so the keydown handler can open
+  // it without going through a ref or event bus.
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+
   // Fact shown after card reveal — randomised on each reveal.
   const [currentFact, setCurrentFact] = useState<PokemonFact | null>(null);
 
@@ -656,6 +661,15 @@ export function ReviewSession() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
+  // Stable refs to the latest handleReveal / handleGrade so the keyboard
+  // keydown effect never captures stale closures. handleReveal and handleGrade
+  // are function-declarations (hoisted), so they can be referenced here even
+  // though they appear lower in the file. The refs are updated synchronously
+  // every render — no effect needed.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const handleRevealRef = useRef<() => Promise<void>>(handleReveal);
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const handleGradeRef = useRef<(grade: Grade) => Promise<void>>(handleGrade);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
   const { user, supabase } = useAuth();
   const { anyFlagOn: superuserGuarded, flags: superuserFlags } = useSuperuser();
@@ -1041,6 +1055,84 @@ export function ReviewSession() {
     // stable — the dep is needed so the persist call sees the real timezone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undoSnapshot, grading, limits, timezone]);
+
+  // Update stable callback refs every render so the keyboard handler below
+  // always dispatches to the latest handleReveal / handleGrade without needing
+  // to re-register the listener on every render.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  handleRevealRef.current = handleReveal;
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  handleGradeRef.current = handleGrade;
+
+  // Space/Enter → reveal; 1/2/4/5 → grade; ? → open shortcut overlay.
+  // Deps: only the state values used as guards inside the handler (`revealed`,
+  // `grading`, `revealing`). handleReveal / handleGrade are accessed via stable
+  // refs (updated every render above) so adding them here would cause a new
+  // listener registration on every render without any benefit.
+  useEffect(() => {
+    function isTextInputFocused(): boolean {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = (el as HTMLElement).tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return true;
+      if ((el as HTMLElement).isContentEditable) return true;
+      return false;
+    }
+
+    function onKey(e: KeyboardEvent) {
+      // Never fire while a text field is focused (superuser chord, sign-in
+      // fields, search boxes, etc.).
+      if (isTextInputFocused()) return;
+
+      // Escape closes the shortcut overlay.
+      if (e.key === "Escape") {
+        setShowKeyboardShortcuts(false);
+        return;
+      }
+
+      // ? opens the shortcut overlay (Shift+/ on US-ANSI). Guard against
+      // modifier combos that use ? (e.g. Shift+? still fires "?" as e.key).
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowKeyboardShortcuts(true);
+        return;
+      }
+
+      // Space / Enter → reveal the current card (only when not yet revealed).
+      if ((e.key === " " || e.key === "Enter") && !revealed && !revealing) {
+        // Prevent the default scroll-on-space behaviour.
+        e.preventDefault();
+        void handleRevealRef.current();
+        return;
+      }
+
+      // 1/2/4/5 → grade Again/Hard/Good/Easy. Only active after reveal and
+      // while not mid-grade. Also accept 3 as an alias for 4 (Good) to support
+      // the common 1/2/3/4 muscle memory from other SRS apps.
+      if (revealed && !grading) {
+        const GRADE_MAP: Record<string, Grade> = {
+          "1": 1,
+          "2": 2,
+          "3": 4,
+          "4": 4,
+          "5": 5,
+        };
+        const grade = GRADE_MAP[e.key];
+        if (grade !== undefined) {
+          e.preventDefault();
+          void handleGradeRef.current(grade);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // handleReveal / handleGrade are accessed via stable refs (updated every
+    // render above) so they do not belong in deps. Only the state values used
+    // as guards inside the handler — `revealed`, `grading`, `revealing` — need
+    // to be listed so the listener is re-registered when those values change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealed, grading, revealing]);
 
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
@@ -1961,6 +2053,9 @@ export function ReviewSession() {
               onGrade={handleGrade}
               disabled={grading}
               previews={gradePreviewsOrNull ?? undefined}
+              showShortcuts={showKeyboardShortcuts}
+              onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+              onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
             />
           </>
         ) : (
@@ -1972,6 +2067,15 @@ export function ReviewSession() {
           >
             Reveal
           </button>
+        )}
+
+        {/* Keyboard shortcuts overlay — rendered outside the revealed/unrevealed
+            conditional so pressing `?` works at any point in the review cycle,
+            including before the card has been flipped. */}
+        {showKeyboardShortcuts && (
+          <KeyboardShortcutsOverlay
+            onClose={() => setShowKeyboardShortcuts(false)}
+          />
         )}
 
         {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
@@ -2140,6 +2244,9 @@ export function ReviewSession() {
             onGrade={handleGrade}
             disabled={grading}
             previews={gradePreviewsOrNull ?? undefined}
+            showShortcuts={showKeyboardShortcuts}
+            onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+            onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
           />
         </>
       ) : (
@@ -2151,6 +2258,14 @@ export function ReviewSession() {
         >
           Reveal
         </button>
+      )}
+
+      {/* Keyboard shortcuts overlay — rendered outside the revealed/unrevealed
+          conditional so pressing `?` works at any point in the review cycle. */}
+      {showKeyboardShortcuts && (
+        <KeyboardShortcutsOverlay
+          onClose={() => setShowKeyboardShortcuts(false)}
+        />
       )}
 
       {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
