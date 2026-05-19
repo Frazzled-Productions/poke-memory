@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCardClass } from "@/lib/review/useCardClass";
+import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { getPokemonFacts } from "@/lib/pokemon/facts";
@@ -205,6 +206,11 @@ export function PokemonDetailDisclosure({
   const isLocked = cardClass === "locked";
   const isMasteredCard = cardClass === "mastered";
   const isLearning = cardClass === "learning";
+  // Always called (hooks must not be conditional). Only rendered when
+  // pretendAllMastered is off — the flag fakes mastery state without altering
+  // the SRS schedule, so showing schedule info alongside faked-mastery UI
+  // would be misleading.
+  const nextReview = useNextReviewDate(id);
 
   const facts = getPokemonFacts(pokemon);
   const stages = buildStages(evolutionChain);
@@ -288,6 +294,17 @@ export function PokemonDetailDisclosure({
           </div>
         )}
       </div>
+
+      {!isLocked &&
+        !flags.pretendAllMastered &&
+        nextReview.status !== "pending" &&
+        nextReview.status !== "not-started" && (
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            {nextReview.status === "due-today"
+              ? "Due today"
+              : `Next review: in ${nextReview.days} ${nextReview.days === 1 ? "day" : "days"}`}
+          </p>
+        )}
 
       {isLocked ? (
         <p className="mt-8 text-sm text-zinc-400 dark:text-zinc-500 text-center">
