@@ -583,7 +583,7 @@ test.describe("Pokédex detail — next review date (#992)", () => {
 
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
-    await expect(page.getByText("Bulbasaur")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
 
     // The review-date line should appear with "Due today" for an overdue card.
     await expect(page.getByText("Due today")).toBeVisible();
@@ -624,7 +624,7 @@ test.describe("Pokédex detail — next review date (#992)", () => {
 
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
-    await expect(page.getByText("Bulbasaur")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
 
     // The review-date line should appear with "Next review: in N days" for a future card.
     await expect(page.getByText(/Next review: in \d+ days?/)).toBeVisible();
