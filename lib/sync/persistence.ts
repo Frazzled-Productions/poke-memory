@@ -1,6 +1,8 @@
 import type { ReviewableCard } from "@/lib/review/session";
+import { KEY_SYNC_STATUS, KEY_PENDING_GRADE_QUEUE } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 
-export const STORAGE_KEY = "poke-memory:sync-status:v1";
+export const STORAGE_KEY = KEY_SYNC_STATUS;
 /**
  * localStorage key for the persisted pending-grade queue (#893).
  *
@@ -13,7 +15,7 @@ export const STORAGE_KEY = "poke-memory:sync-status:v1";
  * client/userId in `usePerGradeSync` causes the queue to be cleared rather
  * than persisted, ensuring a QA session never leaves fake state behind.
  */
-export const PENDING_QUEUE_KEY = "poke-memory:pending-grade-queue:v1";
+export const PENDING_QUEUE_KEY = KEY_PENDING_GRADE_QUEUE;
 
 export type SyncStatus = {
   lastPushAt: string | null;
@@ -40,25 +42,22 @@ const ZERO: SyncStatus = {
 };
 
 export function loadSyncStatus(): SyncStatus {
-  if (typeof window === "undefined") return ZERO;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return ZERO;
-    const parsed = JSON.parse(raw) as unknown;
-    if (typeof parsed !== "object" || parsed === null) return ZERO;
-    const obj = parsed as Record<string, unknown>;
-    return {
-      lastPushAt: typeof obj.lastPushAt === "string" ? obj.lastPushAt : null,
-      lastPushFailed: typeof obj.lastPushFailed === "boolean" ? obj.lastPushFailed : false,
-      lastPushAttemptAt: typeof obj.lastPushAttemptAt === "string" ? obj.lastPushAttemptAt : null,
-      failedCardCount: Number.isInteger(obj.failedCardCount) && (obj.failedCardCount as number) >= 0 ? obj.failedCardCount as number : null,
-      lastPullAt: typeof obj.lastPullAt === "string" ? obj.lastPullAt : null,
-      lastSettingsPullAt: typeof obj.lastSettingsPullAt === "string" ? obj.lastSettingsPullAt : null,
-      lastSeenResetAt: typeof obj.lastSeenResetAt === "string" ? obj.lastSeenResetAt : null,
-    };
-  } catch {
-    return ZERO;
-  }
+  return readLocalStorage(STORAGE_KEY, parseSyncStatus, ZERO);
+}
+
+function parseSyncStatus(raw: string): SyncStatus {
+  const parsed = JSON.parse(raw) as unknown;
+  if (typeof parsed !== "object" || parsed === null) return ZERO;
+  const obj = parsed as Record<string, unknown>;
+  return {
+    lastPushAt: typeof obj.lastPushAt === "string" ? obj.lastPushAt : null,
+    lastPushFailed: typeof obj.lastPushFailed === "boolean" ? obj.lastPushFailed : false,
+    lastPushAttemptAt: typeof obj.lastPushAttemptAt === "string" ? obj.lastPushAttemptAt : null,
+    failedCardCount: Number.isInteger(obj.failedCardCount) && (obj.failedCardCount as number) >= 0 ? obj.failedCardCount as number : null,
+    lastPullAt: typeof obj.lastPullAt === "string" ? obj.lastPullAt : null,
+    lastSettingsPullAt: typeof obj.lastSettingsPullAt === "string" ? obj.lastSettingsPullAt : null,
+    lastSeenResetAt: typeof obj.lastSeenResetAt === "string" ? obj.lastSeenResetAt : null,
+  };
 }
 
 /**
@@ -143,36 +142,33 @@ export function saveSyncStatus(status: SyncStatus): void {
  * rejecting the whole array — partial corruption is better than total loss.
  */
 export function loadPendingQueue(): ReviewableCard[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(PENDING_QUEUE_KEY);
-    if (raw === null) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    // Keep only entries that look like ReviewableCard. Validate the minimum
-    // fields needed to push a card via pushSingleCard: `id` (dedup key),
-    // `cardType` and `subjectKey` (the DB primary key alongside user_id), and
-    // `state` (the FSRS payload). Entries missing any of these are dropped
-    // rather than rejecting the whole array — partial corruption is better
-    // than total loss. A full schema validation is intentionally omitted;
-    // the data was written by this app so the risk is malformed storage,
-    // not adversarial input.
-    return parsed.filter(
-      (item): item is ReviewableCard =>
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        "cardType" in item &&
-        typeof (item as Record<string, unknown>).cardType === "string" &&
-        "subjectKey" in item &&
-        typeof (item as Record<string, unknown>).subjectKey === "string" &&
-        "state" in item &&
-        typeof (item as Record<string, unknown>).state === "object" &&
-        (item as Record<string, unknown>).state !== null,
-    );
-  } catch {
-    return [];
-  }
+  return readLocalStorage(PENDING_QUEUE_KEY, parsePendingQueue, []);
+}
+
+function parsePendingQueue(raw: string): ReviewableCard[] {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) return [];
+  // Keep only entries that look like ReviewableCard. Validate the minimum
+  // fields needed to push a card via pushSingleCard: `id` (dedup key),
+  // `cardType` and `subjectKey` (the DB primary key alongside user_id), and
+  // `state` (the FSRS payload). Entries missing any of these are dropped
+  // rather than rejecting the whole array — partial corruption is better
+  // than total loss. A full schema validation is intentionally omitted;
+  // the data was written by this app so the risk is malformed storage,
+  // not adversarial input.
+  return parsed.filter(
+    (item): item is ReviewableCard =>
+      typeof item === "object" &&
+      item !== null &&
+      "id" in item &&
+      "cardType" in item &&
+      typeof (item as Record<string, unknown>).cardType === "string" &&
+      "subjectKey" in item &&
+      typeof (item as Record<string, unknown>).subjectKey === "string" &&
+      "state" in item &&
+      typeof (item as Record<string, unknown>).state === "object" &&
+      (item as Record<string, unknown>).state !== null,
+  );
 }
 
 /**
