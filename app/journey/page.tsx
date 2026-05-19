@@ -525,6 +525,14 @@ export default function JourneyPage() {
         return out;
       })();
 
+  // Mastered species IDs for the proximity hint in BadgeGallery.
+  // When forceAllMastered is on, every badge is earned and no hint is needed
+  // (BadgeGallery skips the hint when forceAllMastered is true).
+  const masteredIds: ReadonlySet<number> | undefined =
+    cards !== null && masteryRepetitions !== null
+      ? masteredSpeciesIds(cards, masteryRepetitions, flags.pretendAllMastered)
+      : undefined;
+
   const records: Records | null =
     nameCards !== null && masteryRepetitions !== null
       ? computeRecords(
@@ -608,6 +616,7 @@ export default function JourneyPage() {
             <BadgeGallery
               earnedBadges={badgesToShow}
               forceAllMastered={flags.pretendAllMastered}
+              masteredSpeciesIds={masteredIds}
             />
 
             {/* Streak */}

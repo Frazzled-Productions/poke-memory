@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { BadgeGallery } from "./BadgeGallery";
 import type { BadgeDefinition } from "@/lib/badges/catalog";
 
-// Minimal stub badges so the test is independent of the real catalog size.
+// Minimal stub badges so the accordion tests are independent of the real catalog size.
 const BOULDER: BadgeDefinition = {
   id: "boulder-badge",
   name: "Boulder Badge",
@@ -19,6 +19,92 @@ const CASCADE: BadgeDefinition = {
   lockedHint: "A Cerulean gym leader favours the sea…",
   criterion: { kind: "all-mastered", speciesIds: [120, 121] },
 };
+
+describe("BadgeGallery proximity hint", () => {
+  it("renders no hint when masteredSpeciesIds is not provided", () => {
+    render(<BadgeGallery earnedBadges={[]} />);
+    expect(screen.queryByTestId("next-badge-hint")).not.toBeInTheDocument();
+  });
+
+  it("renders no hint when forceAllMastered is true", () => {
+    render(
+      <BadgeGallery
+        earnedBadges={[]}
+        forceAllMastered
+        masteredSpeciesIds={new Set()}
+      />,
+    );
+    expect(screen.queryByTestId("next-badge-hint")).not.toBeInTheDocument();
+  });
+
+  it("shows the hint with the nearest unearned badge", () => {
+    // Boulder Badge requires species 74 and 95. Mastering 74 leaves 1 remaining,
+    // which is fewer than any other unearned badge — so Boulder Badge is the
+    // nearest target.
+    render(
+      <BadgeGallery
+        earnedBadges={[]}
+        masteredSpeciesIds={new Set([74])}
+      />,
+    );
+    const hint = screen.getByTestId("next-badge-hint");
+    expect(hint).toBeInTheDocument();
+    expect(hint).toHaveTextContent("Next badge:");
+    expect(hint).toHaveTextContent("Boulder Badge");
+    expect(hint).toHaveTextContent("1 more Pokémon to master");
+  });
+
+  it("uses singular phrasing for 1 remaining", () => {
+    // Master species 74 — Boulder Badge needs only 95 still remaining.
+    render(
+      <BadgeGallery
+        earnedBadges={[]}
+        masteredSpeciesIds={new Set([74])}
+      />,
+    );
+    expect(screen.getByTestId("next-badge-hint")).toHaveTextContent(
+      "1 more Pokémon to master",
+    );
+  });
+
+  it("uses plural phrasing for 2+ remaining", () => {
+    // Empty mastered set — Boulder Badge needs 2 species, which is the minimum
+    // across all real-catalog badges with size 2.
+    render(
+      <BadgeGallery
+        earnedBadges={[]}
+        masteredSpeciesIds={new Set()}
+      />,
+    );
+    expect(screen.getByTestId("next-badge-hint")).toHaveTextContent(
+      "2 more Pokémon to master",
+    );
+  });
+
+  it("skips badges with 0 remaining (about to be awarded by the badge check)", () => {
+    // Boulder Badge has both species mastered but is not in earnedBadges yet.
+    // findNextBadge skips 0-remaining badges, so the hint must not show Boulder Badge.
+    render(
+      <BadgeGallery
+        earnedBadges={[]}
+        masteredSpeciesIds={new Set([74, 95])}
+      />,
+    );
+    const hint = screen.getByTestId("next-badge-hint");
+    expect(hint).not.toHaveTextContent("Boulder Badge");
+  });
+
+  it("renders no hint when forceAllMastered suppresses it even with a non-empty mastered set", () => {
+    render(
+      <BadgeGallery
+        earnedBadges={[]}
+        forceAllMastered
+        masteredSpeciesIds={new Set([1, 2, 3])}
+      />,
+    );
+    expect(screen.queryByTestId("next-badge-hint")).not.toBeInTheDocument();
+  });
+});
 
 describe("BadgeGallery accordion", () => {
   it("renders the section heading", () => {
