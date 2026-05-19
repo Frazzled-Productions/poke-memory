@@ -155,7 +155,7 @@ function GenerationSection({
         </span>
       </h2>
       <ul
-        className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8"
+        className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10"
         role="list"
         aria-label={`${name} Pokémon`}
       >
@@ -181,7 +181,7 @@ export function LoadingSkeleton() {
       {GEN_RANGES.map((range) => (
         <div key={range.gen} className="flex flex-col gap-3">
           <div className="h-4 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
             {Array.from({ length: Math.min(range.last - range.first + 1, 16) }).map(
               (_, i) => (
                 <div
