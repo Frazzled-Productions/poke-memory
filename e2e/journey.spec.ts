@@ -381,14 +381,22 @@ test.describe("Journey page — milestone share card", () => {
 });
 
 test.describe("Journey page — next badge proximity hint", () => {
-  test("hint is absent on a fresh guest session (no mastered Pokémon)", async ({
+  test("hint is present on a fresh guest session and targets the nearest badge", async ({
     page,
   }) => {
+    // On a fresh session there are zero mastered Pokémon. Every badge is
+    // unearned; findNextBadge picks the one with the fewest required species.
+    // All gym badges need 2 species; Boulder Badge is first in catalog order
+    // so it wins the tie and appears as the hint target.
     await page.goto("/journey");
     await expect(
       page.getByRole("heading", { level: 2, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("next-badge-hint")).toHaveCount(0);
+    const hint = page.getByTestId("next-badge-hint");
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText("Next badge:");
+    await expect(hint).toContainText("Boulder Badge");
+    await expect(hint).toContainText("2 more Pokémon to master");
   });
 
   test("hint renders and shows the nearest badge when some Pokémon are mastered", async ({
