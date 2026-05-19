@@ -29,6 +29,13 @@ name: Auto Deep Audit
 # follow-up issues not yet filed) recoverable: a re-run sees the marker, drops
 # the finished axes, and resumes the rest. The in-prompt "Step A" check stays
 # as defence-in-depth for a comment that lands during the run.
+#
+# A manual workflow_dispatch run bypasses idempotency entirely — with OR
+# without an `axis` input — and re-runs every selected axis even if a report
+# for the current month already exists. Only the scheduled cron is guarded
+# against duplicates. Re-running manually in a month that already has reports
+# may therefore post second report comments and file duplicate follow-up
+# issues — that is intended.
 
 on:
   schedule:
@@ -105,8 +112,20 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           MONTH_KEY: ${{ steps.rotation.outputs.month_key }}
           AXES: ${{ steps.rotation.outputs.axes }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
+
+          # A manual workflow_dispatch run bypasses idempotency entirely: keep
+          # every selected axis (whether the normal rotation or a single forced
+          # axis) and skip the marker-based axis-dropping below.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual run (workflow_dispatch) — bypassing idempotency pre-flight; running all selected axes."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "remaining_axes=${AXES}" >> "$GITHUB_OUTPUT"
+            echo "Axes to run this invocation: ${AXES:-<none>}"
+            exit 0
+          fi
 
           # Per-axis umbrella issue. Keep in sync with the axis table in the
           # Claude prompt below.
@@ -154,6 +173,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           MONTH_KEY: ${{ steps.rotation.outputs.month_key }}
           AXES: ${{ steps.idempotency.outputs.remaining_axes }}
+          EVENT_NAME: ${{ github.event_name }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -165,9 +185,12 @@ jobs:
             The axes to run this cycle are: **${{ steps.idempotency.outputs.remaining_axes }}**
             (a space-separated subset of: code-quality test-coverage workflow subagent).
 
-            A shell-level pre-flight guard has already dropped any axis whose
-            `${{ steps.rotation.outputs.month_key }}` report comment already
-            exists — so every axis listed here genuinely needs running.
+            On a scheduled run, a shell-level pre-flight guard has already
+            dropped any axis whose `${{ steps.rotation.outputs.month_key }}`
+            report comment already exists — so every axis listed here
+            genuinely needs running. On a manual `workflow_dispatch` run the
+            pre-flight is deliberately bypassed and every selected axis is
+            re-run regardless of existing reports (see Step A).
 
             Run each listed axis **sequentially** (one at a time, never in
             parallel — stay within rate limits). For each axis follow the
@@ -202,11 +225,19 @@ jobs:
 
             ### Step A — Idempotency check (defence-in-depth)
 
-            The shell-level pre-flight guard is the **primary** idempotency
-            mechanism — it already dropped any axis with a current-month
-            report comment, so the axis list above is pre-filtered. This
-            in-prompt check is a secondary safety net for the case where a
-            report comment lands *during* this run.
+            **First, check the run type.** If the `EVENT_NAME` environment
+            variable is `workflow_dispatch`, this is a deliberate manual
+            re-run: **skip Step A entirely** — do NOT check for an existing
+            marker, and do NOT skip any axis. Run every listed axis in full
+            even if a current-month report already exists, then go straight to
+            Step B. Apply the rest of Step A only when `EVENT_NAME` is not
+            `workflow_dispatch` (i.e. a scheduled run).
+
+            On a scheduled run, the shell-level pre-flight guard is the
+            **primary** idempotency mechanism — it already dropped any axis
+            with a current-month report comment, so the axis list above is
+            pre-filtered. This in-prompt check is a secondary safety net for
+            the case where a report comment lands *during* this run.
 
             The dated comment marker is `<!-- auto-deep-audit:<axis>:${{ steps.rotation.outputs.month_key }} -->`
             (e.g. `<!-- auto-deep-audit:code-quality:${{ steps.rotation.outputs.month_key }} -->`).
