@@ -230,6 +230,55 @@ describe("cardMatchesScope — evolution cards — combined axes", () => {
   });
 });
 
+// ─── incomplete-chains preset (#995) ─────────────────────────────────────────
+//
+// The preset depends on the user's progress, so a non-static `ScopeMatchContext`
+// supplies the incomplete-chain species ids. With no context (or an empty set)
+// the preset matches nothing; with a populated set it matches exactly those ids.
+
+describe("cardMatchesScope — incomplete-chains preset (#995)", () => {
+  const scope = { gens: [], types: [], presets: ["incomplete-chains" as const] };
+
+  it("matches a name card whose species is in the incomplete-chain set", () => {
+    const ctx = { incompleteChainSpeciesIds: new Set([1, 2, 3]) };
+    expect(cardMatchesScope(nameCard(1), scope, ctx)).toBe(true);
+  });
+
+  it("excludes a name card whose species is not in the set", () => {
+    const ctx = { incompleteChainSpeciesIds: new Set([1, 2, 3]) };
+    expect(cardMatchesScope(nameCard(50), scope, ctx)).toBe(false);
+  });
+
+  it("matches nothing when no context is supplied", () => {
+    expect(cardMatchesScope(nameCard(1), scope)).toBe(false);
+  });
+
+  it("matches nothing when the context set is empty", () => {
+    const ctx = { incompleteChainSpeciesIds: new Set<number>() };
+    expect(cardMatchesScope(nameCard(1), scope, ctx)).toBe(false);
+  });
+
+  it("anchors an evolution card on its pre-evo species id", () => {
+    // Bulbasaur (1) → Ivysaur (2). The card is "about" Bulbasaur, so the
+    // pre-evo id is what the incomplete-chain set is checked against.
+    const ctx = { incompleteChainSpeciesIds: new Set([1]) };
+    const card = evoCard(1500001, 1, 2);
+    expect(cardMatchesScope(card, scope, ctx)).toBe(true);
+  });
+
+  it("OR's with other axes: a Gen-I card passes gens:[1] even if not in the set", () => {
+    const ctx = { incompleteChainSpeciesIds: new Set<number>() };
+    const orScope = { gens: [1], types: [], presets: ["incomplete-chains" as const] };
+    expect(cardMatchesScope(nameCard(1), orScope, ctx)).toBe(true);
+  });
+
+  it("cardIsEligible honours the preset via the context argument", () => {
+    const ctx = { incompleteChainSpeciesIds: new Set([4]) };
+    expect(cardIsEligible(nameCard(4, ["fire"]), scope, true, ctx)).toBe(true);
+    expect(cardIsEligible(nameCard(9, ["water"]), scope, true, ctx)).toBe(false);
+  });
+});
+
 describe("isScopeEmpty", () => {
   it("returns true for the canonical empty scope", () => {
     expect(isScopeEmpty(EMPTY_SCOPE)).toBe(true);
@@ -254,6 +303,11 @@ describe("scopeLabel", () => {
     expect(
       scopeLabel({ gens: [1, 3, 9], types: [], presets: [] }),
     ).toBe("Gen I, III, IX");
+  });
+  it("labels the incomplete-chains preset (#995)", () => {
+    expect(
+      scopeLabel({ gens: [], types: [], presets: ["incomplete-chains"] }),
+    ).toBe("Incomplete chains");
   });
 });
 
@@ -388,6 +442,18 @@ describe("countMatchingSpecies", () => {
 
   it("returns 0 when nothing matches", () => {
     expect(countMatchingSpecies(SEED, { gens: [9], types: ["dragon"], presets: [] })).toBe(0);
+  });
+
+  it("counts only incomplete-chain species when the preset is active (#995)", () => {
+    const scope = { gens: [], types: [], presets: ["incomplete-chains" as const] };
+    // Bulbasaur (1) and Charmander (4) are in incomplete chains; the rest aren't.
+    const ctx = { incompleteChainSpeciesIds: new Set([1, 4]) };
+    expect(countMatchingSpecies(SEED, scope, true, ctx)).toBe(2);
+  });
+
+  it("counts 0 for the incomplete-chains preset with no context (#995)", () => {
+    const scope = { gens: [], types: [], presets: ["incomplete-chains" as const] };
+    expect(countMatchingSpecies(SEED, scope, true)).toBe(0);
   });
 });
 

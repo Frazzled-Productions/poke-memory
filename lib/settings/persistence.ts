@@ -255,8 +255,8 @@ function clampRetention(v: number): number {
  *   - types: any string accepted — the UI restricts the input set; this
  *     validator just guards JSON shape so a manually-edited localStorage
  *     blob with a stray type name doesn't drop the whole payload.
- *   - presets: only the known preset literals (`"starters"`, `"legendaries"`)
- *     are kept; unknown values are silently dropped.
+ *   - presets: only the known preset literals (`"starters"`, `"legendaries"`,
+ *     `"incomplete-chains"`) are kept; unknown values are silently dropped.
  *
  * Returns `null` on malformed input so `loadSettings` can fall back to
  * the default.
@@ -285,7 +285,7 @@ function validatePracticeScope(value: unknown): PracticeScope | null {
   const presets: PracticeScopePreset[] = [];
   const seenPresets = new Set<PracticeScopePreset>();
   for (const p of v.presets) {
-    if (p !== "starters" && p !== "legendaries") continue;
+    if (p !== "starters" && p !== "legendaries" && p !== "incomplete-chains") continue;
     if (seenPresets.has(p)) continue;
     seenPresets.add(p);
     presets.push(p);
