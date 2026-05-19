@@ -6,7 +6,7 @@ import { MobileNavSlot } from "@/components/MobileNavSlot";
 
 export function Nav() {
   return (
-    <header className="border-b border-theme-secondary bg-theme-primary">
+    <header className="border-b border-theme-secondary bg-theme-primary pt-[env(safe-area-inset-top)]">
       <nav
         className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3"
         aria-label="Main navigation"
