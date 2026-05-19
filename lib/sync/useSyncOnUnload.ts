@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
-import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
+import { loadSyncStatus, saveSyncStatus, clearPendingQueue } from "@/lib/sync/persistence";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
@@ -84,11 +84,18 @@ export function useSyncOnUnload(
           failedCardCount: queued ? 0 : unsynced.length,
           ...(queued && { lastPushAt: now }),
         });
-        // When the beacon could not be queued (offline or SW declined), register
-        // a Background Sync tag so the SW can replay the persisted queue after
-        // the app is closed and connectivity is restored. Best-effort: fire and
-        // forget, never block unload.
-        if (!queued) {
+        if (queued) {
+          // Beacon accepted by the browser — clear the IDB mirror so the SW
+          // does not re-push grades that already left this device (#1072 concern).
+          // Best-effort: fire and forget. The IDB mirror is only a safety-net for
+          // the all-tabs-closed path; the sendBeacon response is not observable,
+          // so we trust the browser's "queued" boolean here.
+          clearPendingQueue();
+        } else {
+          // When the beacon could not be queued (offline or SW declined), register
+          // a Background Sync tag so the SW can replay the persisted queue after
+          // the app is closed and connectivity is restored. Best-effort: fire and
+          // forget, never block unload.
           void registerBackgroundSync();
         }
         pushingRef.current = false;
@@ -112,9 +119,13 @@ export function useSyncOnUnload(
             failedCardCount: ok ? 0 : unsynced.length,
             ...(ok && { lastPushAt: now }),
           });
-          // Register Background Sync when the fetch failed so the SW can
-          // replay once connectivity is restored (even if the tab is then closed).
-          if (!ok) {
+          if (ok) {
+            // Successful fetch — clear the IDB mirror so the SW does not
+            // re-push grades that are already in the cloud (#1072 concern).
+            clearPendingQueue();
+          } else {
+            // Register Background Sync when the fetch failed so the SW can
+            // replay once connectivity is restored (even if the tab is then closed).
             void registerBackgroundSync();
           }
         } catch {

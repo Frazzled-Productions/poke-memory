@@ -2,6 +2,7 @@ import type { ReviewableCard } from "@/lib/review/session";
 import { KEY_SYNC_STATUS, KEY_PENDING_GRADE_QUEUE } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { idbSet, idbDelete } from "@/lib/idb/db";
+import { toCloudRows } from "@/lib/sync/cloud";
 
 export const STORAGE_KEY = KEY_SYNC_STATUS;
 /**
@@ -187,16 +188,18 @@ function parsePendingQueue(raw: string): ReviewableCard[] {
  */
 export function savePendingQueue(queue: ReviewableCard[]): void {
   if (typeof window === "undefined") return;
-  const serialised = JSON.stringify(queue);
   try {
-    localStorage.setItem(PENDING_QUEUE_KEY, serialised);
+    localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
   } catch {
     // Storage full or unavailable — best effort.
   }
   // Mirror to IDB so the service worker can read the queue on Background Sync.
+  // The IDB copy is stored as CloudRow[] (snake_case, with appTypeToDbType
+  // applied) because the SW cannot import app modules and must be able to POST
+  // the rows to /api/sync directly without any further transformation (#1072 B1).
   // Fire-and-forget: IDB writes are async; we don't await here to avoid
   // blocking the synchronous enqueue path.
-  void idbSet(PENDING_QUEUE_KEY, serialised);
+  void idbSet(PENDING_QUEUE_KEY, JSON.stringify(toCloudRows(queue)));
 }
 
 /**

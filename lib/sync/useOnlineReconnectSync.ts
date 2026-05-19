@@ -179,13 +179,25 @@ export function useOnlineReconnectSync(
 
     // Handle BACKGROUND_SYNC_REPLAY messages from the service worker (#1054).
     // When the SW's `sync` event fires while the app is open, the SW posts this
-    // message instead of pushing directly, delegating to this hook so the
-    // pull-before-push invariant is respected and no concurrent push occurs.
+    // message via a MessageChannel so it can await an explicit ACK before
+    // deciding whether to fall through to the direct-push path. This hook
+    // replies on the transferred port immediately (ACK = "I'm handling it") and
+    // then runs the pull-push sequence. If the reply races the SW timeout, the
+    // SW may push directly in parallel — the upsert is idempotent so that is
+    // safe (#1072 B3).
     function handleSwMessage(event: MessageEvent<unknown>) {
       const data = event.data as Record<string, unknown> | null;
-      if (typeof data === "object" && data !== null && data["type"] === SW_REPLAY_MESSAGE) {
-        void handleOnline();
+      if (typeof data !== "object" || data === null || data["type"] !== SW_REPLAY_MESSAGE) return;
+
+      // Send ACK on the MessageChannel port transferred by the SW, if present.
+      // The ACK tells the SW a live client is committed to running the sequence,
+      // so the SW does not fall through to its own direct-push path.
+      const port = event.ports?.[0];
+      if (port) {
+        port.postMessage({ type: "ACK" });
       }
+
+      void handleOnline();
     }
 
     window.addEventListener("online", handleOnline);
