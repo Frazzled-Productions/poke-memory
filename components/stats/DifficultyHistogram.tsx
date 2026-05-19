@@ -13,6 +13,7 @@ import {
   totalHistogramCards,
   type DifficultyBucket,
 } from "@/lib/stats/difficulty-histogram";
+import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
 
 type Props = {
   /** The nine difficulty buckets, from `computeDifficultyHistogram`. */
@@ -82,9 +83,9 @@ export function DifficultyHistogram({ buckets, mean }: Props) {
         1 (easy) to 10 (hard).
       </p>
 
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         {total === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={mutedText}>
             No cards introduced yet. Start a review session to build this up.
           </p>
         ) : (
@@ -124,7 +125,7 @@ export function DifficultyHistogram({ buckets, mean }: Props) {
                   <YAxis
                     allowDecimals={false}
                     tick={{ fontSize: 11, fill: "currentColor" }}
-                    className="text-zinc-400 dark:text-zinc-500"
+                    className={chartTickText}
                     width={28}
                     axisLine={false}
                     tickLine={false}

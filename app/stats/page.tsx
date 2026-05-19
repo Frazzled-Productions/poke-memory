@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
+import { cn } from "@/lib/utils/cn";
+import { cardPanel, colStack, mutedText } from "@/lib/utils/class-names";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats } from "@/lib/stats/derive";
@@ -117,7 +119,7 @@ function DueForecast({
       >
         Due forecast
       </h2>
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
           {total.toLocaleString('en-GB')} card{total === 1 ? "" : "s"} over the next 14
           days
@@ -178,11 +180,11 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
       </h2>
 
       {stats.struggling.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={mutedText}>
           No struggling cards yet. Keep it up!
         </p>
       ) : (
-        <ul className="flex flex-col gap-2" role="list">
+        <ul className={colStack} role="list">
           {stats.struggling.map((card) => (
             <li key={card.id}>
               <Link
@@ -327,7 +329,7 @@ function ForcePullSection({
       >
         Data
       </h2>
-      <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+      <p className={cn("mb-3", mutedText)}>
         Use this if your stats look wrong; it pulls authoritative data from the cloud.
       </p>
       <button

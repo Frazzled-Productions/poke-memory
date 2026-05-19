@@ -16,6 +16,7 @@
 import { useState, useId, useMemo, useCallback } from "react";
 import type { CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { snapshotAtPosition } from "@/lib/timeline/reconstruct";
+import { chartTickText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -241,7 +242,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
               <CountPill
                 count={totalSpecies - snapshot.mastered}
                 label="forgotten"
-                colour="text-zinc-400 dark:text-zinc-500"
+                colour={chartTickText}
               />
             </>
           ) : (

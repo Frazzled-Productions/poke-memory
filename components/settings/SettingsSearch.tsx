@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { colStack } from "@/lib/utils/class-names";
 
 type Props = {
   value: string;
@@ -19,7 +20,7 @@ export function SettingsSearch({ value, onChange, matchCount }: Props) {
   const isFiltering = value.trim().length > 0;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={colStack}>
       <label htmlFor={inputId} className="sr-only">
         Search settings
       </label>

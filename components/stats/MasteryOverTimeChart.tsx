@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
 import type { DateFormat } from "@/lib/utils/format-date";
+import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette — consistent with other Stats components (zinc/emerald/rose)
@@ -123,9 +124,9 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
         when each card crossed the mastery threshold.
       </p>
 
-      <div className="rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800">
+      <div className={cardPanel}>
         {!hasData ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={mutedText}>
             No mastered species yet. Keep reviewing and the line will start
             climbing.
           </p>
@@ -184,7 +185,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
                       dataKey="date"
                       tickFormatter={(date: string) => formatXTick(date, dateFormat)}
                       tick={{ fontSize: 10, fill: "currentColor" }}
-                      className="text-zinc-400 dark:text-zinc-500"
+                      className={chartTickText}
                       axisLine={false}
                       tickLine={false}
                       // Show a manageable number of ticks regardless of series length.
@@ -193,7 +194,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
                     <YAxis
                       allowDecimals={false}
                       tick={{ fontSize: 10, fill: "currentColor" }}
-                      className="text-zinc-400 dark:text-zinc-500"
+                      className={chartTickText}
                       width={32}
                       axisLine={false}
                       tickLine={false}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { speakName } from "@/lib/audio/tts";
+import { cardPanelPadded, colStackLg } from "@/lib/utils/class-names";
 
 type TtsControlsProps = {
   ttsVoice: string | null;
@@ -34,9 +35,9 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={colStackLg}>
       {/* Voice picker */}
-      <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+      <div className={cardPanelPadded}>
         <label
           htmlFor="tts-voice"
           className="block text-sm font-medium text-foreground"
@@ -63,7 +64,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
       </div>
 
       {/* Rate slider */}
-      <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+      <div className={cardPanelPadded}>
         <div className="flex items-center justify-between gap-2">
           <label
             htmlFor="tts-rate"
@@ -96,7 +97,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
       </div>
 
       {/* Volume slider */}
-      <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+      <div className={cardPanelPadded}>
         <label
           htmlFor="tts-volume"
           className="block text-sm font-medium text-foreground"

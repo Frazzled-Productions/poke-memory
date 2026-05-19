@@ -52,6 +52,8 @@ import {
 } from "@/lib/utils/format-date";
 import { pushRegionalPrefs } from "@/lib/sync/settings";
 import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
+import { cn } from "@/lib/utils/cn";
+import { cardPanelPadded, colStackLg, mutedText } from "@/lib/utils/class-names";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -127,7 +129,7 @@ function ResetEarnedBadgesRow() {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+    <div className={cardPanelPadded}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-foreground">
@@ -153,7 +155,7 @@ function ResetEarnedBadgesRow() {
 
 function LoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading settings">
+    <div className={colStackLg} aria-busy="true" aria-label="Loading settings">
       <SkeletonBlock className="h-20 w-full" />
       <SkeletonBlock className="h-20 w-full" />
       <SkeletonBlock className="h-20 w-full" />
@@ -796,11 +798,11 @@ export default function SettingsPage() {
                 />
 
                 {/* Mobile navigation style (#661) — bottom tab bar vs hamburger */}
-                <div id="mobile-nav-heading" className="flex flex-col gap-4">
+                <div id="mobile-nav-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Mobile navigation
                   </p>
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
@@ -848,7 +850,7 @@ export default function SettingsPage() {
                 transientOpen={isFiltering}
               >
                 {/* Scheduler knobs */}
-                <div id="scheduler-heading" className="flex flex-col gap-4">
+                <div id="scheduler-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Scheduler
                   </p>
@@ -866,7 +868,7 @@ export default function SettingsPage() {
                     g.fields.map(({ key, label, helper, min, max }) => (
                       <div
                         key={key}
-                        className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                        className={cardPanelPadded}
                       >
                         <label
                           htmlFor={key}
@@ -892,7 +894,7 @@ export default function SettingsPage() {
                     ))
                   )}
                   {/* Recall target slider */}
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <label
                       htmlFor="retentionTarget"
                       className="block text-sm font-medium text-foreground"
@@ -940,11 +942,11 @@ export default function SettingsPage() {
                 />
 
                 {/* Name cards */}
-                <div id="name-cards-heading" className="flex flex-col gap-4">
+                <div id="name-cards-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Name cards
                   </p>
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
@@ -979,11 +981,11 @@ export default function SettingsPage() {
                     </p>
                   )}
                   <div className={settings.nameCardsEnabled ? undefined : "opacity-50"}>
-                    <div className="flex flex-col gap-4">
+                    <div className={colStackLg}>
                       {NAME_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
                         <div
                           key={key}
-                          className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                          className={cardPanelPadded}
                         >
                           <label
                             htmlFor={key}
@@ -1013,11 +1015,11 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Evolution cards */}
-                <div id="evolution-cards-heading" className="flex flex-col gap-4">
+                <div id="evolution-cards-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Evolution cards
                   </p>
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
@@ -1052,11 +1054,11 @@ export default function SettingsPage() {
                     </p>
                   )}
                   <div className={settings.evolutionCardsEnabled ? undefined : "opacity-50"}>
-                    <div className="flex flex-col gap-4">
+                    <div className={colStackLg}>
                       {EVOLUTION_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
                         <div
                           key={key}
-                          className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                          className={cardPanelPadded}
                         >
                           <label
                             htmlFor={key}
@@ -1086,11 +1088,11 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Reverse-evolution cards */}
-                <div id="reverse-evolution-heading" className="flex flex-col gap-4">
+                <div id="reverse-evolution-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Reverse-evolution cards
                   </p>
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
@@ -1124,11 +1126,11 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Alternate forms (#658) */}
-                <div id="alternate-forms-heading" className="flex flex-col gap-4">
+                <div id="alternate-forms-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Alternate forms
                   </p>
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
@@ -1161,11 +1163,11 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Reverse cards */}
-                <div id="reverse-heading" className="flex flex-col gap-4">
+                <div id="reverse-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Reverse cards
                   </p>
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
@@ -1206,7 +1208,7 @@ export default function SettingsPage() {
                       {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
                         <div
                           key={key}
-                          className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+                          className={cardPanelPadded}
                         >
                           <label
                             htmlFor={key}
@@ -1264,11 +1266,11 @@ export default function SettingsPage() {
                 transientOpen={isFiltering}
               >
                 {/* Cry cards */}
-                <div id="cry-heading" className="flex flex-col gap-4">
+                <div id="cry-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Cry → name cards
                   </p>
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
@@ -1302,7 +1304,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Audio playback */}
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                <div className={cardPanelPadded}>
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">
@@ -1331,7 +1333,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
-                <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                <div className={cardPanelPadded}>
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">
@@ -1387,7 +1389,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Onboarding explainer */}
-                <div id="onboarding-heading" className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                <div id="onboarding-heading" className={cn("flex flex-col gap-3", cardPanelPadded)}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     How this works
                   </p>
@@ -1447,7 +1449,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Backup */}
-                <div id="backup-heading" className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
+                <div id="backup-heading" className={cn(cardPanelPadded, "flex flex-col gap-3")}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Backup
                   </p>
@@ -1519,13 +1521,13 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Regional */}
-                <div id="regional-heading" className="flex flex-col gap-4">
+                <div id="regional-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Regional
                   </p>
 
                   {/* Timezone picker */}
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <label
                       htmlFor="timezone"
                       className="block text-sm font-medium text-foreground"
@@ -1560,7 +1562,7 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Date format picker */}
-                  <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                  <div className={cardPanelPadded}>
                     <p className="text-sm font-medium text-foreground">
                       Date format
                     </p>
@@ -1613,7 +1615,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* About */}
-                <div id="about-heading" className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800 flex flex-col gap-3">
+                <div id="about-heading" className={cn(cardPanelPadded, "flex flex-col gap-3")}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     About
                   </p>
@@ -1706,7 +1708,7 @@ export default function SettingsPage() {
                       cloud state for signed-in users, or offers to reset local
                       state for guests.
                     </p>
-                    <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className={cn("mt-4", cardPanelPadded)}>
                       <a
                         href="/audit-themes"
                         className="block text-sm font-medium text-foreground underline-offset-4 hover:underline"
@@ -1720,7 +1722,7 @@ export default function SettingsPage() {
                       </p>
                     </div>
 
-                    <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className={cn("mt-4", cardPanelPadded)}>
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-foreground">
@@ -1753,7 +1755,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+                    <div className={cn("mt-4", cardPanelPadded)}>
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-foreground">

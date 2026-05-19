@@ -47,6 +47,7 @@ import {
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import type { CloudRow } from "@/lib/sync/cloud";
 import type { ReviewableCard } from "@/lib/review/session";
+import { mutedText } from "@/lib/utils/class-names";
 
 type ConflictData = {
   localCards: ReviewableCard[];
@@ -346,7 +347,7 @@ export default function CallbackCompletePage() {
       <div className="flex flex-1 items-center justify-center" aria-busy="true" aria-label="Checking sync status">
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-foreground" />
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Checking sync status…</p>
+          <p className={mutedText}>Checking sync status…</p>
         </div>
       </div>
     );
@@ -357,7 +358,7 @@ export default function CallbackCompletePage() {
       <div className="flex flex-1 items-center justify-center px-4">
         <div className="flex flex-col items-center gap-4 text-center max-w-sm">
           <p className="text-lg font-semibold text-foreground">Could not reach the cloud</p>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">There was a network error while checking your cloud progress.</p>
+          <p className={mutedText}>There was a network error while checking your cloud progress.</p>
           <button type="button" onClick={() => setRetryCount((c) => c + 1)} className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2">
             Retry
           </button>
@@ -371,7 +372,7 @@ export default function CallbackCompletePage() {
       <div className="flex flex-1 items-center justify-center px-4">
         <div className="flex flex-col items-center gap-4 text-center max-w-sm">
           <p className="text-lg font-semibold text-foreground">Sync upload failed</p>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{status.message}</p>
+          <p className={mutedText}>{status.message}</p>
           <button type="button" onClick={() => router.replace("/")} className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2">
             Continue
           </button>
