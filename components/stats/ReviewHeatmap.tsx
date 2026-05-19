@@ -45,11 +45,6 @@ function formatTooltipLabel(cell: HeatmapCell): string {
   return `${human} - ${cell.count} review${cell.count === 1 ? "" : "s"}`;
 }
 
-/** SVG `<title>` text for screen readers — same wording as the visible tooltip. */
-function formatSvgTitle(cell: HeatmapCell): string {
-  return formatTooltipLabel(cell);
-}
-
 type TooltipState = {
   cell: HeatmapCell;
   /** Pixel x offset from the SVG container's left edge. */
@@ -67,6 +62,24 @@ export function ReviewHeatmap({ columns }: Props) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
+  function clampTooltipPos(
+    rawX: number,
+    rawY: number,
+    containerWidth: number,
+  ): { x: number; y: number } {
+    // Keep the tooltip's centre point far enough from the container edges that
+    // the tooltip box (roughly 120 px wide, 30 px tall) stays visible.
+    // Using half the assumed max width (60 px) as a horizontal margin and the
+    // assumed height (30 px) as a vertical minimum so top-row cells don't push
+    // the tooltip above the container boundary.
+    const X_MARGIN = 60;
+    const Y_MIN = 30;
+    return {
+      x: Math.max(X_MARGIN, Math.min(rawX, containerWidth - X_MARGIN)),
+      y: Math.max(Y_MIN, rawY),
+    };
+  }
+
   function handleCellEnter(
     e: React.MouseEvent<SVGRectElement>,
     cell: HeatmapCell,
@@ -75,11 +88,12 @@ export function ReviewHeatmap({ columns }: Props) {
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
-    setTooltip({
-      cell,
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
+    const pos = clampTooltipPos(
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+      rect.width,
+    );
+    setTooltip({ cell, ...pos });
     setHoveredKey(key);
   }
 
@@ -87,9 +101,15 @@ export function ReviewHeatmap({ columns }: Props) {
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
-    setTooltip((prev) =>
-      prev ? { cell, x: e.clientX - rect.left, y: e.clientY - rect.top } : null,
-    );
+    setTooltip((prev) => {
+      if (!prev) return null;
+      const pos = clampTooltipPos(
+        e.clientX - rect.left,
+        e.clientY - rect.top,
+        rect.width,
+      );
+      return { cell, ...pos };
+    });
   }
 
   function handleCellLeave() {
@@ -146,19 +166,19 @@ export function ReviewHeatmap({ columns }: Props) {
                     onMouseEnter={(e) => handleCellEnter(e, cell, key)}
                     onMouseMove={(e) => handleCellMove(e, cell)}
                   >
-                    <title>{formatSvgTitle(cell)}</title>
+                    <title>{formatTooltipLabel(cell)}</title>
                   </rect>
                 );
               }),
             )}
           </svg>
 
-          {/* Hover tooltip — visible only on pointer devices via CSS. The `hidden`
-              class is removed via pointer-events detection at the React level: we
-              only set `tooltip` when a mouseEnter fires, which only happens on
-              pointer devices. The `[@media(hover:hover)]` wrapper ensures the
-              tooltip element itself is invisible on touch screens even if React
-              state leaks (e.g. a touch device that briefly fires mouseEnter). */}
+          {/* Hover tooltip — visible only on pointer devices. Primary guard:
+              React only sets `tooltip` state from `onMouseEnter`, which only
+              fires on pointer devices. Defence-in-depth: the
+              `[@media(hover:hover)]` class hides the element via CSS on touch
+              screens even if React state were to leak (e.g. a touch device
+              that briefly fires mouseEnter). */}
           {tooltip && (
             <div
               role="tooltip"
@@ -169,6 +189,9 @@ export function ReviewHeatmap({ columns }: Props) {
                 "rounded-md bg-zinc-900 px-2 py-1 text-xs text-white shadow-md dark:bg-zinc-100 dark:text-zinc-900",
                 // Offset above the cursor so it does not obscure cells.
                 "-translate-y-full -translate-x-1/2",
+                // CSS-level guard: hidden by default, visible only on
+                // pointer (hover-capable) devices.
+                "hidden [@media(hover:hover)]:block",
               ].join(" ")}
               style={{
                 left: tooltip.x,

@@ -258,7 +258,7 @@ export function GradeButtons({
           type="button"
           aria-label="Show keyboard shortcuts"
           onClick={handleOpen}
-          className="absolute -top-3 -right-3 hidden sm:flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-500 shadow-sm hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+          className="absolute -top-3 -right-3 hidden sm:flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-500 shadow-sm [@media(hover:hover)]:hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:bg-zinc-800 dark:text-zinc-400 [@media(hover:hover)]:dark:hover:bg-zinc-700"
         >
           ?
         </button>

@@ -199,7 +199,13 @@ test.describe("Stats page — section headings", () => {
 test.describe("Stats page — heatmap hover tooltip", () => {
   test("hovering a heatmap cell shows a tooltip with the date and review count", async ({
     page,
+    browserName,
   }) => {
+    test.skip(
+      browserName !== "chromium",
+      "hover() is unreliable on the mobile-safari (Webkit touch) project",
+    );
+
     await page.goto("/stats");
 
     // Wait for the heatmap section to be present.

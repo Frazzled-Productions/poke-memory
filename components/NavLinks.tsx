@@ -71,7 +71,7 @@ export function NavLinks() {
                   LINK_BASE,
                   isActive
                     ? "bg-theme-fg-on-primary text-theme-primary"
-                    : "text-theme-fg-on-primary opacity-75 hover:opacity-100",
+                    : "text-theme-fg-on-primary opacity-75 [@media(hover:hover)]:hover:opacity-100",
                 ].join(" ")}
               >
                 {label}
@@ -88,7 +88,7 @@ export function NavLinks() {
                 LINK_BASE,
                 pathname === "/pasture"
                   ? "bg-theme-fg-on-primary text-theme-primary"
-                  : "text-theme-fg-on-primary opacity-75 hover:opacity-100",
+                  : "text-theme-fg-on-primary opacity-75 [@media(hover:hover)]:hover:opacity-100",
               ].join(" ")}
             >
               Pasture
@@ -109,7 +109,7 @@ export function NavLinksFallback() {
         <li key={href}>
           <Link
             href={href}
-            className={`${LINK_BASE} text-theme-fg-on-primary opacity-75 hover:opacity-100`}
+            className={`${LINK_BASE} text-theme-fg-on-primary opacity-75 [@media(hover:hover)]:hover:opacity-100`}
           >
             {label}
           </Link>
