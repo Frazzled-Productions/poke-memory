@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { Grade } from "@/lib/review/session";
+import { triggerHaptic } from "@/lib/review/haptic";
+import { useHapticSwitch } from "@/components/review/useHapticSwitch";
 
 type Props = {
   onGrade: (grade: Grade) => void;
@@ -180,6 +182,12 @@ export function GradeButtons({
   // Local open/close state, used when the parent does not provide controlled props.
   const [showShortcutsLocal, setShowShortcutsLocal] = useState(false);
 
+  // iOS haptic switch — hidden off-screen element toggled to trigger a system
+  // haptic on iOS 17.4+ (Mobile Safari supports `<input switch>`). Fully inert
+  // to keyboard and assistive tech via aria-hidden + tabIndex={-1}.
+  const hapticSwitchId = useId();
+  const { labelRef: hapticLabelRef, triggerIosHaptic } = useHapticSwitch();
+
   const isControlled = showShortcutsControlled !== undefined;
   const overlayOpen = isControlled ? showShortcutsControlled : showShortcutsLocal;
 
@@ -215,7 +223,10 @@ export function GradeButtons({
               key={grade}
               type="button"
               disabled={disabled}
-              onClick={() => onGrade(grade)}
+              onClick={() => {
+                triggerHaptic(grade, triggerIosHaptic);
+                onGrade(grade);
+              }}
               className={[
                 "min-h-[44px] min-w-[80px] rounded-lg px-5 py-2",
                 "text-sm font-semibold tracking-wide",
@@ -258,6 +269,30 @@ export function GradeButtons({
           renders it at a higher level (e.g. so the `?` key works even
           before the card is revealed). */}
       {!isControlled && overlayOpen && <KeyboardShortcutsOverlay onClose={handleClose} />}
+
+      {/* Hidden iOS haptic switch — toggling this element via a label click
+          triggers a system haptic on iOS 17.4+ (Mobile Safari supports the
+          `switch` attribute on checkboxes). Fully inert to AT and keyboard:
+          aria-hidden, tabIndex={-1}, positioned off-screen. Rendered
+          unconditionally so the label ref is always valid; the trigger function
+          is only called when `supportsSwitchHaptic()` is true. */}
+      {/* `switch` is an iOS-only non-standard attribute not yet in React's type
+          definitions — cast through unknown to avoid the no-explicit-any rule. */}
+      <input
+        id={hapticSwitchId}
+        type="checkbox"
+        {...({ switch: "" } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
+        aria-hidden="true"
+        tabIndex={-1}
+        readOnly
+        className="absolute -left-[9999px] pointer-events-none opacity-0"
+      />
+      <label
+        ref={hapticLabelRef}
+        htmlFor={hapticSwitchId}
+        aria-hidden="true"
+        className="absolute -left-[9999px] pointer-events-none opacity-0"
+      />
     </>
   );
 }
