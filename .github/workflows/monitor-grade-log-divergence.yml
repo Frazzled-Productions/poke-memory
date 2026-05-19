@@ -16,7 +16,12 @@ on:
   workflow_dispatch:
     inputs:
       threshold:
-        description: "Override the divergence threshold (default 5)"
+        # The check uses an existence metric: a grade_log subject with no
+        # card_reviews row at all (#1047). Every missing subject is a real
+        # #584 signal, so the default threshold is 0 — leave this blank to
+        # alert on any non-zero count. Set it above 0 only to mute a
+        # temporarily known-noisy run.
+        description: "Override the divergence threshold (default 0)"
         required: false
         default: ""
 
