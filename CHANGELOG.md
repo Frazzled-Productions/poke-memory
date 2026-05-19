@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.7] - 2026-05-19
+
+### Fixed
+
+- Pasture biome stats no longer undercount mastered Pokémon when the mastery repetitions threshold is set below 3. The redundant `isMastered()` re-check inside `biomeStats()` (which always used the hardcoded default of 3) has been removed; the function now trusts the pre-filtered input from its callers, which already honour the user's configured threshold.
+
 ## [0.10.6] - 2026-05-19
 
 ### Added
@@ -1221,7 +1227,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.6...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.7...HEAD
+[0.10.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.7
 [0.10.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.6
 [0.10.5]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.5
 [0.10.4]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.4
