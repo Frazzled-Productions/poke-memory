@@ -50,6 +50,12 @@ export type OnboardingFlags = {
    * forms) is still disabled. `true` = user dismissed it.
    */
   cardTypesHintDismissed: boolean;
+  /**
+   * Guest storage-persistence notice (#1057). Shown to signed-out users to
+   * explain that progress is device-local and how to protect it. `true` = user
+   * dismissed it.
+   */
+  guestStorageNoticeDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -60,6 +66,7 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   installNudgeDismissed: false,
   audioHintDismissed: false,
   cardTypesHintDismissed: false,
+  guestStorageNoticeDismissed: false,
 };
 
 /**
@@ -445,6 +452,7 @@ function validateOnboarding(value: unknown): OnboardingFlags {
     installNudgeDismissed: v.installNudgeDismissed === true,
     audioHintDismissed: v.audioHintDismissed === true,
     cardTypesHintDismissed: v.cardTypesHintDismissed === true,
+    guestStorageNoticeDismissed: v.guestStorageNoticeDismissed === true,
   };
 }
 

@@ -57,6 +57,7 @@ const SAMPLE: UserSettings = {
     installNudgeDismissed: false,
     audioHintDismissed: false,
     cardTypesHintDismissed: false,
+    guestStorageNoticeDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

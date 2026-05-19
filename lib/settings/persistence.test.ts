@@ -515,6 +515,7 @@ describe('themeIntensity setting (#411)', () => {
           installNudgeDismissed: true,
           audioHintDismissed: false,
           cardTypesHintDismissed: true,
+          guestStorageNoticeDismissed: false,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -525,6 +526,7 @@ describe('themeIntensity setting (#411)', () => {
         installNudgeDismissed: true,
         audioHintDismissed: false,
         cardTypesHintDismissed: true,
+        guestStorageNoticeDismissed: false,
       });
     });
 
@@ -561,6 +563,7 @@ describe('themeIntensity setting (#411)', () => {
         installNudgeDismissed: false,
         audioHintDismissed: false,
         cardTypesHintDismissed: false,
+        guestStorageNoticeDismissed: false,
       });
     });
   });
