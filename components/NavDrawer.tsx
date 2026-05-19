@@ -20,7 +20,7 @@ const NAV_LINKS = [
 ] as const;
 
 const LINK_BASE =
-  "block rounded px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2";
+  "block rounded px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 [@media(hover:hover)]:hover:bg-white/20";
 
 /** Hamburger icon — three horizontal bars. */
 function HamburgerIcon({ className }: { className?: string }) {
@@ -220,7 +220,7 @@ export function NavDrawer() {
         aria-expanded={open}
         aria-controls="mobile-nav-drawer"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-center rounded p-2 text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 md:hidden"
+        className="flex items-center justify-center rounded p-2 text-theme-fg-on-primary transition-colors [@media(hover:hover)]:hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 md:hidden"
       >
         {open ? <CloseIcon /> : <HamburgerIcon />}
       </button>
@@ -264,7 +264,7 @@ export function NavDrawer() {
             type="button"
             aria-label="Close navigation menu"
             onClick={close}
-            className="flex items-center justify-center rounded p-2 text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+            className="flex items-center justify-center rounded p-2 text-theme-fg-on-primary transition-colors [@media(hover:hover)]:hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
           >
             <CloseIcon />
           </button>
@@ -286,7 +286,7 @@ export function NavDrawer() {
                       LINK_BASE,
                       isActive
                         ? "bg-theme-fg-on-primary text-theme-primary"
-                        : "text-theme-fg-on-primary opacity-75 hover:opacity-100",
+                        : "text-theme-fg-on-primary opacity-75 [@media(hover:hover)]:hover:opacity-100",
                     ].join(" ")}
                   >
                     {label}

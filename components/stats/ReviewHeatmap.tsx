@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import type { HeatmapCell } from "@/lib/stats/heatmap";
 import { intensityBucket } from "@/lib/stats/heatmap";
 import { cardPanel } from "@/lib/utils/class-names";
@@ -22,7 +23,16 @@ const INTENSITY_FILLS = [
   "fill-emerald-600 dark:fill-emerald-300", // 4
 ] as const;
 
-function formatTooltip(cell: HeatmapCell): string {
+/** Hover highlight stroke classes, matching the intensity bucket colour. */
+const INTENSITY_HOVER_STROKES = [
+  "stroke-zinc-400 dark:stroke-zinc-500",       // 0
+  "stroke-emerald-400 dark:stroke-emerald-700", // 1
+  "stroke-emerald-500 dark:stroke-emerald-600", // 2
+  "stroke-emerald-600 dark:stroke-emerald-400", // 3
+  "stroke-emerald-700 dark:stroke-emerald-200", // 4
+] as const;
+
+function formatTooltipLabel(cell: HeatmapCell): string {
   // en-GB locale gives English month/weekday names on all browser locales.
   const d = new Date(cell.date + "T00:00:00Z");
   const human = d.toLocaleDateString("en-GB", {
@@ -32,13 +42,80 @@ function formatTooltip(cell: HeatmapCell): string {
     year: "numeric",
     timeZone: "UTC",
   });
-  return `${human} · ${cell.count} review${cell.count === 1 ? "" : "s"}`;
+  return `${human} - ${cell.count} review${cell.count === 1 ? "" : "s"}`;
 }
+
+type TooltipState = {
+  cell: HeatmapCell;
+  /** Pixel x offset from the SVG container's left edge. */
+  x: number;
+  /** Pixel y offset from the SVG container's top edge. */
+  y: number;
+};
 
 export function ReviewHeatmap({ columns }: Props) {
   const width = COLS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
   const height = ROWS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
   const total = columns.flat().reduce((s, c) => s + c.count, 0);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  function clampTooltipPos(
+    rawX: number,
+    rawY: number,
+    containerWidth: number,
+  ): { x: number; y: number } {
+    // Keep the tooltip's centre point far enough from the container edges that
+    // the tooltip box (roughly 120 px wide, 30 px tall) stays visible.
+    // Using half the assumed max width (60 px) as a horizontal margin and the
+    // assumed height (30 px) as a vertical minimum so top-row cells don't push
+    // the tooltip above the container boundary.
+    const X_MARGIN = 60;
+    const Y_MIN = 30;
+    return {
+      x: Math.max(X_MARGIN, Math.min(rawX, containerWidth - X_MARGIN)),
+      y: Math.max(Y_MIN, rawY),
+    };
+  }
+
+  function handleCellEnter(
+    e: React.MouseEvent<SVGRectElement>,
+    cell: HeatmapCell,
+    key: string,
+  ) {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const pos = clampTooltipPos(
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+      rect.width,
+    );
+    setTooltip({ cell, ...pos });
+    setHoveredKey(key);
+  }
+
+  function handleCellMove(e: React.MouseEvent<SVGRectElement>, cell: HeatmapCell) {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    setTooltip((prev) => {
+      if (!prev) return null;
+      const pos = clampTooltipPos(
+        e.clientX - rect.left,
+        e.clientY - rect.top,
+        rect.width,
+      );
+      return { cell, ...pos };
+    });
+  }
+
+  function handleCellLeave() {
+    setTooltip(null);
+    setHoveredKey(null);
+  }
 
   return (
     <section aria-labelledby="heatmap-heading">
@@ -52,31 +129,79 @@ export function ReviewHeatmap({ columns }: Props) {
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
           {total.toLocaleString('en-GB')} review{total === 1 ? "" : "s"} in the last year
         </p>
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="xMidYMid meet"
-          className="block h-auto w-full"
-          style={{ maxWidth: width }}
-          role="img"
-          aria-label={`Review activity heatmap for the last 365 days, ${total} total reviews`}
-        >
-          {columns.map((col, x) =>
-            col.map((cell, y) => (
-              <rect
-                key={`${x}-${y}`}
-                x={x * (CELL_SIZE + CELL_GAP)}
-                y={y * (CELL_SIZE + CELL_GAP)}
-                width={CELL_SIZE}
-                height={CELL_SIZE}
-                rx={2}
-                ry={2}
-                className={INTENSITY_FILLS[intensityBucket(cell.count)]}
-              >
-                <title>{formatTooltip(cell)}</title>
-              </rect>
-            )),
+        {/* relative container so the tooltip can be absolutely positioned. */}
+        <div ref={containerRef} className="relative">
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            preserveAspectRatio="xMidYMid meet"
+            className="block h-auto w-full"
+            style={{ maxWidth: width }}
+            role="img"
+            aria-label={`Review activity heatmap for the last 365 days, ${total} total reviews`}
+            onMouseLeave={handleCellLeave}
+          >
+            {columns.map((col, x) =>
+              col.map((cell, y) => {
+                const key = `${x}-${y}`;
+                const bucket = intensityBucket(cell.count);
+                const isHovered = hoveredKey === key;
+                return (
+                  <rect
+                    key={key}
+                    x={x * (CELL_SIZE + CELL_GAP)}
+                    y={y * (CELL_SIZE + CELL_GAP)}
+                    width={CELL_SIZE}
+                    height={CELL_SIZE}
+                    rx={2}
+                    ry={2}
+                    className={[
+                      INTENSITY_FILLS[bucket],
+                      // Pointer cursor and highlight ring on hover — scoped to
+                      // pointer devices so touch screens are unaffected.
+                      "[@media(hover:hover)]:cursor-pointer",
+                      isHovered
+                        ? `${INTENSITY_HOVER_STROKES[bucket]} stroke-[1.5]`
+                        : "stroke-none",
+                    ].join(" ")}
+                    onMouseEnter={(e) => handleCellEnter(e, cell, key)}
+                    onMouseMove={(e) => handleCellMove(e, cell)}
+                  >
+                    <title>{formatTooltipLabel(cell)}</title>
+                  </rect>
+                );
+              }),
+            )}
+          </svg>
+
+          {/* Hover tooltip — visible only on pointer devices. Primary guard:
+              React only sets `tooltip` state from `onMouseEnter`, which only
+              fires on pointer devices. Defence-in-depth: the
+              `[@media(hover:hover)]` class hides the element via CSS on touch
+              screens even if React state were to leak (e.g. a touch device
+              that briefly fires mouseEnter). */}
+          {tooltip && (
+            <div
+              role="tooltip"
+              className={[
+                // Positioned relative to the SVG container.
+                "pointer-events-none absolute z-10",
+                // Visual styling.
+                "rounded-md bg-zinc-900 px-2 py-1 text-xs text-white shadow-md dark:bg-zinc-100 dark:text-zinc-900",
+                // Offset above the cursor so it does not obscure cells.
+                "-translate-y-full -translate-x-1/2",
+                // CSS-level guard: hidden by default, visible only on
+                // pointer (hover-capable) devices.
+                "hidden [@media(hover:hover)]:block",
+              ].join(" ")}
+              style={{
+                left: tooltip.x,
+                top: tooltip.y - 8,
+              }}
+            >
+              {formatTooltipLabel(tooltip.cell)}
+            </div>
           )}
-        </svg>
+        </div>
         <div className="mt-3 flex items-center gap-2 text-[10px] text-zinc-500 dark:text-zinc-400">
           <span>Less</span>
           {INTENSITY_FILLS.map((cls, i) => (

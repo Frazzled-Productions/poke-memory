@@ -34,25 +34,25 @@ const GRADE_OPTIONS: GradeOption[] = [
     grade: 1,
     label: "Again",
     className:
-      "bg-red-500 text-white hover:bg-red-600 focus-visible:ring-red-400",
+      "bg-red-500 text-white [@media(hover:hover)]:hover:bg-red-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-red-400",
   },
   {
     grade: 2,
     label: "Hard",
     className:
-      "bg-amber-500 text-white hover:bg-amber-600 focus-visible:ring-amber-400",
+      "bg-amber-500 text-white [@media(hover:hover)]:hover:bg-amber-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-amber-400",
   },
   {
     grade: 4,
     label: "Good",
     className:
-      "bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-400",
+      "bg-emerald-600 text-white [@media(hover:hover)]:hover:bg-emerald-700 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-emerald-400",
   },
   {
     grade: 5,
     label: "Easy",
     className:
-      "bg-sky-500 text-white hover:bg-sky-600 focus-visible:ring-sky-400",
+      "bg-sky-500 text-white [@media(hover:hover)]:hover:bg-sky-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-sky-400",
   },
 ];
 
@@ -258,7 +258,7 @@ export function GradeButtons({
           type="button"
           aria-label="Show keyboard shortcuts"
           onClick={handleOpen}
-          className="absolute -top-3 -right-3 hidden sm:flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-500 shadow-sm hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+          className="absolute -top-3 -right-3 hidden sm:flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-500 shadow-sm [@media(hover:hover)]:hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:bg-zinc-800 dark:text-zinc-400 [@media(hover:hover)]:dark:hover:bg-zinc-700"
         >
           ?
         </button>
