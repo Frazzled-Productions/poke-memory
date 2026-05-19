@@ -42,6 +42,74 @@ export const metadata: Metadata = {
   appleWebApp: {
     title: "Poké Memory",
     statusBarStyle: "black-translucent",
+    startupImage: [
+      // iPhone 16 Pro Max  (430 × 932 logical, 3×)
+      {
+        url: "/splash/iphone16promax-portrait.png",
+        media:
+          "(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone16promax-landscape.png",
+        media:
+          "(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone 16 Pro / 15 Pro / 14 Pro  (402 × 874 logical, 3×)
+      {
+        url: "/splash/iphone16pro-portrait.png",
+        media:
+          "(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone16pro-landscape.png",
+        media:
+          "(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone 16 Plus / 15 Plus / 14 Plus  (430 × 932 logical, 3×)
+      {
+        url: "/splash/iphone16plus-portrait.png",
+        media:
+          "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone16plus-landscape.png",
+        media:
+          "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone 16 / 15 / 14  (393 × 852 logical, 3×)
+      {
+        url: "/splash/iphone16-portrait.png",
+        media:
+          "(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone16-landscape.png",
+        media:
+          "(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone 13 mini / 12 mini  (375 × 812 logical, 3×)
+      {
+        url: "/splash/iphone13mini-portrait.png",
+        media:
+          "(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphone13mini-landscape.png",
+        media:
+          "(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
+      },
+      // iPhone SE (3rd gen) / SE (2nd gen) / iPhone 8  (375 × 667 logical, 2×)
+      {
+        url: "/splash/iphoneSE-portrait.png",
+        media:
+          "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)",
+      },
+      {
+        url: "/splash/iphoneSE-landscape.png",
+        media:
+          "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)",
+      },
+    ],
   },
   openGraph: {
     title: "Poké Memory",
