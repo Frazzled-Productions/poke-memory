@@ -13,7 +13,10 @@ name: Auto Code-Quality Suggest
 #
 # Idempotency: skips silently when a digest issue for the current ISO week
 # already exists (open or closed), or when nothing crosses the relevance
-# threshold.
+# threshold. A manual workflow_dispatch run bypasses the duplicate-issue
+# check and always runs; only the scheduled cron is guarded against duplicates.
+# Re-running manually in a week that already has a digest may therefore
+# create a second digest issue — that is intended.
 
 on:
   schedule:
@@ -60,8 +63,14 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           WEEK_KEY: ${{ steps.week.outputs.key }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual run (workflow_dispatch) — bypassing idempotency check."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           TITLE="Weekly code-quality review — ${WEEK_KEY}"
           COUNT=$(gh issue list \
             --search "\"${TITLE}\" in:title" \
