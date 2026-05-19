@@ -1,0 +1,136 @@
+name: Visual Regression
+
+# Compares committed Playwright screenshot baselines against a fresh render of
+# the six key surfaces (Practice front/flipped, Stats, Pokédex, Pasture,
+# Journey) at a mobile and a desktop viewport, across the Chromium and WebKit
+# engines.
+#
+# Why a dedicated workflow rather than a leg of ci.yml's e2e matrix:
+# baselines are pixel-exact and platform-sensitive. They are generated AND
+# compared inside the SAME pinned mcr.microsoft.com/playwright Docker image so
+# Linux font anti-aliasing is deterministic. macOS-generated baselines would
+# fail here (AGENTS.md → "Screenshots"). The job tag MUST track the
+# @playwright/test version resolved in package-lock.json.
+#
+# Trigger: only PRs that touch rendered UI — components/**, app/**/*.tsx, or
+# global CSS. Path filtering keeps CI spend bounded, consistent with how
+# integration-tests.yml is scoped. The `visual-regression` PR label is an
+# explicit opt-in escape hatch for changes outside the path filter; manual
+# runs use workflow_dispatch.
+#
+# Not a required check: a non-matching PR simply does not run it and is not
+# blocked.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+
+concurrency:
+  group: visual-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Gate job: decides whether the visual suite should run. Runs on every PR
+  # (cheap), so the decision can combine "paths OR label" — a bare
+  # on.pull_request.paths filter cannot, because it would also filter out
+  # `labeled` events on PRs that do not touch the paths, breaking the escape
+  # hatch. Mirrors integration-tests.yml's decide job.
+  decide:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.actor != 'dependabot[bot]'
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ui:
+              - 'components/**'
+              - 'app/**/*.tsx'
+              - 'app/globals.css'
+              - 'e2e/visual.spec.ts'
+              - 'playwright.config.ts'
+              - '.github/workflows/visual-regression.yml'
+
+      - name: Decide
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PATHS_MATCH: ${{ steps.filter.outputs.ui }}
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'visual-regression') }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$PATHS_MATCH" = "true" ] || [ "$HAS_LABEL" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  visual:
+    needs: decide
+    if: needs.decide.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # Browsers + system deps are baked into the image, so there is no
+    # `playwright install --with-deps` step. The tag MUST track the
+    # @playwright/test version resolved in package-lock.json (currently
+    # 1.60.0); the image ships Node 24. Baselines committed under
+    # e2e/__screenshots__/ were generated inside this exact image, so the
+    # comparison is byte-deterministic.
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Start Next.js and run visual snapshots
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+        run: |
+          npm start &
+          echo $! > /tmp/next.pid
+          npx wait-on http://localhost:3000 --timeout 60000
+          npm run test:e2e -- --project=visual-chromium --project=visual-webkit
+
+      - name: Stop Next.js
+        if: always()
+        run: |
+          if [ -f /tmp/next.pid ]; then
+            kill "$(cat /tmp/next.pid)" 2>/dev/null || true
+          fi
+
+      # On failure the report carries the expected/actual/diff triplet so a
+      # maintainer can eyeball whether the change is an intended visual update
+      # (commit the new baselines) or a regression (fix the code).
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-report
+          path: playwright-report/
+          retention-days: 14
