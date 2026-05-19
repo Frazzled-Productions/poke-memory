@@ -24,7 +24,14 @@ export type BackupFile = {
 // Uses isBaseCardShaped from lib/review/card-shape.ts for the shared core;
 // no extra strictness is layered on top here because hydrateSession refreshes
 // the fields that isReviewCardShaped additionally validates.
-function isMinimalCardShaped(value: unknown): value is ReviewableCard {
+//
+// Returns `value is Record<string, unknown>` (not `value is ReviewableCard`)
+// because isBaseCardShaped only validates the minimal shared invariants — it
+// does not check reverse-evolution preEvoId/postEvoId, name, spriteUrl, etc.
+// Claiming ReviewableCard here would be unsound.  The outer isBackupFile
+// predicate is what narrows the whole blob to BackupFile; this helper only
+// gates the per-element array check.
+function isMinimalCardShaped(value: unknown): value is Record<string, unknown> {
   return isBaseCardShaped(value);
 }
 

@@ -22,9 +22,13 @@ export const STORAGE_KEY = KEY_REVIEW_SESSION;
 // Uses isBaseCardShaped from lib/review/card-shape.ts for the shared core,
 // then layers the extra checks on top.
 //
-// The type-predicate return type (value is ReviewableCard) means callers can
-// use this as a filter callback without needing an unsafe cast afterwards.
-function isReviewCardShaped(value: unknown): value is ReviewableCard {
+// Returns boolean (not a type predicate) because the checks here do not cover
+// every field required to soundly narrow to ReviewableCard — subjectKey,
+// flavorTexts, evolutionChain, pokemonId, and others are absent.  A
+// type-predicate return would be a lie the compiler would trust.  The single
+// authoritative cast lives in parseSession, at the point where the validated
+// + migrated array is first used as ReviewableCard[].
+function isReviewCardShaped(value: unknown): boolean {
   if (!isBaseCardShaped(value)) return false;
   // isBaseCardShaped narrows value to Record<string, unknown> and guarantees a
   // valid cardType, state.dueDate, id, and — for evolution cards — a recognised
@@ -235,12 +239,15 @@ function parseSession(raw: string): SavedSession | null {
       for (const card of parsed) {
         migrateReviewCard(card);
       }
-      // isReviewCardShaped is a type predicate, so filter narrows to ReviewableCard[]
-      // without a cast. isLegacyEvolutionCard is not a predicate (it identifies cards
-      // to *drop*), so we negate it in a predicate wrapper.
-      const filtered = parsed.filter(
-        (c): c is ReviewableCard => !isLegacyEvolutionCard(c),
-      );
+      // isReviewCardShaped validates the shape but returns boolean (not a type
+      // predicate) because it cannot soundly check every ReviewableCard field.
+      // The every() guard above confirmed all elements pass validation, and
+      // migrateReviewCard has backfilled any missing state fields, so a single
+      // localised cast here is the honest narrowing point.
+      const validated = parsed as ReviewableCard[];
+      // isLegacyEvolutionCard identifies legacy cards to drop; it is not a type
+      // predicate, so we use a plain boolean filter — no inline type assertion needed.
+      const filtered = validated.filter((c) => !isLegacyEvolutionCard(c));
       return {
         cards: filtered,
         limits: DEFAULT_LIMITS,
@@ -259,9 +266,10 @@ function parseSession(raw: string): SavedSession | null {
         for (const card of obj.cards) {
           migrateReviewCard(card);
         }
-        const filtered = obj.cards.filter(
-          (c): c is ReviewableCard => !isLegacyEvolutionCard(c),
-        );
+        // Same rationale as the array branch above: every() + migrate guarantees
+        // the shape; a single cast is the honest narrowing point.
+        const validated = obj.cards as ReviewableCard[];
+        const filtered = validated.filter((c) => !isLegacyEvolutionCard(c));
         return {
           cards: filtered,
           limits: migrateDailyLimits(obj.limits),

@@ -112,6 +112,8 @@ export function isBaseCardShaped(value: unknown): value is Record<string, unknow
 
   if (typeof v.id !== "number") return false;
   if (!isNonNullObject(v.state)) return false;
+  // TS does not narrow index-access properties (v.state) outside the if-guard
+  // expression itself, so the cast below is load-bearing — not redundant.
   if (typeof (v.state as Record<string, unknown>).dueDate !== "string") return false;
 
   if (!isKnownCardType(v.cardType)) return false;
