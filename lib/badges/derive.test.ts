@@ -32,12 +32,24 @@ function reverseCard(id: number, state: ReviewState): ReviewableCard {
 }
 
 describe("masteredSpeciesIds", () => {
+  it("returns an empty set when the cards array is empty", () => {
+    expect([...masteredSpeciesIds([], 3, false)]).toEqual([]);
+  });
+
+  it("returns an empty set when all cards are non-name directions", () => {
+    const cards: ReviewableCard[] = [
+      reverseCard(2_000_001, mkState(99, 99)),
+      reverseCard(2_000_004, mkState(99, 99)),
+    ];
+    expect([...masteredSpeciesIds(cards, 3, false)]).toEqual([]);
+  });
+
   it("returns only species whose name card meets the mastery rule", () => {
     const cards: ReviewableCard[] = [
-      nameCard(1, mkState(3, 21)), // mastered
-      nameCard(4, mkState(2, 21)), // reps below threshold
-      nameCard(7, mkState(3, 20)), // interval below threshold
-      nameCard(25, mkState(5, 60)), // mastered
+      nameCard(1, mkState(3, 21)), // mastered — exactly at both thresholds
+      nameCard(4, mkState(2, 21)), // reps one below threshold (N-1)
+      nameCard(7, mkState(3, 20)), // scheduledDays one below threshold (N-1)
+      nameCard(25, mkState(5, 60)), // mastered — comfortably above both
     ];
     expect([...masteredSpeciesIds(cards, 3, false)].sort((a, b) => a - b)).toEqual([1, 25]);
   });
@@ -59,6 +71,10 @@ describe("masteredSpeciesIds", () => {
       reverseCard(2_000_001, mkState(0, 0)),
     ];
     expect([...masteredSpeciesIds(cards, 3, true)].sort((a, b) => a - b)).toEqual([1, 4]);
+  });
+
+  it("returns an empty set when forceAllMastered is true but cards is empty", () => {
+    expect([...masteredSpeciesIds([], 3, true)]).toEqual([]);
   });
 
   it("respects a custom masteryRepetitions threshold", () => {
