@@ -21,16 +21,10 @@ const projectRoot = path.resolve(__dirname, '..');
 // Use the project's own sharp copy.
 const require = createRequire(import.meta.url);
 
-// Resolve sharp from the main project's node_modules (worktrees share the
-// same install via a linked node_modules or we fall back to the repo root).
+// Resolve sharp from the project's node_modules.
 function resolveSharp() {
-  const candidates = [
-    path.join(projectRoot, 'node_modules', 'sharp'),
-    '/Users/fraser/Projects/poke-memory/node_modules/sharp',
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return require(p);
-  }
+  const candidate = path.join(projectRoot, 'node_modules', 'sharp');
+  if (fs.existsSync(candidate)) return require(candidate);
   throw new Error('sharp not found — run `npm ci` in the project root first');
 }
 const sharp = resolveSharp();
@@ -51,7 +45,7 @@ const ICON_SIZE = 180;        // rendered icon diameter (matches apple-icon.tsx)
 const DEVICES = [
   // iPhone 16 Pro Max
   { label: 'iphone16promax', w: 440, h: 956, scale: 3 },
-  // iPhone 16 Pro / 15 Pro / 14 Pro
+  // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 — see iphone16 entry)
   { label: 'iphone16pro',    w: 402, h: 874, scale: 3 },
   // iPhone 16 Plus / 15 Plus / 14 Plus
   { label: 'iphone16plus',   w: 430, h: 932, scale: 3 },

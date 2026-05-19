@@ -54,7 +54,7 @@ export const metadata: Metadata = {
         media:
           "(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
       },
-      // iPhone 16 Pro / 15 Pro / 14 Pro  (402 × 874 logical, 3×)
+      // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 — see iphone16 entry)
       {
         url: "/splash/iphone16pro-portrait.png",
         media:
