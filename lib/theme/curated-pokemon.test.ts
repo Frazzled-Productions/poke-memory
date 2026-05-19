@@ -81,11 +81,19 @@ describe("BRAND_DEFAULT_COLORS", () => {
     }
   });
 
-  it("primary is the Poké-ball red (#D8334A)", () => {
-    expect(BRAND_DEFAULT_COLORS.primary).toBe("#D8334A");
+  it("primary is the Poké-ball red (#E01B2E)", () => {
+    expect(BRAND_DEFAULT_COLORS.primary).toBe("#E01B2E");
   });
 
   it("fgOnPrimary is white (for contrast on the primary colour)", () => {
     expect(BRAND_DEFAULT_COLORS.fgOnPrimary).toBe("#FFFFFF");
+  });
+
+  it("secondary is the soft pink (#FF9DA6)", () => {
+    expect(BRAND_DEFAULT_COLORS.secondary).toBe("#FF9DA6");
+  });
+
+  it("accent is the deeper red (#C2162A)", () => {
+    expect(BRAND_DEFAULT_COLORS.accent).toBe("#C2162A");
   });
 });

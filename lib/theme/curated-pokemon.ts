@@ -18,7 +18,7 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     colors: {
       primary: "#E8631A",
       secondary: "#F4A460",
-      accent: "#FFD700",
+      accent: "#36B3A6", // teal wing membrane
       fgOnPrimary: "#1A0A00",
     },
   },
@@ -28,7 +28,7 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     colors: {
       primary: "#D4A800",
       secondary: "#FFE066",
-      accent: "#B87800",
+      accent: "#E25C4C", // red cheeks
       fgOnPrimary: "#1A1200",
     },
   },
@@ -38,7 +38,7 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     colors: {
       primary: "#5A3E78",
       secondary: "#8B6EAE",
-      accent: "#E8AAFF",
+      accent: "#E23B3B", // red eyes
       fgOnPrimary: "#FFFFFF",
     },
   },
@@ -58,7 +58,7 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     colors: {
       primary: "#3D6A9E",
       secondary: "#7AAAD0",
-      accent: "#D4E8FF",
+      accent: "#E9DCB5", // cream belly/face
       fgOnPrimary: "#FFFFFF",
     },
   },
@@ -68,7 +68,7 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     colors: {
       primary: "#6848A8",
       secondary: "#A882D8",
-      accent: "#E8D0FF",
+      accent: "#4A2E7A", // deep-purple tail
       fgOnPrimary: "#FFFFFF",
     },
   },
@@ -86,10 +86,11 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     id: 282,
     name: "Gardevoir",
     colors: {
-      primary: "#A84F6C",
-      secondary: "#D48AA4",
-      accent: "#FFEEF3",
-      fgOnPrimary: "#FFFFFF",
+      primary: "#3FA98C", // green hair/arms
+      secondary: "#7FCBB5",
+      accent: "#E0556B", // red chest fin
+      // White body fails AA on this teal-green primary (2.9:1); dark fg needed.
+      fgOnPrimary: "#07251C",
     },
   },
   {
@@ -98,7 +99,7 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     colors: {
       primary: "#425E8C",
       secondary: "#6888B8",
-      accent: "#E87040",
+      accent: "#D8443C", // belly red
       fgOnPrimary: "#FFFFFF",
     },
   },
@@ -108,7 +109,7 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     colors: {
       primary: "#1E4A8C",
       secondary: "#4A7ABD",
-      accent: "#FFD700",
+      accent: "#E6D6B0", // cream chest
       fgOnPrimary: "#FFFFFF",
     },
   },
@@ -118,7 +119,7 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
     colors: {
       primary: "#3E7858",
       secondary: "#72B088",
-      accent: "#D4EDE0",
+      accent: "#EFE9DA", // cream mane
       fgOnPrimary: "#FFFFFF",
     },
   },
@@ -129,13 +130,15 @@ export const CURATED_POKEMON: readonly CuratedPokemon[] = [
  * selected any favourite. Poké-ball red with warm complementary tones —
  * gives baseline mode visible accent without being loud.
  *
- * Contrast verified against both the off-white light body (#fafafa) and the
- * deep dark body (#0f0f0f): primary and accent both exceed 4.5:1 for AA on
- * the relevant backgrounds.
+ * These reds are used as background/fill colours, not as foreground text on
+ * the page body. White fgOnPrimary achieves ≈4.8:1 on the primary, meeting
+ * WCAG AA. Do not use primary or accent as text on dark surfaces — primary
+ * (#E01B2E) scores ≈4.0:1 and accent (#C2162A) scores ≈3.1:1 against
+ * #0f0f0f, both below the 4.5:1 AA threshold.
  */
 export const BRAND_DEFAULT_COLORS: ThemeColors = {
-  primary: "#D8334A",   // Poké-ball red
-  secondary: "#F4B6C0", // soft pink
-  accent: "#B82838",    // deeper red for focus rings / progress fills
+  primary: "#E01B2E",   // Poké-ball red
+  secondary: "#FF9DA6", // soft pink
+  accent: "#C2162A",    // deeper red for focus rings / progress fills
   fgOnPrimary: "#FFFFFF",
 };

@@ -107,9 +107,9 @@ type ThemeTokens = {
 };
 
 const FALLBACK_TOKENS: ThemeTokens = {
-  primary: "#D8334A",
-  secondary: "#F4B6C0",
-  accent: "#B82838",
+  primary: "#E01B2E",
+  secondary: "#FF9DA6",
+  accent: "#C2162A",
   fgOnPrimary: "#FFFFFF",
 };
 
@@ -178,12 +178,12 @@ function makeBackgroundGradient(
  * Minimum WCAG contrast ratio required for the accent ring to be visibly
  * distinct from the near-black disc (#111113). 3:1 is the WCAG AA threshold
  * for graphical elements and large text; anything below this is effectively
- * invisible against the disc.
+ * invisible against the disc and falls back to white.
  *
- * The default Poké Ball accent #B82838 has a contrast ratio of ~2.4:1 against
- * #111113, which falls below this threshold and correctly falls back to white.
- * Bright accents (gold #FFD700 ~13:1, light blue #D4E8FF ~16:1) easily clear
- * the bar and keep their accent colour.
+ * The brand default accent #C2162A scores ≈3.1:1 and just clears the floor,
+ * rendering a coloured red ring. Dark mascot accents sit well below — e.g.
+ * Mewtwo's deep-purple #4A2E7A at ≈1.8:1 — and fall back to white. Bright
+ * accents (Umbreon gold #FFD700 at ≈13.5:1) clear the floor easily.
  */
 const RING_MIN_CONTRAST = 3;
 
