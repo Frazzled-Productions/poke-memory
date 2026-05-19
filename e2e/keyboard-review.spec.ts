@@ -6,44 +6,58 @@
  */
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import {
+  buildCompletedSession,
+  SEED_POKEMON_IDS,
+  EVOLUTION_CARD_IDS,
+} from "./helpers/completedSession";
 
-// A single name card seeded as a review-due card so it is served immediately.
-const REVIEW_DUE_CARD = {
-  id: 1,
-  name: "Bulbasaur",
-  spriteUrl: "/sprites/pokemon/1.png",
-  cardType: "name",
-  state: {
-    stability: 10,
-    difficulty: 5,
-    elapsedDays: 10,
-    scheduledDays: 10,
-    reps: 3,
-    lapses: 0,
-    fsrsState: "review",
-    dueDate: "2026-01-01",
-    lastReview: "2026-04-01",
-    firstSeen: "2026-03-01",
-    learningStep: null,
-    stepStartedAt: null,
-    hiddenSince: null,
-    seenInPasture: false,
+// Build a base session with every known card in a future-due state, so that
+// hydrateSession adds no new cards on load and the queue is empty. We then
+// override Bulbasaur (id=1) to be review-due so exactly one card appears.
+const baseSession = buildCompletedSession({
+  pokemonIds: SEED_POKEMON_IDS,
+  evolutionCardIds: EVOLUTION_CARD_IDS,
+});
+
+const SESSION_WITH_ONE_DUE_CARD = {
+  ...baseSession,
+  cards: (baseSession.cards as Array<{ id: number; [key: string]: unknown }>).map((c) =>
+    c.id === 1
+      ? {
+          ...c,
+          state: {
+            stability: 10,
+            difficulty: 5,
+            elapsedDays: 10,
+            scheduledDays: 10,
+            reps: 3,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2026-01-01",
+            lastReview: "2026-04-01",
+            firstSeen: "2026-03-01",
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        }
+      : c,
+  ),
+  limits: {
+    name: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
   },
 };
 
-const SESSION_LIMITS = {
-  name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-  evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-  reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-  cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-};
-
-// Seed a session with one review-due name card and navigate to the practice page.
+// Seed the session and navigate to the practice page. All non-Bulbasaur cards
+// are already future-due so hydrateSession finds every id in savedIds and adds
+// no new cards — the only card served is the review-due Bulbasaur.
 async function seedAndGo(page: Parameters<typeof seedSessionIdb>[0]) {
-  await seedSessionIdb(page, {
-    cards: [REVIEW_DUE_CARD],
-    limits: SESSION_LIMITS,
-  });
+  await seedSessionIdb(page, SESSION_WITH_ONE_DUE_CARD);
   await page.goto("/");
   await awaitSeedIdb(page);
 }
@@ -198,7 +212,7 @@ test.describe("Keyboard-driven review (#1060)", () => {
       timeout: 10_000,
     });
 
-    // Press ? — the overlay should appear.
+    // Press ? — the overlay should appear even before the card is revealed.
     await page.keyboard.press("?");
 
     const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });

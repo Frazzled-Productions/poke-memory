@@ -10,7 +10,7 @@ import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites"
 import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { QueueStateBadge } from "@/components/review/QueueStateBadge";
-import { GradeButtons } from "@/components/review/GradeButtons";
+import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/GradeButtons";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
@@ -661,6 +661,15 @@ export function ReviewSession() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
+  // Stable refs to the latest handleReveal / handleGrade so the keyboard
+  // keydown effect never captures stale closures. handleReveal and handleGrade
+  // are function-declarations (hoisted), so they can be referenced here even
+  // though they appear lower in the file. The refs are updated synchronously
+  // every render — no effect needed.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const handleRevealRef = useRef<() => Promise<void>>(handleReveal);
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const handleGradeRef = useRef<(grade: Grade) => Promise<void>>(handleGrade);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
   const { user, supabase } = useAuth();
   const { anyFlagOn: superuserGuarded, flags: superuserFlags } = useSuperuser();
@@ -1047,9 +1056,19 @@ export function ReviewSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undoSnapshot, grading, limits, timezone]);
 
+  // Update stable callback refs every render so the keyboard handler below
+  // always dispatches to the latest handleReveal / handleGrade without needing
+  // to re-register the listener on every render.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  handleRevealRef.current = handleReveal;
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  handleGradeRef.current = handleGrade;
+
   // Space/Enter → reveal; 1/2/4/5 → grade; ? → open shortcut overlay.
-  // The handler is re-registered whenever any of these values changes so the
-  // closure always sees the current `revealed` / `grading` / `revealing` state.
+  // Deps: only the state values used as guards inside the handler (`revealed`,
+  // `grading`, `revealing`). handleReveal / handleGrade are accessed via stable
+  // refs (updated every render above) so adding them here would cause a new
+  // listener registration on every render without any benefit.
   useEffect(() => {
     function isTextInputFocused(): boolean {
       const el = document.activeElement;
@@ -1083,7 +1102,7 @@ export function ReviewSession() {
       if ((e.key === " " || e.key === "Enter") && !revealed && !revealing) {
         // Prevent the default scroll-on-space behaviour.
         e.preventDefault();
-        void handleReveal();
+        void handleRevealRef.current();
         return;
       }
 
@@ -1101,19 +1120,17 @@ export function ReviewSession() {
         const grade = GRADE_MAP[e.key];
         if (grade !== undefined) {
           e.preventDefault();
-          void handleGrade(grade);
+          void handleGradeRef.current(grade);
         }
       }
     }
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // handleReveal and handleGrade are `async function` declarations inside the
-    // component — they re-bind on every render and are therefore not stable refs.
-    // Including them in deps would cause a new listener on every render. Instead
-    // we include only the state values that the handler branches on; the functions
-    // always close over the current state via the latest render's scope because
-    // the effect is re-registered whenever those values change.
+    // handleReveal / handleGrade are accessed via stable refs (updated every
+    // render above) so they do not belong in deps. Only the state values used
+    // as guards inside the handler — `revealed`, `grading`, `revealing` — need
+    // to be listed so the listener is re-registered when those values change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealed, grading, revealing]);
 
@@ -2052,6 +2069,15 @@ export function ReviewSession() {
           </button>
         )}
 
+        {/* Keyboard shortcuts overlay — rendered outside the revealed/unrevealed
+            conditional so pressing `?` works at any point in the review cycle,
+            including before the card has been flipped. */}
+        {showKeyboardShortcuts && (
+          <KeyboardShortcutsOverlay
+            onClose={() => setShowKeyboardShortcuts(false)}
+          />
+        )}
+
         {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}
         <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
         {undoSnapshot !== null && (
@@ -2232,6 +2258,14 @@ export function ReviewSession() {
         >
           Reveal
         </button>
+      )}
+
+      {/* Keyboard shortcuts overlay — rendered outside the revealed/unrevealed
+          conditional so pressing `?` works at any point in the review cycle. */}
+      {showKeyboardShortcuts && (
+        <KeyboardShortcutsOverlay
+          onClose={() => setShowKeyboardShortcuts(false)}
+        />
       )}
 
       {outOfScopeLearningSet.has(effectiveCard.id) && <OutOfScopeHint />}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Grade } from "@/lib/review/session";
 
 type Props = {
@@ -54,29 +54,74 @@ const GRADE_OPTIONS: GradeOption[] = [
   },
 ];
 
-// Keyboard shortcut rows shown in the help overlay.
+// Keyboard shortcut rows shown in the help overlay. Key `3` is listed alongside
+// `4` as an alias for Good, matching the common 1/2/3/4 muscle memory from other
+// SRS apps — the keydown handler in ReviewSession accepts both.
 const SHORTCUT_ROWS: { keys: string; action: string }[] = [
   { keys: "Space / Enter", action: "Reveal card" },
   { keys: "1", action: "Grade: Again" },
   { keys: "2", action: "Grade: Hard" },
-  { keys: "4", action: "Grade: Good" },
+  { keys: "3 / 4", action: "Grade: Good" },
   { keys: "5", action: "Grade: Easy" },
   { keys: "?", action: "Show this overlay" },
   { keys: "Esc", action: "Close this overlay" },
 ];
 
-function KeyboardShortcutsOverlay({ onClose }: { onClose: () => void }) {
+export function KeyboardShortcutsOverlay({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus the first focusable element inside the dialog when it opens, and
+  // restore focus to the trigger when it closes.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const firstFocusable = dialog.querySelector<HTMLElement>(
+      'button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    firstFocusable?.focus();
+  }, []);
+
+  // Focus trap: keep Tab cycles inside the dialog while it is open.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   return (
-    // Backdrop - click-away closes. Does not trap focus.
+    // Backdrop - click-away closes.
     <div
       role="presentation"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-label="Keyboard shortcuts"
-        aria-modal="true"
         // Stop click bubbling so clicking inside the panel does not close it.
         onClick={(e) => e.stopPropagation()}
         className="relative mx-4 w-full max-w-sm rounded-2xl bg-surface-raised p-6 shadow-xl border border-[var(--theme-secondary)]"
@@ -156,43 +201,48 @@ export function GradeButtons({
 
   return (
     <>
-      <div
-        className="relative flex flex-wrap justify-center gap-3 rounded-xl bg-surface-raised p-3 shadow-sm border border-[var(--theme-secondary)]"
-        role="group"
-        aria-label="Grade your answer"
-      >
-        {GRADE_OPTIONS.map(({ grade, label, className }) => (
-          <button
-            key={grade}
-            type="button"
-            disabled={disabled}
-            onClick={() => onGrade(grade)}
-            className={[
-              "min-h-[44px] min-w-[80px] rounded-lg px-5 py-2",
-              "text-sm font-semibold tracking-wide",
-              // Always-on outline + shadow so buttons keep their edge against
-              // any mascot-tinted card backdrop.
-              "ring-1 ring-black/15 dark:ring-white/20",
-              "shadow-md",
-              "transition-all duration-150",
-              "active:scale-95",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-              className,
-            ].join(" ")}
-          >
-            <span className="block leading-tight">{label}</span>
-            {previews?.[grade] && (
-              <span className="block text-xs font-normal opacity-70 mt-0.5 leading-none">
-                {previews[grade]}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Grade buttons group — role="group" scopes the accessible name to the
+          four grade buttons only. The `?` hint button is a sibling outside this
+          group so screen readers do not announce it as part of the grading action. */}
+      <div className="relative">
+        <div
+          className="flex flex-wrap justify-center gap-3 rounded-xl bg-surface-raised p-3 shadow-sm border border-[var(--theme-secondary)]"
+          role="group"
+          aria-label="Grade your answer"
+        >
+          {GRADE_OPTIONS.map(({ grade, label, className }) => (
+            <button
+              key={grade}
+              type="button"
+              disabled={disabled}
+              onClick={() => onGrade(grade)}
+              className={[
+                "min-h-[44px] min-w-[80px] rounded-lg px-5 py-2",
+                "text-sm font-semibold tracking-wide",
+                // Always-on outline + shadow so buttons keep their edge against
+                // any mascot-tinted card backdrop.
+                "ring-1 ring-black/15 dark:ring-white/20",
+                "shadow-md",
+                "transition-all duration-150",
+                "active:scale-95",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                className,
+              ].join(" ")}
+            >
+              <span className="block leading-tight">{label}</span>
+              {previews?.[grade] && (
+                <span className="block text-xs font-normal opacity-70 mt-0.5 leading-none">
+                  {previews[grade]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
-        {/* Keyboard shortcut hint — positioned outside the grade group visually
-            but inside the wrapper div so it does not contribute to ARIA group
-            semantics via role="group". Hidden on small viewports (sm: breakpoint). */}
+        {/* Keyboard shortcut hint — a sibling of the grade group, not inside it,
+            so it is not announced as part of "Grade your answer". Positioned
+            absolutely relative to the outer wrapper. Hidden on small viewports. */}
         <button
           type="button"
           aria-label="Show keyboard shortcuts"
@@ -203,7 +253,11 @@ export function GradeButtons({
         </button>
       </div>
 
-      {overlayOpen && <KeyboardShortcutsOverlay onClose={handleClose} />}
+      {/* Render the overlay only in uncontrolled mode. When the parent
+          provides showShortcuts/onCloseShortcuts it owns the overlay and
+          renders it at a higher level (e.g. so the `?` key works even
+          before the card is revealed). */}
+      {!isControlled && overlayOpen && <KeyboardShortcutsOverlay onClose={handleClose} />}
     </>
   );
 }
