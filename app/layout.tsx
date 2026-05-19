@@ -134,6 +134,11 @@ export const viewport: Viewport = {
   colorScheme: "light dark",
   maximumScale: 1,
   userScalable: false,
+  // Required for env(safe-area-inset-*) to resolve to non-zero values on iOS.
+  // Without this, safe-area insets in BottomTabBar and MobileNavPaddingWrapper
+  // collapse to zero, and the status-bar overlay set by black-translucent has
+  // no corresponding top inset to push content clear of the Dynamic Island.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
