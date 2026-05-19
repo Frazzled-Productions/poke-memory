@@ -1,13 +1,20 @@
 name: Auto Retro Harvest
 
-# Weekly cron that harvests every `<!-- auto-retro -->` retrospective comment
-# posted by `auto-retro.yml` across closed issues, then produces two outputs:
+# Weekly cron that harvests `<!-- auto-retro -->` retrospective comments
+# posted by `auto-retro.yml` across the 100 most recent closed issues, then
+# produces two outputs:
 #
 #   1. DIGEST — regenerates `docs/retros.md` wholesale: one readable,
-#      most-recent-first surface aggregating every retro. Committed straight
-#      to `qa` by the bot App. Regenerating the whole file each run (rather
-#      than editing in place) is what makes the digest idempotent — there is
-#      no per-entry marker bookkeeping to drift.
+#      most-recent-first surface aggregating the harvested retros. Committed
+#      straight to `qa` by the bot App. Regenerating the whole file each run
+#      (rather than editing in place) is what makes the digest idempotent —
+#      there is no per-entry marker bookkeeping to drift.
+#
+#      The scan is bounded to the 100 most recent closed issues (newest
+#      first) so the per-issue comment fan-out cannot grow unbounded with
+#      repo history (#996). The digest is therefore a rolling window: once
+#      the project exceeds 100 closed-issue retros, the oldest retros drop
+#      off the file. This is an accepted trade-off for a bounded runtime.
 #
 #   2. RECURRING-PATTERN AUTO-FILE — when the SAME concrete problem recurs
 #      across >= 3 retros, files exactly ONE tracking issue for that pattern
@@ -53,7 +60,7 @@ jobs:
     name: Weekly Retro Harvest
     if: github.repository == 'fraserbrookhouse/poke-memory'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     permissions:
       contents: write       # commit docs/retros.md to qa
       issues: write         # file recurring-pattern tracking issues
@@ -148,20 +155,24 @@ jobs:
             These comments are write-once and effectively unread. Your job is
             to aggregate them and surface recurring problems.
 
-            ## Step 1 — Gather every auto-retro comment
+            ## Step 1 — Gather auto-retro comments (100 most recent closed issues)
 
-            Closed issues with retros are the source. List them and extract
-            each retro comment with its issue number, issue title, and the
-            comment's `created_at` timestamp:
+            The 100 most recent closed issues are the source. Listing more
+            than that, then fanning out a per-issue comment fetch over the
+            whole repo history, is the time sink that timed this workflow out
+            (#996), so the scan is deliberately bounded by COUNT. List the 100
+            most recent closed issues (newest first) and extract each retro
+            comment with its issue number, issue title, and the comment's
+            `created_at` timestamp:
 
             ```bash
-            # All closed issues, newest first.
-            gh issue list --state closed --limit 400 \
+            # 100 most recent closed issues, newest first.
+            gh issue list --state closed --limit 100 \
               --json number,title,closedAt --jq '.[] | "\(.number)\t\(.title)"'
             ```
 
-            For each closed issue, fetch its comments and keep only the one
-            whose body starts with `<!-- auto-retro -->`:
+            For each of those closed issues, fetch its comments and keep only
+            the one whose body starts with `<!-- auto-retro -->`:
 
             ```bash
             gh api "repos/${{ github.repository }}/issues/<N>/comments" --paginate \
@@ -169,11 +180,12 @@ jobs:
                           | {created_at, html_url, body}'
             ```
 
-            Iterating ~400 issues is acceptable. If an issue has no auto-retro
-            comment, skip it silently. Collect every retro found into a list,
-            each carrying: issue number, issue title, retro comment URL,
-            comment `created_at`, and the parsed fields (Agents used / What
-            worked / What didn't / Lesson).
+            Iterating 100 issues is the bounded budget — do not widen the
+            `--limit`. If an issue has no auto-retro comment, skip it
+            silently. Collect every retro found into a list, each carrying:
+            issue number, issue title, retro comment URL, comment
+            `created_at`, and the parsed fields (Agents used / What worked /
+            What didn't / Lesson).
 
             If you find ZERO retro comments, write nothing, file nothing, and
             exit cleanly with a note to stdout.
@@ -182,7 +194,13 @@ jobs:
 
             Regenerate the file WHOLESALE from the list gathered in Step 1 —
             do not try to edit it in place. Order entries MOST-RECENT-FIRST by
-            the retro comment's `created_at`.
+            the retro comment's `created_at`. Because Step 1 is bounded to the
+            100 most recent closed issues, the digest is a rolling window of
+            (at most) the 100 most recent retros — once the project exceeds
+            100 closed-issue retros, the oldest retros fall off the file on
+            each regeneration. That is the accepted trade-off for a bounded
+            runtime; do not try to preserve older entries by reading the
+            previous `docs/retros.md`.
 
             Write `docs/retros.md` in exactly this shape:
 
@@ -192,9 +210,10 @@ jobs:
             <!-- GENERATED FILE — do not edit by hand. -->
             <!-- Regenerated weekly by .github/workflows/auto-retro-harvest.yml. -->
 
-            Aggregates every `<!-- auto-retro -->` comment posted by
-            `auto-retro.yml` across closed issues, most recent first. Last
-            harvested ${{ steps.date.outputs.date }} — <COUNT> retros.
+            Aggregates the `<!-- auto-retro -->` comments posted by
+            `auto-retro.yml` across the 100 most recent closed issues, most
+            recent first (a rolling window). Last harvested
+            ${{ steps.date.outputs.date }} — <COUNT> retros.
 
             ---
 
