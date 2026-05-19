@@ -18,9 +18,15 @@ vi.mock("@/lib/sync/cloud", () => ({
 vi.mock("@/lib/sync/persistence", () => ({
   loadSyncStatus: vi.fn(),
   saveSyncStatus: vi.fn(),
+  clearPendingQueue: vi.fn(),
+}));
+
+vi.mock("@/lib/sync/backgroundSync", () => ({
+  registerBackgroundSync: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
+import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
@@ -273,5 +279,86 @@ describe("useSyncOnUnload — superuser write-guard (null client/userId)", () =>
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(saveSyncStatus).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Background Sync registration (#1054) ────────────────────────────────────
+//
+// When a push fails, useSyncOnUnload should register the Background Sync tag
+// so the service worker can replay the queue after the app is closed.
+
+describe("useSyncOnUnload — Background Sync registration (#1054)", () => {
+  let beacon: ReturnType<typeof vi.fn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.mocked(loadSyncStatus).mockReturnValue(ZERO_STATUS);
+    beacon = vi.fn(() => true);
+    Object.defineProperty(navigator, "sendBeacon", {
+      value: beacon,
+      configurable: true,
+      writable: true,
+    });
+    fetchSpy = vi.spyOn(global, "fetch");
+    vi.clearAllMocks();
+    vi.mocked(loadSyncStatus).mockReturnValue(ZERO_STATUS);
+    vi.mocked(registerBackgroundSync).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "sendBeacon", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    fetchSpy.mockRestore();
+    vi.clearAllMocks();
+  });
+
+  it("registers Background Sync when sendBeacon is rejected (beacon returns false)", async () => {
+    beacon.mockReturnValue(false);
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+
+    act(() => firePagehide());
+
+    // registerBackgroundSync is called asynchronously (void fire-and-forget).
+    await waitFor(() => expect(registerBackgroundSync).toHaveBeenCalledOnce());
+  });
+
+  it("does NOT register Background Sync when sendBeacon succeeds", () => {
+    beacon.mockReturnValue(true);
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+
+    act(() => firePagehide());
+
+    expect(registerBackgroundSync).not.toHaveBeenCalled();
+  });
+
+  it("registers Background Sync when fetch returns non-2xx (visibilitychange path)", async () => {
+    fetchSpy.mockResolvedValue(new Response(null, { status: 502 }));
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(3)));
+
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(registerBackgroundSync).toHaveBeenCalledOnce());
+  });
+
+  it("does NOT register Background Sync when fetch succeeds (visibilitychange path)", async () => {
+    fetchSpy.mockResolvedValue(new Response(null, { status: 200 }));
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(3)));
+
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(saveSyncStatus).toHaveBeenCalled());
+    expect(registerBackgroundSync).not.toHaveBeenCalled();
+  });
+
+  it("registers Background Sync when fetch throws (network offline)", async () => {
+    fetchSpy.mockRejectedValue(new TypeError("network down"));
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(1)));
+
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(registerBackgroundSync).toHaveBeenCalledOnce());
   });
 });
