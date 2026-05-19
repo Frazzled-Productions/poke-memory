@@ -17,7 +17,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [planner](.claude/agents/planner.md) | Designs implementation plans; surfaces unknowns before any code is written | Yes |
 | [next16-expert](.claude/agents/next16-expert.md) | Next.js 16 API, caching, routing, rendering questions | Yes |
 | [pokeapi-expert](.claude/agents/pokeapi-expert.md) | PokéAPI endpoint selection, schemas, caching strategy — low-frequency: the dataset is build-time-seeded, so invoke only when changing the seed script or adding a data category | Yes |
-| [srs-expert](.claude/agents/srs-expert.md) | Spaced-repetition algorithm design and implementation | No |
+| [srs-expert](.claude/agents/srs-expert.md) | Spaced-repetition algorithm design and scheduler-code review (data-coder implements) | No |
 | [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth + RLS + schema design for persisted user data (currently FSRS scheduling state on `card_reviews`, plus `streak_days`, `user_settings`, `grade_log`) | Yes |
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist | Yes |
 | [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling | No |
