@@ -53,7 +53,7 @@ import {
 import { pushRegionalPrefs } from "@/lib/sync/settings";
 import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 import { cn } from "@/lib/utils/cn";
-import { cardPanelPadded, colStackLg, mutedText } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStackLg } from "@/lib/utils/class-names";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -129,7 +129,7 @@ function ResetEarnedBadgesRow() {
   }
 
   return (
-    <div className={cardPanelPadded}>
+    <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-foreground">
