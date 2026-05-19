@@ -49,6 +49,10 @@ import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { SYNC_PULL_APPLIED_EVENT } from "@/lib/sync/pullAndMerge";
 import { appendGradeEntry, loadGradeLog, removeGradeEntry, todayGradeSequence } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
+import {
+  computeSessionDirectionAccuracy,
+  type SessionDirectionTally,
+} from "@/lib/stats/direction-breakdown";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 import { ShareTodayButton } from "@/components/review/ShareTodayButton";
 import { previewIntervals } from "@/lib/srs/intervalPreview";
@@ -96,6 +100,7 @@ type UndoSnapshot = {
   cards: ReviewableCard[];
   sessionGrades: Record<Grade, number>;
   sessionGradeSeq: Grade[];
+  sessionDirectionGrades: SessionDirectionTally;
   newCardsThisSession: number;
   masteredThisSession: number;
   learningQueue: LearningQueueEntry[];
@@ -278,6 +283,48 @@ function TodayPill({
 }
 
 // ---------------------------------------------------------------------------
+// Per-direction accuracy row (#994)
+// ---------------------------------------------------------------------------
+
+/**
+ * A compact inline row showing session accuracy per card direction, e.g.
+ * "Name 91% · Evo 74% · Cry 58%". Only directions that received at least one
+ * grade this session are shown. Omitted when the tally is empty (the user
+ * graded nothing, so there is nothing to show).
+ *
+ * Accuracy is defined as the share of grades that were Good (4) or Easy (5)
+ * — the same pass/fail convention used in `computeDirectionBreakdown` on the
+ * Stats page, so both surfaces are consistent.
+ */
+function DirectionAccuracyRow({ tally }: { tally: SessionDirectionTally }) {
+  const rows = computeSessionDirectionAccuracy(tally);
+  if (rows.length === 0) return null;
+
+  /** Short display label for each direction. */
+  const shortLabel: Record<string, string> = {
+    name: "Name",
+    reverse: "Reverse",
+    cry: "Cry",
+    evolution: "Evo",
+    "reverse-evolution": "Reverse evo",
+  };
+
+  const parts = rows.map((row) => {
+    const pct = Math.round((row.accuracy ?? 0) * 100);
+    return `${shortLabel[row.direction] ?? row.direction} ${pct}%`;
+  });
+
+  return (
+    <p
+      className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums"
+      aria-label={`Session accuracy by direction: ${parts.join(", ")}`}
+    >
+      {parts.join(" · ")}
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Unified end-of-session screen (#926)
 // ---------------------------------------------------------------------------
 
@@ -305,6 +352,7 @@ function EndOfSessionScreen({
   shareParts,
   dueTomorrow,
   showCardTypesHint,
+  directionGrades,
 }: {
   variant: EndOfSessionVariant;
   perType: PerTypeTodayCounts;
@@ -325,6 +373,8 @@ function EndOfSessionScreen({
    * still self-suppresses once dismissed via `OnboardingFlags`.
    */
   showCardTypesHint: boolean;
+  /** Per-direction grade tally from the current session, for the accuracy row. */
+  directionGrades: SessionDirectionTally;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
@@ -366,6 +416,7 @@ function EndOfSessionScreen({
         reverseEvolutionEnabled={reverseEvolutionEnabled}
         cryEnabled={cryEnabled}
       />
+      <DirectionAccuracyRow tally={directionGrades} />
       {shareText !== null && shareParts !== null ? (
         <ShareTodayButton parts={shareParts} text={shareText} />
       ) : null}
@@ -499,6 +550,9 @@ export function ReviewSession() {
   // Live session grade tally — resets on page navigation by design. Labelled
   // "this session" in the UI to set expectations.
   const [sessionGrades, setSessionGrades] = useState<Record<Grade, number>>({ 1: 0, 2: 0, 4: 0, 5: 0 });
+  // Per-direction grade tally for the session-end accuracy breakdown row.
+  // Only directions that received at least one grade appear in this map.
+  const [sessionDirectionGrades, setSessionDirectionGrades] = useState<SessionDirectionTally>(new Map());
   // Per-card grade history for the daily share card. Wiped on session
   // reload; not persisted (the share is a one-tap end-of-session affordance).
   const [sessionGradeSeq, setSessionGradeSeq] = useState<Grade[]>([]);
@@ -948,6 +1002,7 @@ export function ReviewSession() {
           setCards(undoSnapshot.cards);
           setSessionGrades(undoSnapshot.sessionGrades);
           setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
+          setSessionDirectionGrades(undoSnapshot.sessionDirectionGrades);
           setNewCardsThisSession(undoSnapshot.newCardsThisSession);
           setMasteredThisSession(undoSnapshot.masteredThisSession);
           setLearningQueue(undoSnapshot.learningQueue);
@@ -1374,6 +1429,7 @@ export function ReviewSession() {
           shareParts={shareParts}
           dueTomorrow={dueTomorrow}
           showCardTypesHint={!cardTypesAllOn}
+          directionGrades={sessionDirectionGrades}
         />
         {seenPokemon.length >= 2 && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />
@@ -1522,6 +1578,7 @@ export function ReviewSession() {
       cards,
       sessionGrades,
       sessionGradeSeq,
+      sessionDirectionGrades,
       newCardsThisSession,
       masteredThisSession,
       learningQueue,
@@ -1682,6 +1739,20 @@ export function ReviewSession() {
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
     setSessionGradeSeq((prev) => [...prev, grade]);
+    // Update the per-direction tally. Good (4) and Easy (5) count as passes;
+    // Again (1) and Hard (2) do not. Only directions that receive at least one
+    // grade appear in the map, so the session-end row omits directions with no
+    // history — matching the convention in computeDirectionBreakdown.
+    setSessionDirectionGrades((prev) => {
+      const dir = effectiveCard.cardType;
+      const existing = prev.get(dir) ?? { total: 0, passes: 0 };
+      const next = new Map(prev);
+      next.set(dir, {
+        total: existing.total + 1,
+        passes: existing.passes + (grade === 4 || grade === 5 ? 1 : 0),
+      });
+      return next;
+    });
     // Track new / mastered transitions for the daily share card. Uses
     // `isMastered` against the current mastery threshold.
     if (wasNew && nextState.firstSeen !== null) {
@@ -1798,6 +1869,7 @@ export function ReviewSession() {
     setCards(undoSnapshot.cards);
     setSessionGrades(undoSnapshot.sessionGrades);
     setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
+    setSessionDirectionGrades(undoSnapshot.sessionDirectionGrades);
     setNewCardsThisSession(undoSnapshot.newCardsThisSession);
     setMasteredThisSession(undoSnapshot.masteredThisSession);
     setLearningQueue(undoSnapshot.learningQueue);
