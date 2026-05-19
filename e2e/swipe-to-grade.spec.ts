@@ -2,8 +2,10 @@
  * E2E tests for swipe-to-grade gestures (#1052).
  *
  * Exercises the swipe gesture on the review card using Playwright's
- * `page.mouse` drag API. The tests run on the `mobile-safari` project to
- * verify the feature on the primary target viewport (iPhone 14).
+ * `page.mouse` drag API (pointer events under the hood — touch-event
+ * fidelity is not guaranteed at this layer). The tests run on the
+ * `mobile-safari` project to verify the feature on the primary target
+ * viewport (iPhone 14).
  */
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
@@ -60,6 +62,28 @@ async function seedAndGo(page: Parameters<typeof seedSessionIdb>[0]) {
   await awaitSeedIdb(page);
 }
 
+/** Reveal the card and return the centre coordinates of the Bulbasaur sprite. */
+async function revealAndGetCentre(page: Parameters<typeof seedSessionIdb>[0]) {
+  const revealBtn = page.getByRole("button", { name: "Reveal" });
+  await expect(revealBtn).toBeVisible({ timeout: 10_000 });
+  await revealBtn.click();
+
+  // Grade buttons should now appear.
+  await expect(page.getByRole("group", { name: "Grade your answer" })).toBeVisible();
+
+  // The sprite image is a reliable anchor — always present on a revealed name card.
+  const sprite = page.locator("img[alt='Bulbasaur']");
+  await expect(sprite).toBeVisible();
+
+  const box = await sprite.boundingBox();
+  if (!box) throw new Error("Could not find sprite bounding box");
+
+  return {
+    centerX: box.x + box.width / 2,
+    centerY: box.y + box.height / 2,
+  };
+}
+
 test.describe("Swipe-to-grade gestures (#1052)", () => {
   // Run on mobile-safari only — this is the primary mobile target. The swipe
   // logic uses pointer events which are identical across browsers; running both
@@ -69,29 +93,7 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
   test("swipe right grades as Good and advances the session", async ({ page }) => {
     await seedAndGo(page);
 
-    // Wait for and click Reveal.
-    const revealBtn = page.getByRole("button", { name: "Reveal" });
-    await expect(revealBtn).toBeVisible({ timeout: 10_000 });
-    await revealBtn.click();
-
-    // Grade buttons should now appear.
-    const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
-    await expect(gradeGroup).toBeVisible();
-
-    // Locate the swipeable card wrapper.
-    const card = page.locator("[data-testid='swipe-card']").first();
-
-    // If no test-id, find the card by its containing element. The card wrapper
-    // sits between QueueStateBadge and the grade buttons. We use the sprite
-    // image as a reliable anchor — it is always present on a revealed name card.
-    const sprite = page.locator("img[alt='Bulbasaur']");
-    await expect(sprite).toBeVisible();
-
-    const box = await sprite.boundingBox();
-    if (!box) throw new Error("Could not find sprite bounding box");
-
-    const centerX = box.x + box.width / 2;
-    const centerY = box.y + box.height / 2;
+    const { centerX, centerY } = await revealAndGetCentre(page);
 
     // Swipe right: start at the centre, move 120 px to the right.
     await page.mouse.move(centerX, centerY);
@@ -108,22 +110,7 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
   test("swipe left grades as Again and returns the Reveal button", async ({ page }) => {
     await seedAndGo(page);
 
-    const revealBtn = page.getByRole("button", { name: "Reveal" });
-    await expect(revealBtn).toBeVisible({ timeout: 10_000 });
-    await revealBtn.click();
-
-    await expect(
-      page.getByRole("group", { name: "Grade your answer" }),
-    ).toBeVisible();
-
-    const sprite = page.locator("img[alt='Bulbasaur']");
-    await expect(sprite).toBeVisible();
-
-    const box = await sprite.boundingBox();
-    if (!box) throw new Error("Could not find sprite bounding box");
-
-    const centerX = box.x + box.width / 2;
-    const centerY = box.y + box.height / 2;
+    const { centerX, centerY } = await revealAndGetCentre(page);
 
     // Swipe left: Again (1) keeps the card in the learning queue.
     await page.mouse.move(centerX, centerY);
@@ -133,6 +120,40 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
 
     // Again puts the card back into the learning queue — the Reveal button
     // will reappear for the next learning-step presentation.
+    await expect(page.getByRole("button", { name: "Reveal" })).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  test("swipe up grades as Easy and advances the session", async ({ page }) => {
+    await seedAndGo(page);
+
+    const { centerX, centerY } = await revealAndGetCentre(page);
+
+    // Swipe up: Easy (5) — move 120 px upward.
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX, centerY - 120, { steps: 10 });
+    await page.mouse.up();
+
+    // Easy (5) grades the only due card and completes the session.
+    await expect(page.getByText("All caught up!")).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  test("swipe down grades as Hard and returns the Reveal button", async ({ page }) => {
+    await seedAndGo(page);
+
+    const { centerX, centerY } = await revealAndGetCentre(page);
+
+    // Swipe down: Hard (2) — move 120 px downward.
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX, centerY + 120, { steps: 10 });
+    await page.mouse.up();
+
+    // Hard (2) keeps the card in the learning queue.
     await expect(page.getByRole("button", { name: "Reveal" })).toBeVisible({
       timeout: 10_000,
     });
@@ -159,22 +180,7 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
   test("a short drag below commit threshold does not grade the card", async ({ page }) => {
     await seedAndGo(page);
 
-    const revealBtn = page.getByRole("button", { name: "Reveal" });
-    await expect(revealBtn).toBeVisible({ timeout: 10_000 });
-    await revealBtn.click();
-
-    await expect(
-      page.getByRole("group", { name: "Grade your answer" }),
-    ).toBeVisible();
-
-    const sprite = page.locator("img[alt='Bulbasaur']");
-    await expect(sprite).toBeVisible();
-
-    const box = await sprite.boundingBox();
-    if (!box) throw new Error("Could not find sprite bounding box");
-
-    const centerX = box.x + box.width / 2;
-    const centerY = box.y + box.height / 2;
+    const { centerX, centerY } = await revealAndGetCentre(page);
 
     // Only move 30 px — well below the 80 px commit threshold.
     await page.mouse.move(centerX, centerY);

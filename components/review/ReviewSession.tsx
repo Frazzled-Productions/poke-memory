@@ -2250,7 +2250,7 @@ export function ReviewSession() {
             id={effectiveCard.id}
           />
         )}
-        <SwipeHint swipeState={swipeState} />
+        {revealed && <SwipeHint swipeState={swipeState} />}
       </div>
 
       {revealed ? (

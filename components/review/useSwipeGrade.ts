@@ -25,7 +25,6 @@ import {
   resolveSwipe,
   directionToGrade,
   clampOffset,
-  COMMIT_THRESHOLD_PX,
 } from "@/lib/review/swipeGesture";
 import type { SwipeDirection } from "@/lib/review/swipeGesture";
 
@@ -98,44 +97,88 @@ export function useSwipeGrade({
   const originRef = useRef<{ x: number; y: number } | null>(null);
   const pointerId = useRef<number | null>(null);
 
-  // Detect `prefers-reduced-motion` once at hook mount.
-  const reducedMotion =
-    typeof window !== "undefined"
-      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      : false;
+  // Snap-back timeout ref — cleared when a new gesture starts so an orphaned
+  // timeout from a previous gesture cannot clobber the next one.
+  const snapBackTidRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // `prefers-reduced-motion` — sampled reactively so a mid-session OS change
+  // is honoured. Stored in a ref (not state) so pointer handlers always see
+  // the current value without triggering re-renders or effect reruns.
+  const reducedMotionRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    reducedMotionRef.current = mql.matches;
+
+    function onMqlChange(e: MediaQueryListEvent) {
+      reducedMotionRef.current = e.matches;
+    }
+
+    mql.addEventListener("change", onMqlChange);
+    return () => {
+      mql.removeEventListener("change", onMqlChange);
+    };
+  }, []);
 
   const applyTransform = useCallback(
     (dx: number, dy: number, transition = "") => {
       const el = targetRef.current;
       if (!el) return;
-      if (reducedMotion) return; // never animate under reduced-motion
+      if (reducedMotionRef.current) return; // never animate under reduced-motion
       el.style.transform = `translate(${dx}px, ${dy}px)`;
       el.style.transition = transition;
     },
-    [targetRef, reducedMotion],
+    [targetRef],
   );
 
   const resetTransform = useCallback(
     (animate: boolean) => {
+      // Clear any pending snap-back timeout before scheduling a new one so
+      // there is never more than one live timeout clobbering the element's
+      // transition style.
+      if (snapBackTidRef.current !== null) {
+        clearTimeout(snapBackTidRef.current);
+        snapBackTidRef.current = null;
+      }
+
       const el = targetRef.current;
       if (!el) return;
       el.style.transform = "";
-      el.style.transition = animate && !reducedMotion
-        ? `transform ${SNAP_BACK_MS}ms cubic-bezier(0.34,1.56,0.64,1)`
-        : "";
+      el.style.transition =
+        animate && !reducedMotionRef.current
+          ? `transform ${SNAP_BACK_MS}ms cubic-bezier(0.34,1.56,0.64,1)`
+          : "";
       // Clear the transition property after the animation completes so it
       // does not interfere with other CSS transitions on the element.
-      if (animate && !reducedMotion) {
-        const tid = setTimeout(() => {
+      if (animate && !reducedMotionRef.current) {
+        snapBackTidRef.current = setTimeout(() => {
+          snapBackTidRef.current = null;
           if (targetRef.current) {
             targetRef.current.style.transition = "";
           }
         }, SNAP_BACK_MS);
-        return () => clearTimeout(tid);
       }
     },
-    [targetRef, reducedMotion],
+    [targetRef],
   );
+
+  // Apply / remove `touch-action: none` in response to `enabled` changes.
+  // We only suppress native scroll while the card is revealed (enabled=true)
+  // so that a user scrolling the page before tapping Reveal is unaffected.
+  useEffect(() => {
+    const el = targetRef.current;
+    if (!el) return;
+    if (enabled) {
+      el.style.touchAction = "none";
+      return () => {
+        el.style.touchAction = "";
+      };
+    }
+    // Not enabled — ensure touchAction is clear (it may have been set by a
+    // previous render cycle where enabled was true).
+    el.style.touchAction = "";
+  }, [targetRef, enabled]);
 
   useEffect(() => {
     const el = targetRef.current;
@@ -145,6 +188,16 @@ export function useSwipeGrade({
       if (!enabledRef.current || gradingRef.current) return;
       // Only respond to primary pointer (ignore multi-touch, stylus hover, etc.).
       if (!e.isPrimary) return;
+
+      // Clear any pending snap-back timeout from a previous gesture so it
+      // cannot interfere with the new one.
+      if (snapBackTidRef.current !== null) {
+        clearTimeout(snapBackTidRef.current);
+        snapBackTidRef.current = null;
+        if (targetRef.current) {
+          targetRef.current.style.transition = "";
+        }
+      }
 
       originRef.current = { x: e.clientX, y: e.clientY };
       pointerId.current = e.pointerId;
@@ -214,12 +267,6 @@ export function useSwipeGrade({
       endGesture(e, true);
     }
 
-    // `touch-action: none` is required on the element so the browser does not
-    // also initiate a scroll while we're capturing the pointer. We set it via
-    // JS so the element keeps its default value when the hook is inactive and
-    // we don't have to add a Tailwind class to the parent.
-    el.style.touchAction = "none";
-
     el.addEventListener("pointerdown", onPointerDown);
     el.addEventListener("pointermove", onPointerMove);
     el.addEventListener("pointerup", onPointerUp);
@@ -231,14 +278,15 @@ export function useSwipeGrade({
       el.removeEventListener("pointerup", onPointerUp);
       el.removeEventListener("pointercancel", onPointerCancel);
       // Restore defaults on cleanup.
-      el.style.touchAction = "";
       el.style.transform = "";
       el.style.transition = "";
     };
   }, [targetRef, applyTransform, resetTransform]);
   // `enabled` and `grading` are read via stable refs (updated every render)
-  // so they don't need to be in deps — the listener re-registers only when
-  // the element ref changes (e.g. card type switch mounts a new element).
+  // so they don't need to be in the pointer-listener deps — the listener
+  // re-registers only when the element ref changes (e.g. card type switch
+  // mounts a new element). `touch-action` is managed by the separate effect
+  // above that does list `enabled` as a dep.
 
   return { swipeState };
 }
