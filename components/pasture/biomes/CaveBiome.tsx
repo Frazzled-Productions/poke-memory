@@ -103,7 +103,7 @@ export function CaveBiome() {
       <BiomeFloor
         curvePath="M0,470 C200,450 400,478 700,460 C1000,448 1300,478 1600,458"
         fill="url(#cave-floor)"
-        strokeColor="#0a0814"
+        strokeColour="#0a0814"
         strokeOpacity={0.7}
       />
 

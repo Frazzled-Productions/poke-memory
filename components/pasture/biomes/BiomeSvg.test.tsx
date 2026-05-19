@@ -157,24 +157,24 @@ describe("BiomeFloor", () => {
         <BiomeFloor
           curvePath={curve}
           fill="url(#forest-floor)"
-          strokeColor="#2a1a08"
+          strokeColour="#2a1a08"
         />
       </svg>,
     );
     const paths = container.querySelectorAll("path");
-    expect(paths.length).toBeGreaterThanOrEqual(2);
+    expect(paths.length).toBe(2);
     const fillPath = paths[0];
     expect(fillPath.getAttribute("d")).toBe(`${curve} L1600,600 L0,600 Z`);
     expect(fillPath.getAttribute("fill")).toBe("url(#forest-floor)");
   });
 
-  it("renders an edge stroke path with the curve path only", () => {
+  it("renders an edge stroke path defaulting to curvePath when strokePath is omitted", () => {
     const { container } = render(
       <svg>
         <BiomeFloor
           curvePath={curve}
           fill="#5dba4f"
-          strokeColor="#3a8f30"
+          strokeColour="#3a8f30"
           strokeOpacity={0.7}
         />
       </svg>,
@@ -187,10 +187,31 @@ describe("BiomeFloor", () => {
     expect(strokePath.getAttribute("opacity")).toBe("0.7");
   });
 
+  it("uses the strokePath prop for the shadow edge when provided", () => {
+    const offsetCurve =
+      "M0,445 C200,425 400,453 700,437 C1000,423 1300,453 1600,433";
+    const { container } = render(
+      <svg>
+        <BiomeFloor
+          curvePath={curve}
+          strokePath={offsetCurve}
+          fill="url(#forest-floor)"
+          strokeColour="#2a1a08"
+        />
+      </svg>,
+    );
+    const paths = container.querySelectorAll("path");
+    expect(paths.length).toBe(2);
+    // Fill path must still use the original curvePath
+    expect(paths[0].getAttribute("d")).toBe(`${curve} L1600,600 L0,600 Z`);
+    // Stroke path must use the explicitly supplied offset path
+    expect(paths[1].getAttribute("d")).toBe(offsetCurve);
+  });
+
   it("uses a default strokeWidth of 3 when not specified", () => {
     const { container } = render(
       <svg>
-        <BiomeFloor curvePath={curve} fill="#5dba4f" strokeColor="#3a8f30" />
+        <BiomeFloor curvePath={curve} fill="#5dba4f" strokeColour="#3a8f30" />
       </svg>,
     );
     const paths = container.querySelectorAll("path");
@@ -201,7 +222,7 @@ describe("BiomeFloor", () => {
   it("uses a default strokeOpacity of 0.55 when not specified", () => {
     const { container } = render(
       <svg>
-        <BiomeFloor curvePath={curve} fill="#5dba4f" strokeColor="#3a8f30" />
+        <BiomeFloor curvePath={curve} fill="#5dba4f" strokeColour="#3a8f30" />
       </svg>,
     );
     const paths = container.querySelectorAll("path");

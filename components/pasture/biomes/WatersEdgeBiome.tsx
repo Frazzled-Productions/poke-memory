@@ -100,7 +100,7 @@ export function WatersEdgeBiome() {
       <BiomeFloor
         curvePath="M0,540 C200,520 400,548 700,530 C1000,516 1300,548 1600,528"
         fill="url(#we-shore)"
-        strokeColor="#7a4a22"
+        strokeColour="#7a4a22"
         strokeOpacity={0.55}
       />
 

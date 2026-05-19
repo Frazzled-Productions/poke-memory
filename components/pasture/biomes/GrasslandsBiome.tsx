@@ -93,7 +93,7 @@ export function GrasslandsBiome() {
       <BiomeFloor
         curvePath="M0,470 C200,450 400,478 700,462 C1000,448 1300,478 1600,458"
         fill="#5dba4f"
-        strokeColor="#3a8f30"
+        strokeColour="#3a8f30"
         strokeWidth={3.5}
         strokeOpacity={0.7}
       />

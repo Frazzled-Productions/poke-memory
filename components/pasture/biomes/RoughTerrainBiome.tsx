@@ -60,7 +60,7 @@ export function RoughTerrainBiome() {
       <BiomeFloor
         curvePath="M0,500 C200,488 400,510 700,495 C1000,484 1300,512 1600,490"
         fill="url(#rt-ground)"
-        strokeColor="#7a3e1c"
+        strokeColour="#7a3e1c"
         strokeOpacity={0.65}
       />
 

@@ -88,8 +88,9 @@ export function ForestBiome() {
       {/* Forest floor */}
       <BiomeFloor
         curvePath="M0,440 C200,420 400,448 700,432 C1000,418 1300,448 1600,428"
+        strokePath="M0,445 C200,425 400,453 700,437 C1000,423 1300,453 1600,433"
         fill="url(#forest-floor)"
-        strokeColor="#2a1a08"
+        strokeColour="#2a1a08"
         strokeOpacity={0.55}
       />
 

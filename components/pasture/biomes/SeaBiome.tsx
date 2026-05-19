@@ -78,7 +78,7 @@ export function SeaBiome() {
       <BiomeFloor
         curvePath="M0,510 C200,490 400,520 700,500 C1000,484 1300,520 1600,498"
         fill="url(#sea-sand)"
-        strokeColor="#a07832"
+        strokeColour="#a07832"
         strokeOpacity={0.55}
       />
 

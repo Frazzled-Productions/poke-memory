@@ -117,7 +117,7 @@ export function SanctuaryBiome() {
       <BiomeFloor
         curvePath="M0,460 C200,440 400,468 700,452 C1000,438 1300,468 1600,448"
         fill="url(#sanc-floor)"
-        strokeColor="#1a0e3a"
+        strokeColour="#1a0e3a"
         strokeOpacity={0.7}
       />
 

@@ -14,38 +14,45 @@
  *
  * Props
  * ─────
- * curvePath     — the SVG path data for the wavy edge, WITHOUT the closing
- *                 rectangle. Example:
+ * curvePath     — the SVG path data for the wavy fill edge, WITHOUT the
+ *                 closing rectangle. Example:
  *                 "M0,440 C200,420 400,448 700,432 C1000,418 1300,448 1600,428"
  *                 The fill polygon appends "L1600,600 L0,600 Z" automatically.
+ * strokePath    — optional SVG path for the shadow-edge stroke. When omitted,
+ *                 defaults to curvePath. Supply a different path when the
+ *                 shadow edge must be offset from the fill edge (e.g. the
+ *                 Forest biome strokes 5 px below its fill curve).
  * fill          — fill value for the terrain polygon (colour or url(#id)).
- * strokeColor   — colour of the 1-px shadow stroke along the top edge.
+ * strokeColour  — colour of the shadow stroke along the top edge.
  * strokeWidth   — width of the edge stroke (defaults to 3).
  * strokeOpacity — opacity of the edge stroke (defaults to 0.55).
  */
 
 interface BiomeFloorProps {
   curvePath: string;
+  strokePath?: string;
   fill: string;
-  strokeColor: string;
+  strokeColour: string;
   strokeWidth?: number;
   strokeOpacity?: number;
 }
 
 export function BiomeFloor({
   curvePath,
+  strokePath,
   fill,
-  strokeColor,
+  strokeColour,
   strokeWidth = 3,
   strokeOpacity = 0.55,
 }: BiomeFloorProps) {
   const fillPath = `${curvePath} L1600,600 L0,600 Z`;
+  const edgePath = strokePath ?? curvePath;
   return (
     <>
       <path d={fillPath} fill={fill} />
       <path
-        d={curvePath}
-        stroke={strokeColor}
+        d={edgePath}
+        stroke={strokeColour}
         strokeWidth={strokeWidth}
         fill="none"
         opacity={strokeOpacity}

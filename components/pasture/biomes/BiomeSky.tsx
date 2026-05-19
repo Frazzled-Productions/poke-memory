@@ -1,5 +1,8 @@
 /**
- * Shared full-bleed background layer used by all 10 biome backdrops.
+ * Shared full-bleed background layer used by 9 of the 10 biome backdrops.
+ * Sea is the exception: its sky occupies only the top ~100 px of the viewport
+ * (the rest is a water column), so it renders the gradient inline rather than
+ * using this component.
  *
  * Renders a vertical linearGradient into `<defs>` and a 1600×600 background
  * rect that references it. Every biome has exactly this structure — only the

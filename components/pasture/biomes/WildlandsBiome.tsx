@@ -101,7 +101,7 @@ export function WildlandsBiome() {
       <BiomeFloor
         curvePath="M0,520 C200,500 400,524 700,508 C1000,496 1300,524 1600,504"
         fill="url(#wl-foreground)"
-        strokeColor="#1a2a14"
+        strokeColour="#1a2a14"
         strokeOpacity={0.65}
       />
 
