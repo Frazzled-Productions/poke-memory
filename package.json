@@ -19,7 +19,8 @@
     "test:coverage": "vitest run --coverage",
     "coverage:diff": "git diff origin/qa...HEAD | node scripts/diff-coverage.mjs",
     "test:integration": "VITEST_INTEGRATION=1 vitest run --project integration",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=chromium --project=mobile-safari --project=desktop-webkit --project=mobile-chrome",
+    "test:visual": "playwright test --project=visual-chromium --project=visual-webkit",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

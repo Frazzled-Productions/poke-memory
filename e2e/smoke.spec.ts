@@ -5,6 +5,7 @@ import {
   EVOLUTION_CARD_IDS,
   buildCompletedSession,
 } from "./helpers/completedSession";
+import { isMobileProject } from "./helpers/navHelpers";
 
 test.describe("Navigation", () => {
   test("nav links are visible and navigate between pages", async ({
@@ -20,7 +21,7 @@ test.describe("Navigation", () => {
      * bar (aria-label "Mobile tab navigation").
      */
     function getNavLinkContainer() {
-      if (testInfo.project.name === "mobile-safari") {
+      if (isMobileProject(testInfo)) {
         return page.getByRole("navigation", { name: "Mobile tab navigation" });
       }
       return nav;

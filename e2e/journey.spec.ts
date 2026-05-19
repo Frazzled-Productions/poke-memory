@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { isMobileProject } from "./helpers/navHelpers";
 
 async function seedSuperuser(
   page: Page,
@@ -470,7 +471,7 @@ test.describe("Journey page — navigation", () => {
     page,
   }, testInfo) => {
     test.skip(
-      testInfo.project.name === "mobile-safari",
+      isMobileProject(testInfo),
       "desktop nav only — mobile uses bottom tab bar",
     );
     await page.goto("/");
@@ -486,7 +487,7 @@ test.describe("Journey page — navigation", () => {
     page,
   }, testInfo) => {
     test.skip(
-      testInfo.project.name !== "mobile-safari",
+      !isMobileProject(testInfo),
       "mobile bottom tab bar only",
     );
     await page.goto("/");

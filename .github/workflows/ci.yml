@@ -165,7 +165,13 @@ jobs:
           npm start &
           echo $! > /tmp/next.pid
           npx wait-on http://localhost:3000 --timeout 60000
-          npm run test:e2e -- --project=${{ matrix.project }}
+          # Invoke Playwright directly with only the matrix project. The
+          # `test:e2e` npm script hardcodes the four functional projects (for
+          # local macOS runs), so `npm run test:e2e -- --project=...` would be
+          # additive and each matrix leg would run every project. The matrix
+          # below must stay [chromium, mobile-safari]; the desktop-webkit and
+          # mobile-chrome projects are for local/dispatch use only.
+          npx playwright test --project=${{ matrix.project }}
       - name: Stop Next.js
         if: always() && needs.changes.outputs.e2e_relevant == 'true'
         run: |
