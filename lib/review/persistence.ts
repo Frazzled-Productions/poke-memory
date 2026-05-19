@@ -2,6 +2,7 @@ import type { ReviewableCard, DailyLimits, PerTypeLimits } from "@/lib/review/se
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { Subject } from "@/lib/cards/subjectKey";
 import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
+import { KEY_REVIEW_SESSION } from "@/lib/storage/keys";
 
 export type { DailyLimits };
 
@@ -10,7 +11,7 @@ export type SavedSession = {
   limits: DailyLimits;
 };
 
-export const STORAGE_KEY = "poke-memory:review-session:v1";
+export const STORAGE_KEY = KEY_REVIEW_SESSION;
 
 function isReviewCardShaped(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;

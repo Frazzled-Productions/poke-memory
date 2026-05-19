@@ -1,7 +1,8 @@
 import type { Grade } from "@/lib/srs/scheduler";
 import { todayInTimezone } from "@/lib/utils/format-date";
+import { KEY_DAILY_SUMMARY } from "@/lib/storage/keys";
 
-export const STORAGE_KEY = "poke-memory:daily-summary:v1";
+export const STORAGE_KEY = KEY_DAILY_SUMMARY;
 
 export type DailySummaryRecord = {
   date: string;

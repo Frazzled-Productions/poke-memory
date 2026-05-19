@@ -1,15 +1,11 @@
 import { idbDelete, MIGRATION_FLAG_KEY } from "@/lib/idb/db";
+import { KEY_REVIEW_SESSION, KEY_GRADE_LOG } from "@/lib/storage/keys";
 
-// SESSION_IDB_KEY and GRADE_LOG_IDB_KEY must be kept in sync with:
-//   lib/review/persistence.ts     (STORAGE_KEY)
-//   lib/gradelog/persistence.ts   (STORAGE_KEY)
-//   lib/idb/db.ts                 (SESSION_LS_KEY, GRADE_LOG_LS_KEY)
-// They are duplicated here because importing those modules would create a
-// dependency cycle: persistence layers also depend on the reset function
-// indirectly via shared utilities.
-// MIGRATION_FLAG_KEY is imported directly from lib/idb/db.ts — no duplication.
-const SESSION_IDB_KEY = "poke-memory:review-session:v1";
-const GRADE_LOG_IDB_KEY = "poke-memory:grade-log:v1";
+// Local aliases so the idbDelete calls below read like named store handles
+// rather than raw key strings. Both constants are sourced from the shared
+// key registry (lib/storage/keys.ts) — lib/idb/db.ts does the same.
+const SESSION_IDB_KEY = KEY_REVIEW_SESSION;
+const GRADE_LOG_IDB_KEY = KEY_GRADE_LOG;
 
 /**
  * Wipes localStorage + IDB stores for a guest reset. **Local-only** — does

@@ -9,9 +9,10 @@ import {
   parseFormCategoryFilter,
 } from "@/lib/review/scope";
 import type { DateFormat } from "@/lib/utils/format-date";
+import { KEY_SETTINGS } from "@/lib/storage/keys";
 
 // localStorage key for all user-configurable settings
-export const STORAGE_KEY = "poke-memory:settings:v1";
+export const STORAGE_KEY = KEY_SETTINGS;
 
 // Mirror of the structure stored under `favouriteTheme`. Validation of the
 // values (HEX_COLOR / known Pokémon id) happens in lib/theme/persistence.ts

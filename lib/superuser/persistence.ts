@@ -9,8 +9,10 @@
 // Flags are kept separate from "unlocked" so a user can have superuser
 // unlocked but no flags active — equivalent to a closed inspector window.
 
-export const UNLOCKED_KEY = "poke-memory:superuser";
-export const FLAGS_KEY = "poke-memory:superuser:flags:v1";
+import { KEY_SUPERUSER_UNLOCKED, KEY_SUPERUSER_FLAGS } from "@/lib/storage/keys";
+
+export const UNLOCKED_KEY = KEY_SUPERUSER_UNLOCKED;
+export const FLAGS_KEY = KEY_SUPERUSER_FLAGS;
 
 export type SuperuserFlagKey =
   | "pretendAllMastered"
