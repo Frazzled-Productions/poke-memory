@@ -28,6 +28,10 @@ export const MAX_HIDDEN_SHIFT_DAYS = 365;
  * active practice scope. Mutates each card whose state changes and
  * returns the same array for chaining.
  *
+ * The parameter is genuinely mutable: the function writes to
+ * `card.state.hiddenSince` and `card.state.dueDate` on each affected card.
+ * All callers rely on this side effect.
+ *
  * For each card with `firstSeen !== null` and `learningStep === null`:
  *   - Out-of-scope AND `hiddenSince === null` → stamp `hiddenSince = today`.
  *     (Never fires when scope is empty: `cardMatchesScope` returns true for
@@ -53,7 +57,7 @@ export const MAX_HIDDEN_SHIFT_DAYS = 365;
  * scope change keeps the data tidy.
  */
 export function reconcileHiddenState(
-  cards: readonly ReviewableCard[],
+  cards: ReviewableCard[],
   scope: PracticeScope,
   today: string,
 ): ReviewableCard[] {
@@ -80,8 +84,5 @@ export function reconcileHiddenState(
       card.state.hiddenSince = null;
     }
   }
-  // The function's contract is explicit in-place mutation. The cast away
-  // from `readonly` lets the caller chain (consistent with similar
-  // mutating helpers in lib/srs).
-  return cards as ReviewableCard[];
+  return cards;
 }
