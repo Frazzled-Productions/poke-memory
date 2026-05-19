@@ -14,6 +14,7 @@ import {
 } from "@/lib/sync/persistence";
 import { loadSession } from "@/lib/review/persistence";
 import { todayString } from "@/lib/review/session";
+import { SW_REPLAY_MESSAGE } from "@/lib/sync/backgroundSync";
 
 /**
  * Listens for the browser `online` event and automatically performs a
@@ -38,6 +39,12 @@ import { todayString } from "@/lib/review/session";
  * any superuser flag is on (same contract as `usePerGradeSync` and
  * `useRetryPush`), so this hook does not read `useSuperuser()` directly.
  *
+ * Background Sync delegation (#1054): the service worker posts a
+ * `BACKGROUND_SYNC_REPLAY` message when the `sync` event fires while at least
+ * one window client is active. This hook listens for that message and triggers
+ * the same pull-then-push logic, preventing a concurrent push from both the SW
+ * and the running app.
+ *
  * This hook is best-effort: errors are swallowed with `console.warn` and never
  * flip the overall sync status into the error state.
  */
@@ -51,7 +58,8 @@ export function useOnlineReconnectSync(
   const userIdRef = useLatestRef(userId);
 
   // In-flight guard: prevents concurrent reconnect handlers from running
-  // simultaneously (e.g. rapid on/off/on network flaps).
+  // simultaneously (e.g. rapid on/off/on network flaps, or the SW message and
+  // the online event firing at the same time).
   const runningRef = useRef(false);
 
   useEffect(() => {
@@ -169,9 +177,33 @@ export function useOnlineReconnectSync(
       }
     }
 
+    // Handle BACKGROUND_SYNC_REPLAY messages from the service worker (#1054).
+    // When the SW's `sync` event fires while the app is open, the SW posts this
+    // message instead of pushing directly, delegating to this hook so the
+    // pull-before-push invariant is respected and no concurrent push occurs.
+    function handleSwMessage(event: MessageEvent<unknown>) {
+      const data = event.data as Record<string, unknown> | null;
+      if (typeof data === "object" && data !== null && data["type"] === SW_REPLAY_MESSAGE) {
+        void handleOnline();
+      }
+    }
+
     window.addEventListener("online", handleOnline);
+    // Capture the serviceWorker reference at registration time so the cleanup
+    // closure uses the same object — the property may become undefined later in
+    // tests (afterEach teardown) before cleanup runs.
+    const swContainer =
+      typeof navigator !== "undefined" && "serviceWorker" in navigator
+        ? navigator.serviceWorker
+        : null;
+    if (swContainer) {
+      swContainer.addEventListener("message", handleSwMessage);
+    }
     return () => {
       window.removeEventListener("online", handleOnline);
+      if (swContainer) {
+        swContainer.removeEventListener("message", handleSwMessage);
+      }
     };
   }, []); // empty deps — handler always reads from refs
 }

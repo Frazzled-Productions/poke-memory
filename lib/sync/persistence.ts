@@ -1,6 +1,7 @@
 import type { ReviewableCard } from "@/lib/review/session";
 import { KEY_SYNC_STATUS, KEY_PENDING_GRADE_QUEUE } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { idbSet, idbDelete } from "@/lib/idb/db";
 
 export const STORAGE_KEY = KEY_SYNC_STATUS;
 /**
@@ -128,12 +129,17 @@ export function saveSyncStatus(status: SyncStatus): void {
   }
 }
 
-// ─── Persisted pending-grade queue (#893) ─────────────────────────────────────
+// ─── Persisted pending-grade queue (#893, #1054) ──────────────────────────────
 //
 // `usePerGradeSync` writes the in-memory `pendingQueueRef` here on every
 // debounce cycle so that the exact failed-card set survives a tab force-kill.
 // The key is cleared after a fully-successful drain and is never written during
 // a superuser session (null client/userId → clear instead of persist).
+//
+// The queue is mirrored to IndexedDB (#1054) so the service worker can read it
+// during a Background Sync event. Service workers cannot access localStorage,
+// so `savePendingQueue` writes to both stores and `clearPendingQueue` clears
+// both. The IDB write is fire-and-forget (async, best-effort).
 
 /**
  * Loads the persisted pending-grade queue from localStorage.
@@ -172,21 +178,31 @@ function parsePendingQueue(raw: string): ReviewableCard[] {
 }
 
 /**
- * Persists the pending-grade queue to localStorage. Best-effort — storage
- * errors are swallowed so a quota-full condition never interrupts the review.
+ * Persists the pending-grade queue to localStorage AND mirrors it to
+ * IndexedDB. The IDB mirror is the source the service worker reads on
+ * Background Sync (#1054) — service workers cannot access localStorage, so the
+ * IDB copy is required for the offline-grade-replay path. Both writes are
+ * best-effort; errors are swallowed so a quota-full condition never interrupts
+ * the review session.
  */
 export function savePendingQueue(queue: ReviewableCard[]): void {
   if (typeof window === "undefined") return;
+  const serialised = JSON.stringify(queue);
   try {
-    localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
+    localStorage.setItem(PENDING_QUEUE_KEY, serialised);
   } catch {
     // Storage full or unavailable — best effort.
   }
+  // Mirror to IDB so the service worker can read the queue on Background Sync.
+  // Fire-and-forget: IDB writes are async; we don't await here to avoid
+  // blocking the synchronous enqueue path.
+  void idbSet(PENDING_QUEUE_KEY, serialised);
 }
 
 /**
- * Removes the persisted pending-grade queue from localStorage.
- * Call this after a fully-successful push so stale data does not accumulate.
+ * Removes the persisted pending-grade queue from both localStorage and
+ * IndexedDB. Call this after a fully-successful push so stale data does not
+ * accumulate. Both deletions are best-effort.
  */
 export function clearPendingQueue(): void {
   if (typeof window === "undefined") return;
@@ -195,4 +211,7 @@ export function clearPendingQueue(): void {
   } catch {
     // Best effort.
   }
+  // Also clear the IDB mirror so the service worker does not re-replay already-
+  // pushed grades on the next Background Sync event.
+  void idbDelete(PENDING_QUEUE_KEY);
 }

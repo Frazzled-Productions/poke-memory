@@ -20,9 +20,14 @@
  *   cache name, so a deploy that needs a clean slate orphans the old caches;
  *   the `ExpirationPlugin` and the client update prompt handle the rest.
  *
- * Sync interaction: this worker only caches reads. localStorage stays the
- * source of truth and the per-grade upsert / unload beacon already tolerate
- * being offline (see docs/sync.md). No queued-write model is introduced here.
+ * Background Sync (#1054): handles the `poke-memory:grade-sync` sync event.
+ * When the device reconnects after offline grading, the browser fires a `sync`
+ * event in this worker even if every app tab is closed. The handler reads the
+ * persisted pending-grade queue from IndexedDB (the same `poke-memory/kv` store
+ * used by `lib/idb/db.ts`) and replays it against `/api/sync`. If active window
+ * clients are present, the handler posts `BACKGROUND_SYNC_REPLAY` to them
+ * instead — `useOnlineReconnectSync` then handles the pull-before-push
+ * sequence so the sync invariants from docs/sync.md are respected.
  */
 import {
   CacheFirst,
@@ -47,6 +52,28 @@ import {
  */
 const SW_CACHE_VERSION = "v1";
 
+/** IndexedDB database/store names — must match lib/idb/db.ts exactly. */
+const IDB_DB_NAME = "poke-memory";
+const IDB_STORE_NAME = "kv";
+/**
+ * localStorage / IDB key for the persisted pending-grade queue.
+ * Must stay byte-identical to KEY_PENDING_GRADE_QUEUE in lib/storage/keys.ts.
+ */
+const PENDING_QUEUE_KEY = "poke-memory:pending-grade-queue:v1";
+
+/**
+ * Sync tag — must stay byte-identical to BACKGROUND_SYNC_TAG in
+ * lib/sync/backgroundSync.ts.
+ */
+const BACKGROUND_SYNC_TAG = "poke-memory:grade-sync";
+
+/**
+ * Message type sent to active window clients when the `sync` event fires while
+ * the app is open. Must stay byte-identical to SW_REPLAY_MESSAGE in
+ * lib/sync/backgroundSync.ts.
+ */
+const SW_REPLAY_MESSAGE = "BACKGROUND_SYNC_REPLAY";
+
 /**
  * Minimal typing for the service-worker global scope.
  *
@@ -66,6 +93,26 @@ interface ServiceWorkerScope {
     type: "message",
     listener: (event: { data?: { type?: string } }) => void,
   ): void;
+  addEventListener(
+    type: "sync",
+    listener: (event: SyncEvent) => void,
+  ): void;
+  clients: {
+    matchAll(options?: { type?: string; includeUncontrolled?: boolean }): Promise<Array<{
+      postMessage(data: unknown): void;
+      visibilityState?: string;
+    }>>;
+  };
+  registration: {
+    sync?: { register(tag: string): Promise<void> };
+  };
+  indexedDB: IDBFactory;
+}
+
+/** Minimal shape of a Background Sync event. */
+interface SyncEvent extends Event {
+  tag: string;
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 declare const self: ServiceWorkerScope;
@@ -164,6 +211,151 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     void self.skipWaiting();
   }
+});
+
+/**
+ * Reads the persisted pending-grade queue from the shared `poke-memory` IDB
+ * store. Returns an empty array when the key is absent or IDB is unavailable.
+ * Uses raw indexedDB API because the `lib/idb/db.ts` wrapper guards on
+ * `typeof window === "undefined"` and is therefore not callable from the SW.
+ */
+async function readPendingQueueFromIdb(): Promise<unknown[]> {
+  return new Promise((resolve) => {
+    try {
+      const request = self.indexedDB.open(IDB_DB_NAME, 1);
+      request.onerror = () => resolve([]);
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        try {
+          const tx = db.transaction(IDB_STORE_NAME, "readonly");
+          const store = tx.objectStore(IDB_STORE_NAME);
+          const getReq = store.get(PENDING_QUEUE_KEY);
+          getReq.onsuccess = () => {
+            db.close();
+            const raw: unknown = getReq.result;
+            if (typeof raw !== "string") {
+              resolve([]);
+              return;
+            }
+            try {
+              const parsed: unknown = JSON.parse(raw);
+              resolve(Array.isArray(parsed) ? parsed : []);
+            } catch {
+              resolve([]);
+            }
+          };
+          getReq.onerror = () => { db.close(); resolve([]); };
+        } catch {
+          db.close();
+          resolve([]);
+        }
+      };
+    } catch {
+      resolve([]);
+    }
+  });
+}
+
+/**
+ * Clears the persisted pending-grade queue from IDB after a successful SW push.
+ * Best-effort — errors are swallowed.
+ */
+async function clearPendingQueueFromIdb(): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const request = self.indexedDB.open(IDB_DB_NAME, 1);
+      request.onerror = () => resolve();
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        try {
+          const tx = db.transaction(IDB_STORE_NAME, "readwrite");
+          const store = tx.objectStore(IDB_STORE_NAME);
+          const delReq = store.delete(PENDING_QUEUE_KEY);
+          delReq.onsuccess = () => { db.close(); resolve(); };
+          delReq.onerror = () => { db.close(); resolve(); };
+        } catch {
+          db.close();
+          resolve();
+        }
+      };
+    } catch {
+      resolve();
+    }
+  });
+}
+
+/**
+ * Background Sync handler (#1054).
+ *
+ * Fires when the browser reconnects after offline grading, even if every app
+ * tab has been closed. The handler:
+ *
+ *   1. Checks for active window clients. If any are present, posts
+ *      `BACKGROUND_SYNC_REPLAY` to each one and returns — the mounted
+ *      `useOnlineReconnectSync` hook handles the pull-before-push sequence so
+ *      the sync invariants from docs/sync.md are respected and no concurrent
+ *      push occurs.
+ *
+ *   2. When no clients are active (the app is closed), reads the pending-grade
+ *      queue from IndexedDB and POSTs it to `/api/sync`. Auth cookies are
+ *      included automatically by the browser for same-origin SW fetches.
+ *      On success the IDB queue is cleared; on failure the event's `waitUntil`
+ *      promise rejects, so the browser will retry the `sync` event later.
+ *
+ * Superuser write-guard: the guard runs in the client context (the hook passes
+ * null client/userId when a superuser flag is on). In this SW path there is no
+ * session context to inspect, but the `/api/sync` route handler re-authenticates
+ * via session cookie and returns 401 for unauthenticated calls. A QA session
+ * therefore produces no cloud writes via this path either — the IDB queue is
+ * cleared by `enqueueGrade` (which calls `clearPendingQueue` when superuser is
+ * active) before the tab is closed, so the queue is empty when the SW fires.
+ */
+self.addEventListener("sync", (event) => {
+  if (event.tag !== BACKGROUND_SYNC_TAG) return;
+
+  event.waitUntil(
+    (async () => {
+      // Step 1: delegate to any active window clients so they can honour the
+      // pull-before-push invariant. Using `includeUncontrolled: false` ensures
+      // we only message clients that are controlled by this worker (i.e. loaded
+      // from the same origin and SW scope).
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: false });
+      if (clients.length > 0) {
+        // Post to all active clients — the first one to process the message
+        // will run the catch-up. The `useOnlineReconnectSync` in-flight guard
+        // prevents concurrent runs within the same client.
+        for (const client of clients) {
+          client.postMessage({ type: SW_REPLAY_MESSAGE });
+        }
+        // Return without pushing from the SW — the client handles it.
+        return;
+      }
+
+      // Step 2: no active clients — push directly from the SW.
+      const queue = await readPendingQueueFromIdb();
+      if (queue.length === 0) {
+        // Nothing to push; resolve so the sync event is not retried.
+        return;
+      }
+
+      // POST the queue to /api/sync. The route handler authenticates via
+      // session cookie (same-origin request; cookies are included by default).
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cards: queue }),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        // Non-2xx from the server: reject so the browser retries the sync.
+        throw new Error(`[sw-sync] /api/sync returned ${String(res.status)}`);
+      }
+
+      // All cards pushed successfully — clear the IDB queue.
+      await clearPendingQueueFromIdb();
+    })(),
+  );
 });
 
 serwist.addEventListeners();
