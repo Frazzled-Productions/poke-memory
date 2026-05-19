@@ -1,16 +1,20 @@
 name: Visual Regression
 
 # Compares committed Playwright screenshot baselines against a fresh render of
-# the six key surfaces (Practice front/flipped, Stats, Pokédex, Pasture,
-# Journey) at a mobile and a desktop viewport, across the Chromium and WebKit
-# engines.
+# the two deterministic README surfaces (Stats, Journey) at a mobile and a
+# desktop viewport, across the Chromium and WebKit engines. Practice, Pasture
+# and Pokédex are deliberately excluded — their renders are not pixel-stable
+# across runs; see e2e/visual.spec.ts for the per-surface rationale.
 #
 # Why a dedicated workflow rather than a leg of ci.yml's e2e matrix:
-# baselines are pixel-exact and platform-sensitive. They are generated AND
-# compared inside the SAME pinned mcr.microsoft.com/playwright Docker image so
-# Linux font anti-aliasing is deterministic. macOS-generated baselines would
-# fail here (AGENTS.md → "Screenshots"). The job tag MUST track the
-# @playwright/test version resolved in package-lock.json.
+# baselines are platform-sensitive. They are generated AND compared inside the
+# SAME pinned mcr.microsoft.com/playwright Docker image so Linux font
+# anti-aliasing is deterministic. macOS-generated baselines would fail here
+# (AGENTS.md → "Screenshots"). The comparison itself is fuzzy, not byte-exact:
+# playwright.config.ts sets `threshold: 0.25` and `maxDiffPixelRatio: 0.02` so
+# harmless rasterisation noise is absorbed while a real layout shift still
+# fails. The job tag MUST track the @playwright/test version resolved in
+# package-lock.json.
 #
 # Trigger: only PRs that touch rendered UI — components/**, app/**/*.tsx, or
 # global CSS. Path filtering keeps CI spend bounded, consistent with how
@@ -87,8 +91,8 @@ jobs:
     # `playwright install --with-deps` step. The tag MUST track the
     # @playwright/test version resolved in package-lock.json (currently
     # 1.60.0); the image ships Node 24. Baselines committed under
-    # e2e/__screenshots__/ were generated inside this exact image, so the
-    # comparison is byte-deterministic.
+    # e2e/__screenshots__/ were generated inside this exact image, so Linux
+    # font rendering matches and the fuzzy comparison stays within tolerance.
     container:
       image: mcr.microsoft.com/playwright:v1.60.0-noble
     steps:
@@ -115,7 +119,7 @@ jobs:
           npm start &
           echo $! > /tmp/next.pid
           npx wait-on http://localhost:3000 --timeout 60000
-          npm run test:e2e -- --project=visual-chromium --project=visual-webkit
+          npm run test:visual
 
       - name: Stop Next.js
         if: always()

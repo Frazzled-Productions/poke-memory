@@ -2,10 +2,13 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
-// Visual-regression specs (e2e/visual.spec.ts) are opt-in: they only run under
-// the dedicated `--project` legs below, and the functional projects ignore
-// them. This keeps `npm run test:e2e` (functional smoke) and the visual
-// snapshot job cleanly separate. See WORKFLOW.md → "Visual-regression gate".
+// Visual-regression specs (e2e/visual.spec.ts) are opt-in. They run ONLY under
+// the dedicated `visual-*` projects below (`npm run test:visual`); the
+// functional projects additionally `testIgnore` the spec as defence in depth.
+// `npm run test:e2e` names the functional projects explicitly so a developer
+// run on macOS never compares against Linux-generated baselines. This keeps
+// the functional smoke suite and the visual snapshot job cleanly separate.
+// See WORKFLOW.md → "Visual-regression gate".
 const VISUAL_SPEC = "**/visual.spec.ts";
 
 export default defineConfig({
@@ -15,8 +18,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 4 : undefined,
   reporter: process.env.CI ? "github" : "html",
-  // Snapshot baselines are committed under e2e/visual.spec.ts-snapshots/ and
-  // are platform-tagged. CI generates and compares them inside the pinned
+  // Snapshot baselines are committed under e2e/__screenshots__/<projectName>/
+  // and are platform-tagged. CI generates and compares them inside the pinned
   // mcr.microsoft.com/playwright Docker image so Linux font rendering is
   // deterministic; never regenerate baselines from a developer macOS machine.
   snapshotPathTemplate:
@@ -31,7 +34,9 @@ export default defineConfig({
       threshold: 0.25,
       maxDiffPixelRatio: 0.02,
       // Disable CSS animations/transitions and the blinking caret so a frame is
-      // byte-stable between runs.
+      // as stable as possible between runs. The comparison is still fuzzy, not
+      // byte-exact: the `threshold` / `maxDiffPixelRatio` tolerances above
+      // absorb harmless rasterisation noise.
       animations: "disabled",
       caret: "hide",
     },
