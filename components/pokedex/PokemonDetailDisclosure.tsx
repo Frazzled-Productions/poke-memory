@@ -299,14 +299,7 @@ export function PokemonDetailDisclosure({
         !flags.pretendAllMastered &&
         nextReview.status !== "pending" &&
         nextReview.status !== "not-started" && (
-          <p
-            className="mt-2 text-xs text-zinc-500 dark:text-zinc-400"
-            aria-label={
-              nextReview.status === "due-today"
-                ? "Due today"
-                : `Next review: in ${nextReview.days} ${nextReview.days === 1 ? "day" : "days"}`
-            }
-          >
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
             {nextReview.status === "due-today"
               ? "Due today"
               : `Next review: in ${nextReview.days} ${nextReview.days === 1 ? "day" : "days"}`}

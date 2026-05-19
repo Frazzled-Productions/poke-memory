@@ -107,10 +107,8 @@ export function useNextReviewDate(speciesId: number): NextReviewInfo {
     let cancelled = false;
 
     async function load() {
-      const [session, settings] = await Promise.all([
-        loadSession(),
-        Promise.resolve(loadSettings()),
-      ]);
+      const session = await loadSession();
+      const settings = loadSettings();
 
       if (cancelled) return;
 
