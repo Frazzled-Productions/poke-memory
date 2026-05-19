@@ -1254,51 +1254,112 @@ test.describe("Per-direction accuracy breakdown on session-end screen (#994)", (
 });
 
 test.describe("Document title due-count badge (#1062)", () => {
-  test("document.title shows no prefix on a fresh guest session", async ({ page }) => {
+  // Both tests use the completed-session pattern so that hydrateSession does not
+  // append the entire Pokémon seed as new cards (which would make the badge show
+  // 1000+ and make the "clears at zero" assertion impossible to reach).  The
+  // pattern is identical to the SESSION_COMPLETE and per-direction-accuracy tests
+  // elsewhere in this file: seed every known card as already reviewed with a
+  // far-future due date, then override individual cards as needed.
+
+  const allFutureDueSession = buildCompletedSession({
+    pokemonIds: SEED_POKEMON_IDS,
+    evolutionCardIds: EVOLUTION_CARD_IDS,
+  });
+
+  // One name card (Bulbasaur, id=1) is overridden to be past-due so the badge
+  // shows exactly (1) and the session reaches SESSION_COMPLETE after one grade.
+  const sessionWithOneDueCard = {
+    ...allFutureDueSession,
+    cards: (allFutureDueSession.cards as Array<{ id: number; [key: string]: unknown }>).map(
+      (c) =>
+        c.id === 1
+          ? {
+              ...c,
+              state: {
+                stability: 10,
+                difficulty: 5,
+                elapsedDays: 10,
+                scheduledDays: 10,
+                reps: 3,
+                lapses: 0,
+                fsrsState: "review",
+                dueDate: "2026-01-01",
+                lastReview: "2026-04-01",
+                firstSeen: "2026-03-01",
+                learningStep: null,
+                stepStartedAt: null,
+              },
+            }
+          : c,
+    ),
+    limits: {
+      name: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    },
+  };
+
+  test("document.title shows no prefix when all cards have a future due date", async ({ page }) => {
+    // Seed every Pokémon card as reviewed with a far-future due date so the
+    // badge hook counts zero due cards and applies no prefix.
+    await seedSessionIdb(page, allFutureDueSession);
+
     await page.goto("/");
-    // Allow the DocumentTitleBadge hook to settle (async IDB read).
-    await page.waitForLoadState("networkidle");
+    await awaitSeedIdb(page);
+
+    // Wait for the hook's async IDB read to settle — use waitForFunction so
+    // we don't assert before the effect has had a chance to run.
+    await page.waitForFunction(
+      () => document.readyState === "complete",
+    );
+    // Give the hook time to finish its async IDB read.
+    await page.waitForTimeout(500);
+
     const title = await page.title();
     expect(title).not.toMatch(/^\(\d+\)/);
+    expect(title).toContain("Poké Memory");
   });
 
   test("document.title shows a (N) prefix when cards are due and clears at zero", async ({
     page,
   }) => {
-    // Seed one name card due for review (past due date, has prior reviews).
-    await seedSessionIdb(page, {
-      cards: [
-        {
-          id: 1,
-          name: "Bulbasaur",
-          spriteUrl: "/sprites/pokemon/1.png",
-          cardType: "name",
-          state: {
-            stability: 10,
-            difficulty: 5,
-            elapsedDays: 10,
-            scheduledDays: 10,
-            reps: 3,
-            lapses: 0,
-            fsrsState: "review",
-            dueDate: "2026-01-01",
-            lastReview: "2026-04-01",
-            firstSeen: "2026-03-01",
-            learningStep: null,
-            stepStartedAt: null,
-          },
-        },
-      ],
-      limits: {
-        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
-      },
+    // Seed a completed session with Bulbasaur (id=1) past-due.  All other cards
+    // have a far-future due date so hydrateSession adds no new entries and the
+    // badge reflects exactly one due card.
+    await seedSessionIdb(page, sessionWithOneDueCard);
+    // Disable new-card introduction so the session stays at exactly one review.
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "poke-memory:user-settings:v1",
+        JSON.stringify({
+          maxNewPerDay: 0,
+          maxNewEvolutionPerDay: 0,
+          maxNewReversePerDay: 0,
+          maxNewCryPerDay: 0,
+          evolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+        }),
+      );
     });
 
     await page.goto("/");
     await awaitSeedIdb(page);
+
+    // The DocumentTitleBadge hook depends on a StorageEvent to re-read IDB
+    // after the seed commits.  ReviewSession does not fire one when the hydrated
+    // session length is unchanged (i.e. all cards were already present), so we
+    // dispatch it manually here to ensure the hook re-runs sync().
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "poke-memory:review-session:v1",
+          storageArea: window.localStorage,
+          newValue: null,
+        }),
+      );
+    });
 
     // Wait for the DocumentTitleBadge hook to apply the prefix.
     await page.waitForFunction(
