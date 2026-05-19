@@ -380,6 +380,83 @@ test.describe("Journey page — milestone share card", () => {
   });
 });
 
+test.describe("Journey page — next badge proximity hint", () => {
+  test("hint is absent on a fresh guest session (no mastered Pokémon)", async ({
+    page,
+  }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("next-badge-hint")).toHaveCount(0);
+  });
+
+  test("hint renders and shows the nearest badge when some Pokémon are mastered", async ({
+    page,
+  }) => {
+    // Seed one mastered name card for species 74 (Geodude). Boulder Badge
+    // requires 74 and 95 — so 1 remaining, which is the smallest gap and
+    // therefore Boulder Badge is the hint target.
+    await page.addInitScript(() => {
+      const card = {
+        id: 74,
+        speciesId: 74,
+        cardType: "name",
+        subjectKey: "74",
+        name: "Geodude",
+        spriteUrl: "/sprites/pokemon/74.png",
+        types: ["rock", "ground"],
+        state: {
+          stability: 30,
+          difficulty: 5,
+          elapsedDays: 0,
+          scheduledDays: 21,
+          reps: 3,
+          lapses: 0,
+          fsrsState: "review",
+          dueDate: "2099-01-01",
+          lastReview: "2025-01-01",
+          firstSeen: "2024-12-01",
+          learningStep: null,
+          stepStartedAt: null,
+          hiddenSince: null,
+          seenInPasture: false,
+        },
+      };
+      window.localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards: [card],
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+    ).toBeVisible({ timeout: 15_000 });
+    const hint = page.getByTestId("next-badge-hint");
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText("Next badge:");
+    await expect(hint).toContainText("Boulder Badge");
+    await expect(hint).toContainText("1 more Pokémon to master");
+  });
+
+  test("hint is absent when pretendAllMastered is on", async ({ page }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("next-badge-hint")).toHaveCount(0);
+  });
+});
+
 test.describe("Journey page — navigation", () => {
   test("Journey link in the desktop nav navigates to /journey", async ({
     page,
