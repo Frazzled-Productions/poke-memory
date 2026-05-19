@@ -24,14 +24,14 @@ export default defineConfig({
       // html  → drillable local report under coverage/
       reporter: ["text", "json-summary", "json", "html"],
       // Global floor (regression guard, #824). Set just below today's
-      // measured baseline (S 74.12 / B 69.02 / F 66.41 / L 76.03) rounded
+      // measured baseline (S 77.56 / B 70.78 / F 72.46 / L 79.75) rounded
       // down, so an unrelated coverage drop fails CI. Ratchet upward as
       // coverage improves — never downward to make a red build pass.
       thresholds: {
-        statements: 74,
-        branches: 69,
-        functions: 66,
-        lines: 76,
+        statements: 76,
+        branches: 70,
+        functions: 71,
+        lines: 78,
       },
       // Measure the application/library source we actually ship and test.
       include: ["app/**", "components/**", "lib/**"],
