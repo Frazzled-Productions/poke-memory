@@ -2040,7 +2040,7 @@ export function ReviewSession() {
         </div>
         <QueueStateBadge state={effectiveCard.state} />
         {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
-        <div ref={cardRef} className="relative">
+        <div ref={cardRef} className="relative" data-testid="swipe-card">
           {revealed ? (
             <>
               <PokemonCard
@@ -2226,7 +2226,7 @@ export function ReviewSession() {
       />
       <QueueStateBadge state={effectiveCard.state} />
       {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
-      <div ref={cardRef} className="relative">
+      <div ref={cardRef} className="relative" data-testid="swipe-card">
         {effectiveCard.cardType === "evolution" ||
         effectiveCard.cardType === "reverse-evolution" ? (
           <EvolutionCard

@@ -201,7 +201,16 @@ export function useSwipeGrade({
 
       originRef.current = { x: e.clientX, y: e.clientY };
       pointerId.current = e.pointerId;
-      el!.setPointerCapture(e.pointerId);
+      // setPointerCapture routes future move/up events to this element even
+      // when the pointer leaves its bounds. It may throw for synthetic pointer
+      // events (e.g. from Playwright dispatchEvent) whose pointer ID is not
+      // tracked by the browser — that is fine, since synthetic tests dispatch
+      // all events directly on the element anyway.
+      try {
+        el!.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore — gesture tracking proceeds via originRef/pointerId refs.
+      }
     }
 
     function onPointerMove(e: PointerEvent) {
@@ -281,12 +290,19 @@ export function useSwipeGrade({
       el.style.transform = "";
       el.style.transition = "";
     };
-  }, [targetRef, applyTransform, resetTransform]);
-  // `enabled` and `grading` are read via stable refs (updated every render)
-  // so they don't need to be in the pointer-listener deps — the listener
-  // re-registers only when the element ref changes (e.g. card type switch
-  // mounts a new element). `touch-action` is managed by the separate effect
-  // above that does list `enabled` as a dep.
+  }, [targetRef, applyTransform, resetTransform, enabled]);
+  // `grading` is read via a stable ref (updated every render) so it does not
+  // need to be in the deps — the handler reads the current value at call time.
+  //
+  // `enabled` IS in the deps even though it is also read via ref. The reason:
+  // the ReviewSession component renders a loading skeleton (no card element)
+  // on initial mount while IndexedDB data loads. When the skeleton is active,
+  // `targetRef.current` is null and the effect returns early without attaching
+  // listeners. Once the card renders and the user reveals it (`enabled` flips
+  // to `true`), the effect re-runs with a non-null element, and listeners are
+  // attached correctly. Without `enabled` in the deps, the listener effect
+  // would never re-run after the initial null-element no-op, and swipe events
+  // would never be received. (#1052)
 
   return { swipeState };
 }
