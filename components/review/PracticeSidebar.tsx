@@ -66,7 +66,7 @@ function GradeTallyRow({
 }) {
   if (count === 0) return null;
   return (
-    <div className="flex items-center gap-2">
+    <div role="listitem" className="flex items-center gap-2">
       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${gradeDotClass(grade)}`} aria-hidden="true" />
       <span className="text-sm text-zinc-500 dark:text-zinc-400 flex-1">{gradeLabel(grade)}</span>
       <span className={`tabular-nums text-sm font-semibold ${gradeTextClass(grade)}`}>{count}</span>
