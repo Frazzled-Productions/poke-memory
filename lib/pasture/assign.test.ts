@@ -177,4 +177,74 @@ describe("assignAnchors", () => {
     };
     expect(assignAnchors([makeCard(1)], emptyZone)).toHaveLength(0);
   });
+
+  it("multiple cards with null firstSeen are tie-broken by id ASC", () => {
+    // All three cards have no firstSeen — sort must fall back to id.
+    const cardA = makeCard(10, null);
+    const cardB = makeCard(3, null);
+    const cardC = makeCard(7, null);
+    const result = assignAnchors([cardA, cardB, cardC], tinyZone);
+    expect(result.map((r) => r.card.id)).toEqual([3, 7, 10]);
+  });
+
+  it("each assignment references the correct anchor object from the zone's slot list", () => {
+    // Verify that the anchor in the assignment is the exact object from the
+    // zone definition, not a copy, and that coordinates match position in the
+    // flattened slot list.
+    const cards = [makeCard(1), makeCard(2), makeCard(3), makeCard(4), makeCard(5)];
+    const result = assignAnchors(cards, tinyZone);
+
+    // Expected flat slot order: sub-a[0], sub-a[1], sub-a[2], sub-b[0], sub-b[1]
+    const expectedAnchors = [
+      tinyZone.subRegions[0].anchorSlots[0],
+      tinyZone.subRegions[0].anchorSlots[1],
+      tinyZone.subRegions[0].anchorSlots[2],
+      tinyZone.subRegions[1].anchorSlots[0],
+      tinyZone.subRegions[1].anchorSlots[1],
+    ];
+    for (let i = 0; i < 5; i++) {
+      expect(result[i].anchor).toEqual(expectedAnchors[i]);
+    }
+  });
+
+  it("large overflow: N cards > 3× slot count all receive valid assignments", () => {
+    // 5 slots total; 17 cards produces 3 full wraps plus 2 extra.
+    const cards = Array.from({ length: 17 }, (_, i) => makeCard(i + 1));
+    const result = assignAnchors(cards, tinyZone);
+    expect(result).toHaveLength(17);
+    for (const assignment of result) {
+      expect(assignment.subRegion).toBeDefined();
+      expect(assignment.anchor.x).toBeGreaterThanOrEqual(0);
+      expect(assignment.anchor.y).toBeGreaterThanOrEqual(0);
+    }
+    // 17th card (0-indexed: 16) wraps to slot index 16 % 5 = 1, which is sub-a slot index 1.
+    expect(result[16].subRegion.id).toBe("sub-a");
+    expect(result[16].anchor).toEqual(tinyZone.subRegions[0].anchorSlots[1]);
+  });
+
+  it("card properties (types, isLegendary, habitat) do not affect zone assignment", () => {
+    // Zone assignment is purely positional (slot index = sorted rank % totalSlots).
+    // Two cards with identical firstSeen and adjacent ids should land in slots 0
+    // and 1 regardless of what their species properties are.
+    const legendaryCard = {
+      ...makeCard(1, "2026-04-01"),
+      types: ["psychic"],
+      isLegendary: true,
+      habitat: "rare",
+    } as ReviewableCard;
+    const waterFlyingCard = {
+      ...makeCard(2, "2026-04-01"),
+      types: ["water", "flying"],
+      isLegendary: false,
+      habitat: "sea",
+    } as ReviewableCard;
+
+    const result = assignAnchors([legendaryCard, waterFlyingCard], tinyZone);
+    // Card 1 has lower id, so it gets slot 0 (sub-a first anchor).
+    expect(result[0].card.id).toBe(1);
+    expect(result[0].anchor).toEqual(tinyZone.subRegions[0].anchorSlots[0]);
+    // Card 2 gets slot 1 (sub-a second anchor).
+    expect(result[1].card.id).toBe(2);
+    expect(result[1].anchor).toEqual(tinyZone.subRegions[0].anchorSlots[1]);
+  });
 });
