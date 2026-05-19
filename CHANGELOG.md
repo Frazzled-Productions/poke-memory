@@ -6,6 +6,19 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.6] - 2026-05-19
+
+### Added
+
+- Pokédex detail page now shows the next scheduled review date for started Pokémon: "Due today" when a card is overdue, or "Next review: in N days" for upcoming cards.
+- Journey tab badge gallery now shows a "Next badge" proximity hint, naming the closest unearned badge and how many more Pokémon need to be mastered to unlock it.
+- Session-end screen now shows a compact per-direction accuracy row (e.g. "Name 91% · Evo 74% · Cry 58%") so you can see at a glance which card type needs the most work, without visiting the Stats page. Only directions reviewed in the current session are shown.
+- Practice scope: a new "Incomplete evolution chains" preset that targets evolution families you have started but not finished mastering, matching the Journey tab's Evolution Wall "In progress" filter.
+
+### Fixed
+
+- Fixed the share card hero disc: the large number and label are now vertically centred within the circle on both daily summary and milestone cards.
+
 ## [0.10.5] - 2026-05-19
 
 ### Changed
@@ -1208,7 +1221,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.5...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.6...HEAD
+[0.10.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.6
 [0.10.5]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.5
 [0.10.4]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.4
 [0.10.3]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.3
