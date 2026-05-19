@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
-import { ReverseEvolutionCard } from "@/components/review/ReverseEvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { SpritePreloader, type SizedSpriteUrl } from "@/components/sprites/SpritePreloader";
 import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites";
@@ -2089,22 +2088,12 @@ export function ReviewSession() {
         incompleteChainSpeciesIds={incompleteChains}
       />
       <QueueStateBadge state={effectiveCard.state} />
-      {effectiveCard.cardType === "evolution" ? (
+      {effectiveCard.cardType === "evolution" ||
+      effectiveCard.cardType === "reverse-evolution" ? (
         <EvolutionCard
+          direction={effectiveCard.cardType}
           preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
           preEvoName={effectiveCard.preEvoName}
-          postEvoName={effectiveCard.postEvoName}
-          postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
-          triggerPhrase={effectiveCard.triggerPhrase}
-          revealed={revealed}
-          fact={currentFact}
-          preEvoId={effectiveCard.preEvoId}
-          postEvoId={effectiveCard.postEvoId}
-        />
-      ) : effectiveCard.cardType === "reverse-evolution" ? (
-        <ReverseEvolutionCard
-          preEvoName={effectiveCard.preEvoName}
-          preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
           postEvoName={effectiveCard.postEvoName}
           postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
           triggerPhrase={effectiveCard.triggerPhrase}
