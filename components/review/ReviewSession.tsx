@@ -540,6 +540,11 @@ export function ReviewSession() {
   // Not persisted — resets on every page load by design.
   const [extendedReview, setExtendedReview] = useState(false);
 
+  // Keyboard shortcuts overlay — opened by the `?` key or the `?` hint button
+  // on the GradeButtons panel. Controlled here so the keydown handler can open
+  // it without going through a ref or event bus.
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+
   // Fact shown after card reveal — randomised on each reveal.
   const [currentFact, setCurrentFact] = useState<PokemonFact | null>(null);
 
@@ -1041,6 +1046,76 @@ export function ReviewSession() {
     // stable — the dep is needed so the persist call sees the real timezone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undoSnapshot, grading, limits, timezone]);
+
+  // Space/Enter → reveal; 1/2/4/5 → grade; ? → open shortcut overlay.
+  // The handler is re-registered whenever any of these values changes so the
+  // closure always sees the current `revealed` / `grading` / `revealing` state.
+  useEffect(() => {
+    function isTextInputFocused(): boolean {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = (el as HTMLElement).tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return true;
+      if ((el as HTMLElement).isContentEditable) return true;
+      return false;
+    }
+
+    function onKey(e: KeyboardEvent) {
+      // Never fire while a text field is focused (superuser chord, sign-in
+      // fields, search boxes, etc.).
+      if (isTextInputFocused()) return;
+
+      // Escape closes the shortcut overlay.
+      if (e.key === "Escape") {
+        setShowKeyboardShortcuts(false);
+        return;
+      }
+
+      // ? opens the shortcut overlay (Shift+/ on US-ANSI). Guard against
+      // modifier combos that use ? (e.g. Shift+? still fires "?" as e.key).
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowKeyboardShortcuts(true);
+        return;
+      }
+
+      // Space / Enter → reveal the current card (only when not yet revealed).
+      if ((e.key === " " || e.key === "Enter") && !revealed && !revealing) {
+        // Prevent the default scroll-on-space behaviour.
+        e.preventDefault();
+        void handleReveal();
+        return;
+      }
+
+      // 1/2/4/5 → grade Again/Hard/Good/Easy. Only active after reveal and
+      // while not mid-grade. Also accept 3 as an alias for 4 (Good) to support
+      // the common 1/2/3/4 muscle memory from other SRS apps.
+      if (revealed && !grading) {
+        const GRADE_MAP: Record<string, Grade> = {
+          "1": 1,
+          "2": 2,
+          "3": 4,
+          "4": 4,
+          "5": 5,
+        };
+        const grade = GRADE_MAP[e.key];
+        if (grade !== undefined) {
+          e.preventDefault();
+          void handleGrade(grade);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // handleReveal and handleGrade are `async function` declarations inside the
+    // component — they re-bind on every render and are therefore not stable refs.
+    // Including them in deps would cause a new listener on every render. Instead
+    // we include only the state values that the handler branches on; the functions
+    // always close over the current state via the latest render's scope because
+    // the effect is re-registered whenever those values change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealed, grading, revealing]);
 
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
@@ -1961,6 +2036,9 @@ export function ReviewSession() {
               onGrade={handleGrade}
               disabled={grading}
               previews={gradePreviewsOrNull ?? undefined}
+              showShortcuts={showKeyboardShortcuts}
+              onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+              onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
             />
           </>
         ) : (
@@ -2140,6 +2218,9 @@ export function ReviewSession() {
             onGrade={handleGrade}
             disabled={grading}
             previews={gradePreviewsOrNull ?? undefined}
+            showShortcuts={showKeyboardShortcuts}
+            onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+            onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
           />
         </>
       ) : (
