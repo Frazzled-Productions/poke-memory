@@ -1,4 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 /**
  * Mobile nav E2E tests (#661).
