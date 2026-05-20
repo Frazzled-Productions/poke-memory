@@ -203,7 +203,7 @@ test.describe("Stats page — due forecast bar popup", () => {
   }) => {
     // This test targets the mobile tap flow. Skip on non-mobile projects
     // (the hover flow is covered by the desktop test below).
-    test.skip(!isMobile, "mobile tap test — skipped on desktop project");
+    test.skip(!isMobile, "mobile tap test - skipped on desktop project");
 
     await page.goto("/stats");
 

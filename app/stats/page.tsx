@@ -163,6 +163,13 @@ function DueForecast({
   const [openTooltip, setOpenTooltip] = useState<ForecastTooltip | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Tracks whether the last interaction with the active bar was a click/tap
+  // or a mouse hover. On hybrid touch+mouse devices (e.g. Surface, iPad with
+  // keyboard), (hover: hover) returns true but a tap also fires synthetic
+  // mouse events. The mouseleave handler should only close the tooltip when it
+  // was opened via hover, not via a deliberate tap.
+  const lastInteraction = useRef<"click" | "hover" | null>(null);
+
   // Close the popup when the user clicks/taps outside the chart container.
   useEffect(() => {
     if (openTooltip === null) return;
@@ -172,6 +179,7 @@ function DueForecast({
         !containerRef.current.contains(e.target as Node)
       ) {
         setOpenTooltip(null);
+        lastInteraction.current = null;
       }
     }
     document.addEventListener("mousedown", handleOutside);
@@ -183,6 +191,7 @@ function DueForecast({
   }, [openTooltip]);
 
   function handleBarClick(idx: number) {
+    lastInteraction.current = "click";
     setOpenTooltip((prev) => (prev?.idx === idx ? null : { idx }));
   }
 
@@ -192,7 +201,30 @@ function DueForecast({
       handleBarClick(idx);
     } else if (e.key === "Escape") {
       setOpenTooltip(null);
+      lastInteraction.current = null;
     }
+  }
+
+  /**
+   * Returns Tailwind classes for horizontal tooltip positioning.
+   *
+   * Each bar is ~1/14th of the container width (roughly 26 px on iPhone 14).
+   * Centring the tooltip over the bar with -translate-x-1/2 causes the
+   * tooltip to bleed off the panel edges for the first and last few bars.
+   *
+   * Rule (14 bars, 0-indexed):
+   *   bars 0-2   → anchor to left edge  (left-0, no translate)
+   *   bars 11-13 → anchor to right edge (right-0, no translate, left-auto)
+   *   bars 3-10  → centre               (left-1/2, -translate-x-1/2)
+   */
+  function tooltipPositionClasses(idx: number): string {
+    if (idx <= 2) {
+      return "left-0";
+    }
+    if (idx >= 11) {
+      return "right-0 left-auto";
+    }
+    return "left-1/2 -translate-x-1/2";
   }
 
   return (
@@ -219,6 +251,7 @@ function DueForecast({
               const heightPct = max === 0 ? 0 : (day.count / max) * 100;
               const isToday = idx === 0;
               const isOpen = openTooltip?.idx === idx;
+              const tooltipId = `due-forecast-tooltip-${idx}`;
               const label = `${formatForecastDate(day.date, fmt, tz)}: ${day.count} card${day.count === 1 ? "" : "s"}`;
               return (
                 <div
@@ -226,14 +259,16 @@ function DueForecast({
                   role="listitem"
                   className="group relative flex h-full flex-col justify-end"
                 >
-                  {/* Popup tooltip — shown on tap (mobile) or hover (desktop). */}
+                  {/* Popup tooltip — shown on tap (mobile) or hover (desktop).
+                      Positioned with horizontal clamping so the tooltip never
+                      bleeds off the panel edge on narrow viewports. */}
                   {isOpen && (
                     <div
                       role="tooltip"
-                      id={`forecast-tooltip-${idx}`}
+                      id={tooltipId}
                       className={[
-                        "pointer-events-none absolute bottom-full left-1/2 z-10 mb-2",
-                        "-translate-x-1/2",
+                        "pointer-events-none absolute bottom-full z-10 mb-2",
+                        tooltipPositionClasses(idx),
                         "whitespace-nowrap rounded-md px-2 py-1 text-xs shadow-md",
                         "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900",
                       ].join(" ")}
@@ -249,27 +284,32 @@ function DueForecast({
                   {/*
                     Each bar is a <button> so it is natively focusable and
                     activatable via Enter/Space. The aria-label carries the
-                    full date + count for screen readers; the tooltip is a
-                    supplementary visual aid for sighted pointer users.
+                    full date + count for screen readers; aria-describedby
+                    references the tooltip when it is open, giving assistive
+                    technology access to the supplementary popup content.
+                    aria-expanded is intentionally omitted — it signals an
+                    owned expandable region (accordion pattern), which does
+                    not apply here; the tooltip is a sibling description, not
+                    a controlled child.
                   */}
                   <button
                     type="button"
                     aria-label={label}
-                    aria-expanded={isOpen}
-                    aria-controls={isOpen ? `forecast-tooltip-${idx}` : undefined}
+                    aria-describedby={isOpen ? tooltipId : undefined}
                     onClick={() => handleBarClick(idx)}
                     onKeyDown={(e) => handleBarKeyDown(e, idx)}
-                    onMouseEnter={() => setOpenTooltip({ idx })}
+                    onMouseEnter={() => {
+                      lastInteraction.current = "hover";
+                      setOpenTooltip({ idx });
+                    }}
                     onMouseLeave={() => {
-                      // Only close on mouse-leave if it was a hover-open (not a
-                      // tap-open). We detect tap-open by checking if the device
-                      // supports fine pointer; we leave the popup open on touch
-                      // so the user has time to read it.
-                      if (
-                        typeof window !== "undefined" &&
-                        window.matchMedia("(hover: hover)").matches
-                      ) {
+                      // Only dismiss on mouseleave when the tooltip was opened
+                      // by hovering — not by a tap. On hybrid touch+mouse
+                      // devices, tapping fires synthetic mouse events that
+                      // would otherwise immediately close the popup.
+                      if (lastInteraction.current === "hover") {
                         setOpenTooltip(null);
+                        lastInteraction.current = null;
                       }
                     }}
                     className={[
