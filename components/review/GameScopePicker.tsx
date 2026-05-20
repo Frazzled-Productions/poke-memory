@@ -35,18 +35,31 @@ const PILL_BASE =
   "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors text-left";
 
 /**
- * Derive the set of version-group slugs actually present in the seed. Only
- * these are rendered in the picker — listing slugs that are not in the seed
- * would let users pick a game that matches zero cards.
+ * Version-group slugs present in the seed, grouped by generation number and
+ * sorted for display. Computed once at module load — the seed is a build-time
+ * constant so the result is stable for the module lifetime (mirrors the
+ * `_seedById` / `_legendaryIds` pattern in `scope.ts`).
+ *
+ * Generation 0 ("Other") is placed after all numbered generations so mainline
+ * games appear first in the picker.
  */
-function presentVersionGroups(): string[] {
+const _groupedVersionGroups: [number, string[]][] = (() => {
   const seen = new Set<string>();
   for (const p of SEED_POKEMON) {
-    const vgs = (p as { versionGroups?: string[] }).versionGroups ?? [];
-    for (const vg of vgs) seen.add(vg);
+    for (const vg of (p as { versionGroups?: string[] }).versionGroups ?? []) seen.add(vg);
   }
-  return [...seen].sort(compareVersionGroupSlugs);
-}
+  const map = new Map<number, string[]>();
+  for (const slug of [...seen].sort(compareVersionGroupSlugs)) {
+    const gen = versionGroupGeneration(slug);
+    if (!map.has(gen)) map.set(gen, []);
+    map.get(gen)!.push(slug);
+  }
+  return [...map.entries()].sort((a, b) => {
+    if (a[0] === 0) return 1;
+    if (b[0] === 0) return -1;
+    return a[0] - b[0];
+  });
+})();
 
 /**
  * Game / version-group scope picker (#1089). Renders a vertical list of
@@ -57,17 +70,6 @@ function presentVersionGroups(): string[] {
  * generation (e.g. all Gen VIII games) without 5 individual taps.
  */
 export function GameScopePicker({ selected, onChange }: Props) {
-  const grouped = useMemo(() => {
-    const slugs = presentVersionGroups();
-    const map = new Map<number, string[]>();
-    for (const slug of slugs) {
-      const gen = versionGroupGeneration(slug);
-      if (!map.has(gen)) map.set(gen, []);
-      map.get(gen)!.push(slug);
-    }
-    return [...map.entries()].sort((a, b) => a[0] - b[0]);
-  }, []);
-
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   function toggleGame(slug: string): void {
@@ -92,7 +94,7 @@ export function GameScopePicker({ selected, onChange }: Props) {
     }
   }
 
-  if (grouped.length === 0) {
+  if (_groupedVersionGroups.length === 0) {
     return (
       <p className="text-xs text-zinc-400 dark:text-zinc-500">
         No games in the current seed.
@@ -102,7 +104,7 @@ export function GameScopePicker({ selected, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      {grouped.map(([gen, slugs]) => {
+      {_groupedVersionGroups.map(([gen, slugs]) => {
         const allSelected = slugs.every((s) => selectedSet.has(s));
         const genName = GEN_LABELS[gen] ?? "Other";
         return (

@@ -159,6 +159,7 @@ function speciesMatchesScope(
   formCategory: FormCategory = "default",
   versionGroups: readonly string[] = [],
   context: ScopeMatchContext = {},
+  gamesSet?: ReadonlySet<string>,
 ): boolean {
   // ── formCategories gate (hard filter applied before the OR axes) ───────
   // When mode !== 'all', a form that fails the gate is excluded regardless of
@@ -197,8 +198,8 @@ function speciesMatchesScope(
   )
     return true;
   if (gamesActive) {
-    const games = scope.games!;
-    if (versionGroups.some((vg) => games.includes(vg))) return true;
+    const lookup = gamesSet ?? new Set(scope.games!);
+    if (versionGroups.some((vg) => lookup.has(vg))) return true;
   }
   return false;
 }
@@ -396,6 +397,10 @@ export function countMatchingSpecies(
   alternateFormsEnabled: boolean = true,
   context: ScopeMatchContext = {},
 ): number {
+  // Precompute once so the inner loop uses O(1) Set lookups instead of
+  // O(n) Array.includes across ~1025 species × up to 30 version-groups each.
+  const gamesSet: ReadonlySet<string> | undefined =
+    (scope.games?.length ?? 0) > 0 ? new Set(scope.games!) : undefined;
   let count = 0;
   for (const s of seed) {
     // isDefaultForm may be absent in a pre-#445 seed; default to true so old
@@ -428,6 +433,7 @@ export function countMatchingSpecies(
         formCategory,
         versionGroups,
         context,
+        gamesSet,
       )
     )
       count += 1;

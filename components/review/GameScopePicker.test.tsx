@@ -71,22 +71,27 @@ describe("GameScopePicker", () => {
     expect(onChange).toHaveBeenCalledWith(["red-blue"]);
   });
 
-  it("renders generation labels in ascending order", () => {
+  it("renders generation labels in ascending order, with Other at end", () => {
     render(<GameScopePicker selected={[]} onChange={() => {}} />);
+    // Query all section headers — both "Generation X" and "Other".
     const headers = screen
-      .getAllByText(/^Generation /)
+      .getAllByText(/^Generation |^Other$/)
       .map((el) => el.textContent ?? "");
-    // First mainline header should be Generation I.
+    // Generation I must be first overall (Other, if present, sorts to end).
     expect(headers[0]).toBe("Generation I");
-    // Headers should be monotonically increasing.
-    for (let i = 1; i < headers.length; i++) {
-      const prevRoman = headers[i - 1].replace("Generation ", "");
-      const currRoman = headers[i].replace("Generation ", "");
-      // No need to convert; rely on the picker's deterministic ordering. The
-      // test above (headers[0] === "Generation I") plus the presence assertions
-      // give the smoke coverage we need without a full roman-numeral parser.
-      expect(prevRoman.length).toBeGreaterThan(0);
-      expect(currRoman.length).toBeGreaterThan(0);
+    // Generation headers must be in strictly ascending order.
+    const GEN_ORDER = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
+    const genHeaders = headers.filter((h) => h.startsWith("Generation "));
+    for (let i = 1; i < genHeaders.length; i++) {
+      const prev = GEN_ORDER.indexOf(genHeaders[i - 1].replace("Generation ", ""));
+      const curr = GEN_ORDER.indexOf(genHeaders[i].replace("Generation ", ""));
+      expect(curr).toBeGreaterThan(prev);
+    }
+    // "Other" group (if present) must appear after all Generation headers.
+    const firstOtherIdx = headers.indexOf("Other");
+    if (firstOtherIdx !== -1) {
+      const lastGenIdx = headers.findLastIndex((h) => h.startsWith("Generation "));
+      expect(firstOtherIdx).toBeGreaterThan(lastGenIdx);
     }
   });
 
