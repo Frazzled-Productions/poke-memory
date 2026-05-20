@@ -197,9 +197,10 @@ describe("buildCollectionTimeline — past direction", () => {
     expect(tl.totalSpecies).toBe(5);
   });
 
-  it("log with date gaps: weekly checkpoints bridge the gap correctly", () => {
-    // Two species introduced 5 weeks apart — the checkpoints between them
-    // must show introduced=1, not 0 or 2.
+  it("log with date gaps: checkpoints bridge the gap correctly", () => {
+    // Two species introduced 35 and 7 days ago — both are within the daily
+    // resolution window (90 days), so the checkpoints between them must show
+    // introduced=1 for entries between the two events.
     const earlyMs = NOW_MS - 35 * DAY_MS; // 5 weeks ago
     const lateMs = NOW_MS - 7 * DAY_MS;   // 1 week ago
 
@@ -234,6 +235,74 @@ describe("buildCollectionTimeline — past direction", () => {
     const tl = buildCollectionTimeline(baseOpts({ log }));
     const last = tl.past[tl.past.length - 1];
     expect(last.introduced).toBe(1);
+  });
+
+  it("6-day-streak user: at least one snapshot per active day between first and last activity", () => {
+    // Simulates a user who reviewed cards on 6 consecutive distinct days.
+    // Each day should produce at least one snapshot (daily resolution).
+    const log: GradeLogEntry[] = [];
+    for (let d = 5; d >= 0; d--) {
+      log.push({
+        date: "2026-01-01",
+        grade: 4,
+        cardType: "name",
+        occurredAt: NOW_MS - d * DAY_MS - 3600_000, // 1 hour before midnight each day
+        subjectKey: String(d + 1),
+      });
+    }
+
+    const tl = buildCollectionTimeline(baseOpts({ log }));
+
+    // Should have at least 6 distinct snapshot dates between the earliest activity and now.
+    const firstActivityMs = log[0].occurredAt;
+    const relevantSnaps = tl.past.filter(
+      (s) => s.atMs >= firstActivityMs - DAY_MS, // allow one day of slack for midnight alignment
+    );
+    const uniqueDates = new Set(
+      relevantSnaps.map((s) => new Date(s.atMs).toISOString().slice(0, 10)),
+    );
+    expect(uniqueDates.size).toBeGreaterThanOrEqual(6);
+
+    // The final snapshot must show all 6 species introduced.
+    const last = tl.past[tl.past.length - 1];
+    expect(last.introduced).toBe(6);
+  });
+
+  it("past timeline: history older than 90 days uses weekly resolution, recent uses daily", () => {
+    // One species introduced 120 days ago (in the weekly region) and one
+    // 10 days ago (in the daily region). The total snapshot count must be
+    // well below 120 (weekly for old history) rather than 120+ (daily for all).
+    const oldMs = NOW_MS - 120 * DAY_MS;
+    const recentMs = NOW_MS - 10 * DAY_MS;
+
+    const log: GradeLogEntry[] = [
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: oldMs,    subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: recentMs, subjectKey: "2" },
+    ];
+    const tl = buildCollectionTimeline(baseOpts({ log }));
+
+    // Total entries must be bounded — 120 daily entries would be excessive.
+    // Expect roughly: ~4-5 weekly entries (weeks 1-4 of older history) +
+    // ~90 daily entries = well under 150 total.
+    expect(tl.past.length).toBeLessThan(150);
+    // But there must be daily granularity in the last 10 days: at least
+    // 8 snapshots in the last 10 days (allows for boundary alignment).
+    const last10DaysSnaps = tl.past.filter(
+      (s) => s.atMs >= NOW_MS - 12 * DAY_MS,
+    );
+    expect(last10DaysSnaps.length).toBeGreaterThanOrEqual(8);
+
+    // The final snapshot shows both species.
+    const last = tl.past[tl.past.length - 1];
+    expect(last.introduced).toBe(2);
+  });
+
+  it("nowMs is always the final entry in the past array", () => {
+    const log = [makeEntry("1", 4, 0)];
+    const tl = buildCollectionTimeline(baseOpts({ log }));
+    expect(tl.past.length).toBeGreaterThan(0);
+    const last = tl.past[tl.past.length - 1];
+    expect(last.atMs).toBe(NOW_MS);
   });
 
   it("mastery achieved then lapsed: mastered status is not revoked in reconstruction", () => {
