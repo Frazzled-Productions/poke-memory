@@ -1417,6 +1417,14 @@ describe('stableShuffleForDay (per-user salt)', () => {
     const result = stableShuffleForDay(IDS, TODAY, 'user-abc');
     expect(result.slice().sort((a, b) => a - b)).toEqual(IDS.slice().sort((a, b) => a - b));
   });
+
+  it('numeric salt 0 produces a different order from empty-string salt (no type-coercion collision)', () => {
+    // Guards a future refactor against accidentally collapsing the numeric/string
+    // code paths — String(0) === "0", which must not equal String("") === "".
+    const withZero  = stableShuffleForDay(IDS, TODAY, 0);
+    const withEmpty = stableShuffleForDay(IDS, TODAY, '');
+    expect(withZero).not.toEqual(withEmpty);
+  });
 });
 
 describe('buildSessionQueues (per-user salt)', () => {
