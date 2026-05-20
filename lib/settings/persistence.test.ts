@@ -130,7 +130,7 @@ describe('loadSettings migration', () => {
       favouriteTheme: null,
       themeIntensity: 'accents' as const,
       retentionTarget: 0.95,
-      practiceScope: { gens: [1, 3], types: ['fire', 'water'], presets: ['starters' as const], formCategories: { mode: 'all' as const } },
+      practiceScope: { gens: [1, 3], types: ['fire', 'water'], presets: ['starters' as const], formCategories: { mode: 'all' as const }, games: [] },
       miniGameBestScore: 0,
       seenStreakMilestones: [3, 7],
       earnedBadges: [{ id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' }],
@@ -215,19 +215,20 @@ describe('loadSettings: practiceScope (#333)', () => {
       types: ['fire'],
       presets: ['starters'],
       formCategories: { mode: 'all' },
+      games: [],
     });
   });
 
   it('falls back to the empty scope when the field is missing', () => {
     mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, practiceScope: undefined }));
     const settings = loadSettings();
-    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
   });
 
   it('falls back to the empty scope on a non-object value', () => {
     mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, practiceScope: 'broken' }));
     const settings = loadSettings();
-    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
   });
 
   it('falls back to the empty scope when gens contains an out-of-range value', () => {
@@ -238,7 +239,7 @@ describe('loadSettings: practiceScope (#333)', () => {
         practiceScope: { gens: [0], types: [], presets: [] },
       }),
     );
-    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
   });
 
   it('falls back to the empty scope when gens contains a non-integer', () => {
@@ -249,7 +250,7 @@ describe('loadSettings: practiceScope (#333)', () => {
         practiceScope: { gens: [1.5], types: [], presets: [] },
       }),
     );
-    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
   });
 
   it('falls back to the empty scope when any axis is not an array', () => {
@@ -260,7 +261,7 @@ describe('loadSettings: practiceScope (#333)', () => {
         practiceScope: { gens: 1, types: [], presets: [] },
       }),
     );
-    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
 
     mockLocalStorage.setItem(
       STORAGE_KEY,
@@ -269,7 +270,7 @@ describe('loadSettings: practiceScope (#333)', () => {
         practiceScope: { gens: [], types: 'fire', presets: [] },
       }),
     );
-    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
 
     mockLocalStorage.setItem(
       STORAGE_KEY,
@@ -278,7 +279,7 @@ describe('loadSettings: practiceScope (#333)', () => {
         practiceScope: { gens: [], types: [], presets: 'starters' },
       }),
     );
-    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
   });
 
   it('dedupes repeated gen values', () => {
@@ -289,7 +290,7 @@ describe('loadSettings: practiceScope (#333)', () => {
         practiceScope: { gens: [1, 1, 2, 1], types: [], presets: [] },
       }),
     );
-    expect(loadSettings().practiceScope).toEqual({ gens: [1, 2], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(loadSettings().practiceScope).toEqual({ gens: [1, 2], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
   });
 
   it('drops unknown preset literals silently (no payload-wide rejection)', () => {
@@ -305,6 +306,7 @@ describe('loadSettings: practiceScope (#333)', () => {
       types: [],
       presets: ['starters', 'legendaries'],
       formCategories: { mode: 'all' },
+      games: [],
     });
   });
 
@@ -321,6 +323,7 @@ describe('loadSettings: practiceScope (#333)', () => {
       types: [],
       presets: ['incomplete-chains'],
       formCategories: { mode: 'all' },
+      games: [],
     });
   });
 
@@ -337,6 +340,7 @@ describe('loadSettings: practiceScope (#333)', () => {
       types: ['fire', 'unknown-but-stringy'],
       presets: [],
       formCategories: { mode: 'all' },
+      games: [],
     });
   });
 });
@@ -353,20 +357,20 @@ describe('loadSettings: legacy practice-scope migration', () => {
       JSON.stringify({ gens: [1], types: ['fire'], presets: [] }),
     );
     const settings = loadSettings();
-    expect(settings.practiceScope).toEqual({ gens: [1], types: ['fire'], presets: [], formCategories: { mode: 'all' } });
+    expect(settings.practiceScope).toEqual({ gens: [1], types: ['fire'], presets: [], formCategories: { mode: 'all' }, games: [] });
     // Legacy key removed after migration — never fires again.
     expect(mockLocalStorage.getItem(LEGACY_SCOPE_KEY)).toBeNull();
     // Settings persisted, so the next load reads the migrated scope from
     // the canonical settings blob without needing the legacy key.
     expect(mockLocalStorage.getItem(STORAGE_KEY)).not.toBeNull();
     const reloaded = loadSettings();
-    expect(reloaded.practiceScope).toEqual({ gens: [1], types: ['fire'], presets: [], formCategories: { mode: 'all' } });
+    expect(reloaded.practiceScope).toEqual({ gens: [1], types: ['fire'], presets: [], formCategories: { mode: 'all' }, games: [] });
   });
 
   it('no-ops when the legacy key is absent', () => {
     // No legacy key → loadSettings returns defaults; no persistence side effect.
     const settings = loadSettings();
-    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
     // No settings blob was written (legacy absent → no migration fired).
     expect(mockLocalStorage.getItem(STORAGE_KEY)).toBeNull();
   });
@@ -383,7 +387,7 @@ describe('loadSettings: legacy practice-scope migration', () => {
       JSON.stringify({ gens: [1], types: ['fire'], presets: [] }),
     );
     const settings = loadSettings();
-    expect(settings.practiceScope).toEqual({ gens: [2], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(settings.practiceScope).toEqual({ gens: [2], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
     expect(mockLocalStorage.getItem(LEGACY_SCOPE_KEY)).toBeNull();
   });
 
@@ -393,14 +397,14 @@ describe('loadSettings: legacy practice-scope migration', () => {
       JSON.stringify({ gens: [], types: [], presets: [] }),
     );
     const settings = loadSettings();
-    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(settings.practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
     expect(mockLocalStorage.getItem(LEGACY_SCOPE_KEY)).toBeNull();
   });
 
   it('ignores a malformed legacy payload without throwing', () => {
     mockLocalStorage.setItem(LEGACY_SCOPE_KEY, '{not json');
     expect(() => loadSettings()).not.toThrow();
-    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' } });
+    expect(loadSettings().practiceScope).toEqual({ gens: [], types: [], presets: [], formCategories: { mode: 'all' }, games: [] });
   });
 });
 
