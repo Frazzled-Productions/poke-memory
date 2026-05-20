@@ -126,7 +126,12 @@ test.describe("Pasture nav guard", () => {
     const nav = getPrimaryNavContainer(page, testInfo);
     const pastureLink = nav.getByRole("link", { name: "Pasture" });
     await expect(pastureLink).toBeVisible();
-    await pastureLink.click();
+    // `force: true` bypasses Playwright's stability check. The BottomTabBar
+    // briefly re-renders after the mastery-check useEffect completes (causing
+    // the Pasture link to detach and re-attach), which races with the default
+    // click's actionability gate on slow mobile-safari runs. The link's href
+    // is stable; we just need the click to fire.
+    await pastureLink.click({ force: true });
 
     await expect(page).toHaveURL("/pasture");
   });
