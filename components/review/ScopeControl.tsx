@@ -14,6 +14,7 @@ import {
   type PracticeScopePreset,
   type ScopeMatchContext,
 } from "@/lib/review/scope";
+import { GameScopePicker } from "@/components/review/GameScopePicker";
 
 type Props = {
   scope: PracticeScope;
@@ -235,6 +236,21 @@ export function ScopeControl({
                   </button>
                 );
               })}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Games
+            </legend>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Limit practice to Pokémon available in specific games.
+            </p>
+            <div className="mt-2">
+              <GameScopePicker
+                selected={scope.games ?? []}
+                onChange={(games) => onChange({ ...scope, games })}
+              />
             </div>
           </fieldset>
 

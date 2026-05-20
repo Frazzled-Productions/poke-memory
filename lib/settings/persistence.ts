@@ -301,7 +301,20 @@ function validatePracticeScope(value: unknown): PracticeScope | null {
   // formCategories is additive — absent in pre-#450 persisted scopes; default
   // to {mode:'all'} so existing users see no behaviour change.
   const formCategories = parseFormCategoryFilter(v.formCategories);
-  return { gens, types, presets, formCategories };
+  // games is additive — absent in pre-#1089 persisted scopes; default to [].
+  // Unknown string entries are kept (the matcher just won't match them) rather
+  // than rejecting the whole payload, mirroring the type-axis approach.
+  const games: string[] = [];
+  if (Array.isArray(v.games)) {
+    const seenGames = new Set<string>();
+    for (const g of v.games) {
+      if (typeof g !== "string") return null;
+      if (seenGames.has(g)) continue;
+      seenGames.add(g);
+      games.push(g);
+    }
+  }
+  return { gens, types, presets, formCategories, games };
 }
 
 // ─── Coercion helpers (local to this file) ──────────────────────────────────
