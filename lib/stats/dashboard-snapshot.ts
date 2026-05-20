@@ -122,6 +122,17 @@ export type DashboardSnapshotOptions = {
    * Defaults to 0.9.
    */
   retentionTarget?: number;
+  /**
+   * Reference timestamp for the `firstMastery` axis. Defaults to `new Date()`
+   * (the real current moment) when omitted, which matches the behaviour of the
+   * pre-refactor Stats-page code that passed `new Date()` directly.
+   *
+   * Passing an explicit value (e.g. midnight UTC) anchors the projection to a
+   * fixed point, which improves test determinism but shifts the result by up to
+   * ~12 hours depending on when the user grades. Omit this parameter for
+   * production call sites so the projection always counts from the real moment.
+   */
+  now?: Date;
 };
 
 // ---------------------------------------------------------------------------
@@ -151,6 +162,7 @@ export function computeDashboardSnapshot(
     masteryRepetitions,
     forceAllMastered = false,
     retentionTarget = 0.9,
+    now = new Date(),
   } = options;
 
   function wants(axis: SnapshotAxis): boolean {
@@ -205,15 +217,16 @@ export function computeDashboardSnapshot(
       };
     }
 
-    if (wants("forecast") && statsResult !== null) {
+    if (wants("forecast")) {
       // Replace the today bar with the exact queue total. Future bars
       // (indices 1–13) come from computeStats unchanged — they are exact
       // dueDate matches and don't depend on eligibility settings.
-      const forecast = statsResult.dueForecast;
-      dueForecast =
-        forecast.length > 0
-          ? [{ ...forecast[0], count: todayCount }, ...forecast.slice(1)]
-          : forecast;
+      // statsResult is always non-null here: needsStats = wants("mastery") ||
+      // wants("struggling") || wants("forecast"), so forecast implies computed.
+      const forecast = statsResult!.dueForecast;
+      // computeStats always returns 14 entries (DUE_FORECAST_DAYS), so
+      // forecast.length > 0 is unconditionally true — spread directly.
+      dueForecast = [{ ...forecast[0], count: todayCount }, ...forecast.slice(1)];
     }
   }
 
@@ -277,7 +290,7 @@ export function computeDashboardSnapshot(
       firstMasteryDays =
         projectTimeToFirstMastery(
           nameCards,
-          new Date(today + "T00:00:00Z"),
+          now,
           masteryRepetitions,
           forceAllMastered,
           { retentionTarget },

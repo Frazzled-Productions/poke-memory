@@ -570,8 +570,8 @@ export default function StatsPage() {
                     <RetentionIndicator comparison={reviewCharts.retentionComparison} />
                     <DirectionBreakdownChart rows={reviewCharts.directionRows} />
                     <DifficultyHistogram
-                      buckets={snapshot.difficulty?.buckets ?? []}
-                      mean={snapshot.difficulty?.mean ?? null}
+                      buckets={snapshot.difficulty!.buckets}
+                      mean={snapshot.difficulty!.mean}
                     />
                   </>
                 )}
@@ -593,7 +593,7 @@ export default function StatsPage() {
                     />
                     <MasteryOverTimeChart
                       series={reviewCharts.masteryOverTime}
-                      totalCards={snapshot.mastery?.totalCards ?? 0}
+                      totalCards={snapshot.mastery!.totalCards}
                       dateFormat={userDateFormat}
                       forceAllMastered={flags.pretendAllMastered}
                     />
