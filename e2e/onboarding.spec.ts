@@ -8,7 +8,7 @@ test.describe("First-visit onboarding modal (#1103)", () => {
   }) => {
     await page.goto("/");
 
-    const modal = page.getByRole("dialog", { name: /welcome to poke memory/i });
+    const modal = page.getByRole("dialog", { name: /welcome to pok[eé] memory/i });
     await expect(modal).toBeVisible();
 
     // Grading guidance must be present inside the modal.
@@ -17,24 +17,23 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     await modal.getByRole("button", { name: /get started/i }).click();
     await expect(modal).toHaveCount(0);
 
-    // After dismissal the Practice card surface is interactable.
-    // Allow for end-state screens as well as active-card states.
-    const cardOrEndState = page.locator('[data-testid="swipe-card"], button:text("Reveal"), button:text("All caught up"), p:text("All caught up")').first();
-    // Just verify the page is usable without the modal blocking it.
-    await expect(page.locator("main")).toBeVisible();
+    // After dismissal the Practice card surface must be interactable.
+    await expect(
+      page.getByRole("button", { name: /reveal/i }).or(page.getByText(/all caught up/i)),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test("modal does not reappear after dismissal", async ({ page }) => {
     await page.goto("/");
 
-    const modal = page.getByRole("dialog", { name: /welcome to poke memory/i });
+    const modal = page.getByRole("dialog", { name: /welcome to pok[eé] memory/i });
     await expect(modal).toBeVisible();
     await modal.getByRole("button", { name: /get started/i }).click();
     await expect(modal).toHaveCount(0);
 
     await page.reload();
     await expect(
-      page.getByRole("dialog", { name: /welcome to poke memory/i }),
+      page.getByRole("dialog", { name: /welcome to pok[eé] memory/i }),
     ).toHaveCount(0);
   });
 
@@ -52,7 +51,7 @@ test.describe("First-visit onboarding modal (#1103)", () => {
 
     await page.goto("/");
     await expect(
-      page.getByRole("dialog", { name: /welcome to poke memory/i }),
+      page.getByRole("dialog", { name: /welcome to pok[eé] memory/i }),
     ).toHaveCount(0);
   });
 
@@ -61,7 +60,7 @@ test.describe("First-visit onboarding modal (#1103)", () => {
   }) => {
     // Dismiss the modal first.
     await page.goto("/");
-    const modal = page.getByRole("dialog", { name: /welcome to poke memory/i });
+    const modal = page.getByRole("dialog", { name: /welcome to pok[eé] memory/i });
     if (await modal.isVisible().catch(() => false)) {
       await modal.getByRole("button", { name: /get started/i }).click();
     }
@@ -69,11 +68,11 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     await page.goto("/settings");
     // "How this works" lives inside the collapsible "Account & Data" section.
     await page.getByRole("button", { name: /account & data/i }).click();
-    await page.getByRole("button", { name: /show tips again/i }).click();
+    await page.getByRole("button", { name: /show onboarding again/i }).click();
 
     await page.goto("/");
     await expect(
-      page.getByRole("dialog", { name: /welcome to poke memory/i }),
+      page.getByRole("dialog", { name: /welcome to pok[eé] memory/i }),
     ).toBeVisible();
   });
 });
@@ -103,7 +102,7 @@ test.describe("Feature nudges (#702)", () => {
     // test without a full card set, so just verify the modal is absent and the
     // page loads cleanly.
     await expect(
-      page.getByRole("dialog", { name: /welcome to poke memory/i }),
+      page.getByRole("dialog", { name: /welcome to pok[eé] memory/i }),
     ).toHaveCount(0);
   });
 });
@@ -199,7 +198,7 @@ test.describe("PWA install nudge (#701)", () => {
     expect(stored?.onboarding?.installNudgeDismissed).toBe(true);
   });
 
-  test("show tips again resets installNudgeDismissed flag", async ({ page }) => {
+  test("show onboarding again resets installNudgeDismissed flag", async ({ page }) => {
     // Seed as dismissed with a high visit count.
     await page.addInitScript((key) => {
       localStorage.setItem(
@@ -219,7 +218,7 @@ test.describe("PWA install nudge (#701)", () => {
 
     await page.goto("/settings");
     await page.getByRole("button", { name: /account & data/i }).click();
-    await page.getByRole("button", { name: /show tips again/i }).click();
+    await page.getByRole("button", { name: /show onboarding again/i }).click();
 
     // After the reset, installNudgeDismissed must be false in localStorage.
     const stored = await page.evaluate((key) => {
@@ -236,91 +235,29 @@ test.describe("PWA install nudge (#701)", () => {
   });
 });
 
-test.describe("Guest storage-persistence notice (#1057)", () => {
-  test("notice appears for a guest user after the modal is dismissed", async ({ page }) => {
+test.describe("Guest storage section in onboarding modal (#1057)", () => {
+  test("modal shows guest storage section for a guest user", async ({ page }) => {
     await page.goto("/");
 
-    // Dismiss the first-visit modal so it does not obscure the notice behind the backdrop.
-    const modal = page.getByRole("dialog", { name: /welcome to poke memory/i });
-    if (await modal.isVisible().catch(() => false)) {
-      await modal.getByRole("button", { name: /get started/i }).click();
-    }
+    const modal = page.getByRole("dialog", { name: /welcome to pok[eé] memory/i });
+    await expect(modal).toBeVisible();
 
-    const notice = page.getByRole("note", {
-      name: /your progress is saved on this device/i,
-    });
-    await expect(notice).toBeVisible();
-
-    // Key content must be present.
-    await expect(notice.getByText(/stored in your browser/i)).toBeVisible();
+    // Guest storage info must be present inside the modal.
+    await expect(modal.getByText(/your progress is saved on this device/i)).toBeVisible();
+    await expect(modal.getByText(/stored in your browser/i)).toBeVisible();
   });
 
-  test("notice can be dismissed and stays dismissed after reload", async ({
+  test("guest storage section is absent after the modal is dismissed", async ({
     page,
   }) => {
-    // Pre-dismiss the modal so we go straight to the notice.
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
-      );
-    }, SETTINGS_KEY);
-
     await page.goto("/");
 
-    const notice = page.getByRole("note", {
-      name: /your progress is saved on this device/i,
-    });
-    await expect(notice).toBeVisible();
+    const modal = page.getByRole("dialog", { name: /welcome to pok[eé] memory/i });
+    await expect(modal).toBeVisible();
+    await modal.getByRole("button", { name: /get started/i }).click();
+    await expect(modal).toHaveCount(0);
 
-    await notice.getByRole("button", { name: /dismiss hint/i }).click();
-    await expect(notice).toHaveCount(0);
-
-    // Verify the flag is persisted to localStorage.
-    const stored = await page.evaluate((key) => {
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      try {
-        return JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        return null;
-      }
-    }, SETTINGS_KEY);
-    expect(
-      (stored?.onboarding as Record<string, unknown> | undefined)
-        ?.guestStorageNoticeDismissed,
-    ).toBe(true);
-
-    // Notice must not reappear after reload.
-    await page.reload();
-    await expect(
-      page.getByRole("note", { name: /your progress is saved on this device/i }),
-    ).toHaveCount(0);
-  });
-
-  test("notice is absent when already dismissed in settings", async ({
-    page,
-  }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          onboarding: {
-            firstVisitOnboardingDismissed: true,
-            welcomeDismissed: false,
-            practiceHintDismissed: false,
-            statsHintDismissed: false,
-            settingsHintDismissed: false,
-            installNudgeDismissed: false,
-            audioHintDismissed: false,
-            cardTypesHintDismissed: false,
-            guestStorageNoticeDismissed: true,
-          },
-        }),
-      );
-    }, SETTINGS_KEY);
-
-    await page.goto("/");
+    // No standalone storage notice should appear — info was in the modal.
     await expect(
       page.getByRole("note", { name: /your progress is saved on this device/i }),
     ).toHaveCount(0);

@@ -5,7 +5,7 @@
  * dismiss, Settings reset re-opens it.
  */
 
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { FirstVisitOnboardingModal } from "@/components/onboarding/FirstVisitOnboardingModal";
@@ -55,13 +55,13 @@ describe("FirstVisitOnboardingModal", () => {
     render(<FirstVisitOnboardingModal />);
     // After useEffect runs the modal should appear.
     expect(
-      await screen.findByRole("dialog", { name: /welcome to poke memory/i }),
+      await screen.findByRole("dialog", { name: /welcome to pok[eé] memory/i }),
     ).toBeInTheDocument();
   });
 
   it("renders grading guidance content", async () => {
     render(<FirstVisitOnboardingModal />);
-    await screen.findByRole("dialog", { name: /welcome to poke memory/i });
+    await screen.findByRole("dialog", { name: /welcome to pok[eé] memory/i });
     // "Again" appears as a bold label in the grading list; getAllByText handles
     // the fact that the text matches both the <strong> and its parent <li>.
     expect(screen.getAllByText(/again/i).length).toBeGreaterThan(0);
@@ -132,7 +132,7 @@ describe("FirstVisitOnboardingModal", () => {
     await user.click(screen.getByRole("button", { name: /get started/i }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    // Simulate the Settings "Show tips again" reset.
+    // Simulate the Settings "Show onboarding again" reset.
     act(() => {
       const current = loadSettings();
       saveSettings({ ...current, onboarding: { ...DEFAULT_ONBOARDING } });
@@ -142,7 +142,61 @@ describe("FirstVisitOnboardingModal", () => {
     rerender(<FirstVisitOnboardingModal />);
 
     expect(
-      await screen.findByRole("dialog", { name: /welcome to poke memory/i }),
+      await screen.findByRole("dialog", { name: /welcome to pok[eé] memory/i }),
     ).toBeInTheDocument();
+  });
+
+  describe("keyboard interaction", () => {
+    it("Escape key dismisses the modal and persists the flag", async () => {
+      render(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+
+      act(() => {
+        fireEvent.keyDown(document, { key: "Escape" });
+      });
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+      const settings = loadSettings();
+      expect(settings.onboarding.firstVisitOnboardingDismissed).toBe(true);
+    });
+
+    it("sets scroll-lock on open and restores overflow on dismiss", async () => {
+      const user = userEvent.setup();
+      render(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+
+      expect(document.body.style.overflow).toBe("hidden");
+
+      await user.click(screen.getByRole("button", { name: /get started/i }));
+
+      // overflow is restored to whatever it was before open (empty string when unset).
+      expect(document.body.style.overflow).not.toBe("hidden");
+    });
+
+    it("Tab cycling stays within the modal", async () => {
+      const user = userEvent.setup();
+      render(<FirstVisitOnboardingModal />);
+      const dialog = await screen.findByRole("dialog");
+
+      // Collect focusable elements inside the dialog.
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      expect(focusable.length).toBeGreaterThan(1);
+
+      // Start at first element (close button receives initial focus).
+      focusable[0].focus();
+
+      // Tab through all elements; focus must stay inside the dialog.
+      for (let i = 1; i < focusable.length; i++) {
+        await user.tab();
+        expect(dialog.contains(document.activeElement)).toBe(true);
+      }
+
+      // One more Tab from the last element wraps to the first.
+      await user.tab();
+      expect(document.activeElement).toBe(focusable[0]);
+    });
   });
 });

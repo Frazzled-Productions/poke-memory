@@ -7,10 +7,18 @@
  * storage. Once dismissed the `firstVisitOnboardingDismissed` flag is
  * persisted and the modal never re-opens automatically.
  *
- * Re-openable from Settings ("Show onboarding tour again").
+ * Re-openable from Settings ("Show onboarding again").
+ *
+ * Accessibility notes:
+ * - Rendered via createPortal so it sits outside #app-root in the DOM.
+ * - While open, #app-root receives `inert` and `aria-hidden` so screen-reader
+ *   virtual cursor cannot escape into background content.
+ * - Previously focused element is restored on dismiss (WCAG 2.1 SC 2.4.3).
+ * - Escape key dismisses; Tab/Shift-Tab cycle is trapped inside the dialog.
  */
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   DEFAULT_ONBOARDING,
@@ -28,9 +36,19 @@ type Props = {
 export function FirstVisitOnboardingModal({ onDismiss }: Props) {
   // null = not yet read from localStorage (SSR / first paint).
   const [open, setOpen] = useState<boolean | null>(null);
+  // Whether we have a DOM available (guards createPortal from SSR).
+  const [mounted, setMounted] = useState(false);
   const { user, loading: authLoading } = useAuth();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // Stores the element that was focused before the modal opened so focus can
+  // be returned there on dismiss (WCAG 2.1 SC 2.4.3).
+  const prevFocusRef = useRef<HTMLElement | null>(null);
+
+  // Confirm DOM is available before using createPortal.
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Read the persisted flag once auth has resolved so we know whether to
   // surface the guest-storage section.
@@ -46,12 +64,31 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
     return () => window.removeEventListener(SETTINGS_SAVED_EVENT, sync);
   }, []);
 
-  // Focus the close button when the modal opens so keyboard users land on a
-  // meaningful action target immediately.
+  // When the modal opens:
+  //   1. Capture the currently focused element so we can restore it on close.
+  //   2. Focus the close button so keyboard users land on a meaningful target.
+  //   3. Mark #app-root inert + aria-hidden so background content is hidden
+  //      from screen-reader virtual cursor and pointer interaction.
   useEffect(() => {
-    if (open) {
-      closeButtonRef.current?.focus();
+    if (!open) return;
+
+    // Capture previous focus before moving it.
+    prevFocusRef.current = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+
+    const appRoot = document.getElementById("app-root");
+    if (appRoot) {
+      appRoot.setAttribute("inert", "");
+      appRoot.setAttribute("aria-hidden", "true");
     }
+
+    return () => {
+      // Clean up inert / aria-hidden when modal closes or unmounts.
+      if (appRoot) {
+        appRoot.removeAttribute("inert");
+        appRoot.removeAttribute("aria-hidden");
+      }
+    };
   }, [open]);
 
   // Lock background scroll while open and trap Escape to dismiss.
@@ -108,15 +145,25 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
       onboarding: { ...onboarding, firstVisitOnboardingDismissed: true },
     });
     setOpen(false);
+
+    // Return focus to where it was before the modal opened. Fall back to the
+    // document body if nothing useful was captured (e.g. on page load).
+    if (prevFocusRef.current && prevFocusRef.current !== document.body) {
+      prevFocusRef.current.focus();
+    }
+
     onDismiss?.();
   }
 
-  // Do not render until we know the flag value (avoids a flash on first paint).
-  if (open === null || !open) return null;
+  // Do not render until we know the flag value (avoids a flash on first paint)
+  // or until the DOM is ready for createPortal.
+  if (!mounted || open === null || !open) return null;
 
   const isGuest = !authLoading && user === null;
 
-  return (
+  // Render into document.body so the dialog sits outside #app-root and is not
+  // made inert along with the rest of the page content.
+  return createPortal(
     /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
@@ -137,7 +184,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
             id="onboarding-modal-title"
             className="text-base font-semibold text-foreground"
           >
-            Welcome to Poke Memory
+            Welcome to Poké Memory
           </h2>
           <button
             ref={closeButtonRef}
@@ -155,7 +202,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
 
           {/* Intro */}
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Learn every Pokemon name and evolution with spaced repetition.
+            Learn every Pokémon name and evolution with spaced repetition.
             New cards arrive daily; the app surfaces each card right before
             you would likely forget it, so gaps grow as your memory strengthens.
           </p>
@@ -198,7 +245,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
               Adding sound (optional)
             </h3>
             <p className="text-sm text-zinc-600 dark:text-zinc-300">
-              You can enable Pokemon cries on card reveal and spoken names via
+              You can enable Pokémon cries on card reveal and spoken names via
               text-to-speech. You can also unlock cry cards, where the audio is
               the prompt.
             </p>
@@ -244,6 +291,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
           </button>
         </div>
       </dialog>
-    </div>
+    </div>,
+    document.body,
   );
 }

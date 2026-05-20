@@ -46,7 +46,6 @@ vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 vi.mock("@vercel/speed-insights/next", () => ({ SpeedInsights: () => null }));
 vi.mock("@/components/IdbMigration", () => ({ IdbMigration: () => null }));
 vi.mock("@/components/onboarding/PwaInstallNudge", () => ({ PwaInstallNudge: () => null }));
-vi.mock("@/components/onboarding/GuestStorageNotice", () => ({ GuestStorageNotice: () => null }));
 vi.mock("@/components/pwa/ServiceWorkerProvider", () => ({ ServiceWorkerProvider: () => null }));
 vi.mock("@/components/pwa/StoragePersistenceRequester", () => ({
   StoragePersistenceRequester: () => null,

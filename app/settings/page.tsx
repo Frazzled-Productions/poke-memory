@@ -1486,7 +1486,7 @@ export default function SettingsPage() {
                   <hr className="border-zinc-200 dark:border-zinc-800" />
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      Show onboarding guide again
+                      Show onboarding again
                     </p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Re-opens the welcome guide on the Practice page and
@@ -1504,7 +1504,7 @@ export default function SettingsPage() {
                       }}
                       className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
-                      Show tips again
+                      Show onboarding again
                     </button>
                   </div>
                 </div>
