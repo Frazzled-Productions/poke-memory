@@ -1,5 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { seedIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 /**
  * Signed-in UI coverage via the test-only mock-auth seam (issue #751).

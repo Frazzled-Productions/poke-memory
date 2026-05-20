@@ -71,6 +71,7 @@ const VALID_SETTINGS: UserSettings = {
   seenStreakMilestones: [],
   earnedBadges: [],
   onboarding: {
+    firstVisitOnboardingDismissed: false,
     welcomeDismissed: false,
     practiceHintDismissed: false,
     statsHintDismissed: false,

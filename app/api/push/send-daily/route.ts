@@ -78,14 +78,14 @@ function isAuthorized(headerValue: string | null, secret: string): boolean {
  * we can unit test it without touching the network or DB.
  *
  * British English copy. No em dashes (per AGENTS.md "Punctuation"). The
- * "Pokémon" spelling is the proper noun and stays as-is.
+ * count is scheduled-due cards only (due_date <= today in the user's
+ * timezone) — it does not include new cards with no row yet or respect
+ * daily caps, so it intentionally does not claim to be the full session
+ * queue.
  */
 export function buildDailyMessage(dueCount: number): PushPayload {
   const title = "Time to practise";
-  const body =
-    dueCount === 1
-      ? "1 Pokémon is ready for review."
-      : `${String(dueCount)} ${plural(dueCount, "Pokémon is", "Pokémon are")} ready for review.`;
+  const body = `${String(dueCount)} ${plural(dueCount, "card", "cards")} scheduled for today.`;
   return { title, body, url: "/" };
 }
 

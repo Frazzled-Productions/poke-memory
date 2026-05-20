@@ -506,47 +506,9 @@ describe("handleReveal decode-ahead (#930)", () => {
 });
 
 describe("ReviewSession onboarding nudges (#702)", () => {
-  it("shows the audio hint at reveal when no audio feature is enabled", async () => {
-    const user = userEvent.setup();
-    render(<ReviewSession />);
-
-    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
-    await user.click(revealBtn);
-
-    expect(
-      screen.getByText(/hear Pokémon cries and names read aloud/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /open audio settings/i }),
-    ).toHaveAttribute("href", "/settings#audio-heading");
-  });
-
-  it("hides the audio hint when an audio feature is already on", async () => {
-    const user = userEvent.setup();
-    mockLoadSettings.mockReturnValue({
-      masteryRepetitions: 3,
-      maxNewPerDay: 10,
-      maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
-      maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: true,
-      playCryOnReveal: true,
-      practiceScope: { gens: [], types: [], presets: [] },
-      earnedBadges: [],
-    });
-    render(<ReviewSession />);
-
-    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
-    await user.click(revealBtn);
-
-    expect(
-      screen.queryByText(/hear Pokémon cries and names read aloud/i),
-    ).not.toBeInTheDocument();
-  });
+  // Audio-feature hints were removed in #1103 (replaced by the first-visit
+  // onboarding modal). Only the card-types nudge on the session-complete screen
+  // remains — it is still rendered by EndOfSessionScreen.
 
   it("shows the card-types hint on the session-complete screen", async () => {
     const user = userEvent.setup();
@@ -565,74 +527,6 @@ describe("ReviewSession onboarding nudges (#702)", () => {
     expect(
       screen.getByRole("link", { name: /open practice settings/i }),
     ).toHaveAttribute("href", "/settings#practice-heading");
-  });
-
-  it("shows the audio hint for reverse cards when no audio feature is enabled", async () => {
-    // Reverse cards use SpritePicker and have no reveal step. The nudge must
-    // appear immediately after the picker renders, not gated on a reveal click.
-    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
-    mockLoadSettings.mockReturnValue({
-      masteryRepetitions: 3,
-      maxNewPerDay: 10,
-      maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: true,
-      maxNewReversePerDay: 10,
-      maxReviewsReversePerDay: 100,
-      nameCardsEnabled: false,
-      evolutionCardsEnabled: false,
-      playCryOnReveal: false,
-      practiceScope: { gens: [], types: [], presets: [] },
-      earnedBadges: [],
-    });
-
-    render(<ReviewSession />);
-
-    // SpritePicker renders immediately (no reveal step).
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument(),
-    );
-
-    // The audio nudge must be visible without any reveal interaction.
-    await waitFor(() =>
-      expect(
-        screen.getByText(/hear Pokémon cries and names read aloud/i),
-      ).toBeInTheDocument(),
-    );
-    expect(
-      screen.getByRole("link", { name: /open audio settings/i }),
-    ).toHaveAttribute("href", "/settings#audio-heading");
-  });
-
-  it("hides the audio hint for reverse cards when an audio feature is already on", async () => {
-    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
-    mockLoadSettings.mockReturnValue({
-      masteryRepetitions: 3,
-      maxNewPerDay: 10,
-      maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: true,
-      maxNewReversePerDay: 10,
-      maxReviewsReversePerDay: 100,
-      nameCardsEnabled: false,
-      evolutionCardsEnabled: false,
-      playCryOnReveal: true,
-      practiceScope: { gens: [], types: [], presets: [] },
-      earnedBadges: [],
-    });
-
-    render(<ReviewSession />);
-
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument(),
-    );
-
-    // playCryOnReveal is on → audioFeaturesOff is false → nudge must not appear.
-    expect(
-      screen.queryByText(/hear Pokémon cries and names read aloud/i),
-    ).not.toBeInTheDocument();
   });
 
   it("hides the card-types hint when every card type is already on", async () => {
@@ -2881,5 +2775,181 @@ describe("Keyboard shortcuts (#1060)", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: /keyboard shortcuts/i })).not.toBeInTheDocument();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ReviewCardLayout extraction regression (#1106)
+//
+// Verifies that the shared chrome (QueueCounterRow, undo button) is present
+// in all four render paths after the extraction. Each test drives a specific
+// branch by controlling settings / loadSession, then asserts the chrome
+// elements that ReviewCardLayout now owns appear on screen.
+// ---------------------------------------------------------------------------
+
+describe("ReviewCardLayout shared chrome (#1106)", () => {
+  /** Settings for a name-only session (the default flip branch). */
+  const flipSettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    reverseCardsEnabled: false,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 0,
+    cryCardsEnabled: false,
+    maxNewCryPerDay: 0,
+    maxReviewsCryPerDay: 0,
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [], types: [], presets: [] },
+    earnedBadges: [],
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("flip branch (name card): QueueCounterRow is present", async () => {
+    render(<ReviewSession />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("status", { name: /queue counts/i })).toBeInTheDocument(),
+    );
+  });
+
+  it("flip branch (name card): undo button appears after grading", async () => {
+    const user = userEvent.setup();
+    mockLoadSettings.mockReturnValue(flipSettings);
+    render(<ReviewSession />);
+
+    const reveal = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(reveal);
+    // Grade Again (non-graduating) so the card re-enters the learning queue
+    // and the session continues, keeping ReviewCardLayout mounted with the
+    // undo button visible.
+    await user.click(screen.getByRole("button", { name: /again/i }));
+
+    // ReviewCardLayout wires the undo button; assert it is actually in the DOM.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /undo last grade/i }),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("reverse branch (SpritePicker): QueueCounterRow is present", async () => {
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: true,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("status", { name: /queue counts/i })).toBeInTheDocument(),
+    );
+    // Reverse branch: no Reveal button (SpritePicker grades inline).
+    expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+  });
+
+  it("cry branch: QueueCounterRow is present before reveal", async () => {
+    mockSeedPokemon.mockReturnValue([
+      { ...FIXTURE_CARD, cryUrl: "https://example.com/bulbasaur.ogg" },
+    ]);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      // All non-cry card types disabled so buildSession produces only a cry
+      // card. Without these, the name card (built first) would be served and
+      // the test would exercise the flip branch instead of the cry branch.
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 10,
+      maxReviewsCryPerDay: 100,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // Cry branch shows a Reveal button alongside the play button.
+    await screen.findByRole("button", { name: /reveal/i });
+
+    expect(
+      screen.getByRole("status", { name: /queue counts/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("countdown branch: QueueCounterRow is present while waiting for a learning card", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-20T12:00:00Z"));
+    const T = Date.now();
+
+    // Relearning card due in 30 min — beyond the 20-min learn-ahead window so
+    // the countdown branch renders instead of the card.
+    const learningCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      state: {
+        stability: 1,
+        difficulty: 1,
+        elapsedDays: 0,
+        scheduledDays: 1,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "relearning" as const,
+        dueDate: "2026-05-20",
+        lastReview: "2026-05-20",
+        firstSeen: "2026-05-01",
+        learningStep: 0,
+        // stepMs for relearning step 0 = 600_000 ms (10 min).
+        // stepStartedAt = T + 20*60_000 so dueAt = T + 30*60_000.
+        stepStartedAt: T + 20 * 60_000,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [learningCard],
+      limits: DEFAULT_LIMITS,
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/next card in/i)).toBeInTheDocument(),
+    );
+    // Countdown branch delegates bottom chrome to ReviewCardLayout.
+    expect(
+      screen.getByRole("status", { name: /queue counts/i }),
+    ).toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@
  * CollectionTimeline — the hero scrubber on the Journey tab.
  *
  * Allows the user to drag through time in both directions:
- *   Left (past): replay how the collection was built, week by week.
+ *   Left (past): replay how the collection was built, day by day.
  *   Right (future): the forgetting horizon — cards that will fade if
  *                   never reviewed again.
  *

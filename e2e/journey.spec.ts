@@ -1,5 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { isMobileProject } from "./helpers/navHelpers";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 async function seedSuperuser(
   page: Page,

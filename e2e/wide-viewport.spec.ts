@@ -8,6 +8,11 @@
  * by design.
  */
 import { test, expect } from "@playwright/test";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 test.describe("Practice page — session-progress sidebar (lg: layout)", () => {
   // Only meaningful at desktop width (lg: ≥ 1024px). The chromium project

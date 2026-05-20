@@ -54,7 +54,7 @@ import {
   computeSessionDirectionAccuracy,
   type SessionDirectionTally,
 } from "@/lib/stats/direction-breakdown";
-import { QueueCounterRow } from "@/components/review/QueueCounterRow";
+import { ReviewCardLayout } from "@/components/review/ReviewCardLayout";
 import { ShareTodayButton } from "@/components/review/ShareTodayButton";
 import { previewIntervals } from "@/lib/srs/intervalPreview";
 import { isMastered } from "@/lib/stats/derive";
@@ -73,6 +73,7 @@ import {
   EMPTY_SCOPE,
   cardIsEligible,
   cardMatchesScope,
+  computeEligibleCardIds,
   isScopeEmpty,
   type PracticeScope,
   type ScopeMatchContext,
@@ -160,24 +161,6 @@ function formatCountdown(ms: number): string {
   const seconds = totalSecs % 60;
   if (minutes === 0) return `${seconds}s`;
   return `${minutes}m ${seconds}s`;
-}
-
-// ---------------------------------------------------------------------------
-// Sub-components: out-of-scope hint
-// ---------------------------------------------------------------------------
-
-/**
- * Subtle caption shown when a card is mid-learning-step but falls outside the
- * active practice scope. The scheduling behaviour is intentional — abandoning a
- * card mid-step would corrupt FSRS state — but to the user it can look like a
- * broken filter. This hint explains what is happening.
- */
-function OutOfScopeHint() {
-  return (
-    <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center italic">
-      Finishing an in-progress card
-    </p>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -528,12 +511,12 @@ export function ReviewSession() {
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
   // settings default) until the session load effect reads the real value.
   const [masteryRepetitions, setMasteryRepetitions] = useState(3);
-  // Onboarding nudges (#702). `audioFeaturesOff` is true when the user has no
-  // audio behaviour switched on at all (no cry playback, no spoken names, no
-  // cry cards) — only then does the audio hint at card reveal make sense.
-  // `cardTypesAllOn` is true when every off-by-default card type is enabled —
-  // when that holds there is nothing left to nudge towards.
-  const [audioFeaturesOff, setAudioFeaturesOff] = useState(false);
+  // Onboarding nudges (#702). `cardTypesAllOn` is true when every
+  // off-by-default card type is enabled — when that holds there is nothing
+  // left to nudge towards on the session-complete screen.
+  // Note: `audioFeaturesOff` was removed in #1103 (consolidated into the
+  // one-time first-visit modal). `cardTypesAllOn` remains for the end-of-session
+  // card-types nudge, which is still shown in EndOfSessionScreen.
   const [cardTypesAllOn, setCardTypesAllOn] = useState(false);
   const [revealed, setRevealed] = useState(false);
   // True while decode-ahead is running for an evolution/reverse-evolution
@@ -606,26 +589,21 @@ export function ReviewSession() {
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
       // reload when toggling card-type gates, so the state is always current.
-      const cardTypeOpts = {
-        nameEnabled: nameCardsEnabled,
-        evolutionEnabled: evolutionCardsEnabled,
-        reverseEnabled,
-        reverseEvolutionEnabled,
-        cryEnabled: cryCardsEnabled,
-      };
       // Context for the "Incomplete evolution chains" preset (#995): the
       // incomplete-chain set is derived from the current card set, which has
       // not changed here (only the scope did), so `incompleteChains` is current.
-      const eligibleIds = new Set(
-        cards
-          .filter(
-            (c) =>
-              cardTypeIsEnabled(c, cardTypeOpts) &&
-              cardIsEligible(c, next, alternateFormsEnabled, {
-                incompleteChainSpeciesIds: incompleteChains,
-              }),
-          )
-          .map((c) => c.id),
+      const eligibleIds = computeEligibleCardIds(
+        cards,
+        {
+          nameCardsEnabled,
+          evolutionCardsEnabled,
+          reverseCardsEnabled: reverseEnabled,
+          reverseEvolutionCardsEnabled: reverseEvolutionEnabled,
+          cryCardsEnabled: cryCardsEnabled,
+          alternateFormsEnabled,
+          practiceScope: next,
+        },
+        { incompleteChainSpeciesIds: incompleteChains },
       );
       setEligibleCardIds(eligibleIds);
       // Clear the displayed-card render lock (#1088). The lock pins the
@@ -842,14 +820,6 @@ export function ReviewSession() {
       reconcileHiddenState(sessionCards, persistedScope, today);
       // Three-tier eligibility: card-type-enabled gate, then
       // `alternateFormsEnabled` gate, then scope filter (#658, #835).
-      // `cardIsEligible` encapsulates the second and third checks.
-      const cardTypeOpts = {
-        nameEnabled,
-        evolutionEnabled,
-        reverseEnabled: enabled,
-        reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
-        cryEnabled,
-      };
       // Context for the "Incomplete evolution chains" preset (#995): derive
       // chain progress from the freshly-built/hydrated card set. The
       // `scopeContext` memo cannot be used here — it depends on `cards` state
@@ -861,14 +831,18 @@ export function ReviewSession() {
           superuserFlags.pretendAllMastered,
         ),
       };
-      const eligibleIds = new Set(
-        sessionCards
-          .filter(
-            (c) =>
-              cardTypeIsEnabled(c, cardTypeOpts) &&
-              cardIsEligible(c, persistedScope, formsEnabled, loadScopeContext),
-          )
-          .map((c) => c.id),
+      const eligibleIds = computeEligibleCardIds(
+        sessionCards,
+        {
+          nameCardsEnabled: nameEnabled,
+          evolutionCardsEnabled: evolutionEnabled,
+          reverseCardsEnabled: enabled,
+          reverseEvolutionCardsEnabled: reverseEvolutionEnabledLocal,
+          cryCardsEnabled: cryEnabled,
+          alternateFormsEnabled: formsEnabled,
+          practiceScope: persistedScope,
+        },
+        loadScopeContext,
       );
       // Persist whenever scope is active so reconciliation results survive a
       // reload. When scope is empty, the only thing reconcileHiddenState can do
@@ -883,12 +857,6 @@ export function ReviewSession() {
       setEvolutionCardsEnabled(evolutionEnabled);
       setCryCardsEnabled(cryEnabled);
       setAlternateFormsEnabled(formsEnabled);
-      // Onboarding nudges (#702): derive once from the same settings read.
-      setAudioFeaturesOff(
-        !settings.playCryOnReveal &&
-          !settings.speakNameOnReveal &&
-          !cryEnabled,
-      );
       setCardTypesAllOn(
         enabled && reverseEvolutionEnabledLocal && formsEnabled,
       );
@@ -1554,28 +1522,24 @@ export function ReviewSession() {
       if (futureLearning.length > 0) {
         const earliestDueAt = Math.min(...futureLearning.map((e) => e.dueAt));
         return (
-          <div className="flex flex-col items-center gap-6">
-            <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
-        {undoSnapshot !== null && (
-          <button
-            type="button"
-            onClick={handleUndo}
-            className="min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            aria-label="Undo last grade"
-          >
-            Undo last grade (⌘Z)
-          </button>
-        )}
-            <CountdownScreen
-              dueAt={earliestDueAt}
-              perType={perType}
-              nameEnabled={nameCardsEnabled}
-              evolutionEnabled={evolutionCardsEnabled}
-              reverseEnabled={reverseEnabled}
-              reverseEvolutionEnabled={reverseEvolutionEnabled}
-              cryEnabled={cryCardsEnabled}
-            />
-          </div>
+          <ReviewCardLayout
+            variant="countdown"
+            queueCounts={{ newCount, learningCount, reviewCount }}
+            hasUndoSnapshot={undoSnapshot !== null}
+            onUndo={handleUndo}
+            showOutOfScopeHint={false}
+            cardRegion={
+              <CountdownScreen
+                dueAt={earliestDueAt}
+                perType={perType}
+                nameEnabled={nameCardsEnabled}
+                evolutionEnabled={evolutionCardsEnabled}
+                reverseEnabled={reverseEnabled}
+                reverseEvolutionEnabled={reverseEvolutionEnabled}
+                cryEnabled={cryCardsEnabled}
+              />
+            }
+          />
         );
       }
       // futureLearning is empty: all entries are overdue. Overdue entries
@@ -2116,33 +2080,33 @@ export function ReviewSession() {
   // appear after the user taps Reveal (or the visually-merged Play tile).
   if (effectiveCard.cardType === "cry") {
     return (
-      /* Height-filling flex column — grade buttons stay on screen without scrolling
-         on mobile (#1087). flex-1 min-h-0 propagates from the page height chain. */
-      <div className="flex flex-col flex-1 min-h-0 w-full items-center gap-2 sm:gap-8">
-        {/* Banners and scope control: flex-none so they don't consume the stretch height */}
-        <div className="flex-none w-full">
-          {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-          {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
-          <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
-          <div className="flex w-full max-w-xl flex-col gap-2">
-            <ScopeControl
-              scope={scope}
-              onChange={handleScopeChange}
-              alternateFormsEnabled={alternateFormsEnabled}
-              incompleteChainSpeciesIds={incompleteChains}
-            />
-          </div>
-        </div>
-        <div className="flex-none"><QueueStateBadge state={effectiveCard.state} /></div>
-        {/* Card region: flex-1 min-h-0 absorbs leftover height; items-center
-            keeps the play button (unrevealed) and the revealed PokemonCard
-            balanced vertically. PokemonCard reserves the revealed-state height
-            in its answer container so the bounding box is stable across reveal
-            (#1104). The cry play button (h-28 ≈ 7rem) coincidentally matches
-            the reserved answer-area height, so the unrevealed and revealed
-            states centre at the same point. */}
-        <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-hidden">
-          {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
+      <ReviewCardLayout
+        variant="flip"
+        topChrome={
+          <>
+            {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+            {gradeError !== null && (
+              <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
+            )}
+            <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+            {/* Cry card wraps ScopeControl in a max-width column for alignment. */}
+            <div className="flex w-full max-w-xl flex-col gap-2">
+              <ScopeControl
+                scope={scope}
+                onChange={handleScopeChange}
+                alternateFormsEnabled={alternateFormsEnabled}
+                incompleteChainSpeciesIds={incompleteChains}
+              />
+            </div>
+          </>
+        }
+        queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
+        cardRegion={
+          /* Swipeable card wrapper — pointer listeners attached here (#1052).
+             PokemonCard reserves the revealed-state height in its answer container
+             so the bounding box is stable across reveal (#1104). The cry play
+             button (h-28 ≈ 7rem) coincidentally matches that reserved height, so
+             unrevealed and revealed states centre at the same point. */
           <div ref={cardRef} className="relative" data-testid="swipe-card">
             {revealed ? (
               <>
@@ -2173,29 +2137,17 @@ export function ReviewSession() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Grade / reveal controls: flex-none anchored below the card region */}
-        <div className="flex-none w-full flex flex-col items-center gap-2">
-          {revealed ? (
-            <>
-              <OnboardingHint id="practiceHintDismissed" title="How to grade">
-                <p>
-                  <strong>Again</strong>: forgot. <strong>Hard</strong>:
-                  struggled. <strong>Good</strong>: recalled with effort.{" "}
-                  <strong>Easy</strong>: instant. Grade honestly; FSRS uses
-                  this to space your next review.
-                </p>
-              </OnboardingHint>
-              <GradeButtons
-                onGrade={handleGrade}
-                disabled={grading}
-                previews={gradePreviewsOrNull ?? undefined}
-                showShortcuts={showKeyboardShortcuts}
-                onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
-                onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
-              />
-            </>
+        }
+        controls={
+          revealed ? (
+            <GradeButtons
+              onGrade={handleGrade}
+              disabled={grading}
+              previews={gradePreviewsOrNull ?? undefined}
+              showShortcuts={showKeyboardShortcuts}
+              onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+              onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
+            />
           ) : (
             <button
               type="button"
@@ -2205,45 +2157,32 @@ export function ReviewSession() {
             >
               Reveal
             </button>
-          )}
-        </div>
-
-        {/* Keyboard shortcuts overlay — rendered outside the revealed/unrevealed
-            conditional so pressing `?` works at any point in the review cycle,
-            including before the card has been flipped. */}
-        {showKeyboardShortcuts && (
-          <KeyboardShortcutsOverlay
-            onClose={() => setShowKeyboardShortcuts(false)}
-          />
-        )}
-
-        {outOfScopeLearningSet.has(effectiveCard.id) && <div className="flex-none"><OutOfScopeHint /></div>}
-        <div className="flex-none">
-          <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
-        </div>
-        {undoSnapshot !== null && (
-          <button
-            type="button"
-            onClick={handleUndo}
-            className="flex-none min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            aria-label="Undo last grade"
-          >
-            Undo last grade (⌘Z)
-          </button>
-        )}
-        {/* Session stats are hidden on mobile to keep grade buttons in view (#1087) */}
-        <div className="hidden sm:block sm:w-full flex-none">
-          <GradeBreakdownBar
-            again={sessionGrades[1]}
-            hard={sessionGrades[2]}
-            good={sessionGrades[4]}
-            easy={sessionGrades[5]}
-            label="This session"
-            hideZeroSegments
-          />
-        </div>
-        {badgeToastSlot}
-      </div>
+          )
+        }
+        keyboardShortcutsOverlay={
+          showKeyboardShortcuts ? (
+            <KeyboardShortcutsOverlay onClose={() => setShowKeyboardShortcuts(false)} />
+          ) : undefined
+        }
+        showOutOfScopeHint={outOfScopeLearningSet.has(effectiveCard.id)}
+        queueCounts={{ newCount, learningCount, reviewCount }}
+        hasUndoSnapshot={undoSnapshot !== null}
+        onUndo={handleUndo}
+        statsPanel={
+          /* Session stats are hidden on mobile to keep grade buttons in view (#1087) */
+          <div className="hidden sm:block sm:w-full flex-none">
+            <GradeBreakdownBar
+              again={sessionGrades[1]}
+              hard={sessionGrades[2]}
+              good={sessionGrades[4]}
+              easy={sessionGrades[5]}
+              label="This session"
+              hideZeroSegments
+            />
+          </div>
+        }
+        badgeToastSlot={badgeToastSlot}
+      />
     );
   }
 
@@ -2267,26 +2206,28 @@ export function ReviewSession() {
     const playCryOnAnswer = reverseSettings.playCryOnReveal;
     const speakNameOnAnswer = reverseSettings.speakNameOnReveal;
     return (
-      /* Height-filling flex column — grade buttons stay on screen without scrolling
-         on mobile (#1087). flex-1 min-h-0 propagates from the page height chain. */
-      <div className="flex flex-col flex-1 min-h-0 w-full items-center gap-2 sm:gap-4">
-        {/* Banners and scope control: flex-none */}
-        <div className="flex-none w-full">
-          {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-          {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
-          <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
-          <ScopeControl
-            scope={scope}
-            onChange={handleScopeChange}
-            alternateFormsEnabled={alternateFormsEnabled}
-            incompleteChainSpeciesIds={incompleteChains}
-          />
-        </div>
-        <div className="flex-none"><QueueStateBadge state={effectiveCard.state} /></div>
-        {/* Picker region: flex-1 min-h-0 absorbs leftover height on mobile.
-            overflow-y-auto (not overflow-hidden) so very short viewports (e.g.
-            iPhone SE, 667 px) can scroll rather than silently clip tiles. */}
-        <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-y-auto">
+      <ReviewCardLayout
+        variant="reverse"
+        topChrome={
+          <>
+            {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+            {gradeError !== null && (
+              <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
+            )}
+            <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+            <ScopeControl
+              scope={scope}
+              onChange={handleScopeChange}
+              alternateFormsEnabled={alternateFormsEnabled}
+              incompleteChainSpeciesIds={incompleteChains}
+            />
+          </>
+        }
+        queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
+        cardRegion={
+          /* SpritePicker: overflow-y-auto is set by the "reverse" variant on
+             the card region so very short viewports (e.g. iPhone SE, 667 px)
+             can scroll rather than silently clip the tiles. */
           <SpritePicker
             key={`${effectiveCard.id}-${cardPresentationCount}`}
             targetPokemon={reverseTarget}
@@ -2295,77 +2236,64 @@ export function ReviewSession() {
             playCryOnAnswer={playCryOnAnswer}
             speakNameOnAnswer={speakNameOnAnswer}
           />
-        </div>
-        {audioFeaturesOff && (
-          <div className="flex-none w-full">
-            <OnboardingHint
-              id="audioHintDismissed"
-              title="Add sound to your reviews"
-              ctaHref="/settings#audio-heading"
-              ctaLabel="Open audio settings"
-            >
-              <p>
-                Want to hear Pokémon cries and names read aloud? Turn on
-                audio in Settings.
-              </p>
-            </OnboardingHint>
+        }
+        belowCard={undefined}
+        showOutOfScopeHint={outOfScopeLearningSet.has(effectiveCard.id)}
+        queueCounts={{ newCount, learningCount, reviewCount }}
+        hasUndoSnapshot={undoSnapshot !== null}
+        onUndo={handleUndo}
+        statsPanel={
+          /* Session stats are hidden on mobile to keep the picker in view (#1087) */
+          <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
+            <TodayPill
+              perType={perType}
+              nameEnabled={nameCardsEnabled}
+              evolutionEnabled={evolutionCardsEnabled}
+              reverseEnabled={reverseEnabled}
+              reverseEvolutionEnabled={reverseEvolutionEnabled}
+              cryEnabled={cryCardsEnabled}
+            />
+            <GradeBreakdownBar
+              again={sessionGrades[1]}
+              hard={sessionGrades[2]}
+              good={sessionGrades[4]}
+              easy={sessionGrades[5]}
+              label="This session"
+              hideZeroSegments
+            />
           </div>
-        )}
-        {outOfScopeLearningSet.has(effectiveCard.id) && <div className="flex-none"><OutOfScopeHint /></div>}
-        <div className="flex-none">
-          <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
-        </div>
-        {undoSnapshot !== null && (
-          <button
-            type="button"
-            onClick={handleUndo}
-            className="flex-none min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            aria-label="Undo last grade"
-          >
-            Undo last grade (⌘Z)
-          </button>
-        )}
-        {/* Session stats are hidden on mobile to keep the picker in view (#1087) */}
-        <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
-          <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
-          <GradeBreakdownBar
-            again={sessionGrades[1]}
-            hard={sessionGrades[2]}
-            good={sessionGrades[4]}
-            easy={sessionGrades[5]}
-            label="This session"
-            hideZeroSegments
-          />
-        </div>
-        {badgeToastSlot}
-      </div>
+        }
+        badgeToastSlot={badgeToastSlot}
+      />
     );
   }
 
+  // Default branch: name, evolution, and reverse-evolution cards.
   return (
-    /* Height-filling flex column — grade buttons stay on screen without scrolling
-       on mobile (#1087). flex-1 min-h-0 propagates from the page height chain. */
-    <div className="flex flex-col flex-1 min-h-0 w-full items-center gap-2 sm:gap-8">
-      {/* Banners and scope control: flex-none */}
-      <div className="flex-none w-full">
-        {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
-        {gradeError !== null && <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />}
-        <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
-        <ScopeControl
-          scope={scope}
-          onChange={handleScopeChange}
-          alternateFormsEnabled={alternateFormsEnabled}
-          incompleteChainSpeciesIds={incompleteChains}
-        />
-      </div>
-      <div className="flex-none"><QueueStateBadge state={effectiveCard.state} /></div>
-      {/* Card region: flex-1 min-h-0 absorbs leftover height; items-center
-          keeps the card vertically balanced. PokemonCard and EvolutionCardLayout
-          reserve the revealed-state height in their inner answer container
-          (min-h-[7rem]), so the card's bounding box is the same size across
-          reveal and centring does not cause the sprite to drift (#1104). */}
-      <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-hidden">
-        {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
+    <ReviewCardLayout
+      variant="flip"
+      topChrome={
+        <>
+          {quotaExceeded && <StorageQuotaBanner onDismiss={dismiss} />}
+          {gradeError !== null && (
+            <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
+          )}
+          <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+          <ScopeControl
+            scope={scope}
+            onChange={handleScopeChange}
+            alternateFormsEnabled={alternateFormsEnabled}
+            incompleteChainSpeciesIds={incompleteChains}
+          />
+        </>
+      }
+      queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
+      cardRegion={
+        /* Swipeable card wrapper — pointer listeners attached here (#1052).
+           PokemonCard and EvolutionCard reserve the revealed-state height in
+           their inner answer container (min-h-[7rem]), so the card's bounding
+           box is the same size across reveal and centring does not cause the
+           sprite to drift (#1104). */
         <div ref={cardRef} className="relative" data-testid="swipe-card">
           {effectiveCard.cardType === "evolution" ||
           effectiveCard.cardType === "reverse-evolution" ? (
@@ -2392,42 +2320,17 @@ export function ReviewSession() {
           )}
           {revealed && <SwipeHint swipeState={swipeState} />}
         </div>
-      </div>
-
-      {/* Grade / reveal controls: flex-none anchored below the card region */}
-      <div className="flex-none w-full flex flex-col items-center gap-2">
-        {revealed ? (
-          <>
-            <OnboardingHint id="practiceHintDismissed" title="How to grade">
-              <p>
-                <strong>Again</strong>: forgot. <strong>Hard</strong>:
-                struggled. <strong>Good</strong>: recalled with effort.{" "}
-                <strong>Easy</strong>: instant. Grade honestly; FSRS uses
-                this to space your next review.
-              </p>
-            </OnboardingHint>
-            {audioFeaturesOff && (
-              <OnboardingHint
-                id="audioHintDismissed"
-                title="Add sound to your reviews"
-                ctaHref="/settings#audio-heading"
-                ctaLabel="Open audio settings"
-              >
-                <p>
-                  Want to hear Pokémon cries and names read aloud? Turn on
-                  audio in Settings.
-                </p>
-              </OnboardingHint>
-            )}
-            <GradeButtons
-              onGrade={handleGrade}
-              disabled={grading}
-              previews={gradePreviewsOrNull ?? undefined}
-              showShortcuts={showKeyboardShortcuts}
-              onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
-              onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
-            />
-          </>
+      }
+      controls={
+        revealed ? (
+          <GradeButtons
+            onGrade={handleGrade}
+            disabled={grading}
+            previews={gradePreviewsOrNull ?? undefined}
+            showShortcuts={showKeyboardShortcuts}
+            onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+            onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
+          />
         ) : (
           <button
             type="button"
@@ -2437,43 +2340,38 @@ export function ReviewSession() {
           >
             Reveal
           </button>
-        )}
-      </div>
-
-      {/* Keyboard shortcuts overlay — rendered outside the revealed/unrevealed
-          conditional so pressing `?` works at any point in the review cycle. */}
-      {showKeyboardShortcuts && (
-        <KeyboardShortcutsOverlay
-          onClose={() => setShowKeyboardShortcuts(false)}
-        />
-      )}
-
-      {outOfScopeLearningSet.has(effectiveCard.id) && <div className="flex-none"><OutOfScopeHint /></div>}
-      <div className="flex-none">
-        <QueueCounterRow newCount={newCount} learningCount={learningCount} reviewCount={reviewCount} />
-      </div>
-      {undoSnapshot !== null && (
-        <button
-          type="button"
-          onClick={handleUndo}
-          className="flex-none min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          aria-label="Undo last grade"
-        >
-          Undo last grade (⌘Z)
-        </button>
-      )}
-      {/* Session stats are hidden on mobile to keep grade buttons in view (#1087) */}
-      <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
-        <TodayPill perType={perType} nameEnabled={nameCardsEnabled} evolutionEnabled={evolutionCardsEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryCardsEnabled} />
-        <GradeBreakdownBar
-          again={sessionGrades[1]}
-          hard={sessionGrades[2]}
-          good={sessionGrades[4]}
-          easy={sessionGrades[5]}
-          label="This session"
-        />
-      </div>
-      {badgeToastSlot}
-    </div>
+        )
+      }
+      keyboardShortcutsOverlay={
+        showKeyboardShortcuts ? (
+          <KeyboardShortcutsOverlay onClose={() => setShowKeyboardShortcuts(false)} />
+        ) : undefined
+      }
+      showOutOfScopeHint={outOfScopeLearningSet.has(effectiveCard.id)}
+      queueCounts={{ newCount, learningCount, reviewCount }}
+      hasUndoSnapshot={undoSnapshot !== null}
+      onUndo={handleUndo}
+      statsPanel={
+        /* Session stats are hidden on mobile to keep grade buttons in view (#1087) */
+        <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
+          <TodayPill
+            perType={perType}
+            nameEnabled={nameCardsEnabled}
+            evolutionEnabled={evolutionCardsEnabled}
+            reverseEnabled={reverseEnabled}
+            reverseEvolutionEnabled={reverseEvolutionEnabled}
+            cryEnabled={cryCardsEnabled}
+          />
+          <GradeBreakdownBar
+            again={sessionGrades[1]}
+            hard={sessionGrades[2]}
+            good={sessionGrades[4]}
+            easy={sessionGrades[5]}
+            label="This session"
+          />
+        </div>
+      }
+      badgeToastSlot={badgeToastSlot}
+    />
   );
 }

@@ -152,16 +152,23 @@ beforeEach(() => {
 });
 
 describe("buildDailyMessage", () => {
-  it("uses singular form for one due card", () => {
+  it("uses singular 'card' for one due card", () => {
     const msg = buildDailyMessage(1);
     expect(msg.title).toBe("Time to practise");
-    expect(msg.body).toBe("1 Pokémon is ready for review.");
+    expect(msg.body).toBe("1 card scheduled for today.");
     expect(msg.url).toBe("/");
   });
 
-  it("uses plural form for multiple due cards", () => {
+  it("uses plural 'cards' for multiple due cards", () => {
     const msg = buildDailyMessage(7);
-    expect(msg.body).toContain("7 Pokémon are ready for review.");
+    expect(msg.body).toBe("7 cards scheduled for today.");
+  });
+
+  it("copy does not imply it is the full session queue", () => {
+    // The server only knows due_date <= today; it cannot see new cards
+    // (no row yet) or respect daily caps. The copy must not say "ready
+    // for review" or similar phrases that suggest session-queue parity.
+    expect(buildDailyMessage(3).body).not.toContain("ready for review");
   });
 
   it("does not use em dashes anywhere in the message", () => {

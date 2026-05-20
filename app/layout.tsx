@@ -18,7 +18,6 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
-import { GuestStorageNotice } from "@/components/onboarding/GuestStorageNotice";
 import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
 import { StoragePersistenceRequester } from "@/components/pwa/StoragePersistenceRequester";
 import { PwaBadge } from "@/components/pwa/PwaBadge";
@@ -169,42 +168,44 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-dvh flex flex-col">
-        <AuthProvider>
-          <SuperuserProvider>
-            <FavouriteThemeProvider>
-              <ThemeWatermark />
-              <Nav />
-              <Suspense fallback={null}>
-                <SyncOnVisible />
-              </Suspense>
-              <SignInPull />
-              <AutoSyncOnChange />
-              <OnlineReconnectSync />
-              <PwaInstallNudge />
-              {/*
-                GuestStorageNotice informs signed-out users that their progress
-                is device-local and how to protect it (#1057). Renders nothing
-                for authenticated users.
-              */}
-              <GuestStorageNotice />
-              {/*
-                MobileNavPaddingWrapper adds bottom padding on mobile only when
-                the bottom tab bar is active, so the fixed bar never overlaps content.
-                The padding is removed automatically when the user switches to the
-                hamburger nav style via Settings.
-              */}
-              <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
-              <Footer />
-              {/*
-                BottomTabBar is always mounted but returns null internally when
-                mobileNav === 'hamburger'. The single Suspense boundary here is
-                sufficient — the component has its own inner Suspense for the
-                async mastery check.
-              */}
-              <BottomTabBar />
-            </FavouriteThemeProvider>
-          </SuperuserProvider>
-        </AuthProvider>
+        {/*
+          #app-root wraps all persistent page chrome. FirstVisitOnboardingModal
+          renders via createPortal directly onto <body> and toggles `inert` +
+          `aria-hidden` on this element while open, preventing the screen-reader
+          virtual cursor from escaping into background content.
+        */}
+        <div id="app-root" className="contents">
+          <AuthProvider>
+            <SuperuserProvider>
+              <FavouriteThemeProvider>
+                <ThemeWatermark />
+                <Nav />
+                <Suspense fallback={null}>
+                  <SyncOnVisible />
+                </Suspense>
+                <SignInPull />
+                <AutoSyncOnChange />
+                <OnlineReconnectSync />
+                <PwaInstallNudge />
+                {/*
+                  MobileNavPaddingWrapper adds bottom padding on mobile only when
+                  the bottom tab bar is active, so the fixed bar never overlaps content.
+                  The padding is removed automatically when the user switches to the
+                  hamburger nav style via Settings.
+                */}
+                <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
+                <Footer />
+                {/*
+                  BottomTabBar is always mounted but returns null internally when
+                  mobileNav === 'hamburger'. The single Suspense boundary here is
+                  sufficient — the component has its own inner Suspense for the
+                  async mastery check.
+                */}
+                <BottomTabBar />
+              </FavouriteThemeProvider>
+            </SuperuserProvider>
+          </AuthProvider>
+        </div>
         <IdbMigration />
         {/* Requests persistent storage to protect against 7-day ITP eviction (#1057). */}
         <StoragePersistenceRequester />

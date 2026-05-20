@@ -1,4 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 test.describe("Privacy notice page", () => {
   test("loads and shows the main heading", async ({ page }) => {
