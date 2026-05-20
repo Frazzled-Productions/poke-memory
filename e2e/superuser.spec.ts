@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 test.beforeEach(async ({ page }) => {
-  await preDismissOnboardingModal(page);
+  await addOnboardingPreDismiss(page);
 });
 
 // Seeds localStorage on the about-to-load page so the Developer panel is

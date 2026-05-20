@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 test.beforeEach(async ({ page }) => {
-  await preDismissOnboardingModal(page);
+  await addOnboardingPreDismiss(page);
 });
 
 test.describe("Settings — Audio TTS controls (#435)", () => {

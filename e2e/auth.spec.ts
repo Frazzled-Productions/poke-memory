@@ -1,9 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import { seedIdb, awaitSeedIdb } from "./helpers/seedIdb";
-import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 test.beforeEach(async ({ page }) => {
-  await preDismissOnboardingModal(page);
+  await addOnboardingPreDismiss(page);
 });
 
 /**
