@@ -33,7 +33,16 @@ export function MobileNavPaddingWrapper({ children }: { children: React.ReactNod
   return (
     <div
       className={[
-        "flex flex-1 flex-col md:pb-0",
+        // min-h-dvh ensures the content wrapper always fills the current dynamic
+        // viewport height. On iOS Safari, short pages (e.g. the Pokédex detail page
+        // for a locked Pokémon) can be shorter than the large viewport, which causes
+        // the browser toolbar to appear and the visual viewport to shrink. Because
+        // `position: fixed; bottom: 0` anchors to the visual viewport, the bottom
+        // tab bar visually jumps upward when the toolbar appears. Giving the wrapper
+        // a minimum height of 100dvh keeps the page body at least as tall as the
+        // current visual viewport, which keeps the toolbar state stable and the nav
+        // bar anchored (#1086).
+        "flex flex-1 flex-col min-h-dvh md:min-h-0 md:pb-0",
         mobileNav === "bottom"
           ? "pb-[calc(4rem+env(safe-area-inset-bottom))]"
           : "",
