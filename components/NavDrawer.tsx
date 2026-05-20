@@ -87,6 +87,9 @@ export function NavDrawer() {
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  // Tracks the write epoch seen when the mastery effect last attached its
+  // listener, to detect writes that happened before React hydrated.
+  const epochAtLastAttach = useRef<number>(0);
 
   useEffect(() => {
     function onSaved() {
@@ -112,6 +115,16 @@ export function NavDrawer() {
     // StorageEvents to same-tab `storage` listeners, so the CustomEvent is the
     // authoritative post-write signal on mobile-safari.
     window.addEventListener(SESSION_CHANGED_EVENT, load);
+
+    // Catch-up check: if a write happened before this effect registered its
+    // listener (e.g. the E2E seed fires tx.oncomplete before React hydrates),
+    // the epoch on window will be higher than what we recorded last time.
+    const epochNow = window.__pokeMemorySessionWriteEpoch ?? 0;
+    if (epochNow !== epochAtLastAttach.current) {
+      epochAtLastAttach.current = epochNow;
+      requestAnimationFrame(() => { void load(); });
+    }
+
     return () => window.removeEventListener(SESSION_CHANGED_EVENT, load);
   }, [sessionVersion, settingsVersion]);
 

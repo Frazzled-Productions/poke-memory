@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY, SESSION_CHANGED_EVENT } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
@@ -34,6 +34,9 @@ export function NavLinks() {
   // masteryRepetitions threshold re-derives Pasture link visibility without
   // waiting for an unrelated session storage bump.
   const [settingsVersion, setSettingsVersion] = useState(0);
+  // Tracks the write epoch seen when the mastery effect last attached its
+  // listener, to detect writes that happened before React hydrated.
+  const epochAtLastAttach = useRef<number>(0);
 
   useEffect(() => {
     function onSaved() {
@@ -58,6 +61,16 @@ export function NavLinks() {
     // StorageEvents to same-tab `storage` listeners, so the CustomEvent is the
     // authoritative post-write signal on mobile-safari.
     window.addEventListener(SESSION_CHANGED_EVENT, load);
+
+    // Catch-up check: if a write happened before this effect registered its
+    // listener (e.g. the E2E seed fires tx.oncomplete before React hydrates),
+    // the epoch on window will be higher than what we recorded last time.
+    const epochNow = window.__pokeMemorySessionWriteEpoch ?? 0;
+    if (epochNow !== epochAtLastAttach.current) {
+      epochAtLastAttach.current = epochNow;
+      requestAnimationFrame(() => { void load(); });
+    }
+
     return () => window.removeEventListener(SESSION_CHANGED_EVENT, load);
   }, [sessionVersion, settingsVersion]);
 

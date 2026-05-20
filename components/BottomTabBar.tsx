@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY, SESSION_CHANGED_EVENT } from "@/lib/review/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
@@ -181,6 +181,11 @@ function BottomTabBarInner() {
     return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
   }, []);
 
+  // Tracks the write epoch seen when this effect last attached its listener.
+  // Used to detect writes that happened before the listener was registered
+  // (e.g. the E2E seed helper fires tx.oncomplete before React hydrates).
+  const epochAtLastAttach = useRef<number>(0);
+
   useEffect(() => {
     async function load() {
       const session = await loadSession();
@@ -196,6 +201,17 @@ function BottomTabBarInner() {
     // StorageEvents to same-tab `storage` listeners, so the CustomEvent is the
     // authoritative post-write signal for BottomTabBar on mobile-safari.
     window.addEventListener(SESSION_CHANGED_EVENT, load);
+
+    // Catch-up check: if a write happened between the last attach and now
+    // (e.g. the E2E seed fires tx.oncomplete before this useEffect runs),
+    // the epoch on window will be higher than what we last saw. Schedule a
+    // rAF so the check runs after the current render-commit, not during it.
+    const epochNow = window.__pokeMemorySessionWriteEpoch ?? 0;
+    if (epochNow !== epochAtLastAttach.current) {
+      epochAtLastAttach.current = epochNow;
+      requestAnimationFrame(() => { void load(); });
+    }
+
     return () => window.removeEventListener(SESSION_CHANGED_EVENT, load);
   }, [sessionVersion, settingsVersion]);
 
