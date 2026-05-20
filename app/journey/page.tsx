@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, useMemo } from "react";
 import { useCountUp } from "@/lib/stats/useCountUp";
-import { buildSession, hydrateSession, todayString } from "@/lib/review/session";
+import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS } from "@/lib/review/session";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
-import { computeStats } from "@/lib/stats/derive";
-import type { StatsResult } from "@/lib/stats/derive";
+import { computeDashboardSnapshot } from "@/lib/stats/dashboard-snapshot";
+import type { MasterySnapshot } from "@/lib/stats/dashboard-snapshot";
+import { EMPTY_SCOPE, type EligibilitySettings } from "@/lib/review/scope";
 import { loadSettings } from "@/lib/settings/persistence";
 import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
@@ -190,7 +191,7 @@ function RadialRing({
 // MasteryRings
 // ---------------------------------------------------------------------------
 
-function MasteryRings({ stats, nameCardsEnabled }: { stats: StatsResult; nameCardsEnabled: boolean }) {
+function MasteryRings({ stats, nameCardsEnabled }: { stats: MasterySnapshot; nameCardsEnabled: boolean }) {
   const { totalCards, locked, learning, mastered } = stats;
   const masteredPct = pct(mastered, totalCards);
   const learningPct = pct(learning, totalCards);
@@ -284,7 +285,7 @@ function MasteryRings({ stats, nameCardsEnabled }: { stats: StatsResult; nameCar
 // IntroducedRing
 // ---------------------------------------------------------------------------
 
-function IntroducedRing({ stats }: { stats: StatsResult }) {
+function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
   const { introduced, totalCards } = stats;
   const introPct = pct(introduced, totalCards);
   const introducedAnimated = useCountUp(introduced);
@@ -329,7 +330,7 @@ function IntroducedRing({ stats }: { stats: StatsResult }) {
 // GenerationBreakdown
 // ---------------------------------------------------------------------------
 
-function GenerationBreakdown({ stats }: { stats: StatsResult }) {
+function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
   return (
     <section aria-labelledby="gen-heading">
       <h2
@@ -397,6 +398,15 @@ export default function JourneyPage() {
   const [cards, setCards] = useState<Awaited<ReturnType<typeof buildSession>> | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
+  const [eligibilitySettings, setEligibilitySettings] = useState<EligibilitySettings>({
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
+    reverseCardsEnabled: false,
+    reverseEvolutionCardsEnabled: false,
+    cryCardsEnabled: false,
+    alternateFormsEnabled: false,
+    practiceScope: EMPTY_SCOPE,
+  });
   const [currentStreak, setCurrentStreak] = useState<number | null>(null);
   const [streakDates, setStreakDates] = useState<string[]>([]);
   const [gradeLog, setGradeLog] = useState<Awaited<ReturnType<typeof loadGradeLog>>>([]);
@@ -415,6 +425,15 @@ export default function JourneyPage() {
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
       setNameCardsEnabled(settings.nameCardsEnabled);
+      setEligibilitySettings({
+        nameCardsEnabled: settings.nameCardsEnabled,
+        evolutionCardsEnabled: settings.evolutionCardsEnabled,
+        reverseCardsEnabled: settings.reverseCardsEnabled,
+        reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
+        cryCardsEnabled: settings.cryCardsEnabled,
+        alternateFormsEnabled: settings.alternateFormsEnabled,
+        practiceScope: settings.practiceScope,
+      });
       const dates = loadStreakData();
       setStreakDates(dates);
       const tz = settings.timezone ?? "UTC";
@@ -499,20 +518,28 @@ export default function JourneyPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageVersion, anyFlagOn, supabase, user]);
 
+  // Mastery snapshot for Journey — only the mastery axis is needed; skip the
+  // expensive queue + forecast computation (#1121).
+  const masterySnapshot: MasterySnapshot | null = useMemo(() => {
+    if (cards === null || masteryRepetitions === null) return null;
+    const snap = computeDashboardSnapshot(
+      cards,
+      eligibilitySettings,
+      DEFAULT_LIMITS,
+      todayString(new Date()),
+      {
+        include: ["mastery"],
+        masteryRepetitions,
+        forceAllMastered: flags.pretendAllMastered,
+      },
+    );
+    return snap.mastery;
+  }, [cards, eligibilitySettings, masteryRepetitions, flags.pretendAllMastered]);
+
+  // nameCards is still needed for computeRecords which isn't part of the snapshot.
   const nameCards =
     cards !== null
-      ? (cards.filter((c) => c.cardType === "name") as Parameters<typeof computeStats>[0])
-      : null;
-
-  const stats: StatsResult | null =
-    nameCards !== null && masteryRepetitions !== null
-      ? computeStats(
-          nameCards,
-          todayString(new Date()),
-          10,
-          masteryRepetitions,
-          flags.pretendAllMastered,
-        )
+      ? cards.filter((c) => c.cardType === "name")
       : null;
 
   const badgesToShow: readonly BadgeDefinition[] = flags.pretendAllMastered
@@ -538,7 +565,7 @@ export default function JourneyPage() {
   const records: Records | null =
     nameCards !== null && masteryRepetitions !== null
       ? computeRecords(
-          nameCards,
+          nameCards as Parameters<typeof computeRecords>[0],
           gradeLog,
           streakDates,
           masteryRepetitions,
@@ -553,7 +580,7 @@ export default function JourneyPage() {
           Journey
         </h1>
 
-        {stats === null || currentStreak === null ? (
+        {masterySnapshot === null || currentStreak === null ? (
           <LoadingSkeleton />
         ) : (
           <div className="flex flex-col gap-10">
@@ -564,8 +591,8 @@ export default function JourneyPage() {
                   (user?.user_metadata?.preferred_username as string | undefined) ??
                   null)
               }
-              totalMastered={stats.mastered}
-              perGeneration={stats.perGeneration}
+              totalMastered={masterySnapshot.mastered}
+              perGeneration={masterySnapshot.perGeneration}
               earnedBadges={badgesToShow}
             />
 
@@ -575,7 +602,7 @@ export default function JourneyPage() {
               milestone={
                 anyFlagOn
                   ? null
-                  : detectTopMilestone(stats.mastered, stats.perGeneration)
+                  : detectTopMilestone(masterySnapshot.mastered, masterySnapshot.perGeneration)
               }
             />
 
@@ -643,16 +670,16 @@ export default function JourneyPage() {
             {records !== null ? <RecordsCard records={records} /> : null}
 
             {/* Mastery rings */}
-            <MasteryRings stats={stats} nameCardsEnabled={nameCardsEnabled} />
+            <MasteryRings stats={masterySnapshot} nameCardsEnabled={nameCardsEnabled} />
 
             {/* Introduced ring */}
-            <IntroducedRing stats={stats} />
+            <IntroducedRing stats={masterySnapshot} />
 
             {/* Generation breakdown */}
-            <GenerationBreakdown stats={stats} />
+            <GenerationBreakdown stats={masterySnapshot} />
 
             {/* Type breakdown */}
-            <TypeBreakdown perType={stats.perType} />
+            <TypeBreakdown perType={masterySnapshot.perType} />
           </div>
         )}
       </div>

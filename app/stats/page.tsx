@@ -3,16 +3,16 @@
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
-import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, buildSessionQueues, type ReviewableCard, type DailyLimits } from "@/lib/review/session";
-import { computeEligibleCardIds, type EligibilitySettings, EMPTY_SCOPE, type PracticeScope } from "@/lib/review/scope";
+import { useEffect, useState, useMemo } from "react";
+import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard, type DailyLimits } from "@/lib/review/session";
+import { EMPTY_SCOPE, type PracticeScope } from "@/lib/review/scope";
 import { type DateFormat } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
 import { colStack, mutedText } from "@/lib/utils/class-names";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
-import { computeStats, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
-import type { StatsResult, DueForecastDay } from "@/lib/stats/derive";
+import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
+import type { StrugglingCard } from "@/lib/stats/derive";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { BADGE_CATALOG } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
@@ -26,14 +26,12 @@ import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { computeAccuracySparkline, computeRollingAccuracy } from "@/lib/stats/accuracy";
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { computeDirectionBreakdown, enabledDirectionsFromSettings } from "@/lib/stats/direction-breakdown";
-import { computeDifficultyHistogram, meanDifficulty } from "@/lib/stats/difficulty-histogram";
 import { computeRetentionComparison } from "@/lib/stats/retention";
 import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-distribution";
-import { computeCompletionProjection } from "@/lib/stats/completion-projection";
+import { computeDashboardSnapshot, type DashboardSnapshot } from "@/lib/stats/dashboard-snapshot";
 import { CompletionProjection } from "@/components/stats/CompletionProjection";
 import DueForecast from "@/components/stats/DueForecast";
 import { FirstMasteryHint } from "@/components/stats/FirstMasteryHint";
-import { projectTimeToFirstMastery } from "@/lib/srs/timeToMastery";
 import { computeMasteryOverTime } from "@/lib/stats/mastery-over-time";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
@@ -49,49 +47,6 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
-
-// ---------------------------------------------------------------------------
-// Due-forecast today-bar parity helper (#1117)
-// ---------------------------------------------------------------------------
-
-/**
- * Replaces the today-bar count (index 0) in a due-forecast array with the
- * exact queue total from `buildSessionQueues` so it matches what the Practice
- * page displays. Future bars (indices 1–13) are left unchanged.
- *
- * The discrepancy existed because `computeStats` only counted introduced name
- * cards due today, ignoring new cards (no review history) and all non-name card
- * types (evolution, reverse, cry). Using `buildSessionQueues` with the same
- * eligibility set as the Practice page removes all three gaps.
- *
- * `today` is a UTC date string. The Practice page also uses UTC for queue
- * building (scheduling-internal). User-facing "today" via `todayInTimezone`
- * applies only to display formatting and the streak/daily-cap counters.
- *
- * Only the today bar's count is recomputed; shuffle order is not used here,
- * so we don't thread `shuffleSalt` through. If a future caller uses the
- * returned forecast for card ordering, pass a salt to `buildSessionQueues`.
- *
- * Pure — no I/O, no side effects. Exported for unit testing.
- */
-export function patchForecastTodayBar(
-  forecast: readonly DueForecastDay[],
-  cards: readonly ReviewableCard[],
-  eligibilitySettings: EligibilitySettings,
-  limits: DailyLimits,
-  today: string,
-): readonly DueForecastDay[] {
-  if (forecast.length === 0) return forecast;
-  const eligibleCardIds = computeEligibleCardIds(cards, eligibilitySettings);
-  const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
-    cards,
-    limits,
-    today,
-    eligibleCardIds,
-  );
-  const todayCount = newQueue.length + learningCardIds.length + reviewQueue.length;
-  return [{ ...forecast[0], count: todayCount }, ...forecast.slice(1)];
-}
 
 // ---------------------------------------------------------------------------
 // Lazily-loaded Recharts chart components.
@@ -170,7 +125,7 @@ function LoadingSkeleton() {
 }
 
 
-function StrugglingCards({ stats }: { stats: StatsResult }) {
+function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[] }) {
   return (
     <section aria-labelledby="struggling-heading">
       <h2
@@ -180,13 +135,13 @@ function StrugglingCards({ stats }: { stats: StatsResult }) {
         Struggling cards
       </h2>
 
-      {stats.struggling.length === 0 ? (
+      {struggling.length === 0 ? (
         <p className={mutedText}>
           No struggling cards yet. Keep it up!
         </p>
       ) : (
         <ul className={colStack} role="list">
-          {stats.struggling.map((card) => (
+          {struggling.map((card) => (
             <li key={card.id}>
               <Link
                 href={`/pokedex/${card.id}`}
@@ -505,77 +460,38 @@ export default function StatsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageVersion, anyFlagOn, supabase, user]);
 
-  const nameCards =
-    cards !== null
-      ? (cards.filter((c) => c.cardType === "name") as Parameters<typeof computeStats>[0])
-      : null;
-
-  const stats: StatsResult | null =
-    nameCards !== null && masteryRepetitions !== null
-      ? computeStats(
-          nameCards,
-          todayString(new Date()),
-          10,
-          masteryRepetitions,
-          flags.pretendAllMastered,
-        )
-      : null;
-
-  // Patch the today bar (#1117): replace dueForecast[0] with the exact queue
-  // total from buildSessionQueues so it matches the Practice page display.
-  // Future bars (indices 1–13) are left as-is — only today is in scope.
-  const patchedForecast: readonly DueForecastDay[] | null =
-    stats !== null && cards !== null
-      ? patchForecastTodayBar(
-          stats.dueForecast,
-          cards,
-          {
-            nameCardsEnabled: cardTypeSettings.nameCardsEnabled,
-            evolutionCardsEnabled: cardTypeSettings.evolutionCardsEnabled,
-            reverseCardsEnabled: cardTypeSettings.reverseCardsEnabled,
-            reverseEvolutionCardsEnabled: cardTypeSettings.reverseEvolutionCardsEnabled,
-            cryCardsEnabled: cardTypeSettings.cryCardsEnabled,
-            alternateFormsEnabled,
-            practiceScope,
-          },
-          sessionLimits,
-          todayString(new Date()),
-        )
-      : null;
-
-  const completionProjection =
-    nameCards !== null && masteryRepetitions !== null
-      ? computeCompletionProjection(
-          nameCards,
-          todayString(new Date()),
-          masteryRepetitions,
-          flags.pretendAllMastered,
-        )
-      : null;
-
-  // Time-to-first-mastery hint (#1083). Show only when the user has at least
-  // one introduced card, zero mastered cards, and the projection helper
-  // produced a finite estimate. The helper already returns null when the
-  // superuser pretendAllMastered flag is on, so the hint hides under cheats.
-  const firstMasteryDays =
-    nameCards !== null &&
-    masteryRepetitions !== null &&
-    stats !== null &&
-    stats.introduced > 0 &&
-    stats.mastered === 0
-      ? projectTimeToFirstMastery(
-          nameCards,
-          new Date(),
-          masteryRepetitions,
-          flags.pretendAllMastered,
-          { retentionTarget },
-        ).days
-      : null;
+  // Single unified snapshot — replaces the standalone computeStats, patchForecastTodayBar,
+  // computeCompletionProjection, projectTimeToFirstMastery, computeDifficultyHistogram,
+  // and meanDifficulty calls (#1121).
+  const snapshot: DashboardSnapshot | null = useMemo(() => {
+    if (cards === null || masteryRepetitions === null) return null;
+    return computeDashboardSnapshot(
+      cards,
+      {
+        nameCardsEnabled: cardTypeSettings.nameCardsEnabled,
+        evolutionCardsEnabled: cardTypeSettings.evolutionCardsEnabled,
+        reverseCardsEnabled: cardTypeSettings.reverseCardsEnabled,
+        reverseEvolutionCardsEnabled: cardTypeSettings.reverseEvolutionCardsEnabled,
+        cryCardsEnabled: cardTypeSettings.cryCardsEnabled,
+        alternateFormsEnabled,
+        practiceScope,
+      },
+      sessionLimits,
+      todayString(new Date()),
+      {
+        masteryRepetitions,
+        forceAllMastered: flags.pretendAllMastered,
+        retentionTarget,
+      },
+    );
+  }, [cards, cardTypeSettings, alternateFormsEnabled, practiceScope, sessionLimits, masteryRepetitions, flags.pretendAllMastered, retentionTarget]);
 
   const reviewCharts =
-    cards !== null
+    cards !== null && snapshot !== null
       ? (() => {
           const today = todayString(new Date(), userTimezone);
+          // nameCards is needed for masteryOverTime — derived from cards directly.
+          const nameCardsForCharts = cards.filter((c) => c.cardType === "name");
           return {
             directionRows: computeDirectionBreakdown(
               gradeLog,
@@ -586,16 +502,11 @@ export default function StatsPage() {
               today,
               retentionTarget,
             ),
-            difficultyBuckets: computeDifficultyHistogram(
-              cards,
-              flags.pretendAllMastered,
-            ),
-            difficultyMean: meanDifficulty(cards, flags.pretendAllMastered),
             gradeDistribution: computeGradeDistribution(gradeLog),
             gradeTrend: computeGradeTrend(gradeLog, today, 12),
             activityHistory: computeActivityHistory(gradeLog, today, 365),
             masteryOverTime: computeMasteryOverTime(
-              nameCards!,
+              nameCardsForCharts as Parameters<typeof computeMasteryOverTime>[0],
               today,
               masteryRepetitions ?? undefined,
               flags.pretendAllMastered,
@@ -620,7 +531,7 @@ export default function StatsPage() {
           </div>
         )}
 
-        {stats === null ? (
+        {snapshot === null ? (
           <LoadingSkeleton />
         ) : (
           <div className="flex flex-col gap-10">
@@ -659,8 +570,8 @@ export default function StatsPage() {
                     <RetentionIndicator comparison={reviewCharts.retentionComparison} />
                     <DirectionBreakdownChart rows={reviewCharts.directionRows} />
                     <DifficultyHistogram
-                      buckets={reviewCharts.difficultyBuckets}
-                      mean={reviewCharts.difficultyMean}
+                      buckets={snapshot.difficulty?.buckets ?? []}
+                      mean={snapshot.difficulty?.mean ?? null}
                     />
                   </>
                 )}
@@ -682,7 +593,7 @@ export default function StatsPage() {
                     />
                     <MasteryOverTimeChart
                       series={reviewCharts.masteryOverTime}
-                      totalCards={stats.totalCards}
+                      totalCards={snapshot.mastery?.totalCards ?? 0}
                       dateFormat={userDateFormat}
                       forceAllMastered={flags.pretendAllMastered}
                     />
@@ -707,22 +618,22 @@ export default function StatsPage() {
                   term.
                 </p>
               </OnboardingHint>
-              {firstMasteryDays !== null && masteryRepetitions !== null && (
+              {snapshot.firstMasteryDays !== null && masteryRepetitions !== null && (
                 <FirstMasteryHint
-                  days={firstMasteryDays}
+                  days={snapshot.firstMasteryDays}
                   masteryReps={masteryRepetitions}
                   masteryDays={MASTERY_INTERVAL_DAYS}
                 />
               )}
-              {completionProjection !== null && (
+              {snapshot.projection !== null && (
                 <CompletionProjection
-                  projection={completionProjection}
+                  projection={snapshot.projection}
                   fmt={userDateFormat}
                   tz={userTimezone}
                 />
               )}
-              <DueForecast forecast={patchedForecast ?? stats.dueForecast} fmt={userDateFormat} tz={userTimezone} />
-              <StrugglingCards stats={stats} />
+              <DueForecast forecast={snapshot.dueForecast ?? []} fmt={userDateFormat} tz={userTimezone} />
+              <StrugglingCards struggling={snapshot.struggling ?? []} />
             </section>
 
             {user !== null && supabase !== null && !anyFlagOn && (
