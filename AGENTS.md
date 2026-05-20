@@ -43,6 +43,8 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 | `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
 | `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
 
+**Cross-layer fixes.** The table above is the default routing, not a hard wall. When a `ui-coder` finds the root cause is in `lib/` (or a `data-coder` finds the visible bug is in a component), it is OK to touch the helper as part of the same change — prefer the cleanest layering over strict ownership. The alternative (a page-layer workaround that papers over a `lib/` bug) is the failure mode this carve-out exists to prevent. Document the cross-layer touch in the PR description so the reviewer sees why ownership bent. (See #1125 for the discussion, and #1117 / #1121 for the worked example.)
+
 ## Conventions
 
 These are decisions made through deliberate research/discussion, not guesses. Add to this section only when a real decision is locked in.
@@ -283,7 +285,34 @@ The backlog lives on GitHub Issues, labelled `priority:now` / `priority:next` / 
 
 When a change closes an issue, reference it in the commit message (`closes #N`) so it auto-closes on push.
 
-**Pre-PR build gate.** After pushing a branch, run `npm run typecheck && npm run build && npm test`. If any step fails, apply a targeted fix and retry — up to two attempts. After the second failure, post a comment with the last 80 lines of build output and stop without opening a PR.
+**Pre-PR build gate.** After pushing a branch, run `npm run typecheck && npm run build && npm test && npm run test:coverage`. If any step fails, apply a targeted fix and retry — up to two attempts. After the second failure, post a comment with the last 80 lines of build output and stop without opening a PR.
+
+The `test:coverage` step adds roughly 30 seconds (full suite under v8 instrumentation) and catches global-floor breaches before push. The 90% per-diff patch-coverage gate (`scripts/diff-coverage.mjs`) is **not** part of `test:coverage` — it is enforced only in the `coverage` CI workflow against `coverage/coverage-final.json`. To catch per-diff breaches locally too, pipe a diff against your PR base into the script after running `test:coverage`:
+
+```bash
+git diff origin/qa...HEAD | node scripts/diff-coverage.mjs
+```
+
+This is optional — the global floor is the most common breach class — but worth running on a PR that adds new product code under `app/`, `components/`, or `lib/`.
+
+**Pre-PR e2e smoke (high-surface-area changes).** If the PR diff touches any of these paths, additionally run the chromium-only Playwright smoke subset locally via the pinned Docker image before opening the PR:
+
+- `app/layout.tsx`
+- `app/page.tsx`
+- `components/onboarding/**`
+- `components/Nav.tsx`, `components/BottomTabBar.tsx`, `components/MobileNavPaddingWrapper.tsx`
+- `lib/settings/persistence.ts`
+- `playwright.config.ts`
+
+```bash
+docker run --rm -v "$PWD":/work -w /work \
+  mcr.microsoft.com/playwright:v1.60.0-noble \
+  bash -c "npm ci && npm run build && (npm start &) && npx wait-on http://localhost:3000 && npx playwright test --project=chromium e2e/smoke.spec.ts e2e/onboarding.spec.ts e2e/practice-scope.spec.ts e2e/pasture.spec.ts"
+```
+
+A convenience wrapper lives at `scripts/pre-pr-smoke.sh` so the long command does not have to be remembered. Same two-attempt retry budget as the other steps: if anything fails, apply a targeted fix and retry up to twice, then stop and report.
+
+The smoke subset is intentionally smaller than CI's full e2e matrix — the goal is to catch the "modal blocks every page" class of regression (PR #1119 was the prompt), not parity. CI still runs chromium + mobile-safari authoritatively on the full spec set. PRs that only touch a single component or page surface outside the trigger list skip this step.
 
 **Pre-push spelling check.** Before pushing, spell-check all prose, code comments, and UI strings against the British-English convention (see "Spelling" above) — `optimise`, `colour`, `behaviour`, etc. Catch this in the first commit, not a follow-up: a second commit just to fix `optimize` → `optimise` is a recurring, trivially avoidable pattern.
 
