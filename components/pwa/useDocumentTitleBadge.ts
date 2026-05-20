@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
-import { buildQueueCounters, todayString } from "@/lib/review/session";
+import { buildSessionQueues, todayString } from "@/lib/review/session";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 
 /**
@@ -18,8 +18,10 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
  * navigation.
  *
  * The due-card count uses the same logic as the PWA app-icon badge (#916):
- * `buildQueueCounters` over the session from IndexedDB/localStorage, re-run
- * whenever the session storage key changes or settings are saved.
+ * `buildSessionQueues` over the session from IndexedDB/localStorage, re-run
+ * whenever the session storage key changes or settings are saved. This
+ * mirrors the capped queue the Practice page shows, so the tab count is
+ * consistent with the session the user is about to open.
  *
  * Superuser flags are deliberately not plumbed here — the title badge should
  * reflect the user's real card state, consistent with `usePwaBadge`.
@@ -57,8 +59,14 @@ export function useDocumentTitleBadge(): void {
       const settings = loadSettings();
       const tz = settings.timezone ?? "UTC";
       const today = todayString(new Date(), tz);
-      const { newCount, learningCount, reviewCount } = buildQueueCounters(session.cards, today);
-      const total = newCount + learningCount + reviewCount;
+      // Use buildSessionQueues (same function the Practice page uses) so the
+      // title badge reflects today's capped queue, not the full untouched backlog.
+      const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
+        session.cards,
+        session.limits,
+        today,
+      );
+      const total = newQueue.length + learningCardIds.length + reviewQueue.length;
 
       currentCount = total;
       applyTitle(total);
