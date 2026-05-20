@@ -627,6 +627,15 @@ export function ReviewSession() {
           .map((c) => c.id),
       );
       setEligibleCardIds(eligibleIds);
+      // Clear the displayed-card render lock (#1088). The lock pins the
+      // currently-displayed card across re-renders so a learning card whose
+      // dueAt passes mid-render cannot displace it (#839). When the user
+      // changes scope, the locked card may no longer be in scope, and keeping
+      // the lock would leave the displayed card frozen on a now-out-of-scope
+      // entry until the user grades it. The render-side override below also
+      // checks scope-eligibility as a self-healing belt-and-braces guard, but
+      // clearing here documents intent at the source of the change.
+      displayedCardId.current = null;
       void saveSession({ cards, limits }).then(notifySaveResult);
     }
   }
@@ -1292,6 +1301,22 @@ export function ReviewSession() {
   // the user explicitly advances by grading (#839). Setting a ref during render
   // is safe here — it is always in the same render branch and never triggers a
   // re-render itself. The lock is cleared at the end of handleGrade.
+  //
+  // Drop the lock when the locked id is no longer scope-eligible (#1088). This
+  // is the render-side belt-and-braces guard that pairs with handleScopeChange
+  // clearing the lock explicitly: if any future code path mutates
+  // eligibleCardIds without remembering to release the lock, this still
+  // self-heals so the user never sees a frozen out-of-scope card. The check
+  // only kicks in when a scope is active — an empty scope means every card is
+  // eligible, so the eligibleCardIds set is intentionally empty and is not
+  // consulted (see the `isScopeEmpty(scope)` gate at line 1211).
+  if (
+    displayedCardId.current !== null &&
+    !isScopeEmpty(scope) &&
+    !eligibleCardIds.has(displayedCardId.current)
+  ) {
+    displayedCardId.current = null;
+  }
   if (currentCard !== null && displayedCardId.current === null) {
     // A new card just became the current card — lock it in.
     displayedCardId.current = currentCard.id;

@@ -73,6 +73,53 @@ test.describe("Practice scope (#333)", () => {
     await expect(noMatch).not.toBeVisible();
   });
 
+  test("scope change before any grade swaps the displayed card (#1088)", async ({
+    page,
+  }) => {
+    // Regression for #1088: handleScopeChange used to update eligibleCardIds
+    // without releasing the displayedCardId lock, so the card on screen stayed
+    // frozen on the pre-scope-change pick until the user graded it. Picking
+    // a scope that excludes the on-screen card must swap it for the new queue
+    // head immediately.
+    await page.goto("/");
+
+    // Capture the sprite src that's rendered before any scope action. The
+    // PokemonCard renders a single img with alt="A Pokémon sprite, answer
+    // hidden" pre-reveal; the SpritePreloader uses alt="" so this locator is
+    // unique. The src points at a /sprites/pokemon/<id>.png path that
+    // encodes the displayed card's species.
+    const onScreenSprite = page.getByAltText("A Pokémon sprite, answer hidden");
+    await expect(onScreenSprite).toBeVisible();
+    const initialSrc = await onScreenSprite.getAttribute("src");
+    expect(initialSrc).toBeTruthy();
+
+    // Open the Scope panel and apply a Generation IX filter. The default seed
+    // sort almost always surfaces a low-id (early-gen) card first, so Gen IX
+    // is a safe choice for "exclude whatever's on screen" — but we still
+    // assert that the rendered sprite changed, which is the real invariant.
+    const scopeToggle = page
+      .getByRole("button", { expanded: false })
+      .filter({ hasText: /scope/i })
+      .first();
+    await scopeToggle.click();
+    const scopePanel = page.locator("#scope-panel");
+    await expect(scopePanel).toBeVisible();
+
+    const genIX = scopePanel.getByRole("button", { name: "Generation IX", exact: true });
+    await genIX.click();
+    await expect(genIX).toHaveAttribute("aria-pressed", "true");
+
+    // The sprite must swap to a Gen IX card. The lock-clear release in
+    // handleScopeChange (and the render-side scope-eligibility guard) makes
+    // this happen on the next render rather than waiting for a grade.
+    await expect.poll(async () =>
+      onScreenSprite.getAttribute("src"),
+    ).not.toBe(initialSrc);
+
+    // Smoke-check that the session is still operable post-swap.
+    await expect(page.getByRole("button", { name: /reveal/i })).toBeVisible();
+  });
+
   test("no-match scope renders empty state with Clear scope CTA", async ({
     page,
   }) => {

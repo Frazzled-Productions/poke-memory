@@ -1460,6 +1460,141 @@ describe("Practice scope: Clear scope button (#835)", () => {
   });
 });
 
+describe("Practice scope: stale display lock clears on scope change (#1088)", () => {
+  it("changing scope before any grade updates the displayed card to the new queue head", async () => {
+    // Repro for #1088: the displayedCardId ref locks the on-screen card from
+    // the first render until a grade fires. Before the fix, handleScopeChange
+    // updated eligibleCardIds but never released the lock, so the rendered
+    // card stayed frozen on the pre-scope-change pick even when the new scope
+    // excluded it.
+    const user = userEvent.setup();
+
+    // Two Gen-spanning fixtures so a single-gen scope toggle excludes exactly
+    // one of them. Bulbasaur (id 1, speciesId 1) is Gen I; Chikorita (id 152,
+    // speciesId 152) is Gen II. Both are new cards (firstSeen: null), so they
+    // surface in the new-card queue without any persisted state needed.
+    const bulbasaur: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 1,
+      speciesId: 1,
+      name: "Bulbasaur",
+      displayName: "Bulbasaur",
+      subjectKey: "1",
+      spriteUrl: "https://example.com/bulbasaur.png",
+      generation: "generation-i",
+    };
+    const chikorita: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 152,
+      speciesId: 152,
+      name: "Chikorita",
+      displayName: "Chikorita",
+      subjectKey: "152",
+      spriteUrl: "https://example.com/chikorita.png",
+      generation: "generation-ii",
+    };
+    mockSeedPokemon.mockReturnValue([bulbasaur, chikorita]);
+
+    // Empty scope at mount, so eligibility includes both cards and either
+    // can be the queue head depending on the stable-shuffle order. Whichever
+    // shows first, scoping to the OTHER gen must release the lock and swap.
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+
+    // Find the answer-hidden sprite. The preloader uses alt="", so this alt
+    // is unique to the on-screen card.
+    const initialSprite = await screen.findByAltText(
+      "A Pokémon sprite, answer hidden",
+    );
+    const initialSrc = initialSprite.getAttribute("src") ?? "";
+    expect(initialSrc).toMatch(/(bulbasaur|chikorita)\.png/);
+    const initialIsBulbasaur = /bulbasaur\.png/.test(initialSrc);
+
+    // Open the Scope panel. The collapsed toggle has aria-expanded="false";
+    // expanding it exposes #scope-panel and the per-generation pills.
+    const scopeToggle = screen
+      .getAllByRole("button", { expanded: false })
+      .find((b) => /scope/i.test(b.textContent ?? ""));
+    expect(scopeToggle).toBeDefined();
+    await user.click(scopeToggle!);
+
+    // Pick the generation that EXCLUDES whatever's currently displayed:
+    // if Bulbasaur is on screen, click "Generation II"; otherwise click "Generation I".
+    // Each pill carries an aria-label of the form "Generation <Roman>".
+    const excludingGen = initialIsBulbasaur ? "Generation II" : "Generation I";
+    const genPill = screen.getByRole("button", { name: excludingGen });
+    await user.click(genPill);
+
+    // The displayed sprite must swap to the remaining in-scope card. Before
+    // the fix this stayed pinned on the initially-displayed card because the
+    // displayedCardId lock was never released by handleScopeChange.
+    await waitFor(() => {
+      const sprite = screen.getByAltText("A Pokémon sprite, answer hidden");
+      const src = sprite.getAttribute("src") ?? "";
+      const expected = initialIsBulbasaur ? "chikorita.png" : "bulbasaur.png";
+      expect(src).toContain(expected);
+    });
+  });
+
+  it("changing scope to an empty set immediately renders the no-match empty state", async () => {
+    // Companion check for the third acceptance criterion: with the lock
+    // cleared on scope change, scoping to a no-match set must surface the
+    // empty-state immediately rather than staying frozen on a now out-of-scope
+    // card. Uses a fictitious type string with no seed matches.
+    const user = userEvent.setup();
+    mockSeedPokemon.mockReturnValue([FIXTURE_CARD]);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    render(<ReviewSession />);
+    await screen.findByAltText("A Pokémon sprite, answer hidden");
+
+    const scopeToggle = screen
+      .getAllByRole("button", { expanded: false })
+      .find((b) => /scope/i.test(b.textContent ?? ""));
+    await user.click(scopeToggle!);
+
+    // Bulbasaur is Gen I, so scoping to Gen IX excludes it. The empty-state
+    // must appear without any intervening grade.
+    const genIX = screen.getByRole("button", { name: "Generation IX" });
+    await user.click(genIX);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no Pok[ée]mon match your scope/i),
+      ).toBeInTheDocument();
+    });
+  });
+});
+
 describe("ReviewSession TTS warm-up (#479)", () => {
   it("calls warmupTts on the reveal button click and again on the grade button click", async () => {
     const user = userEvent.setup();
