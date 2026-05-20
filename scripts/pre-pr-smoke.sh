@@ -43,4 +43,4 @@ docker run --rm \
   -v "${REPO_ROOT}":/work \
   -w /work \
   mcr.microsoft.com/playwright:v1.60.0-noble \
-  bash -c "npm ci && npm run build && (npm start &) && npx wait-on http://localhost:3000 && npx playwright test --project=chromium e2e/smoke.spec.ts e2e/onboarding.spec.ts e2e/practice-scope.spec.ts e2e/pasture.spec.ts"
+  bash -c "npm ci && npm run build && (npm start &) && npx wait-on --timeout 60000 http://localhost:3000 && npx playwright test --project=chromium e2e/smoke.spec.ts e2e/onboarding.spec.ts e2e/practice-scope.spec.ts e2e/pasture.spec.ts"

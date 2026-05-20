@@ -287,7 +287,7 @@ When a change closes an issue, reference it in the commit message (`closes #N`) 
 
 **Pre-PR build gate.** After pushing a branch, run `npm run typecheck && npm run build && npm test && npm run test:coverage`. If any step fails, apply a targeted fix and retry — up to two attempts. After the second failure, post a comment with the last 80 lines of build output and stop without opening a PR.
 
-The `test:coverage` step adds roughly 30 seconds (full suite under v8 instrumentation) and catches global-floor breaches before push. The 90% per-diff patch-coverage gate (`scripts/diff-coverage.mjs`) is **not** part of `test:coverage` — it is enforced only in the `coverage` CI workflow against `coverage/coverage-final.json`. To catch per-diff breaches locally too, pipe a diff against your PR base into the script after running `test:coverage`:
+The `test:coverage` step adds roughly 30 seconds (full suite under v8 instrumentation) and catches global-floor breaches before push. The 90% per-diff patch-coverage gate (`scripts/diff-coverage.mjs`) is **not** part of `test:coverage` — it is enforced only in the `coverage` CI workflow against `coverage/coverage-final.json`. To catch per-diff breaches locally too, pipe a diff against your PR base into the script immediately after the `test:coverage` run, while `coverage/coverage-final.json` is still present in the working tree (the script reads that file directly; a subsequent `npm test` run without `--coverage` will overwrite or remove it):
 
 ```bash
 git diff origin/qa...HEAD | node scripts/diff-coverage.mjs
@@ -304,10 +304,12 @@ This is optional — the global floor is the most common breach class — but wo
 - `lib/settings/persistence.ts`
 - `playwright.config.ts`
 
+Run from the repo root (the wrapper `scripts/pre-pr-smoke.sh` handles this automatically — it resolves the repo root from its own location, so it works from any subdirectory):
+
 ```bash
 docker run --rm -v "$PWD":/work -w /work \
   mcr.microsoft.com/playwright:v1.60.0-noble \
-  bash -c "npm ci && npm run build && (npm start &) && npx wait-on http://localhost:3000 && npx playwright test --project=chromium e2e/smoke.spec.ts e2e/onboarding.spec.ts e2e/practice-scope.spec.ts e2e/pasture.spec.ts"
+  bash -c "npm ci && npm run build && (npm start &) && npx wait-on --timeout 60000 http://localhost:3000 && npx playwright test --project=chromium e2e/smoke.spec.ts e2e/onboarding.spec.ts e2e/practice-scope.spec.ts e2e/pasture.spec.ts"
 ```
 
 A convenience wrapper lives at `scripts/pre-pr-smoke.sh` so the long command does not have to be remembered. Same two-attempt retry budget as the other steps: if anything fails, apply a targeted fix and retry up to twice, then stop and report.
