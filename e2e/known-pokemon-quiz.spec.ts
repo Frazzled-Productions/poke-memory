@@ -58,8 +58,12 @@ test.describe("Mark Pokémon I already know quiz (#1084)", () => {
       page.getByRole("checkbox", { name: /i already know bulbasaur/i }),
     ).toHaveCount(0);
 
-    // Status banner confirms.
-    await expect(page.getByRole("status")).toContainText(/marked 1 pokémon as known/i);
+    // Status banner confirms. Filter by text because the settings page also
+    // has a sr-only role="status" live region for the search input — strict
+    // mode would error if we matched both.
+    await expect(
+      page.getByRole("status").filter({ hasText: /marked 1 pokémon as known/i }),
+    ).toBeVisible();
   });
 
   test("bulk action shows a confirm dialog before marking a generation", async ({
