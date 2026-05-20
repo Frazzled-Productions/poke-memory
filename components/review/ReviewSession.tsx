@@ -511,12 +511,12 @@ export function ReviewSession() {
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
   // settings default) until the session load effect reads the real value.
   const [masteryRepetitions, setMasteryRepetitions] = useState(3);
-  // Onboarding nudges (#702). `audioFeaturesOff` is true when the user has no
-  // audio behaviour switched on at all (no cry playback, no spoken names, no
-  // cry cards) — only then does the audio hint at card reveal make sense.
-  // `cardTypesAllOn` is true when every off-by-default card type is enabled —
-  // when that holds there is nothing left to nudge towards.
-  const [audioFeaturesOff, setAudioFeaturesOff] = useState(false);
+  // Onboarding nudges (#702). `cardTypesAllOn` is true when every
+  // off-by-default card type is enabled — when that holds there is nothing
+  // left to nudge towards on the session-complete screen.
+  // Note: `audioFeaturesOff` was removed in #1103 (consolidated into the
+  // one-time first-visit modal). `cardTypesAllOn` remains for the end-of-session
+  // card-types nudge, which is still shown in EndOfSessionScreen.
   const [cardTypesAllOn, setCardTypesAllOn] = useState(false);
   const [revealed, setRevealed] = useState(false);
   // True while decode-ahead is running for an evolution/reverse-evolution
@@ -857,12 +857,6 @@ export function ReviewSession() {
       setEvolutionCardsEnabled(evolutionEnabled);
       setCryCardsEnabled(cryEnabled);
       setAlternateFormsEnabled(formsEnabled);
-      // Onboarding nudges (#702): derive once from the same settings read.
-      setAudioFeaturesOff(
-        !settings.playCryOnReveal &&
-          !settings.speakNameOnReveal &&
-          !cryEnabled,
-      );
       setCardTypesAllOn(
         enabled && reverseEvolutionEnabledLocal && formsEnabled,
       );
@@ -2146,24 +2140,14 @@ export function ReviewSession() {
         }
         controls={
           revealed ? (
-            <>
-              <OnboardingHint id="practiceHintDismissed" title="How to grade">
-                <p>
-                  <strong>Again</strong>: forgot. <strong>Hard</strong>:
-                  struggled. <strong>Good</strong>: recalled with effort.{" "}
-                  <strong>Easy</strong>: instant. Grade honestly; FSRS uses
-                  this to space your next review.
-                </p>
-              </OnboardingHint>
-              <GradeButtons
-                onGrade={handleGrade}
-                disabled={grading}
-                previews={gradePreviewsOrNull ?? undefined}
-                showShortcuts={showKeyboardShortcuts}
-                onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
-                onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
-              />
-            </>
+            <GradeButtons
+              onGrade={handleGrade}
+              disabled={grading}
+              previews={gradePreviewsOrNull ?? undefined}
+              showShortcuts={showKeyboardShortcuts}
+              onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+              onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
+            />
           ) : (
             <button
               type="button"
@@ -2253,25 +2237,7 @@ export function ReviewSession() {
             speakNameOnAnswer={speakNameOnAnswer}
           />
         }
-        belowCard={
-          /* Audio hint rendered outside the overflow-y-auto card region so it
-             is always visible and not clipped on short viewports. */
-          audioFeaturesOff ? (
-            <div className="flex-none w-full">
-              <OnboardingHint
-                id="audioHintDismissed"
-                title="Add sound to your reviews"
-                ctaHref="/settings#audio-heading"
-                ctaLabel="Open audio settings"
-              >
-                <p>
-                  Want to hear Pokémon cries and names read aloud? Turn on
-                  audio in Settings.
-                </p>
-              </OnboardingHint>
-            </div>
-          ) : undefined
-        }
+        belowCard={undefined}
         showOutOfScopeHint={outOfScopeLearningSet.has(effectiveCard.id)}
         queueCounts={{ newCount, learningCount, reviewCount }}
         hasUndoSnapshot={undoSnapshot !== null}
@@ -2357,37 +2323,14 @@ export function ReviewSession() {
       }
       controls={
         revealed ? (
-          <>
-            <OnboardingHint id="practiceHintDismissed" title="How to grade">
-              <p>
-                <strong>Again</strong>: forgot. <strong>Hard</strong>:
-                struggled. <strong>Good</strong>: recalled with effort.{" "}
-                <strong>Easy</strong>: instant. Grade honestly; FSRS uses
-                this to space your next review.
-              </p>
-            </OnboardingHint>
-            {audioFeaturesOff && (
-              <OnboardingHint
-                id="audioHintDismissed"
-                title="Add sound to your reviews"
-                ctaHref="/settings#audio-heading"
-                ctaLabel="Open audio settings"
-              >
-                <p>
-                  Want to hear Pokémon cries and names read aloud? Turn on
-                  audio in Settings.
-                </p>
-              </OnboardingHint>
-            )}
-            <GradeButtons
-              onGrade={handleGrade}
-              disabled={grading}
-              previews={gradePreviewsOrNull ?? undefined}
-              showShortcuts={showKeyboardShortcuts}
-              onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
-              onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
-            />
-          </>
+          <GradeButtons
+            onGrade={handleGrade}
+            disabled={grading}
+            previews={gradePreviewsOrNull ?? undefined}
+            showShortcuts={showKeyboardShortcuts}
+            onOpenShortcuts={() => setShowKeyboardShortcuts(true)}
+            onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
+          />
         ) : (
           <button
             type="button"

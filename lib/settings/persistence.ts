@@ -32,13 +32,22 @@ export type ThemeIntensity = "accents" | "tinted" | "full";
  * `false` = hint still shows; `true` = user dismissed it.
  */
 export type OnboardingFlags = {
+  /**
+   * One-time first-visit onboarding modal (#1103). Shown on the first
+   * Practice-page load; covers grading mechanics, audio features, and guest
+   * storage. `true` = user dismissed it and it will not re-open automatically.
+   */
+  firstVisitOnboardingDismissed: boolean;
+  /** @deprecated Replaced by firstVisitOnboardingDismissed (#1103). The banner is removed; flag retained to avoid migration noise. */
   welcomeDismissed: boolean;
+  /** @deprecated Replaced by firstVisitOnboardingDismissed (#1103). The banner is removed; flag retained to avoid migration noise. */
   practiceHintDismissed: boolean;
   statsHintDismissed: boolean;
   settingsHintDismissed: boolean;
   /** PWA install nudge (#701). `true` = user dismissed it; resets with the onboarding reset button. */
   installNudgeDismissed: boolean;
   /**
+   * @deprecated Replaced by firstVisitOnboardingDismissed (#1103). The banner is removed; flag retained to avoid migration noise.
    * Audio-features nudge (#702). Shown at card reveal when the user has no
    * audio behaviour switched on, pointing them to Settings → Audio (cry
    * playback and spoken names). `true` = user dismissed it.
@@ -51,6 +60,7 @@ export type OnboardingFlags = {
    */
   cardTypesHintDismissed: boolean;
   /**
+   * @deprecated Replaced by firstVisitOnboardingDismissed (#1103). The banner is removed; flag retained to avoid migration noise.
    * Guest storage-persistence notice (#1057). Shown to signed-out users to
    * explain that progress is device-local and how to protect it. `true` = user
    * dismissed it.
@@ -59,6 +69,7 @@ export type OnboardingFlags = {
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
+  firstVisitOnboardingDismissed: false,
   welcomeDismissed: false,
   practiceHintDismissed: false,
   statsHintDismissed: false,
@@ -458,6 +469,7 @@ function validateOnboarding(value: unknown): OnboardingFlags {
   if (typeof value !== "object" || value === null) return { ...DEFAULT_ONBOARDING };
   const v = value as Record<string, unknown>;
   return {
+    firstVisitOnboardingDismissed: v.firstVisitOnboardingDismissed === true,
     welcomeDismissed: v.welcomeDismissed === true,
     practiceHintDismissed: v.practiceHintDismissed === true,
     statsHintDismissed: v.statsHintDismissed === true,

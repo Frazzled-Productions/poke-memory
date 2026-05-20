@@ -1486,18 +1486,18 @@ export default function SettingsPage() {
                   <hr className="border-zinc-200 dark:border-zinc-800" />
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      Show onboarding tips again
+                      Show onboarding guide again
                     </p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Restores the welcome message and the contextual hints on
-                      Practice, Stats, and Settings, including the audio and
-                      card-type nudges.
+                      Re-opens the welcome guide on the Practice page and
+                      restores contextual hints on Stats and Settings.
                     </p>
                     <button
                       type="button"
                       onClick={() => {
-                        // DEFAULT_ONBOARDING includes installNudgeDismissed: false (#701),
-                        // so this spread also resets the PWA install nudge for free.
+                        // DEFAULT_ONBOARDING resets all flags including
+                        // firstVisitOnboardingDismissed (#1103) and
+                        // installNudgeDismissed (#701).
                         const next = { ...settings, onboarding: { ...DEFAULT_ONBOARDING } };
                         setSettings(next);
                         saveSettings(next);

@@ -53,10 +53,19 @@ const SESSION_WITH_ONE_DUE_CARD = {
   },
 };
 
+const SETTINGS_KEY = "poke-memory:settings:v1";
+
 // Seed the session and navigate to the practice page. All non-Bulbasaur cards
 // are already future-due so hydrateSession finds every id in savedIds and adds
 // no new cards — the only card served is the review-due Bulbasaur.
+// The first-visit modal is pre-dismissed so it doesn't block keyboard events.
 async function seedAndGo(page: Parameters<typeof seedSessionIdb>[0]) {
+  await page.addInitScript((key) => {
+    localStorage.setItem(
+      key,
+      JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+    );
+  }, SETTINGS_KEY);
   await seedSessionIdb(page, SESSION_WITH_ONE_DUE_CARD);
   await page.goto("/");
   await awaitSeedIdb(page);

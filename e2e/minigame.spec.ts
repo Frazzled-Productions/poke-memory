@@ -107,7 +107,19 @@ function buildNewCardsLockedSession(args: {
   };
 }
 
+const SETTINGS_KEY = "poke-memory:settings:v1";
+
 test.describe("Higher-or-Lower mini-game", () => {
+  // Pre-dismiss the first-visit modal so it does not block the end-of-session screen.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      );
+    }, SETTINGS_KEY);
+  });
+
   test("mini-game section appears on SESSION_COMPLETE", async ({ page }) => {
     await seedSessionIdb(page, buildCompletedSession({
       pokemonIds: SEED_POKEMON_IDS,

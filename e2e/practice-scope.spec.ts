@@ -31,6 +31,13 @@ test.describe("Practice scope (#333)", () => {
     // Fresh slate — drop any settings/session state from a prior test so
     // the scope starts at its empty default.
     await page.addInitScript(() => localStorage.clear());
+    // Pre-dismiss the first-visit modal so it does not block the scope controls.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      );
+    }, SETTINGS_STORAGE_KEY);
   });
 
   test("happy path: scope to Generation I, practice page still shows a card", async ({
