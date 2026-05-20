@@ -2,6 +2,12 @@ import { test, expect } from "@playwright/test";
 
 const SETTINGS_KEY = "poke-memory:settings:v1";
 
+// The global storageState (e2e/global-setup.ts) pre-dismisses the onboarding
+// modal so it does not block every other spec. This file's whole purpose is
+// to verify the modal renders and dismisses correctly, so override the global
+// storageState with an empty one — the app must see a brand-new visitor.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe("First-visit onboarding modal (#1103)", () => {
   test("modal appears on a fresh visit and is dismissable", async ({
     page,
