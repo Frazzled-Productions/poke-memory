@@ -138,3 +138,8 @@ jobs:
           name: visual-regression-report
           path: playwright-report/
           retention-days: 14
+          # Fail loud if the html reporter has not produced the directory, so a
+          # future config drift (e.g. dropping the html reporter from
+          # playwright.config.ts) cannot silently upload an empty artifact and
+          # leave the maintainer without diff images. See #1127.
+          if-no-files-found: error
