@@ -1,0 +1,262 @@
+import { NextResponse } from "next/server";
+import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
+import webpush from "web-push";
+import { todayInTimezone } from "@/lib/utils/format-date";
+
+/**
+ * Daily Web Push reminder route (#1056).
+ *
+ * Triggered by the `web-push-daily-reminders` pg_cron job (migration 028)
+ * via `net.http_post` with a Bearer header carrying the
+ * `cron_shared_secret` Vault value. The job fires once per day at 08:00
+ * UTC; this handler then fans out per-user Web Push notifications for
+ * every `push_subscriptions` row whose owning user has at least one card
+ * due today in their own timezone.
+ *
+ * Why a route handler instead of a Supabase Edge Function: VAPID JWTs are
+ * ECDSA P-256 (ES256) and pgcrypto / pgsodium can't produce that shape, so
+ * the cron call has to land somewhere with a real crypto stack. Keeping
+ * this in the Next.js codebase means one deploy pipeline, one set of env
+ * vars, and one place to test the auth + payload encryption logic.
+ *
+ * AUTH MODEL
+ *   1. Caller authenticates via `Authorization: Bearer <CRON_SHARED_SECRET>`.
+ *      Any other value (or missing header) returns 401. The shared secret
+ *      lives in both Vercel env (`CRON_SHARED_SECRET`) and Supabase Vault
+ *      (`cron_shared_secret`); they must match exactly.
+ *   2. Inside the route, we use the SUPABASE_SERVICE_ROLE_KEY to read
+ *      across every user's `push_subscriptions` row. Row-level security is
+ *      bypassed by design — the cron has no `auth.uid()` to authorise as,
+ *      and the route's only privileged operation is reading subscriptions
+ *      + computing due counts + sending pushes.
+ */
+
+// Note: this route must run on Node.js (not Edge) because the `web-push`
+// package relies on the Node `crypto` module for ES256 JWT signing and
+// payload encryption. Next.js 16's Cache Components mode forbids the
+// per-route `runtime` segment config, so we rely on the project-wide
+// default Node runtime here.
+
+/** JSON shape of the push payload delivered to the SW push handler. */
+type PushPayload = {
+  title: string;
+  body: string;
+  url: string;
+};
+
+/** Pluralisation helper. Avoids relying on Intl.PluralRules for one word. */
+function plural(n: number, singular: string, plural: string): string {
+  return n === 1 ? singular : plural;
+}
+
+/**
+ * Builds the user-facing body string for the daily reminder. Kept pure so
+ * we can unit test it without touching the network or DB.
+ *
+ * British English copy. No em dashes (per AGENTS.md "Punctuation"). The
+ * "Pokémon" spelling is the proper noun and stays as-is.
+ */
+export function buildDailyMessage(dueCount: number): PushPayload {
+  const title = "Time to practise";
+  const body =
+    dueCount === 1
+      ? "1 Pokémon is ready for review."
+      : `${String(dueCount)} ${plural(dueCount, "Pokémon is", "Pokémon are")} ready for review.`;
+  return { title, body, url: "/" };
+}
+
+type SubscriptionRow = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth_secret: string;
+};
+
+type SettingsRow = {
+  user_id: string;
+  timezone: string | null;
+};
+
+type DueRow = {
+  user_id: string;
+};
+
+export async function POST(request: Request) {
+  const sharedSecret = process.env.CRON_SHARED_SECRET;
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+  const vapidSubject = process.env.VAPID_SUBJECT;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  // Misconfiguration → 503 (Service Unavailable). 500 would imply a crash
+  // worth investigating; 503 conveys "the route is configured wrong" which
+  // is the actual state. The cron job retries are bounded by pg_net's
+  // own retry policy so this won't loop indefinitely.
+  if (
+    !sharedSecret ||
+    !vapidPublicKey ||
+    !vapidPrivateKey ||
+    !vapidSubject ||
+    !supabaseUrl ||
+    !serviceRoleKey
+  ) {
+    return NextResponse.json(
+      { ok: false, error: "misconfigured" },
+      { status: 503 },
+    );
+  }
+
+  // Constant-time-ish bearer check. JS strings don't expose a true
+  // constant-time comparison but the secret is server-side and per-deploy,
+  // not per-request, so a timing oracle is not the realistic attack here.
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader || authHeader !== `Bearer ${sharedSecret}`) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
+  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+
+  // Service-role client. Bypasses RLS so we can read across all users in
+  // a single round-trip. This client must NEVER reach the browser; the
+  // route handler is the only consumer.
+  const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  // Step 1: fetch every push subscription. The result fits comfortably in
+  // memory at our scale (one row per device per signed-in user).
+  const { data: subsData, error: subsError } = await admin
+    .from("push_subscriptions")
+    .select("id, user_id, endpoint, p256dh, auth_secret");
+  if (subsError || !subsData) {
+    return NextResponse.json(
+      { ok: false, error: "subscriptions_query_failed" },
+      { status: 502 },
+    );
+  }
+  const subscriptions = subsData as SubscriptionRow[];
+  if (subscriptions.length === 0) {
+    return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
+  }
+
+  // Step 2: resolve timezones. Users without a stored timezone fall back
+  // to UTC for the due-date comparison — same default as the rest of the
+  // app per migration 019.
+  const uniqueUserIds = Array.from(new Set(subscriptions.map((s) => s.user_id)));
+  const { data: settingsData, error: settingsError } = await admin
+    .from("user_settings")
+    .select("user_id, timezone")
+    .in("user_id", uniqueUserIds);
+  if (settingsError) {
+    return NextResponse.json(
+      { ok: false, error: "settings_query_failed" },
+      { status: 502 },
+    );
+  }
+  const settingsByUser = new Map<string, string>();
+  for (const row of (settingsData ?? []) as SettingsRow[]) {
+    if (row.timezone) settingsByUser.set(row.user_id, row.timezone);
+  }
+
+  // Step 3: figure out which users have at least one due card. We bucket
+  // users by "today in their timezone" so we only need one query per
+  // distinct calendar date. At our scale this is at most ~30 buckets
+  // (every inhabited UTC offset). Querying for due cards in one go and
+  // filtering client-side is cheaper than N round-trips.
+  const usersByDueDate = new Map<string, string[]>();
+  for (const userId of uniqueUserIds) {
+    const tz = settingsByUser.get(userId) ?? "UTC";
+    const today = todayInTimezone(tz);
+    const bucket = usersByDueDate.get(today);
+    if (bucket) bucket.push(userId);
+    else usersByDueDate.set(today, [userId]);
+  }
+
+  const userHasDue = new Set<string>();
+  for (const [today, userIds] of usersByDueDate) {
+    const { data: dueData, error: dueError } = await admin
+      .from("card_reviews")
+      .select("user_id")
+      .lte("due_date", today)
+      .in("user_id", userIds)
+      // hidden_since cards are paused under the learning filter (#333) and
+      // should not count as due. The schema allows NULL for "not hidden",
+      // so the filter is "is null".
+      .is("hidden_since", null);
+    if (dueError) {
+      return NextResponse.json(
+        { ok: false, error: "due_query_failed" },
+        { status: 502 },
+      );
+    }
+    for (const row of (dueData ?? []) as DueRow[]) {
+      userHasDue.add(row.user_id);
+    }
+  }
+
+  // Step 4: per-user count for the message body. Done as a second pass so
+  // the SQL stays a simple "any row" check; getting counts inline would
+  // require either a group-by or one query per user.
+  const dueCountByUser = new Map<string, number>();
+  for (const [today, userIds] of usersByDueDate) {
+    const targets = userIds.filter((u) => userHasDue.has(u));
+    if (targets.length === 0) continue;
+    for (const userId of targets) {
+      const { count, error } = await admin
+        .from("card_reviews")
+        .select("user_id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .lte("due_date", today)
+        .is("hidden_since", null);
+      if (error) continue; // Skip this user's count; we still send a generic body if any.
+      dueCountByUser.set(userId, count ?? 0);
+    }
+  }
+
+  // Step 5: send. Dead subscriptions (410 Gone) and not-found (404) are
+  // deleted so the next cron run doesn't try them again. All other errors
+  // are logged and skipped — a single bad endpoint must not abort the
+  // whole batch.
+  const toDelete: string[] = [];
+  let sent = 0;
+  for (const sub of subscriptions) {
+    const dueCount = dueCountByUser.get(sub.user_id) ?? 0;
+    if (dueCount <= 0) continue;
+
+    const payload = buildDailyMessage(dueCount);
+    try {
+      await webpush.sendNotification(
+        {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth_secret },
+        },
+        JSON.stringify(payload),
+      );
+      sent++;
+    } catch (err: unknown) {
+      const status = (err as { statusCode?: number }).statusCode;
+      if (status === 404 || status === 410) {
+        toDelete.push(sub.id);
+        continue;
+      }
+      // Transient or non-fatal error — keep going so a single bad device
+      // does not block the rest of the batch.
+      console.warn("[push] sendNotification failed", { id: sub.id, status });
+    }
+  }
+
+  // Step 6: cleanup. Best-effort — if the delete fails we'll retry on the
+  // next cron cycle when the same endpoints fail again.
+  let deleted = 0;
+  if (toDelete.length > 0) {
+    const { error: deleteError, count } = await admin
+      .from("push_subscriptions")
+      .delete({ count: "exact" })
+      .in("id", toDelete);
+    if (!deleteError) deleted = count ?? toDelete.length;
+  }
+
+  return NextResponse.json({ ok: true, sent, deleted });
+}

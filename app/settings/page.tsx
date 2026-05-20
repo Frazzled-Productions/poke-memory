@@ -52,6 +52,7 @@ import {
 } from "@/lib/utils/format-date";
 import { pushRegionalPrefs } from "@/lib/sync/settings";
 import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
+import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg } from "@/lib/utils/class-names";
 
@@ -1386,6 +1387,14 @@ export default function SettingsPage() {
                 {/* Sign-in methods — only shown for signed-in users */}
                 {user && supabase && (
                   <LinkIdentitiesSection user={user} supabase={supabase} />
+                )}
+
+                {/* Daily review reminder (Web Push, #1056). The component
+                    handles its own visibility — it renders nothing outside
+                    an installed PWA or when push is unsupported, so the
+                    parent does not need to gate further. */}
+                {user && supabase && (
+                  <PushOptIn user={user} supabase={supabase} />
                 )}
 
                 {/* Onboarding explainer */}

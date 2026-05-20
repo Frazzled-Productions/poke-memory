@@ -487,3 +487,39 @@ test.describe("Settings — Danger zone (#697)", () => {
     ).toHaveCount(0);
   });
 });
+
+test.describe("Settings page — Web Push opt-in (#1056)", () => {
+  test("daily reminder toggle is hidden in a regular browser tab (not standalone)", async ({
+    page,
+  }) => {
+    // The PushOptIn component renders only when display-mode is standalone
+    // AND push is supported AND the user is authenticated. A normal browser
+    // session in CI satisfies none of those, so the toggle must be entirely
+    // absent — not just hidden via CSS.
+    await page.goto("/settings");
+
+    // Expand Account & Data so the would-be parent section is open.
+    await page.getByRole("button", { name: /account & data/i }).click();
+    await expect(
+      page.getByRole("button", { name: /account & data/i }),
+    ).toHaveAttribute("aria-expanded", "true");
+
+    // The opt-in switch must not render. Use a data-testid match so the
+    // assertion does not depend on label wording remaining stable.
+    await expect(page.getByTestId("push-optin-button")).toHaveCount(0);
+  });
+
+  test("daily reminder toggle is also hidden when display-mode is forced to standalone (push unsupported in CI)", async ({
+    page,
+  }) => {
+    // Even with display-mode emulated to standalone, the test browser in CI
+    // does not provide a real PushManager + Notification surface that
+    // isPushSupported considers valid. The toggle must still not render —
+    // we don't want to show a control that can't actually subscribe.
+    await page.emulateMedia({ media: "screen", colorScheme: "light" });
+
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /account & data/i }).click();
+    await expect(page.getByTestId("push-optin-button")).toHaveCount(0);
+  });
+});

@@ -97,14 +97,28 @@ interface ServiceWorkerScope {
     type: "sync",
     listener: (event: SyncEvent) => void,
   ): void;
+  addEventListener(
+    type: "push",
+    listener: (event: PushEvent) => void,
+  ): void;
+  addEventListener(
+    type: "notificationclick",
+    listener: (event: NotificationClickEvent) => void,
+  ): void;
   clients: {
     matchAll(options?: { type?: string; includeUncontrolled?: boolean }): Promise<Array<{
       postMessage(data: unknown, transfer?: Transferable[]): void;
       visibilityState?: string;
+      focused?: boolean;
+      url?: string;
+      focus?(): Promise<unknown>;
+      navigate?(url: string): Promise<unknown>;
     }>>;
+    openWindow(url: string): Promise<unknown | null>;
   };
   registration: {
     sync?: { register(tag: string): Promise<void> };
+    showNotification(title: string, options?: NotificationOptionsLite): Promise<void>;
   };
   indexedDB: IDBFactory;
 }
@@ -113,6 +127,33 @@ interface ServiceWorkerScope {
 interface SyncEvent extends Event {
   tag: string;
   waitUntil(promise: Promise<unknown>): void;
+}
+
+/** Minimal shape of a Push event. */
+interface PushEvent extends Event {
+  data?: { json(): unknown; text(): string } | null;
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+/** Minimal shape of the notification object attached to a click event. */
+interface NotificationLite {
+  data?: unknown;
+  close(): void;
+}
+
+/** Minimal shape of a notificationclick event. */
+interface NotificationClickEvent extends Event {
+  notification: NotificationLite;
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+/** Subset of NotificationOptions used by `showNotification`. */
+interface NotificationOptionsLite {
+  body?: string;
+  icon?: string;
+  badge?: string;
+  tag?: string;
+  data?: unknown;
 }
 
 declare const self: ServiceWorkerScope;
@@ -431,6 +472,120 @@ self.addEventListener("sync", (event) => {
 
       // All cards pushed successfully — clear the IDB queue.
       await clearPendingQueueFromIdb();
+    })(),
+  );
+});
+
+/**
+ * Web Push handler (#1056).
+ *
+ * Fires when the push service delivers a message from our send-daily route
+ * handler. The payload shape is small and JSON-serialised by the sender:
+ *
+ *   { title: string, body: string, url?: string }
+ *
+ * Defaults are conservative so a malformed payload from a future client
+ * does not skip the visible notification — userVisibleOnly was set true at
+ * subscribe time, so Chromium will surface a generic "site updated"
+ * notification on our behalf if we fail to call showNotification.
+ *
+ * The icon and badge paths point at the existing manifest icons. `tag`
+ * is fixed so a second daily notification on the same day replaces the
+ * first rather than stacking — the user only needs to be told "you have
+ * reviews due" once per day.
+ */
+self.addEventListener("push", (event) => {
+  let title = "Poké Memory";
+  let body = "You have Pokémon reviews waiting.";
+  let url = "/";
+
+  if (event.data) {
+    try {
+      const payload = event.data.json() as Partial<{
+        title: string;
+        body: string;
+        url: string;
+      }>;
+      if (typeof payload.title === "string" && payload.title.length > 0) {
+        title = payload.title;
+      }
+      if (typeof payload.body === "string" && payload.body.length > 0) {
+        body = payload.body;
+      }
+      if (typeof payload.url === "string" && payload.url.length > 0) {
+        url = payload.url;
+      }
+    } catch {
+      // Malformed JSON — fall through with defaults so we still surface
+      // a notification (Chromium will otherwise show the generic "site
+      // updated" fallback because userVisibleOnly was set true).
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      // /icon2 and /apple-icon are dynamic Next.js icon routes — see
+      // app/icon2.tsx / app/apple-icon.tsx. The browser fetches and caches
+      // them like any other image; the SW does not need to special-case them.
+      icon: "/icon2",
+      badge: "/icon2",
+      tag: "poke-memory-daily-reminder",
+      data: { url },
+    }),
+  );
+});
+
+/**
+ * notificationclick handler. Opens Practice (or the URL embedded in the
+ * payload) when the user taps the notification. Behaviour matches Web
+ * standards guidance: if an existing app tab is open at the destination,
+ * focus it; otherwise navigate an existing tab or open a fresh window.
+ */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const data = event.notification.data;
+  const targetUrl =
+    data && typeof (data as { url?: unknown }).url === "string"
+      ? (data as { url: string }).url
+      : "/";
+
+  event.waitUntil(
+    (async () => {
+      const allClients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      // Resolve the target URL against the SW's origin so the equality
+      // check below compares like-for-like (clients expose absolute URLs).
+      const absoluteTarget = new URL(targetUrl, self.location.origin).href;
+
+      for (const client of allClients) {
+        if (client.url === absoluteTarget && typeof client.focus === "function") {
+          await client.focus();
+          return;
+        }
+      }
+
+      // No exact match — prefer to navigate an existing tab so we don't
+      // stack windows. Fall back to opening a new one when navigate is
+      // unavailable (Safari < 17) or no tab exists.
+      const firstClient = allClients[0];
+      if (firstClient && typeof firstClient.navigate === "function") {
+        try {
+          await firstClient.navigate(absoluteTarget);
+          if (typeof firstClient.focus === "function") {
+            await firstClient.focus();
+          }
+          return;
+        } catch {
+          // Fall through to openWindow.
+        }
+      }
+
+      await self.clients.openWindow(absoluteTarget);
     })(),
   );
 });

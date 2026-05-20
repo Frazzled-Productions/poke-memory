@@ -7,6 +7,7 @@ import {
 } from "@/lib/sync/settings";
 import { pullStreak, mergeStreak } from "@/lib/sync/streak";
 import { pullGradeLog, mergeGradeLog } from "@/lib/sync/gradeLog";
+import { pullPushSubscriptionCount } from "@/lib/sync/pushSubscriptions";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
@@ -327,6 +328,23 @@ export async function pullAndMerge(
     } catch (e) {
       // Best-effort — grade-log pull failure must not flip sync into error.
       console.warn("[pullAndMerge] grade-log pull failed (non-fatal)", e);
+    }
+
+    // Pull push-subscription count (#1056) as a best-effort signal so the
+    // Settings page can render an accurate initial toggle state on a fresh
+    // device. Cards remain the primary contract; this leg's failure must
+    // never flip overall sync into error.
+    try {
+      const count = await pullPushSubscriptionCount(client, userId);
+      if (count !== null && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("poke-memory:push-subscriptions-pulled", {
+            detail: { count },
+          }),
+        );
+      }
+    } catch (e) {
+      console.warn("[pullAndMerge] push-subscription pull failed (non-fatal)", e);
     }
 
     saveSyncStatus({
