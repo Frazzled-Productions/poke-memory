@@ -170,6 +170,12 @@ function DueForecast({
   // was opened via hover, not via a deliberate tap.
   const lastInteraction = useRef<"click" | "hover" | null>(null);
 
+  // On mobile WebKit (iOS Safari), a tap fires synthetic mouseenter before the
+  // click event. This ref records the index that onMouseEnter just opened so
+  // that handleBarClick can detect "mouseenter already opened this bar" and
+  // avoid toggling the tooltip closed again in the same gesture.
+  const hoverOpenedIdx = useRef<number | null>(null);
+
   // Close the popup when the user clicks/taps outside the chart container.
   useEffect(() => {
     if (openTooltip === null) return;
@@ -191,6 +197,16 @@ function DueForecast({
   }, [openTooltip]);
 
   function handleBarClick(idx: number) {
+    // On mobile WebKit, a tap fires synthetic mouseenter before onClick.
+    // hoverOpenedIdx records the bar index that onMouseEnter just opened.
+    // When click fires for the same bar, the tooltip is already open from
+    // hover — skip the toggle so we don't immediately close it again.
+    if (hoverOpenedIdx.current === idx) {
+      hoverOpenedIdx.current = null;
+      lastInteraction.current = "click";
+      return;
+    }
+    hoverOpenedIdx.current = null;
     lastInteraction.current = "click";
     setOpenTooltip((prev) => (prev?.idx === idx ? null : { idx }));
   }
@@ -300,6 +316,7 @@ function DueForecast({
                     onKeyDown={(e) => handleBarKeyDown(e, idx)}
                     onMouseEnter={() => {
                       lastInteraction.current = "hover";
+                      hoverOpenedIdx.current = idx;
                       setOpenTooltip({ idx });
                     }}
                     onMouseLeave={() => {
@@ -307,6 +324,7 @@ function DueForecast({
                       // by hovering — not by a tap. On hybrid touch+mouse
                       // devices, tapping fires synthetic mouse events that
                       // would otherwise immediately close the popup.
+                      hoverOpenedIdx.current = null;
                       if (lastInteraction.current === "hover") {
                         setOpenTooltip(null);
                         lastInteraction.current = null;
