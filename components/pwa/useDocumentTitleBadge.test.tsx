@@ -30,13 +30,24 @@ vi.mock("@/lib/settings/persistence", () => ({
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
 }));
 
-const mockBuildQueueCounters = vi.fn().mockReturnValue({
-  newCount: 0,
-  learningCount: 0,
-  reviewCount: 0,
+// buildSessionQueues and todayString are tested separately; mock them here to
+// keep useDocumentTitleBadge tests isolated from the SRS scheduler.
+const mockBuildSessionQueues = vi.fn().mockReturnValue({
+  newQueue: [],
+  learningCardIds: [],
+  reviewQueue: [],
+  outOfScopeLearningIds: [],
+  newIntroducedToday: 0,
+  reviewsDoneToday: 0,
+  perType: {
+    name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+    evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+    reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+    cry: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+  },
 });
 vi.mock("@/lib/review/session", () => ({
-  buildQueueCounters: (...args: unknown[]) => mockBuildQueueCounters(...args),
+  buildSessionQueues: (...args: unknown[]) => mockBuildSessionQueues(...args),
   todayString: vi.fn().mockReturnValue("2026-05-19"),
 }));
 
@@ -60,14 +71,28 @@ function baseTitle(): string {
 
 // ---------------------------------------------------------------------------
 
+/** Helper to stub buildSessionQueues with queue arrays of the given lengths. */
+function stubQueues(newLen: number, learningLen: number, reviewLen: number) {
+  mockBuildSessionQueues.mockReturnValue({
+    newQueue: Array.from({ length: newLen }, (_, i) => i + 1),
+    learningCardIds: Array.from({ length: learningLen }, (_, i) => 1000 + i),
+    reviewQueue: Array.from({ length: reviewLen }, (_, i) => 2000 + i),
+    outOfScopeLearningIds: [],
+    newIntroducedToday: 0,
+    reviewsDoneToday: 0,
+    perType: {
+      name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+      evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+      reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+      cry: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+    },
+  });
+}
+
 beforeEach(() => {
   mockLoadSession.mockResolvedValue(null);
   mockLoadSettings.mockReturnValue({ timezone: "UTC" });
-  mockBuildQueueCounters.mockReturnValue({
-    newCount: 0,
-    learningCount: 0,
-    reviewCount: 0,
-  });
+  stubQueues(0, 0, 0);
   sessionVersion = 0;
   document.title = "Poké Memory";
 });
@@ -97,11 +122,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 0,
-      learningCount: 0,
-      reviewCount: 0,
-    });
+    stubQueues(0, 0, 0);
 
     renderHook(() => useDocumentTitleBadge());
 
@@ -115,11 +136,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }, { id: 2 }, { id: 3 }],
       limits: {},
     });
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 2,
-      learningCount: 1,
-      reviewCount: 3,
-    });
+    stubQueues(2, 1, 3);
 
     renderHook(() => useDocumentTitleBadge());
 
@@ -134,11 +151,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 0,
-      learningCount: 0,
-      reviewCount: 4,
-    });
+    stubQueues(0, 0, 4);
 
     renderHook(() => useDocumentTitleBadge());
 
@@ -162,11 +175,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 0,
-      learningCount: 0,
-      reviewCount: 2,
-    });
+    stubQueues(0, 0, 2);
 
     rerender();
 
@@ -181,11 +190,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 1,
-      learningCount: 0,
-      reviewCount: 0,
-    });
+    stubQueues(1, 0, 0);
 
     const { rerender } = renderHook(() => useDocumentTitleBadge());
 
@@ -195,11 +200,7 @@ describe("useDocumentTitleBadge", () => {
 
     // Grade the card: session key bumps, no cards left.
     sessionVersion = 1;
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 0,
-      learningCount: 0,
-      reviewCount: 0,
-    });
+    stubQueues(0, 0, 0);
 
     rerender();
 
@@ -213,11 +214,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 1,
-      learningCount: 0,
-      reviewCount: 0,
-    });
+    stubQueues(1, 0, 0);
 
     renderHook(() => useDocumentTitleBadge());
 
@@ -226,11 +223,7 @@ describe("useDocumentTitleBadge", () => {
     });
 
     // Settings change (e.g. timezone) → more cards in scope.
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 1,
-      learningCount: 2,
-      reviewCount: 0,
-    });
+    stubQueues(1, 2, 0);
 
     act(() => {
       window.dispatchEvent(new Event("poke-memory:settings-saved"));
@@ -246,11 +239,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    mockBuildQueueCounters.mockReturnValue({
-      newCount: 1,
-      learningCount: 0,
-      reviewCount: 0,
-    });
+    stubQueues(1, 0, 0);
 
     const { unmount } = renderHook(() => useDocumentTitleBadge());
 
@@ -261,5 +250,23 @@ describe("useDocumentTitleBadge", () => {
     unmount();
 
     expect(document.title).toBe("Poké Memory");
+  });
+
+  it("calls buildSessionQueues (not buildQueueCounters) to count today's capped queue", async () => {
+    mockLoadSession.mockResolvedValue({
+      cards: [{ id: 1 }],
+      limits: { maxNewPerDay: 10 },
+    });
+    stubQueues(1, 0, 0);
+
+    renderHook(() => useDocumentTitleBadge());
+
+    await waitFor(() => {
+      expect(mockBuildSessionQueues).toHaveBeenCalledWith(
+        [{ id: 1 }],
+        { maxNewPerDay: 10 },
+        expect.any(String),
+      );
+    });
   });
 });

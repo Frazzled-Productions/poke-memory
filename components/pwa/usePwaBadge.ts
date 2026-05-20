@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
-import { buildQueueCounters, todayString } from "@/lib/review/session";
+import { buildSessionQueues, todayString } from "@/lib/review/session";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 
 /**
@@ -48,8 +48,14 @@ export function usePwaBadge(): void {
       const settings = loadSettings();
       const tz = settings.timezone ?? "UTC";
       const today = todayString(new Date(), tz);
-      const { newCount, learningCount, reviewCount } = buildQueueCounters(session.cards, today);
-      const total = newCount + learningCount + reviewCount;
+      // Use buildSessionQueues (same function the Practice page uses) so the
+      // badge reflects today's capped queue — not the entire untouched backlog.
+      const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
+        session.cards,
+        session.limits,
+        today,
+      );
+      const total = newQueue.length + learningCardIds.length + reviewQueue.length;
 
       try {
         if (total > 0) {
