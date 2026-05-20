@@ -2933,16 +2933,16 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
 
     const reveal = await screen.findByRole("button", { name: /reveal/i });
     await user.click(reveal);
-    await user.click(screen.getByRole("button", { name: /easy/i }));
+    // Grade Again (non-graduating) so the card re-enters the learning queue
+    // and the session continues, keeping ReviewCardLayout mounted with the
+    // undo button visible.
+    await user.click(screen.getByRole("button", { name: /again/i }));
 
-    // After grading Easy the card graduates. The session-complete screen
-    // renders next; the undo button is wired through ReviewCardLayout only
-    // for active-card branches. The session-complete branch owns the undo
-    // button separately (it pre-dates this extraction).
-    // What this test verifies: no crash and the queue counter was present
-    // up to the grade point (the card was rendered in the flip branch).
+    // ReviewCardLayout wires the undo button; assert it is actually in the DOM.
     await waitFor(() =>
-      expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: /undo last grade/i }),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -2989,11 +2989,15 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
+      // All non-cry card types disabled so buildSession produces only a cry
+      // card. Without these, the name card (built first) would be served and
+      // the test would exercise the flip branch instead of the cry branch.
       cryCardsEnabled: true,
       maxNewCryPerDay: 10,
       maxReviewsCryPerDay: 100,
-      nameCardsEnabled: true,
+      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
       practiceScope: { gens: [], types: [], presets: [] },
       earnedBadges: [],
