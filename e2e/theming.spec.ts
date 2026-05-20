@@ -7,15 +7,19 @@ async function seedSettings(
   intensity: "accents" | "tinted" | "full" | null,
 ): Promise<void> {
   await page.addInitScript((i) => {
-    window.localStorage.removeItem("poke-memory:settings:v1");
+    // Minimal settings blob — only the fields the pre-paint script and
+    // FavouriteThemeProvider actually read, plus the first-visit onboarding
+    // pre-dismiss flag so the modal does not render on Practice (#1103).
+    const blob: Record<string, unknown> = {
+      onboarding: { firstVisitOnboardingDismissed: true },
+    };
     if (i !== null) {
-      // Minimal settings blob — only the fields the pre-paint script and
-      // FavouriteThemeProvider actually read. Other defaults are fine at zero.
-      window.localStorage.setItem(
-        "poke-memory:settings:v1",
-        JSON.stringify({ themeIntensity: i }),
-      );
+      blob.themeIntensity = i;
     }
+    window.localStorage.setItem(
+      "poke-memory:settings:v1",
+      JSON.stringify(blob),
+    );
   }, intensity);
 }
 

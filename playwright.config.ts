@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import path from "node:path";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
@@ -41,9 +42,14 @@ export default defineConfig({
       caret: "hide",
     },
   },
+  // Generates e2e/.storage-state.json with `firstVisitOnboardingDismissed: true`
+  // pre-populated in localStorage so the first-visit onboarding modal (#1103)
+  // never blocks Practice / nav tests. See e2e/global-setup.ts.
+  globalSetup: path.join(__dirname, "e2e/global-setup.ts"),
   use: {
     baseURL,
     trace: "on-first-retry",
+    storageState: path.join(__dirname, "e2e/.storage-state.json"),
   },
   projects: [
     // --- Functional smoke projects -----------------------------------------

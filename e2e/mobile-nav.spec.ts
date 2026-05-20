@@ -21,7 +21,15 @@ test.describe("Mobile nav — bottom tab bar (default)", () => {
     );
     // Clear localStorage so we get the new-user default (bottom tab bar).
     await page.goto("/");
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => {
+      localStorage.clear();
+      // Re-seed the first-visit onboarding pre-dismiss flag after the clear
+      // so the modal does not render on the post-reload Practice surface (#1103).
+      localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      );
+    });
     await page.reload();
   });
 
@@ -210,7 +218,15 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
 
     // Clear any persisted settings so we get the new-user default (bottom tab bar).
     await page.goto("/");
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => {
+      localStorage.clear();
+      // Re-seed the first-visit onboarding pre-dismiss flag after the clear
+      // so the modal does not render on the post-reload Practice surface (#1103).
+      localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      );
+    });
     await page.reload();
 
     await page.goto("/");
@@ -226,7 +242,15 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
     );
 
     await page.goto("/");
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => {
+      localStorage.clear();
+      // Re-seed the first-visit onboarding pre-dismiss flag after the clear
+      // so the modal does not render on the post-reload Practice surface (#1103).
+      localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      );
+    });
     await page.reload();
 
     // Navigate to Settings via the tab bar.
@@ -254,7 +278,15 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
     );
 
     await page.goto("/");
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => {
+      localStorage.clear();
+      // Re-seed the first-visit onboarding pre-dismiss flag after the clear
+      // so the modal does not render on the post-reload Practice surface (#1103).
+      localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      );
+    });
     await page.reload();
 
     // The Terms link lives inside the "Account & Data" accordion. Navigate to
