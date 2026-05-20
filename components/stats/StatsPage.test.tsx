@@ -286,6 +286,10 @@ vi.mock("@/lib/stats/completion-projection", () => ({
   computeCompletionProjection: vi.fn(() => ({ kind: "insufficient-history" })),
 }));
 
+vi.mock("@/lib/srs/timeToMastery", () => ({
+  projectTimeToFirstMastery: vi.fn(() => ({ days: 20 })),
+}));
+
 vi.mock("@/components/stats/CompletionProjection", () => ({
   CompletionProjection: () => <div data-testid="completion-projection" />,
 }));
@@ -562,5 +566,115 @@ describe("StatsPage — CompletionProjection widget", () => {
     await waitFor(() => {
       expect(screen.getByTestId("completion-projection")).toBeInTheDocument();
     });
+  });
+});
+
+describe("StatsPage — FirstMasteryHint (#1083)", () => {
+  it("renders the hint when introduced > 0 and mastered === 0", async () => {
+    // One card with firstSeen set (introduced) and reps=0 (not mastered).
+    // The stats mock derives introduced from firstSeen and mastered from
+    // reps >= 3, so this combination triggers the hint.
+    const card = makeCard(1, 0);
+    card.state.firstSeen = "2026-05-01";
+    mockLoadSession.mockResolvedValue({
+      cards: [card],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<StatsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("first-mastery-hint")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("first-mastery-hint").textContent).toContain(
+      "20",
+    );
+  });
+
+  it("hides the hint when at least one card is mastered", async () => {
+    // Two cards: one mastered (reps=5) and one not (reps=0). mastered >= 1
+    // means the hint should be suppressed.
+    const mastered = makeCard(1, 5);
+    const learning = makeCard(2, 0);
+    learning.state.firstSeen = "2026-05-01";
+    mockLoadSession.mockResolvedValue({
+      cards: [mastered, learning],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<StatsPage />);
+
+    // Wait until the page has hydrated past the loading skeleton.
+    await waitFor(() => {
+      expect(screen.getByTestId("review-heatmap")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("first-mastery-hint")).toBeNull();
+  });
+
+  it("hides the hint when no card has been introduced (all locked)", async () => {
+    // A card with firstSeen=null is locked; introduced === 0 → hint hides.
+    const locked = makeCard(1, 0);
+    locked.state.firstSeen = null;
+    mockLoadSession.mockResolvedValue({
+      cards: [locked],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<StatsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("review-heatmap")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("first-mastery-hint")).toBeNull();
+  });
+
+  it("hides the hint when projectTimeToFirstMastery returns null (e.g. superuser flag on)", async () => {
+    // The helper itself short-circuits to null when pretendAllMastered is on.
+    // The page just renders whatever the helper produces, so a null result
+    // suppresses the hint regardless of the introduced/mastered counts.
+    const { projectTimeToFirstMastery } = await import("@/lib/srs/timeToMastery");
+    vi.mocked(projectTimeToFirstMastery).mockReturnValueOnce({ days: null });
+
+    const card = makeCard(1, 0);
+    card.state.firstSeen = "2026-05-01";
+    mockLoadSession.mockResolvedValue({
+      cards: [card],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<StatsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("review-heatmap")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("first-mastery-hint")).toBeNull();
   });
 });

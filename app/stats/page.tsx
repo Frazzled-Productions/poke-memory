@@ -31,6 +31,8 @@ import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-d
 import { computeCompletionProjection } from "@/lib/stats/completion-projection";
 import { CompletionProjection } from "@/components/stats/CompletionProjection";
 import DueForecast from "@/components/stats/DueForecast";
+import { FirstMasteryHint } from "@/components/stats/FirstMasteryHint";
+import { projectTimeToFirstMastery } from "@/lib/srs/timeToMastery";
 import { computeMasteryOverTime } from "@/lib/stats/mastery-over-time";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
@@ -471,6 +473,25 @@ export default function StatsPage() {
         )
       : null;
 
+  // Time-to-first-mastery hint (#1083). Show only when the user has at least
+  // one introduced card, zero mastered cards, and the projection helper
+  // produced a finite estimate. The helper already returns null when the
+  // superuser pretendAllMastered flag is on, so the hint hides under cheats.
+  const firstMasteryDays =
+    nameCards !== null &&
+    masteryRepetitions !== null &&
+    stats !== null &&
+    stats.introduced > 0 &&
+    stats.mastered === 0
+      ? projectTimeToFirstMastery(
+          nameCards,
+          new Date(),
+          masteryRepetitions,
+          flags.pretendAllMastered,
+          { retentionTarget },
+        ).days
+      : null;
+
   const reviewCharts =
     cards !== null
       ? (() => {
@@ -606,6 +627,9 @@ export default function StatsPage() {
                   term.
                 </p>
               </OnboardingHint>
+              {firstMasteryDays !== null && (
+                <FirstMasteryHint days={firstMasteryDays} />
+              )}
               {completionProjection !== null && (
                 <CompletionProjection
                   projection={completionProjection}
