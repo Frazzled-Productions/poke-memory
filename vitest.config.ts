@@ -23,15 +23,15 @@ export default defineConfig({
       //         consumed by coverage.yml's diff-coverage gate
       // html  → drillable local report under coverage/
       reporter: ["text", "json-summary", "json", "html"],
-      // Global floor (regression guard, #824). Set just below today's
-      // measured baseline (S 77.56 / B 70.78 / F 72.46 / L 79.75) rounded
+      // Global floor (regression guard, #824). Set ~1.5 pts below today's
+      // measured baseline (S 78.69 / B 71.93 / F 74.28 / L 80.87) rounded
       // down, so an unrelated coverage drop fails CI. Ratchet upward as
       // coverage improves — never downward to make a red build pass.
       thresholds: {
-        statements: 76,
+        statements: 77,
         branches: 70,
-        functions: 71,
-        lines: 78,
+        functions: 72,
+        lines: 79,
       },
       // Measure the application/library source we actually ship and test.
       include: ["app/**", "components/**", "lib/**"],
