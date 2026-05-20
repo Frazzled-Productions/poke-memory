@@ -86,7 +86,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
-      contents: read
+      # The regenerate job pushes regenerated baselines via the poke-memory-bot
+      # App token. Declare contents: write to match the actual capability for
+      # audit clarity, even though the token's scope is independent of this block.
+      contents: write
     # Browsers + system deps are baked into the image. The tag MUST track the
     # `@playwright/test` version resolved in `package-lock.json` (currently
     # 1.60.0) — the same pin `visual-regression.yml` uses. Baselines
