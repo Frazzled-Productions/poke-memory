@@ -73,6 +73,118 @@ test.describe("Practice scope (#333)", () => {
     await expect(noMatch).not.toBeVisible();
   });
 
+  test("scope change before any grade swaps the displayed card (#1088)", async ({
+    page,
+  }) => {
+    // Regression for #1088: handleScopeChange used to update eligibleCardIds
+    // without releasing the displayedCardId lock, so the card on screen stayed
+    // frozen on the pre-scope-change pick until the user graded it. Picking
+    // a scope that excludes the on-screen card must swap it for the new queue
+    // head immediately.
+    //
+    // Seed settings with only name cards enabled so the first queued card is
+    // guaranteed to be a name card (rendered by PokemonCard with a single
+    // sprite and alt="A Pokémon sprite, answer hidden"). Evolution, reverse,
+    // and cry cards use different layouts and alt text, which would make the
+    // sprite locator below fail intermittently.
+    await page.addInitScript(
+      ({ key }) => {
+        const settings = {
+          masteryRepetitions: 3,
+          maxNewPerDay: 10,
+          maxReviewsPerDay: 100,
+          maxNewEvolutionPerDay: 5,
+          maxReviewsEvolutionPerDay: 50,
+          nameCardsEnabled: true,
+          evolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          maxNewReversePerDay: 10,
+          maxReviewsReversePerDay: 100,
+          playCryOnReveal: false,
+          cryCardsEnabled: false,
+          maxNewCryPerDay: 10,
+          maxReviewsCryPerDay: 100,
+          favouriteTheme: null,
+          retentionTarget: 0.9,
+        };
+        localStorage.setItem(key, JSON.stringify(settings));
+      },
+      { key: SETTINGS_STORAGE_KEY },
+    );
+    await page.goto("/");
+
+    // Capture the sprite src that's rendered before any scope action. The
+    // PokemonCard renders a single img with alt="A Pokémon sprite, answer
+    // hidden" pre-reveal; the SpritePreloader uses alt="" so this locator is
+    // unique. The src points at a /sprites/pokemon/<id>.png path that
+    // encodes the displayed card's species; under next/image it is wrapped
+    // as /_next/image?url=...%2Fsprites%2Fpokemon%2F<id>.png. We decode the
+    // id from whichever form is rendered.
+    const onScreenSprite = page.getByAltText("A Pokémon sprite, answer hidden");
+    await expect(onScreenSprite).toBeVisible();
+    const initialSrc = await onScreenSprite.getAttribute("src");
+    expect(initialSrc).toBeTruthy();
+
+    // Extract the species id from the sprite URL. Falls back to a defensive
+    // null if the URL shape is unexpected, in which case the test bails out
+    // rather than picking a possibly-in-scope generation.
+    function speciesIdFromSrc(src: string | null): number | null {
+      if (src === null) return null;
+      const decoded = decodeURIComponent(src);
+      const match = decoded.match(/\/sprites\/pokemon\/(\d+)\.png/);
+      if (!match) return null;
+      return Number(match[1]);
+    }
+
+    // Map a species id to its generation pill label. Mirrors the dynamic-pick
+    // pattern used by the unit test in ReviewSession.test.tsx (#1088). Pokemon
+    // id ranges per generation come from the canonical species list.
+    function generationLabel(id: number): string {
+      if (id <= 151) return "Generation I";
+      if (id <= 251) return "Generation II";
+      if (id <= 386) return "Generation III";
+      if (id <= 493) return "Generation IV";
+      if (id <= 649) return "Generation V";
+      if (id <= 721) return "Generation VI";
+      if (id <= 809) return "Generation VII";
+      if (id <= 905) return "Generation VIII";
+      return "Generation IX";
+    }
+
+    const initialId = speciesIdFromSrc(initialSrc);
+    expect(initialId, `unable to parse species id from sprite src ${initialSrc}`).not.toBeNull();
+    const displayedGen = generationLabel(initialId!);
+    // Pick any generation that ISN'T the displayed card's gen. Generation I
+    // is the obvious "other" choice when the displayed card is high-gen;
+    // otherwise pick Generation IX so the excluding-gen is far away in id-space.
+    const excludingGen =
+      displayedGen === "Generation I" ? "Generation IX" : "Generation I";
+
+    // Open the Scope panel and apply the excluding-generation filter.
+    const scopeToggle = page
+      .getByRole("button", { expanded: false })
+      .filter({ hasText: /scope/i })
+      .first();
+    await scopeToggle.click();
+    const scopePanel = page.locator("#scope-panel");
+    await expect(scopePanel).toBeVisible();
+
+    const excludingPill = scopePanel.getByRole("button", { name: excludingGen, exact: true });
+    await excludingPill.click();
+    await expect(excludingPill).toHaveAttribute("aria-pressed", "true");
+
+    // The sprite must swap to a card from the excluding generation. The
+    // lock-clear release in handleScopeChange (and the render-side
+    // scope-eligibility guard) makes this happen on the next render rather
+    // than waiting for a grade.
+    await expect.poll(async () =>
+      onScreenSprite.getAttribute("src"),
+    ).not.toBe(initialSrc);
+
+    // Smoke-check that the session is still operable post-swap.
+    await expect(page.getByRole("button", { name: /reveal/i })).toBeVisible();
+  });
+
   test("no-match scope renders empty state with Clear scope CTA", async ({
     page,
   }) => {

@@ -627,6 +627,15 @@ export function ReviewSession() {
           .map((c) => c.id),
       );
       setEligibleCardIds(eligibleIds);
+      // Clear the displayed-card render lock (#1088). The lock pins the
+      // currently-displayed card across re-renders so a learning card whose
+      // dueAt passes mid-render cannot displace it (#839). When the user
+      // changes scope, the locked card may no longer be in scope, and keeping
+      // the lock would leave the displayed card frozen on a now-out-of-scope
+      // entry until the user grades it. The render-side override below also
+      // checks scope-eligibility as a self-healing belt-and-braces guard, but
+      // clearing here documents intent at the source of the change.
+      setDisplayedCardId(null);
       void saveSession({ cards, limits }).then(notifySaveResult);
     }
   }
@@ -656,7 +665,15 @@ export function ReviewSession() {
   // until the user explicitly advances by grading. Without this lock a learning
   // card whose dueAt passes mid-render can displace the current card before the
   // user has had a chance to tap Reveal, causing a mis-click (#839).
-  const displayedCardId = useRef<number | null>(null);
+  //
+  // Held as state (not a ref) so render reads are pure and writes from
+  // event handlers / effects don't trip react-hooks/immutability. The
+  // first-render auto-pin lives in a useEffect below; handlers
+  // (handleGrade / handleUndo / handleScopeChange) call
+  // setDisplayedCardId(...) directly. The "no extra render on lock change"
+  // property the original ref had is preserved because every lock-write site
+  // already batches with other setState calls in the same handler.
+  const [displayedCardId, setDisplayedCardId] = useState<number | null>(null);
   // Guards against advancing to the next card after the component has unmounted
   // (e.g. the user navigates away during the waitForAudio delay).
   const isMountedRef = useRef(true);
@@ -1045,7 +1062,7 @@ export function ReviewSession() {
               mastered: undoSnapshot.masteredThisSession,
             });
           }
-          displayedCardId.current = undoSnapshot.cardId;
+          setDisplayedCardId(undoSnapshot.cardId);
           revealedCardId.current = undoSnapshot.cardId;
           setRevealed(true);
           // Bump presentation counter so SpritePicker remounts with fresh
@@ -1159,6 +1176,57 @@ export function ReviewSession() {
     // to be listed so the listener is re-registered when those values change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealed, grading, revealing]);
+
+  // Auto-pin the display lock when a card is on screen and the lock has not
+  // been claimed by a handler (#839). The lock pins the currently-displayed
+  // card across re-renders so a learning card whose dueAt passes mid-render
+  // cannot displace it. The effect recomputes currentCardId from the same
+  // inputs the render block uses and assigns it to displayedCardId when the
+  // lock is null; releases the lock when the session has no current card.
+  // Skipped while cards has not loaded yet.
+  useEffect(() => {
+    if (cards === null) return;
+    const today = todayString(new Date());
+    const effLimits: DailyLimits = extendedReview
+      ? {
+          name: { ...limits.name, maxReviewsPerDay: Number.POSITIVE_INFINITY },
+          evolution: { ...limits.evolution, maxReviewsPerDay: Number.POSITIVE_INFINITY },
+          reverse: { ...limits.reverse, maxReviewsPerDay: Number.POSITIVE_INFINITY },
+          cry: { ...limits.cry, maxReviewsPerDay: Number.POSITIVE_INFINITY },
+        }
+      : limits;
+    const { reviewQueue: rQ, newQueue: nQ } = buildSessionQueues(
+      cards,
+      effLimits,
+      today,
+      eligibleCardIds,
+    );
+    const nowMs = Date.now();
+    const dueLearningEntries = learningQueue
+      .filter((e) => e.dueAt <= nowMs)
+      .sort((a, b) => a.dueAt - b.dueAt);
+    let currentId: number | null;
+    if (dueLearningEntries.length > 0) {
+      currentId = dueLearningEntries[0].cardId;
+    } else {
+      currentId = getNextCardId(rQ, nQ);
+      if (currentId === null) {
+        const ahead = learningQueue
+          .filter((e) => e.dueAt > nowMs && e.dueAt <= nowMs + LEARN_AHEAD_MS)
+          .sort((a, b) => a.dueAt - b.dueAt);
+        if (ahead.length > 0) currentId = ahead[0].cardId;
+      }
+    }
+    if (currentId !== null && displayedCardId === null) {
+      setDisplayedCardId(currentId);
+    } else if (currentId === null && displayedCardId !== null) {
+      setDisplayedCardId(null);
+    }
+    // Re-run on any input that affects currentCardId. Deps deliberately list
+    // only the React state inputs; recomputing on `displayedCardId` itself
+    // would race with the setState call inside this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, learningQueue, eligibleCardIds, limits, extendedReview]);
 
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
@@ -1289,24 +1357,30 @@ export function ReviewSession() {
     currentCardId !== null ? cards.find((c) => c.id === currentCardId) ?? null : null;
 
   // Maintain the display lock: once a card is on screen, keep it there until
-  // the user explicitly advances by grading (#839). Setting a ref during render
-  // is safe here — it is always in the same render branch and never triggers a
-  // re-render itself. The lock is cleared at the end of handleGrade.
-  if (currentCard !== null && displayedCardId.current === null) {
-    // A new card just became the current card — lock it in.
-    displayedCardId.current = currentCard.id;
-  } else if (currentCard === null) {
-    // No card left (session complete) — release the lock.
-    displayedCardId.current = null;
-  }
+  // the user explicitly advances by grading (#839). The lock is held in the
+  // `displayedCardId` state. This render block reads it once and never
+  // mutates it - writes happen only in event handlers / effects.
+  //
+  // Drop the lock when the locked id is no longer scope-eligible (#1088). This
+  // is the read-only belt-and-braces guard that pairs with handleScopeChange
+  // clearing the lock explicitly: if any future code path mutates
+  // eligibleCardIds without remembering to release the lock, we still fall
+  // through to the freshly-computed currentCard so the user never sees a
+  // frozen out-of-scope card. The check only kicks in when a scope is active —
+  // an empty scope means every card is eligible, so the eligibleCardIds set
+  // is intentionally empty and is not consulted (see the
+  // `isScopeEmpty(scope)` gate at line 1211).
+  const lockedId = displayedCardId;
+  const lockHonoured =
+    lockedId !== null &&
+    (isScopeEmpty(scope) || eligibleCardIds.has(lockedId));
 
-  // Prefer the locked displayed card over the freshly computed one.
+  // Prefer the honoured lock over the freshly computed current card.
   // This prevents a learning card whose dueAt passes mid-render from
   // displacing the card the user is currently looking at.
-  const lockedDisplayCard =
-    displayedCardId.current !== null
-      ? (cards.find((c) => c.id === displayedCardId.current) ?? null)
-      : null;
+  const lockedDisplayCard = lockHonoured
+    ? (cards.find((c) => c.id === lockedId) ?? null)
+    : null;
 
   // If the user has clicked Reveal, additionally lock that card for the
   // duration of the grading window so the grade buttons act on the right card.
@@ -1970,7 +2044,7 @@ export function ReviewSession() {
     revealedCardId.current = null;
     // Release the display lock so the next card can be picked up on the
     // following render (#839).
-    displayedCardId.current = null;
+    setDisplayedCardId(null);
     // Advance the presentation counter so the next card (or a replay of this
     // same card) gets a fresh SpritePicker mount with a re-shuffled option
     // grid (#496).
@@ -2011,7 +2085,7 @@ export function ReviewSession() {
     // Make the undone card the current revealed card so the user lands
     // back on the prompt they just graded. Also reset the display lock so
     // the undo card is locked in from this point (#839).
-    displayedCardId.current = undoSnapshot.cardId;
+    setDisplayedCardId(undoSnapshot.cardId);
     revealedCardId.current = undoSnapshot.cardId;
     setRevealed(true);
     // Bump the presentation counter so SpritePicker remounts with a fresh
