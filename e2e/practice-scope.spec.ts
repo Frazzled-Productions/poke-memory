@@ -634,8 +634,10 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     await expect(scopePanel).toBeVisible();
 
     // The Games fieldset has a "Generation II" header containing the
-    // Gold/Silver pill.
-    await expect(scopePanel.getByText("Games")).toBeVisible();
+    // Gold/Silver pill. Use getByRole("group") to target the <fieldset>
+    // semantically — getByText("Games") would also match the description
+    // paragraph that contains the word "games".
+    await expect(scopePanel.getByRole("group", { name: "Games" })).toBeVisible();
     const goldSilverPill = scopePanel.getByRole("button", {
       name: "Pokémon Gold/Silver",
     });
@@ -677,8 +679,10 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     const scopePanel = page.locator("#scope-panel");
 
     // Click "Select all games in Generation II" — Gold/Silver + Crystal.
+    // Anchored regex required: the unanchored form also matches the
+    // "Generation III" button (strict-mode violation).
     const selectAllGenII = scopePanel.getByRole("button", {
-      name: /Select all games in Generation II/,
+      name: /^Select all games in Generation II$/,
     });
     await selectAllGenII.click();
 
