@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
@@ -141,6 +141,11 @@ function LoadingSkeleton() {
   );
 }
 
+type ForecastTooltip = {
+  /** Index of the bar with the open tooltip. */
+  idx: number;
+};
+
 function DueForecast({
   stats,
   fmt = "dmy",
@@ -154,6 +159,42 @@ function DueForecast({
   const max = forecast.reduce((m, d) => (d.count > m ? d.count : m), 0);
   const total = forecast.reduce((s, d) => s + d.count, 0);
 
+  // Tooltip state: the index of the bar whose popup is open, or null.
+  const [openTooltip, setOpenTooltip] = useState<ForecastTooltip | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close the popup when the user clicks/taps outside the chart container.
+  useEffect(() => {
+    if (openTooltip === null) return;
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpenTooltip(null);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
+  }, [openTooltip]);
+
+  function handleBarClick(idx: number) {
+    setOpenTooltip((prev) => (prev?.idx === idx ? null : { idx }));
+  }
+
+  function handleBarKeyDown(e: React.KeyboardEvent, idx: number) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleBarClick(idx);
+    } else if (e.key === "Escape") {
+      setOpenTooltip(null);
+    }
+  }
+
   return (
     <section aria-labelledby="due-heading">
       <h2
@@ -164,48 +205,105 @@ function DueForecast({
       </h2>
       <div className={cardPanel}>
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-          {total.toLocaleString('en-GB')} card{total === 1 ? "" : "s"} over the next 14
-          days
+          {total.toLocaleString("en-GB")} card{total === 1 ? "" : "s"} over the
+          next 14 days
         </p>
-        <div
-          className="grid h-24 grid-cols-[repeat(14,minmax(0,1fr))] items-end gap-1"
-          role="img"
-          aria-label={`14-day due forecast: ${forecast
-            .map((d) => `${formatForecastDate(d.date, fmt, tz)} ${d.count}`)
-            .join(", ")}`}
-        >
-          {forecast.map((day, idx) => {
-            const heightPct = max === 0 ? 0 : (day.count / max) * 100;
-            const isToday = idx === 0;
-            return (
-              <div
-                key={day.date}
-                className="group relative flex h-full flex-col justify-end"
-                title={`${formatForecastDate(day.date, fmt, tz)} · ${day.count} card${day.count === 1 ? "" : "s"}`}
-              >
+        {/* ref on this container so outside-click detection has a boundary. */}
+        <div ref={containerRef}>
+          <div
+            className="grid h-24 grid-cols-[repeat(14,minmax(0,1fr))] items-end gap-1"
+            role="list"
+            aria-label="14-day due forecast"
+          >
+            {forecast.map((day, idx) => {
+              const heightPct = max === 0 ? 0 : (day.count / max) * 100;
+              const isToday = idx === 0;
+              const isOpen = openTooltip?.idx === idx;
+              const label = `${formatForecastDate(day.date, fmt, tz)}: ${day.count} card${day.count === 1 ? "" : "s"}`;
+              return (
                 <div
-                  className={
-                    isToday
-                      ? "rounded-sm bg-rose-500"
-                      : "rounded-sm bg-emerald-500/60 group-hover:bg-emerald-500"
-                  }
-                  style={{
-                    height: heightPct === 0 ? "2px" : `${Math.max(heightPct, 6)}%`,
-                  }}
-                  aria-hidden="true"
-                />
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-2 grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1 text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
-          {forecast.map((day, idx) => (
-            <span key={day.date} className="text-center">
-              {idx === 0
-                ? "Today"
-                : new Date(day.date).getDate()}
-            </span>
-          ))}
+                  key={day.date}
+                  role="listitem"
+                  className="group relative flex h-full flex-col justify-end"
+                >
+                  {/* Popup tooltip — shown on tap (mobile) or hover (desktop). */}
+                  {isOpen && (
+                    <div
+                      role="tooltip"
+                      id={`forecast-tooltip-${idx}`}
+                      className={[
+                        "pointer-events-none absolute bottom-full left-1/2 z-10 mb-2",
+                        "-translate-x-1/2",
+                        "whitespace-nowrap rounded-md px-2 py-1 text-xs shadow-md",
+                        "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900",
+                      ].join(" ")}
+                    >
+                      <span className="block font-medium">
+                        {formatForecastDate(day.date, fmt, tz)}
+                      </span>
+                      <span className="block tabular-nums">
+                        {day.count} card{day.count === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  )}
+                  {/*
+                    Each bar is a <button> so it is natively focusable and
+                    activatable via Enter/Space. The aria-label carries the
+                    full date + count for screen readers; the tooltip is a
+                    supplementary visual aid for sighted pointer users.
+                  */}
+                  <button
+                    type="button"
+                    aria-label={label}
+                    aria-expanded={isOpen}
+                    aria-controls={isOpen ? `forecast-tooltip-${idx}` : undefined}
+                    onClick={() => handleBarClick(idx)}
+                    onKeyDown={(e) => handleBarKeyDown(e, idx)}
+                    onMouseEnter={() => setOpenTooltip({ idx })}
+                    onMouseLeave={() => {
+                      // Only close on mouse-leave if it was a hover-open (not a
+                      // tap-open). We detect tap-open by checking if the device
+                      // supports fine pointer; we leave the popup open on touch
+                      // so the user has time to read it.
+                      if (
+                        typeof window !== "undefined" &&
+                        window.matchMedia("(hover: hover)").matches
+                      ) {
+                        setOpenTooltip(null);
+                      }
+                    }}
+                    className={[
+                      "h-full w-full flex flex-col justify-end",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+                      isToday
+                        ? "focus-visible:ring-rose-500"
+                        : "focus-visible:ring-emerald-500",
+                    ].join(" ")}
+                  >
+                    <div
+                      className={
+                        isToday
+                          ? "rounded-sm bg-rose-500"
+                          : "rounded-sm bg-emerald-500/60 group-hover:bg-emerald-500"
+                      }
+                      style={{
+                        height:
+                          heightPct === 0 ? "2px" : `${Math.max(heightPct, 6)}%`,
+                      }}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1 text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
+            {forecast.map((day, idx) => (
+              <span key={day.date} className="text-center">
+                {idx === 0 ? "Today" : new Date(day.date).getDate()}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </section>
