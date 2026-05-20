@@ -60,8 +60,20 @@
 --      at 08:00 UTC. Until step 3 is complete the job runs but fails with
 --      a NULL URL / NULL bearer — harmless, but visible in cron.job_run_details.
 
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
+-- pg_cron / pg_net are Supabase-managed extensions; they're available on
+-- production Supabase but NOT on the stock postgres:15 image used by the
+-- CI integration test container. Wrap in a DO block so a missing extension
+-- in CI degrades to a NOTICE rather than aborting the whole migration apply.
+-- The schedule call below is wrapped the same way for the same reason.
+DO $do$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_cron;
+  CREATE EXTENSION IF NOT EXISTS pg_net;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping pg_cron/pg_net extension setup (not available in this environment): %', SQLERRM;
+END
+$do$;
 
 CREATE TABLE push_subscriptions (
   id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -102,17 +114,30 @@ CREATE POLICY "push_subscriptions_delete" ON push_subscriptions
 -- so rotating either value requires only an UPDATE on vault.secrets — no
 -- code change. The `headers` JSONB attaches the bearer token; the route
 -- handler rejects any caller that does not match.
-SELECT cron.schedule(
-  'web-push-daily-reminders',
-  '0 8 * * *',
-  $$
-  SELECT net.http_post(
-    url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'push_send_url'),
-    headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_shared_secret'),
-      'Content-Type', 'application/json'
-    ),
-    body := '{}'::jsonb
+--
+-- Wrapped in a DO block with an EXCEPTION clause so that a CI environment
+-- without pg_cron (the stock postgres:15 integration test container)
+-- tolerates the missing `cron` schema rather than aborting the whole
+-- migration. On production Supabase the extension is present and this
+-- behaves as a normal SELECT cron.schedule(...) call.
+DO $do$
+BEGIN
+  PERFORM cron.schedule(
+    'web-push-daily-reminders',
+    '0 8 * * *',
+    $cronbody$
+    SELECT net.http_post(
+      url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'push_send_url'),
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_shared_secret'),
+        'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb
+    );
+    $cronbody$
   );
-  $$
-);
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping cron.schedule (pg_cron not available): %', SQLERRM;
+END
+$do$;
