@@ -2,8 +2,14 @@ import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import { getPrimaryNavContainer } from "./helpers/navHelpers";
 
-// Pre-dismiss the first-visit onboarding modal before every test so it does
-// not render on the Practice surface and block nav guard / navigation tests.
+// Pre-dismiss the first-visit onboarding modal and explicitly opt in to the
+// bottom tab bar before every test.
+//
+// `mobileNav: "bottom"` must be set explicitly. `parseStoredSettings` migrates
+// any stored settings object that has no `mobileNav` field to `"hamburger"`
+// (the existing-user default), which would prevent BottomTabBar from rendering
+// on mobile-safari tests and make the Pasture link permanently invisible in the
+// `"Mobile tab navigation"` landmark.
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     try {
@@ -13,6 +19,7 @@ test.beforeEach(async ({ page }) => {
         KEY,
         JSON.stringify({
           ...existing,
+          mobileNav: "bottom",
           onboarding: {
             ...(existing.onboarding ?? {}),
             firstVisitOnboardingDismissed: true,
