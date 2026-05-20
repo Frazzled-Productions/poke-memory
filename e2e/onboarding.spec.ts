@@ -11,8 +11,12 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     const modal = page.getByRole("dialog", { name: /welcome to pok[eé] memory/i });
     await expect(modal).toBeVisible();
 
-    // Grading guidance must be present inside the modal.
-    await expect(modal.getByText(/again/i)).toBeVisible();
+    // Grading guidance must be present inside the modal — assert all four grade
+    // labels render as bold terms in the grading list.
+    await expect(modal.locator("strong").filter({ hasText: /^Again$/ })).toBeVisible();
+    await expect(modal.locator("strong").filter({ hasText: /^Hard$/ })).toBeVisible();
+    await expect(modal.locator("strong").filter({ hasText: /^Good$/ })).toBeVisible();
+    await expect(modal.locator("strong").filter({ hasText: /^Easy$/ })).toBeVisible();
 
     await modal.getByRole("button", { name: /get started/i }).click();
     await expect(modal).toHaveCount(0);

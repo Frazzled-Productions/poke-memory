@@ -234,6 +234,8 @@ test.describe("Practice scope (#333)", () => {
           favouriteTheme: null,
           retentionTarget: 0.9,
           practiceScope: { gens: [], types: ["nonexistent-type"], presets: [] },
+          // Pre-dismiss the first-visit modal so it does not cover the empty state.
+          onboarding: { firstVisitOnboardingDismissed: true },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },
@@ -369,6 +371,8 @@ test.describe("Practice scope (#333)", () => {
             presets: [],
             formCategories: { mode: "default-only" },
           },
+          // Pre-dismiss the first-visit modal so it does not block the reveal button.
+          onboarding: { firstVisitOnboardingDismissed: true },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },

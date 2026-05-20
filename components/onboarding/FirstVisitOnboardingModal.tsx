@@ -230,7 +230,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
               </li>
             </ul>
             <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              Grade honestly. Getting a few Agains is normal and part of the
+              Grade honestly. Hitting Again sometimes is normal and part of the
               system working; the scheduler only improves if you tell it the
               truth.
             </p>
