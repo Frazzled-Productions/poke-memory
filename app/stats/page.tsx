@@ -4,14 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
+import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, buildSessionQueues, type ReviewableCard, type DailyLimits } from "@/lib/review/session";
+import { computeEligibleCardIds, type EligibilitySettings, EMPTY_SCOPE, type PracticeScope } from "@/lib/review/scope";
 import { type DateFormat } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
 import { colStack, mutedText } from "@/lib/utils/class-names";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { computeStats, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
-import type { StatsResult } from "@/lib/stats/derive";
+import type { StatsResult, DueForecastDay } from "@/lib/stats/derive";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { BADGE_CATALOG } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
@@ -48,6 +49,41 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
+
+// ---------------------------------------------------------------------------
+// Due-forecast today-bar parity helper (#1117)
+// ---------------------------------------------------------------------------
+
+/**
+ * Replaces the today-bar count (index 0) in a due-forecast array with the
+ * exact queue total from `buildSessionQueues` so it matches what the Practice
+ * page displays. Future bars (indices 1–13) are left unchanged.
+ *
+ * The discrepancy existed because `computeStats` only counted introduced name
+ * cards due today, ignoring new cards (no review history) and all non-name card
+ * types (evolution, reverse, cry). Using `buildSessionQueues` with the same
+ * eligibility set as the Practice page removes all three gaps.
+ *
+ * Pure — no I/O, no side effects. Exported for unit testing.
+ */
+export function patchForecastTodayBar(
+  forecast: readonly DueForecastDay[],
+  cards: readonly ReviewableCard[],
+  eligibilitySettings: EligibilitySettings,
+  limits: DailyLimits,
+  today: string,
+): readonly DueForecastDay[] {
+  if (forecast.length === 0) return forecast;
+  const eligibleCardIds = computeEligibleCardIds(cards, eligibilitySettings);
+  const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
+    cards,
+    limits,
+    today,
+    eligibleCardIds,
+  );
+  const todayCount = newQueue.length + learningCardIds.length + reviewQueue.length;
+  return [{ ...forecast[0], count: todayCount }, ...forecast.slice(1)];
+}
 
 // ---------------------------------------------------------------------------
 // Lazily-loaded Recharts chart components.
@@ -360,6 +396,9 @@ export default function StatsPage() {
   });
   const [userTimezone, setUserTimezone] = useState("UTC");
   const [userDateFormat, setUserDateFormat] = useState<DateFormat>("dmy");
+  const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
+  const [practiceScope, setPracticeScope] = useState<PracticeScope>(EMPTY_SCOPE);
+  const [sessionLimits, setSessionLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
   const [gradeTotals, setGradeTotals] = useState<GradeTotals>(() => computeGradeTotals([]));
   const [accuracyPoints, setAccuracyPoints] = useState<AccuracyPoint[]>([]);
   const [rolling7d, setRolling7d] = useState<number | null>(null);
@@ -387,6 +426,9 @@ export default function StatsPage() {
         reverseCardsEnabled: settings.reverseCardsEnabled,
         cryCardsEnabled: settings.cryCardsEnabled,
       });
+      setAlternateFormsEnabled(settings.alternateFormsEnabled);
+      setPracticeScope(settings.practiceScope);
+      setSessionLimits(saved?.limits ?? DEFAULT_LIMITS);
       setRetentionTarget(settings.retentionTarget);
       const tz = settings.timezone ?? "UTC";
       const today = todayString(new Date(), tz);
@@ -460,6 +502,28 @@ export default function StatsPage() {
           10,
           masteryRepetitions,
           flags.pretendAllMastered,
+        )
+      : null;
+
+  // Patch the today bar (#1117): replace dueForecast[0] with the exact queue
+  // total from buildSessionQueues so it matches the Practice page display.
+  // Future bars (indices 1–13) are left as-is — only today is in scope.
+  const patchedForecast: readonly DueForecastDay[] | null =
+    stats !== null && cards !== null
+      ? patchForecastTodayBar(
+          stats.dueForecast,
+          cards,
+          {
+            nameCardsEnabled: cardTypeSettings.nameCardsEnabled,
+            evolutionCardsEnabled: cardTypeSettings.evolutionCardsEnabled,
+            reverseCardsEnabled: cardTypeSettings.reverseCardsEnabled,
+            reverseEvolutionCardsEnabled: cardTypeSettings.reverseEvolutionCardsEnabled,
+            cryCardsEnabled: cardTypeSettings.cryCardsEnabled,
+            alternateFormsEnabled,
+            practiceScope,
+          },
+          sessionLimits,
+          todayString(new Date()),
         )
       : null;
 
@@ -641,7 +705,7 @@ export default function StatsPage() {
                   tz={userTimezone}
                 />
               )}
-              <DueForecast forecast={stats.dueForecast} fmt={userDateFormat} tz={userTimezone} />
+              <DueForecast forecast={patchedForecast ?? stats.dueForecast} fmt={userDateFormat} tz={userTimezone} />
               <StrugglingCards stats={stats} />
             </section>
 
