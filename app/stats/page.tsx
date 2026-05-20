@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils/cn";
 import { colStack, mutedText } from "@/lib/utils/class-names";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
-import { computeStats } from "@/lib/stats/derive";
+import { computeStats, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { BADGE_CATALOG } from "@/lib/badges/catalog";
@@ -31,6 +31,8 @@ import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-d
 import { computeCompletionProjection } from "@/lib/stats/completion-projection";
 import { CompletionProjection } from "@/components/stats/CompletionProjection";
 import DueForecast from "@/components/stats/DueForecast";
+import { FirstMasteryHint } from "@/components/stats/FirstMasteryHint";
+import { projectTimeToFirstMastery } from "@/lib/srs/timeToMastery";
 import { computeMasteryOverTime } from "@/lib/stats/mastery-over-time";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
@@ -471,6 +473,25 @@ export default function StatsPage() {
         )
       : null;
 
+  // Time-to-first-mastery hint (#1083). Show only when the user has at least
+  // one introduced card, zero mastered cards, and the projection helper
+  // produced a finite estimate. The helper already returns null when the
+  // superuser pretendAllMastered flag is on, so the hint hides under cheats.
+  const firstMasteryDays =
+    nameCards !== null &&
+    masteryRepetitions !== null &&
+    stats !== null &&
+    stats.introduced > 0 &&
+    stats.mastered === 0
+      ? projectTimeToFirstMastery(
+          nameCards,
+          new Date(),
+          masteryRepetitions,
+          flags.pretendAllMastered,
+          { retentionTarget },
+        ).days
+      : null;
+
   const reviewCharts =
     cards !== null
       ? (() => {
@@ -606,6 +627,13 @@ export default function StatsPage() {
                   term.
                 </p>
               </OnboardingHint>
+              {firstMasteryDays !== null && masteryRepetitions !== null && (
+                <FirstMasteryHint
+                  days={firstMasteryDays}
+                  masteryReps={masteryRepetitions}
+                  masteryDays={MASTERY_INTERVAL_DAYS}
+                />
+              )}
               {completionProjection !== null && (
                 <CompletionProjection
                   projection={completionProjection}
