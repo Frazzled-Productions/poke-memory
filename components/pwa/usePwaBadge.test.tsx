@@ -1,5 +1,5 @@
 /**
- * Component tests for usePwaBadge (issue #916, fixed #1099).
+ * Component tests for usePwaBadge (issue #916, fixed #1099, #1108).
  *
  * Covers:
  *   - Sets badge to the sum of new + learning + review cards when due count > 0.
@@ -10,6 +10,7 @@
  *   - Re-syncs when SETTINGS_SAVED_EVENT fires (e.g. timezone changed).
  *   - Clears badge on unmount.
  *   - On a fresh install, badge is capped by the daily new-card cap, not the full backlog.
+ *   - Badge respects Settings eligibility filters (alternate forms, scope, directions).
  */
 
 import { renderHook, act, waitFor } from "@testing-library/react";
@@ -25,7 +26,16 @@ vi.mock("@/lib/review/persistence", () => ({
   STORAGE_KEY: "poke-memory:review-session:v1",
 }));
 
-const mockLoadSettings = vi.fn().mockReturnValue({ timezone: "UTC" });
+const mockLoadSettings = vi.fn().mockReturnValue({
+  timezone: "UTC",
+  nameCardsEnabled: true,
+  evolutionCardsEnabled: true,
+  reverseCardsEnabled: false,
+  reverseEvolutionCardsEnabled: false,
+  cryCardsEnabled: false,
+  alternateFormsEnabled: false,
+  practiceScope: { gens: [], types: [], presets: [], games: [] },
+});
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
@@ -50,6 +60,14 @@ const mockBuildSessionQueues = vi.fn().mockReturnValue({
 vi.mock("@/lib/review/session", () => ({
   buildSessionQueues: (...args: unknown[]) => mockBuildSessionQueues(...args),
   todayString: vi.fn().mockReturnValue("2026-05-18"),
+}));
+
+// computeEligibleCardIds is the shared eligibility helper (#1108). Mock it
+// here so badge tests remain isolated from scope/filter logic; unit tests
+// for the helper itself live in lib/review/scope.test.ts.
+const mockComputeEligibleCardIds = vi.fn().mockReturnValue(new Set<number>());
+vi.mock("@/lib/review/scope", () => ({
+  computeEligibleCardIds: (...args: unknown[]) => mockComputeEligibleCardIds(...args),
 }));
 
 let sessionVersion = 0;
@@ -112,7 +130,17 @@ beforeEach(() => {
   mockSetAppBadge.mockClear();
   mockClearAppBadge.mockClear();
   mockLoadSession.mockResolvedValue(null);
-  mockLoadSettings.mockReturnValue({ timezone: "UTC" });
+  mockLoadSettings.mockReturnValue({
+    timezone: "UTC",
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
+    reverseCardsEnabled: false,
+    reverseEvolutionCardsEnabled: false,
+    cryCardsEnabled: false,
+    alternateFormsEnabled: false,
+    practiceScope: { gens: [], types: [], presets: [], games: [] },
+  });
+  mockComputeEligibleCardIds.mockReturnValue(new Set<number>());
   stubQueues(0, 0, 0);
   sessionVersion = 0;
   installBadgeApi();
@@ -278,5 +306,83 @@ describe("usePwaBadge", () => {
       expect(mockSetAppBadge).toHaveBeenCalledWith(DAILY_CAP);
     });
     expect(mockSetAppBadge).not.toHaveBeenCalledWith(BACKLOG_SIZE);
+  });
+
+  it("passes eligibleCardIds from computeEligibleCardIds to buildSessionQueues", async () => {
+    // Verifies the hook wires the eligibility helper into the queue builder
+    // so Settings filters (directions, alternate forms, scope) are respected.
+    const cards = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    const eligibleSet = new Set([1, 2]); // card 3 is filtered out (e.g. alternate form)
+    mockLoadSession.mockResolvedValue({ cards, limits: {} });
+    mockComputeEligibleCardIds.mockReturnValue(eligibleSet);
+    stubQueues(2, 0, 0);
+
+    renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      // buildSessionQueues must receive the eligibleCardIds set as the 4th arg.
+      expect(mockBuildSessionQueues).toHaveBeenCalledWith(
+        cards,
+        {},
+        expect.any(String),
+        eligibleSet,
+      );
+    });
+  });
+
+  it("alternate-forms-off baseline: computeEligibleCardIds is called with settings flags", async () => {
+    // When alternateFormsEnabled is false (the default), computeEligibleCardIds
+    // should be called with that flag so alternate-form cards are excluded.
+    const cards = [{ id: 1 }];
+    const settings = {
+      timezone: "UTC",
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+      alternateFormsEnabled: false,
+      practiceScope: { gens: [], types: [], presets: [], games: [] },
+    };
+    mockLoadSession.mockResolvedValue({ cards, limits: {} });
+    mockLoadSettings.mockReturnValue(settings);
+    stubQueues(1, 0, 0);
+
+    renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockComputeEligibleCardIds).toHaveBeenCalledWith(
+        cards,
+        expect.objectContaining({ alternateFormsEnabled: false }),
+      );
+    });
+  });
+
+  it("scope-filtered case: computeEligibleCardIds is called with the active scope", async () => {
+    // When the user has an active scope (e.g. Gen I only), the badge hook
+    // must pass that scope to computeEligibleCardIds.
+    const cards = [{ id: 1 }, { id: 200 }];
+    const scope = { gens: [1], types: [], presets: [], games: [] };
+    mockLoadSettings.mockReturnValue({
+      timezone: "UTC",
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      reverseCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+      alternateFormsEnabled: false,
+      practiceScope: scope,
+    });
+    mockLoadSession.mockResolvedValue({ cards, limits: {} });
+    stubQueues(1, 0, 0);
+
+    renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockComputeEligibleCardIds).toHaveBeenCalledWith(
+        cards,
+        expect.objectContaining({ practiceScope: scope }),
+      );
+    });
   });
 });

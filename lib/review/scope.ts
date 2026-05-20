@@ -1,4 +1,5 @@
-import type { ReviewableCard } from "@/lib/review/session";
+import type { ReviewableCard, CardTypeOpts } from "@/lib/review/session";
+import { cardTypeIsEnabled } from "@/lib/review/session";
 import { generationOf } from "@/lib/stats/derive";
 import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
@@ -333,6 +334,64 @@ export function cardIsEligible(
   }
   if (isScopeEmpty(scope)) return true;
   return cardMatchesScope(card, scope, context);
+}
+
+/**
+ * Minimal settings surface consumed by `computeEligibleCardIds`. Matches the
+ * subset of `UserSettings` that drives eligibility so the helper stays
+ * decoupled from the full settings type and is easy to test.
+ */
+export type EligibilitySettings = {
+  nameCardsEnabled: boolean;
+  evolutionCardsEnabled: boolean;
+  reverseCardsEnabled: boolean;
+  reverseEvolutionCardsEnabled: boolean;
+  cryCardsEnabled: boolean;
+  alternateFormsEnabled: boolean;
+  practiceScope: PracticeScope;
+};
+
+/**
+ * Compute the set of card IDs that are eligible for a practice session given
+ * the current settings and scope. This is the shared eligibility chokepoint
+ * used by both `ReviewSession` and the badge hooks (`usePwaBadge`,
+ * `useDocumentTitleBadge`) so all three surfaces always agree on the count.
+ *
+ * The three-tier gate applied here mirrors `ReviewSession.tsx`:
+ *   1. Card-type enabled (nameCardsEnabled, evolutionCardsEnabled, etc.)
+ *   2. `alternateFormsEnabled` master toggle
+ *   3. `practiceScope` filter via `cardIsEligible`
+ *
+ * @param cards   The full persisted card set (from `loadSession`).
+ * @param settings  Subset of `UserSettings` that drives eligibility.
+ * @param context   Optional runtime context for progress-dependent presets
+ *   (e.g. `incompleteChainSpeciesIds` for the "Incomplete evolution chains"
+ *   preset). When omitted the preset simply matches nothing, which is the
+ *   correct behaviour for callers without access to the full review state.
+ *
+ * Pure — no I/O, no DOM access, no hooks.
+ */
+export function computeEligibleCardIds(
+  cards: readonly ReviewableCard[],
+  settings: EligibilitySettings,
+  context: ScopeMatchContext = {},
+): Set<number> {
+  const cardTypeOpts: CardTypeOpts = {
+    nameEnabled: settings.nameCardsEnabled,
+    evolutionEnabled: settings.evolutionCardsEnabled,
+    reverseEnabled: settings.reverseCardsEnabled,
+    reverseEvolutionEnabled: settings.reverseEvolutionCardsEnabled,
+    cryEnabled: settings.cryCardsEnabled,
+  };
+  return new Set(
+    cards
+      .filter(
+        (c) =>
+          cardTypeIsEnabled(c, cardTypeOpts) &&
+          cardIsEligible(c, settings.practiceScope, settings.alternateFormsEnabled, context),
+      )
+      .map((c) => c.id),
+  );
 }
 
 /**

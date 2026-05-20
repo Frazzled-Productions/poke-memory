@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   cardIsEligible,
   cardMatchesScope,
+  computeEligibleCardIds,
   isScopeEmpty,
   EMPTY_SCOPE,
   loadScope,
@@ -1015,5 +1016,98 @@ describe("cardIsEligible: size-variant formCategory regression (#837)", () => {
     // isDefaultForm === false.  Confirm this invariant holds.
     expect(cardIsEligible(correctlyCategorised, EMPTY_SCOPE, false)).toBe(false);
     expect(cardIsEligible(wronglyCategorised, EMPTY_SCOPE, false)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeEligibleCardIds (#1108)
+// ---------------------------------------------------------------------------
+
+/** Minimal settings for computeEligibleCardIds tests — all directions on,
+ *  alternate forms off, empty scope. */
+function defaultSettings() {
+  return {
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
+    reverseCardsEnabled: false,
+    reverseEvolutionCardsEnabled: false,
+    cryCardsEnabled: false,
+    alternateFormsEnabled: false,
+    practiceScope: EMPTY_SCOPE,
+  };
+}
+
+/** A name card that is flagged as an alternate form (isDefaultForm: false). */
+function altFormCard(id: number): NameReviewCard {
+  return {
+    ...nameCard(id),
+    isDefaultForm: false,
+    formCategory: "regional" as FormCategory,
+  };
+}
+
+describe("computeEligibleCardIds", () => {
+  it("returns all card IDs when scope is empty and all types are on", () => {
+    const cards = [nameCard(1), nameCard(4), nameCard(7)];
+    const result = computeEligibleCardIds(cards, defaultSettings());
+    expect(result).toEqual(new Set([1, 4, 7]));
+  });
+
+  it("excludes cards whose card type is disabled", () => {
+    // A 'reverse' card should be excluded when reverseCardsEnabled is false.
+    const rev: NameReviewCard = { ...nameCard(1), cardType: "reverse" as "name" };
+    const cards = [nameCard(1), rev];
+    const result = computeEligibleCardIds(cards, { ...defaultSettings(), reverseCardsEnabled: false });
+    // Only the name card (id=1) passes; the reverse card also has id=1 but
+    // cardType 'reverse' is gated out, so the Set should only contain 1.
+    expect(result).toEqual(new Set([1]));
+  });
+
+  it("excludes alternate-form cards when alternateFormsEnabled is false (default baseline)", () => {
+    // Simulates the issue: badge was including alternate forms that the
+    // Practice page excluded. With this helper both surfaces agree.
+    const cards = [nameCard(1), altFormCard(10100)];
+    const result = computeEligibleCardIds(cards, {
+      ...defaultSettings(),
+      alternateFormsEnabled: false,
+    });
+    expect(result).toEqual(new Set([1]));
+    expect(result.has(10100)).toBe(false);
+  });
+
+  it("includes alternate-form cards when alternateFormsEnabled is true", () => {
+    const cards = [nameCard(1), altFormCard(10100)];
+    const result = computeEligibleCardIds(cards, {
+      ...defaultSettings(),
+      alternateFormsEnabled: true,
+    });
+    expect(result.has(1)).toBe(true);
+    expect(result.has(10100)).toBe(true);
+  });
+
+  it("respects a non-empty scope (Gen I filter)", () => {
+    // nameCard(1) = Bulbasaur, Gen I; nameCard(152) = Chikorita, Gen II.
+    const cards = [nameCard(1), nameCard(152)];
+    const result = computeEligibleCardIds(cards, {
+      ...defaultSettings(),
+      practiceScope: { gens: [1], types: [], presets: [], formCategories: { mode: "all" }, games: [] },
+    });
+    expect(result).toEqual(new Set([1]));
+    expect(result.has(152)).toBe(false);
+  });
+
+  it("returns an empty set when all cards are out of scope", () => {
+    // Gen 1 scope, but card is Gen 2.
+    const cards = [nameCard(152)];
+    const result = computeEligibleCardIds(cards, {
+      ...defaultSettings(),
+      practiceScope: { gens: [1], types: [], presets: [], formCategories: { mode: "all" }, games: [] },
+    });
+    expect(result.size).toBe(0);
+  });
+
+  it("returns an empty set when the card list is empty", () => {
+    const result = computeEligibleCardIds([], defaultSettings());
+    expect(result.size).toBe(0);
   });
 });
