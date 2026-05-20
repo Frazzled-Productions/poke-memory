@@ -387,14 +387,12 @@ test.describe("Practice page", () => {
     expect(overflowBefore).toBeLessThanOrEqual(1);
 
     await reveal.click();
-    await expect(
-      page.getByRole("group", { name: "Grade your answer" }),
-    ).toBeVisible();
-
-    const overflowAfter = await page.evaluate(
-      () => document.documentElement.scrollHeight - window.innerHeight,
-    );
-    expect(overflowAfter).toBeLessThanOrEqual(8);
+    const gradeButtons = page.getByRole("group", { name: "Grade your answer" });
+    await expect(gradeButtons).toBeVisible();
+    // The real requirement is that grade buttons are reachable without scrolling.
+    // Assert the buttons group is within the viewport rather than tolerating up
+    // to 8 px of document overflow.
+    await expect(gradeButtons).toBeInViewport();
   });
 
   test("queue state badge shows 'New' on a never-reviewed name card", async ({ page }) => {

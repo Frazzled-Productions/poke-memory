@@ -2261,8 +2261,10 @@ export function ReviewSession() {
           />
         </div>
         <div className="flex-none"><QueueStateBadge state={effectiveCard.state} /></div>
-        {/* Picker region: flex-1 min-h-0 absorbs leftover height on mobile */}
-        <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-hidden">
+        {/* Picker region: flex-1 min-h-0 absorbs leftover height on mobile.
+            overflow-y-auto (not overflow-hidden) so very short viewports (e.g.
+            iPhone SE, 667 px) can scroll rather than silently clip tiles. */}
+        <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-y-auto">
           <SpritePicker
             key={`${effectiveCard.id}-${cardPresentationCount}`}
             targetPokemon={reverseTarget}
