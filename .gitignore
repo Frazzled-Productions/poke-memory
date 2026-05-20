@@ -44,4 +44,3 @@ next-env.d.ts
 
 # claude code background-job worktrees
 /.claude/worktrees/
-e2e/.storage-state.json

@@ -17,7 +17,7 @@ test.describe("FSRS smoke", () => {
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
     await page.goto("/");
@@ -72,7 +72,7 @@ test.describe("FSRS smoke", () => {
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
 

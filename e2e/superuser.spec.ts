@@ -1,4 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 // Seeds localStorage on the about-to-load page so the Developer panel is
 // visible without exercising the chord/tap gesture (awkward to drive across

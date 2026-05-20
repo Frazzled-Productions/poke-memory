@@ -69,7 +69,7 @@ test.describe("StorageQuotaBanner (#766)", () => {
         // Pre-dismiss the first-visit modal so it does not block the Reveal button.
         window.localStorage.setItem(
           SETTINGS_KEY,
-          JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+          JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
         );
 
         // Seed the session into localStorage so loadSessionLS can find it.

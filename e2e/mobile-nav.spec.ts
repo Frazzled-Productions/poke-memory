@@ -27,7 +27,7 @@ test.describe("Mobile nav — bottom tab bar (default)", () => {
       // so the modal does not render on the post-reload Practice surface (#1103).
       localStorage.setItem(
         "poke-memory:settings:v1",
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     });
     await page.reload();
@@ -224,7 +224,7 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
       // so the modal does not render on the post-reload Practice surface (#1103).
       localStorage.setItem(
         "poke-memory:settings:v1",
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     });
     await page.reload();
@@ -248,7 +248,7 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
       // so the modal does not render on the post-reload Practice surface (#1103).
       localStorage.setItem(
         "poke-memory:settings:v1",
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     });
     await page.reload();
@@ -284,7 +284,7 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
       // so the modal does not render on the post-reload Practice surface (#1103).
       localStorage.setItem(
         "poke-memory:settings:v1",
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     });
     await page.reload();

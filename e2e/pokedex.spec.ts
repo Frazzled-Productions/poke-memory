@@ -1,5 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 // ---------------------------------------------------------------------------
 // Helper — expand the filter disclosure before interacting with filter controls.

@@ -58,7 +58,7 @@ test.describe("Practice page", () => {
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
   });
@@ -773,7 +773,7 @@ test.describe("Sign-in picker (#360)", () => {
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
   });
@@ -869,10 +869,31 @@ test.describe("Streak milestone celebration (#419)", () => {
         JSON.stringify([day(-2), day(-1), day(0)]),
       );
       // Pre-dismiss the modal so it does not cover the milestone banner.
-      localStorage.setItem(
-        "poke-memory:settings:v1",
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
-      );
+      // MERGE the flag into existing settings rather than overwriting — this
+      // addInitScript runs on every navigation, and the app saves
+      // seenStreakMilestones into settings after the milestone fires.
+      // An overwrite would wipe seenStreakMilestones on reload and the
+      // milestone would re-fire (breaking the "does not re-fire" assertion).
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = localStorage.getItem(KEY);
+        const existing: Record<string, unknown> =
+          raw && typeof JSON.parse(raw) === "object" ? JSON.parse(raw) : {};
+        const existingOnboarding =
+          typeof existing.onboarding === "object" && existing.onboarding !== null
+            ? (existing.onboarding as Record<string, unknown>)
+            : {};
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({
+            ...existing,
+            onboarding: { ...existingOnboarding, firstVisitOnboardingDismissed: true },
+            mobileNav: existing.mobileNav ?? "bottom",
+          }),
+        );
+      } catch {
+        /* localStorage unavailable - ignore */
+      }
     });
 
     await page.goto("/");
@@ -909,7 +930,7 @@ test.describe("Daily summary persistence (#685)", () => {
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
   });
@@ -989,7 +1010,7 @@ test.describe("EndOfSessionScreen unification — share button on NEW_CARDS_LOCK
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
   });
@@ -1077,7 +1098,7 @@ test.describe("Graduated-cards review queue hint (#880)", () => {
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
   });
@@ -1235,7 +1256,7 @@ test.describe("Per-direction accuracy breakdown on session-end screen (#994)", (
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
   });
@@ -1328,7 +1349,7 @@ test.describe("Document title due-count badge (#1062)", () => {
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
       );
     }, SETTINGS_KEY);
   });

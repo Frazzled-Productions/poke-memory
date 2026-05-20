@@ -63,7 +63,7 @@ async function seedAndGo(page: Parameters<typeof seedSessionIdb>[0]) {
   await page.addInitScript((key) => {
     localStorage.setItem(
       key,
-      JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
     );
   }, SETTINGS_KEY);
   await seedSessionIdb(page, SESSION_WITH_ONE_DUE_CARD);

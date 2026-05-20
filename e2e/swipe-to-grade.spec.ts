@@ -121,7 +121,7 @@ async function seedAndGo(
   await page.addInitScript((key) => {
     localStorage.setItem(
       key,
-      JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
     );
   }, SETTINGS_KEY);
   await seedSessionIdb(page, session);
