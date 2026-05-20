@@ -5,6 +5,7 @@ import {
   EVOLUTION_CARD_IDS,
   buildCompletedSession,
 } from "./helpers/completedSession";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 // ---------------------------------------------------------------------------
 // Pre-seed a NEW_CARDS_LOCKED state for the `name` card type:
@@ -112,12 +113,7 @@ const SETTINGS_KEY = "poke-memory:settings:v1";
 test.describe("Higher-or-Lower mini-game", () => {
   // Pre-dismiss the first-visit modal so it does not block the end-of-session screen.
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
+    await addOnboardingPreDismiss(page);
   });
 
   test("mini-game section appears on SESSION_COMPLETE", async ({ page }) => {

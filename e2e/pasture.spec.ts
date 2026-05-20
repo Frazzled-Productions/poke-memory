@@ -1,35 +1,31 @@
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import { getPrimaryNavContainer } from "./helpers/navHelpers";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 // Pre-dismiss the first-visit onboarding modal and explicitly opt in to the
 // bottom tab bar before every test.
 //
-// `mobileNav: "bottom"` must be set explicitly. `parseStoredSettings` migrates
-// any stored settings object that has no `mobileNav` field to `"hamburger"`
-// (the existing-user default), which would prevent BottomTabBar from rendering
-// on mobile-safari tests and make the Pasture link permanently invisible in the
-// `"Mobile tab navigation"` landmark.
+// `mobileNav: "bottom"` must be set explicitly via a separate addInitScript.
+// `parseStoredSettings` migrates any stored settings object that has no
+// `mobileNav` field to `"hamburger"` (the existing-user default), which would
+// prevent BottomTabBar from rendering on mobile-safari tests and make the
+// Pasture link permanently invisible in the `"Mobile tab navigation"` landmark.
+// `addOnboardingPreDismiss` only seeds `mobileNav` when the settings key is
+// absent entirely — it does not force the value when the key already exists.
 test.beforeEach(async ({ page }) => {
+  // Merge `mobileNav: "bottom"` into settings regardless of prior state.
   await page.addInitScript(() => {
     try {
       const KEY = "poke-memory:settings:v1";
       const existing = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-      localStorage.setItem(
-        KEY,
-        JSON.stringify({
-          ...existing,
-          mobileNav: "bottom",
-          onboarding: {
-            ...(existing.onboarding ?? {}),
-            firstVisitOnboardingDismissed: true,
-          },
-        }),
-      );
+      localStorage.setItem(KEY, JSON.stringify({ ...existing, mobileNav: "bottom" }));
     } catch {
       /* ignore - localStorage unavailable */
     }
   });
+  // Merge the onboarding pre-dismiss flag after the mobileNav write.
+  await addOnboardingPreDismiss(page);
 });
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 // Smoke coverage for the FSRS scheduler swap (#263). Asserts structural
 // behaviour — queue movement and the relative shape of the per-button
@@ -14,12 +15,7 @@ test.describe("FSRS smoke", () => {
   }) => {
     await page.addInitScript(() => localStorage.clear());
     // Pre-dismiss the modal after the clear so it does not block the Reveal button.
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
+    await addOnboardingPreDismiss(page);
     await page.goto("/");
 
     const reveal = page.getByRole("button", { name: /reveal/i });
@@ -69,12 +65,7 @@ test.describe("FSRS smoke", () => {
     page,
   }) => {
     // Pre-dismiss the modal so it does not block the Reveal button.
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
+    await addOnboardingPreDismiss(page);
 
     // Seed a single graduated FSRS card so the test doesn't depend on
     // grading a brand-new card through the learning steps. Stability and

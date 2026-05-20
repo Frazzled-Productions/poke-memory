@@ -13,6 +13,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 import {
   buildCompletedSession,
   SEED_POKEMON_IDS,
@@ -118,12 +119,7 @@ async function seedAndGo(
   session: object = SESSION_WITH_ONE_DUE_CARD,
 ) {
   // Pre-dismiss the first-visit modal so it does not intercept pointer events.
-  await page.addInitScript((key) => {
-    localStorage.setItem(
-      key,
-      JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-    );
-  }, SETTINGS_KEY);
+  await addOnboardingPreDismiss(page);
   await seedSessionIdb(page, session);
   await page.goto("/");
   await awaitSeedIdb(page);

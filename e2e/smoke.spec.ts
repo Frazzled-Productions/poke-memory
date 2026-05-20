@@ -6,10 +6,10 @@ import {
   buildCompletedSession,
 } from "./helpers/completedSession";
 import { isMobileProject } from "./helpers/navHelpers";
-import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 test.beforeEach(async ({ page }) => {
-  await preDismissOnboardingModal(page);
+  await addOnboardingPreDismiss(page);
 });
 
 test.describe("Navigation", () => {
@@ -56,17 +56,6 @@ test.describe("Navigation", () => {
 const SETTINGS_KEY = "poke-memory:settings:v1";
 
 test.describe("Practice page", () => {
-  // Pre-dismiss the first-visit onboarding modal for every practice test so it
-  // does not obscure the card surface (#1103). addInitScript runs before every
-  // page.goto within the same test, including nested navigations.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
-  });
 
   test("loads and shows a card or end-state", async ({ page }) => {
     await page.goto("/");
@@ -773,15 +762,6 @@ test.describe("Settings page", () => {
 });
 
 test.describe("Sign-in picker (#360)", () => {
-  // Pre-dismiss the modal so header elements are not blocked by the backdrop.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
-  });
 
   test("opens menu with GitHub and Google options plus provider warning", async ({
     page,
@@ -873,33 +853,12 @@ test.describe("Streak milestone celebration (#419)", () => {
         "poke-memory:streak:v1",
         JSON.stringify([day(-2), day(-1), day(0)]),
       );
-      // Pre-dismiss the modal so it does not cover the milestone banner.
-      // MERGE the flag into existing settings rather than overwriting — this
-      // addInitScript runs on every navigation, and the app saves
-      // seenStreakMilestones into settings after the milestone fires.
-      // An overwrite would wipe seenStreakMilestones on reload and the
-      // milestone would re-fire (breaking the "does not re-fire" assertion).
-      try {
-        const KEY = "poke-memory:settings:v1";
-        const raw = localStorage.getItem(KEY);
-        const existing: Record<string, unknown> =
-          raw && typeof JSON.parse(raw) === "object" ? JSON.parse(raw) : {};
-        const existingOnboarding =
-          typeof existing.onboarding === "object" && existing.onboarding !== null
-            ? (existing.onboarding as Record<string, unknown>)
-            : {};
-        localStorage.setItem(
-          KEY,
-          JSON.stringify({
-            ...existing,
-            onboarding: { ...existingOnboarding, firstVisitOnboardingDismissed: true },
-            mobileNav: existing.mobileNav ?? "bottom",
-          }),
-        );
-      } catch {
-        /* localStorage unavailable - ignore */
-      }
     });
+    // Pre-dismiss the modal so it does not cover the milestone banner.
+    // Called AFTER the streak-seed script so it merges into whatever state
+    // exists — it will not overwrite seenStreakMilestones that the app saves
+    // into settings after the milestone fires.
+    await addOnboardingPreDismiss(page);
 
     await page.goto("/");
 
@@ -928,16 +887,6 @@ test.describe("Daily summary persistence (#685)", () => {
   const completedSession = buildCompletedSession({
     pokemonIds: SEED_POKEMON_IDS,
     evolutionCardIds: EVOLUTION_CARD_IDS,
-  });
-
-  // Pre-dismiss the first-visit modal so it does not block the end-of-session screen.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
   });
 
   test("'Share today' button visible when today-dated summary is in localStorage", async ({ page }) => {
@@ -1010,15 +959,6 @@ test.describe("Daily summary persistence (#685)", () => {
 });
 
 test.describe("EndOfSessionScreen unification — share button on NEW_CARDS_LOCKED (#926)", () => {
-  // Pre-dismiss the modal so it does not block the end-of-session screen.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
-  });
   // All known species pre-seeded as reviewed, PLUS one extra unseen name card
   // (id 99999) not in SEED_POKEMON_IDS. With maxNewPerDay: 0, hydrateSession
   // adds the unseen card but it cannot enter the new queue — landing on NEW_CARDS_LOCKED.
@@ -1098,16 +1038,6 @@ test.describe("Graduated-cards review queue hint (#880)", () => {
     evolutionCardIds: EVOLUTION_CARD_IDS,
   });
 
-  // Pre-dismiss the modal so it does not block the end-of-session screen.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
-  });
-
   test("explains that the review queue surfaces only graduated cards", async ({ page }) => {
     // Default settings enable both name and evolution cards (two directions),
     // so the passive hint is shown beneath the "Done today" counter.
@@ -1168,7 +1098,6 @@ test.describe("Evolution edge card prompt (#262)", () => {
     // The session limits in the IDB payload are overridden by settings. Disable
     // name/reverse/cry cards in settings so only the seeded evolution card can
     // appear — it's a review card so the review queue is served first.
-    // Also pre-dismiss the modal so it does not block the Reveal button.
     await page.addInitScript(() => {
       window.localStorage.setItem(
         "poke-memory:settings:v1",
@@ -1179,10 +1108,12 @@ test.describe("Evolution edge card prompt (#262)", () => {
           evolutionCardsEnabled: true,
           maxNewEvolutionPerDay: 10,
           maxReviewsEvolutionPerDay: 100,
-          onboarding: { firstVisitOnboardingDismissed: true },
         }),
       );
     });
+    // Pre-dismiss the modal after the settings override so the flag is merged
+    // into the final settings value rather than being clobbered.
+    await addOnboardingPreDismiss(page);
 
     await page.goto("/");
     await awaitSeedIdb(page);
@@ -1256,16 +1187,6 @@ test.describe("PWA / offline support", () => {
 });
 
 test.describe("Per-direction accuracy breakdown on session-end screen (#994)", () => {
-  // Pre-dismiss the modal so it does not block the Reveal button or grade buttons.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
-  });
-
   // Build a completed session where all cards are in the future EXCEPT one
   // name card (Bulbasaur, id=1) which is due today. After grading that card,
   // the session reaches SESSION_COMPLETE and the direction accuracy row should
@@ -1349,16 +1270,6 @@ test.describe("Per-direction accuracy breakdown on session-end screen (#994)", (
 });
 
 test.describe("Document title due-count badge (#1062)", () => {
-  // Pre-dismiss the modal so it does not block page interactions.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript((key) => {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-      );
-    }, SETTINGS_KEY);
-  });
-
   // Both tests use the completed-session pattern so that hydrateSession does not
   // append the entire Pokémon seed as new cards (which would make the badge show
   // 1000+ and make the "clears at zero" assertion impossible to reach).  The
