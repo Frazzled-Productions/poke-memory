@@ -68,8 +68,8 @@ const _groupedVersionGroups: [number, string[]][] = (() => {
  * generation rather than game appearance (#1110).
  *
  * Examples:
- *   Gen II  -> "Gold / Silver / Crystal"
- *   Gen III -> "Ruby / Sapphire / Emerald / FR LG"
+ *   Gen II  -> "Gold/Silver, Crystal"
+ *   Gen III -> "Ruby/Sapphire, Emerald, FR/LG"
  *
  * Short names strip the "Pokémon " prefix and common suffixes so the label
  * stays readable at small size.
@@ -94,7 +94,7 @@ function shortGameName(slug: string): string {
 }
 
 function genBulkLabel(slugs: string[]): string {
-  return slugs.map(shortGameName).join(" / ");
+  return slugs.map(shortGameName).join(", ");
 }
 
 /**

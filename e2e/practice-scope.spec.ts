@@ -702,10 +702,10 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     const gamesGroup = scopePanel.getByRole("group", { name: "Games" });
     await gamesGroup.locator("summary").click();
 
-    // "Select Gold/Silver / Crystal" is the bulk-select label for Gen II
+    // "Select Gold/Silver, Crystal" is the bulk-select label for Gen II
     // (Gold/Silver + Crystal). Anchored regex avoids matching other gens.
     const selectAllGenII = scopePanel.getByRole("button", {
-      name: /^Select Gold\/Silver \/ Crystal$/,
+      name: /^Select Gold\/Silver, Crystal$/,
     });
     await selectAllGenII.click();
 

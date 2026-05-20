@@ -45,10 +45,10 @@ describe("GameScopePicker", () => {
     const onChange = vi.fn();
     render(<GameScopePicker selected={[]} onChange={onChange} />);
     // Find Gen II's Select-all button. Gen II has gold-silver + crystal.
-    // The aria-label spells out game names ("Select Gold/Silver / Crystal")
+    // The aria-label spells out game names ("Select Gold/Silver, Crystal")
     // to distinguish it from the gens-axis "Generation II" toggle (#1110).
     const selectAllButtons = screen.getAllByRole("button", {
-      name: /^Select Gold\/Silver \/ Crystal$/,
+      name: /^Select Gold\/Silver, Crystal$/,
     });
     await userEvent.click(selectAllButtons[0]);
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -66,7 +66,7 @@ describe("GameScopePicker", () => {
       />,
     );
     const clearAll = screen.getByRole("button", {
-      name: /^Clear Gold\/Silver \/ Crystal$/,
+      name: /^Clear Gold\/Silver, Crystal$/,
     });
     await userEvent.click(clearAll);
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -95,6 +95,34 @@ describe("GameScopePicker", () => {
       const lastGenIdx = headers.findLastIndex((h) => h.startsWith("Generation "));
       expect(firstOtherIdx).toBeGreaterThan(lastGenIdx);
     }
+  });
+
+  it("bulk-action labels use comma separators and produce unambiguous strings", () => {
+    // Table-driven regression guard for genBulkLabel. Verifies that the comma
+    // separator keeps game names with internal slashes (Black/White, X/Y, etc.)
+    // unambiguous when joined. The assertions are based on the seed's known
+    // version-group set — update if the seed adds new version groups.
+    render(<GameScopePicker selected={[]} onChange={() => {}} />);
+
+    // Gen II: Gold/Silver + Crystal — simplest unambiguous example
+    expect(
+      screen.queryAllByRole("button", { name: /^Select Gold\/Silver, Crystal$/ }).length,
+    ).toBeGreaterThan(0);
+
+    // Gen V: Black/White + B2/W2 — the classic ambiguous case with the old " / " separator
+    expect(
+      screen.getByRole("button", { name: /^Select Black\/White, B2\/W2$/ }),
+    ).toBeInTheDocument();
+
+    // Gen VI: X/Y + OR/AS — two slash-containing names
+    expect(
+      screen.getByRole("button", { name: /^Select X\/Y, OR\/AS$/ }),
+    ).toBeInTheDocument();
+
+    // Gen VIII: Sword/Shield is the first game listed (followed by DLC entries)
+    expect(
+      screen.getByRole("button", { name: /^Select Sword\/Shield,/ }),
+    ).toBeInTheDocument();
   });
 
   it("the picker section is reachable inside ScopeControl via a games label search", () => {
