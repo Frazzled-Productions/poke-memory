@@ -578,7 +578,7 @@ test.describe("Pokédex detail — bottom nav anchoring (#1086)", () => {
     expect(Math.abs(barBottom - viewportSize!.height)).toBeLessThanOrEqual(2);
   });
 
-  test("page content wrapper fills at least the viewport height on the detail page", async ({ page }) => {
+  test("page is at least one viewport tall on the detail page", async ({ page }) => {
     await page.goto("/pokedex/1");
 
     // Wait for the page to render.
@@ -587,11 +587,16 @@ test.describe("Pokédex detail — bottom nav anchoring (#1086)", () => {
     const viewportSize = page.viewportSize();
     expect(viewportSize).not.toBeNull();
 
-    // The [data-page-content] wrapper must be at least as tall as the viewport
-    // so iOS Safari keeps its toolbar hidden and bottom: 0 stays stable.
-    const contentBox = await page.locator("[data-page-content]").boundingBox();
-    expect(contentBox).not.toBeNull();
-    expect(contentBox!.height).toBeGreaterThanOrEqual(viewportSize!.height - 2);
+    // The #1086 invariant: the page itself must be at least as tall as the
+    // viewport so iOS Safari keeps its toolbar hidden and `position: fixed;
+    // bottom: 0` on the tab bar stays anchored. As of #1104 that
+    // `min-h-dvh` guarantee lives on <body> (was on [data-page-content]),
+    // because pinning the wrapper to 100dvh on top of the Nav + sibling
+    // banners pushed the Practice page past the viewport and re-introduced
+    // the scroll #1087 was meant to remove. Assert the property at body so
+    // the test follows where the contract now lives.
+    const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+    expect(bodyHeight).toBeGreaterThanOrEqual(viewportSize!.height - 2);
   });
 });
 
