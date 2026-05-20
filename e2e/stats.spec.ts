@@ -196,6 +196,102 @@ test.describe("Stats page — section headings", () => {
   });
 });
 
+test.describe("Stats page — due forecast bar popup", () => {
+  test("tapping a forecast bar reveals a popup with date and card count (mobile)", async ({
+    page,
+    isMobile,
+  }) => {
+    // This test targets the mobile tap flow. Skip on non-mobile projects
+    // (the hover flow is covered by the desktop test below).
+    test.skip(!isMobile, "mobile tap test - skipped on desktop project");
+
+    await page.goto("/stats");
+
+    // Wait for the Scheduling section to appear (due forecast is inside it).
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // The forecast chart is a list of bars. Each bar is a button.
+    const forecastList = page.getByRole("list", { name: "14-day due forecast" });
+    await expect(forecastList).toBeVisible();
+
+    // Tap the first bar (Today).
+    const firstBar = forecastList.getByRole("button").first();
+    await expect(firstBar).toBeVisible();
+    await firstBar.tap();
+
+    // A tooltip should appear with a date and card count.
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeVisible();
+    // The tooltip always shows a count in the form "N card(s)".
+    await expect(tooltip).toContainText(/card/i);
+
+    // Tapping outside the chart dismisses the popup.
+    await page.getByRole("heading", { level: 1, name: "Stats" }).tap();
+    await expect(tooltip).not.toBeVisible();
+  });
+
+  test("hovering a forecast bar reveals a popup with date and card count (desktop)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "hover() is unreliable on the mobile-safari (Webkit touch) project",
+    );
+
+    await page.goto("/stats");
+
+    // Wait for the Scheduling section to appear.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const forecastList = page.getByRole("list", { name: "14-day due forecast" });
+    await expect(forecastList).toBeVisible();
+
+    // Hover the first bar (Today).
+    const firstBar = forecastList.getByRole("button").first();
+    await firstBar.hover();
+
+    // The tooltip should appear.
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(/card/i);
+  });
+
+  test("keyboard: Enter on a forecast bar toggles the popup", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "keyboard focus navigation varies across projects",
+    );
+
+    await page.goto("/stats");
+
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const forecastList = page.getByRole("list", { name: "14-day due forecast" });
+    const firstBar = forecastList.getByRole("button").first();
+
+    // Focus and activate the bar with keyboard.
+    await firstBar.focus();
+    await page.keyboard.press("Enter");
+
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeVisible();
+
+    // Pressing Enter again should close it.
+    await page.keyboard.press("Enter");
+    await expect(tooltip).not.toBeVisible();
+  });
+});
+
 test.describe("Stats page — heatmap hover tooltip", () => {
   test("hovering a heatmap cell shows a tooltip with the date and review count", async ({
     page,
