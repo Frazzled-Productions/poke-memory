@@ -259,9 +259,9 @@ describe("usePwaBadge", () => {
   });
 
   it("badge is capped at the daily new-card limit on a fresh install", async () => {
-    // Simulate a fresh install: ~3600 untouched cards but buildSessionQueues
-    // returns only the daily new-card cap's worth (e.g. 10 name cards).
-    // The badge must reflect the queue size, not the backlog size.
+    // Fresh install with ~3600 untouched cards; the mock stands in for
+    // buildSessionQueues returning a capped queue (e.g. 10 name cards).
+    // Verifies the hook sums from buildSessionQueues output, not the backlog.
     const BACKLOG_SIZE = 3600;
     const DAILY_CAP = 10;
 
