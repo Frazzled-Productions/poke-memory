@@ -31,21 +31,17 @@ export function MobileNavPaddingWrapper({ children }: { children: React.ReactNod
   }, []);
 
   return (
+    // The "page is at least 100dvh tall" guarantee that anchors the iOS Safari
+    // toolbar / bottom tab bar (#1086) lives on <body> (`min-h-dvh`), not here.
+    // Putting it on the wrapper forced wrapper height to 100dvh on top of the
+    // Nav and any sibling banners (e.g. GuestStorageNotice), pushing the page
+    // past the viewport and re-introducing the Practice scroll (#1087).
+    // Keeping the wrapper as `flex-1` lets it absorb only the space body has
+    // left after its siblings, so the height chain that feeds ReviewSession
+    // can land grade buttons within the viewport.
     <div
       className={[
-        // min-h-dvh ensures the content wrapper always fills the current dynamic
-        // viewport height. On iOS Safari, short pages (e.g. the Pokédex detail page
-        // for a locked Pokémon) can be shorter than the large viewport, which causes
-        // the browser toolbar to appear and the visual viewport to shrink. Because
-        // `position: fixed; bottom: 0` anchors to the visual viewport, the bottom
-        // tab bar visually jumps upward when the toolbar appears. Giving the wrapper
-        // a minimum height of 100dvh keeps the page body at least as tall as the
-        // current visual viewport, which keeps the toolbar state stable and the nav
-        // bar anchored (#1086). Only applied when the bottom tab bar is active
-        // (mobileNav === 'bottom' or null during hydration); the hamburger layout
-        // has no fixed bar so the minimum height is not needed.
-        "flex flex-1 flex-col md:min-h-0 md:pb-0",
-        mobileNav !== "hamburger" ? "min-h-dvh" : "",
+        "flex flex-1 flex-col min-h-0 md:pb-0",
         mobileNav === "bottom"
           ? "pb-[calc(4rem+env(safe-area-inset-bottom))]"
           : "",

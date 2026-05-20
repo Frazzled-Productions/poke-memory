@@ -107,7 +107,13 @@ export function EvolutionCardLayout({
         {/* Right side: hidden when hiddenSide === "post" and not yet revealed */}
         {hiddenSide === "post" ? (revealed ? postEvoImg : placeholder) : postEvoImg}
       </div>
-      <div className="min-h-[2.5rem] flex flex-col items-center justify-center">
+      {/*
+        Reserve the revealed-state height (name row + fact, ~7rem worst case)
+        in the unrevealed state too, so the card's bounding box is constant
+        across reveal. Lets the parent region keep the card centred without
+        the sprite drifting upward when Reveal grows the answer area (#1104).
+      */}
+      <div className="min-h-[7rem] flex flex-col items-center justify-center">
         {revealed ? (
           <>
             <div className="flex items-center gap-2">
