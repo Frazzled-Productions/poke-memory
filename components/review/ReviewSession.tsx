@@ -1560,7 +1560,7 @@ export function ReviewSession() {
           <button
             type="button"
             onClick={handleUndo}
-            className="min-h-[36px] rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
             aria-label="Undo last grade"
           >
             Undo last grade (⌘Z)
@@ -2134,7 +2134,13 @@ export function ReviewSession() {
           </div>
         </div>
         <div className="flex-none"><QueueStateBadge state={effectiveCard.state} /></div>
-        {/* Card region: flex-1 min-h-0 centres the card and absorbs leftover height */}
+        {/* Card region: flex-1 min-h-0 absorbs leftover height; items-center
+            keeps the play button (unrevealed) and the revealed PokemonCard
+            balanced vertically. PokemonCard reserves the revealed-state height
+            in its answer container so the bounding box is stable across reveal
+            (#1104). The cry play button (h-28 ≈ 7rem) coincidentally matches
+            the reserved answer-area height, so the unrevealed and revealed
+            states centre at the same point. */}
         <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-hidden">
           {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
           <div ref={cardRef} className="relative" data-testid="swipe-card">
@@ -2219,7 +2225,7 @@ export function ReviewSession() {
           <button
             type="button"
             onClick={handleUndo}
-            className="flex-none min-h-[36px] rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="flex-none min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
             aria-label="Undo last grade"
           >
             Undo last grade (⌘Z)
@@ -2313,7 +2319,7 @@ export function ReviewSession() {
           <button
             type="button"
             onClick={handleUndo}
-            className="flex-none min-h-[36px] rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="flex-none min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
             aria-label="Undo last grade"
           >
             Undo last grade (⌘Z)
@@ -2353,7 +2359,11 @@ export function ReviewSession() {
         />
       </div>
       <div className="flex-none"><QueueStateBadge state={effectiveCard.state} /></div>
-      {/* Card region: flex-1 min-h-0 absorbs leftover height and centres the card */}
+      {/* Card region: flex-1 min-h-0 absorbs leftover height; items-center
+          keeps the card vertically balanced. PokemonCard and EvolutionCardLayout
+          reserve the revealed-state height in their inner answer container
+          (min-h-[7rem]), so the card's bounding box is the same size across
+          reveal and centring does not cause the sprite to drift (#1104). */}
       <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-hidden">
         {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
         <div ref={cardRef} className="relative" data-testid="swipe-card">
@@ -2446,7 +2456,7 @@ export function ReviewSession() {
         <button
           type="button"
           onClick={handleUndo}
-          className="flex-none min-h-[36px] rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          className="flex-none min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
           aria-label="Undo last grade"
         >
           Undo last grade (⌘Z)

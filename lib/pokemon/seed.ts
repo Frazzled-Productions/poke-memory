@@ -85,6 +85,23 @@ export type SeedPokemon = {
   isLegendary: boolean;
   isMythical: boolean;
   cryUrl: string | null;
+  /**
+   * PokéAPI version-group slugs whose pokedex includes this species/form.
+   * Sorted, deduplicated. Empty array is only used as a defensive fallback —
+   * after `scripts/seed-version-groups.mjs` runs every entry has at least one
+   * version-group.
+   *
+   * For regional alternate forms (Alolan/Galarian/Hisuian/Paldean) the list is
+   * narrowed to version-groups whose pokedex matches the regional prefix, so
+   * Alolan Raichu's list contains only sun-moon and ultra-sun-ultra-moon, not
+   * every dex Raichu the species appears in.  Non-regional formes (Rotom
+   * appliances, Deoxys formes, etc.) share the default species' membership.
+   *
+   * Optional at the TypeScript level so persisted scopes / seeds built before
+   * #1089 continue to validate; consumers should treat a missing value as an
+   * empty array.
+   */
+  versionGroups?: string[];
 };
 
 export const SEED_POKEMON: readonly SeedPokemon[] = seedData as unknown as readonly SeedPokemon[];

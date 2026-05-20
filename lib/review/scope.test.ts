@@ -338,6 +338,7 @@ describe("loadScope / saveScope round-trip (deprecated shims)", () => {
       types: ["fire"],
       presets: ["starters" as const],
       formCategories: { mode: "all" as const },
+      games: [] as string[],
     };
     saveScope(scope);
     expect(loadScope()).toEqual(scope);
@@ -502,6 +503,7 @@ describe("readLegacyScope / clearLegacyScope", () => {
       types: ["fire"],
       presets: ["starters"],
       formCategories: { mode: "all" },
+      games: [],
     });
   });
 
@@ -515,6 +517,7 @@ describe("readLegacyScope / clearLegacyScope", () => {
       types: ["fire"],
       presets: [],
       formCategories: { mode: "all" },
+      games: [],
     });
   });
 
@@ -787,6 +790,196 @@ describe("cardIsEligible: alternateFormsEnabled gate", () => {
 // but a "include" mode formCategories filter would incorrectly pass them through
 // because "default" was in the allowed set.  The seed fix ensures such entries
 // now carry formCategory: "forme".
+
+// ─── Games axis (#1089) ──────────────────────────────────────────────────────
+
+describe("cardMatchesScope: games axis (#1089)", () => {
+  function nameCardWithGames(
+    id: number,
+    types: string[],
+    versionGroups: string[],
+  ): NameReviewCard {
+    const base = nameCard(id, types);
+    return { ...base, versionGroups } as NameReviewCard & { versionGroups: string[] };
+  }
+
+  it("empty games array means the games axis is inactive", () => {
+    const scope = { gens: [], types: [], presets: [], games: [] };
+    expect(cardMatchesScope(nameCardWithGames(1, ["normal"], ["red-blue"]), scope)).toBe(true);
+  });
+
+  it("matches a card whose versionGroups intersect the scope's games", () => {
+    const scope = { gens: [], types: [], presets: [], games: ["gold-silver"] };
+    expect(
+      cardMatchesScope(nameCardWithGames(152, ["grass"], ["gold-silver", "crystal"]), scope),
+    ).toBe(true);
+  });
+
+  it("excludes a card whose versionGroups do not intersect the scope's games", () => {
+    const scope = { gens: [], types: [], presets: [], games: ["gold-silver"] };
+    expect(
+      cardMatchesScope(nameCardWithGames(906, ["grass"], ["scarlet-violet"]), scope),
+    ).toBe(false);
+  });
+
+  it("OR's the games axis with other axes (a Gen-I card passes a Gold scope on the gens axis)", () => {
+    const scope = { gens: [1], types: [], presets: [], games: ["gold-silver"] };
+    // A Gen-I species not in the GS dex (versionGroups omits gold-silver) still
+    // passes because the gens axis matches.
+    expect(
+      cardMatchesScope(nameCardWithGames(1, ["grass"], ["red-blue"]), scope),
+    ).toBe(true);
+  });
+
+  it("matches when any of multiple games in the scope intersects the card's versionGroups", () => {
+    const scope = {
+      gens: [],
+      types: [],
+      presets: [],
+      games: ["gold-silver", "sword-shield"],
+    };
+    expect(
+      cardMatchesScope(nameCardWithGames(810, ["grass"], ["sword-shield"]), scope),
+    ).toBe(true);
+  });
+
+  it("evolution card anchors the games axis to the pre-evo's seed entry", () => {
+    // Charmander (4) is in red-blue. Charmander → Charmeleon evolution card
+    // resolves the pre-evo from SEED_POKEMON, so the card matches a red-blue scope
+    // even though the card itself does not carry versionGroups.
+    const card = evoCard(1500011, 4, 5);
+    const scope = { gens: [], types: [], presets: [], games: ["red-blue"] };
+    expect(cardMatchesScope(card, scope)).toBe(true);
+  });
+
+  it("evolution card excluded when the pre-evo is not in any scope game", () => {
+    // Snivy (495) is Gen V, not in red-blue.
+    const card = evoCard(1501080, 495, 496);
+    const scope = { gens: [], types: [], presets: [], games: ["red-blue"] };
+    expect(cardMatchesScope(card, scope)).toBe(false);
+  });
+
+  it("reverse-evolution card anchors the games axis to the pre-evo's seed entry", () => {
+    const card = reverseEvoCard(2500011, 4, 5); // Charmander (pre-evo) → Charmeleon
+    const scope = { gens: [], types: [], presets: [], games: ["red-blue"] };
+    expect(cardMatchesScope(card, scope)).toBe(true);
+  });
+});
+
+describe("isScopeEmpty: games axis (#1089)", () => {
+  it("returns true when games is missing", () => {
+    expect(
+      isScopeEmpty({ gens: [], types: [], presets: [], formCategories: { mode: "all" } }),
+    ).toBe(true);
+  });
+
+  it("returns true when games is an empty array", () => {
+    expect(
+      isScopeEmpty({
+        gens: [],
+        types: [],
+        presets: [],
+        formCategories: { mode: "all" },
+        games: [],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when games has any entry", () => {
+    expect(
+      isScopeEmpty({
+        gens: [],
+        types: [],
+        presets: [],
+        formCategories: { mode: "all" },
+        games: ["gold-silver"],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("scopeLabel: games axis (#1089)", () => {
+  it("includes the marketing label when exactly one game is selected", () => {
+    const scope = {
+      gens: [],
+      types: [],
+      presets: [] as PracticeScopePreset[],
+      games: ["gold-silver"],
+    };
+    expect(scopeLabel(scope)).toBe("Pokémon Gold/Silver");
+  });
+
+  it("summarises the count when multiple games are selected", () => {
+    const scope = {
+      gens: [],
+      types: [],
+      presets: [] as PracticeScopePreset[],
+      games: ["red-blue", "gold-silver"],
+    };
+    expect(scopeLabel(scope)).toBe("2 games");
+  });
+
+  it("falls back to the slug for unknown version-group slugs", () => {
+    const scope = {
+      gens: [],
+      types: [],
+      presets: [] as PracticeScopePreset[],
+      games: ["something-new-pokeapi-2099"],
+    };
+    expect(scopeLabel(scope)).toBe("something-new-pokeapi-2099");
+  });
+});
+
+describe("countMatchingSpecies: games axis (#1089)", () => {
+  function makeSeedWithGames(
+    id: number,
+    types: string[],
+    versionGroups: string[],
+  ): SeedPokemon {
+    return { ...makeSeed(id, types), versionGroups };
+  }
+
+  const SEED: readonly SeedPokemon[] = [
+    makeSeedWithGames(1, ["grass"], ["red-blue", "yellow"]),
+    makeSeedWithGames(4, ["fire"], ["red-blue", "yellow"]),
+    makeSeedWithGames(152, ["grass"], ["gold-silver", "crystal"]),
+    makeSeedWithGames(906, ["grass"], ["scarlet-violet"]),
+  ];
+
+  it("counts only species in the selected game", () => {
+    expect(
+      countMatchingSpecies(SEED, {
+        gens: [],
+        types: [],
+        presets: [],
+        games: ["red-blue"],
+      }),
+    ).toBe(2);
+  });
+
+  it("returns 0 when no species is in the selected game", () => {
+    expect(
+      countMatchingSpecies(SEED, {
+        gens: [],
+        types: [],
+        presets: [],
+        games: ["legends-arceus"],
+      }),
+    ).toBe(0);
+  });
+
+  it("OR's the games axis with other axes", () => {
+    // Fire (4) OR gold-silver (152) → 2
+    expect(
+      countMatchingSpecies(SEED, {
+        gens: [],
+        types: ["fire"],
+        presets: [],
+        games: ["gold-silver"],
+      }),
+    ).toBe(2);
+  });
+});
 
 describe("cardIsEligible: size-variant formCategory regression (#837)", () => {
   // Simulate Small Pumpkaboo: isDefaultForm=false, but wrongly classified as

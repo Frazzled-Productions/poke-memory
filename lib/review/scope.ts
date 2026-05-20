@@ -3,6 +3,7 @@ import { generationOf } from "@/lib/stats/derive";
 import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
 import { KEY_LEGACY_PRACTICE_SCOPE } from "@/lib/storage/keys";
+import { versionGroupLabel } from "@/lib/pokemon/versionGroupLabels";
 
 export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains";
 
@@ -58,6 +59,15 @@ export type PracticeScope = {
    * value as `{mode:'all'}`.
    */
   formCategories?: FormCategoryFilter;
+  /**
+   * Game / version-group filter axis (#1089). Slugs come from PokéAPI
+   * (e.g. `"gold-silver"`, `"sword-shield"`). Empty array means every game
+   * is included, mirroring the convention of the other axes.
+   *
+   * Optional at the TypeScript level so persisted scopes built before #1089
+   * continue to validate. All runtime paths treat a missing value as `[]`.
+   */
+  games?: string[];
 };
 
 export const EMPTY_SCOPE: PracticeScope = {
@@ -65,6 +75,7 @@ export const EMPTY_SCOPE: PracticeScope = {
   types: [],
   presets: [],
   formCategories: { mode: "all" },
+  games: [],
 };
 
 /**
@@ -103,7 +114,8 @@ export function isScopeEmpty(scope: PracticeScope): boolean {
     scope.gens.length === 0 &&
     scope.types.length === 0 &&
     scope.presets.length === 0 &&
-    (scope.formCategories?.mode ?? "all") === "all"
+    (scope.formCategories?.mode ?? "all") === "all" &&
+    (scope.games?.length ?? 0) === 0
   );
 }
 
@@ -116,12 +128,14 @@ export function isScopeEmpty(scope: PracticeScope): boolean {
  *   types          – ANY-OF semantics; passes if any of the species' types is listed.
  *   presets        – OR'd with gens/types; passes if the species id is in any
  *                    active preset's id set.
+ *   games          – ANY-OF semantics; passes if any of the entry's
+ *                    `versionGroups` is listed in the scope (#1089).
  *   formCategories – evaluated first; returns false immediately when the card's
  *                    form fails the filter, regardless of other axes.
  *
- * Within the scope, the gens/types/presets categories are OR'd: passing any
- * active category passes the species. Within each category, an empty list is
- * "no contribution to the OR" (does not match anything).
+ * Within the scope, the gens/types/presets/games categories are OR'd: passing
+ * any active category passes the species. Within each category, an empty list
+ * is "no contribution to the OR" (does not match anything).
  *
  * Empty scope is handled by callers — this function is only reached for
  * non-empty scopes.
@@ -129,6 +143,10 @@ export function isScopeEmpty(scope: PracticeScope): boolean {
  * @param isDefaultForm  Whether this is the primary form of its species.
  *   Defaults to `true` (safe fallback for seeds that pre-date #445).
  * @param formCategory   The broad category of the form. Defaults to `"default"`.
+ * @param versionGroups  PokéAPI version-group slugs whose pokedex includes
+ *   this entry. Defaults to `[]` (safe fallback for pre-#1089 seeds — the
+ *   entry then can never satisfy a games-axis match, which is the
+ *   conservative behaviour).
  * @param context        Runtime data for progress-dependent presets. When the
  *   `incomplete-chains` preset is active, `context.incompleteChainSpeciesIds`
  *   supplies the species in incomplete chains; a missing set matches nothing.
@@ -139,7 +157,9 @@ function speciesMatchesScope(
   scope: PracticeScope,
   isDefaultForm: boolean = true,
   formCategory: FormCategory = "default",
+  versionGroups: readonly string[] = [],
   context: ScopeMatchContext = {},
+  gamesSet?: ReadonlySet<string>,
 ): boolean {
   // ── formCategories gate (hard filter applied before the OR axes) ───────
   // When mode !== 'all', a form that fails the gate is excluded regardless of
@@ -152,11 +172,15 @@ function speciesMatchesScope(
   }
   // fc.mode === 'all' — passthrough; form is never excluded
 
-  // ── gens / types / presets (OR'd) ──────────────────────────────────────
+  // ── gens / types / presets / games (OR'd) ──────────────────────────────
   // If none of these axes are active, the species passes the scope based on
   // the form gate alone (all other axes are permissive by default).
+  const gamesActive = (scope.games?.length ?? 0) > 0;
   const hasActiveAxes =
-    scope.gens.length > 0 || scope.types.length > 0 || scope.presets.length > 0;
+    scope.gens.length > 0 ||
+    scope.types.length > 0 ||
+    scope.presets.length > 0 ||
+    gamesActive;
   if (!hasActiveAxes) return true;
 
   if (scope.gens.length > 0) {
@@ -173,6 +197,10 @@ function speciesMatchesScope(
     (context.incompleteChainSpeciesIds?.has(speciesId) ?? false)
   )
     return true;
+  if (gamesActive) {
+    const lookup = gamesSet ?? new Set(scope.games!);
+    if (versionGroups.some((vg) => lookup.has(vg))) return true;
+  }
   return false;
 }
 
@@ -245,7 +273,25 @@ export function cardMatchesScope(
       ? "default"
       : (card as { formCategory?: FormCategory }).formCategory ?? "default";
 
-  return speciesMatchesScope(pokemonId, types, scope, isDefaultForm, formCategory, context);
+  // Version-groups (#1089). Evolution cards anchor to the pre-evo just like
+  // every other axis — a card "about" Bulbasaur should match a Red/Blue scope
+  // because Bulbasaur appears in that dex, even though Ivysaur's set is
+  // (effectively) identical here. Name/reverse/cry cards spread SeedPokemon
+  // and carry `versionGroups` directly; fall back to [] for pre-#1089 seeds.
+  const versionGroups: readonly string[] =
+    card.cardType === "evolution" || card.cardType === "reverse-evolution"
+      ? (getSeedById().get(card.preEvoId)?.versionGroups ?? [])
+      : (card as { versionGroups?: string[] }).versionGroups ?? [];
+
+  return speciesMatchesScope(
+    pokemonId,
+    types,
+    scope,
+    isDefaultForm,
+    formCategory,
+    versionGroups,
+    context,
+  );
 }
 
 /**
@@ -315,7 +361,16 @@ export function seedPokemonIsEligible(
 
   const resolvedId = (p as { speciesId?: number }).speciesId ?? p.id;
   const formCategory = (p as { formCategory?: FormCategory }).formCategory ?? "default";
-  return speciesMatchesScope(resolvedId, p.types, scope, isDefaultForm, formCategory, context);
+  const versionGroups = (p as { versionGroups?: string[] }).versionGroups ?? [];
+  return speciesMatchesScope(
+    resolvedId,
+    p.types,
+    scope,
+    isDefaultForm,
+    formCategory,
+    versionGroups,
+    context,
+  );
 }
 
 /**
@@ -342,6 +397,10 @@ export function countMatchingSpecies(
   alternateFormsEnabled: boolean = true,
   context: ScopeMatchContext = {},
 ): number {
+  // Precompute once so the inner loop uses O(1) Set lookups instead of
+  // O(n) Array.includes across ~1025 species × up to 30 version-groups each.
+  const gamesSet: ReadonlySet<string> | undefined =
+    (scope.games?.length ?? 0) > 0 ? new Set(scope.games!) : undefined;
   let count = 0;
   for (const s of seed) {
     // isDefaultForm may be absent in a pre-#445 seed; default to true so old
@@ -363,7 +422,20 @@ export function countMatchingSpecies(
     const resolvedId = (s as { speciesId?: number }).speciesId ?? s.id;
     // formCategory may be absent in a pre-#445 seed; fall back to 'default'.
     const formCategory = (s as { formCategory?: FormCategory }).formCategory ?? "default";
-    if (speciesMatchesScope(resolvedId, s.types, scope, isDefaultForm, formCategory, context))
+    // versionGroups may be absent in a pre-#1089 seed; fall back to [].
+    const versionGroups = (s as { versionGroups?: string[] }).versionGroups ?? [];
+    if (
+      speciesMatchesScope(
+        resolvedId,
+        s.types,
+        scope,
+        isDefaultForm,
+        formCategory,
+        versionGroups,
+        context,
+        gamesSet,
+      )
+    )
       count += 1;
   }
   return count;
@@ -422,7 +494,11 @@ function parseScopeShape(value: unknown): PracticeScope | null {
     : [];
   // formCategories: absent in pre-#450 persisted scopes → default to {mode:'all'}.
   const formCategories: FormCategoryFilter = parseFormCategoryFilter(obj.formCategories);
-  return { gens, types, presets, formCategories };
+  // games: absent in pre-#1089 persisted scopes → default to [].
+  const games = Array.isArray(obj.games)
+    ? (obj.games as unknown[]).filter((v): v is string => typeof v === "string")
+    : [];
+  return { gens, types, presets, formCategories, games };
 }
 
 /**
@@ -519,6 +595,14 @@ export function scopeLabel(scope: PracticeScope): string {
       (c) => c.charAt(0).toUpperCase() + c.slice(1),
     );
     parts.push(catLabels.join(", ") + " forms");
+  }
+  if ((scope.games?.length ?? 0) > 0) {
+    const games = scope.games!;
+    if (games.length === 1) {
+      parts.push(versionGroupLabel(games[0]));
+    } else {
+      parts.push(`${games.length} games`);
+    }
   }
   return parts.join(" · ");
 }

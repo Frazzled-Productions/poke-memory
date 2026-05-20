@@ -26,10 +26,13 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
         className="h-36 w-36 object-contain sm:h-80 sm:w-80"
       />
       {/*
-        Use min-h instead of a fixed h so the container can grow when a fact
-        is shown below the name without causing a layout shift in the empty state.
+        Reserve the revealed-state height (name row + Pokédex-entry fact, ~7rem
+        worst case) in the unrevealed state too, so the card's bounding box is
+        the same height either way. That lets the parent region centre the
+        card without the sprite drifting upward when Reveal expands the answer
+        area below it (#1104).
       */}
-      <div className="min-h-[2.5rem] flex flex-col items-center justify-center" aria-live="polite">
+      <div className="min-h-[7rem] flex flex-col items-center justify-center" aria-live="polite">
         {revealed ? (
           <>
             <div className="flex items-center gap-2">

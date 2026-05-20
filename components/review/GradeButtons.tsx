@@ -214,7 +214,13 @@ export function GradeButtons({
           group so screen readers do not announce it as part of the grading action. */}
       <div className="relative">
         <div
-          className="flex flex-wrap justify-center gap-3 rounded-xl bg-surface-raised p-3 shadow-sm border border-[var(--theme-secondary)]"
+          // grid-cols-4 on mobile guarantees all four buttons share one row at
+          // any viewport >= 320 px — the flex-wrap layout previously bumped
+          // Easy to a second line at 402 px (iPhone 17 Pro) because the
+          // per-button `min-w-[80px]` plus gaps overshot the available width
+          // by ~10 px. The flex fallback at sm+ keeps the tablet/desktop
+          // layout untouched.
+          className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3 rounded-xl bg-surface-raised p-2 sm:p-3 shadow-sm border border-[var(--theme-secondary)]"
           role="group"
           aria-label="Grade your answer"
         >
@@ -228,7 +234,11 @@ export function GradeButtons({
                 onGrade(grade);
               }}
               className={[
-                "min-h-[44px] min-w-[80px] rounded-lg px-5 py-2",
+                // min-w lifted off on mobile so the grid-cols-4 layout above
+                // can shrink each button to 1/4 of the row instead of forcing
+                // a wrap. sm+ restores the 80 px floor that the wrap layout
+                // expects on tablet/desktop.
+                "min-h-[44px] min-w-0 sm:min-w-[80px] rounded-lg px-3 sm:px-5 py-2",
                 "text-sm font-semibold tracking-wide",
                 // Always-on outline + shadow so buttons keep their edge against
                 // any mascot-tinted card backdrop.

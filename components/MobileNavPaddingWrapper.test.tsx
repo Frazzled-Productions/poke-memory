@@ -4,11 +4,14 @@
  * Covers:
  *   - Renders children passed to it.
  *   - Sets the data-page-content attribute on the wrapper div.
- *   - Applies min-h-dvh when mobileNav is null (initial hydration state).
- *   - Applies min-h-dvh when mobileNav is "bottom".
- *   - Does NOT apply min-h-dvh when mobileNav is "hamburger".
  *   - Applies pb-* padding class when mobileNav is "bottom".
  *   - Updates classes when SETTINGS_SAVED_EVENT fires.
+ *
+ * The 100dvh page-height guarantee that anchors the iOS Safari bottom tab bar
+ * (#1086) now lives on <body> in app/layout.tsx (`min-h-dvh`), not on this
+ * wrapper. Putting it here forced the wrapper to 100dvh on top of the Nav
+ * and any sibling banners, pushing the Practice page past the viewport
+ * (#1087 regression). The wrapper now only owns the bottom-tab-bar padding.
  */
 
 import { act, render, screen, waitFor } from "@testing-library/react";
@@ -64,7 +67,11 @@ describe("MobileNavPaddingWrapper", () => {
     expect(container.querySelector("[data-page-content]")).not.toBeNull();
   });
 
-  it("applies min-h-dvh when mobileNav is 'bottom' (after effect runs)", async () => {
+  it("never applies min-h-dvh on the wrapper itself (#1087)", async () => {
+    // min-h-dvh now lives on <body> so the wrapper can be a true flex-1 child
+    // and shrink to fit alongside the Nav and any sibling banners. If this
+    // assertion regresses, the Practice page will require scrolling again on
+    // iPhone 17 Pro because the wrapper will push past the viewport.
     mockLoadSettings.mockReturnValue({ mobileNav: "bottom", masteryRepetitions: 3 });
 
     const { container } = render(
@@ -75,25 +82,8 @@ describe("MobileNavPaddingWrapper", () => {
 
     await waitFor(() => {
       const wrapper = container.querySelector("[data-page-content]") as HTMLElement;
-      expect(wrapper.className).toContain("min-h-dvh");
-    });
-  });
-
-  it("does NOT apply min-h-dvh when mobileNav is 'hamburger'", async () => {
-    mockLoadSettings.mockReturnValue({
-      mobileNav: "hamburger" as MobileNav,
-      masteryRepetitions: 3,
-    });
-
-    const { container } = render(
-      <MobileNavPaddingWrapper>
-        <span>content</span>
-      </MobileNavPaddingWrapper>,
-    );
-
-    await waitFor(() => {
-      const wrapper = container.querySelector("[data-page-content]") as HTMLElement;
-      // The effect should have fired and removed min-h-dvh for hamburger mode
+      // Effect has run; pb-* is the marker that "bottom" mode took effect.
+      expect(wrapper.className).toContain("pb-[calc(4rem+env(safe-area-inset-bottom))]");
       expect(wrapper.className).not.toContain("min-h-dvh");
     });
   });
@@ -145,7 +135,7 @@ describe("MobileNavPaddingWrapper", () => {
 
     await waitFor(() => {
       const wrapper = container.querySelector("[data-page-content]") as HTMLElement;
-      expect(wrapper.className).toContain("min-h-dvh");
+      expect(wrapper.className).toContain("pb-[calc(4rem+env(safe-area-inset-bottom))]");
     });
 
     // User switches to hamburger mode in Settings; SETTINGS_SAVED_EVENT fires
@@ -160,7 +150,7 @@ describe("MobileNavPaddingWrapper", () => {
 
     await waitFor(() => {
       const wrapper = container.querySelector("[data-page-content]") as HTMLElement;
-      expect(wrapper.className).not.toContain("min-h-dvh");
+      expect(wrapper.className).not.toContain("pb-[calc(4rem+env(safe-area-inset-bottom))]");
     });
   });
 });

@@ -607,3 +607,98 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     ).toBeVisible();
   });
 });
+
+// E2E smoke for #1089 "Game / version-group scope filter".
+//
+// The picker renders a section per generation under the "Games" fieldset,
+// each containing a pill per available version-group with marketing labels.
+// Toggling a single game updates the live count and the scope label chip;
+// the practice session stays operable.
+test.describe("Practice scope — Games axis (#1089)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
+  });
+
+  test("toggling Pokemon Gold/Silver narrows the scope and keeps practice operable", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // Open the Scope panel.
+    const scopeToggle = page
+      .getByRole("button", { expanded: false })
+      .filter({ hasText: /scope/i })
+      .first();
+    await scopeToggle.click();
+    const scopePanel = page.locator("#scope-panel");
+    await expect(scopePanel).toBeVisible();
+
+    // The Games fieldset has a "Generation II" header containing the
+    // Gold/Silver pill. Use getByRole("group") to target the <fieldset>
+    // semantically — getByText("Games") would also match the description
+    // paragraph that contains the word "games".
+    await expect(scopePanel.getByRole("group", { name: "Games" })).toBeVisible();
+    const goldSilverPill = scopePanel.getByRole("button", {
+      name: "Pokémon Gold/Silver",
+    });
+    await expect(goldSilverPill).toBeVisible();
+    await expect(goldSilverPill).toHaveAttribute("aria-pressed", "false");
+
+    await goldSilverPill.click();
+    await expect(goldSilverPill).toHaveAttribute("aria-pressed", "true");
+
+    // The scope label chip in the header should now read "Pokémon Gold/Silver"
+    // (single-game label path in scopeLabel).
+    const scopeHeader = page
+      .getByRole("button", { expanded: true })
+      .filter({ hasText: /scope/i })
+      .first();
+    await expect(scopeHeader).toContainText("Pokémon Gold/Silver");
+
+    // The live count should reflect a non-zero subset of the total pool
+    // (Gold/Silver dex has ~267 entries including remakes).
+    await expect(scopePanel.getByText(/of \d+ Pok[ée]mon match/)).toBeVisible();
+
+    // A practice card should still render — the no-match empty-state must NOT
+    // appear.
+    const reveal = page.getByRole("button", { name: /reveal/i });
+    const noMatch = page.getByText(/no Pok[ée]mon match your scope/i);
+    await expect(reveal).toBeVisible();
+    await expect(noMatch).not.toBeVisible();
+  });
+
+  test("select-all-in-generation toggles every game in that generation", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const scopeToggle = page
+      .getByRole("button", { expanded: false })
+      .filter({ hasText: /scope/i })
+      .first();
+    await scopeToggle.click();
+    const scopePanel = page.locator("#scope-panel");
+
+    // Click "Select all games in Generation II" — Gold/Silver + Crystal.
+    // Anchored regex required: the unanchored form also matches the
+    // "Generation III" button (strict-mode violation).
+    const selectAllGenII = scopePanel.getByRole("button", {
+      name: /^Select all games in Generation II$/,
+    });
+    await selectAllGenII.click();
+
+    // Both games should now be selected.
+    await expect(
+      scopePanel.getByRole("button", { name: "Pokémon Gold/Silver" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      scopePanel.getByRole("button", { name: "Pokémon Crystal" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    // The scope label chip should summarise as "N games".
+    const scopeHeader = page
+      .getByRole("button", { expanded: true })
+      .filter({ hasText: /scope/i })
+      .first();
+    await expect(scopeHeader).toContainText(/\d+ games/);
+  });
+});
