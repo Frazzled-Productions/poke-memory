@@ -87,16 +87,50 @@ test.describe("Practice scope (#333)", () => {
     // PokemonCard renders a single img with alt="A Pokémon sprite, answer
     // hidden" pre-reveal; the SpritePreloader uses alt="" so this locator is
     // unique. The src points at a /sprites/pokemon/<id>.png path that
-    // encodes the displayed card's species.
+    // encodes the displayed card's species; under next/image it is wrapped
+    // as /_next/image?url=...%2Fsprites%2Fpokemon%2F<id>.png. We decode the
+    // id from whichever form is rendered.
     const onScreenSprite = page.getByAltText("A Pokémon sprite, answer hidden");
     await expect(onScreenSprite).toBeVisible();
     const initialSrc = await onScreenSprite.getAttribute("src");
     expect(initialSrc).toBeTruthy();
 
-    // Open the Scope panel and apply a Generation IX filter. The default seed
-    // sort almost always surfaces a low-id (early-gen) card first, so Gen IX
-    // is a safe choice for "exclude whatever's on screen" — but we still
-    // assert that the rendered sprite changed, which is the real invariant.
+    // Extract the species id from the sprite URL. Falls back to a defensive
+    // null if the URL shape is unexpected, in which case the test bails out
+    // rather than picking a possibly-in-scope generation.
+    function speciesIdFromSrc(src: string | null): number | null {
+      if (src === null) return null;
+      const decoded = decodeURIComponent(src);
+      const match = decoded.match(/\/sprites\/pokemon\/(\d+)\.png/);
+      if (!match) return null;
+      return Number(match[1]);
+    }
+
+    // Map a species id to its generation pill label. Mirrors the dynamic-pick
+    // pattern used by the unit test in ReviewSession.test.tsx (#1088). Pokemon
+    // id ranges per generation come from the canonical species list.
+    function generationLabel(id: number): string {
+      if (id <= 151) return "Generation I";
+      if (id <= 251) return "Generation II";
+      if (id <= 386) return "Generation III";
+      if (id <= 493) return "Generation IV";
+      if (id <= 649) return "Generation V";
+      if (id <= 721) return "Generation VI";
+      if (id <= 809) return "Generation VII";
+      if (id <= 905) return "Generation VIII";
+      return "Generation IX";
+    }
+
+    const initialId = speciesIdFromSrc(initialSrc);
+    expect(initialId, `unable to parse species id from sprite src ${initialSrc}`).not.toBeNull();
+    const displayedGen = generationLabel(initialId!);
+    // Pick any generation that ISN'T the displayed card's gen. Generation I
+    // is the obvious "other" choice when the displayed card is high-gen;
+    // otherwise pick Generation IX so the excluding-gen is far away in id-space.
+    const excludingGen =
+      displayedGen === "Generation I" ? "Generation IX" : "Generation I";
+
+    // Open the Scope panel and apply the excluding-generation filter.
     const scopeToggle = page
       .getByRole("button", { expanded: false })
       .filter({ hasText: /scope/i })
@@ -105,13 +139,14 @@ test.describe("Practice scope (#333)", () => {
     const scopePanel = page.locator("#scope-panel");
     await expect(scopePanel).toBeVisible();
 
-    const genIX = scopePanel.getByRole("button", { name: "Generation IX", exact: true });
-    await genIX.click();
-    await expect(genIX).toHaveAttribute("aria-pressed", "true");
+    const excludingPill = scopePanel.getByRole("button", { name: excludingGen, exact: true });
+    await excludingPill.click();
+    await expect(excludingPill).toHaveAttribute("aria-pressed", "true");
 
-    // The sprite must swap to a Gen IX card. The lock-clear release in
-    // handleScopeChange (and the render-side scope-eligibility guard) makes
-    // this happen on the next render rather than waiting for a grade.
+    // The sprite must swap to a card from the excluding generation. The
+    // lock-clear release in handleScopeChange (and the render-side
+    // scope-eligibility guard) makes this happen on the next render rather
+    // than waiting for a grade.
     await expect.poll(async () =>
       onScreenSprite.getAttribute("src"),
     ).not.toBe(initialSrc);
