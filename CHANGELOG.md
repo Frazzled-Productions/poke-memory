@@ -6,6 +6,22 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.11] - 2026-05-20
+
+### Changed
+
+- Replaced the four stacked onboarding banners on the Practice page (welcome, how-to-grade, add sound, guest storage notice) with a single one-time modal that opens on first visit and never reappears unless reset from Settings.
+- Added a "Show onboarding guide again" entry under Settings so the welcome content remains discoverable after initial dismissal.
+- The scope picker is now an accordion: Generation, Type, Groups, and Games each collapse independently, keeping the panel compact. Sections with an active filter open automatically.
+- Games-axis bulk-select buttons now spell out game names (e.g. "Select Gold/Silver, Crystal") instead of "Select all games in Generation II", removing the label clash with the gens-axis Generation filter.
+
+### Fixed
+
+- PWA app-icon badge and document-title badge now respect all Settings eligibility filters (card direction toggles, alternate-form toggle, scope/presets), matching the Practice page queue count exactly.
+- Daily push reminder now reads "N cards scheduled for today." instead of "N Pokémon ready for review.", accurately reflecting that the count is scheduled-due cards only and not the full session queue.
+- The Journey collection timeline now shows day-by-day history for the past 90 days, so new users see one data point per active day rather than weekly jumps.
+- The "today" bar in the due forecast now matches the Practice page queue total, correctly accounting for card-direction toggles, alternate-forms setting, and practice scope.
+
 ## [0.10.10] - 2026-05-20
 
 ### Added
@@ -1285,7 +1301,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.10...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.11...HEAD
+[0.10.11]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.11
 [0.10.10]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.10
 [0.10.9]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.9
 [0.10.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.8
