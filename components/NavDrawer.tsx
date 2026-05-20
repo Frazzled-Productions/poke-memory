@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { filterMastered } from "@/lib/pasture/arrivals";
-import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY, SESSION_CHANGED_EVENT } from "@/lib/review/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
@@ -107,6 +107,12 @@ export function NavDrawer() {
       );
     }
     void load();
+    // Also listen for the CustomEvent dispatched after every IDB write (including
+    // the E2E test seed helper). WebKit does not reliably propagate synthetic
+    // StorageEvents to same-tab `storage` listeners, so the CustomEvent is the
+    // authoritative post-write signal on mobile-safari.
+    window.addEventListener(SESSION_CHANGED_EVENT, load);
+    return () => window.removeEventListener(SESSION_CHANGED_EVENT, load);
   }, [sessionVersion, settingsVersion]);
 
   const showPasture = hasMastered || flags.pretendAllMastered;

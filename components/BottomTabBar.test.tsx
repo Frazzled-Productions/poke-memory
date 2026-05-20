@@ -189,6 +189,31 @@ describe("BottomTabBar", () => {
     });
   });
 
+  it("shows Pasture tab when SESSION_CHANGED_EVENT fires after an IDB write", async () => {
+    // Start with no mastered cards — Pasture tab should be absent.
+    mockLoadSession.mockResolvedValue(null);
+    mockFilterMastered.mockReturnValue([]);
+
+    render(<BottomTabBar />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "Pasture" })).toBeNull();
+
+    // Simulate an IDB write completing: stub loadSession to return a mastered
+    // card, then fire the CustomEvent that saveSession dispatches post-write.
+    mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }] });
+    mockFilterMastered.mockReturnValue([{ id: 1 }]);
+    act(() => {
+      window.dispatchEvent(new CustomEvent("poke-memory:session-changed"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Pasture" })).toBeInTheDocument();
+    });
+  });
+
   it("renders nothing when mobileNav is 'hamburger'", async () => {
     mockLoadSettings.mockReturnValue({
       mobileNav: "hamburger" as MobileNav,

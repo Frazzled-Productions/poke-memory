@@ -49,11 +49,17 @@ export async function seedIdb(
           store.put(value, key);
         }
         tx.oncomplete = () => {
-          // Dispatch the same CustomEvent that saveSession emits so
-          // BottomTabBar's mastery-check effect re-fires after the seed
-          // transaction commits. WebKit does not reliably propagate synthetic
-          // StorageEvents to same-tab `storage` listeners, so this CustomEvent
-          // is the authoritative post-seed signal for mobile-safari.
+          // Dispatch the same CustomEvent that saveSession emits so nav
+          // components' mastery-check effects re-fire after the seed transaction
+          // commits. WebKit does not reliably propagate synthetic StorageEvents
+          // to same-tab `storage` listeners, so this CustomEvent is the
+          // authoritative post-seed signal for mobile-safari.
+          //
+          // The string "poke-memory:session-changed" is intentionally hardcoded
+          // here. This function is serialised to a string by page.addInitScript
+          // and injected into the browser context, so it cannot import from lib/.
+          // If SESSION_CHANGED_EVENT in lib/review/persistence.ts is ever
+          // renamed, this string must be updated manually to match.
           try {
             window.dispatchEvent(new CustomEvent("poke-memory:session-changed"));
           } catch {
