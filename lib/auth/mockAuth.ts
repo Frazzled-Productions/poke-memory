@@ -173,6 +173,13 @@ class MockQueryBuilder<Row extends Record<string, unknown>>
     this.rows = [];
     return this;
   }
+  insert(): this {
+    // Same shape as upsert above — no-op success. Added for the Web Push
+    // opt-in path which uses delete-then-insert against `push_subscriptions`
+    // (see lib/push/subscribe.ts).
+    this.rows = [];
+    return this;
+  }
   update(): this {
     this.rows = [];
     return this;

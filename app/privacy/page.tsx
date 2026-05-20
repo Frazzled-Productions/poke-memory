@@ -156,6 +156,28 @@ export default function PrivacyPage() {
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            Web Push subscriptions (opt-in, signed-in PWA users only)
+          </h3>
+          <p>
+            If you install the app to your Home Screen and opt in to daily
+            review reminders, we store the Web Push subscription details your
+            browser issues for that device: the push service endpoint URL,
+            and the two cryptographic keys (<code>p256dh</code> and{" "}
+            <code>auth</code>) the standard requires to deliver an encrypted
+            notification. These are kept in a <code>push_subscriptions</code>
+            {" "}
+            table, scoped to your account.
+          </p>
+          <p className="mt-2">
+            We use these values for one purpose only: to send a single daily
+            notification when you have Pokémon cards due for review. The
+            subscription is deleted as soon as you turn the toggle off, when
+            you delete your account, or when your browser or operating system
+            invalidates the endpoint. No notification content includes
+            personal data beyond the count of cards waiting for review.
+          </p>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
             Aggregate analytics (all users)
           </h3>
           <p>
