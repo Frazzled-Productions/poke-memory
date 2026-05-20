@@ -25,9 +25,27 @@ import { mutedText } from "@/lib/utils/class-names";
 type Props = {
   /** Projected days to first mastery; rendered verbatim into the copy. */
   days: number;
+  /** Mastery threshold: number of successful reviews required. Matches the
+   *  `masteryRepetitions` user setting so a non-default value in Settings is
+   *  reflected in the hint. */
+  masteryReps: number;
+  /** Mastery threshold: scheduled-interval floor in days (currently always
+   *  `MASTERY_INTERVAL_DAYS`, but threaded through so the copy can never drift
+   *  from the constant). */
+  masteryDays: number;
 };
 
-export function FirstMasteryHint({ days }: Props) {
+const SMALL_NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"] as const;
+
+function spellOutSmall(n: number): string {
+  if (n >= 0 && n < SMALL_NUMBER_WORDS.length && Number.isInteger(n)) {
+    return SMALL_NUMBER_WORDS[n];
+  }
+  return n.toLocaleString("en-GB");
+}
+
+export function FirstMasteryHint({ days, masteryReps, masteryDays }: Props) {
+  const repsWord = spellOutSmall(masteryReps);
   return (
     <p
       className={mutedText}
@@ -38,8 +56,9 @@ export function FirstMasteryHint({ days }: Props) {
       <span className="font-medium text-foreground tabular-nums">
         {days.toLocaleString("en-GB")}
       </span>{" "}
-      day{days === 1 ? "" : "s"} if you keep reviewing daily. Mastery needs
-      three successful reviews and a 21-day interval.
+      day{days === 1 ? "" : "s"} if you keep reviewing daily. Mastery needs{" "}
+      {repsWord} successful review{masteryReps === 1 ? "" : "s"} and a{" "}
+      {masteryDays}-day interval.
     </p>
   );
 }

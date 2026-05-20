@@ -272,10 +272,12 @@ vi.mock("@/lib/stats/derive", () => ({
   ),
   // `isMastered` and `MASTERY_REPETITIONS` are used by computeMasteryOverTime,
   // which is called from the stats page's reviewCharts computation.
+  // `MASTERY_INTERVAL_DAYS` is read by the FirstMasteryHint render path.
   isMastered: vi.fn((state: { reps: number; scheduledDays: number }) =>
     state.reps >= 3 && state.scheduledDays >= 21,
   ),
   MASTERY_REPETITIONS: 3,
+  MASTERY_INTERVAL_DAYS: 21,
 }));
 
 vi.mock("@/lib/stats/records", () => ({

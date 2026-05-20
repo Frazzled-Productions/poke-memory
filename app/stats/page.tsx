@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils/cn";
 import { colStack, mutedText } from "@/lib/utils/class-names";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
-import { computeStats } from "@/lib/stats/derive";
+import { computeStats, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { BADGE_CATALOG } from "@/lib/badges/catalog";
@@ -627,8 +627,12 @@ export default function StatsPage() {
                   term.
                 </p>
               </OnboardingHint>
-              {firstMasteryDays !== null && (
-                <FirstMasteryHint days={firstMasteryDays} />
+              {firstMasteryDays !== null && masteryRepetitions !== null && (
+                <FirstMasteryHint
+                  days={firstMasteryDays}
+                  masteryReps={masteryRepetitions}
+                  masteryDays={MASTERY_INTERVAL_DAYS}
+                />
               )}
               {completionProjection !== null && (
                 <CompletionProjection

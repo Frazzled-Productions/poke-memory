@@ -432,11 +432,58 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
   test("hides the hint when the pretendAllMastered superuser flag is on", async ({
     page,
   }) => {
+    // Seed an introduced-but-unmastered name card so the introduced > 0 /
+    // mastered === 0 gate would otherwise render the hint. The
+    // pretendAllMastered flag should suppress the hint anyway — that is the
+    // behaviour this test guards.
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.addInitScript(() => {
+      const cards = [1, 4].map((id) => ({
+        id,
+        speciesId: id,
+        cardType: "name",
+        subjectKey: String(id),
+        name: `Pokemon ${id}`,
+        spriteUrl: `/sprites/pokemon/${id}.png`,
+        types: ["normal"],
+        state: {
+          stability: 1,
+          difficulty: 5,
+          elapsedDays: 0,
+          scheduledDays: 1,
+          reps: 1,
+          lapses: 0,
+          fsrsState: "review",
+          dueDate: "2099-01-01",
+          lastReview: "2026-05-19",
+          firstSeen: "2026-05-19",
+          learningStep: null,
+          stepStartedAt: null,
+          hiddenSince: null,
+          seenInPasture: false,
+        },
+      }));
+      window.localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards,
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
     await page.goto("/stats");
     await expect(
       page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
     ).toBeVisible({ timeout: 15_000 });
+    // With pretendAllMastered on, computeStats overlays mastered = totalCards,
+    // and projectTimeToFirstMastery short-circuits to null — both guards
+    // independently hide the hint. The introduced > 0 gate is exercised by
+    // the seed above, so this test now actually covers the superuser path.
     await expect(page.getByTestId("first-mastery-hint")).toHaveCount(0);
   });
 });

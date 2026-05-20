@@ -29,10 +29,7 @@ import {
   type ReviewState,
   type NextReviewOptions,
 } from "@/lib/srs/scheduler";
-import {
-  learningStepsFor,
-  relearningStepsFor,
-} from "@/lib/srs/constants";
+import { relearningStepsFor } from "@/lib/srs/constants";
 import {
   isMastered,
   MASTERY_REPETITIONS,
@@ -116,9 +113,9 @@ function simulateOne(
 
   for (let step = 0; step < MAX_SIMULATION_STEPS; step++) {
     // Advance the simulated clock to when the next "Good" grade would
-    // realistically happen. For in-step cards, that's the step's duration
-    // (~1m or ~10m). For graduated cards, that's `scheduledDays` from the
-    // last review. Brand-new cards (handled above for safety) advance by 0.
+    // realistically happen. For in-step cards, that's the relearning step's
+    // duration (~1m or ~10m). For graduated cards, that's `scheduledDays`
+    // from the last review.
     const advanceMs = computeAdvanceMs(state);
     cursorMs += advanceMs;
 
@@ -137,13 +134,18 @@ function simulateOne(
  * Milliseconds from "now" to the next realistic "Good" grade for `state`.
  * Mirrors the timing logic in `lib/srs/intervalPreview.ts` so the projection
  * uses the same step ladder the UI actually counts down with.
+ *
+ * Precondition: `state.lastReview !== null`. The caller (`simulateOne`) is
+ * only invoked after `projectTimeToFirstMastery` has skipped every card whose
+ * `lastReview === null` (a not-yet-introduced card is, by definition, not in
+ * scope for a first-mastery projection). The brand-new branch of the step
+ * ladder is therefore unreachable from this function, and we read from the
+ * relearning steps unconditionally — the same ladder a lapsed-but-introduced
+ * card uses to climb back to graduation.
  */
 function computeAdvanceMs(state: ReviewState): number {
   if (state.learningStep !== null) {
-    const steps =
-      state.lastReview === null
-        ? learningStepsFor(state.difficulty)
-        : relearningStepsFor(state.difficulty);
+    const steps = relearningStepsFor(state.difficulty);
     const stepMs = steps[Math.min(state.learningStep, steps.length - 1)];
     return stepMs;
   }
