@@ -87,7 +87,6 @@ function shortGameName(slug: string): string {
     .replace(/Ultra Sun\/Ultra Moon/, "US/UM")
     .replace(/Let's Go Pikachu\/Eevee/, "Let's Go")
     .replace(/Black 2\/White 2/, "B2/W2")
-    .replace(/Scarlet\/Violet/, "Scarlet/Violet")
     // DLC entries like "Sword/Shield: The Isle of Armor" → "Isle of Armor"
     .replace(/^(?:Sword\/Shield|Scarlet\/Violet):\s+(?:The\s+)?/, "");
   return name;
