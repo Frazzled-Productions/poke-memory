@@ -37,7 +37,20 @@ export default function Home({
   searchParams: Promise<{ error?: string }>;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center bg-background px-4 py-4 sm:py-16">
+    /*
+      On mobile the page must fill the available height between the top nav and
+      the bottom nav without scrolling (#1087). The height chain is:
+        body (flex flex-col min-h-full)
+        → MobileNavPaddingWrapper (flex-1 flex-col)
+        → this div (flex-1 flex-col min-h-0) ← fills the gap
+        → inner container → main → ReviewSession wrapper
+      `min-h-0` prevents the flex child from overflowing its parent when the
+      session content is taller than the available space (flex's default is
+      min-height: auto which lets children overflow).
+      On sm+ (>= 640 px) the layout reverts to a scrollable centred column
+      with `sm:items-center sm:py-16`.
+    */
+    <div className="flex flex-1 flex-col min-h-0 bg-background px-4 pt-2 sm:items-center sm:py-16">
       <Suspense fallback={null}>
         {/*
           AuthErrorBanner needs the full viewport width at the top — render it
@@ -56,14 +69,19 @@ export default function Home({
         sidebar is hidden. The sidebar shows session-local counters only (grades
         reviewed today, accuracy, recent grade dots) — not mastery/completion
         state — so it is unaffected by the `pretendAllMastered` superuser flag.
+
+        `flex-1 flex-col min-h-0` continues the height chain on mobile so that
+        ReviewSession fills the remaining space and places grade buttons on screen.
+        `lg:flex-none` releases the flex growth at the lg breakpoint where the
+        three-column grid takes over.
       */}
-      <div className="w-full max-w-md lg:max-w-5xl lg:grid lg:grid-cols-[1fr_min(448px,100%)_1fr] lg:gap-8 lg:items-start">
+      <div className="flex flex-1 flex-col min-h-0 w-full max-w-md lg:max-w-5xl lg:flex-none lg:grid lg:grid-cols-[1fr_min(448px,100%)_1fr] lg:gap-8 lg:items-start">
         {/* Left gutter — empty on lg+, keeps the card centred */}
         <div className="hidden lg:block" aria-hidden="true" />
 
         {/* Main review session — always visible */}
-        <main className="w-full">
-          <div className="mb-4">
+        <main className="flex flex-1 flex-col min-h-0 w-full lg:flex-none">
+          <div className="mb-2 sm:mb-4">
             <OnboardingHint
               id="welcomeDismissed"
               tone="callout"
@@ -77,7 +95,13 @@ export default function Home({
             </OnboardingHint>
           </div>
           <StreakBadge />
-          <ReviewSession />
+          {/*
+            Wrapper propagates the remaining height into ReviewSession on mobile
+            so the grade buttons stay on screen without scrolling (#1087).
+          */}
+          <div className="flex flex-1 flex-col min-h-0">
+            <ReviewSession />
+          </div>
         </main>
 
         {/* Session progress sidebar — visible only at lg+, hidden on mobile/tablet */}

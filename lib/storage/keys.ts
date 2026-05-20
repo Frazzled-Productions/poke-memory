@@ -86,3 +86,16 @@ export const KEY_LEGACY_PRACTICE_SCOPE = "poke-memory:practice-scope:v1";
  * successful request is sufficient to lock the permission in.
  */
 export const KEY_PERSIST_REQUESTED = "poke-memory:storage-persist-requested:v1";
+
+// ─── Per-device shuffle salt ──────────────────────────────────────────────────
+
+/**
+ * Stable per-device UUID used as a salt for `stableShuffleForDay`.
+ * Generated once on first session build via `crypto.randomUUID()` and
+ * persisted here so the shuffle order is consistent across page loads on the
+ * same device but differs from other users/devices.
+ *
+ * Authenticated users use their Supabase `user.id` instead; this key is only
+ * read/written for the guest path.
+ */
+export const KEY_CLIENT_SALT = "poke-memory:client-salt:v1";

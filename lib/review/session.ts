@@ -384,8 +384,12 @@ export function todayString(now: Date, tz = "UTC"): string {
 export function stableShuffleForDay(
   ids: readonly number[],
   today: string,
+  salt: string | number = "",
 ): number[] {
-  const daySalt = fnv1a(today);
+  // Fold the day string and the per-user salt into a single 32-bit seed so
+  // the shuffle is deterministic per (user, day) but differs across users.
+  const saltHash = typeof salt === "number" ? fnv1aUint32(salt) : fnv1a(String(salt));
+  const daySalt = fnv1aUint32(fnv1a(today), saltHash);
 
   const keyed = ids.map((id) => ({
     id,
@@ -493,6 +497,11 @@ export function buildSessionQueues(
   limits: DailyLimits,
   today: string,
   eligibleCardIds?: ReadonlySet<number>,
+  /** Per-user salt for `stableShuffleForDay`. Authenticated users pass their
+   *  Supabase `user.id`; guests pass the stable per-device value from
+   *  `getOrCreateClientSalt()`. Omitting it (or passing `""`) reproduces the
+   *  legacy behaviour — same shuffle for all users on the same day. */
+  userSalt: string | number = "",
 ): {
   learningCardIds: number[];
   /** Subset of `learningCardIds` whose cards fall outside the active scope.
@@ -505,6 +514,10 @@ export function buildSessionQueues(
   reviewsDoneToday: number;
   perType: Record<CardTypeKey, PerTypeCounters>;
 } {
+  // Convenience wrapper that binds the per-user salt so every shuffle call
+  // inside this function automatically gets the same (today, userSalt) pair.
+  const shuffle = (ids: readonly number[]) => stableShuffleForDay(ids, today, userSalt);
+
   const learningCardIds = cards
     .filter((c) => c.state.learningStep !== null)
     .map((c) => c.id);
@@ -566,7 +579,7 @@ export function buildSessionQueues(
       limits[type].maxReviewsPerDay - perType[type].reviewsDoneToday,
     );
     reviewQueue.push(
-      ...stableShuffleForDay(reviewCandidatesByType[type], today).slice(0, reviewSlots),
+      ...shuffle(reviewCandidatesByType[type]).slice(0, reviewSlots),
     );
   }
 
@@ -615,9 +628,9 @@ export function buildSessionQueues(
   // every present direction still has budget remaining.  Budgets are consumed
   // atomically per species: either all directions of a species are admitted, or
   // none are.
-  const nameCandidates    = stableShuffleForDay(newCandidatesByType.name,    today).slice(0, remainingNew.name);
-  const reverseCandidates = stableShuffleForDay(newCandidatesByType.reverse, today).slice(0, remainingNew.reverse);
-  const cryCandidates     = stableShuffleForDay(newCandidatesByType.cry,     today).slice(0, remainingNew.cry);
+  const nameCandidates    = shuffle(newCandidatesByType.name).slice(0,    remainingNew.name);
+  const reverseCandidates = shuffle(newCandidatesByType.reverse).slice(0, remainingNew.reverse);
+  const cryCandidates     = shuffle(newCandidatesByType.cry).slice(0,     remainingNew.cry);
 
   const speciesGroups = groupNewCandidatesBySpecies(
     { name: nameCandidates, reverse: reverseCandidates, cry: cryCandidates },
@@ -626,7 +639,7 @@ export function buildSessionQueues(
 
   // Stable-shuffle species IDs so day-to-day ordering within the admitted set
   // is deterministic and rotates daily.
-  const shuffledSpeciesIds = stableShuffleForDay([...speciesGroups.keys()], today);
+  const shuffledSpeciesIds = shuffle([...speciesGroups.keys()]);
 
   const speciesNewIds: number[] = [];
 
@@ -648,17 +661,14 @@ export function buildSessionQueues(
   }
 
   // --- Pass 2: evolution cards (unchanged) ---
-  const evolutionSlice = stableShuffleForDay(newCandidatesByType.evolution, today).slice(
-    0,
-    remainingNew.evolution,
-  );
+  const evolutionSlice = shuffle(newCandidatesByType.evolution).slice(0, remainingNew.evolution);
 
   const newQueue: number[] = [...speciesNewIds, ...evolutionSlice];
 
   // Reshuffle the merged new-card queue so species pairs and evolution cards
   // interleave deterministically rather than appearing in contiguous blocks.
-  const shuffledReviewQueue = stableShuffleForDay(reviewQueue, today);
-  const shuffledNewQueue = stableShuffleForDay(newQueue, today);
+  const shuffledReviewQueue = shuffle(reviewQueue);
+  const shuffledNewQueue = shuffle(newQueue);
 
   const newIntroducedToday =
     perType.name.newIntroducedToday +

@@ -5,11 +5,11 @@ import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import type { CardDirection } from "@/components/review/DirectionBadge";
 
-export const SPRITE_CLASS = "h-28 w-28 object-contain sm:h-48 sm:w-48";
+export const SPRITE_CLASS = "h-24 w-24 object-contain sm:h-48 sm:w-48";
 export const ARROW_CLASS =
-  "text-3xl font-semibold text-zinc-400 dark:text-zinc-500 sm:text-5xl";
+  "text-2xl font-semibold text-zinc-400 dark:text-zinc-500 sm:text-5xl";
 export const PLACEHOLDER_CLASS =
-  "flex h-28 w-28 items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 text-3xl font-semibold text-zinc-400 sm:h-48 sm:w-48 sm:text-5xl dark:border-zinc-700 dark:text-zinc-600";
+  "flex h-24 w-24 items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 text-2xl font-semibold text-zinc-400 sm:h-48 sm:w-48 sm:text-5xl dark:border-zinc-700 dark:text-zinc-600";
 
 type Props = {
   /** Badge direction — determines which `DirectionBadge` label is shown. */
@@ -89,7 +89,7 @@ export function EvolutionCardLayout({
   );
 
   return (
-    <div className="flex flex-col items-center gap-3 sm:gap-4">
+    <div className="flex flex-col items-center gap-2 sm:gap-4">
       <DirectionBadge direction={direction} />
       <p className="text-base font-semibold text-foreground sm:text-lg">
         {prompt}

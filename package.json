@@ -37,7 +37,8 @@
     "react-dom": "19.2.6",
     "recharts": "^3.8.1",
     "serwist": "^9.5.11",
-    "ts-fsrs": "^5.4.0"
+    "ts-fsrs": "^5.4.0",
+    "web-push": "^3.6.7"
   },
   "overrides": {
     "postcss": ">=8.5.10"
@@ -52,6 +53,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",

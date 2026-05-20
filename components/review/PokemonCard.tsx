@@ -15,7 +15,7 @@ type Props = {
 
 export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name", id }: Props) {
   return (
-    <div className="flex flex-col items-center gap-2 sm:gap-4">
+    <div className="flex flex-col items-center gap-1 sm:gap-4">
       <DirectionBadge direction={direction} />
       <Image
         src={spriteUrl}
@@ -23,7 +23,7 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
         width={320}
         height={320}
         priority
-        className="h-48 w-48 object-contain sm:h-80 sm:w-80"
+        className="h-36 w-36 object-contain sm:h-80 sm:w-80"
       />
       {/*
         Use min-h instead of a fixed h so the container can grow when a fact

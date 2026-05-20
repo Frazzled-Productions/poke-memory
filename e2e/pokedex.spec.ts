@@ -547,6 +547,54 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
   });
 });
 
+test.describe("Pokédex detail — bottom nav anchoring (#1086)", () => {
+  // These tests run on mobile projects where the bottom tab bar is visible.
+  // On desktop the tab bar is hidden so the position check is moot.
+  test.beforeEach(async ({}, testInfo) => {
+    const mobileProjects = ["mobile-safari", "mobile-chrome"];
+    test.skip(
+      !mobileProjects.includes(testInfo.project.name),
+      "bottom-nav anchoring check is mobile-only",
+    );
+  });
+
+  test("bottom tab bar bottom edge aligns with viewport on the detail page", async ({ page }) => {
+    await page.goto("/pokedex/1");
+
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
+    await expect(tabBar).toBeVisible();
+
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+
+    const box = await tabBar.boundingBox();
+    expect(box).not.toBeNull();
+
+    // The bar's bottom edge must reach the viewport bottom (within 2px
+    // tolerance for sub-pixel rounding across device-pixel ratios).
+    const barBottom = box!.y + box!.height;
+    expect(Math.abs(barBottom - viewportSize!.height)).toBeLessThanOrEqual(2);
+  });
+
+  test("page content wrapper fills at least the viewport height on the detail page", async ({ page }) => {
+    await page.goto("/pokedex/1");
+
+    // Wait for the page to render.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+
+    // The [data-page-content] wrapper must be at least as tall as the viewport
+    // so iOS Safari keeps its toolbar hidden and bottom: 0 stays stable.
+    const contentBox = await page.locator("[data-page-content]").boundingBox();
+    expect(contentBox).not.toBeNull();
+    expect(contentBox!.height).toBeGreaterThanOrEqual(viewportSize!.height - 2);
+  });
+});
+
 test.describe("Pokédex detail — next review date (#992)", () => {
   test("shows 'Due today' for a Pokémon whose review is overdue", async ({ page }) => {
     // Seed Bulbasaur (id=1) with a dueDate in the past so it is overdue.

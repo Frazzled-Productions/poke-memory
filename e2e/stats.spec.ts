@@ -196,6 +196,298 @@ test.describe("Stats page — section headings", () => {
   });
 });
 
+test.describe("Stats page — due forecast bar popup", () => {
+  test("tapping a forecast bar reveals a popup with date and card count (mobile)", async ({
+    page,
+    isMobile,
+  }) => {
+    // This test targets the mobile tap flow. Skip on non-mobile projects
+    // (the hover flow is covered by the desktop test below).
+    test.skip(!isMobile, "mobile tap test - skipped on desktop project");
+
+    await page.goto("/stats");
+
+    // Wait for the Scheduling section to appear (due forecast is inside it).
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // The forecast chart is a list of bars. Each bar is a button.
+    const forecastList = page.getByRole("list", { name: "14-day due forecast" });
+    await expect(forecastList).toBeVisible();
+
+    // Tap the first bar (Today).
+    const firstBar = forecastList.getByRole("button").first();
+    await expect(firstBar).toBeVisible();
+    await firstBar.tap();
+
+    // A tooltip should appear with a date and card count.
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeVisible();
+    // The tooltip always shows a count in the form "N card(s)".
+    await expect(tooltip).toContainText(/card/i);
+
+    // Tapping outside the chart dismisses the popup.
+    await page.getByRole("heading", { level: 1, name: "Stats" }).tap();
+    await expect(tooltip).not.toBeVisible();
+  });
+
+  test("hovering a forecast bar reveals a popup with date and card count (desktop)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "hover() is unreliable on the mobile-safari (Webkit touch) project",
+    );
+
+    await page.goto("/stats");
+
+    // Wait for the Scheduling section to appear.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const forecastList = page.getByRole("list", { name: "14-day due forecast" });
+    await expect(forecastList).toBeVisible();
+
+    // Hover the first bar (Today).
+    const firstBar = forecastList.getByRole("button").first();
+    await firstBar.hover();
+
+    // The tooltip should appear.
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(/card/i);
+  });
+
+  test("keyboard: Enter on a forecast bar toggles the popup", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "keyboard focus navigation varies across projects",
+    );
+
+    await page.goto("/stats");
+
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const forecastList = page.getByRole("list", { name: "14-day due forecast" });
+    const firstBar = forecastList.getByRole("button").first();
+
+    // Focus and activate the bar with keyboard.
+    await firstBar.focus();
+    await page.keyboard.press("Enter");
+
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeVisible();
+
+    // Pressing Enter again should close it.
+    await page.keyboard.press("Enter");
+    await expect(tooltip).not.toBeVisible();
+  });
+});
+
+test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
+  test("renders the hint when the user has introduced cards but none mastered", async ({
+    page,
+  }) => {
+    // Seed two introduced-but-unmastered name cards. introduced > 0,
+    // mastered === 0 → the hint should appear in the Scheduling section.
+    await page.addInitScript(() => {
+      const cards = [1, 4].map((id) => ({
+        id,
+        speciesId: id,
+        cardType: "name",
+        subjectKey: String(id),
+        name: `Pokemon ${id}`,
+        spriteUrl: `/sprites/pokemon/${id}.png`,
+        types: ["normal"],
+        state: {
+          // Graduated but well below the 21-day mastery interval.
+          stability: 1,
+          difficulty: 5,
+          elapsedDays: 0,
+          scheduledDays: 1,
+          reps: 1,
+          lapses: 0,
+          fsrsState: "review",
+          dueDate: "2099-01-01",
+          lastReview: "2026-05-19",
+          firstSeen: "2026-05-19",
+          learningStep: null,
+          stepStartedAt: null,
+          hiddenSince: null,
+          seenInPasture: false,
+        },
+      }));
+      window.localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards,
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
+    await page.goto("/stats");
+    // Wait for hydration.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const hint = page.getByTestId("first-mastery-hint");
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText("First mastery in roughly");
+    await expect(hint).toContainText("if you keep reviewing daily");
+  });
+
+  test("hides the hint once at least one card is mastered", async ({
+    page,
+  }) => {
+    // Seed one mastered card plus one not-yet-mastered card. mastered >= 1
+    // suppresses the hint.
+    await page.addInitScript(() => {
+      const cards = [
+        {
+          id: 1,
+          speciesId: 1,
+          cardType: "name",
+          subjectKey: "1",
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          types: ["grass", "poison"],
+          state: {
+            stability: 30,
+            difficulty: 5,
+            elapsedDays: 0,
+            scheduledDays: 30,
+            reps: 5,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2025-01-01",
+            firstSeen: "2024-12-01",
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        },
+        {
+          id: 4,
+          speciesId: 4,
+          cardType: "name",
+          subjectKey: "4",
+          name: "Charmander",
+          spriteUrl: "/sprites/pokemon/4.png",
+          types: ["fire"],
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 0,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-19",
+            firstSeen: "2026-05-19",
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        },
+      ];
+      window.localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards,
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    await expect(page.getByTestId("first-mastery-hint")).toHaveCount(0);
+  });
+
+  test("hides the hint when the pretendAllMastered superuser flag is on", async ({
+    page,
+  }) => {
+    // Seed an introduced-but-unmastered name card so the introduced > 0 /
+    // mastered === 0 gate would otherwise render the hint. The
+    // pretendAllMastered flag should suppress the hint anyway — that is the
+    // behaviour this test guards.
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.addInitScript(() => {
+      const cards = [1, 4].map((id) => ({
+        id,
+        speciesId: id,
+        cardType: "name",
+        subjectKey: String(id),
+        name: `Pokemon ${id}`,
+        spriteUrl: `/sprites/pokemon/${id}.png`,
+        types: ["normal"],
+        state: {
+          stability: 1,
+          difficulty: 5,
+          elapsedDays: 0,
+          scheduledDays: 1,
+          reps: 1,
+          lapses: 0,
+          fsrsState: "review",
+          dueDate: "2099-01-01",
+          lastReview: "2026-05-19",
+          firstSeen: "2026-05-19",
+          learningStep: null,
+          stepStartedAt: null,
+          hiddenSince: null,
+          seenInPasture: false,
+        },
+      }));
+      window.localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards,
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    // With pretendAllMastered on, computeStats overlays mastered = totalCards,
+    // and projectTimeToFirstMastery short-circuits to null — both guards
+    // independently hide the hint. The introduced > 0 gate is exercised by
+    // the seed above, so this test now actually covers the superuser path.
+    await expect(page.getByTestId("first-mastery-hint")).toHaveCount(0);
+  });
+});
+
 test.describe("Stats page — heatmap hover tooltip", () => {
   test("hovering a heatmap cell shows a tooltip with the date and review count", async ({
     page,

@@ -5,18 +5,17 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
-import { formatDate, type DateFormat } from "@/lib/utils/format-date";
+import { type DateFormat } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel, colStack, mutedText } from "@/lib/utils/class-names";
+import { colStack, mutedText } from "@/lib/utils/class-names";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
-import { computeStats } from "@/lib/stats/derive";
+import { computeStats, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 import type { StatsResult } from "@/lib/stats/derive";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { BADGE_CATALOG } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
-import { computeStreak, loadStreakData } from "@/lib/streak";
 import { saveStreakData } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
 import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
@@ -31,6 +30,9 @@ import { computeRetentionComparison } from "@/lib/stats/retention";
 import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-distribution";
 import { computeCompletionProjection } from "@/lib/stats/completion-projection";
 import { CompletionProjection } from "@/components/stats/CompletionProjection";
+import DueForecast from "@/components/stats/DueForecast";
+import { FirstMasteryHint } from "@/components/stats/FirstMasteryHint";
+import { projectTimeToFirstMastery } from "@/lib/srs/timeToMastery";
 import { computeMasteryOverTime } from "@/lib/stats/mastery-over-time";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
@@ -96,24 +98,6 @@ const ActivityHistoryChart = dynamic(
 );
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Format a YYYY-MM-DD date for the due-forecast tooltip / aria-label.
- * Uses en-GB English month/weekday names to avoid locale-leaking French or
- * German names on non-English browser locales. fmt and tz come from user
- * settings; they default to dmy / UTC when not yet set.
- */
-function formatForecastDate(
-  iso: string,
-  fmt: DateFormat = "dmy",
-  tz = "UTC",
-): string {
-  return formatDate(iso, fmt, tz);
-}
-
-// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
@@ -141,76 +125,6 @@ function LoadingSkeleton() {
   );
 }
 
-function DueForecast({
-  stats,
-  fmt = "dmy",
-  tz = "UTC",
-}: {
-  stats: StatsResult;
-  fmt?: DateFormat;
-  tz?: string;
-}) {
-  const forecast = stats.dueForecast;
-  const max = forecast.reduce((m, d) => (d.count > m ? d.count : m), 0);
-  const total = forecast.reduce((s, d) => s + d.count, 0);
-
-  return (
-    <section aria-labelledby="due-heading">
-      <h2
-        id="due-heading"
-        className="mb-3 text-base font-semibold text-foreground"
-      >
-        Due forecast
-      </h2>
-      <div className={cardPanel}>
-        <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-          {total.toLocaleString('en-GB')} card{total === 1 ? "" : "s"} over the next 14
-          days
-        </p>
-        <div
-          className="grid h-24 grid-cols-[repeat(14,minmax(0,1fr))] items-end gap-1"
-          role="img"
-          aria-label={`14-day due forecast: ${forecast
-            .map((d) => `${formatForecastDate(d.date, fmt, tz)} ${d.count}`)
-            .join(", ")}`}
-        >
-          {forecast.map((day, idx) => {
-            const heightPct = max === 0 ? 0 : (day.count / max) * 100;
-            const isToday = idx === 0;
-            return (
-              <div
-                key={day.date}
-                className="group relative flex h-full flex-col justify-end"
-                title={`${formatForecastDate(day.date, fmt, tz)} · ${day.count} card${day.count === 1 ? "" : "s"}`}
-              >
-                <div
-                  className={
-                    isToday
-                      ? "rounded-sm bg-rose-500"
-                      : "rounded-sm bg-emerald-500/60 group-hover:bg-emerald-500"
-                  }
-                  style={{
-                    height: heightPct === 0 ? "2px" : `${Math.max(heightPct, 6)}%`,
-                  }}
-                  aria-hidden="true"
-                />
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-2 grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1 text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
-          {forecast.map((day, idx) => (
-            <span key={day.date} className="text-center">
-              {idx === 0
-                ? "Today"
-                : new Date(day.date).getDate()}
-            </span>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function StrugglingCards({ stats }: { stats: StatsResult }) {
   return (
@@ -559,6 +473,25 @@ export default function StatsPage() {
         )
       : null;
 
+  // Time-to-first-mastery hint (#1083). Show only when the user has at least
+  // one introduced card, zero mastered cards, and the projection helper
+  // produced a finite estimate. The helper already returns null when the
+  // superuser pretendAllMastered flag is on, so the hint hides under cheats.
+  const firstMasteryDays =
+    nameCards !== null &&
+    masteryRepetitions !== null &&
+    stats !== null &&
+    stats.introduced > 0 &&
+    stats.mastered === 0
+      ? projectTimeToFirstMastery(
+          nameCards,
+          new Date(),
+          masteryRepetitions,
+          flags.pretendAllMastered,
+          { retentionTarget },
+        ).days
+      : null;
+
   const reviewCharts =
     cards !== null
       ? (() => {
@@ -694,6 +627,13 @@ export default function StatsPage() {
                   term.
                 </p>
               </OnboardingHint>
+              {firstMasteryDays !== null && masteryRepetitions !== null && (
+                <FirstMasteryHint
+                  days={firstMasteryDays}
+                  masteryReps={masteryRepetitions}
+                  masteryDays={MASTERY_INTERVAL_DAYS}
+                />
+              )}
               {completionProjection !== null && (
                 <CompletionProjection
                   projection={completionProjection}
@@ -701,7 +641,7 @@ export default function StatsPage() {
                   tz={userTimezone}
                 />
               )}
-              <DueForecast stats={stats} fmt={userDateFormat} tz={userTimezone} />
+              <DueForecast forecast={stats.dueForecast} fmt={userDateFormat} tz={userTimezone} />
               <StrugglingCards stats={stats} />
             </section>
 
