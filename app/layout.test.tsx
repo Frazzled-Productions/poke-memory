@@ -57,7 +57,30 @@ vi.mock("@/components/pwa/DocumentTitleBadge", () => ({ DocumentTitleBadge: () =
 // Subject under test
 // ---------------------------------------------------------------------------
 
-import { metadata } from "@/app/layout";
+import RootLayout, { metadata } from "@/app/layout";
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
+
+/**
+ * Walks the React element tree returned by RootLayout to find the first
+ * element matching the predicate. React doesn't expose a tree-walking API for
+ * server components, so this does a depth-first search over `props.children`.
+ * Used to assert layout body structure without trying to render `<html>` /
+ * `<body>` through @testing-library (jsdom rejects that).
+ */
+function findElement(
+  node: ReactNode,
+  predicate: (element: ReactElement) => boolean,
+): ReactElement | null {
+  if (!isValidElement(node)) return null;
+  if (predicate(node)) return node;
+  const children = (node.props as { children?: ReactNode }).children;
+  let found: ReactElement | null = null;
+  Children.forEach(children, (child) => {
+    if (found !== null) return;
+    found = findElement(child, predicate);
+  });
+  return found;
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -114,5 +137,41 @@ describe("Root layout — metadata export", () => {
       expect(entry.media).toMatch(/device-height: \d+px/);
       expect(entry.media).toMatch(/-webkit-device-pixel-ratio: [23]/);
     }
+  });
+});
+
+describe("Root layout — body structure (#1103)", () => {
+  it("wraps persistent chrome in #app-root so FirstVisitOnboardingModal can toggle inert (#1103)", () => {
+    // Render the layout function to a React element tree. We don't mount it via
+    // @testing-library because RTL can't render <html>/<body> in jsdom.
+    const tree = RootLayout({ children: null });
+
+    const appRoot = findElement(
+      tree,
+      (el) => typeof el.props === "object" && (el.props as { id?: string }).id === "app-root",
+    );
+    expect(appRoot).not.toBeNull();
+    expect((appRoot!.props as { className?: string }).className).toBe("contents");
+
+    // children must be threaded through the wrapper, not rendered as siblings.
+    const childrenMarker = Symbol("kids");
+    const treeWithKids = RootLayout({
+      // Pass an element we can identify by its key to verify the children slot.
+      children: (
+        <span data-testid="layout-children" data-marker={String(childrenMarker)} />
+      ),
+    });
+    const wrapper = findElement(
+      treeWithKids,
+      (el) => typeof el.props === "object" && (el.props as { id?: string }).id === "app-root",
+    );
+    expect(wrapper).not.toBeNull();
+    const found = findElement(
+      wrapper,
+      (el) =>
+        typeof el.props === "object" &&
+        (el.props as { ["data-marker"]?: string })["data-marker"] === String(childrenMarker),
+    );
+    expect(found).not.toBeNull();
   });
 });
