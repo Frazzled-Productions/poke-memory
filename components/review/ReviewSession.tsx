@@ -73,6 +73,7 @@ import {
   EMPTY_SCOPE,
   cardIsEligible,
   cardMatchesScope,
+  computeEligibleCardIds,
   isScopeEmpty,
   type PracticeScope,
   type ScopeMatchContext,
@@ -588,26 +589,21 @@ export function ReviewSession() {
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
       // reload when toggling card-type gates, so the state is always current.
-      const cardTypeOpts = {
-        nameEnabled: nameCardsEnabled,
-        evolutionEnabled: evolutionCardsEnabled,
-        reverseEnabled,
-        reverseEvolutionEnabled,
-        cryEnabled: cryCardsEnabled,
-      };
       // Context for the "Incomplete evolution chains" preset (#995): the
       // incomplete-chain set is derived from the current card set, which has
       // not changed here (only the scope did), so `incompleteChains` is current.
-      const eligibleIds = new Set(
-        cards
-          .filter(
-            (c) =>
-              cardTypeIsEnabled(c, cardTypeOpts) &&
-              cardIsEligible(c, next, alternateFormsEnabled, {
-                incompleteChainSpeciesIds: incompleteChains,
-              }),
-          )
-          .map((c) => c.id),
+      const eligibleIds = computeEligibleCardIds(
+        cards,
+        {
+          nameCardsEnabled,
+          evolutionCardsEnabled,
+          reverseCardsEnabled: reverseEnabled,
+          reverseEvolutionCardsEnabled: reverseEvolutionEnabled,
+          cryCardsEnabled: cryCardsEnabled,
+          alternateFormsEnabled,
+          practiceScope: next,
+        },
+        { incompleteChainSpeciesIds: incompleteChains },
       );
       setEligibleCardIds(eligibleIds);
       // Clear the displayed-card render lock (#1088). The lock pins the
@@ -824,14 +820,6 @@ export function ReviewSession() {
       reconcileHiddenState(sessionCards, persistedScope, today);
       // Three-tier eligibility: card-type-enabled gate, then
       // `alternateFormsEnabled` gate, then scope filter (#658, #835).
-      // `cardIsEligible` encapsulates the second and third checks.
-      const cardTypeOpts = {
-        nameEnabled,
-        evolutionEnabled,
-        reverseEnabled: enabled,
-        reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
-        cryEnabled,
-      };
       // Context for the "Incomplete evolution chains" preset (#995): derive
       // chain progress from the freshly-built/hydrated card set. The
       // `scopeContext` memo cannot be used here — it depends on `cards` state
@@ -843,14 +831,18 @@ export function ReviewSession() {
           superuserFlags.pretendAllMastered,
         ),
       };
-      const eligibleIds = new Set(
-        sessionCards
-          .filter(
-            (c) =>
-              cardTypeIsEnabled(c, cardTypeOpts) &&
-              cardIsEligible(c, persistedScope, formsEnabled, loadScopeContext),
-          )
-          .map((c) => c.id),
+      const eligibleIds = computeEligibleCardIds(
+        sessionCards,
+        {
+          nameCardsEnabled: nameEnabled,
+          evolutionCardsEnabled: evolutionEnabled,
+          reverseCardsEnabled: enabled,
+          reverseEvolutionCardsEnabled: reverseEvolutionEnabledLocal,
+          cryCardsEnabled: cryEnabled,
+          alternateFormsEnabled: formsEnabled,
+          practiceScope: persistedScope,
+        },
+        loadScopeContext,
       );
       // Persist whenever scope is active so reconciliation results survive a
       // reload. When scope is empty, the only thing reconcileHiddenState can do

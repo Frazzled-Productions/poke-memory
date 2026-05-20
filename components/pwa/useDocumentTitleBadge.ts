@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { buildSessionQueues, todayString } from "@/lib/review/session";
+import { computeEligibleCardIds } from "@/lib/review/scope";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 
 /**
@@ -59,12 +60,28 @@ export function useDocumentTitleBadge(): void {
       const settings = loadSettings();
       const tz = settings.timezone ?? "UTC";
       const today = todayString(new Date(), tz);
+      // Compute eligible card IDs using the same three-tier gate as the
+      // Practice page (card-type toggles, alternateFormsEnabled, scope).
+      // Note: the incomplete-chains context is omitted here because the
+      // badge hook does not have access to mastery/repetition state. The
+      // preset will simply match nothing when active, which is acceptable
+      // — the badge count may be slightly conservative in that edge case.
+      const eligibleCardIds = computeEligibleCardIds(session.cards, {
+        nameCardsEnabled: settings.nameCardsEnabled,
+        evolutionCardsEnabled: settings.evolutionCardsEnabled,
+        reverseCardsEnabled: settings.reverseCardsEnabled,
+        reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
+        cryCardsEnabled: settings.cryCardsEnabled,
+        alternateFormsEnabled: settings.alternateFormsEnabled,
+        practiceScope: settings.practiceScope,
+      });
       // Use buildSessionQueues (same function the Practice page uses) so the
       // title badge reflects today's capped queue, not the full untouched backlog.
       const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
         session.cards,
         session.limits,
         today,
+        eligibleCardIds,
       );
       const total = newQueue.length + learningCardIds.length + reviewQueue.length;
 
