@@ -711,7 +711,14 @@ export function ReviewSession() {
   // Per-user shuffle salt: authenticated users use their stable Supabase UUID;
   // guests use a per-device UUID persisted to localStorage.  This ensures the
   // daily card order is deterministic per (user, day) but differs across users.
-  const shuffleSalt = user?.id ?? getOrCreateClientSalt();
+  //
+  // Wrapped in useMemo so the localStorage read/write only fires when the
+  // identity changes, not on every render — avoids a side effect during render
+  // that React 19 strict-mode would double-invoke.
+  const shuffleSalt = useMemo(
+    () => user?.id ?? getOrCreateClientSalt(),
+    [user?.id],
+  );
 
   // Runtime context for the "Incomplete evolution chains" scope preset (#995).
   // An incomplete chain is one the user has started but not finished mastering;
