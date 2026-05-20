@@ -350,6 +350,16 @@ function saveSessionLS(session: SavedSession): SaveResult {
 }
 
 /**
+ * CustomEvent name dispatched on `window` whenever the review session is
+ * written to IndexedDB (or localStorage). Subscribers that need a reliable
+ * post-IDB-write signal — such as BottomTabBar — should listen for this
+ * event in addition to (or instead of) the synthetic `storage` event, because
+ * WebKit does not reliably propagate synthetic StorageEvents to same-tab
+ * `storage` listeners after an addInitScript IDB seed.
+ */
+export const SESSION_CHANGED_EVENT = "poke-memory:session-changed";
+
+/**
  * Dispatches a synthetic StorageEvent against the session-storage key. Used by
  * `saveSession` to wake same-tab `useLocalStorageKey` subscribers, and by
  * `pullAndMerge` (auxiliary table merges) to surface non-session writes
@@ -377,6 +387,15 @@ function dispatchStorageEvent(): void {
     );
   } catch {
     // Older browsers / non-standard envs without a StorageEvent constructor.
+  }
+  // Also dispatch a CustomEvent so BottomTabBar (and any future subscriber that
+  // needs a reliable post-IDB-write signal) can react without relying on the
+  // synthetic StorageEvent, which WebKit does not always propagate to same-tab
+  // `storage` listeners after an addInitScript IDB seed.
+  try {
+    window.dispatchEvent(new CustomEvent(SESSION_CHANGED_EVENT));
+  } catch {
+    // Non-standard envs.
   }
 }
 

@@ -48,7 +48,19 @@ export async function seedIdb(
         for (const [key, value] of Object.entries(data.entries)) {
           store.put(value, key);
         }
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => {
+          // Dispatch the same CustomEvent that saveSession emits so
+          // BottomTabBar's mastery-check effect re-fires after the seed
+          // transaction commits. WebKit does not reliably propagate synthetic
+          // StorageEvents to same-tab `storage` listeners, so this CustomEvent
+          // is the authoritative post-seed signal for mobile-safari.
+          try {
+            window.dispatchEvent(new CustomEvent("poke-memory:session-changed"));
+          } catch {
+            // Non-standard envs.
+          }
+          resolve();
+        };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(new Error("IDB transaction aborted"));
       };

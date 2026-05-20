@@ -46,6 +46,7 @@ const mockLoadSession = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: () => mockLoadSession(),
   STORAGE_KEY: "poke-memory:review-session:v1",
+  SESSION_CHANGED_EVENT: "poke-memory:session-changed",
 }));
 
 const mockFilterMastered = vi.fn().mockReturnValue([]);
