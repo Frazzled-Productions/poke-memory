@@ -602,6 +602,11 @@ test.describe("Settings page", () => {
   // wipe settings the user just saved before the reload can read them back.
   // Instead, each test clears localStorage once via page.evaluate() before
   // its initial page.goto().
+  //
+  // NOTE: The per-test localStorage.clear() intentionally does NOT re-seed
+  // `firstVisitOnboardingDismissed`. This is safe because the onboarding modal
+  // only renders on `/`. If a future test in this describe block navigates to
+  // `/`, add an explicit `await addOnboardingPreDismiss(page)` first.
 
   test("loads with key sections", async ({ page }) => {
     await page.addInitScript(() => localStorage.clear());
