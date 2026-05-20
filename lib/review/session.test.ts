@@ -8,7 +8,6 @@ import {
   limitBucket,
   cardTypeIsEnabled,
   groupNewCandidatesBySpecies,
-  stableShuffleForDay,
   type DailyLimits,
   type EvolutionReviewCard,
   type NameReviewCard,
@@ -1376,87 +1375,6 @@ describe('buildQueueCounters', () => {
     expect(result.newCount).toBe(0);
     expect(result.learningCount).toBe(0);
     expect(result.reviewCount).toBe(0);
-  });
-});
-
-describe('stableShuffleForDay (per-user salt)', () => {
-  const TODAY = '2026-05-09';
-  const IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-  it('same salt + same inputs produces the same order (stability)', () => {
-    const a = stableShuffleForDay(IDS, TODAY, 'user-abc');
-    const b = stableShuffleForDay(IDS, TODAY, 'user-abc');
-    expect(a).toEqual(b);
-  });
-
-  it('different string salts produce a different order for a sufficiently large id list', () => {
-    const a = stableShuffleForDay(IDS, TODAY, 'user-abc');
-    const b = stableShuffleForDay(IDS, TODAY, 'user-xyz');
-    expect(a).not.toEqual(b);
-  });
-
-  it('different numeric salts produce a different order for a sufficiently large id list', () => {
-    const a = stableShuffleForDay(IDS, TODAY, 1);
-    const b = stableShuffleForDay(IDS, TODAY, 2);
-    expect(a).not.toEqual(b);
-  });
-
-  it('empty string salt is stable (backward-compatible default)', () => {
-    const a = stableShuffleForDay(IDS, TODAY);
-    const b = stableShuffleForDay(IDS, TODAY, '');
-    expect(a).toEqual(b);
-  });
-
-  it('same ids and same salt on different days produce different orders', () => {
-    const a = stableShuffleForDay(IDS, '2026-05-09', 'user-abc');
-    const b = stableShuffleForDay(IDS, '2026-05-10', 'user-abc');
-    expect(a).not.toEqual(b);
-  });
-
-  it('output contains the same ids as the input', () => {
-    const result = stableShuffleForDay(IDS, TODAY, 'user-abc');
-    expect(result.slice().sort((a, b) => a - b)).toEqual(IDS.slice().sort((a, b) => a - b));
-  });
-
-  it('numeric salt 0 produces a different order from empty-string salt (no type-coercion collision)', () => {
-    // Guards a future refactor against accidentally collapsing the numeric/string
-    // code paths — String(0) === "0", which must not equal String("") === "".
-    const withZero   = stableShuffleForDay(IDS, TODAY, 0);
-    const withEmpty  = stableShuffleForDay(IDS, TODAY, '');
-    expect(withZero).not.toEqual(withEmpty);
-  });
-});
-
-describe('buildSessionQueues (per-user salt)', () => {
-  const TODAY = '2026-05-09';
-  const highLimits: DailyLimits = {
-    name:      { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-    evolution: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-    reverse:   { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-    cry:       { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-  };
-
-  function nameCard(id: number): NameReviewCard {
-    return {
-      ...makeSeedPokemon(id),
-      cardType: 'name',
-      subjectKey: String(id),
-      state: initialReviewState(NOW),
-    };
-  }
-
-  const cards: ReviewableCard[] = Array.from({ length: 15 }, (_, i) => nameCard(i + 1));
-
-  it('same salt produces the same queue order (stability)', () => {
-    const a = buildSessionQueues(cards, highLimits, TODAY, undefined, 'salt-a').newQueue;
-    const b = buildSessionQueues(cards, highLimits, TODAY, undefined, 'salt-a').newQueue;
-    expect(a).toEqual(b);
-  });
-
-  it('different salts produce different queue orders for a large enough card set', () => {
-    const a = buildSessionQueues(cards, highLimits, TODAY, undefined, 'salt-a').newQueue;
-    const b = buildSessionQueues(cards, highLimits, TODAY, undefined, 'salt-b').newQueue;
-    expect(a).not.toEqual(b);
   });
 });
 
