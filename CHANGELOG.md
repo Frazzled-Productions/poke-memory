@@ -6,6 +6,25 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.9] - 2026-05-20
+
+### Added
+
+- Daily review reminders for installed PWA users. Opt in from Settings on a signed-in installed app to receive one Web Push notification a day when you have Pokémon cards due for review.
+- Due forecast bars on the Stats page now show a tap/hover popup with the date and card count, matching the behaviour of other Stats charts.
+- Stats page now shows a hedged "first mastery in roughly N days" hint while you have introduced cards but no mastered cards yet, so the long road to the 21-day mastery floor is signposted instead of reading as broken.
+- Settings now has a Quickstart quiz: tap the Pokémon you already know to fast-track them into the scheduler. Each pick graduates the card straight into review at a long initial interval, so you can skip the new-card queue for species you know cold.
+
+### Changed
+
+- Daily card order now differs across users: authenticated users are shuffled by their account ID, guests by a stable per-device token, so two people starting on the same day no longer see identical card sequences.
+- Practice page now fits within the iPhone 17 Pro viewport (402x874 CSS px) without scrolling across all four card variants: forward, evolution, reverse picker, and cry.
+
+### Fixed
+
+- Bottom tab bar no longer jumps upward when navigating to the Pokédex detail page on iOS Safari. Short pages now fill the full dynamic viewport height, keeping the browser toolbar hidden and the nav bar anchored to the screen bottom.
+- Practice: changing scope before grading any card now updates the displayed card immediately instead of leaving the previous, now out-of-scope card frozen on screen.
+
 ## [0.10.8] - 2026-05-19
 
 ### Added
@@ -1253,7 +1272,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.8...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.9...HEAD
+[0.10.9]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.9
 [0.10.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.8
 [0.10.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.7
 [0.10.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.6
