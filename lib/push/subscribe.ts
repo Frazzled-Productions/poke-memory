@@ -96,8 +96,10 @@ export type UnsubscribeResult =
  *   or the prompt is suppressed without a "denied" reason — the caller
  *   must keep this call on the synchronous handler path.
  * - If the user has previously subscribed from this device, we reuse the
- *   existing subscription rather than tearing it down. The DB upsert
- *   handles the duplicate via the (user_id, endpoint) UNIQUE.
+ *   existing PushManager subscription rather than tearing it down. The DB
+ *   row for that (user_id, endpoint) pair is deleted and reinserted on every
+ *   call so the operation stays inside the INSERT/DELETE policies — there
+ *   is no UPDATE policy on push_subscriptions (see the persist block below).
  * - The DB row is keyed by (user_id, endpoint). One device that switches
  *   accounts therefore creates a second row; the new user owns the new
  *   row, the old user's row is still tied to its own user_id and will be
@@ -170,24 +172,35 @@ export async function subscribeToPush(
   const p256dh = arrayBufferToBase64Url(p256dhBuf);
   const auth = arrayBufferToBase64Url(authBuf);
 
-  // Persist. The migration's (user_id, endpoint) UNIQUE makes this an
-  // idempotent re-subscribe; the conflict path bumps last_seen_at on the
-  // server side (the daily route does that explicitly on every successful
-  // send too).
+  // Persist via delete-then-insert. Migration 028 deliberately omits an
+  // UPDATE policy on push_subscriptions (per docs/persistence.md's
+  // append-only baseline). Postgres treats INSERT ... ON CONFLICT DO UPDATE
+  // as an UPDATE for RLS purposes, so a Supabase-client `.upsert(...)` on the
+  // (user_id, endpoint) conflict key would silently fail every time a device
+  // re-subscribes after the first one — the conflict branch is denied by RLS.
+  // Removing the existing row first and inserting a fresh one keeps the
+  // operation inside the SELECT/INSERT/DELETE policies that DO exist, and
+  // sidesteps the missing UPDATE policy entirely. The cost is that a
+  // returning subscriber gets a new `created_at`; we don't surface that
+  // value anywhere user-facing, so the trade is fine.
   try {
-    const { error } = await client
+    const { error: deleteError } = await client
       .from("push_subscriptions")
-      .upsert(
-        {
-          user_id: userId,
-          endpoint: subscription.endpoint,
-          p256dh,
-          auth_secret: auth,
-          last_seen_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,endpoint" },
-      );
-    if (error) return { ok: false, reason: "persist-failed" };
+      .delete()
+      .eq("user_id", userId)
+      .eq("endpoint", subscription.endpoint);
+    if (deleteError) return { ok: false, reason: "persist-failed" };
+
+    const { error: insertError } = await client
+      .from("push_subscriptions")
+      .insert({
+        user_id: userId,
+        endpoint: subscription.endpoint,
+        p256dh,
+        auth_secret: auth,
+        last_seen_at: new Date().toISOString(),
+      });
+    if (insertError) return { ok: false, reason: "persist-failed" };
   } catch {
     return { ok: false, reason: "persist-failed" };
   }

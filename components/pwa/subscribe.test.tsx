@@ -156,29 +156,49 @@ function makeRegistration(initial: FakeSubscription | null) {
 
 function makeClient(): {
   client: SupabaseClient;
-  upsertCalls: unknown[];
-  deleteCalls: unknown[];
-  failUpsert?: boolean;
+  insertCalls: unknown[];
+  deleteCalls: { filters: Array<{ col: string; val: unknown }> }[];
+  failInsert?: boolean;
   failDelete?: boolean;
 } {
   const state = {
-    upsertCalls: [] as unknown[],
-    deleteCalls: [] as unknown[],
-    failUpsert: false,
+    insertCalls: [] as unknown[],
+    deleteCalls: [] as { filters: Array<{ col: string; val: unknown }> }[],
+    failInsert: false,
     failDelete: false,
   };
+  function makeDeleteChain() {
+    // Supabase delete().eq().eq() returns a thenable on each chain step. We
+    // model it as a builder whose `.eq` returns the same shape and which
+    // resolves when awaited, regardless of how many .eq calls were chained.
+    const filters: Array<{ col: string; val: unknown }> = [];
+    state.deleteCalls.push({ filters });
+    const chain: {
+      eq: (col: string, val: unknown) => typeof chain;
+      then: <R>(
+        onFulfilled?: (value: { error: { message: string } | null }) => R,
+      ) => Promise<R | { error: { message: string } | null }>;
+    } = {
+      eq(col, val) {
+        filters.push({ col, val });
+        return chain;
+      },
+      then(onFulfilled) {
+        const result = {
+          error: state.failDelete ? { message: "boom" } : null,
+        };
+        return Promise.resolve(onFulfilled ? onFulfilled(result) : result);
+      },
+    };
+    return chain;
+  }
   const client = {
     from: () => ({
-      upsert: async (rows: unknown, opts?: unknown) => {
-        state.upsertCalls.push({ rows, opts });
-        return { error: state.failUpsert ? { message: "boom" } : null };
+      insert: async (rows: unknown) => {
+        state.insertCalls.push({ rows });
+        return { error: state.failInsert ? { message: "boom" } : null };
       },
-      delete: () => ({
-        eq: async (col: string, val: unknown) => {
-          state.deleteCalls.push({ col, val });
-          return { error: state.failDelete ? { message: "boom" } : null };
-        },
-      }),
+      delete: () => makeDeleteChain(),
     }),
   } as unknown as SupabaseClient;
   return Object.assign(state, { client });
@@ -240,7 +260,7 @@ describe("subscribeToPush", () => {
     expect(result).toEqual({ ok: false, reason: "permission-denied" });
   });
 
-  it("subscribes, persists, and returns ok", async () => {
+  it("subscribes, persists via delete-then-insert, and returns ok", async () => {
     const registration = makeRegistration(null);
     Object.defineProperty(navigator, "serviceWorker", {
       value: { ready: Promise.resolve(registration) },
@@ -250,9 +270,25 @@ describe("subscribeToPush", () => {
     const result = await subscribeToPush(harness.client, "user-1");
     expect(result).toEqual({ ok: true });
     expect(registration.pushManager.subscribe).toHaveBeenCalled();
-    expect(harness.upsertCalls).toHaveLength(1);
-    const call = harness.upsertCalls[0] as {
-      rows: { user_id: string; endpoint: string; p256dh: string; auth_secret: string };
+
+    // Exactly one DELETE keyed by (user_id, endpoint) precedes the INSERT.
+    // The delete pair is the precondition that lets us run inside the
+    // INSERT/DELETE RLS policies without needing an UPDATE policy.
+    expect(harness.deleteCalls).toHaveLength(1);
+    const deleteFilters = harness.deleteCalls[0].filters;
+    expect(deleteFilters).toHaveLength(2);
+    expect(deleteFilters[0]).toEqual({ col: "user_id", val: "user-1" });
+    expect(deleteFilters[1].col).toBe("endpoint");
+    expect(deleteFilters[1].val).toMatch(/^https:\/\/push\./);
+
+    expect(harness.insertCalls).toHaveLength(1);
+    const call = harness.insertCalls[0] as {
+      rows: {
+        user_id: string;
+        endpoint: string;
+        p256dh: string;
+        auth_secret: string;
+      };
     };
     expect(call.rows.user_id).toBe("user-1");
     expect(call.rows.endpoint).toMatch(/^https:\/\/push\./);
@@ -271,18 +307,32 @@ describe("subscribeToPush", () => {
     const result = await subscribeToPush(harness.client, "user-1");
     expect(result.ok).toBe(true);
     expect(registration.pushManager.subscribe).not.toHaveBeenCalled();
-    const call = harness.upsertCalls[0] as { rows: { endpoint: string } };
+    const call = harness.insertCalls[0] as { rows: { endpoint: string } };
     expect(call.rows.endpoint).toBe("https://push.example/existing");
   });
 
-  it("returns persist-failed when the Supabase upsert errors", async () => {
+  it("returns persist-failed when the Supabase delete errors", async () => {
     const registration = makeRegistration(null);
     Object.defineProperty(navigator, "serviceWorker", {
       value: { ready: Promise.resolve(registration) },
       configurable: true,
     });
     const harness = makeClient();
-    harness.failUpsert = true;
+    harness.failDelete = true;
+    const result = await subscribeToPush(harness.client, "user-1");
+    expect(result).toEqual({ ok: false, reason: "persist-failed" });
+    // INSERT must NOT fire when the preceding DELETE errors.
+    expect(harness.insertCalls).toHaveLength(0);
+  });
+
+  it("returns persist-failed when the Supabase insert errors", async () => {
+    const registration = makeRegistration(null);
+    Object.defineProperty(navigator, "serviceWorker", {
+      value: { ready: Promise.resolve(registration) },
+      configurable: true,
+    });
+    const harness = makeClient();
+    harness.failInsert = true;
     const result = await subscribeToPush(harness.client, "user-1");
     expect(result).toEqual({ ok: false, reason: "persist-failed" });
   });
@@ -304,7 +354,10 @@ describe("unsubscribeFromPush", () => {
     const harness = makeClient();
     const result = await unsubscribeFromPush(harness.client, "user-1");
     expect(result).toEqual({ ok: true });
-    expect(harness.deleteCalls).toEqual([{ col: "user_id", val: "user-1" }]);
+    expect(harness.deleteCalls).toHaveLength(1);
+    expect(harness.deleteCalls[0].filters).toEqual([
+      { col: "user_id", val: "user-1" },
+    ]);
     expect(existing.unsubscribe).toHaveBeenCalled();
   });
 
