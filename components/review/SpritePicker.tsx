@@ -122,7 +122,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
   }
 
   return (
-    <div className="flex flex-col items-center gap-6">
+    <div className="flex flex-col items-center gap-3 sm:gap-6">
       <DirectionBadge direction="reverse" />
       {/* Name prompt */}
       <div className="flex items-center gap-2">

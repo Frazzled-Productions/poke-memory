@@ -44,9 +44,10 @@ const OUT_DIR = join(
 const VIEWPORT = { width: 402, height: 874 };
 const DEVICE_SCALE_FACTOR = 3;
 
-// Storage keys must match lib/superuser/persistence.ts.
+// Storage keys must match lib/superuser/persistence.ts and lib/settings/persistence.ts.
 const SUPERUSER_UNLOCKED_KEY = "poke-memory:superuser";
 const SUPERUSER_FLAGS_KEY = "poke-memory:superuser:flags:v1";
+const SETTINGS_KEY = "poke-memory:settings:v1";
 
 const SHOTS = {
   "practice-front": {
@@ -162,17 +163,34 @@ async function main() {
 
     // Seed superuser flags so pretendAllMastered renders every species as
     // mastered. Must happen before any /pokedex, /pasture, /stats navigation.
+    // Also dismiss onboarding hints so the practice screenshots show the card
+    // layout without first-run banners obscuring the content.
     const page = await ctx.newPage();
     await page.goto(`${BASE_URL}/`, { waitUntil: "domcontentloaded" });
     await page.evaluate(
-      ({ unlockedKey, flagsKey }) => {
+      ({ unlockedKey, flagsKey, settingsKey }) => {
         localStorage.setItem(unlockedKey, "true");
         localStorage.setItem(
           flagsKey,
           JSON.stringify({ pretendAllMastered: true }),
         );
+        // Dismiss the welcome, practice-grading, audio, and card-types hints
+        // so the practice screenshots show card content rather than first-run
+        // banners. Matches what a returning user sees after their first session.
+        const rawSettings = localStorage.getItem(settingsKey);
+        const existing = rawSettings ? JSON.parse(rawSettings) : {};
+        localStorage.setItem(settingsKey, JSON.stringify({
+          ...existing,
+          onboarding: {
+            welcomeDismissed: true,
+            practiceHintDismissed: true,
+            audioHintDismissed: true,
+            cardTypesHintDismissed: true,
+            pwaInstallDismissed: true,
+          },
+        }));
       },
-      { unlockedKey: SUPERUSER_UNLOCKED_KEY, flagsKey: SUPERUSER_FLAGS_KEY },
+      { unlockedKey: SUPERUSER_UNLOCKED_KEY, flagsKey: SUPERUSER_FLAGS_KEY, settingsKey: SETTINGS_KEY },
     );
 
     for (const name of targets) await captureSurface(page, name);
