@@ -6,6 +6,19 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.10] - 2026-05-20
+
+### Added
+
+- Practice scope can now be filtered by the game a Pokémon appears in. The scope picker has a new Games section that groups every game in the seed by generation (Pokémon Red/Blue through Pokémon Legends: Z-A), with marketing labels and a select-all toggle per generation.
+
+### Fixed
+
+- Practice page no longer requires scrolling on iPhone 17 Pro in default mobile bottom-nav mode (#1104, follow-up to #1087). The 100dvh page-height anchor (added for #1086 to keep the bottom tab bar in place) now lives on `<body>`, so the wrapper can shrink to fit alongside the top nav and any sibling banners instead of forcing every page to overflow by ~200px.
+- Grade buttons now always render on a single row at mobile widths. Easy was wrapping to a second line on iPhone 17 Pro because the per-button minimum width plus gaps overshot the available width by ~10px; the row uses a four-column grid on mobile and falls back to the original wrap layout at sm+.
+- The card no longer drifts upward when the user taps Reveal. The card region anchors the sprite to the top of its space on mobile, so the empty area sits below the card instead of being split above and below: revealing adds the name and Pokédex entry beneath the sprite without moving it.
+- PWA app-icon badge now shows today's capped queue size (e.g. 10 new cards) rather than the full untouched backlog on a fresh install.
+
 ## [0.10.9] - 2026-05-20
 
 ### Added
@@ -1272,7 +1285,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.9...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.10...HEAD
+[0.10.10]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.10
 [0.10.9]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.9
 [0.10.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.8
 [0.10.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.7
