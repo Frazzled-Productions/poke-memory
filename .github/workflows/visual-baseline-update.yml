@@ -1,0 +1,183 @@
+name: Visual Baseline Update
+
+# Regenerates the Playwright visual baselines committed under
+# e2e/__screenshots__/ for a dispatching feature branch. Use this when a PR
+# legitimately changes Stats or Journey rendering and the comparison job in
+# `visual-regression.yml` is failing because the committed baselines are now
+# stale.
+#
+# Why a dedicated workflow rather than a local `--update-snapshots` run:
+# baselines are platform-sensitive. macOS Core Text and Linux font
+# anti-aliasing differ visibly, so baselines must be generated inside the
+# pinned `mcr.microsoft.com/playwright:v1.60.0-noble` image — the same image
+# `visual-regression.yml` uses for comparison. The maintainer would otherwise
+# have to run that Docker image locally on a Linux host or extract actuals
+# from a failed CI run; this workflow folds that into a one-click dispatch.
+#
+# Safety posture (these guards stack):
+#   1. `workflow_dispatch` only — no PR/push trigger can fire this.
+#   2. Owner-gated — only the repository owner can dispatch. Implemented as an
+#      actor-vs-`github.repository_owner` check in the `gate` job. The repo
+#      does not have a team-membership API available without an extra token,
+#      so actor-vs-owner is the simplest robust gate.
+#   3. Refuses to push if the input branch is `main` or `qa`. The regenerated
+#      baselines must land on a feature branch only; never on a long-lived
+#      branch directly. See AGENTS.md → "Branching model".
+#
+# The push uses a `poke-memory-bot` App installation token (the same pattern
+# `auto-release.yml` uses). `GITHUB_TOKEN` cannot bypass branch protection,
+# so the App token is also what gives us a sensible escape hatch if the
+# dispatcher ever targets a protected feature-flow branch in future.
+#
+# The commit message carries `[skip ci]` so the push does not immediately
+# re-fire `ci.yml` / `migration-check.yml` etc. on the regenerated baselines.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Feature branch to regenerate baselines on (must not be `main` or `qa`)."
+        required: true
+        type: string
+
+concurrency:
+  group: visual-baseline-update-${{ inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  # Cheap gate: validates the dispatcher and the branch input BEFORE spinning
+  # up the Playwright Docker container in the regenerate job. Failing fast
+  # here keeps the audit trail tidy and avoids burning container minutes on
+  # an obviously-invalid dispatch.
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify dispatcher is the repository owner
+        env:
+          ACTOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          if [ "$ACTOR" != "$OWNER" ]; then
+            echo "Refusing to run: actor '$ACTOR' is not the repository owner '$OWNER'."
+            exit 1
+          fi
+          echo "Dispatcher '$ACTOR' is the repository owner. OK."
+
+      - name: Refuse to target a long-lived branch
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BRANCH" ]; then
+            echo "Refusing to run: 'branch' input was empty."
+            exit 1
+          fi
+          if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "qa" ]; then
+            echo "Refusing to run: regenerated baselines must not land on '$BRANCH' directly."
+            echo "Dispatch this workflow against a feature branch instead."
+            exit 1
+          fi
+          echo "Target branch '$BRANCH' is acceptable. OK."
+
+  regenerate:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      # The regenerate job pushes regenerated baselines via the poke-memory-bot
+      # App token. Declare contents: write to match the actual capability for
+      # audit clarity, even though the token's scope is independent of this block.
+      contents: write
+    # Browsers + system deps are baked into the image. The tag MUST track the
+    # `@playwright/test` version resolved in `package-lock.json` (currently
+    # 1.60.0) — the same pin `visual-regression.yml` uses. Baselines
+    # generated here are byte-comparable against that compare job's renders.
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Check out the dispatching branch
+        uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "poke-memory-bot[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Start Next.js and regenerate visual snapshots
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+        run: |
+          set -euo pipefail
+          npm start &
+          echo $! > /tmp/next.pid
+          npx wait-on http://localhost:3000 --timeout 60000
+          # `npm run test:visual` runs the visual-chromium and visual-webkit
+          # projects against e2e/visual.spec.ts. `--update-snapshots` rewrites
+          # the PNGs under e2e/__screenshots__/{visual-chromium,visual-webkit}.
+          npm run test:visual -- --update-snapshots
+
+      - name: Stop Next.js
+        if: always()
+        run: |
+          if [ -f /tmp/next.pid ]; then
+            kill "$(cat /tmp/next.pid)" 2>/dev/null || true
+          fi
+
+      - name: Commit and push regenerated baselines
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          # Defence in depth: re-check the branch guard here, in the same job
+          # that actually pushes. The `gate` job already enforces this, but a
+          # second check next to the push means a future refactor that drops
+          # the gate job cannot silently start writing to a protected branch.
+          if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "qa" ]; then
+            echo "Refusing to push: regenerated baselines must not land on '$BRANCH' directly."
+            exit 1
+          fi
+          git add e2e/__screenshots__/
+          if git diff --cached --quiet; then
+            echo "No baseline changes to commit — the regenerated PNGs are identical to the committed ones."
+            exit 0
+          fi
+          git commit -m "chore(visual): regenerate baselines [skip ci]"
+          git push origin "HEAD:${BRANCH}"
+          echo "Pushed regenerated baselines to '${BRANCH}'."
+
+      # If the snapshot run itself failed (rather than the comparison being
+      # different), the report carries the failing-test detail.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baseline-update-report
+          path: playwright-report/
+          retention-days: 14
