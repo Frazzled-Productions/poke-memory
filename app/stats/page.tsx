@@ -64,6 +64,14 @@ import { seedOptsFromSettings } from "@/lib/review/seedOpts";
  * types (evolution, reverse, cry). Using `buildSessionQueues` with the same
  * eligibility set as the Practice page removes all three gaps.
  *
+ * `today` is a UTC date string. The Practice page also uses UTC for queue
+ * building (scheduling-internal). User-facing "today" via `todayInTimezone`
+ * applies only to display formatting and the streak/daily-cap counters.
+ *
+ * Only the today bar's count is recomputed; shuffle order is not used here,
+ * so we don't thread `shuffleSalt` through. If a future caller uses the
+ * returned forecast for card ordering, pass a salt to `buildSessionQueues`.
+ *
  * Pure — no I/O, no side effects. Exported for unit testing.
  */
 export function patchForecastTodayBar(
@@ -428,7 +436,15 @@ export default function StatsPage() {
       });
       setAlternateFormsEnabled(settings.alternateFormsEnabled);
       setPracticeScope(settings.practiceScope);
-      setSessionLimits(saved?.limits ?? DEFAULT_LIMITS);
+      // Derive limits from settings (same source of truth as ReviewSession.tsx).
+      // Reading saved?.limits would lag settings changes until the next session
+      // save, breaking parity the moment the user raises a daily cap.
+      setSessionLimits({
+        name: { maxNewPerDay: settings.maxNewPerDay, maxReviewsPerDay: settings.maxReviewsPerDay },
+        evolution: { maxNewPerDay: settings.maxNewEvolutionPerDay, maxReviewsPerDay: settings.maxReviewsEvolutionPerDay },
+        reverse: { maxNewPerDay: settings.maxNewReversePerDay, maxReviewsPerDay: settings.maxReviewsReversePerDay },
+        cry: { maxNewPerDay: settings.maxNewCryPerDay, maxReviewsPerDay: settings.maxReviewsCryPerDay },
+      });
       setRetentionTarget(settings.retentionTarget);
       const tz = settings.timezone ?? "UTC";
       const today = todayString(new Date(), tz);
