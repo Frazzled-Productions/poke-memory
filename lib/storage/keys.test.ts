@@ -25,6 +25,7 @@ import {
   KEY_LAST_SEEN_VERSION,
   KEY_LEGACY_FAVOURITE_THEME,
   KEY_LEGACY_PRACTICE_SCOPE,
+  KEY_CLIENT_SALT,
 } from "./keys";
 
 describe("localStorage key registry — byte-exact strings", () => {
@@ -66,4 +67,7 @@ describe("localStorage key registry — byte-exact strings", () => {
 
   it("KEY_LEGACY_PRACTICE_SCOPE", () =>
     expect(KEY_LEGACY_PRACTICE_SCOPE).toBe("poke-memory:practice-scope:v1"));
+
+  it("KEY_CLIENT_SALT", () =>
+    expect(KEY_CLIENT_SALT).toBe("poke-memory:client-salt:v1"));
 });

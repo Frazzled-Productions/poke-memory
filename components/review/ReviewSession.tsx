@@ -82,6 +82,7 @@ import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
 import { mutedText } from "@/lib/utils/class-names";
+import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
@@ -707,6 +708,11 @@ export function ReviewSession() {
   const { enqueueGrade, flushPending } = usePerGradeSync(syncClient, syncUserId);
   useSyncOnUnload(syncClient, syncUserId, flushPending);
 
+  // Per-user shuffle salt: authenticated users use their stable Supabase UUID;
+  // guests use a per-device UUID persisted to localStorage.  This ensures the
+  // daily card order is deterministic per (user, day) but differs across users.
+  const shuffleSalt = user?.id ?? getOrCreateClientSalt();
+
   // Runtime context for the "Incomplete evolution chains" scope preset (#995).
   // An incomplete chain is one the user has started but not finished mastering;
   // membership shifts as progress is made, so it is recomputed from the current
@@ -913,7 +919,7 @@ export function ReviewSession() {
       // Initialize the learning queue from persisted learning-step cards.
       // Use stepStartedAt from persisted state so the countdown resumes correctly
       // after navigation instead of resetting to the full step duration.
-      const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today);
+      const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today, undefined, shuffleSalt);
 
       const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
         const card = sessionCards.find((c) => c.id === cardId)!;
@@ -1200,6 +1206,7 @@ export function ReviewSession() {
       effLimits,
       today,
       eligibleCardIds,
+      shuffleSalt,
     );
     const nowMs = Date.now();
     const dueLearningEntries = learningQueue
@@ -1315,6 +1322,7 @@ export function ReviewSession() {
     effectiveLimits,
     today,
     eligibleCardIds,
+    shuffleSalt,
   );
 
   // Cards that are mid-learning-step but fall outside the active scope.
@@ -1832,6 +1840,7 @@ export function ReviewSession() {
       effectiveLimits,
       today,
       eligibleCardIds,
+      shuffleSalt,
     );
 
     // Compute the post-grade learning queue here, mirroring the `setLearningQueue`
