@@ -3,11 +3,11 @@
  * id stored in `SeedPokemon.versionGroups` and on `PracticeScope.games`; the
  * label is what the UI renders.
  *
- * Coverage: every version-group currently exposed by PokéAPI (32 entries at
- * the time of seeding). `lib/pokemon/versionGroupLabels.test.ts` enforces
- * that every version-group slug appearing in any `SeedPokemon.versionGroups`
- * has an entry here, so re-seeding cannot silently introduce an unlabeled
- * entry.
+ * Coverage: every version-group that appears in the seeded native Pokédex data.
+ * `lib/pokemon/versionGroupLabels.test.ts` enforces that every slug appearing
+ * in any `SeedPokemon.versionGroups` has an entry here, and that every entry
+ * here is used by at least one species, so re-seeding cannot silently introduce
+ * an unlabelled entry and stale entries cannot accumulate.
  *
  * Grouping is by generation (`VERSION_GROUP_GENERATION`). The scope picker
  * uses this to render an accordion of games per generation. Spin-offs and
@@ -32,8 +32,6 @@ export const VERSION_GROUP_LABELS: Record<string, string> = {
   "ruby-sapphire": "Pokémon Ruby/Sapphire",
   emerald: "Pokémon Emerald",
   "firered-leafgreen": "Pokémon FireRed/LeafGreen",
-  colosseum: "Pokémon Colosseum",
-  xd: "Pokémon XD: Gale of Darkness",
   // Gen IV
   "diamond-pearl": "Pokémon Diamond/Pearl",
   platinum: "Pokémon Platinum",
@@ -79,8 +77,6 @@ export const VERSION_GROUP_GENERATION: Record<string, number> = {
   "ruby-sapphire": 3,
   emerald: 3,
   "firered-leafgreen": 3,
-  colosseum: 3,
-  xd: 3,
   "diamond-pearl": 4,
   platinum: 4,
   "heartgold-soulsilver": 4,
@@ -123,8 +119,6 @@ export const VERSION_GROUP_ORDER: string[] = [
   "ruby-sapphire",
   "emerald",
   "firered-leafgreen",
-  "colosseum",
-  "xd",
   // Gen IV
   "diamond-pearl",
   "platinum",

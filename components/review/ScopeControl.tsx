@@ -244,7 +244,7 @@ export function ScopeControl({
               Games
             </legend>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Limit practice to Pokémon available in specific games.
+              Limit practice to Pokémon in the native Pokédex of specific games.
             </p>
             <div className="mt-2">
               <GameScopePicker

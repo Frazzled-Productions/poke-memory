@@ -46,6 +46,19 @@ describe("versionGroupLabels: completeness", () => {
     const orphans = VERSION_GROUP_ORDER.filter((s) => !(s in VERSION_GROUP_LABELS));
     expect(orphans).toEqual([]);
   });
+
+  it("every label key is used by at least one species in SEED_POKEMON (no orphan labels)", () => {
+    // Collects every version-group slug that actually appears in the seed.
+    const slugsInSeed = new Set<string>();
+    for (const p of SEED_POKEMON) {
+      const vgs = (p as { versionGroups?: string[] }).versionGroups ?? [];
+      for (const vg of vgs) slugsInSeed.add(vg);
+    }
+    // Any key in VERSION_GROUP_LABELS that never appears in the seed is an orphan
+    // — it can never be toggled by the game-scope picker and should be removed.
+    const orphans = Object.keys(VERSION_GROUP_LABELS).filter((k) => !slugsInSeed.has(k));
+    expect(orphans).toEqual([]);
+  });
 });
 
 describe("versionGroupLabel / versionGroupGeneration", () => {
