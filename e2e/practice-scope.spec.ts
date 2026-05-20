@@ -81,6 +81,36 @@ test.describe("Practice scope (#333)", () => {
     // frozen on the pre-scope-change pick until the user graded it. Picking
     // a scope that excludes the on-screen card must swap it for the new queue
     // head immediately.
+    //
+    // Seed settings with only name cards enabled so the first queued card is
+    // guaranteed to be a name card (rendered by PokemonCard with a single
+    // sprite and alt="A Pokémon sprite, answer hidden"). Evolution, reverse,
+    // and cry cards use different layouts and alt text, which would make the
+    // sprite locator below fail intermittently.
+    await page.addInitScript(
+      ({ key }) => {
+        const settings = {
+          masteryRepetitions: 3,
+          maxNewPerDay: 10,
+          maxReviewsPerDay: 100,
+          maxNewEvolutionPerDay: 5,
+          maxReviewsEvolutionPerDay: 50,
+          nameCardsEnabled: true,
+          evolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          maxNewReversePerDay: 10,
+          maxReviewsReversePerDay: 100,
+          playCryOnReveal: false,
+          cryCardsEnabled: false,
+          maxNewCryPerDay: 10,
+          maxReviewsCryPerDay: 100,
+          favouriteTheme: null,
+          retentionTarget: 0.9,
+        };
+        localStorage.setItem(key, JSON.stringify(settings));
+      },
+      { key: SETTINGS_STORAGE_KEY },
+    );
     await page.goto("/");
 
     // Capture the sprite src that's rendered before any scope action. The
