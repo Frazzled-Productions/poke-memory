@@ -63,27 +63,26 @@ type FromBuilder = {
  *
  *   from("push_subscriptions").select(...)           → subs
  *   from("user_settings").select(...).in(...)        → settings
- *   from("card_reviews").select(...).lte().in().is() → due (any)
- *   from("card_reviews").select(..., { count, head }).eq().lte().is()
- *                                                    → due count
+ *   from("card_reviews").select(...).lte().in().is() → due rows
  *   from("push_subscriptions").delete().in()         → delete
  *
- * We make each builder method return a thenable so the route's chained
- * await resolves to the configured value.
+ * The route used to issue a second per-user COUNT query inside a loop —
+ * that's been collapsed (see commit history). Now per-user counts come from
+ * counting matching rows in the single `.select("user_id")` result. To
+ * configure a test where user-a has 3 due cards, pass three matching rows
+ * in `due`. The helper `dueRowsFor({ "user-a": 3 })` builds them.
  */
 function buildAdminMock(opts: {
   subscriptions?: Array<Record<string, unknown>>;
   subsError?: unknown;
   settings?: Array<{ user_id: string; timezone: string | null }>;
   due?: Array<{ user_id: string }>;
-  dueCountByUser?: Record<string, number>;
   deleteError?: unknown;
   deleteCount?: number;
 }) {
   const subsRows = opts.subscriptions ?? [];
   const settingsRows = opts.settings ?? [];
   const dueRows = opts.due ?? [];
-  const dueCounts = opts.dueCountByUser ?? {};
   const deleteCount = opts.deleteCount ?? 0;
 
   const deleteCalls: Array<{ ids: unknown[] }> = [];
@@ -91,11 +90,16 @@ function buildAdminMock(opts: {
   const from = vi.fn((table: string) => {
     if (table === "push_subscriptions") {
       const builder = {
-        select: vi.fn(() => Promise.resolve({ data: subsRows, error: opts.subsError ?? null })),
+        select: vi.fn(() =>
+          Promise.resolve({ data: subsRows, error: opts.subsError ?? null }),
+        ),
         delete: vi.fn((_opts?: unknown) => ({
           in: vi.fn((_col: string, ids: unknown[]) => {
             deleteCalls.push({ ids });
-            return Promise.resolve({ error: opts.deleteError ?? null, count: deleteCount });
+            return Promise.resolve({
+              error: opts.deleteError ?? null,
+              count: deleteCount,
+            });
           }),
         })),
       };
@@ -108,25 +112,9 @@ function buildAdminMock(opts: {
         })),
       };
     }
-    // card_reviews — distinguished by whether the call passes count opts.
-    // The route's first call selects "user_id" with no count; the per-user
-    // count call passes { count: "exact", head: true }.
+    // card_reviews — one "due rows" select chain, no inline count path.
     return {
-      select: vi.fn((_cols?: string, opts2?: { count?: string; head?: boolean }) => {
-        if (opts2?.count === "exact" && opts2.head === true) {
-          // Per-user count path.
-          const captured = { userId: "" };
-          const builder = {
-            eq: vi.fn((_col: string, userId: string) => {
-              captured.userId = userId;
-              return builder;
-            }),
-            lte: vi.fn(() => builder),
-            is: vi.fn(() => Promise.resolve({ count: dueCounts[captured.userId] ?? 0, error: null })),
-          };
-          return builder;
-        }
-        // First "any due" path.
+      select: vi.fn(() => {
         const builder = {
           lte: vi.fn(() => builder),
           in: vi.fn(() => builder),
@@ -138,6 +126,19 @@ function buildAdminMock(opts: {
   });
 
   return { client: { from }, deleteCalls };
+}
+
+/**
+ * Builds an array of `{ user_id }` rows that, when fed into the mocked
+ * `card_reviews` select chain, makes the route observe `counts[userId]`
+ * due cards for each user.
+ */
+function dueRowsFor(counts: Record<string, number>): Array<{ user_id: string }> {
+  const rows: Array<{ user_id: string }> = [];
+  for (const [userId, count] of Object.entries(counts)) {
+    for (let i = 0; i < count; i++) rows.push({ user_id: userId });
+  }
+  return rows;
 }
 
 beforeEach(() => {
@@ -199,6 +200,21 @@ describe("POST /api/push/send-daily — auth and config gates", () => {
     const res = await POST(makeRequest("wrong-secret"));
     expect(res.status).toBe(401);
   });
+
+  it("returns 401 with an empty body so the route does not leak metadata", async () => {
+    const res = await POST(makeRequest("wrong-secret"));
+    expect(res.status).toBe(401);
+    // The body must be empty: no JSON `error` field, no header schema hint,
+    // nothing that helps an unauthenticated caller probe the endpoint.
+    expect(await res.text()).toBe("");
+  });
+
+  it("treats a Bearer with the wrong length as unauthorised without throwing", async () => {
+    // The constant-time check requires equal-length buffers; a shorter or
+    // longer header must still return 401 cleanly rather than crashing.
+    const res = await POST(makeRequest("x"));
+    expect(res.status).toBe(401);
+  });
 });
 
 describe("POST /api/push/send-daily — happy path", () => {
@@ -230,8 +246,7 @@ describe("POST /api/push/send-daily — happy path", () => {
         },
       ],
       settings: [{ user_id: "user-a", timezone: "Europe/London" }],
-      due: [{ user_id: "user-a" }],
-      dueCountByUser: { "user-a": 3 },
+      due: dueRowsFor({ "user-a": 3 }),
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
     mockSendNotification.mockResolvedValue({
@@ -291,8 +306,7 @@ describe("POST /api/push/send-daily — dead-endpoint cleanup", () => {
         },
       ],
       settings: [{ user_id: "user-a", timezone: "UTC" }],
-      due: [{ user_id: "user-a" }],
-      dueCountByUser: { "user-a": 1 },
+      due: dueRowsFor({ "user-a": 1 }),
       deleteCount: 1,
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -319,8 +333,7 @@ describe("POST /api/push/send-daily — dead-endpoint cleanup", () => {
         },
       ],
       settings: [{ user_id: "user-a", timezone: "UTC" }],
-      due: [{ user_id: "user-a" }],
-      dueCountByUser: { "user-a": 2 },
+      due: dueRowsFor({ "user-a": 2 }),
       deleteCount: 1,
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -344,8 +357,7 @@ describe("POST /api/push/send-daily — dead-endpoint cleanup", () => {
         },
       ],
       settings: [{ user_id: "user-a", timezone: "UTC" }],
-      due: [{ user_id: "user-a" }],
-      dueCountByUser: { "user-a": 1 },
+      due: dueRowsFor({ "user-a": 1 }),
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
     mockSendNotification.mockRejectedValueOnce({ statusCode: 500, body: "", headers: {} });
