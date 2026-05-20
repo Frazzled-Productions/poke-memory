@@ -40,10 +40,8 @@ vi.mock("@/components/review/StreakBadge", () => ({
   StreakBadge: () => <div data-testid="streak-badge" />,
 }));
 
-vi.mock("@/components/onboarding/OnboardingHint", () => ({
-  OnboardingHint: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="onboarding-hint">{children}</div>
-  ),
+vi.mock("@/components/onboarding/FirstVisitOnboardingModal", () => ({
+  FirstVisitOnboardingModal: () => <div data-testid="first-visit-onboarding-modal" />,
 }));
 
 // ---------------------------------------------------------------------------
@@ -73,11 +71,11 @@ describe("Practice page (Home) — layout shell", () => {
     expect(screen.getByTestId("practice-sidebar")).toBeInTheDocument();
   });
 
-  it("renders the StreakBadge and OnboardingHint", () => {
+  it("renders the StreakBadge and FirstVisitOnboardingModal", () => {
     render(<Home searchParams={pendingSearchParams()} />);
 
     expect(screen.getByTestId("streak-badge")).toBeInTheDocument();
-    expect(screen.getByTestId("onboarding-hint")).toBeInTheDocument();
+    expect(screen.getByTestId("first-visit-onboarding-modal")).toBeInTheDocument();
   });
 
   it("renders the PracticeSidebar inside the wide-viewport grid column", () => {

@@ -6,11 +6,20 @@ import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 // interval preview — not exact day counts. Exact intervals depend on
 // FSRS parameters and would make the test brittle.
 
+const SETTINGS_KEY = "poke-memory:settings:v1";
+
 test.describe("FSRS smoke", () => {
   test("Easy on a brand-new card graduates it out of the queue", async ({
     page,
   }) => {
     await page.addInitScript(() => localStorage.clear());
+    // Pre-dismiss the modal after the clear so it does not block the Reveal button.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
+      );
+    }, SETTINGS_KEY);
     await page.goto("/");
 
     const reveal = page.getByRole("button", { name: /reveal/i });
@@ -59,6 +68,14 @@ test.describe("FSRS smoke", () => {
   test("Graduated card: Again preview is <Xm, Good/Easy previews are day-shaped, Easy ≥ Good", async ({
     page,
   }) => {
+    // Pre-dismiss the modal so it does not block the Reveal button.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
+      );
+    }, SETTINGS_KEY);
+
     // Seed a single graduated FSRS card so the test doesn't depend on
     // grading a brand-new card through the learning steps. Stability and
     // difficulty are chosen so FSRS produces a non-trivial scheduledDays

@@ -174,14 +174,15 @@ async function main() {
           flagsKey,
           JSON.stringify({ pretendAllMastered: true }),
         );
-        // Dismiss the welcome, practice-grading, audio, and card-types hints
+        // Dismiss the first-visit onboarding modal and all contextual hints
         // so the practice screenshots show card content rather than first-run
-        // banners. Matches what a returning user sees after their first session.
+        // overlays. Matches what a returning user sees after their first session.
         const rawSettings = localStorage.getItem(settingsKey);
         const existing = rawSettings ? JSON.parse(rawSettings) : {};
         localStorage.setItem(settingsKey, JSON.stringify({
           ...existing,
           onboarding: {
+            firstVisitOnboardingDismissed: true,
             welcomeDismissed: true,
             practiceHintDismissed: true,
             audioHintDismissed: true,

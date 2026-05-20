@@ -50,6 +50,7 @@ const SAMPLE: UserSettings = {
   seenStreakMilestones: [],
   earnedBadges: [],
   onboarding: {
+    firstVisitOnboardingDismissed: false,
     welcomeDismissed: false,
     practiceHintDismissed: false,
     statsHintDismissed: false,

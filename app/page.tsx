@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
+import { FirstVisitOnboardingModal } from "@/components/onboarding/FirstVisitOnboardingModal";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import { PracticeSidebar } from "@/components/review/PracticeSidebar";
 import { StreakBadge } from "@/components/review/StreakBadge";
@@ -81,19 +81,13 @@ export default function Home({
 
         {/* Main review session — always visible */}
         <main className="flex flex-1 flex-col min-h-0 w-full lg:flex-none">
-          <div className="mb-2 sm:mb-4">
-            <OnboardingHint
-              id="welcomeDismissed"
-              tone="callout"
-              title="Welcome to Poké Memory"
-              ctaHref="/settings#onboarding-heading"
-              ctaLabel="How this works"
-            >
-              Learn every Pokémon&apos;s name and evolutions with spaced
-              repetition. Grade honestly: the app shows each card right before
-              you&apos;d likely forget it, so gaps grow as you remember.
-            </OnboardingHint>
-          </div>
+          {/*
+            First-visit onboarding modal (#1103). Renders as a fixed overlay;
+            it reads its own persisted flag so no state is needed here.
+            Rendered client-side only — no SSR flash because the component
+            stays null until the flag is read from localStorage.
+          */}
+          <FirstVisitOnboardingModal />
           <StreakBadge />
           {/*
             Wrapper propagates the remaining height into ReviewSession on mobile

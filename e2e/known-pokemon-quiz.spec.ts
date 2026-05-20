@@ -1,6 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
 
 const SETTINGS_HEADING_HASH = "/settings#known-quiz-heading";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 test.describe("Mark Pokémon I already know quiz (#1084)", () => {
   test("entry point renders in Practice section and opens the quiz", async ({

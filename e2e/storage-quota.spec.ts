@@ -64,6 +64,13 @@ test.describe("StorageQuotaBanner (#766)", () => {
     await page.addInitScript(
       ({ sessionJson }: { sessionJson: string }) => {
         const SESSION_KEY = "poke-memory:review-session:v1";
+        const SETTINGS_KEY = "poke-memory:settings:v1";
+
+        // Pre-dismiss the first-visit modal so it does not block the Reveal button.
+        window.localStorage.setItem(
+          SETTINGS_KEY,
+          JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
+        );
 
         // Seed the session into localStorage so loadSessionLS can find it.
         window.localStorage.setItem(SESSION_KEY, sessionJson);

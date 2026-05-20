@@ -31,6 +31,13 @@ test.describe("Practice scope (#333)", () => {
     // Fresh slate — drop any settings/session state from a prior test so
     // the scope starts at its empty default.
     await page.addInitScript(() => localStorage.clear());
+    // Pre-dismiss the first-visit modal so it does not block the scope controls.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
+      );
+    }, SETTINGS_STORAGE_KEY);
   });
 
   test("happy path: scope to Generation I, practice page still shows a card", async ({
@@ -112,6 +119,7 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsCryPerDay: 100,
           favouriteTheme: null,
           retentionTarget: 0.9,
+          onboarding: { firstVisitOnboardingDismissed: true },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },
@@ -227,6 +235,8 @@ test.describe("Practice scope (#333)", () => {
           favouriteTheme: null,
           retentionTarget: 0.9,
           practiceScope: { gens: [], types: ["nonexistent-type"], presets: [] },
+          // Pre-dismiss the first-visit modal so it does not cover the empty state.
+          onboarding: { firstVisitOnboardingDismissed: true },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },
@@ -362,6 +372,8 @@ test.describe("Practice scope (#333)", () => {
             presets: [],
             formCategories: { mode: "default-only" },
           },
+          // Pre-dismiss the first-visit modal so it does not block the reveal button.
+          onboarding: { firstVisitOnboardingDismissed: true },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },
@@ -450,6 +462,12 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     // mastered, reverse edge unseen), keeping the panel mounted after selection.
     await page.addInitScript(() => {
       localStorage.clear();
+      // Re-seed the onboarding pre-dismiss flag after the clear above so the
+      // first-visit modal does not render and block scope-panel interactions.
+      window.localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
+      );
       window.localStorage.setItem(
         "poke-memory:review-session:v1",
         JSON.stringify({
@@ -602,6 +620,7 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
             types: [],
             presets: ["incomplete-chains"],
           },
+          onboarding: { firstVisitOnboardingDismissed: true },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },
@@ -633,7 +652,19 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
 // the practice session stays operable.
 test.describe("Practice scope — Games axis (#1089)", () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => localStorage.clear());
+    await page.addInitScript(() => {
+      localStorage.clear();
+      // Re-seed the modal-dismiss flag and new-user mobileNav default so the
+      // first-visit onboarding modal does not block scope-panel interactions
+      // and the bottom tab bar appears as expected (#1103).
+      localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({
+          onboarding: { firstVisitOnboardingDismissed: true },
+          mobileNav: "bottom",
+        }),
+      );
+    });
   });
 
   test("toggling Pokemon Gold/Silver narrows the scope and keeps practice operable", async ({

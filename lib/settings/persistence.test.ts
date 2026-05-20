@@ -512,6 +512,7 @@ describe('themeIntensity setting (#411)', () => {
       saveSettings({
         ...DEFAULT_SETTINGS,
         onboarding: {
+          firstVisitOnboardingDismissed: true,
           welcomeDismissed: true,
           practiceHintDismissed: false,
           statsHintDismissed: true,
@@ -523,6 +524,7 @@ describe('themeIntensity setting (#411)', () => {
         },
       });
       expect(loadSettings().onboarding).toEqual({
+        firstVisitOnboardingDismissed: true,
         welcomeDismissed: true,
         practiceHintDismissed: false,
         statsHintDismissed: true,
@@ -560,6 +562,7 @@ describe('themeIntensity setting (#411)', () => {
         }),
       );
       expect(loadSettings().onboarding).toEqual({
+        firstVisitOnboardingDismissed: false,
         welcomeDismissed: false,
         practiceHintDismissed: false,
         statsHintDismissed: false,

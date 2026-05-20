@@ -506,47 +506,9 @@ describe("handleReveal decode-ahead (#930)", () => {
 });
 
 describe("ReviewSession onboarding nudges (#702)", () => {
-  it("shows the audio hint at reveal when no audio feature is enabled", async () => {
-    const user = userEvent.setup();
-    render(<ReviewSession />);
-
-    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
-    await user.click(revealBtn);
-
-    expect(
-      screen.getByText(/hear Pokémon cries and names read aloud/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /open audio settings/i }),
-    ).toHaveAttribute("href", "/settings#audio-heading");
-  });
-
-  it("hides the audio hint when an audio feature is already on", async () => {
-    const user = userEvent.setup();
-    mockLoadSettings.mockReturnValue({
-      masteryRepetitions: 3,
-      maxNewPerDay: 10,
-      maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
-      maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: true,
-      playCryOnReveal: true,
-      practiceScope: { gens: [], types: [], presets: [] },
-      earnedBadges: [],
-    });
-    render(<ReviewSession />);
-
-    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
-    await user.click(revealBtn);
-
-    expect(
-      screen.queryByText(/hear Pokémon cries and names read aloud/i),
-    ).not.toBeInTheDocument();
-  });
+  // Audio-feature hints were removed in #1103 (replaced by the first-visit
+  // onboarding modal). Only the card-types nudge on the session-complete screen
+  // remains — it is still rendered by EndOfSessionScreen.
 
   it("shows the card-types hint on the session-complete screen", async () => {
     const user = userEvent.setup();
@@ -565,74 +527,6 @@ describe("ReviewSession onboarding nudges (#702)", () => {
     expect(
       screen.getByRole("link", { name: /open practice settings/i }),
     ).toHaveAttribute("href", "/settings#practice-heading");
-  });
-
-  it("shows the audio hint for reverse cards when no audio feature is enabled", async () => {
-    // Reverse cards use SpritePicker and have no reveal step. The nudge must
-    // appear immediately after the picker renders, not gated on a reveal click.
-    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
-    mockLoadSettings.mockReturnValue({
-      masteryRepetitions: 3,
-      maxNewPerDay: 10,
-      maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: true,
-      maxNewReversePerDay: 10,
-      maxReviewsReversePerDay: 100,
-      nameCardsEnabled: false,
-      evolutionCardsEnabled: false,
-      playCryOnReveal: false,
-      practiceScope: { gens: [], types: [], presets: [] },
-      earnedBadges: [],
-    });
-
-    render(<ReviewSession />);
-
-    // SpritePicker renders immediately (no reveal step).
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument(),
-    );
-
-    // The audio nudge must be visible without any reveal interaction.
-    await waitFor(() =>
-      expect(
-        screen.getByText(/hear Pokémon cries and names read aloud/i),
-      ).toBeInTheDocument(),
-    );
-    expect(
-      screen.getByRole("link", { name: /open audio settings/i }),
-    ).toHaveAttribute("href", "/settings#audio-heading");
-  });
-
-  it("hides the audio hint for reverse cards when an audio feature is already on", async () => {
-    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
-    mockLoadSettings.mockReturnValue({
-      masteryRepetitions: 3,
-      maxNewPerDay: 10,
-      maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: true,
-      maxNewReversePerDay: 10,
-      maxReviewsReversePerDay: 100,
-      nameCardsEnabled: false,
-      evolutionCardsEnabled: false,
-      playCryOnReveal: true,
-      practiceScope: { gens: [], types: [], presets: [] },
-      earnedBadges: [],
-    });
-
-    render(<ReviewSession />);
-
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument(),
-    );
-
-    // playCryOnReveal is on → audioFeaturesOff is false → nudge must not appear.
-    expect(
-      screen.queryByText(/hear Pokémon cries and names read aloud/i),
-    ).not.toBeInTheDocument();
   });
 
   it("hides the card-types hint when every card type is already on", async () => {
