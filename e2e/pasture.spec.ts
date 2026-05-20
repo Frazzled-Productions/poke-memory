@@ -112,22 +112,14 @@ test.describe("Pasture nav guard", () => {
     await page.goto("/");
     await awaitSeedIdb(page);
 
-    // Fire a synthetic StorageEvent so the BottomTabBar's mastery-check
-    // useEffect re-runs after the IDB seed transaction commits. Without this,
-    // the BottomTabBar's initial render may complete BEFORE the IDB write
-    // finishes (the seed's addInitScript is async), leaving `hasMastered`
-    // stuck at false and the Pasture link absent. The component's
-    // `useLocalStorageKey(SESSION_STORAGE_KEY)` watcher reacts to storage
-    // events, so a synthetic one with the session key triggers the re-read.
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key: "poke-memory:review-session:v1",
-          storageArea: window.localStorage,
-          newValue: null,
-        }),
-      );
-    });
+    // Reload after the IDB seed commits so the BottomTabBar's mastery-check
+    // useEffect runs against committed data. Without the reload, the
+    // BottomTabBar's initial render on the first goto can complete BEFORE the
+    // seed's async addInitScript finishes its IDB transaction, leaving
+    // `hasMastered` stuck at false. A synthetic StorageEvent was tried first
+    // but does not reliably trigger same-tab `storage` listeners on webkit.
+    await page.reload();
+    await awaitSeedIdb(page);
 
     // On mobile the Pasture link is in the bottom tab bar (the new default for
     // fresh users). On desktop it lives in the main navigation header row.
