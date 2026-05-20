@@ -41,8 +41,11 @@ export function MobileNavPaddingWrapper({ children }: { children: React.ReactNod
         // tab bar visually jumps upward when the toolbar appears. Giving the wrapper
         // a minimum height of 100dvh keeps the page body at least as tall as the
         // current visual viewport, which keeps the toolbar state stable and the nav
-        // bar anchored (#1086).
-        "flex flex-1 flex-col min-h-dvh md:min-h-0 md:pb-0",
+        // bar anchored (#1086). Only applied when the bottom tab bar is active
+        // (mobileNav === 'bottom' or null during hydration); the hamburger layout
+        // has no fixed bar so the minimum height is not needed.
+        "flex flex-1 flex-col md:min-h-0 md:pb-0",
+        mobileNav !== "hamburger" ? "min-h-dvh" : "",
         mobileNav === "bottom"
           ? "pb-[calc(4rem+env(safe-area-inset-bottom))]"
           : "",
