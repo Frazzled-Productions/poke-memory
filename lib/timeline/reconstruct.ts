@@ -208,12 +208,23 @@ function replayLog(
 }
 
 /**
- * Build the past half of the timeline: a sorted list of snapshots,
- * each representing a week boundary (Sunday midnight UTC) from the
+ * How many days of history to render at daily resolution.
+ * Beyond this window, the past timeline falls back to weekly snapshots.
+ * At one entry per day, 90 days = 90 entries; older history adds at most
+ * ~52 more per year of weekly entries, keeping the total array manageable.
+ */
+const DAILY_RESOLUTION_DAYS = 90;
+
+/**
+ * Build the past half of the timeline: a sorted list of snapshots from the
  * first grade ever recorded up to now.
  *
- * Resolution: weekly. This keeps the snapshot array small (~52 entries
- * per year) while matching the "week by week" description in the issue.
+ * Resolution strategy:
+ *   - The most recent `DAILY_RESOLUTION_DAYS` days are sampled daily (one
+ *     snapshot per midnight UTC), giving day-by-day fidelity for new users.
+ *   - Older history is sampled weekly (Sunday midnight UTC) to keep the total
+ *     snapshot count bounded.
+ *   - `nowMs` is always the final entry so the scrubber "now" anchor is exact.
  */
 function buildPastTimeline(
   speciesEvents: Map<string, SpeciesEvent>,
@@ -234,17 +245,36 @@ function buildPastTimeline(
     if (ev.firstSeenMs < minMs) minMs = ev.firstSeenMs;
   }
 
-  // Snap minMs back to the previous Sunday midnight UTC.
-  const minDate = new Date(minMs);
-  const dayOfWeek = minDate.getUTCDay(); // 0 = Sunday
-  const startMs = minMs - dayOfWeek * 86_400_000 - (minMs % 86_400_000);
+  // Boundary between the weekly (old) and daily (recent) regions.
+  // Snap to midnight UTC so checkpoints are always aligned to day boundaries.
+  const dailyBoundaryMs = nowMs - DAILY_RESOLUTION_DAYS * 86_400_000;
+  // Snap to the start of the boundary day (midnight UTC).
+  const dailyStartMs = dailyBoundaryMs - (dailyBoundaryMs % 86_400_000);
 
-  // Enumerate weekly checkpoints from start to now.
   const checkpoints: number[] = [];
-  for (let t = startMs; t <= nowMs; t += 7 * 86_400_000) {
+
+  // --- Weekly region: from the earliest firstSeen up to the daily boundary ---
+  if (minMs < dailyStartMs) {
+    // Snap minMs back to the previous Sunday midnight UTC.
+    const minDate = new Date(minMs);
+    const dayOfWeek = minDate.getUTCDay(); // 0 = Sunday
+    const weeklyStartMs = minMs - dayOfWeek * 86_400_000 - (minMs % 86_400_000);
+
+    for (let t = weeklyStartMs; t < dailyStartMs; t += 7 * 86_400_000) {
+      checkpoints.push(t);
+    }
+  }
+
+  // --- Daily region: one checkpoint per midnight UTC for the recent window ---
+  // Anchor on the start of the current day so daily entries align to UTC dates.
+  const todayMidnightMs = nowMs - (nowMs % 86_400_000);
+  const dailyRegionStart = Math.max(minMs - (minMs % 86_400_000), dailyStartMs);
+  for (let t = dailyRegionStart; t <= todayMidnightMs; t += 86_400_000) {
     checkpoints.push(t);
   }
-  if (checkpoints[checkpoints.length - 1] < nowMs) {
+
+  // Ensure nowMs is the final entry (exact "now" anchor for the scrubber).
+  if (checkpoints.length === 0 || checkpoints[checkpoints.length - 1] < nowMs) {
     checkpoints.push(nowMs);
   }
 
