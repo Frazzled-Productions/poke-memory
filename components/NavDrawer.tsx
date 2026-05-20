@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { filterMastered } from "@/lib/pasture/arrivals";
-import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY, SESSION_CHANGED_EVENT } from "@/lib/review/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
@@ -87,6 +87,9 @@ export function NavDrawer() {
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  // Tracks the write epoch seen when the mastery effect last attached its
+  // listener, to detect writes that happened before React hydrated.
+  const epochAtLastAttach = useRef<number>(0);
 
   useEffect(() => {
     function onSaved() {
@@ -107,6 +110,22 @@ export function NavDrawer() {
       );
     }
     void load();
+    // Also listen for the CustomEvent dispatched after every IDB write (including
+    // the E2E test seed helper). WebKit does not reliably propagate synthetic
+    // StorageEvents to same-tab `storage` listeners, so the CustomEvent is the
+    // authoritative post-write signal on mobile-safari.
+    window.addEventListener(SESSION_CHANGED_EVENT, load);
+
+    // Catch-up check: if a write happened before this effect registered its
+    // listener (e.g. the E2E seed fires tx.oncomplete before React hydrates),
+    // the epoch on window will be higher than what we recorded last time.
+    const epochNow = window.__pokeMemorySessionWriteEpoch ?? 0;
+    if (epochNow !== epochAtLastAttach.current) {
+      epochAtLastAttach.current = epochNow;
+      requestAnimationFrame(() => { void load(); });
+    }
+
+    return () => window.removeEventListener(SESSION_CHANGED_EVENT, load);
   }, [sessionVersion, settingsVersion]);
 
   const showPasture = hasMastered || flags.pretendAllMastered;

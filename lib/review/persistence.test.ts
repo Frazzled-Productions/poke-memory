@@ -558,9 +558,13 @@ describe("saveSession (synthetic StorageEvent dispatch)", () => {
     const result = await saveSession({ cards: [makeReverseCard()], limits: defaultLimits });
 
     expect(result.ok).toBe(true);
-    expect(dispatched).toHaveLength(1);
+    // saveSession dispatches two events: a synthetic StorageEvent (to wake
+    // same-tab useLocalStorageKey subscribers) and a CustomEvent for the
+    // SESSION_CHANGED_EVENT channel (to wake BottomTabBar on WebKit).
+    expect(dispatched).toHaveLength(2);
     expect((dispatched[0] as unknown as { key: string }).key).toBe(
       "poke-memory:review-session:v1",
     );
+    expect(dispatched[1].type).toBe("poke-memory:session-changed");
   });
 });

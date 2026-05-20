@@ -350,6 +350,33 @@ function saveSessionLS(session: SavedSession): SaveResult {
 }
 
 /**
+ * CustomEvent name dispatched on `window` whenever the review session is
+ * written to IndexedDB (or localStorage). Subscribers that need a reliable
+ * post-IDB-write signal — such as BottomTabBar — should listen for this
+ * event in addition to (or instead of) the synthetic `storage` event, because
+ * WebKit does not reliably propagate synthetic StorageEvents to same-tab
+ * `storage` listeners after an addInitScript IDB seed.
+ */
+export const SESSION_CHANGED_EVENT = "poke-memory:session-changed";
+
+// ─── Global write-epoch ───────────────────────────────────────────────────────
+//
+// Every IDB (or localStorage) session write bumps a monotonically increasing
+// counter on `window`. Components that subscribe to SESSION_CHANGED_EVENT can
+// capture this counter at mount time and then check in a `requestAnimationFrame`
+// whether the counter advanced before their listener attached — catching the
+// race where the write (and event dispatch) happened before the React tree
+// hydrated and the listener was registered.
+//
+// The counter is also bumped by the E2E seed helper (`e2e/helpers/seedIdb.ts`)
+// so tests behave identically to production writes.
+declare global {
+  interface Window {
+    __pokeMemorySessionWriteEpoch?: number;
+  }
+}
+
+/**
  * Dispatches a synthetic StorageEvent against the session-storage key. Used by
  * `saveSession` to wake same-tab `useLocalStorageKey` subscribers, and by
  * `pullAndMerge` (auxiliary table merges) to surface non-session writes
@@ -360,6 +387,10 @@ export function bumpSessionStorageKey(): void {
 }
 
 function dispatchStorageEvent(): void {
+  // Bump the write epoch so components can detect missed events at mount time.
+  // See the declare global block above for the design rationale.
+  window.__pokeMemorySessionWriteEpoch =
+    (window.__pokeMemorySessionWriteEpoch ?? 0) + 1;
   // Same-tab subscribers (useLocalStorageKey) require a synthetic StorageEvent
   // to re-render. The browser only fires the native event in *other* tabs.
   // Even though data now lives in IndexedDB rather than localStorage, browsers
@@ -377,6 +408,15 @@ function dispatchStorageEvent(): void {
     );
   } catch {
     // Older browsers / non-standard envs without a StorageEvent constructor.
+  }
+  // Also dispatch a CustomEvent so BottomTabBar (and any future subscriber that
+  // needs a reliable post-IDB-write signal) can react without relying on the
+  // synthetic StorageEvent, which WebKit does not always propagate to same-tab
+  // `storage` listeners after an addInitScript IDB seed.
+  try {
+    window.dispatchEvent(new CustomEvent(SESSION_CHANGED_EVENT));
+  } catch {
+    // Non-standard envs.
   }
 }
 

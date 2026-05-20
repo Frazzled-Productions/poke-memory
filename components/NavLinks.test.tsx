@@ -46,6 +46,7 @@ const mockLoadSession = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: () => mockLoadSession(),
   STORAGE_KEY: "poke-memory:review-session:v1",
+  SESSION_CHANGED_EVENT: "poke-memory:session-changed",
 }));
 
 const mockFilterMastered = vi.fn().mockReturnValue([]);
@@ -183,6 +184,31 @@ describe("NavLinks", () => {
       expect(
         screen.getByRole("link", { name: "Pasture" }),
       ).toBeInTheDocument();
+    });
+  });
+
+  it("shows Pasture link when SESSION_CHANGED_EVENT fires after an IDB write", async () => {
+    // Start with no mastered cards — Pasture should be hidden.
+    mockLoadSession.mockResolvedValue(null);
+    mockFilterMastered.mockReturnValue([]);
+
+    render(<NavLinks />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "Pasture" })).toBeNull();
+
+    // Simulate an IDB write completing: stub loadSession to return a mastered
+    // card, then fire the CustomEvent that saveSession dispatches post-write.
+    mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }] });
+    mockFilterMastered.mockReturnValue([{ id: 1 }]);
+    act(() => {
+      window.dispatchEvent(new CustomEvent("poke-memory:session-changed"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Pasture" })).toBeInTheDocument();
     });
   });
 });
