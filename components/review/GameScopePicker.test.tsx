@@ -45,8 +45,10 @@ describe("GameScopePicker", () => {
     const onChange = vi.fn();
     render(<GameScopePicker selected={[]} onChange={onChange} />);
     // Find Gen II's Select-all button. Gen II has gold-silver + crystal.
+    // The aria-label spells out game names ("Select Gold/Silver / Crystal")
+    // to distinguish it from the gens-axis "Generation II" toggle (#1110).
     const selectAllButtons = screen.getAllByRole("button", {
-      name: /Select all games in Generation II/,
+      name: /^Select Gold\/Silver \/ Crystal$/,
     });
     await userEvent.click(selectAllButtons[0]);
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -64,7 +66,7 @@ describe("GameScopePicker", () => {
       />,
     );
     const clearAll = screen.getByRole("button", {
-      name: /Clear all games in Generation II/,
+      name: /^Clear Gold\/Silver \/ Crystal$/,
     });
     await userEvent.click(clearAll);
     expect(onChange).toHaveBeenCalledTimes(1);

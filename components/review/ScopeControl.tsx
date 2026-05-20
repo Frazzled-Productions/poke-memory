@@ -84,6 +84,58 @@ const SELECTED_ACCENT = "border-rose-500 bg-rose-500 text-white";
 const PILL_BASE =
   "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors";
 
+/**
+ * A collapsible section inside the scope panel (#1110). Uses `<details>` and
+ * `<summary>` for accessibility-by-default expand/collapse — no JS state
+ * needed. The surrounding `<div role="group">` preserves the ARIA group
+ * semantics that E2E and assistive-technology selectors rely on.
+ *
+ * Multiple sections can be open simultaneously (expansion-panels model, not
+ * exclusive accordion). `defaultOpen` is true when the section already has
+ * an active filter so the user can see the active state immediately.
+ */
+function ScopeSection({
+  legend,
+  legendId,
+  defaultOpen,
+  hasDivider = true,
+  children,
+}: {
+  legend: string;
+  /** Unique id used to link the group role to the visible label. */
+  legendId: string;
+  defaultOpen: boolean;
+  hasDivider?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role="group"
+      aria-labelledby={legendId}
+      className={hasDivider ? "border-b border-zinc-100 dark:border-zinc-800/60" : ""}
+    >
+      <details open={defaultOpen} className="group/details py-1">
+        <summary
+          id={legendId}
+          className="flex cursor-pointer list-none items-center justify-between gap-2 py-0.5 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
+        >
+          <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            {legend}
+          </span>
+          {/* Chevron rotates when the <details> is open via the group-open variant. */}
+          <span
+            aria-hidden="true"
+            className="text-zinc-400 transition-transform duration-150 group-open/details:rotate-180"
+          >
+            ▾
+          </span>
+        </summary>
+        <div className="mt-2 pb-2">{children}</div>
+      </details>
+    </div>
+  );
+}
+
 export function ScopeControl({
   scope,
   onChange,
@@ -114,6 +166,15 @@ export function ScopeControl({
   function setFormFilter(fc: FormCategoryFilter): void {
     onChange({ ...scope, formCategories: fc });
   }
+
+  // Determine which accordion sections should start open. A section opens by
+  // default when it already has an active filter so the active state is
+  // visible immediately without extra interaction.
+  const gensActive = scope.gens.length > 0;
+  const typesActive = scope.types.length > 0;
+  const presetsActive = scope.presets.length > 0;
+  const gamesActive = (scope.games ?? []).length > 0;
+  const formsActive = alternateFormsEnabled && formFilter.mode !== "all";
 
   return (
     <div className="w-full max-w-xl">
@@ -155,13 +216,17 @@ export function ScopeControl({
       {open ? (
         <div
           id="scope-panel"
-          className="mt-2 flex flex-col gap-4 rounded-lg border border-zinc-200 bg-background p-3 text-sm dark:border-zinc-800"
+          className="mt-2 flex flex-col rounded-lg border border-zinc-200 bg-background p-3 text-sm dark:border-zinc-800"
         >
-          <fieldset>
-            <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Generation
-            </legend>
-            <div className="mt-2 flex flex-wrap gap-1.5">
+          {/* Generation axis — filters by species introduction generation.
+              Label reads "I"–"IX" so it is visually distinct from the
+              games-axis bulk-action labels which spell out game names. */}
+          <ScopeSection
+            legend="Generation"
+            legendId="scope-section-generation"
+            defaultOpen={gensActive}
+          >
+            <div className="flex flex-wrap gap-1.5">
               {GENS.map((g) => {
                 const selected = scope.gens.includes(g);
                 return (
@@ -180,13 +245,15 @@ export function ScopeControl({
                 );
               })}
             </div>
-          </fieldset>
+          </ScopeSection>
 
-          <fieldset>
-            <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Type
-            </legend>
-            <div className="mt-2 flex flex-wrap gap-1.5">
+          {/* Type axis. */}
+          <ScopeSection
+            legend="Type"
+            legendId="scope-section-type"
+            defaultOpen={typesActive}
+          >
+            <div className="flex flex-wrap gap-1.5">
               {POKEMON_TYPES.map((t) => {
                 const selected = scope.types.includes(t);
                 const colors = TYPE_COLORS[t];
@@ -211,13 +278,15 @@ export function ScopeControl({
                 );
               })}
             </div>
-          </fieldset>
+          </ScopeSection>
 
-          <fieldset>
-            <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Groups
-            </legend>
-            <div className="mt-2 flex flex-wrap gap-1.5">
+          {/* Presets axis. */}
+          <ScopeSection
+            legend="Groups"
+            legendId="scope-section-groups"
+            defaultOpen={presetsActive}
+          >
+            <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((p) => {
                 const selected = scope.presets.includes(p.key);
                 return (
@@ -237,32 +306,39 @@ export function ScopeControl({
                 );
               })}
             </div>
-          </fieldset>
+          </ScopeSection>
 
-          <fieldset>
-            <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Games
-            </legend>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          {/* Games axis — filters by appearance in a specific game's Pokédex.
+              Distinct from the gens axis: "Generation II games" (Gold/Silver/Crystal)
+              includes many Gen I species via the Johto dex. The gens axis strictly
+              filters by species introduction generation. Bulk-action labels spell
+              out game names to prevent confusion with the gens-axis labels (#1110). */}
+          <ScopeSection
+            legend="Games"
+            legendId="scope-section-games"
+            defaultOpen={gamesActive}
+            hasDivider={alternateFormsEnabled}
+          >
+            <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
               Limit practice to Pokémon in the native Pokédex of specific games.
             </p>
-            <div className="mt-2">
-              <GameScopePicker
-                selected={scope.games ?? []}
-                onChange={(games) => onChange({ ...scope, games })}
-              />
-            </div>
-          </fieldset>
+            <GameScopePicker
+              selected={scope.games ?? []}
+              onChange={(games) => onChange({ ...scope, games })}
+            />
+          </ScopeSection>
 
           {/* "Alternate forms" category filter — only shown when the master
               gate in Settings is on. When it is off, the section is hidden
               entirely because no form cards surface in practice (#658). */}
           {alternateFormsEnabled ? (
-            <fieldset>
-              <legend className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Alternate forms
-              </legend>
-              <div className="mt-2 flex flex-col gap-2">
+            <ScopeSection
+              legend="Alternate forms"
+              legendId="scope-section-forms"
+              defaultOpen={formsActive}
+              hasDivider={false}
+            >
+              <div className="flex flex-col gap-2">
                 {(
                   [
                     { value: "all", label: "Include all" },
@@ -325,7 +401,7 @@ export function ScopeControl({
                   </p>
                 ) : null}
               </div>
-            </fieldset>
+            </ScopeSection>
           ) : null}
 
           <div className="flex flex-col gap-1 border-t border-zinc-200 pt-3 dark:border-zinc-800">

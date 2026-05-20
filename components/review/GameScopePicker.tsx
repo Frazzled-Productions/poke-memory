@@ -62,12 +62,52 @@ const _groupedVersionGroups: [number, string[]][] = (() => {
 })();
 
 /**
+ * Build a short label for the "Select all" / "Clear all" bulk-action button
+ * in each generation group. Spelling out the game names avoids confusion with
+ * the gens axis "Generation N" toggle, which filters by species introduction
+ * generation rather than game appearance (#1110).
+ *
+ * Examples:
+ *   Gen II  -> "Gold / Silver / Crystal"
+ *   Gen III -> "Ruby / Sapphire / Emerald / FR LG"
+ *
+ * Short names strip the "Pokémon " prefix and common suffixes so the label
+ * stays readable at small size.
+ */
+function shortGameName(slug: string): string {
+  const full = VERSION_GROUP_LABELS[slug] ?? slug;
+  // Strip "Pokémon " prefix.
+  let name = full.replace(/^Pok[eé]mon\s+/u, "");
+  // Collapse "FireRed/LeafGreen" to "FR/LG" and similar.
+  name = name
+    .replace(/FireRed\/LeafGreen/, "FR/LG")
+    .replace(/HeartGold\/SoulSilver/, "HG/SS")
+    .replace(/Brilliant Diamond\/Shining Pearl/, "BD/SP")
+    .replace(/Omega Ruby\/Alpha Sapphire/, "OR/AS")
+    .replace(/Ultra Sun\/Ultra Moon/, "US/UM")
+    .replace(/Let's Go Pikachu\/Eevee/, "Let's Go")
+    .replace(/Black 2\/White 2/, "B2/W2")
+    .replace(/Scarlet\/Violet/, "Scarlet/Violet")
+    // DLC entries like "Sword/Shield: The Isle of Armor" → "Isle of Armor"
+    .replace(/^(?:Sword\/Shield|Scarlet\/Violet):\s+(?:The\s+)?/, "");
+  return name;
+}
+
+function genBulkLabel(slugs: string[]): string {
+  return slugs.map(shortGameName).join(" / ");
+}
+
+/**
  * Game / version-group scope picker (#1089). Renders a vertical list of
  * generations; each generation is a header followed by a wrap of game pills.
  *
- * Selection is multi-select. The header carries an "All" toggle that adds /
- * removes every game in that generation in one tap, so users can pick a whole
- * generation (e.g. all Gen VIII games) without 5 individual taps.
+ * Selection is multi-select. The header carries a "Select: <game names>" toggle
+ * that adds / removes every game in that generation in one tap, so users can
+ * pick a whole era (e.g. all Gen VIII games) without 5 individual taps.
+ *
+ * Bulk-action labels spell out actual game names rather than "Select all games
+ * in Generation N" to avoid confusion with the gens-axis "Generation N" filter
+ * in ScopeControl (#1110).
  */
 export function GameScopePicker({ selected, onChange }: Props) {
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -107,6 +147,12 @@ export function GameScopePicker({ selected, onChange }: Props) {
       {_groupedVersionGroups.map(([gen, slugs]) => {
         const allSelected = slugs.every((s) => selectedSet.has(s));
         const genName = GEN_LABELS[gen] ?? "Other";
+        const bulkLabel = genBulkLabel(slugs);
+        // aria-label spells out the action + game names to distinguish from the
+        // gens-axis "Generation N" toggle in ScopeControl.
+        const bulkAriaLabel = allSelected
+          ? `Clear ${bulkLabel}`
+          : `Select ${bulkLabel}`;
         return (
           <div key={gen}>
             <div className="flex items-center justify-between gap-2">
@@ -117,11 +163,7 @@ export function GameScopePicker({ selected, onChange }: Props) {
                 type="button"
                 onClick={() => toggleGen(slugs)}
                 className="text-xs text-rose-600 hover:underline dark:text-rose-400"
-                aria-label={
-                  allSelected
-                    ? `Clear all games in ${genName}`
-                    : `Select all games in ${genName}`
-                }
+                aria-label={bulkAriaLabel}
               >
                 {allSelected ? "Clear all" : "Select all"}
               </button>

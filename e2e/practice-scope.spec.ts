@@ -49,12 +49,18 @@ test.describe("Practice scope (#333)", () => {
     const scopePanel = page.locator("#scope-panel");
     await expect(scopePanel).toBeVisible();
 
+    // The scope panel is now an accordion. Expand the "Generation" section
+    // before interacting with its pills. The <summary> element acts as the
+    // toggle; click it to open the <details>.
+    await scopePanel.getByRole("group", { name: "Generation" }).locator("summary").click();
+
     // Scope to the expanded panel so "Generation I" doesn't clash with
     // any other surfaces that mention generations (e.g. trainer card).
     // `exact: true` is required because "Generation I" is a substring of
     // "Generation II", "Generation III", etc., causing a strict-mode violation
     // without it (Playwright matches 5 buttons instead of 1).
     const genI = scopePanel.getByRole("button", { name: "Generation I", exact: true });
+    await expect(genI).toBeVisible();
     await expect(genI).toHaveAttribute("aria-pressed", "false");
     await genI.click();
     await expect(genI).toHaveAttribute("aria-pressed", "true");
@@ -169,7 +175,11 @@ test.describe("Practice scope (#333)", () => {
     const scopePanel = page.locator("#scope-panel");
     await expect(scopePanel).toBeVisible();
 
+    // Expand the Generation accordion section before clicking a gen pill.
+    await scopePanel.getByRole("group", { name: "Generation" }).locator("summary").click();
+
     const excludingPill = scopePanel.getByRole("button", { name: excludingGen, exact: true });
+    await expect(excludingPill).toBeVisible();
     await excludingPill.click();
     await expect(excludingPill).toHaveAttribute("aria-pressed", "true");
 
@@ -280,7 +290,11 @@ test.describe("Practice scope (#333)", () => {
     const initialMatch = initialText?.match(/^(\d+)/);
     const initialCount = initialMatch ? Number(initialMatch[1]) : -1;
 
-    // Select the "Default form only" radio inside the "Alternate forms" fieldset.
+    // Expand the "Alternate forms" accordion section before interacting with
+    // its radio buttons (the section starts collapsed when mode is "all").
+    await scopePanel.getByRole("group", { name: "Alternate forms" }).locator("summary").click();
+
+    // Select the "Default form only" radio inside the "Alternate forms" section.
     const defaultFormRadio = scopePanel.getByRole("radio", {
       name: "Default form only",
     });
@@ -489,7 +503,10 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     const scopePanel = page.locator("#scope-panel");
     await expect(scopePanel).toBeVisible();
 
-    // The new preset pill renders in the "Groups" fieldset.
+    // The preset pill is in the "Groups" accordion section. Expand it first.
+    await scopePanel.getByRole("group", { name: "Groups" }).locator("summary").click();
+
+    // The new preset pill renders in the "Groups" section.
     const presetPill = scopePanel.getByRole("button", {
       name: "Incomplete evolution chains",
     });
@@ -633,11 +650,12 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     const scopePanel = page.locator("#scope-panel");
     await expect(scopePanel).toBeVisible();
 
-    // The Games fieldset has a "Generation II" header containing the
-    // Gold/Silver pill. Use getByRole("group") to target the <fieldset>
-    // semantically — getByText("Games") would also match the description
-    // paragraph that contains the word "games".
-    await expect(scopePanel.getByRole("group", { name: "Games" })).toBeVisible();
+    // The Games section is now a collapsible accordion. Verify the group
+    // exists then expand it before interacting with individual game pills.
+    const gamesGroup = scopePanel.getByRole("group", { name: "Games" });
+    await expect(gamesGroup).toBeVisible();
+    await gamesGroup.locator("summary").click();
+
     const goldSilverPill = scopePanel.getByRole("button", {
       name: "Pokémon Gold/Silver",
     });
@@ -678,11 +696,16 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     await scopeToggle.click();
     const scopePanel = page.locator("#scope-panel");
 
-    // Click "Select all games in Generation II" — Gold/Silver + Crystal.
-    // Anchored regex required: the unanchored form also matches the
-    // "Generation III" button (strict-mode violation).
+    // Expand the Games accordion section first, then click the Gen II
+    // bulk-action button. The aria-label now spells out game names rather
+    // than "Generation N" to avoid confusion with the gens-axis toggle (#1110).
+    const gamesGroup = scopePanel.getByRole("group", { name: "Games" });
+    await gamesGroup.locator("summary").click();
+
+    // "Select Gold/Silver / Crystal" is the bulk-select label for Gen II
+    // (Gold/Silver + Crystal). Anchored regex avoids matching other gens.
     const selectAllGenII = scopePanel.getByRole("button", {
-      name: /^Select all games in Generation II$/,
+      name: /^Select Gold\/Silver \/ Crystal$/,
     });
     await selectAllGenII.click();
 
