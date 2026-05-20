@@ -34,6 +34,7 @@ import { initialReviewState } from "@/lib/srs/scheduler";
 import { countOptimizableReviews } from "@/lib/srs/optimizer";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
 import { IntensityPicker } from "@/components/settings/IntensityPicker";
+import { KnownPokemonQuiz } from "@/components/onboarding/KnownPokemonQuiz";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
 import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
@@ -377,6 +378,7 @@ const ALL_ANCHOR_IDS = [
   "theme-heading",
   "mobile-nav-heading",
   "scheduler-heading",
+  "known-quiz-heading",
   "name-cards-heading",
   "evolution-cards-heading",
   "reverse-evolution-heading",
@@ -403,6 +405,7 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "theme-heading": "appearance-heading",
   "mobile-nav-heading": "appearance-heading",
   "scheduler-heading": "practice-heading",
+  "known-quiz-heading": "practice-heading",
   "name-cards-heading": "practice-heading",
   "evolution-cards-heading": "practice-heading",
   "reverse-evolution-heading": "practice-heading",
@@ -442,6 +445,10 @@ export default function SettingsPage() {
   const autoDetectedPrefsRef = useRef<{ timezone: string; dateFormat: DateFormat } | null>(null);
 
   const [optimizableReviewCount, setOptimizableReviewCount] = useState<number>(0);
+
+  // "Mark Pokémon I already know" quiz — collapsed by default so the long
+  // sprite grid does not eat the Practice section.
+  const [knownQuizOpen, setKnownQuizOpen] = useState<boolean>(false);
 
   // Settings search/filter query.
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -941,6 +948,51 @@ export default function SettingsPage() {
                     );
                   }}
                 />
+
+                {/* "Mark Pokémon I already know" quiz (#1084).
+
+                    Lets the user fast-track Pokémon they already know without
+                    grinding through the new-card queue. Each selection runs
+                    the brand-new card through the simulated-Easy FSRS path —
+                    real graduated state, not synthesised mastery. */}
+                <div id="known-quiz-heading" className={colStackLg}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Quickstart
+                  </p>
+                  <div className={cardPanelPadded}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Mark Pokémon I already know
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Tap the Pokémon you already recognise. Each one
+                          graduates straight into the scheduler with a long
+                          first interval, so you can skip the new-card queue
+                          for species you know cold.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setKnownQuizOpen((open) => !open)}
+                        aria-expanded={knownQuizOpen}
+                        aria-controls="known-quiz-panel"
+                        className="min-h-[36px] shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                      >
+                        {knownQuizOpen ? "Close" : "Open quiz"}
+                      </button>
+                    </div>
+                    {knownQuizOpen && (
+                      <div id="known-quiz-panel" className="mt-4">
+                        <KnownPokemonQuiz
+                          client={supabase}
+                          userId={user?.id ?? null}
+                          superuserPaused={anyFlagOn}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {/* Name cards */}
                 <div id="name-cards-heading" className={colStackLg}>
