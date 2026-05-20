@@ -119,6 +119,7 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsCryPerDay: 100,
           favouriteTheme: null,
           retentionTarget: 0.9,
+          onboarding: { firstVisitOnboardingDismissed: true },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },
@@ -461,6 +462,12 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     // mastered, reverse edge unseen), keeping the panel mounted after selection.
     await page.addInitScript(() => {
       localStorage.clear();
+      // Re-seed the onboarding pre-dismiss flag after the clear above so the
+      // first-visit modal does not render and block scope-panel interactions.
+      window.localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true } }),
+      );
       window.localStorage.setItem(
         "poke-memory:review-session:v1",
         JSON.stringify({
@@ -613,6 +620,7 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
             types: [],
             presets: ["incomplete-chains"],
           },
+          onboarding: { firstVisitOnboardingDismissed: true },
         };
         localStorage.setItem(key, JSON.stringify(settings));
       },

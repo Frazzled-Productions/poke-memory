@@ -2,6 +2,29 @@ import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import { getPrimaryNavContainer } from "./helpers/navHelpers";
 
+// Pre-dismiss the first-visit onboarding modal before every test so it does
+// not render on the Practice surface and block nav guard / navigation tests.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      const KEY = "poke-memory:settings:v1";
+      const existing = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({
+          ...existing,
+          onboarding: {
+            ...(existing.onboarding ?? {}),
+            firstVisitOnboardingDismissed: true,
+          },
+        }),
+      );
+    } catch {
+      /* ignore - localStorage unavailable */
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
