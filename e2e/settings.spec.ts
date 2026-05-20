@@ -1,4 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 test.describe("Settings — Audio TTS controls (#435)", () => {
   test("'Hear sample' button is present inside the Audio section and clickable without error", async ({

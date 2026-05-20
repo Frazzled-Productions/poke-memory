@@ -6,6 +6,11 @@ import {
   buildCompletedSession,
 } from "./helpers/completedSession";
 import { isMobileProject } from "./helpers/navHelpers";
+import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+
+test.beforeEach(async ({ page }) => {
+  await preDismissOnboardingModal(page);
+});
 
 test.describe("Navigation", () => {
   test("nav links are visible and navigate between pages", async ({
