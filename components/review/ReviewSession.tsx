@@ -2134,8 +2134,11 @@ export function ReviewSession() {
           </div>
         </div>
         <div className="flex-none"><QueueStateBadge state={effectiveCard.state} /></div>
-        {/* Card region: flex-1 min-h-0 centres the card and absorbs leftover height */}
-        <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-hidden">
+        {/* Card region: flex-1 min-h-0 absorbs leftover height. `items-start`
+            on mobile keeps the play button / revealed card anchored to the top
+            of the region so it does not drift upward when Reveal expands the
+            card (#1087 follow-up). */}
+        <div className="flex flex-1 min-h-0 w-full items-start justify-center overflow-hidden pt-2 sm:pt-0 sm:items-center">
           {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
           <div ref={cardRef} className="relative" data-testid="swipe-card">
             {revealed ? (
@@ -2353,8 +2356,13 @@ export function ReviewSession() {
         />
       </div>
       <div className="flex-none"><QueueStateBadge state={effectiveCard.state} /></div>
-      {/* Card region: flex-1 min-h-0 absorbs leftover height and centres the card */}
-      <div className="flex flex-1 min-h-0 w-full items-center justify-center overflow-hidden">
+      {/* Card region: flex-1 min-h-0 absorbs leftover height. `items-start`
+          (not `items-center`) on mobile anchors the card to the top of the
+          region so the sprite stays put when the user taps Reveal — vertical
+          centring made the sprite drift upward as the name/fact appeared below
+          it, which read as the card "jumping" (user report on #1087). On sm+
+          we keep the original centred layout. */}
+      <div className="flex flex-1 min-h-0 w-full items-start justify-center overflow-hidden pt-2 sm:pt-0 sm:items-center">
         {/* Swipeable card wrapper — pointer listeners attached here (#1052). */}
         <div ref={cardRef} className="relative" data-testid="swipe-card">
           {effectiveCard.cardType === "evolution" ||
