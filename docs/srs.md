@@ -50,7 +50,7 @@ Dates as `"YYYY-MM-DD"` strings (string-comparable, no timezone math). The `next
 
 ## Queue policy
 
-Two queues — review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today` (stable for the day, rotates daily).
+Two queues — review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today + userSalt` (stable for the day, rotates daily, differs across users). The salt is the Supabase `user.id` for authenticated users, or a stable per-device UUID persisted to `localStorage` under `poke-memory:client-salt:v1` for guests. See `lib/identity/clientSalt.ts` and `stableShuffleForDay` in `lib/review/session.ts`.
 
 ## Daily limits
 
