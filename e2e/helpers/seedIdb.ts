@@ -5,6 +5,11 @@ import type { Page } from "@playwright/test";
 declare global {
   interface Window {
     __seedIdbReady?: Promise<void>;
+    // Write-epoch counter — mirrors the declaration in lib/review/persistence.ts.
+    // Bumped here (in the browser context injected by addInitScript) so the
+    // catch-up check in BottomTabBar/NavLinks/NavDrawer can detect that a seed
+    // write happened before their SESSION_CHANGED_EVENT listeners attached.
+    __pokeMemorySessionWriteEpoch?: number;
   }
 }
 
@@ -48,7 +53,41 @@ export async function seedIdb(
         for (const [key, value] of Object.entries(data.entries)) {
           store.put(value, key);
         }
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => {
+          // Bump the write-epoch counter before dispatching the CustomEvent.
+          // Components capture this counter at useEffect mount time and check
+          // in a requestAnimationFrame whether it advanced before their listener
+          // attached — catching the race where tx.oncomplete fires before React
+          // hydrates and registers the SESSION_CHANGED_EVENT listener.
+          //
+          // Mirrors the bump in lib/review/persistence.ts::dispatchStorageEvent.
+          // The counter name "__pokeMemorySessionWriteEpoch" is intentionally
+          // hardcoded; this function is serialised by page.addInitScript and
+          // cannot import from lib/. Keep in sync with persistence.ts.
+          try {
+            window.__pokeMemorySessionWriteEpoch =
+              (window.__pokeMemorySessionWriteEpoch ?? 0) + 1;
+          } catch {
+            // Non-standard envs.
+          }
+          // Dispatch the same CustomEvent that saveSession emits so nav
+          // components' mastery-check effects re-fire after the seed transaction
+          // commits. WebKit does not reliably propagate synthetic StorageEvents
+          // to same-tab `storage` listeners, so this CustomEvent is the
+          // authoritative post-seed signal for mobile-safari.
+          //
+          // The string "poke-memory:session-changed" is intentionally hardcoded
+          // here. This function is serialised to a string by page.addInitScript
+          // and injected into the browser context, so it cannot import from lib/.
+          // If SESSION_CHANGED_EVENT in lib/review/persistence.ts is ever
+          // renamed, this string must be updated manually to match.
+          try {
+            window.dispatchEvent(new CustomEvent("poke-memory:session-changed"));
+          } catch {
+            // Non-standard envs.
+          }
+          resolve();
+        };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(new Error("IDB transaction aborted"));
       };

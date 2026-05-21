@@ -11,6 +11,7 @@ import {
   SEED_POKEMON_IDS,
   EVOLUTION_CARD_IDS,
 } from "./helpers/completedSession";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 // Build a base session with every known card in a future-due state, so that
 // hydrateSession adds no new cards on load and the queue is empty. We then
@@ -60,12 +61,7 @@ const SETTINGS_KEY = "poke-memory:settings:v1";
 // no new cards — the only card served is the review-due Bulbasaur.
 // The first-visit modal is pre-dismissed so it doesn't block keyboard events.
 async function seedAndGo(page: Parameters<typeof seedSessionIdb>[0]) {
-  await page.addInitScript((key) => {
-    localStorage.setItem(
-      key,
-      JSON.stringify({ onboarding: { firstVisitOnboardingDismissed: true }, mobileNav: "bottom" }),
-    );
-  }, SETTINGS_KEY);
+  await addOnboardingPreDismiss(page);
   await seedSessionIdb(page, SESSION_WITH_ONE_DUE_CARD);
   await page.goto("/");
   await awaitSeedIdb(page);

@@ -43,6 +43,8 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 | `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
 | `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
 
+**Cross-layer fixes.** The table above is the default routing, not a hard wall. When a `ui-coder` finds the root cause is in `lib/` (or a `data-coder` finds the visible bug is in a component), it is OK to touch the helper as part of the same change — prefer the cleanest layering over strict ownership. The alternative (a page-layer workaround that papers over a `lib/` bug) is the failure mode this carve-out exists to prevent. Document the cross-layer touch in the PR description so the reviewer sees why ownership bent. (See #1125 for the discussion, and #1117 / #1121 for the worked example.)
+
 ## Conventions
 
 These are decisions made through deliberate research/discussion, not guesses. Add to this section only when a real decision is locked in.
@@ -159,7 +161,7 @@ Three tests are in scope: `apply-migrations.test.ts` (all `db/migrations/*.sql` 
 
 `npm run test:coverage` runs the fast suite under the v8 coverage provider. Two gates apply:
 
-- **Global floor.** `coverage.thresholds` in `vitest.config.ts` (Statements 74 / Branches 69 / Functions 66 / Lines 76) is a regression guard set just below the measured baseline. `vitest run --coverage` exits non-zero if overall coverage drops below the floor. Ratchet the floor *upward* as coverage improves — never lower it to make a red build pass.
+- **Global floor.** `coverage.thresholds` in `vitest.config.ts` (Statements 77 / Branches 70 / Functions 72 / Lines 79) is a regression guard set just below the measured baseline. `vitest run --coverage` exits non-zero if overall coverage drops below the floor. Ratchet the floor *upward* as coverage improves — never lower it to make a red build pass.
 - **Diff coverage.** `scripts/diff-coverage.mjs` cross-references the lines a PR adds/changes against the v8 per-statement hit counts in `coverage/coverage-final.json` (the `json` reporter) and requires changed product lines to hit a 90% patch-coverage bar. Lines in test files, the generated seed payload, and non-product directories are excluded; a PR that changes no instrumented product lines skips the gate.
 
 Both gates run in the `coverage` workflow on every PR (see WORKFLOW.md "Build gates"). The coverage step no longer carries `continue-on-error`, so a breach fails the job. The PR comment posts on both pass and fail.
@@ -283,7 +285,36 @@ The backlog lives on GitHub Issues, labelled `priority:now` / `priority:next` / 
 
 When a change closes an issue, reference it in the commit message (`closes #N`) so it auto-closes on push.
 
-**Pre-PR build gate.** After pushing a branch, run `npm run typecheck && npm run build && npm test`. If any step fails, apply a targeted fix and retry — up to two attempts. After the second failure, post a comment with the last 80 lines of build output and stop without opening a PR.
+**Pre-PR build gate.** After pushing a branch, run `npm run typecheck && npm run build && npm test && npm run test:coverage`. If any step fails, apply a targeted fix and retry — up to two attempts. After the second failure, post a comment with the last 80 lines of build output and stop without opening a PR.
+
+The `test:coverage` step adds roughly 30 seconds (full suite under v8 instrumentation) and catches global-floor breaches before push. The 90% per-diff patch-coverage gate (`scripts/diff-coverage.mjs`) is **not** part of `test:coverage` — it is enforced only in the `coverage` CI workflow against `coverage/coverage-final.json`. To catch per-diff breaches locally too, pipe a diff against your PR base into the script immediately after the `test:coverage` run, while `coverage/coverage-final.json` is still present in the working tree (the script reads that file directly; a subsequent `npm test` run without `--coverage` will overwrite or remove it):
+
+```bash
+git diff origin/qa...HEAD | node scripts/diff-coverage.mjs
+```
+
+This is optional — the global floor is the most common breach class — but worth running on a PR that adds new product code under `app/`, `components/`, or `lib/`.
+
+**Pre-PR e2e smoke (high-surface-area changes).** If the PR diff touches any of these paths, additionally run the chromium-only Playwright smoke subset locally via the pinned Docker image before opening the PR:
+
+- `app/layout.tsx`
+- `app/page.tsx`
+- `components/onboarding/**`
+- `components/Nav.tsx`, `components/BottomTabBar.tsx`, `components/MobileNavPaddingWrapper.tsx`
+- `lib/settings/persistence.ts`
+- `playwright.config.ts`
+
+Run from the repo root (the wrapper `scripts/pre-pr-smoke.sh` handles this automatically — it resolves the repo root from its own location, so it works from any subdirectory):
+
+```bash
+docker run --rm -v "$PWD":/work -w /work \
+  mcr.microsoft.com/playwright:v1.60.0-noble \
+  bash -c "npm ci && npm run build && (npm start &) && npx wait-on --timeout 60000 http://localhost:3000 && npx playwright test --project=chromium e2e/smoke.spec.ts e2e/onboarding.spec.ts e2e/practice-scope.spec.ts e2e/pasture.spec.ts"
+```
+
+A convenience wrapper lives at `scripts/pre-pr-smoke.sh` so the long command does not have to be remembered. Same two-attempt retry budget as the other steps: if anything fails, apply a targeted fix and retry up to twice, then stop and report.
+
+The smoke subset is intentionally smaller than CI's full e2e matrix — the goal is to catch the "modal blocks every page" class of regression (PR #1119 was the prompt), not parity. CI still runs chromium + mobile-safari authoritatively on the full spec set. PRs that only touch a single component or page surface outside the trigger list skip this step.
 
 **Pre-push spelling check.** Before pushing, spell-check all prose, code comments, and UI strings against the British-English convention (see "Spelling" above) — `optimise`, `colour`, `behaviour`, etc. Catch this in the first commit, not a follow-up: a second commit just to fix `optimize` → `optimise` is a recurring, trivially avoidable pattern.
 

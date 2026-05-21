@@ -8,10 +8,10 @@
  * by design.
  */
 import { test, expect } from "@playwright/test";
-import { preDismissOnboardingModal } from "./helpers/dismissOnboarding";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 test.beforeEach(async ({ page }) => {
-  await preDismissOnboardingModal(page);
+  await addOnboardingPreDismiss(page);
 });
 
 test.describe("Practice page — session-progress sidebar (lg: layout)", () => {

@@ -211,7 +211,21 @@ The functional Playwright projects are `chromium`, `mobile-safari`, `desktop-web
 | **Why a dedicated workflow** | Snapshot baselines are platform-sensitive. macOS Core Text and Linux font anti-aliasing differ visibly (the reason README screenshots are macOS-only — see AGENTS.md → "Screenshots"). The job runs inside the pinned `mcr.microsoft.com/playwright:v1.60.0-noble` Docker image so baselines are generated AND compared in the same deterministic Linux environment. The image tag MUST track the `@playwright/test` version in `package-lock.json`. |
 | **Required check** | No — non-blocking, and a non-matching PR does not run it at all. |
 | **Concurrency** | Per-ref, `cancel-in-progress: true`. |
-| **Updating baselines** | When a UI change intentionally alters a surface, regenerate baselines inside the Docker image — never from macOS. From the repo root: `docker run --rm -v "$(pwd)":/work -w /work mcr.microsoft.com/playwright:v1.60.0-noble bash -c 'npm ci && npm run build && (npm start &) && npx wait-on http://localhost:3000 && npm run test:visual -- --update-snapshots'` — then commit the changed PNGs under `e2e/__screenshots__/`. |
+| **Updating baselines** | When a UI change intentionally alters a surface, regenerate baselines inside the Docker image — never from macOS. Two paths: (1) **In CI** — dispatch `visual-baseline-update.yml` against the feature branch (owner-gated, refuses `main`/`qa`); it runs the same pinned image, commits the regenerated PNGs as `chore(visual): regenerate baselines [skip ci]`, and pushes to the dispatching branch. (2) **Locally**, from the repo root: `docker run --rm -v "$(pwd)":/work -w /work mcr.microsoft.com/playwright:v1.60.0-noble bash -c 'npm ci && npm run build && (npm start &) && npx wait-on http://localhost:3000 && npm run test:visual -- --update-snapshots'` — then commit the changed PNGs under `e2e/__screenshots__/`. |
+
+---
+
+### `visual-baseline-update.yml` — Visual Baseline Update
+
+| | |
+|---|---|
+| **Trigger** | `workflow_dispatch` only, with a required `branch` input. |
+| **Gate** | The `gate` job refuses to run unless `github.actor == github.repository_owner` (owner-only) and the `branch` input is neither `main` nor `qa`. Defence-in-depth: the push step re-checks the branch name. |
+| **Job** | `gate` (owner + branch guard), `regenerate` (snapshot regeneration + commit + push). |
+| **What it does** | Runs inside the pinned `mcr.microsoft.com/playwright:v1.60.0-noble` image — the same pin `visual-regression.yml` uses for comparison. Checks out the dispatching branch via a `poke-memory-bot` App installation token, builds the app, serves it, runs `npm run test:visual -- --update-snapshots` to rewrite `e2e/__screenshots__/{visual-chromium,visual-webkit}/*.png`, then commits `chore(visual): regenerate baselines [skip ci]` and pushes to the dispatching branch. If the regeneration produces no diff, the job exits cleanly without an empty commit. |
+| **Why an App token** | The push must be able to bypass branch protection on whatever feature-flow branch the dispatcher names (`GITHUB_TOKEN` cannot). The `[skip ci]` marker prevents the regenerated baselines from immediately re-firing `ci.yml` / `migration-check.yml`. |
+| **Required check** | No — manual dispatch only. |
+| **Concurrency** | Per-branch input, `cancel-in-progress: false` (a queued regeneration should finish, not be cancelled by a second dispatch). |
 
 #### Mock-auth seam (E2E)
 
@@ -702,7 +716,7 @@ Runs on every `pull_request` event. Fails the `coverage` job on either a global-
 
 ### Visual-regression gate (`visual-regression.yml`)
 
-Runs on PRs that touch rendered UI (`components/**`, `app/**/*.tsx`, `app/globals.css`) or carry the `visual-regression` label. Compares committed Playwright screenshot baselines (`e2e/__screenshots__/`) against a fresh render of the two deterministic README surfaces (Stats, Journey) at a mobile and a desktop viewport, across the Chromium and WebKit engines. Practice, Pasture and Pokédex are excluded because their renders are not pixel-stable across runs (see `e2e/visual.spec.ts`). The job runs inside the pinned `mcr.microsoft.com/playwright` Docker image so Linux font rendering is deterministic; baselines are generated AND compared in the same image. A mismatch fails the `visual` job and uploads an expected/actual/diff report. Not a required check, and a non-matching PR does not run it. When a UI change is an intended visual update, regenerate baselines inside the Docker image (see the `visual-regression.yml` catalog entry above) and commit the changed PNGs in the same PR. See the `visual-regression.yml` catalog entry for the exact `docker run` command.
+Runs on PRs that touch rendered UI (`components/**`, `app/**/*.tsx`, `app/globals.css`) or carry the `visual-regression` label. Compares committed Playwright screenshot baselines (`e2e/__screenshots__/`) against a fresh render of the two deterministic README surfaces (Stats, Journey) at a mobile and a desktop viewport, across the Chromium and WebKit engines. Practice, Pasture and Pokédex are excluded because their renders are not pixel-stable across runs (see `e2e/visual.spec.ts`). The job runs inside the pinned `mcr.microsoft.com/playwright` Docker image so Linux font rendering is deterministic; baselines are generated AND compared in the same image. A mismatch fails the `visual` job and uploads an expected/actual/diff report. Not a required check, and a non-matching PR does not run it. When a UI change is an intended visual update, regenerate baselines inside the Docker image (see the `visual-regression.yml` catalog entry above) and commit the changed PNGs in the same PR. For an in-CI one-click regeneration, dispatch `visual-baseline-update.yml` against the feature branch — it runs the same pinned image, refuses to push to `main` or `qa`, and is owner-gated. See the `visual-regression.yml` catalog entry for the exact local `docker run` command and the `visual-baseline-update.yml` entry for the CI path.
 
 ---
 

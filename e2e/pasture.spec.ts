@@ -1,28 +1,31 @@
 import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import { getPrimaryNavContainer } from "./helpers/navHelpers";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
-// Pre-dismiss the first-visit onboarding modal before every test so it does
-// not render on the Practice surface and block nav guard / navigation tests.
+// Pre-dismiss the first-visit onboarding modal and explicitly opt in to the
+// bottom tab bar before every test.
+//
+// `mobileNav: "bottom"` must be set explicitly via a separate addInitScript.
+// `parseStoredSettings` migrates any stored settings object that has no
+// `mobileNav` field to `"hamburger"` (the existing-user default), which would
+// prevent BottomTabBar from rendering on mobile-safari tests and make the
+// Pasture link permanently invisible in the `"Mobile tab navigation"` landmark.
+// `addOnboardingPreDismiss` only seeds `mobileNav` when the settings key is
+// absent entirely — it does not force the value when the key already exists.
 test.beforeEach(async ({ page }) => {
+  // Merge `mobileNav: "bottom"` into settings regardless of prior state.
   await page.addInitScript(() => {
     try {
       const KEY = "poke-memory:settings:v1";
       const existing = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-      localStorage.setItem(
-        KEY,
-        JSON.stringify({
-          ...existing,
-          onboarding: {
-            ...(existing.onboarding ?? {}),
-            firstVisitOnboardingDismissed: true,
-          },
-        }),
-      );
+      localStorage.setItem(KEY, JSON.stringify({ ...existing, mobileNav: "bottom" }));
     } catch {
       /* ignore - localStorage unavailable */
     }
   });
+  // Merge the onboarding pre-dismiss flag after the mobileNav write.
+  await addOnboardingPreDismiss(page);
 });
 
 // ---------------------------------------------------------------------------
@@ -106,13 +109,6 @@ test.describe("Pasture nav guard", () => {
   test("Pasture link appears when at least one card is mastered", async ({
     page,
   }, testInfo) => {
-    // Flaky on mobile-safari (webkit) due to a race between the IDB seed
-    // commit and BottomTabBar's mastery-check useEffect. Tracked separately;
-    // chromium project covers the happy path. See follow-up issue.
-    test.skip(
-      testInfo.project.name === "mobile-safari",
-      "IDB→useEffect race on webkit; chromium project covers this surface",
-    );
     // Caterpie is in the Forest habitat. reps=4, scheduledDays=28 → mastered.
     await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
 
@@ -120,11 +116,10 @@ test.describe("Pasture nav guard", () => {
     await awaitSeedIdb(page);
 
     // Reload after the IDB seed commits so the BottomTabBar's mastery-check
-    // useEffect runs against committed data. Without the reload, the
-    // BottomTabBar's initial render on the first goto can complete BEFORE the
-    // seed's async addInitScript finishes its IDB transaction, leaving
-    // `hasMastered` stuck at false. A synthetic StorageEvent was tried first
-    // but does not reliably trigger same-tab `storage` listeners on webkit.
+    // useEffect runs against committed data. The seed helper now also dispatches
+    // a `poke-memory:session-changed` CustomEvent on tx.oncomplete, which
+    // BottomTabBar subscribes to — but the reload is kept as belt-and-suspenders
+    // for environments where the CustomEvent dispatch races with initial mount.
     await page.reload();
     await awaitSeedIdb(page);
 

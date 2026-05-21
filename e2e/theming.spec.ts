@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 // Helper: seed a clean settings key so each test starts from a known state.
 // Passing intensity: null omits the key entirely (factory-fresh visit).
@@ -8,11 +9,8 @@ async function seedSettings(
 ): Promise<void> {
   await page.addInitScript((i) => {
     // Minimal settings blob — only the fields the pre-paint script and
-    // FavouriteThemeProvider actually read, plus the first-visit onboarding
-    // pre-dismiss flag so the modal does not render on Practice (#1103).
-    const blob: Record<string, unknown> = {
-      onboarding: { firstVisitOnboardingDismissed: true },
-    };
+    // FavouriteThemeProvider actually read.
+    const blob: Record<string, unknown> = {};
     if (i !== null) {
       blob.themeIntensity = i;
     }
@@ -21,6 +19,9 @@ async function seedSettings(
       JSON.stringify(blob),
     );
   }, intensity);
+  // Merge the first-visit onboarding pre-dismiss flag after the settings blob
+  // so the modal does not render on Practice (#1103).
+  await addOnboardingPreDismiss(page);
 }
 
 test.describe("Theme intensity — data-intensity attribute", () => {

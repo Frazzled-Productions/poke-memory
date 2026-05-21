@@ -80,10 +80,21 @@ jobs:
           PLAYWRIGHT_BASE_URL: ${{ github.event.deployment_status.target_url }}
           NEXT_PUBLIC_E2E_AUTH_MOCK: "1"
 
+      # Upload the report only on failure. The html reporter populates
+      # `playwright-report/` on every non-cancelled run now (see
+      # playwright.config.ts), so the previous `!cancelled()` gate would
+      # upload a multi-MB artifact for every successful preview run. Failures
+      # are the only case a maintainer needs the diff for; success uploads
+      # were noise. See #1127 for the broader artifact-upload fix.
       - name: Upload Playwright report
+        if: failure()
         uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+          # Fail loud if the html reporter has not produced the directory, so
+          # a future config drift (e.g. dropping the html reporter from
+          # playwright.config.ts) cannot silently upload an empty artifact
+          # and leave the maintainer without diff images. See #1127.
+          if-no-files-found: error

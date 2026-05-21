@@ -17,7 +17,15 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 4 : undefined,
-  reporter: process.env.CI ? "github" : "html",
+  // In CI we pair the `github` reporter (writes annotations only) with the
+  // `html` reporter so the `playwright-report/` directory exists on disk for
+  // the `actions/upload-artifact` step in visual-regression.yml / e2e.yml /
+  // ci.yml. Without the html leg, the directory is never created and the
+  // upload silently produces an empty artifact (#1127). `open: "never"`
+  // prevents the reporter from spawning a browser on the runner.
+  reporter: process.env.CI
+    ? [["github"], ["html", { outputFolder: "playwright-report", open: "never" }]]
+    : "html",
   // Snapshot baselines are committed under e2e/__screenshots__/<projectName>/
   // and are platform-tagged. CI generates and compares them inside the pinned
   // mcr.microsoft.com/playwright Docker image so Linux font rendering is
