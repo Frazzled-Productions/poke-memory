@@ -136,6 +136,47 @@ export type DashboardSnapshotOptions = {
 };
 
 // ---------------------------------------------------------------------------
+// computeQueueCount
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the total number of cards due today for a given session, applying
+ * the same eligibility gate and daily caps as `buildSessionQueues` (which the
+ * Practice page uses). This is the single shared helper for badge surfaces —
+ * `usePwaBadge`, `useDocumentTitleBadge`, and the Stats dashboard's `queue`
+ * axis all delegate here so they can never disagree on the count.
+ *
+ * Pure — no I/O, no DOM access, no hooks.
+ *
+ * @param cards    Full card array from the saved session.
+ * @param settings Eligibility settings (card-type toggles + practice scope).
+ * @param limits   Per-type daily new/review limits.
+ * @param today    UTC `YYYY-MM-DD` date string. Caller owns timezone resolution.
+ * @returns        `QueueCounts` with new / learning / review breakdowns and
+ *                 a convenience `totalCount` field.
+ */
+export function computeQueueCount(
+  cards: readonly ReviewableCard[],
+  settings: EligibilitySettings,
+  limits: DailyLimits,
+  today: string,
+): QueueCounts {
+  const eligibleCardIds = computeEligibleCardIds(cards, settings);
+  const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
+    cards,
+    limits,
+    today,
+    eligibleCardIds,
+  );
+  return {
+    newCount: newQueue.length,
+    learningCount: learningCardIds.length,
+    reviewCount: reviewQueue.length,
+    totalCount: newQueue.length + learningCardIds.length + reviewQueue.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // computeDashboardSnapshot
 // ---------------------------------------------------------------------------
 
@@ -198,23 +239,12 @@ export function computeDashboardSnapshot(
   let dueForecast: readonly DueForecastDay[] | null = null;
 
   if (needsQueue) {
-    const eligibleCardIds = computeEligibleCardIds(cards, settings);
-    const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
-      cards,
-      limits,
-      today,
-      eligibleCardIds,
-    );
-    const todayCount =
-      newQueue.length + learningCardIds.length + reviewQueue.length;
+    // Delegate to the shared helper so the Stats dashboard and badge surfaces
+    // always report the same count for identical inputs.
+    const counts = computeQueueCount(cards, settings, limits, today);
 
     if (wants("queue")) {
-      queue = {
-        newCount: newQueue.length,
-        learningCount: learningCardIds.length,
-        reviewCount: reviewQueue.length,
-        totalCount: todayCount,
-      };
+      queue = counts;
     }
 
     if (wants("forecast")) {
@@ -226,7 +256,7 @@ export function computeDashboardSnapshot(
       const forecast = statsResult!.dueForecast;
       // computeStats always returns 14 entries (DUE_FORECAST_DAYS), so
       // forecast.length > 0 is unconditionally true — spread directly.
-      dueForecast = [{ ...forecast[0], count: todayCount }, ...forecast.slice(1)];
+      dueForecast = [{ ...forecast[0], count: counts.totalCount }, ...forecast.slice(1)];
     }
   }
 

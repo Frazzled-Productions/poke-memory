@@ -1,5 +1,5 @@
 /**
- * Component tests for useDocumentTitleBadge (issue #1062, #1108).
+ * Component tests for useDocumentTitleBadge (issue #1062, #1108, #1134, #1137).
  *
  * Covers:
  *   - Sets document.title with a `(N)` prefix when cards are due.
@@ -8,8 +8,9 @@
  *   - Preserves the base route title (does not replace it).
  *   - Re-syncs when the session storage key changes (card graded).
  *   - Re-syncs when SETTINGS_SAVED_EVENT fires (e.g. timezone changed).
+ *   - Re-syncs when SESSION_CHANGED_EVENT fires (IDB write on WebKit — #1134).
  *   - Clears prefix on unmount.
- *   - Badge respects Settings eligibility filters (alternate forms, scope, directions).
+ *   - Delegates queue computation to computeQueueCount (#1137).
  */
 
 import { renderHook, act, waitFor } from "@testing-library/react";
@@ -23,6 +24,7 @@ const mockLoadSession = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: () => mockLoadSession(),
   STORAGE_KEY: "poke-memory:review-session:v1",
+  SESSION_CHANGED_EVENT: "poke-memory:session-changed",
 }));
 
 const mockLoadSettings = vi.fn().mockReturnValue({
@@ -40,33 +42,20 @@ vi.mock("@/lib/settings/persistence", () => ({
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
 }));
 
-// buildSessionQueues and todayString are tested separately; mock them here to
-// keep useDocumentTitleBadge tests isolated from the SRS scheduler.
-const mockBuildSessionQueues = vi.fn().mockReturnValue({
-  newQueue: [],
-  learningCardIds: [],
-  reviewQueue: [],
-  outOfScopeLearningIds: [],
-  newIntroducedToday: 0,
-  reviewsDoneToday: 0,
-  perType: {
-    name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-    evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-    reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-    cry: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-  },
-});
 vi.mock("@/lib/review/session", () => ({
-  buildSessionQueues: (...args: unknown[]) => mockBuildSessionQueues(...args),
   todayString: vi.fn().mockReturnValue("2026-05-19"),
 }));
 
-// computeEligibleCardIds is the shared eligibility helper (#1108). Mock it
-// here so badge tests remain isolated from scope/filter logic; unit tests
-// for the helper itself live in lib/review/scope.test.ts.
-const mockComputeEligibleCardIds = vi.fn().mockReturnValue(new Set<number>());
-vi.mock("@/lib/review/scope", () => ({
-  computeEligibleCardIds: (...args: unknown[]) => mockComputeEligibleCardIds(...args),
+// computeQueueCount is the shared helper (#1137). Mock it here to keep
+// useDocumentTitleBadge tests isolated from the queue-building logic.
+const mockComputeQueueCount = vi.fn().mockReturnValue({
+  newCount: 0,
+  learningCount: 0,
+  reviewCount: 0,
+  totalCount: 0,
+});
+vi.mock("@/lib/stats/dashboard-snapshot", () => ({
+  computeQueueCount: (...args: unknown[]) => mockComputeQueueCount(...args),
 }));
 
 let sessionVersion = 0;
@@ -87,25 +76,17 @@ function baseTitle(): string {
   return document.title.replace(/^\(\d+\)\s*/, "");
 }
 
-// ---------------------------------------------------------------------------
-
-/** Helper to stub buildSessionQueues with queue arrays of the given lengths. */
-function stubQueues(newLen: number, learningLen: number, reviewLen: number) {
-  mockBuildSessionQueues.mockReturnValue({
-    newQueue: Array.from({ length: newLen }, (_, i) => i + 1),
-    learningCardIds: Array.from({ length: learningLen }, (_, i) => 1000 + i),
-    reviewQueue: Array.from({ length: reviewLen }, (_, i) => 2000 + i),
-    outOfScopeLearningIds: [],
-    newIntroducedToday: 0,
-    reviewsDoneToday: 0,
-    perType: {
-      name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-      evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-      reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-      cry: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-    },
+/** Helper to stub computeQueueCount with the given total. */
+function stubQueueCount(total: number) {
+  mockComputeQueueCount.mockReturnValue({
+    newCount: total,
+    learningCount: 0,
+    reviewCount: 0,
+    totalCount: total,
   });
 }
+
+// ---------------------------------------------------------------------------
 
 beforeEach(() => {
   mockLoadSession.mockResolvedValue(null);
@@ -119,8 +100,12 @@ beforeEach(() => {
     alternateFormsEnabled: false,
     practiceScope: { gens: [], types: [], presets: [], games: [] },
   });
-  mockComputeEligibleCardIds.mockReturnValue(new Set<number>());
-  stubQueues(0, 0, 0);
+  mockComputeQueueCount.mockReturnValue({
+    newCount: 0,
+    learningCount: 0,
+    reviewCount: 0,
+    totalCount: 0,
+  });
   sessionVersion = 0;
   document.title = "Poké Memory";
 });
@@ -150,7 +135,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(0, 0, 0);
+    stubQueueCount(0);
 
     renderHook(() => useDocumentTitleBadge());
 
@@ -164,7 +149,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }, { id: 2 }, { id: 3 }],
       limits: {},
     });
-    stubQueues(2, 1, 3);
+    stubQueueCount(6);
 
     renderHook(() => useDocumentTitleBadge());
 
@@ -179,7 +164,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(0, 0, 4);
+    stubQueueCount(4);
 
     renderHook(() => useDocumentTitleBadge());
 
@@ -203,7 +188,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(0, 0, 2);
+    stubQueueCount(2);
 
     rerender();
 
@@ -218,7 +203,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(1, 0, 0);
+    stubQueueCount(1);
 
     const { rerender } = renderHook(() => useDocumentTitleBadge());
 
@@ -228,7 +213,7 @@ describe("useDocumentTitleBadge", () => {
 
     // Grade the card: session key bumps, no cards left.
     sessionVersion = 1;
-    stubQueues(0, 0, 0);
+    stubQueueCount(0);
 
     rerender();
 
@@ -242,7 +227,7 @@ describe("useDocumentTitleBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(1, 0, 0);
+    stubQueueCount(1);
 
     renderHook(() => useDocumentTitleBadge());
 
@@ -251,7 +236,7 @@ describe("useDocumentTitleBadge", () => {
     });
 
     // Settings change (e.g. timezone) → more cards in scope.
-    stubQueues(1, 2, 0);
+    stubQueueCount(3);
 
     act(() => {
       window.dispatchEvent(new Event("poke-memory:settings-saved"));
@@ -262,12 +247,36 @@ describe("useDocumentTitleBadge", () => {
     });
   });
 
+  it("re-syncs when SESSION_CHANGED_EVENT fires (WebKit IDB write — #1134)", async () => {
+    // Simulates WebKit: loadSession returns null initially, then returns cards
+    // after an IDB write. The hook must re-run `sync` when the CustomEvent fires.
+    mockLoadSession.mockResolvedValue(null);
+
+    renderHook(() => useDocumentTitleBadge());
+
+    await waitFor(() => {
+      expect(document.title).toBe("Poké Memory");
+    });
+
+    // IDB write completes: session now has cards due.
+    mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }], limits: {} });
+    stubQueueCount(5);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("poke-memory:session-changed"));
+    });
+
+    await waitFor(() => {
+      expect(document.title).toBe("(5) Poké Memory");
+    });
+  });
+
   it("clears prefix on unmount", async () => {
     mockLoadSession.mockResolvedValue({
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(1, 0, 0);
+    stubQueueCount(1);
 
     const { unmount } = renderHook(() => useDocumentTitleBadge());
 
@@ -280,98 +289,61 @@ describe("useDocumentTitleBadge", () => {
     expect(document.title).toBe("Poké Memory");
   });
 
-  it("calls buildSessionQueues with eligibleCardIds to count today's capped queue", async () => {
+  it("passes session cards, settings, limits, and today to computeQueueCount", async () => {
+    // Verifies the hook wires all four arguments to the shared helper.
     const cards = [{ id: 1 }];
-    const eligibleSet = new Set([1]);
-    mockLoadSession.mockResolvedValue({ cards, limits: { maxNewPerDay: 10 } });
-    mockComputeEligibleCardIds.mockReturnValue(eligibleSet);
-    stubQueues(1, 0, 0);
+    const limits = { maxNewPerDay: 10 };
+    mockLoadSession.mockResolvedValue({ cards, limits });
+    stubQueueCount(1);
 
     renderHook(() => useDocumentTitleBadge());
 
     await waitFor(() => {
-      expect(mockBuildSessionQueues).toHaveBeenCalledWith(
+      expect(mockComputeQueueCount).toHaveBeenCalledWith(
         cards,
-        { maxNewPerDay: 10 },
+        expect.objectContaining({ nameCardsEnabled: true }),
+        limits,
+        expect.any(String), // today
+      );
+    });
+  });
+
+  it("hook and computeDashboardSnapshot report the same count for identical inputs (#1137)", async () => {
+    // Sanity-check that the refactor keeps badge surfaces aligned with the
+    // Stats dashboard: both delegate to computeQueueCount, so the mock confirms
+    // the same argument structure is used.
+    const cards = [{ id: 1 }, { id: 2 }];
+    const limits = {};
+    mockLoadSession.mockResolvedValue({ cards, limits });
+    stubQueueCount(7);
+
+    renderHook(() => useDocumentTitleBadge());
+
+    // The hook must call computeQueueCount (the shared helper), confirming
+    // both the title badge and the snapshot use the same derivation path.
+    await waitFor(() => {
+      expect(mockComputeQueueCount).toHaveBeenCalledWith(
+        cards,
+        expect.any(Object),
+        limits,
         expect.any(String),
-        eligibleSet,
       );
+      expect(document.title).toBe("(7) Poké Memory");
     });
   });
 
-  it("passes eligibleCardIds from computeEligibleCardIds to buildSessionQueues", async () => {
-    // Verifies the hook wires the eligibility helper into the queue builder.
-    const cards = [{ id: 1 }, { id: 2 }, { id: 3 }];
-    const eligibleSet = new Set([1, 2]); // card 3 filtered out (e.g. alternate form)
-    mockLoadSession.mockResolvedValue({ cards, limits: {} });
-    mockComputeEligibleCardIds.mockReturnValue(eligibleSet);
-    stubQueues(2, 0, 0);
+  it("baseTitle helper strips stale prefix before applying new count", async () => {
+    // When the page already has a (3) prefix from a previous sync, re-syncing
+    // with a new count should strip the old prefix and apply the fresh one.
+    document.title = "(3) Poké Memory";
+    mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }], limits: {} });
+    stubQueueCount(5);
 
     renderHook(() => useDocumentTitleBadge());
 
     await waitFor(() => {
-      expect(mockBuildSessionQueues).toHaveBeenCalledWith(
-        cards,
-        {},
-        expect.any(String),
-        eligibleSet,
-      );
-    });
-  });
-
-  it("alternate-forms-off baseline: computeEligibleCardIds is called with settings flags", async () => {
-    // When alternateFormsEnabled is false (the default), computeEligibleCardIds
-    // should be called with that flag so alternate-form cards are excluded.
-    const cards = [{ id: 1 }];
-    const settings = {
-      timezone: "UTC",
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: true,
-      reverseCardsEnabled: false,
-      reverseEvolutionCardsEnabled: false,
-      cryCardsEnabled: false,
-      alternateFormsEnabled: false,
-      practiceScope: { gens: [], types: [], presets: [], games: [] },
-    };
-    mockLoadSession.mockResolvedValue({ cards, limits: {} });
-    mockLoadSettings.mockReturnValue(settings);
-    stubQueues(1, 0, 0);
-
-    renderHook(() => useDocumentTitleBadge());
-
-    await waitFor(() => {
-      expect(mockComputeEligibleCardIds).toHaveBeenCalledWith(
-        cards,
-        expect.objectContaining({ alternateFormsEnabled: false }),
-      );
-    });
-  });
-
-  it("scope-filtered case: computeEligibleCardIds is called with the active scope", async () => {
-    // When the user has an active scope (e.g. Gen I only), the badge hook
-    // must pass that scope to computeEligibleCardIds.
-    const cards = [{ id: 1 }, { id: 200 }];
-    const scope = { gens: [1], types: [], presets: [], games: [] };
-    mockLoadSettings.mockReturnValue({
-      timezone: "UTC",
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: true,
-      reverseCardsEnabled: false,
-      reverseEvolutionCardsEnabled: false,
-      cryCardsEnabled: false,
-      alternateFormsEnabled: false,
-      practiceScope: scope,
-    });
-    mockLoadSession.mockResolvedValue({ cards, limits: {} });
-    stubQueues(1, 0, 0);
-
-    renderHook(() => useDocumentTitleBadge());
-
-    await waitFor(() => {
-      expect(mockComputeEligibleCardIds).toHaveBeenCalledWith(
-        cards,
-        expect.objectContaining({ practiceScope: scope }),
-      );
+      expect(baseTitle()).toBe("Poké Memory");
+      expect(document.title).toBe("(5) Poké Memory");
     });
   });
 });

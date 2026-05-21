@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY, SESSION_CHANGED_EVENT } from "@/lib/review/persistence";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
-import { buildSessionQueues, todayString } from "@/lib/review/session";
-import { computeEligibleCardIds } from "@/lib/review/scope";
+import { todayString } from "@/lib/review/session";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
+import { computeQueueCount } from "@/lib/stats/dashboard-snapshot";
 
 /**
  * Prefixes `document.title` with `(N)` when N cards are due, clearing the
@@ -18,11 +18,15 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
  * Next.js route-level title changes so the prefix is re-applied after
  * navigation.
  *
- * The due-card count uses the same logic as the PWA app-icon badge (#916):
- * `buildSessionQueues` over the session from IndexedDB/localStorage, re-run
- * whenever the session storage key changes or settings are saved. This
- * mirrors the capped queue the Practice page shows, so the tab count is
- * consistent with the session the user is about to open.
+ * Queue computation is delegated to `computeQueueCount` (shared with the Stats
+ * dashboard and `usePwaBadge`), so the tab count is always consistent with
+ * the session the user is about to open (#1137).
+ *
+ * The hook also subscribes to `SESSION_CHANGED_EVENT` (`poke-memory:session-changed`)
+ * so it updates reactively after every IDB write — including on WebKit (mobile Safari),
+ * where synthetic StorageEvents are not reliably propagated to same-tab listeners
+ * (#1134). The existing `useLocalStorageKey` dependency handles the desktop/non-WebKit
+ * path; the CustomEvent subscription covers WebKit.
  *
  * Superuser flags are deliberately not plumbed here — the title badge should
  * reflect the user's real card state, consistent with `usePwaBadge`.
@@ -60,33 +64,29 @@ export function useDocumentTitleBadge(): void {
       const settings = loadSettings();
       const tz = settings.timezone ?? "UTC";
       const today = todayString(new Date(), tz);
-      // Compute eligible card IDs using the same three-tier gate as the
-      // Practice page (card-type toggles, alternateFormsEnabled, scope).
+      // Delegate to the shared helper so the title badge always agrees with
+      // the Stats dashboard's queue axis for identical inputs (#1137).
       // Note: the incomplete-chains context is omitted here because the
       // badge hook does not have access to mastery/repetition state. The
       // preset will simply match nothing when active, which is acceptable
       // — the badge count may be slightly conservative in that edge case.
-      const eligibleCardIds = computeEligibleCardIds(session.cards, {
-        nameCardsEnabled: settings.nameCardsEnabled,
-        evolutionCardsEnabled: settings.evolutionCardsEnabled,
-        reverseCardsEnabled: settings.reverseCardsEnabled,
-        reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
-        cryCardsEnabled: settings.cryCardsEnabled,
-        alternateFormsEnabled: settings.alternateFormsEnabled,
-        practiceScope: settings.practiceScope,
-      });
-      // Use buildSessionQueues (same function the Practice page uses) so the
-      // title badge reflects today's capped queue, not the full untouched backlog.
-      const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
+      const { totalCount } = computeQueueCount(
         session.cards,
+        {
+          nameCardsEnabled: settings.nameCardsEnabled,
+          evolutionCardsEnabled: settings.evolutionCardsEnabled,
+          reverseCardsEnabled: settings.reverseCardsEnabled,
+          reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
+          cryCardsEnabled: settings.cryCardsEnabled,
+          alternateFormsEnabled: settings.alternateFormsEnabled,
+          practiceScope: settings.practiceScope,
+        },
         session.limits,
         today,
-        eligibleCardIds,
       );
-      const total = newQueue.length + learningCardIds.length + reviewQueue.length;
 
-      currentCount = total;
-      applyTitle(total);
+      currentCount = totalCount;
+      applyTitle(totalCount);
     }
 
     void sync();
@@ -95,6 +95,11 @@ export function useDocumentTitleBadge(): void {
       void sync();
     }
     window.addEventListener(SETTINGS_SAVED_EVENT, onSettingsSaved);
+
+    // Re-sync on every IDB write, including on WebKit (mobile Safari) where
+    // synthetic StorageEvents are not reliably propagated to same-tab listeners.
+    // This matches the canonical pattern from BottomTabBar (#1131).
+    window.addEventListener(SESSION_CHANGED_EVENT, sync);
 
     // Re-apply the prefix when Next.js updates document.title on navigation.
     // The observer fires when the text content of <title> changes; we strip any
@@ -116,6 +121,7 @@ export function useDocumentTitleBadge(): void {
     return () => {
       cancelled = true;
       window.removeEventListener(SETTINGS_SAVED_EVENT, onSettingsSaved);
+      window.removeEventListener(SESSION_CHANGED_EVENT, sync);
       observer?.disconnect();
     };
     // sessionVersion tracks changes to the session storage key; re-run on every bump.
