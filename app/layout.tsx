@@ -14,6 +14,7 @@ import { AuthProvider } from "@/lib/auth/AuthContext";
 import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvider";
 import { ThemeWatermark } from "@/components/theme/ThemeWatermark";
 import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
+import { DashboardSnapshotProvider } from "@/components/stats/DashboardSnapshotContext";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
@@ -177,32 +178,34 @@ export default function RootLayout({
         <div id="app-root" className="contents">
           <AuthProvider>
             <SuperuserProvider>
-              <FavouriteThemeProvider>
-                <ThemeWatermark />
-                <Nav />
-                <Suspense fallback={null}>
-                  <SyncOnVisible />
-                </Suspense>
-                <SignInPull />
-                <AutoSyncOnChange />
-                <OnlineReconnectSync />
-                <PwaInstallNudge />
-                {/*
-                  MobileNavPaddingWrapper adds bottom padding on mobile only when
-                  the bottom tab bar is active, so the fixed bar never overlaps content.
-                  The padding is removed automatically when the user switches to the
-                  hamburger nav style via Settings.
-                */}
-                <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
-                <Footer />
-                {/*
-                  BottomTabBar is always mounted but returns null internally when
-                  mobileNav === 'hamburger'. The single Suspense boundary here is
-                  sufficient — the component has its own inner Suspense for the
-                  async mastery check.
-                */}
-                <BottomTabBar />
-              </FavouriteThemeProvider>
+              <DashboardSnapshotProvider>
+                <FavouriteThemeProvider>
+                  <ThemeWatermark />
+                  <Nav />
+                  <Suspense fallback={null}>
+                    <SyncOnVisible />
+                  </Suspense>
+                  <SignInPull />
+                  <AutoSyncOnChange />
+                  <OnlineReconnectSync />
+                  <PwaInstallNudge />
+                  {/*
+                    MobileNavPaddingWrapper adds bottom padding on mobile only when
+                    the bottom tab bar is active, so the fixed bar never overlaps content.
+                    The padding is removed automatically when the user switches to the
+                    hamburger nav style via Settings.
+                  */}
+                  <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
+                  <Footer />
+                  {/*
+                    BottomTabBar is always mounted but returns null internally when
+                    mobileNav === 'hamburger'. The single Suspense boundary here is
+                    sufficient — the component has its own inner Suspense for the
+                    async mastery check.
+                  */}
+                  <BottomTabBar />
+                </FavouriteThemeProvider>
+              </DashboardSnapshotProvider>
             </SuperuserProvider>
           </AuthProvider>
         </div>

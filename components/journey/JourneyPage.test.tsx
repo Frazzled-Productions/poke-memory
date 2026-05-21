@@ -245,6 +245,31 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => mockSuperuserValue,
 }));
 
+// Mock the DashboardSnapshotContext so the Journey page resolves its mastery
+// snapshot without requiring a real provider in the test tree (#1139).
+vi.mock("@/components/stats/DashboardSnapshotContext", () => ({
+  useDashboardSnapshot: () => ({
+    today: "2026-05-21",
+    forceAllMastered: false,
+    queue: null,
+    dueForecast: null,
+    mastery: {
+      totalCards: 3,
+      introduced: 0,
+      learning: 0,
+      mastered: 0,
+      locked: 3,
+      perGeneration: [{ gen: 1, name: "Generation I", mastered: 0, total: 3 }],
+      perType: [],
+    },
+    struggling: null,
+    projection: null,
+    firstMasteryDays: null,
+    difficulty: null,
+  }),
+  useProvideDashboardSnapshotInput: () => undefined,
+}));
+
 vi.mock("@/lib/review/seedOpts", () => ({
   seedOptsFromSettings: vi.fn(() => ({
     nameEnabled: true,
