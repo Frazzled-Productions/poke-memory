@@ -1,10 +1,10 @@
-import type { ReviewableCard, CardTypeOpts } from "@/lib/review/session";
-import { cardTypeIsEnabled } from "@/lib/review/session";
+import type { ReviewableCard } from "@/lib/review/session";
 import { generationOf } from "@/lib/stats/derive";
 import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
 import { KEY_LEGACY_PRACTICE_SCOPE } from "@/lib/storage/keys";
 import { versionGroupLabel } from "@/lib/pokemon/versionGroupLabels";
+import { isCardEligible, type CardEligibilitySettings } from "@/lib/eligibility";
 
 export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains";
 
@@ -296,6 +296,26 @@ export function cardMatchesScope(
 }
 
 /**
+ * Map a `ReviewableCard` to the `EligibilityInput` shape consumed by the
+ * shared `isCardEligible` predicate in `lib/eligibility`.
+ *
+ * The client card object uses the in-memory `cardType` strings `"evolution"`
+ * and `"reverse-evolution"`, while the shared predicate (and the DB) use
+ * the persisted slugs `"evolution-edge"` and `"reverse-evolution-edge"`.
+ * This adapter normalises to the DB convention so both callers of
+ * `isCardEligible` produce identical inputs for the same logical card.
+ *
+ * `subjectKey` is already present on every `ReviewableCard` (set by
+ * `buildSession` / `hydrateSession`), so no encoding is needed here.
+ */
+function toEligibilityInput(card: ReviewableCard): { cardType: string; subjectKey: string } {
+  let cardType = card.cardType as string;
+  if (cardType === "evolution") cardType = "evolution-edge";
+  else if (cardType === "reverse-evolution") cardType = "reverse-evolution-edge";
+  return { cardType, subjectKey: card.subjectKey };
+}
+
+/**
  * Two-tier eligibility check (#658). Returns true when the card should surface
  * in a practice session, applying the master `alternateFormsEnabled` gate
  * **before** the `practiceScope` filter.
@@ -312,6 +332,11 @@ export function cardMatchesScope(
  * Use this function as the single eligibility chokepoint in the session
  * builder / scope-change handler instead of calling `cardMatchesScope` directly
  * when the forms gate setting is available.
+ *
+ * The alt-forms exclusion is delegated to the shared `isCardEligible` predicate
+ * in `lib/eligibility` (#1160). All card-type flags are set to `true` here
+ * because the type-enable gate lives in `computeEligibleCardIds`; this function
+ * only owns the alt-forms check and the scope filter.
  */
 export function cardIsEligible(
   card: ReviewableCard,
@@ -319,19 +344,17 @@ export function cardIsEligible(
   alternateFormsEnabled: boolean,
   context: ScopeMatchContext = {},
 ): boolean {
-  // Gate: exclude all form cards when the master toggle is off.
-  // A card is only gated OUT when it is *definitely* a non-default form —
-  // undefined (pre-#445 seed) is treated as default form via `?? true`, so
-  // old cards are never incorrectly excluded.
-  if (!alternateFormsEnabled) {
-    if (
-      card.cardType !== "evolution" &&
-      card.cardType !== "reverse-evolution" &&
-      ((card as { isDefaultForm?: boolean }).isDefaultForm ?? true) === false
-    ) {
-      return false;
-    }
-  }
+  // Delegate the alt-forms gate to the shared predicate. All card-type flags
+  // are true so only the `alternateFormsEnabled` axis is active.
+  const altFormsSettings: CardEligibilitySettings = {
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
+    reverseEvolutionCardsEnabled: true,
+    reverseCardsEnabled: true,
+    cryCardsEnabled: true,
+    alternateFormsEnabled,
+  };
+  if (!isCardEligible(toEligibilityInput(card), altFormsSettings)) return false;
   if (isScopeEmpty(scope)) return true;
   return cardMatchesScope(card, scope, context);
 }
@@ -340,14 +363,10 @@ export function cardIsEligible(
  * Minimal settings surface consumed by `computeEligibleCardIds`. Matches the
  * subset of `UserSettings` that drives eligibility so the helper stays
  * decoupled from the full settings type and is easy to test.
+ *
+ * Re-exports `CardEligibilitySettings` fields plus `practiceScope`.
  */
-export type EligibilitySettings = {
-  nameCardsEnabled: boolean;
-  evolutionCardsEnabled: boolean;
-  reverseCardsEnabled: boolean;
-  reverseEvolutionCardsEnabled: boolean;
-  cryCardsEnabled: boolean;
-  alternateFormsEnabled: boolean;
+export type EligibilitySettings = CardEligibilitySettings & {
   practiceScope: PracticeScope;
 };
 
@@ -360,7 +379,11 @@ export type EligibilitySettings = {
  * The three-tier gate applied here mirrors `ReviewSession.tsx`:
  *   1. Card-type enabled (nameCardsEnabled, evolutionCardsEnabled, etc.)
  *   2. `alternateFormsEnabled` master toggle
- *   3. `practiceScope` filter via `cardIsEligible`
+ *   3. `practiceScope` filter via `cardMatchesScope`
+ *
+ * Gates 1 and 2 are delegated to `isCardEligible` from `lib/eligibility`
+ * (#1160) so they share a single source of truth with the daily Web Push
+ * route. Gate 3 (practice scope) is client-side only and stays here.
  *
  * @param cards   The full persisted card set (from `loadSession`).
  * @param settings  Subset of `UserSettings` that drives eligibility.
@@ -376,20 +399,17 @@ export function computeEligibleCardIds(
   settings: EligibilitySettings,
   context: ScopeMatchContext = {},
 ): Set<number> {
-  const cardTypeOpts: CardTypeOpts = {
-    nameEnabled: settings.nameCardsEnabled,
-    evolutionEnabled: settings.evolutionCardsEnabled,
-    reverseEnabled: settings.reverseCardsEnabled,
-    reverseEvolutionEnabled: settings.reverseEvolutionCardsEnabled,
-    cryEnabled: settings.cryCardsEnabled,
-  };
+  const scopeEmpty = isScopeEmpty(settings.practiceScope);
   return new Set(
     cards
-      .filter(
-        (c) =>
-          cardTypeIsEnabled(c, cardTypeOpts) &&
-          cardIsEligible(c, settings.practiceScope, settings.alternateFormsEnabled, context),
-      )
+      .filter((c) => {
+        // Gates 1 + 2: card-type enable flags + alternateFormsEnabled.
+        // Shared with the server-side Web Push eligibility filter (#1160).
+        if (!isCardEligible(toEligibilityInput(c), settings)) return false;
+        // Gate 3: practice scope (client-only — localStorage-backed).
+        if (scopeEmpty) return true;
+        return cardMatchesScope(c, settings.practiceScope, context);
+      })
       .map((c) => c.id),
   );
 }
