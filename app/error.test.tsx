@@ -125,13 +125,13 @@ describe("Error page — offline variant", () => {
     expect(reset).toHaveBeenCalledOnce();
   });
 
-  it("renders a Go to practice link pointing to /practice", () => {
+  it("renders a Go to practice link pointing to /", () => {
     setOnline(false);
     render(<ErrorPage error={fakeError} reset={noop} />);
 
     const link = screen.getByRole("link", { name: /go to practice/i });
     expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute("href", "/practice");
+    expect(link).toHaveAttribute("href", "/");
   });
 
   it("does not render the generic error heading when offline", () => {

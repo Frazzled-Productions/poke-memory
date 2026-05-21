@@ -58,7 +58,7 @@ export default function Error({
               Try again
             </button>
             <Link
-              href="/practice"
+              href="/"
               className="rounded-lg border border-amber-600 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-500 dark:text-amber-300 dark:hover:bg-amber-900"
             >
               Go to practice
