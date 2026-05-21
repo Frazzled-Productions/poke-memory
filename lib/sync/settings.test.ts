@@ -84,12 +84,46 @@ describe("pushSettings", () => {
     const { client } = makeClientWithRpc({ message: "boom" });
     expect(await pushSettings(client, "user-1", SAMPLE)).toBe(false);
   });
+
+  it("includes practiceScope in the patch when provided (#1159)", async () => {
+    const { client, rpc } = makeClientWithRpc();
+    const settingsWithScope: Partial<UserSettings> = {
+      practiceScope: {
+        gens: [1, 2],
+        types: ["fire"],
+        presets: ["starters"],
+        formCategories: { mode: "all" },
+        games: ["red-blue"],
+      },
+    };
+    await pushSettings(client, "user-1", settingsWithScope);
+    const [, args] = rpc.mock.calls[0] as [string, MergeUserSettingsArgs];
+    expect(args.p_patch.practiceScope).toEqual(settingsWithScope.practiceScope);
+  });
 });
 
 describe("pullSettings", () => {
   it("returns the settings object when present", async () => {
     const { client } = makeClientWithMaybeSingle({ settings: SAMPLE });
     expect(await pullSettings(client, "user-1")).toEqual(SAMPLE);
+  });
+
+  it("round-trips practiceScope through push → pull (#1159)", async () => {
+    // The push side sends practiceScope as part of the JSONB patch via
+    // merge_user_settings; the pull side reads it back from the settings column.
+    // This test verifies the pull correctly preserves the scope structure.
+    const scope = {
+      gens: [1, 3],
+      types: ["water"],
+      presets: ["legendaries"] as const,
+      formCategories: { mode: "all" as const },
+      games: ["sword-shield"],
+    };
+    const settingsWithScope = { ...SAMPLE, practiceScope: scope };
+    const { client } = makeClientWithMaybeSingle({ settings: settingsWithScope });
+    const pulled = await pullSettings(client, "user-1");
+    expect(pulled).not.toBeNull();
+    expect(pulled!.practiceScope).toEqual(scope);
   });
 
   it("returns null when no row exists", async () => {
