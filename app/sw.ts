@@ -245,12 +245,21 @@ const serwist = new Serwist({
   runtimeCaching,
 });
 
-// Honour the client's "update now" action: when the prompt's button is
-// pressed, `ServiceWorkerProvider` calls `messageSkipWaiting()`, which posts a
-// SKIP_WAITING message. Activating here lets the new worker take over.
+// Honour the client's silent activator (#1162): when a SW is waiting and the
+// active tab transitions to hidden, `ServiceWorkerProvider` posts a
+// SKIP_WAITING message. We activate the new worker only if at most one
+// window client is open — otherwise a still-foreground sibling tab would be
+// swapped under the user. The client's visibility listener stays armed, so
+// the next quiet moment retries naturally.
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
-    void self.skipWaiting();
+    void (async () => {
+      const clients = await self.clients.matchAll({ type: "window" });
+      if (clients.length <= 1) {
+        await self.skipWaiting();
+      }
+      // Otherwise: decline silently. Another visibility tick will retry.
+    })();
   }
 });
 

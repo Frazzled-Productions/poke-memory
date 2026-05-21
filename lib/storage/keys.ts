@@ -87,6 +87,18 @@ export const KEY_LEGACY_PRACTICE_SCOPE = "poke-memory:practice-scope:v1";
  */
 export const KEY_PERSIST_REQUESTED = "poke-memory:storage-persist-requested:v1";
 
+// ─── Review session activity flag ─────────────────────────────────────────────
+
+/**
+ * Presence flag set while a `ReviewSession` is mounted. Read by visibility-
+ * triggered cloud pulls and the silent SW update flow so they can skip safe
+ * moments where activating mid-card would lose user state.
+ *
+ * Intentionally has no `:v1` suffix — the value lifecycle is bounded by the
+ * session mount, never read across versions, and there is nothing to migrate.
+ */
+export const KEY_REVIEW_SESSION_ACTIVE = "poke-memory:session-active";
+
 // ─── Per-device shuffle salt ──────────────────────────────────────────────────
 
 /**
