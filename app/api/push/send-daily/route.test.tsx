@@ -782,8 +782,10 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
     // 5 due (all first_seen today = due cards introduced today), estimate = 5.
-    expect(parsed.body).toContain("5"); // due count
-    expect(parsed.body).toContain("5"); // new estimate
+    // Pin the exact body string so both counts are asserted simultaneously —
+    // a prior `toContain("5")` pair only proved the digit appeared once,
+    // not that both quantities rendered correctly.
+    expect(parsed.body).toBe("5 cards due plus 5 new ready to practise.");
   });
 
   it("clamps new-card estimate to 0 when daily cap already exhausted", async () => {
@@ -825,5 +827,51 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     // dueCount = 10, newEstimate = 0 → due-only copy without "new".
     expect(parsed.body).toContain("10");
     expect(parsed.body).not.toContain("new");
+  });
+
+  it("dual-evolution directions double-draw maxNewEvolutionPerDay (#1156)", async () => {
+    // When both evolutionCardsEnabled and reverseEvolutionCardsEnabled are on,
+    // computeNewEstimate sums the cap for each direction independently. The
+    // source comment on computeNewEstimate flags this as a deliberate
+    // simplification: the actual session cap is shared between the two
+    // directions but the push estimate doubles it. This test pins that
+    // behaviour so a future refactor that "fixes" the over-count does so
+    // intentionally rather than by accident.
+    //
+    // Distinct fixture values chosen so the doubled estimate (7 + 7 = 14)
+    // cannot collide with any other cap in the settings blob (maxNewPerDay,
+    // maxNewReversePerDay, maxNewCryPerDay all differ from 7 and 14).
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          nameCardsEnabled: false,
+          evolutionCardsEnabled: true,         // draws maxNewEvolutionPerDay
+          reverseEvolutionCardsEnabled: true,  // draws maxNewEvolutionPerDay again
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 10,
+          maxNewEvolutionPerDay: 7,
+          maxNewReversePerDay: 11,
+          maxNewCryPerDay: 13,
+        },
+      }],
+      // No due rows at all → dueCount = 0, body uses the new-only copy.
+      // No first_seen-today rows → both directions retain full headroom.
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // 7 (evolution) + 7 (reverse-evolution) = 14, even though the real
+    // session cap on evolution-direction cards is shared.
+    expect(parsed.body).toBe("14 new cards ready to practise.");
   });
 });
