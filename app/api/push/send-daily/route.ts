@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { todayInTimezone } from "@/lib/utils/format-date";
+import { isCardEligible } from "@/lib/eligibility";
 
 /**
  * Daily Web Push reminder route (#1056).
@@ -194,18 +195,22 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
 /**
  * Returns true when a card row is eligible under the user's settings.
  *
+ * Delegates to `isCardEligible` from `lib/eligibility` (#1160), which is
+ * the single source of truth shared with the on-device PWA badge filter
+ * (`lib/review/scope.ts` `computeEligibleCardIds`).
+ *
  * Card-type gates:
- *   - `name`                 → nameCardsEnabled
- *   - `evolution-edge`       → evolutionCardsEnabled
+ *   - `name`                   → nameCardsEnabled
+ *   - `evolution-edge`         → evolutionCardsEnabled
  *   - `reverse-evolution-edge` → reverseEvolutionCardsEnabled
- *   - `reverse`              → reverseCardsEnabled
- *   - `cry`                  → cryCardsEnabled
+ *   - `reverse`                → reverseCardsEnabled
+ *   - `cry`                    → cryCardsEnabled
  *
  * Alt-forms gate (when `alternateFormsEnabled` is false):
  *   - For `name` / `reverse` / `cry` cards, the subject_key is the numeric
  *     species id. Ids >= 10000 are alt-form variants and are excluded.
  *   - For `evolution-edge` / `reverse-evolution-edge` cards, the subject_key
- *     is `"<preEvoId>>>><postEvoId>"`. Exclude if either endpoint id >= 10000.
+ *     is `"<fromId>>><toId>"`. Exclude if either endpoint id >= 10000.
  *
  * Unknown card_type values pass through so future card types are not
  * silently dropped while we await a route update.
@@ -215,58 +220,7 @@ function rowIsEligible(
   subjectKey: string,
   eligibility: UserEligibility,
 ): boolean {
-  // Card-type gate.
-  switch (cardType) {
-    case "name":
-      if (!eligibility.nameCardsEnabled) return false;
-      break;
-    case "evolution-edge":
-      if (!eligibility.evolutionCardsEnabled) return false;
-      break;
-    case "reverse-evolution-edge":
-      if (!eligibility.reverseEvolutionCardsEnabled) return false;
-      break;
-    case "reverse":
-      if (!eligibility.reverseCardsEnabled) return false;
-      break;
-    case "cry":
-      if (!eligibility.cryCardsEnabled) return false;
-      break;
-    default:
-      // Unknown type: pass through.
-      break;
-  }
-
-  // Alt-forms gate.
-  if (!eligibility.alternateFormsEnabled) {
-    if (
-      cardType === "name" ||
-      cardType === "reverse" ||
-      cardType === "cry"
-    ) {
-      const id = parseInt(subjectKey, 10);
-      if (!isNaN(id) && id >= 10000) return false;
-    } else if (
-      cardType === "evolution-edge" ||
-      cardType === "reverse-evolution-edge"
-    ) {
-      // subject_key format: "<preEvoId>>><postEvoId>" — split on ">>>".
-      // The separator used in Subject.forEdge is ">>>" (three greater-than signs).
-      const parts = subjectKey.split(">>>");
-      if (parts.length === 2) {
-        const preId = parseInt(parts[0], 10);
-        const postId = parseInt(parts[1], 10);
-        if (
-          (!isNaN(preId) && preId >= 10000) ||
-          (!isNaN(postId) && postId >= 10000)
-        ) {
-          return false;
-        }
-      }
-    }
-  }
-
-  return true;
+  return isCardEligible({ cardType, subjectKey }, eligibility);
 }
 
 /**
