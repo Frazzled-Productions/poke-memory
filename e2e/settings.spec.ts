@@ -42,8 +42,8 @@ test.describe("Settings page — collapsible sections (#660)", () => {
   }) => {
     await page.goto("/settings");
 
-    // All four top-level category buttons must be visible.
-    for (const label of ["Appearance", "Practice", "Audio", "Account & Data", "Advanced"]) {
+    // All top-level category buttons must be visible.
+    for (const label of ["Appearance", "Practice", "Audio", "Offline", "Account & Data", "Advanced"]) {
       await expect(
         page.getByRole("button", { name: new RegExp(label, "i") }),
       ).toBeVisible();
@@ -224,8 +224,8 @@ test.describe("Settings page — search/filter (#662)", () => {
     // Clear via the clear button.
     await page.getByRole("button", { name: /clear search/i }).click();
 
-    // All five top-level sections must be visible again after clearing.
-    for (const label of ["Appearance", "Practice", "Audio", "Account & Data", "Advanced"]) {
+    // All top-level sections must be visible again after clearing.
+    for (const label of ["Appearance", "Practice", "Audio", "Offline", "Account & Data", "Advanced"]) {
       await expect(
         page.getByRole("button", { name: new RegExp(label, "i") }),
       ).toBeVisible();
@@ -242,7 +242,7 @@ test.describe("Settings page — search/filter (#662)", () => {
     await input.fill("xyzzynosuchthing");
 
     // All section buttons must be gone.
-    for (const label of ["Appearance", "Practice", "Audio", "Account & Data", "Advanced"]) {
+    for (const label of ["Appearance", "Practice", "Audio", "Offline", "Account & Data", "Advanced"]) {
       await expect(
         page.getByRole("button", { name: new RegExp(label, "i") }),
       ).not.toBeVisible();
@@ -643,5 +643,26 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
     await expect(toggle).toHaveAttribute("aria-checked", "true", {
       timeout: 10_000,
     });
+  });
+});
+
+test.describe("Settings — Offline section (#1168)", () => {
+  test("Offline section heading and Download button are present", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    // The Offline section must be present as a collapsible category.
+    const offlineBtn = page.getByRole("button", { name: /^offline$/i });
+    await expect(offlineBtn).toBeVisible();
+
+    // Expand the section.
+    await offlineBtn.click();
+    await expect(offlineBtn).toHaveAttribute("aria-expanded", "true");
+
+    // The Download button must be present inside the section.
+    await expect(
+      page.getByRole("button", { name: /download/i }),
+    ).toBeVisible();
   });
 });

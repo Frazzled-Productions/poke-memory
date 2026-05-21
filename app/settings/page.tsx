@@ -54,6 +54,7 @@ import {
 import { pushRegionalPrefs } from "@/lib/sync/settings";
 import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 import { PushOptIn } from "@/components/pwa/PushOptIn";
+import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg } from "@/lib/utils/class-names";
 
@@ -368,6 +369,7 @@ const TOP_LEVEL_SECTION_IDS = [
   "appearance-heading",
   "practice-heading",
   "audio-heading",
+  "offline-heading",
   "account-data-heading",
   "advanced-heading",
 ] as const;
@@ -385,6 +387,7 @@ const ALL_ANCHOR_IDS = [
   "alternate-forms-heading",
   "reverse-heading",
   "cry-heading",
+  "offline-download-heading",
   "onboarding-heading",
   "backup-heading",
   "regional-heading",
@@ -412,6 +415,7 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "alternate-forms-heading": "practice-heading",
   "reverse-heading": "practice-heading",
   "cry-heading": "audio-heading",
+  "offline-download-heading": "offline-heading",
   "onboarding-heading": "account-data-heading",
   "backup-heading": "account-data-heading",
   "regional-heading": "account-data-heading",
@@ -1425,6 +1429,23 @@ export default function SettingsPage() {
                   />
                 )}
                 <VoiceQualityHint />
+              </CollapsibleSection>
+              )}
+
+              {/* ── Offline ────────────────────────────────────────────────── */}
+              {visibleSectionIds.has("offline-heading") && (
+              <CollapsibleSection
+                sectionId="offline-heading"
+                heading="Offline"
+                forceOpen={targetCategoryId === "offline-heading"}
+                transientOpen={isFiltering}
+              >
+                <div id="offline-download-heading" className={colStackLg}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Download
+                  </p>
+                  <OfflineSection />
+                </div>
               </CollapsibleSection>
               )}
 
