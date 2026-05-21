@@ -85,6 +85,16 @@ jobs:
     needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # The Playwright container image (`mcr.microsoft.com/playwright:v1.60.0-noble`)
+    # ships dash as /bin/sh, which GitHub Actions picks as the default `run:`
+    # shell when a step has no explicit `shell:`. Dash rejects `set -o pipefail`
+    # and other bashisms used by the steps below, so pin bash for the whole job.
+    # bash is present in the image at /usr/bin/bash. The `gate` job runs on the
+    # bare `ubuntu-latest` runner where bash is already the default, so it does
+    # not need this override.
+    defaults:
+      run:
+        shell: bash
     permissions:
       # The regenerate job pushes regenerated baselines via the poke-memory-bot
       # App token. Declare contents: write to match the actual capability for
