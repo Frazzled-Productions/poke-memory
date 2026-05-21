@@ -29,8 +29,18 @@ name: Visual Baseline Update
 # so the App token is also what gives us a sensible escape hatch if the
 # dispatcher ever targets a protected feature-flow branch in future.
 #
-# The commit message carries `[skip ci]` so the push does not immediately
-# re-fire `ci.yml` / `migration-check.yml` etc. on the regenerated baselines.
+# The regenerated push uses a plain commit message (no `[skip ci]` marker).
+# Earlier iterations of this workflow added `[skip ci]` to suppress
+# downstream workflows from re-firing on the regen push, but that marker
+# also propagates to the resulting PR — opening a PR whose HEAD commit
+# subject contains `[skip ci]` causes GitHub to skip every workflow on the
+# PR itself, including the required `test` / `e2e` / `Test coverage report`
+# checks. See #1145 for the reproduction. The regen PR is exactly where we
+# want full CI to run, so the suppression lives on the workflow side now:
+# `visual-regression.yml` uses `paths-ignore: ['e2e/__screenshots__/**']`
+# on its `pull_request` trigger to avoid re-firing on baseline-only diffs.
+# `ci.yml` is intentionally NOT path-ignored — we want it to confirm that
+# nothing else regressed on the regen PR.
 
 on:
   workflow_dispatch:
@@ -188,7 +198,7 @@ jobs:
             echo "No baseline changes to commit — the regenerated PNGs are identical to the committed ones."
             exit 0
           fi
-          git commit -m "chore(visual): regenerate baselines [skip ci]"
+          git commit -m "chore(visual): regenerate baselines"
           git push origin "HEAD:${BRANCH}"
           echo "Pushed regenerated baselines to '${BRANCH}'."
 
