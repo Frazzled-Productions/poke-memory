@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
+import { isSessionActive } from "@/lib/review/sessionActive";
 
 // Routes where an in-progress review session makes a mid-visit pull confusing.
 const BLOCKED_ROUTES = ["/"];
@@ -42,6 +43,13 @@ export function useVisibilityPull(
       if (!uid || !cl) return;
 
       if (BLOCKED_ROUTES.includes(pathnameRef.current)) return;
+
+      // Don't pull while a review session is mounted regardless of route
+      // (#1163). The session can be on any path (e.g. an embedded study
+      // surface in the future), so the route-block above is no longer
+      // sufficient on its own. The session-active flag is the single source
+      // of truth shared with the silent SW activator (#1162).
+      if (isSessionActive()) return;
 
       const hiddenAt = hiddenAtRef.current;
       if (hiddenAt === null) return;

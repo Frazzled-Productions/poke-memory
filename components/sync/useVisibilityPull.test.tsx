@@ -24,6 +24,10 @@ vi.mock("@/lib/sync/pullAndMerge", () => ({
 
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { useVisibilityPull } from "@/lib/sync/useVisibilityPull";
+import {
+  markSessionActive,
+  markSessionInactive,
+} from "@/lib/review/sessionActive";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -51,12 +55,49 @@ function fireVisible() {
   document.dispatchEvent(new Event("visibilitychange"));
 }
 
+// ─── localStorage stub ────────────────────────────────────────────────────────
+//
+// jsdom on this Node version does not ship localStorage out of the box, so
+// session-active tests need an in-memory stub — matching the pattern used in
+// components/sync/loadPendingQueue.test.tsx and components/identity/clientSalt.test.tsx.
+
+function makeLocalStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() {
+      return store.size;
+    },
+    clear: () => store.clear(),
+    getItem: (k) => store.get(k) ?? null,
+    key: (i) => Array.from(store.keys())[i] ?? null,
+    removeItem: (k) => {
+      store.delete(k);
+    },
+    setItem: (k, v) => {
+      store.set(k, String(v));
+    },
+  };
+}
+
+function installLocalStorage() {
+  Object.defineProperty(window, "localStorage", {
+    value: makeLocalStorage(),
+    configurable: true,
+    writable: true,
+  });
+}
+
+function removeLocalStorage() {
+  delete (window as unknown as { localStorage?: unknown }).localStorage;
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("useVisibilityPull", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    installLocalStorage();
     // Start visible.
     Object.defineProperty(document, "visibilityState", {
       value: "visible",
@@ -67,6 +108,10 @@ describe("useVisibilityPull", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    // Always clear the session-active flag so tests do not leak state, then
+    // tear down the localStorage stub so each test gets a fresh one.
+    markSessionInactive();
+    removeLocalStorage();
   });
 
   // 1. No-op when client is null — lines 28-30 still execute (covered).
@@ -187,7 +232,49 @@ describe("useVisibilityPull", () => {
     expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER);
   });
 
-  // 8. Listener is removed on unmount — no calls after cleanup.
+  // 8. Session-active gate (#1163): skip the pull while a session is mounted,
+  //    regardless of the route.
+  it("does not pull while a review session is active", async () => {
+    vi.mocked(pullAndMerge).mockResolvedValue("ok");
+    markSessionActive();
+
+    renderHook(() =>
+      useVisibilityPull(FAKE_CLIENT, FAKE_USER, NON_BLOCKED_PATH),
+    );
+
+    act(() => fireHidden());
+    vi.advanceTimersByTime(HIDDEN_THRESHOLD_MS + 1);
+    act(() => fireVisible());
+
+    await Promise.resolve();
+    expect(pullAndMerge).not.toHaveBeenCalled();
+  });
+
+  // 9. Once the session ends, the next eligible visibility change fires the pull.
+  it("resumes pulling after the session ends", () => {
+    vi.mocked(pullAndMerge).mockResolvedValue("ok");
+    markSessionActive();
+
+    renderHook(() =>
+      useVisibilityPull(FAKE_CLIENT, FAKE_USER, NON_BLOCKED_PATH),
+    );
+
+    act(() => fireHidden());
+    vi.advanceTimersByTime(HIDDEN_THRESHOLD_MS + 1);
+    act(() => fireVisible());
+    expect(pullAndMerge).not.toHaveBeenCalled();
+
+    // Session ends. The next hidden -> visible round trip with a gap above
+    // the threshold should now fire the pull.
+    markSessionInactive();
+    act(() => fireHidden());
+    vi.advanceTimersByTime(HIDDEN_THRESHOLD_MS + 1);
+    act(() => fireVisible());
+
+    expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER);
+  });
+
+  // 10. Listener is removed on unmount — no calls after cleanup.
   it("removes the visibilitychange listener on unmount", async () => {
     vi.mocked(pullAndMerge).mockResolvedValue("ok");
 

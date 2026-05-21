@@ -63,6 +63,7 @@ import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
 import { triggerHaptic } from "@/lib/review/haptic";
+import { markSessionActive, markSessionInactive } from "@/lib/review/sessionActive";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
   loadDailySummary,
@@ -939,6 +940,18 @@ export function ReviewSession() {
     }
     window.addEventListener(SYNC_PULL_APPLIED_EVENT, handlePullApplied);
     return () => window.removeEventListener(SYNC_PULL_APPLIED_EVENT, handlePullApplied);
+  }, []);
+
+  // Publish a "review session active" flag while this component is mounted so
+  // background side-effects can avoid yanking state mid-card (#1162 / #1163).
+  // Consumers: `useVisibilityPull` skips its visibility-triggered pull, and
+  // `ServiceWorkerProvider`'s silent activator defers the SKIP_WAITING dispatch
+  // to the next quiet visibilitychange tick.
+  useEffect(() => {
+    markSessionActive();
+    return () => {
+      markSessionInactive();
+    };
   }, []);
 
   // Schedule a timeout to re-render when the earliest pending learning card is due.
