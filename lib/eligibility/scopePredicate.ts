@@ -27,25 +27,8 @@
 import type { PracticeScope, FormCategoryFilter } from "@/lib/review/scope";
 import type { ScopeLookupEntry } from "@/lib/pokemon/scopeLookup";
 import type { FormCategory } from "@/lib/pokemon/forms";
-import { generationOf } from "@/lib/stats/derive";
-
-// ---------------------------------------------------------------------------
-// Starter species ids — duplicated from lib/review/scope.ts because that
-// module imports SEED_POKEMON (too heavy for a server route). Kept in sync
-// manually; the seed does not change these ids.
-// ---------------------------------------------------------------------------
-
-const STARTER_IDS: ReadonlySet<number> = new Set([
-  1, 4, 7,
-  152, 155, 158,
-  252, 255, 258,
-  387, 390, 393,
-  495, 498, 501,
-  650, 653, 656,
-  722, 725, 728,
-  810, 813, 816,
-  906, 909, 912,
-]);
+import { generationOf } from "@/lib/stats/generationOf";
+import { STARTER_IDS } from "@/lib/pokemon/starterIds";
 
 // ---------------------------------------------------------------------------
 // Core predicate

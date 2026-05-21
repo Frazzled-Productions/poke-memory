@@ -5,6 +5,16 @@ import type { FormCategory } from "@/lib/pokemon/forms";
 import { KEY_LEGACY_PRACTICE_SCOPE } from "@/lib/storage/keys";
 import { versionGroupLabel } from "@/lib/pokemon/versionGroupLabels";
 import { isCardEligible, type CardEligibilitySettings } from "@/lib/eligibility";
+import { STARTER_IDS } from "@/lib/pokemon/starterIds";
+// Import and re-export lightweight scope constants so server-side routes can
+// import them from scopeConstants directly (no seed dependency), while all
+// existing callers that import from this module continue to work unchanged.
+import {
+  EMPTY_SCOPE,
+  isScopeEmpty,
+  parseFormCategoryFilter,
+} from "@/lib/eligibility/scopeConstants";
+export { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter };
 
 export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains";
 
@@ -71,14 +81,6 @@ export type PracticeScope = {
   games?: string[];
 };
 
-export const EMPTY_SCOPE: PracticeScope = {
-  gens: [],
-  types: [],
-  presets: [],
-  formCategories: { mode: "all" },
-  games: [],
-};
-
 /**
  * Pre-#333 storage key. The scope is now folded into `UserSettings` and
  * synced with the rest of settings via Supabase. The legacy key is read
@@ -86,18 +88,6 @@ export const EMPTY_SCOPE: PracticeScope = {
  * `readLegacyScope` / `clearLegacyScope` below.
  */
 const LEGACY_SCOPE_KEY = KEY_LEGACY_PRACTICE_SCOPE;
-
-const STARTER_IDS: ReadonlySet<number> = new Set([
-  1, 4, 7,
-  152, 155, 158,
-  252, 255, 258,
-  387, 390, 393,
-  495, 498, 501,
-  650, 653, 656,
-  722, 725, 728,
-  810, 813, 816,
-  906, 909, 912,
-]);
 
 /** Cards in the SEED set tagged `isLegendary` (excludes mythicals by design). */
 function legendaryIds(): ReadonlySet<number> {
@@ -108,16 +98,6 @@ let _legendaryIds: ReadonlySet<number> | null = null;
 function getLegendaryIds(): ReadonlySet<number> {
   if (_legendaryIds === null) _legendaryIds = legendaryIds();
   return _legendaryIds;
-}
-
-export function isScopeEmpty(scope: PracticeScope): boolean {
-  return (
-    scope.gens.length === 0 &&
-    scope.types.length === 0 &&
-    scope.presets.length === 0 &&
-    (scope.formCategories?.mode ?? "all") === "all" &&
-    (scope.games?.length ?? 0) === 0
-  );
 }
 
 /**
@@ -518,31 +498,6 @@ export function countMatchingSpecies(
       count += 1;
   }
   return count;
-}
-
-const VALID_FORM_CATEGORIES: readonly FormCategory[] = [
-  "default", "regional", "mega", "gmax", "primal", "forme",
-];
-
-/**
- * Internal: parse a raw JSON value into a `FormCategoryFilter`.
- * Returns `{mode:'all'}` on absent / malformed input so persisted scopes
- * without this field silently upgrade to the safe default.
- */
-export function parseFormCategoryFilter(value: unknown): FormCategoryFilter {
-  if (typeof value !== "object" || value === null) return { mode: "all" };
-  const obj = value as Record<string, unknown>;
-  if (obj.mode === "default-only") return { mode: "default-only" };
-  if (obj.mode === "include") {
-    const cats = Array.isArray(obj.categories)
-      ? (obj.categories as unknown[]).filter(
-          (v): v is FormCategory =>
-            typeof v === "string" && (VALID_FORM_CATEGORIES as readonly string[]).includes(v),
-        )
-      : [];
-    return { mode: "include", categories: cats };
-  }
-  return { mode: "all" };
 }
 
 /**

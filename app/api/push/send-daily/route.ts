@@ -7,7 +7,7 @@ import { isCardEligible } from "@/lib/eligibility";
 import { scopeMatchesEntry, resolveAnchorId } from "@/lib/eligibility/scopePredicate";
 import { SCOPE_LOOKUP } from "@/lib/pokemon/scopeLookup";
 import type { PracticeScope } from "@/lib/review/scope";
-import { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter } from "@/lib/review/scope";
+import { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter } from "@/lib/eligibility/scopeConstants";
 
 /**
  * Daily Web Push reminder route (#1056).

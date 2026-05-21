@@ -211,11 +211,22 @@ describe("scopeMatchesEntry — incomplete-chains preset (skipped server-side)",
     games: [],
   };
 
-  it("treats incomplete-chains as no match (no runtime state available)", () => {
-    // Without runtime review state, no entry can match incomplete-chains.
-    // This is the safe/conservative server-side behaviour.
+  /**
+   * Deliberate server-side approximation: `incomplete-chains` requires
+   * per-user card-review state (which species in a chain have been mastered)
+   * that the daily-push route does not load. The safe posture is to treat the
+   * preset as "never matches" — meaning users with only this preset active
+   * will receive 0 cards from the `incomplete-chains` axis in their push
+   * count. This intentionally under-counts rather than over-counts, avoiding
+   * phantom notifications for cards the user would not actually be shown.
+   *
+   * The client-side `speciesMatchesScope` behaves identically when
+   * `ScopeMatchContext.incompleteChainSpeciesIds` is absent.
+   */
+  it("returns false for every entry (deliberate approximation: no runtime review state)", () => {
     expect(scopeMatchesEntry(BULBASAUR, IC_SCOPE)).toBe(false);
     expect(scopeMatchesEntry(MEWTWO, IC_SCOPE)).toBe(false);
+    expect(scopeMatchesEntry(ALOLAN_RAICHU, IC_SCOPE)).toBe(false);
   });
 });
 
