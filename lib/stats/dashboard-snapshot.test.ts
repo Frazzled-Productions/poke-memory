@@ -16,7 +16,8 @@ import {
   computeQueueCount,
   type SnapshotAxis,
 } from "./dashboard-snapshot";
-import { DEFAULT_LIMITS, buildSessionQueues, type ReviewableCard, type NameReviewCard } from "@/lib/review/session";
+import { DEFAULT_LIMITS, buildSessionQueues, type ReviewableCard, type NameReviewCard, type EvolutionReviewCard, type ReverseReviewCard } from "@/lib/review/session";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import { EMPTY_SCOPE, computeEligibleCardIds, type EligibilitySettings } from "@/lib/review/scope";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
@@ -143,6 +144,77 @@ function makeSettings(overrides: Partial<EligibilitySettings> = {}): Eligibility
 }
 
 // ---------------------------------------------------------------------------
+// Non-name card factories
+// ---------------------------------------------------------------------------
+
+/**
+ * A minimal evolution card fixture. The IDs (preEvoId=1, postEvoId=2) are kept
+ * out of the name-card speciesId space so generation lookups still work — both
+ * are Gen I (1..151).
+ */
+function makeEvoCard(
+  id: number,
+  stateOverrides: Partial<ReviewState> = {},
+): EvolutionReviewCard {
+  return {
+    cardType: "evolution",
+    id,
+    preEvoId: 1,  // Bulbasaur (Gen I)
+    preEvoName: "Bulbasaur",
+    preEvoSpriteUrl: "/sprites/1.png",
+    postEvoId: 2, // Ivysaur
+    postEvoName: "Ivysaur",
+    postEvoSpriteUrl: "/sprites/2.png",
+    triggerPhrase: "at level 16",
+    subjectKey: "1>2",
+    state: makeState(stateOverrides),
+  };
+}
+
+/**
+ * A minimal reverse (sprite-to-name) card fixture. Uses REVERSE_ID_OFFSET + 1
+ * to sit in the correct namespace.
+ */
+function makeReverseCard(
+  pokemonId: number,
+  stateOverrides: Partial<ReviewState> = {},
+): ReverseReviewCard {
+  return {
+    cardType: "reverse",
+    id: REVERSE_ID_OFFSET + pokemonId,
+    pokemonId,
+    speciesId: pokemonId,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `Pokemon ${pokemonId}`,
+    subjectKey: String(pokemonId),
+    name: `Pokemon ${pokemonId}`,
+    spriteUrl: `/sprites/${pokemonId}.png`,
+    types: ["normal"],
+    stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },
+    flavorText: "A pokemon.",
+    flavorTexts: ["A pokemon."],
+    evolutionChain: [],
+    height: 10,
+    weight: 100,
+    baseExperience: 64,
+    genus: "Generic",
+    generation: "generation-i",
+    captureRate: 45,
+    baseHappiness: 50,
+    growthRate: "medium",
+    habitat: null,
+    genderRate: 0,
+    isLegendary: false,
+    isMythical: false,
+    cryUrl: null,
+    versionGroups: [],
+    state: makeState(stateOverrides),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helper: compute queue total using the same path as buildSessionQueues
 // ---------------------------------------------------------------------------
 
@@ -258,7 +330,7 @@ describe("forecast axis", () => {
     expect(snapshot.dueForecast![0].count).toBe(queueTotal(cards, settings));
   });
 
-  it("future bars (indices 1–13) are unchanged from computeStats raw forecast", () => {
+  it("future bars (indices 1–13) count eligible name cards due on those dates", () => {
     // A mastered card due 5 days from now should appear in the future bar.
     const futureDate = "2026-05-25";
     const cards: ReviewableCard[] = [
@@ -347,6 +419,196 @@ describe("forecast axis", () => {
     );
     expect(snapshotOff.dueForecast![0].count).toBe(1);
     expect(snapshotOn.dueForecast![0].count).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// forecast axis — all card types (#1138)
+// ---------------------------------------------------------------------------
+
+describe("forecast axis — all card types", () => {
+  // Helper: future date N days from TODAY.
+  function futureDate(n: number): string {
+    const d = new Date("2026-05-20");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  it("future bars include evolution cards due on that day", () => {
+    // An evolution card due 3 days from today should appear in bar [3].
+    const evoCard = makeEvoCard(1_500_001, {
+      lastReview: "2026-05-10",
+      firstSeen: "2026-05-01",
+      reps: 2,
+      scheduledDays: 13,
+      dueDate: futureDate(3),
+      fsrsState: "review",
+    });
+    const settings = makeSettings({ evolutionCardsEnabled: true });
+    const snapshot = computeDashboardSnapshot(
+      [evoCard],
+      settings,
+      DEFAULT_LIMITS,
+      TODAY,
+      { include: ["forecast"] },
+    );
+
+    expect(snapshot.dueForecast).not.toBeNull();
+    const bar = snapshot.dueForecast!.find((d) => d.date === futureDate(3));
+    expect(bar).toBeDefined();
+    expect(bar!.count).toBe(1);
+  });
+
+  it("future bars include reverse cards due on that day", () => {
+    // A reverse card due 5 days from today should appear in bar [5].
+    const reverseCard = makeReverseCard(1, {
+      lastReview: "2026-05-15",
+      firstSeen: "2026-05-01",
+      reps: 1,
+      scheduledDays: 10,
+      dueDate: futureDate(5),
+      fsrsState: "review",
+    });
+    const settings = makeSettings({ reverseCardsEnabled: true });
+    const snapshot = computeDashboardSnapshot(
+      [reverseCard],
+      settings,
+      DEFAULT_LIMITS,
+      TODAY,
+      { include: ["forecast"] },
+    );
+
+    expect(snapshot.dueForecast).not.toBeNull();
+    const bar = snapshot.dueForecast!.find((d) => d.date === futureDate(5));
+    expect(bar).toBeDefined();
+    expect(bar!.count).toBe(1);
+  });
+
+  it("future bars show mixed card types in the correct bars", () => {
+    // Name card due day 1, evolution card due day 3 — both should appear.
+    const nameCardFuture = makeCard(5, {
+      lastReview: "2026-05-19",
+      firstSeen: "2026-05-01",
+      reps: 2,
+      scheduledDays: 2,
+      dueDate: futureDate(1),
+      fsrsState: "review",
+    });
+    const evoCardFuture = makeEvoCard(1_500_001, {
+      lastReview: "2026-05-17",
+      firstSeen: "2026-05-01",
+      reps: 1,
+      scheduledDays: 6,
+      dueDate: futureDate(3),
+      fsrsState: "review",
+    });
+    const settings = makeSettings({ evolutionCardsEnabled: true });
+    const snapshot = computeDashboardSnapshot(
+      [nameCardFuture, evoCardFuture],
+      settings,
+      DEFAULT_LIMITS,
+      TODAY,
+      { include: ["forecast"] },
+    );
+
+    expect(snapshot.dueForecast).not.toBeNull();
+    const bar1 = snapshot.dueForecast!.find((d) => d.date === futureDate(1));
+    const bar3 = snapshot.dueForecast!.find((d) => d.date === futureDate(3));
+    expect(bar1!.count).toBe(1); // name card
+    expect(bar3!.count).toBe(1); // evolution card
+  });
+
+  it("future bars exclude cards of disabled card types", () => {
+    // Evolution card due day 2, but evolution cards are disabled.
+    const evoCardFuture = makeEvoCard(1_500_001, {
+      lastReview: "2026-05-18",
+      firstSeen: "2026-05-01",
+      reps: 1,
+      scheduledDays: 4,
+      dueDate: futureDate(2),
+      fsrsState: "review",
+    });
+    // Disable evolution cards.
+    const settings = makeSettings({ evolutionCardsEnabled: false });
+    const snapshot = computeDashboardSnapshot(
+      [evoCardFuture],
+      settings,
+      DEFAULT_LIMITS,
+      TODAY,
+      { include: ["forecast"] },
+    );
+
+    expect(snapshot.dueForecast).not.toBeNull();
+    const bar2 = snapshot.dueForecast!.find((d) => d.date === futureDate(2));
+    // The evolution card is excluded because the type is disabled.
+    expect(bar2!.count).toBe(0);
+  });
+
+  it("future bars respect practiceScope — excludes out-of-scope name cards", () => {
+    // A Gen II name card due day 4, with Gen I scope active.
+    const genIICardFuture = makeCard(152, {
+      lastReview: "2026-05-16",
+      firstSeen: "2026-05-01",
+      reps: 1,
+      scheduledDays: 8,
+      dueDate: futureDate(4),
+      fsrsState: "review",
+    });
+    const genIScope = { ...EMPTY_SCOPE, gens: [1] };
+    const settings = makeSettings({ practiceScope: genIScope });
+    const snapshot = computeDashboardSnapshot(
+      [genIICardFuture],
+      settings,
+      DEFAULT_LIMITS,
+      TODAY,
+      { include: ["forecast"] },
+    );
+
+    const bar4 = snapshot.dueForecast!.find((d) => d.date === futureDate(4));
+    // The Gen II card is excluded by the Gen I scope.
+    expect(bar4!.count).toBe(0);
+  });
+
+  it("new cards (lastReview === null) are excluded from future bars", () => {
+    // A new card always has dueDate === today by default. Even if it were
+    // somehow set to a future date, it should not appear in the future bars.
+    const newEvolutionCard = makeEvoCard(1_500_001, {
+      // lastReview stays null (default from makeState)
+      dueDate: futureDate(2),
+    });
+    const settings = makeSettings({ evolutionCardsEnabled: true });
+    const snapshot = computeDashboardSnapshot(
+      [newEvolutionCard],
+      settings,
+      DEFAULT_LIMITS,
+      TODAY,
+      { include: ["forecast"] },
+    );
+
+    const bar2 = snapshot.dueForecast!.find((d) => d.date === futureDate(2));
+    // New card excluded — it flows through the new-card queue, not the review forecast.
+    expect(bar2!.count).toBe(0);
+  });
+
+  it("today bar (dueForecast[0]) still matches the queue total with mixed card types", () => {
+    // Regression check: the today bar must equal computeQueueCount total.
+    const cards: ReviewableCard[] = [
+      newCard(1),
+      learningCard(3, "2026-05-18"),
+      makeEvoCard(1_500_001, {
+        lastReview: "2026-05-19",
+        firstSeen: "2026-05-01",
+        reps: 1,
+        scheduledDays: 1,
+        dueDate: TODAY,
+        fsrsState: "review",
+      }),
+    ];
+    const settings = makeSettings({ evolutionCardsEnabled: true });
+    const snapshot = computeDashboardSnapshot(cards, settings, DEFAULT_LIMITS, TODAY, {
+      include: ["forecast"],
+    });
+    expect(snapshot.dueForecast![0].count).toBe(queueTotal(cards, settings));
   });
 });
 
