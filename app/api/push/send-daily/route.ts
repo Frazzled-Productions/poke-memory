@@ -77,15 +77,34 @@ function isAuthorized(headerValue: string | null, secret: string): boolean {
  * Builds the user-facing body string for the daily reminder. Kept pure so
  * we can unit test it without touching the network or DB.
  *
- * British English copy. No em dashes (per AGENTS.md "Punctuation"). The
- * count is scheduled-due cards only (due_date <= today in the user's
- * timezone) — it does not include new cards with no row yet or respect
- * daily caps, so it intentionally does not claim to be the full session
- * queue.
+ * British English copy. No em dashes (per AGENTS.md "Punctuation").
+ *
+ * When `newEstimate` is 0 (or omitted), renders the due count only, e.g.
+ * "3 cards due for review." When `newEstimate` is positive, renders a
+ * combined count so the user sees the full picture, e.g. "3 due plus 15
+ * new ready to practise." Both counts must be positive to use the combined
+ * form; a zero due count with new cards only renders "15 new cards ready."
+ *
+ * The estimate is capped by per-direction daily new-card limits summed
+ * across enabled directions — it does not include cards whose `first_seen`
+ * is already today (those are cards started during today's session, not
+ * "truly new"). It does not account for practice scope (localStorage-only),
+ * learning-step state, or `maxReviewsPerDay` caps.
  */
-export function buildDailyMessage(dueCount: number): PushPayload {
+export function buildDailyMessage(dueCount: number, newEstimate: number = 0): PushPayload {
   const title = "Time to practise";
-  const body = `${String(dueCount)} ${plural(dueCount, "card", "cards")} scheduled for today.`;
+  let body: string;
+
+  if (dueCount > 0 && newEstimate > 0) {
+    body =
+      `${String(dueCount)} ${plural(dueCount, "card", "cards")} due` +
+      ` plus ${String(newEstimate)} new ready to practise.`;
+  } else if (dueCount > 0) {
+    body = `${String(dueCount)} ${plural(dueCount, "card", "cards")} due for review.`;
+  } else {
+    body = `${String(newEstimate)} new ${plural(newEstimate, "card", "cards")} ready to practise.`;
+  }
+
   return { title, body, url: "/" };
 }
 
@@ -97,13 +116,225 @@ type SubscriptionRow = {
   auth_secret: string;
 };
 
+/**
+ * Subset of the `user_settings` row shape. `settings` is the JSONB blob
+ * carrying per-user card-type enabled flags and daily new-card caps.
+ * `timezone` is a scalar column (migration 019).
+ */
 type SettingsRow = {
   user_id: string;
   timezone: string | null;
+  settings: Record<string, unknown> | null;
 };
+
+/**
+ * The per-user eligibility flags extracted from the `settings` JSONB.
+ * Mirrors the relevant fields from `UserSettings` in lib/settings/persistence.ts.
+ * Defaults match `DEFAULT_SETTINGS` so users with missing/partial JSONB
+ * fall back to the same behaviour as the app itself.
+ */
+type UserEligibility = {
+  nameCardsEnabled: boolean;
+  evolutionCardsEnabled: boolean;
+  reverseEvolutionCardsEnabled: boolean;
+  reverseCardsEnabled: boolean;
+  cryCardsEnabled: boolean;
+  alternateFormsEnabled: boolean;
+  maxNewPerDay: number;
+  maxNewEvolutionPerDay: number;
+  maxNewReversePerDay: number;
+  maxNewCryPerDay: number;
+};
+
+/** DEFAULT_SETTINGS-aligned fallbacks, used when a JSONB field is missing or invalid. */
+const DEFAULT_ELIGIBILITY: UserEligibility = {
+  nameCardsEnabled: true,
+  evolutionCardsEnabled: true,
+  reverseEvolutionCardsEnabled: false,
+  reverseCardsEnabled: false,
+  cryCardsEnabled: false,
+  alternateFormsEnabled: false,
+  maxNewPerDay: 10,
+  maxNewEvolutionPerDay: 5,
+  maxNewReversePerDay: 10,
+  maxNewCryPerDay: 10,
+};
+
+/**
+ * Parse the per-user eligibility settings from the raw JSONB blob. Permissive:
+ * a missing or non-boolean field falls back to the DEFAULT_SETTINGS value.
+ * Only the fields that affect the daily-push due count are extracted.
+ */
+function parseEligibility(rawSettings: Record<string, unknown> | null): UserEligibility {
+  if (!rawSettings || typeof rawSettings !== "object") return { ...DEFAULT_ELIGIBILITY };
+  // Bind to a non-null local so nested functions narrow cleanly.
+  const s: Record<string, unknown> = rawSettings;
+  function boolField(key: keyof UserEligibility, defaultVal: boolean): boolean {
+    const v = s[key];
+    return typeof v === "boolean" ? v : defaultVal;
+  }
+  function numField(key: keyof UserEligibility, defaultVal: number): number {
+    const v = s[key];
+    return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : defaultVal;
+  }
+  return {
+    nameCardsEnabled:             boolField("nameCardsEnabled",             DEFAULT_ELIGIBILITY.nameCardsEnabled),
+    evolutionCardsEnabled:        boolField("evolutionCardsEnabled",        DEFAULT_ELIGIBILITY.evolutionCardsEnabled),
+    reverseEvolutionCardsEnabled: boolField("reverseEvolutionCardsEnabled", DEFAULT_ELIGIBILITY.reverseEvolutionCardsEnabled),
+    reverseCardsEnabled:          boolField("reverseCardsEnabled",          DEFAULT_ELIGIBILITY.reverseCardsEnabled),
+    cryCardsEnabled:              boolField("cryCardsEnabled",              DEFAULT_ELIGIBILITY.cryCardsEnabled),
+    alternateFormsEnabled:        boolField("alternateFormsEnabled",        DEFAULT_ELIGIBILITY.alternateFormsEnabled),
+    maxNewPerDay:          numField("maxNewPerDay",          DEFAULT_ELIGIBILITY.maxNewPerDay),
+    maxNewEvolutionPerDay: numField("maxNewEvolutionPerDay", DEFAULT_ELIGIBILITY.maxNewEvolutionPerDay),
+    maxNewReversePerDay:   numField("maxNewReversePerDay",   DEFAULT_ELIGIBILITY.maxNewReversePerDay),
+    maxNewCryPerDay:       numField("maxNewCryPerDay",       DEFAULT_ELIGIBILITY.maxNewCryPerDay),
+  };
+}
+
+/**
+ * Returns true when a card row is eligible under the user's settings.
+ *
+ * Card-type gates:
+ *   - `name`                 → nameCardsEnabled
+ *   - `evolution-edge`       → evolutionCardsEnabled
+ *   - `reverse-evolution-edge` → reverseEvolutionCardsEnabled
+ *   - `reverse`              → reverseCardsEnabled
+ *   - `cry`                  → cryCardsEnabled
+ *
+ * Alt-forms gate (when `alternateFormsEnabled` is false):
+ *   - For `name` / `reverse` / `cry` cards, the subject_key is the numeric
+ *     species id. Ids >= 10000 are alt-form variants and are excluded.
+ *   - For `evolution-edge` / `reverse-evolution-edge` cards, the subject_key
+ *     is `"<preEvoId>>>><postEvoId>"`. Exclude if either endpoint id >= 10000.
+ *
+ * Unknown card_type values pass through so future card types are not
+ * silently dropped while we await a route update.
+ */
+function rowIsEligible(
+  cardType: string,
+  subjectKey: string,
+  eligibility: UserEligibility,
+): boolean {
+  // Card-type gate.
+  switch (cardType) {
+    case "name":
+      if (!eligibility.nameCardsEnabled) return false;
+      break;
+    case "evolution-edge":
+      if (!eligibility.evolutionCardsEnabled) return false;
+      break;
+    case "reverse-evolution-edge":
+      if (!eligibility.reverseEvolutionCardsEnabled) return false;
+      break;
+    case "reverse":
+      if (!eligibility.reverseCardsEnabled) return false;
+      break;
+    case "cry":
+      if (!eligibility.cryCardsEnabled) return false;
+      break;
+    default:
+      // Unknown type: pass through.
+      break;
+  }
+
+  // Alt-forms gate.
+  if (!eligibility.alternateFormsEnabled) {
+    if (
+      cardType === "name" ||
+      cardType === "reverse" ||
+      cardType === "cry"
+    ) {
+      const id = parseInt(subjectKey, 10);
+      if (!isNaN(id) && id >= 10000) return false;
+    } else if (
+      cardType === "evolution-edge" ||
+      cardType === "reverse-evolution-edge"
+    ) {
+      // subject_key format: "<preEvoId>>><postEvoId>" — split on ">>>".
+      // The separator used in Subject.forEdge is ">>>" (three greater-than signs).
+      const parts = subjectKey.split(">>>");
+      if (parts.length === 2) {
+        const preId = parseInt(parts[0], 10);
+        const postId = parseInt(parts[1], 10);
+        if (
+          (!isNaN(preId) && preId >= 10000) ||
+          (!isNaN(postId) && postId >= 10000)
+        ) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Compute the capped new-card estimate for a user.
+ *
+ * For each enabled card direction, the estimate is:
+ *   min(maxNewPerDay[direction], maxNewPerDay[direction] - startedTodayCount[direction])
+ *
+ * `startedTodayCount[direction]` is the count of `card_reviews` rows for
+ * this user where `first_seen = today` and the row passes the eligibility
+ * gate — i.e. cards the user has already started during today's session.
+ * Subtracting these prevents double-counting cards that are new-and-due
+ * (first introduced today, due today).
+ *
+ * The result is floor'd at 0 so a user who has already hit their daily cap
+ * contributes 0 to the estimate rather than a negative number.
+ *
+ * Note: reverse-evolution cards share the evolution daily-limit bucket with
+ * forward evolution cards. The estimate sums the caps for both directions
+ * independently — a deliberate simplification that may overcount slightly
+ * when both are enabled, but is consistent with how `buildSessionQueues`
+ * was written at the time of #1153.
+ */
+function computeNewEstimate(
+  startedTodayCounts: Record<string, number>,
+  eligibility: UserEligibility,
+): number {
+  let estimate = 0;
+
+  if (eligibility.nameCardsEnabled) {
+    estimate += Math.max(
+      0,
+      eligibility.maxNewPerDay - (startedTodayCounts["name"] ?? 0),
+    );
+  }
+  if (eligibility.evolutionCardsEnabled) {
+    estimate += Math.max(
+      0,
+      eligibility.maxNewEvolutionPerDay - (startedTodayCounts["evolution-edge"] ?? 0),
+    );
+  }
+  if (eligibility.reverseEvolutionCardsEnabled) {
+    estimate += Math.max(
+      0,
+      eligibility.maxNewEvolutionPerDay - (startedTodayCounts["reverse-evolution-edge"] ?? 0),
+    );
+  }
+  if (eligibility.reverseCardsEnabled) {
+    estimate += Math.max(
+      0,
+      eligibility.maxNewReversePerDay - (startedTodayCounts["reverse"] ?? 0),
+    );
+  }
+  if (eligibility.cryCardsEnabled) {
+    estimate += Math.max(
+      0,
+      eligibility.maxNewCryPerDay - (startedTodayCounts["cry"] ?? 0),
+    );
+  }
+
+  return estimate;
+}
 
 type DueRow = {
   user_id: string;
+  card_type: string;
+  subject_key: string;
+  first_seen: string | null;
 };
 
 export async function POST(request: Request) {
@@ -167,13 +398,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
 
-  // Step 2: resolve timezones. Users without a stored timezone fall back
-  // to UTC for the due-date comparison — same default as the rest of the
-  // app per migration 019.
+  // Step 2: resolve timezones and per-user eligibility settings. We widen
+  // the SELECT to include the `settings` JSONB so we can filter by card-type
+  // enabled flags and the alt-forms toggle client-side. Users without a
+  // stored settings record fall back to DEFAULT_ELIGIBILITY (mirrors
+  // DEFAULT_SETTINGS in lib/settings/persistence.ts).
   const uniqueUserIds = Array.from(new Set(subscriptions.map((s) => s.user_id)));
   const { data: settingsData, error: settingsError } = await admin
     .from("user_settings")
-    .select("user_id, timezone")
+    .select("user_id, timezone, settings")
     .in("user_id", uniqueUserIds);
   if (settingsError) {
     return NextResponse.json(
@@ -181,9 +414,11 @@ export async function POST(request: Request) {
       { status: 502 },
     );
   }
-  const settingsByUser = new Map<string, string>();
+  const timezoneByUser = new Map<string, string>();
+  const eligibilityByUser = new Map<string, UserEligibility>();
   for (const row of (settingsData ?? []) as SettingsRow[]) {
-    if (row.timezone) settingsByUser.set(row.user_id, row.timezone);
+    if (row.timezone) timezoneByUser.set(row.user_id, row.timezone);
+    eligibilityByUser.set(row.user_id, parseEligibility(row.settings));
   }
 
   // Step 3: bucket users by "today in their timezone" so each distinct
@@ -191,25 +426,37 @@ export async function POST(request: Request) {
   // ~30 buckets covering every inhabited UTC offset.
   const usersByDueDate = new Map<string, string[]>();
   for (const userId of uniqueUserIds) {
-    const tz = settingsByUser.get(userId) ?? "UTC";
+    const tz = timezoneByUser.get(userId) ?? "UTC";
     const today = todayInTimezone(tz);
     const bucket = usersByDueDate.get(today);
     if (bucket) bucket.push(userId);
     else usersByDueDate.set(today, [userId]);
   }
 
-  // Step 4: per-user due counts in a single round-trip per timezone bucket.
-  // We fetch `user_id` for every row that satisfies
-  // `due_date <= today AND user_id IN bucket AND hidden_since IS NULL`,
-  // then aggregate counts client-side. This collapses the previous N+1
-  // pattern (one COUNT(*) per opted-in user) into one query per distinct
-  // calendar date. hidden_since cards are paused under the learning filter
-  // (#333) and excluded from the due tally.
+  // Step 4: per-user due counts and started-today counts in a single
+  // round-trip per timezone bucket.
+  //
+  // We fetch `user_id`, `card_type`, `subject_key`, and `first_seen` for
+  // every row that satisfies `due_date <= today AND user_id IN bucket AND
+  // hidden_since IS NULL`, then aggregate client-side.
+  //
+  // For each row we apply the per-user eligibility gate:
+  //   - Card-type enable flags (nameCardsEnabled, etc.) from settings JSONB.
+  //   - Alt-forms exclusion: when alternateFormsEnabled is false, rows with
+  //     subject_key that resolves to an alt-form species id (>= 10000) are
+  //     skipped (#1153).
+  //
+  // Rows where `first_seen = today` are still eligible (they count toward
+  // the due total) but also counted in a separate bucket so we can compute
+  // the new-card estimate (cards started today reduce the remaining new-card
+  // headroom for that direction).
   const dueCountByUser = new Map<string, number>();
+  // startedTodayByUser: user_id → { card_type → count }
+  const startedTodayByUser = new Map<string, Record<string, number>>();
   for (const [today, userIds] of usersByDueDate) {
     const { data: dueData, error: dueError } = await admin
       .from("card_reviews")
-      .select("user_id")
+      .select("user_id, card_type, subject_key, first_seen")
       .lte("due_date", today)
       .in("user_id", userIds)
       .is("hidden_since", null);
@@ -220,10 +467,22 @@ export async function POST(request: Request) {
       );
     }
     for (const row of (dueData ?? []) as DueRow[]) {
+      const eligibility = eligibilityByUser.get(row.user_id) ?? DEFAULT_ELIGIBILITY;
+      if (!rowIsEligible(row.card_type, row.subject_key, eligibility)) continue;
+
       dueCountByUser.set(
         row.user_id,
         (dueCountByUser.get(row.user_id) ?? 0) + 1,
       );
+      // Track first_seen = today rows per card type so we can subtract them
+      // from the new-card estimate (they're already started, not truly new).
+      if (row.first_seen === today) {
+        if (!startedTodayByUser.has(row.user_id)) {
+          startedTodayByUser.set(row.user_id, {});
+        }
+        const counts = startedTodayByUser.get(row.user_id)!;
+        counts[row.card_type] = (counts[row.card_type] ?? 0) + 1;
+      }
     }
   }
 
@@ -235,9 +494,13 @@ export async function POST(request: Request) {
   let sent = 0;
   for (const sub of subscriptions) {
     const dueCount = dueCountByUser.get(sub.user_id) ?? 0;
-    if (dueCount <= 0) continue;
+    const eligibility = eligibilityByUser.get(sub.user_id) ?? DEFAULT_ELIGIBILITY;
+    const startedTodayCounts = startedTodayByUser.get(sub.user_id) ?? {};
+    const newEstimate = computeNewEstimate(startedTodayCounts, eligibility);
 
-    const payload = buildDailyMessage(dueCount);
+    if (dueCount <= 0 && newEstimate <= 0) continue;
+
+    const payload = buildDailyMessage(dueCount, newEstimate);
     try {
       await webpush.sendNotification(
         {
