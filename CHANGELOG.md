@@ -6,6 +6,18 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.13] - 2026-05-21
+
+### Changed
+
+- Stats and Journey pages now share a single memoised DashboardSnapshot computation via a React context provider, eliminating redundant work when both pages are mounted simultaneously.
+
+### Fixed
+
+- PWA badge and document-title badge now update reactively after grading a card on mobile Safari, and share queue-count computation with the Stats dashboard.
+- Forecast bars on the Stats dashboard now count all eligible card types (name, evolution, reverse, cry), matching the today bar.
+- PRs opened by the Visual Baseline Update workflow now run the full required CI check set on open. The regen commit no longer carries `[skip ci]`, and `visual-regression.yml` skips baseline-only diffs via `paths-ignore` instead.
+
 ## [0.10.12] - 2026-05-21
 
 ### Fixed
@@ -1309,7 +1321,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.12...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.13...HEAD
+[0.10.13]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.13
 [0.10.12]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.12
 [0.10.11]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.11
 [0.10.10]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.10
