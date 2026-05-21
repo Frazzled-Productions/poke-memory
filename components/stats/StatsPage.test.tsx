@@ -242,6 +242,42 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => ({ flags: { pretendAllMastered: false }, anyFlagOn: false }),
 }));
 
+// Mock the DashboardSnapshotContext so the Stats page can resolve its snapshot
+// without requiring a real DashboardSnapshotProvider in the test tree (#1139).
+// useSetSnapshotInput is a no-op setter; useDashboardSnapshot returns a snapshot
+// shaped to match what the page's mocked derivers would produce.
+const { mockSnapshotValue } = vi.hoisted(() => ({
+  mockSnapshotValue: {
+    snapshot: {
+      today: "2026-05-21",
+      forceAllMastered: false,
+      queue: { newCount: 0, learningCount: 0, reviewCount: 0, totalCount: 0 },
+      dueForecast: Array.from({ length: 14 }, (_, i) => ({
+        date: `2026-05-${String(14 + i).padStart(2, "0")}`,
+        count: 0,
+      })),
+      mastery: {
+        totalCards: 3,
+        introduced: 0,
+        learning: 0,
+        mastered: 0,
+        locked: 3,
+        perGeneration: [],
+        perType: [],
+      },
+      struggling: [],
+      projection: { kind: "insufficient-history" as const },
+      firstMasteryDays: null,
+      difficulty: { buckets: [], mean: null },
+    } as import("@/lib/stats/dashboard-snapshot").DashboardSnapshot,
+  },
+}));
+
+vi.mock("@/components/stats/DashboardSnapshotContext", () => ({
+  useDashboardSnapshot: () => mockSnapshotValue.snapshot,
+  useProvideDashboardSnapshotInput: () => undefined,
+}));
+
 vi.mock("@/lib/review/seedOpts", () => ({
   seedOptsFromSettings: vi.fn(() => ({
     nameEnabled: true,
@@ -278,6 +314,7 @@ vi.mock("@/lib/stats/derive", () => ({
   ),
   MASTERY_REPETITIONS: 3,
   MASTERY_INTERVAL_DAYS: 21,
+  DUE_FORECAST_DAYS: 14,
 }));
 
 vi.mock("@/lib/stats/records", () => ({
@@ -390,6 +427,29 @@ beforeEach(() => {
   // Default: guest
   mockAuthValue.user = null;
   mockAuthValue.supabase = null;
+  // Reset the mock snapshot to the default state so hint tests don't leak.
+  mockSnapshotValue.snapshot = {
+    today: "2026-05-21",
+    forceAllMastered: false,
+    queue: { newCount: 0, learningCount: 0, reviewCount: 0, totalCount: 0 },
+    dueForecast: Array.from({ length: 14 }, (_, i) => ({
+      date: `2026-05-${String(14 + i).padStart(2, "0")}`,
+      count: 0,
+    })),
+    mastery: {
+      totalCards: 3,
+      introduced: 0,
+      learning: 0,
+      mastered: 0,
+      locked: 3,
+      perGeneration: [],
+      perType: [],
+    },
+    struggling: [],
+    projection: { kind: "insufficient-history" as const },
+    firstMasteryDays: null,
+    difficulty: { buckets: [], mean: null },
+  };
 });
 
 describe("StatsPage — signed-in user hydrates from cloud", () => {
@@ -572,21 +632,13 @@ describe("StatsPage — CompletionProjection widget", () => {
 });
 
 describe("StatsPage — FirstMasteryHint (#1083)", () => {
-  it("renders the hint when introduced > 0 and mastered === 0", async () => {
-    // One card with firstSeen set (introduced) and reps=0 (not mastered).
-    // The stats mock derives introduced from firstSeen and mastered from
-    // reps >= 3, so this combination triggers the hint.
-    const card = makeCard(1, 0);
-    card.state.firstSeen = "2026-05-01";
-    mockLoadSession.mockResolvedValue({
-      cards: [card],
-      limits: {
-        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-      },
-    });
+  it("renders the hint when the snapshot has firstMasteryDays set", async () => {
+    // The page renders the hint when snapshot.firstMasteryDays is non-null.
+    // Set it on the mock snapshot and verify the hint text appears.
+    mockSnapshotValue.snapshot = {
+      ...mockSnapshotValue.snapshot,
+      firstMasteryDays: 20,
+    };
     mockAuthValue.user = null;
     mockAuthValue.supabase = null;
 
@@ -600,46 +652,22 @@ describe("StatsPage — FirstMasteryHint (#1083)", () => {
     );
   });
 
-  it("hides the hint when at least one card is mastered", async () => {
-    // Two cards: one mastered (reps=5) and one not (reps=0). mastered >= 1
-    // means the hint should be suppressed.
-    const mastered = makeCard(1, 5);
-    const learning = makeCard(2, 0);
-    learning.state.firstSeen = "2026-05-01";
-    mockLoadSession.mockResolvedValue({
-      cards: [mastered, learning],
-      limits: {
-        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  it("hides the hint when snapshot.firstMasteryDays is null (mastered cards present)", async () => {
+    // computeDashboardSnapshot returns firstMasteryDays=null when mastered > 0
+    // because there is no projection to show for already-mastered cards.
+    mockSnapshotValue.snapshot = {
+      ...mockSnapshotValue.snapshot,
+      firstMasteryDays: null,
+      mastery: {
+        totalCards: 3,
+        introduced: 3,
+        learning: 0,
+        mastered: 3,  // all mastered — hint suppressed
+        locked: 0,
+        perGeneration: [],
+        perType: [],
       },
-    });
-    mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
-
-    render(<StatsPage />);
-
-    // Wait until the page has hydrated past the loading skeleton.
-    await waitFor(() => {
-      expect(screen.getByTestId("review-heatmap")).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId("first-mastery-hint")).toBeNull();
-  });
-
-  it("hides the hint when no card has been introduced (all locked)", async () => {
-    // A card with firstSeen=null is locked; introduced === 0 → hint hides.
-    const locked = makeCard(1, 0);
-    locked.state.firstSeen = null;
-    mockLoadSession.mockResolvedValue({
-      cards: [locked],
-      limits: {
-        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-      },
-    });
+    };
     mockAuthValue.user = null;
     mockAuthValue.supabase = null;
 
@@ -651,24 +679,50 @@ describe("StatsPage — FirstMasteryHint (#1083)", () => {
     expect(screen.queryByTestId("first-mastery-hint")).toBeNull();
   });
 
-  it("hides the hint when projectTimeToFirstMastery returns null (e.g. superuser flag on)", async () => {
-    // The helper itself short-circuits to null when pretendAllMastered is on.
-    // The page just renders whatever the helper produces, so a null result
-    // suppresses the hint regardless of the introduced/mastered counts.
-    const { projectTimeToFirstMastery } = await import("@/lib/srs/timeToMastery");
-    vi.mocked(projectTimeToFirstMastery).mockReturnValueOnce({ days: null });
-
-    const card = makeCard(1, 0);
-    card.state.firstSeen = "2026-05-01";
-    mockLoadSession.mockResolvedValue({
-      cards: [card],
-      limits: {
-        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  it("hides the hint when snapshot.firstMasteryDays is null (no cards introduced)", async () => {
+    // computeDashboardSnapshot returns firstMasteryDays=null when introduced === 0
+    // because there is no learning progress to project from.
+    mockSnapshotValue.snapshot = {
+      ...mockSnapshotValue.snapshot,
+      firstMasteryDays: null,
+      mastery: {
+        totalCards: 3,
+        introduced: 0,  // all locked — hint suppressed
+        learning: 0,
+        mastered: 0,
+        locked: 3,
+        perGeneration: [],
+        perType: [],
       },
+    };
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
+
+    render(<StatsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("review-heatmap")).toBeInTheDocument();
     });
+    expect(screen.queryByTestId("first-mastery-hint")).toBeNull();
+  });
+
+  it("hides the hint when snapshot.firstMasteryDays is null and forceAllMastered is on", async () => {
+    // computeDashboardSnapshot returns firstMasteryDays=null when forceAllMastered
+    // is active, regardless of real card state. The mock reflects that directly.
+    mockSnapshotValue.snapshot = {
+      ...mockSnapshotValue.snapshot,
+      firstMasteryDays: null,
+      forceAllMastered: true,
+      mastery: {
+        totalCards: 3,
+        introduced: 3,
+        learning: 0,
+        mastered: 3,
+        locked: 0,
+        perGeneration: [],
+        perType: [],
+      },
+    };
     mockAuthValue.user = null;
     mockAuthValue.supabase = null;
 

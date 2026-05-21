@@ -22,12 +22,24 @@ name: Visual Regression
 # explicit opt-in escape hatch for changes outside the path filter; manual
 # runs use workflow_dispatch.
 #
+# `paths-ignore` on the `pull_request` trigger short-circuits the workflow
+# entirely on PRs whose diff is confined to the committed baselines under
+# `e2e/__screenshots__/`. The regen PR opened by `visual-baseline-update.yml`
+# is the canonical case: its diff is screenshot-only, the new baselines are
+# already accepted by definition, and re-running the comparison job against
+# them would just shadow-box. The `decide` job's path filter inside the
+# workflow narrows further to UI changes for non-regen PRs; `paths-ignore`
+# here is the outer fence that also prevents the `synchronize` event from
+# firing when a baseline-only push lands on any feature-flow PR.
+#
 # Not a required check: a non-matching PR simply does not run it and is not
 # blocked.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+    paths-ignore:
+      - 'e2e/__screenshots__/**'
   workflow_dispatch:
 
 concurrency:

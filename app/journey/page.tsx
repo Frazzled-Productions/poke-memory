@@ -5,8 +5,8 @@ import { useCountUp } from "@/lib/stats/useCountUp";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS } from "@/lib/review/session";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
-import { computeDashboardSnapshot } from "@/lib/stats/dashboard-snapshot";
 import type { MasterySnapshot } from "@/lib/stats/dashboard-snapshot";
+import { useDashboardSnapshot, useProvideDashboardSnapshotInput } from "@/components/stats/DashboardSnapshotContext";
 import { EMPTY_SCOPE, type EligibilitySettings } from "@/lib/review/scope";
 import { loadSettings } from "@/lib/settings/persistence";
 import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
@@ -518,23 +518,30 @@ export default function JourneyPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageVersion, anyFlagOn, supabase, user]);
 
-  // Mastery snapshot for Journey — only the mastery axis is needed; skip the
-  // expensive queue + forecast computation (#1121).
-  const masterySnapshot: MasterySnapshot | null = useMemo(() => {
+  // Provide the full snapshot input to the shared DashboardSnapshotContext.
+  // Journey reads only the mastery axis from the returned snapshot (#1139,
+  // simplified in #1151 — the include-filter abstraction was dropped).
+  const snapshotOptions = useMemo(() => ({
+    masteryRepetitions: masteryRepetitions ?? undefined,
+    forceAllMastered: flags.pretendAllMastered,
+  }), [masteryRepetitions, flags.pretendAllMastered]);
+
+  const snapshotInput = useMemo(() => {
     if (cards === null || masteryRepetitions === null) return null;
-    const snap = computeDashboardSnapshot(
+    return {
       cards,
-      eligibilitySettings,
-      DEFAULT_LIMITS,
-      todayString(new Date()),
-      {
-        include: ["mastery"],
-        masteryRepetitions,
-        forceAllMastered: flags.pretendAllMastered,
-      },
-    );
-    return snap.mastery;
-  }, [cards, eligibilitySettings, masteryRepetitions, flags.pretendAllMastered]);
+      settings: eligibilitySettings,
+      limits: DEFAULT_LIMITS,
+      today: todayString(new Date()),
+      options: snapshotOptions,
+    };
+  }, [cards, masteryRepetitions, eligibilitySettings, snapshotOptions]);
+
+  useProvideDashboardSnapshotInput(snapshotInput);
+
+  // Read the shared snapshot from context and extract the mastery axis.
+  const dashboardSnapshot = useDashboardSnapshot();
+  const masterySnapshot: MasterySnapshot | null = dashboardSnapshot?.mastery ?? null;
 
   // nameCards is still needed for computeRecords which isn't part of the snapshot.
   const nameCards =

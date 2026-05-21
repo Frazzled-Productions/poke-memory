@@ -24,7 +24,9 @@ import {
   type DueForecastDay,
   type GenerationStats,
   type TypeStats,
+  DUE_FORECAST_DAYS,
 } from "@/lib/stats/derive";
+import { addDaysToIsoDate } from "@/lib/utils/dates";
 import {
   computeCompletionProjection,
   type CompletionProjection,
@@ -136,6 +138,47 @@ export type DashboardSnapshotOptions = {
 };
 
 // ---------------------------------------------------------------------------
+// computeQueueCount
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the total number of cards due today for a given session, applying
+ * the same eligibility gate and daily caps as `buildSessionQueues` (which the
+ * Practice page uses). This is the single shared helper for badge surfaces —
+ * `usePwaBadge`, `useDocumentTitleBadge`, and the Stats dashboard's `queue`
+ * axis all delegate here so they can never disagree on the count.
+ *
+ * Pure — no I/O, no DOM access, no hooks.
+ *
+ * @param cards    Full card array from the saved session.
+ * @param settings Eligibility settings (card-type toggles + practice scope).
+ * @param limits   Per-type daily new/review limits.
+ * @param today    UTC `YYYY-MM-DD` date string. Caller owns timezone resolution.
+ * @returns        `QueueCounts` with new / learning / review breakdowns and
+ *                 a convenience `totalCount` field.
+ */
+export function computeQueueCount(
+  cards: readonly ReviewableCard[],
+  settings: EligibilitySettings,
+  limits: DailyLimits,
+  today: string,
+): QueueCounts {
+  const eligibleCardIds = computeEligibleCardIds(cards, settings);
+  const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
+    cards,
+    limits,
+    today,
+    eligibleCardIds,
+  );
+  return {
+    newCount: newQueue.length,
+    learningCount: learningCardIds.length,
+    reviewCount: reviewQueue.length,
+    totalCount: newQueue.length + learningCardIds.length + reviewQueue.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // computeDashboardSnapshot
 // ---------------------------------------------------------------------------
 
@@ -175,10 +218,11 @@ export function computeDashboardSnapshot(
     (c): c is NameReviewCard => c.cardType === "name",
   );
 
-  // `computeStats` is required for mastery, struggling, and forecast axes.
-  // Compute it whenever any of those axes is wanted.
+  // `computeStats` is required for mastery and struggling axes.
+  // The forecast axis now builds its future bars directly from the full card
+  // set (all card types), so it no longer depends on computeStats.
   const needsStats =
-    wants("mastery") || wants("struggling") || wants("forecast");
+    wants("mastery") || wants("struggling");
 
   let statsResult: StatsResult | null = null;
   if (needsStats) {
@@ -198,35 +242,62 @@ export function computeDashboardSnapshot(
   let dueForecast: readonly DueForecastDay[] | null = null;
 
   if (needsQueue) {
-    const eligibleCardIds = computeEligibleCardIds(cards, settings);
-    const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
-      cards,
-      limits,
-      today,
-      eligibleCardIds,
-    );
-    const todayCount =
-      newQueue.length + learningCardIds.length + reviewQueue.length;
+    // Delegate to the shared helper so the Stats dashboard and badge surfaces
+    // always report the same count for identical inputs.
+    const counts = computeQueueCount(cards, settings, limits, today);
 
     if (wants("queue")) {
-      queue = {
-        newCount: newQueue.length,
-        learningCount: learningCardIds.length,
-        reviewCount: reviewQueue.length,
-        totalCount: todayCount,
-      };
+      queue = counts;
     }
 
     if (wants("forecast")) {
-      // Replace the today bar with the exact queue total. Future bars
-      // (indices 1–13) come from computeStats unchanged — they are exact
-      // dueDate matches and don't depend on eligibility settings.
-      // statsResult is always non-null here: needsStats = wants("mastery") ||
-      // wants("struggling") || wants("forecast"), so forecast implies computed.
-      const forecast = statsResult!.dueForecast;
-      // computeStats always returns 14 entries (DUE_FORECAST_DAYS), so
-      // forecast.length > 0 is unconditionally true — spread directly.
-      dueForecast = [{ ...forecast[0], count: todayCount }, ...forecast.slice(1)];
+      // Build a 14-entry forecast that covers all active card types.
+      //
+      // Day 0 ("today"): the exact queue total from computeQueueCount, which
+      // already applies the full eligibility gate (card-type toggles + scope +
+      // daily caps) for all card types. This was introduced in #1121.
+      //
+      // Days 1–13 ("future"): a count of eligible cards whose dueDate exactly
+      // matches that future date. New cards (lastReview === null) are excluded
+      // — they enter the queue on the day they are introduced, not on their
+      // default dueDate. Cards are filtered through the same eligibility gate
+      // (eligible card IDs) as the queue so disabled card types and out-of-scope
+      // cards are absent from the future bars too. This fixes #1138, where the
+      // future bars only reflected name cards.
+      //
+      // Pre-compute the 13 future date strings (indices 1–13) so the card loop
+      // can do a single Map lookup per card.
+      const futureDates: string[] = [];
+      for (let i = 1; i < DUE_FORECAST_DAYS; i++) {
+        futureDates.push(addDaysToIsoDate(today, i));
+      }
+      const futureDateIndex = new Map<string, number>();
+      futureDates.forEach((d, i) => futureDateIndex.set(d, i + 1)); // offset by 1 (index 0 = today)
+
+      const eligibleCardIds = computeEligibleCardIds(cards, settings);
+      const futureCounts = new Array<number>(DUE_FORECAST_DAYS).fill(0);
+
+      for (const card of cards) {
+        // Exclude ineligible cards (disabled card type, out-of-scope, etc.).
+        if (!eligibleCardIds.has(card.id)) continue;
+        // Exclude never-reviewed cards — they are new-card candidates, not
+        // scheduled reviews, and are accounted for in the today bar via the queue.
+        if (card.state.lastReview === null) continue;
+        // Map the card's dueDate to a future bar index (1–13). Dates outside
+        // the window or equal to today are ignored here (today is bar 0).
+        const idx = futureDateIndex.get(card.state.dueDate);
+        if (idx !== undefined) {
+          futureCounts[idx]++;
+        }
+      }
+
+      // Build the DueForecastDay array. Bar 0 uses the queue total (all card
+      // types, caps applied); bars 1–13 use the eligibility-gated future counts.
+      const forecastDates = [today, ...futureDates];
+      dueForecast = forecastDates.map((date, i) => ({
+        date,
+        count: i === 0 ? counts.totalCount : futureCounts[i],
+      }));
     }
   }
 

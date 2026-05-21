@@ -1,16 +1,17 @@
 /**
- * Component tests for usePwaBadge (issue #916, fixed #1099, #1108).
+ * Component tests for usePwaBadge (issue #916, fixed #1099, #1108, #1134, #1137).
  *
  * Covers:
- *   - Sets badge to the sum of new + learning + review cards when due count > 0.
+ *   - Sets badge to the total due count when cards are due.
  *   - Clears badge when there are no due cards.
  *   - Clears badge when session is null.
  *   - Is a no-op when the Web Badging API is unavailable.
  *   - Re-syncs when the session storage key changes (card graded).
  *   - Re-syncs when SETTINGS_SAVED_EVENT fires (e.g. timezone changed).
+ *   - Re-syncs when SESSION_CHANGED_EVENT fires (IDB write on WebKit — #1134).
  *   - Clears badge on unmount.
  *   - On a fresh install, badge is capped by the daily new-card cap, not the full backlog.
- *   - Badge respects Settings eligibility filters (alternate forms, scope, directions).
+ *   - Delegates queue computation to computeQueueCount (#1137).
  */
 
 import { renderHook, act, waitFor } from "@testing-library/react";
@@ -24,6 +25,7 @@ const mockLoadSession = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: () => mockLoadSession(),
   STORAGE_KEY: "poke-memory:review-session:v1",
+  SESSION_CHANGED_EVENT: "poke-memory:session-changed",
 }));
 
 const mockLoadSettings = vi.fn().mockReturnValue({
@@ -41,33 +43,20 @@ vi.mock("@/lib/settings/persistence", () => ({
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
 }));
 
-// buildSessionQueues and todayString are tested separately; mock them here to
-// keep usePwaBadge tests isolated from the SRS scheduler.
-const mockBuildSessionQueues = vi.fn().mockReturnValue({
-  newQueue: [],
-  learningCardIds: [],
-  reviewQueue: [],
-  outOfScopeLearningIds: [],
-  newIntroducedToday: 0,
-  reviewsDoneToday: 0,
-  perType: {
-    name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-    evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-    reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-    cry: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-  },
-});
 vi.mock("@/lib/review/session", () => ({
-  buildSessionQueues: (...args: unknown[]) => mockBuildSessionQueues(...args),
   todayString: vi.fn().mockReturnValue("2026-05-18"),
 }));
 
-// computeEligibleCardIds is the shared eligibility helper (#1108). Mock it
-// here so badge tests remain isolated from scope/filter logic; unit tests
-// for the helper itself live in lib/review/scope.test.ts.
-const mockComputeEligibleCardIds = vi.fn().mockReturnValue(new Set<number>());
-vi.mock("@/lib/review/scope", () => ({
-  computeEligibleCardIds: (...args: unknown[]) => mockComputeEligibleCardIds(...args),
+// computeQueueCount is the shared helper (#1137). Mock it here to keep
+// usePwaBadge tests isolated from the queue-building logic.
+const mockComputeQueueCount = vi.fn().mockReturnValue({
+  newCount: 0,
+  learningCount: 0,
+  reviewCount: 0,
+  totalCount: 0,
+});
+vi.mock("@/lib/stats/dashboard-snapshot", () => ({
+  computeQueueCount: (...args: unknown[]) => mockComputeQueueCount(...args),
 }));
 
 let sessionVersion = 0;
@@ -106,21 +95,14 @@ function removeBadgeApi() {
   delete (navigator as any).clearAppBadge;
 }
 
-/** Helper to stub buildSessionQueues with queue arrays of the given lengths. */
-function stubQueues(newLen: number, learningLen: number, reviewLen: number) {
-  mockBuildSessionQueues.mockReturnValue({
-    newQueue: Array.from({ length: newLen }, (_, i) => i + 1),
-    learningCardIds: Array.from({ length: learningLen }, (_, i) => 1000 + i),
-    reviewQueue: Array.from({ length: reviewLen }, (_, i) => 2000 + i),
-    outOfScopeLearningIds: [],
-    newIntroducedToday: 0,
-    reviewsDoneToday: 0,
-    perType: {
-      name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-      evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-      reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-      cry: { newIntroducedToday: 0, reviewsDoneToday: 0 },
-    },
+/** Helper to stub computeQueueCount with the given total. */
+function stubQueueCount(total: number) {
+  const newCount = total;
+  mockComputeQueueCount.mockReturnValue({
+    newCount,
+    learningCount: 0,
+    reviewCount: 0,
+    totalCount: total,
   });
 }
 
@@ -140,8 +122,12 @@ beforeEach(() => {
     alternateFormsEnabled: false,
     practiceScope: { gens: [], types: [], presets: [], games: [] },
   });
-  mockComputeEligibleCardIds.mockReturnValue(new Set<number>());
-  stubQueues(0, 0, 0);
+  mockComputeQueueCount.mockReturnValue({
+    newCount: 0,
+    learningCount: 0,
+    reviewCount: 0,
+    totalCount: 0,
+  });
   sessionVersion = 0;
   installBadgeApi();
 });
@@ -169,7 +155,7 @@ describe("usePwaBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(0, 0, 0);
+    stubQueueCount(0);
 
     renderHook(() => usePwaBadge());
 
@@ -179,12 +165,12 @@ describe("usePwaBadge", () => {
     expect(mockSetAppBadge).not.toHaveBeenCalled();
   });
 
-  it("sets badge to total due count (new + learning + review)", async () => {
+  it("sets badge to the total due count from computeQueueCount", async () => {
     mockLoadSession.mockResolvedValue({
-      cards: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }],
+      cards: [{ id: 1 }, { id: 2 }, { id: 3 }],
       limits: {},
     });
-    stubQueues(2, 1, 3);
+    stubQueueCount(6);
 
     renderHook(() => usePwaBadge());
 
@@ -201,7 +187,7 @@ describe("usePwaBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(1, 0, 0);
+    stubQueueCount(1);
 
     // Should not throw.
     const { unmount } = renderHook(() => usePwaBadge());
@@ -231,7 +217,7 @@ describe("usePwaBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(0, 0, 2);
+    stubQueueCount(2);
 
     rerender();
 
@@ -245,7 +231,7 @@ describe("usePwaBadge", () => {
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(1, 0, 0);
+    stubQueueCount(1);
 
     renderHook(() => usePwaBadge());
 
@@ -254,7 +240,7 @@ describe("usePwaBadge", () => {
     });
 
     // Settings change (e.g. timezone) — should re-sync.
-    stubQueues(1, 2, 0);
+    stubQueueCount(3);
 
     act(() => {
       window.dispatchEvent(new Event("poke-memory:settings-saved"));
@@ -265,12 +251,36 @@ describe("usePwaBadge", () => {
     });
   });
 
+  it("re-syncs when SESSION_CHANGED_EVENT fires (WebKit IDB write — #1134)", async () => {
+    // Simulates WebKit: loadSession returns null initially, then returns cards
+    // after an IDB write. The hook must re-run `sync` when the CustomEvent fires.
+    mockLoadSession.mockResolvedValue(null);
+
+    renderHook(() => usePwaBadge());
+
+    await waitFor(() => {
+      expect(mockClearAppBadge).toHaveBeenCalledTimes(1);
+    });
+
+    // IDB write completes: session now has cards due.
+    mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }], limits: {} });
+    stubQueueCount(4);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("poke-memory:session-changed"));
+    });
+
+    await waitFor(() => {
+      expect(mockSetAppBadge).toHaveBeenCalledWith(4);
+    });
+  });
+
   it("clears badge on unmount", async () => {
     mockLoadSession.mockResolvedValue({
       cards: [{ id: 1 }],
       limits: {},
     });
-    stubQueues(1, 0, 0);
+    stubQueueCount(1);
 
     const { unmount } = renderHook(() => usePwaBadge());
 
@@ -287,9 +297,8 @@ describe("usePwaBadge", () => {
   });
 
   it("badge is capped at the daily new-card limit on a fresh install", async () => {
-    // Fresh install with ~3600 untouched cards; the mock stands in for
-    // buildSessionQueues returning a capped queue (e.g. 10 name cards).
-    // Verifies the hook sums from buildSessionQueues output, not the backlog.
+    // Verifies the hook passes the session to computeQueueCount — which applies
+    // the cap — rather than summing the raw backlog directly.
     const BACKLOG_SIZE = 3600;
     const DAILY_CAP = 10;
 
@@ -297,8 +306,7 @@ describe("usePwaBadge", () => {
       cards: Array.from({ length: BACKLOG_SIZE }, (_, i) => ({ id: i + 1 })),
       limits: {},
     });
-    // buildSessionQueues returns only the capped new queue, no learning/reviews.
-    stubQueues(DAILY_CAP, 0, 0);
+    stubQueueCount(DAILY_CAP);
 
     renderHook(() => usePwaBadge());
 
@@ -308,80 +316,22 @@ describe("usePwaBadge", () => {
     expect(mockSetAppBadge).not.toHaveBeenCalledWith(BACKLOG_SIZE);
   });
 
-  it("passes eligibleCardIds from computeEligibleCardIds to buildSessionQueues", async () => {
-    // Verifies the hook wires the eligibility helper into the queue builder
-    // so Settings filters (directions, alternate forms, scope) are respected.
-    const cards = [{ id: 1 }, { id: 2 }, { id: 3 }];
-    const eligibleSet = new Set([1, 2]); // card 3 is filtered out (e.g. alternate form)
-    mockLoadSession.mockResolvedValue({ cards, limits: {} });
-    mockComputeEligibleCardIds.mockReturnValue(eligibleSet);
-    stubQueues(2, 0, 0);
+  it("passes session cards, settings, limits, and today to computeQueueCount", async () => {
+    // Verifies the hook wires all four arguments to the shared helper so filters
+    // (directions, alternate forms, scope) are respected.
+    const cards = [{ id: 1 }, { id: 2 }];
+    const limits = { name: { maxNewPerDay: 5, maxReviewsPerDay: 20 } };
+    mockLoadSession.mockResolvedValue({ cards, limits });
+    stubQueueCount(2);
 
     renderHook(() => usePwaBadge());
 
     await waitFor(() => {
-      // buildSessionQueues must receive the eligibleCardIds set as the 4th arg.
-      expect(mockBuildSessionQueues).toHaveBeenCalledWith(
+      expect(mockComputeQueueCount).toHaveBeenCalledWith(
         cards,
-        {},
-        expect.any(String),
-        eligibleSet,
-      );
-    });
-  });
-
-  it("alternate-forms-off baseline: computeEligibleCardIds is called with settings flags", async () => {
-    // When alternateFormsEnabled is false (the default), computeEligibleCardIds
-    // should be called with that flag so alternate-form cards are excluded.
-    const cards = [{ id: 1 }];
-    const settings = {
-      timezone: "UTC",
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: true,
-      reverseCardsEnabled: false,
-      reverseEvolutionCardsEnabled: false,
-      cryCardsEnabled: false,
-      alternateFormsEnabled: false,
-      practiceScope: { gens: [], types: [], presets: [], games: [] },
-    };
-    mockLoadSession.mockResolvedValue({ cards, limits: {} });
-    mockLoadSettings.mockReturnValue(settings);
-    stubQueues(1, 0, 0);
-
-    renderHook(() => usePwaBadge());
-
-    await waitFor(() => {
-      expect(mockComputeEligibleCardIds).toHaveBeenCalledWith(
-        cards,
-        expect.objectContaining({ alternateFormsEnabled: false }),
-      );
-    });
-  });
-
-  it("scope-filtered case: computeEligibleCardIds is called with the active scope", async () => {
-    // When the user has an active scope (e.g. Gen I only), the badge hook
-    // must pass that scope to computeEligibleCardIds.
-    const cards = [{ id: 1 }, { id: 200 }];
-    const scope = { gens: [1], types: [], presets: [], games: [] };
-    mockLoadSettings.mockReturnValue({
-      timezone: "UTC",
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: true,
-      reverseCardsEnabled: false,
-      reverseEvolutionCardsEnabled: false,
-      cryCardsEnabled: false,
-      alternateFormsEnabled: false,
-      practiceScope: scope,
-    });
-    mockLoadSession.mockResolvedValue({ cards, limits: {} });
-    stubQueues(1, 0, 0);
-
-    renderHook(() => usePwaBadge());
-
-    await waitFor(() => {
-      expect(mockComputeEligibleCardIds).toHaveBeenCalledWith(
-        cards,
-        expect.objectContaining({ practiceScope: scope }),
+        expect.objectContaining({ nameCardsEnabled: true }),
+        limits,
+        expect.any(String), // today
       );
     });
   });
