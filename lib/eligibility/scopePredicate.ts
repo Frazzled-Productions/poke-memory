@@ -26,6 +26,7 @@
 
 import type { PracticeScope, FormCategoryFilter } from "@/lib/review/scope";
 import type { ScopeLookupEntry } from "@/lib/pokemon/scopeLookup";
+import type { FormCategory } from "@/lib/pokemon/forms";
 import { generationOf } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
@@ -80,7 +81,7 @@ export function scopeMatchesEntry(
     if (!entry.isDefaultForm) return false;
   } else if (fc.mode === "include") {
     // Default forms always pass; non-default forms must be in the allow-list.
-    if (!entry.isDefaultForm && !fc.categories.includes(entry.formCategory as never)) {
+    if (!entry.isDefaultForm && !fc.categories.includes(entry.formCategory as FormCategory)) {
       return false;
     }
   }

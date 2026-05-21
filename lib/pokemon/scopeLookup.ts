@@ -6,7 +6,8 @@ export type ScopeLookupEntry = {
   speciesId: number;
   types: string[];
   isDefaultForm: boolean;
-  formCategory: string;
+  /** Broad form category. Matches the FormCategory union in lib/pokemon/forms.ts. */
+  formCategory: "default" | "regional" | "mega" | "gmax" | "primal" | "forme";
   versionGroups: string[];
   isLegendary: boolean;
 };
