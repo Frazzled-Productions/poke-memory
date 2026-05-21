@@ -278,6 +278,7 @@ vi.mock("@/lib/stats/derive", () => ({
   ),
   MASTERY_REPETITIONS: 3,
   MASTERY_INTERVAL_DAYS: 21,
+  DUE_FORECAST_DAYS: 14,
 }));
 
 vi.mock("@/lib/stats/records", () => ({
