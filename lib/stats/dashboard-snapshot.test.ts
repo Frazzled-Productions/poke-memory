@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeDashboardSnapshot,
+  computeQueueCount,
   type SnapshotAxis,
 } from "./dashboard-snapshot";
 import { DEFAULT_LIMITS, buildSessionQueues, type ReviewableCard, type NameReviewCard } from "@/lib/review/session";
@@ -724,5 +725,85 @@ describe("superuser forceAllMastered", () => {
     });
     expect(snapshot.difficulty!.mean).toBeNull();
     expect(snapshot.difficulty!.buckets.every((b) => b.count === 0)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeQueueCount — shared badge helper (#1137)
+// ---------------------------------------------------------------------------
+
+describe("computeQueueCount", () => {
+  it("returns zero counts when cards array is empty", () => {
+    const result = computeQueueCount([], makeSettings(), DEFAULT_LIMITS, TODAY);
+    expect(result).toEqual({
+      newCount: 0,
+      learningCount: 0,
+      reviewCount: 0,
+      totalCount: 0,
+    });
+  });
+
+  it("counts new cards due today", () => {
+    const cards: ReviewableCard[] = [newCard(1), newCard(2), newCard(3)];
+    const settings = makeSettings();
+    const result = computeQueueCount(cards, settings, DEFAULT_LIMITS, TODAY);
+    // New cards are limited by DEFAULT_LIMITS; fixture has 3 new cards well within cap.
+    expect(result.newCount).toBeGreaterThan(0);
+    expect(result.totalCount).toBe(result.newCount + result.learningCount + result.reviewCount);
+  });
+
+  it("totalCount matches the snapshot queue axis for identical inputs", () => {
+    const cards: ReviewableCard[] = [
+      newCard(1),
+      newCard(2),
+      learningCard(10, "2026-05-18"),
+    ];
+    const settings = makeSettings();
+
+    const countResult = computeQueueCount(cards, settings, DEFAULT_LIMITS, TODAY);
+    const snapshot = computeDashboardSnapshot(cards, settings, DEFAULT_LIMITS, TODAY, {
+      include: ["queue"],
+    });
+
+    // The badge helper and the Stats dashboard must agree on the total.
+    expect(countResult.totalCount).toBe(snapshot.queue!.totalCount);
+    expect(countResult.newCount).toBe(snapshot.queue!.newCount);
+    expect(countResult.learningCount).toBe(snapshot.queue!.learningCount);
+    expect(countResult.reviewCount).toBe(snapshot.queue!.reviewCount);
+  });
+
+  it("respects scope filter — excludes cards outside active scope", () => {
+    const genIScope = { ...EMPTY_SCOPE, gens: [1] };
+    const settings = makeSettings({ practiceScope: genIScope });
+    const cards: ReviewableCard[] = [
+      newCard(1),  // Gen I — included
+      newCard(4),  // Gen I — included
+      newCard(152), // Gen II — excluded by scope
+    ];
+
+    const result = computeQueueCount(cards, settings, DEFAULT_LIMITS, TODAY);
+    // Only the two Gen I new cards should be in the queue.
+    expect(result.totalCount).toBe(2);
+  });
+
+  it("respects card-type toggles — excludes disabled card types", () => {
+    // With only name cards enabled and no evolution/reverse cards in the
+    // fixture, the result should match queueTotal with the same settings.
+    const settings = makeSettings({
+      evolutionCardsEnabled: false,
+      reverseCardsEnabled: false,
+    });
+    const cards: ReviewableCard[] = [newCard(1), newCard(2)];
+    const result = computeQueueCount(cards, settings, DEFAULT_LIMITS, TODAY);
+    expect(result.totalCount).toBe(queueTotal(cards, settings));
+  });
+
+  it("returns QueueCounts with all four fields", () => {
+    const result = computeQueueCount([newCard(1)], makeSettings(), DEFAULT_LIMITS, TODAY);
+    expect(result).toHaveProperty("newCount");
+    expect(result).toHaveProperty("learningCount");
+    expect(result).toHaveProperty("reviewCount");
+    expect(result).toHaveProperty("totalCount");
+    expect(typeof result.totalCount).toBe("number");
   });
 });
