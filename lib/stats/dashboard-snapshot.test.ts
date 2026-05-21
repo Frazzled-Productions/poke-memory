@@ -427,9 +427,10 @@ describe("forecast axis", () => {
 // ---------------------------------------------------------------------------
 
 describe("forecast axis — all card types", () => {
-  // Helper: future date N days from TODAY.
+  // Helper: future date N days from TODAY. Derived from the TODAY constant so
+  // that bumping TODAY keeps the forecast-window indices in sync (#1150).
   function futureDate(n: number): string {
-    const d = new Date("2026-05-20");
+    const d = new Date(TODAY);
     d.setUTCDate(d.getUTCDate() + n);
     return d.toISOString().slice(0, 10);
   }

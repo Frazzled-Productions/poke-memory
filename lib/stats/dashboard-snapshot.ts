@@ -242,9 +242,23 @@ export function computeDashboardSnapshot(
   let dueForecast: readonly DueForecastDay[] | null = null;
 
   if (needsQueue) {
-    // Delegate to the shared helper so the Stats dashboard and badge surfaces
-    // always report the same count for identical inputs.
-    const counts = computeQueueCount(cards, settings, limits, today);
+    // Compute eligible card IDs once and share between the queue (via
+    // buildSessionQueues) and the forecast future-bar loop. Both axes gate on
+    // the same eligibility predicate, so running computeEligibleCardIds once
+    // avoids a redundant O(n) pass over the full card collection (#1149).
+    const eligibleCardIds = computeEligibleCardIds(cards, settings);
+    const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
+      cards,
+      limits,
+      today,
+      eligibleCardIds,
+    );
+    const counts: QueueCounts = {
+      newCount: newQueue.length,
+      learningCount: learningCardIds.length,
+      reviewCount: reviewQueue.length,
+      totalCount: newQueue.length + learningCardIds.length + reviewQueue.length,
+    };
 
     if (wants("queue")) {
       queue = counts;
@@ -253,9 +267,9 @@ export function computeDashboardSnapshot(
     if (wants("forecast")) {
       // Build a 14-entry forecast that covers all active card types.
       //
-      // Day 0 ("today"): the exact queue total from computeQueueCount, which
-      // already applies the full eligibility gate (card-type toggles + scope +
-      // daily caps) for all card types. This was introduced in #1121.
+      // Day 0 ("today"): the exact queue total from the session queues above,
+      // which already applies the full eligibility gate (card-type toggles +
+      // scope + daily caps) for all card types. This was introduced in #1121.
       //
       // Days 1–13 ("future"): a count of eligible cards whose dueDate exactly
       // matches that future date. New cards (lastReview === null) are excluded
@@ -274,7 +288,7 @@ export function computeDashboardSnapshot(
       const futureDateIndex = new Map<string, number>();
       futureDates.forEach((d, i) => futureDateIndex.set(d, i + 1)); // offset by 1 (index 0 = today)
 
-      const eligibleCardIds = computeEligibleCardIds(cards, settings);
+      // eligibleCardIds already computed above — reused here.
       const futureCounts = new Array<number>(DUE_FORECAST_DAYS).fill(0);
 
       for (const card of cards) {
