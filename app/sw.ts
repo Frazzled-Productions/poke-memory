@@ -40,6 +40,8 @@ import {
 } from "serwist";
 import {
   CACHE_NAMES,
+  CRY_CACHE_MAX_AGE_SECONDS,
+  CRY_CACHE_MAX_ENTRIES,
   SPRITE_CACHE_MAX_AGE_SECONDS,
   SPRITE_CACHE_MAX_ENTRIES,
   classifyRequest,
@@ -50,7 +52,7 @@ import {
  * previously cached response (e.g. an app-shell format change that would
  * otherwise be served stale). It is appended to every cache name below.
  */
-const SW_CACHE_VERSION = "v1";
+const SW_CACHE_VERSION = "v2";
 
 /** IndexedDB database/store names — must match lib/idb/db.ts exactly. */
 const IDB_DB_NAME = "poke-memory";
@@ -177,6 +179,22 @@ const runtimeCaching: RuntimeCaching[] = [
         new ExpirationPlugin({
           maxEntries: SPRITE_CACHE_MAX_ENTRIES,
           maxAgeSeconds: SPRITE_CACHE_MAX_AGE_SECONDS,
+          maxAgeFrom: "last-used",
+        }),
+      ],
+    }),
+  },
+  {
+    // Pokémon cry audio — immutable per URL, cache-first, large cap.
+    matcher: ({ url, request }) =>
+      classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
+      CACHE_NAMES.cries,
+    handler: new CacheFirst({
+      cacheName: versioned(CACHE_NAMES.cries),
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: CRY_CACHE_MAX_ENTRIES,
+          maxAgeSeconds: CRY_CACHE_MAX_AGE_SECONDS,
           maxAgeFrom: "last-used",
         }),
       ],
