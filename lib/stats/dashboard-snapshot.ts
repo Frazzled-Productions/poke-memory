@@ -138,6 +138,45 @@ export type DashboardSnapshotOptions = {
 };
 
 // ---------------------------------------------------------------------------
+// computeQueueCountFromEligible
+// ---------------------------------------------------------------------------
+
+/**
+ * Lower-level queue-count helper used when the caller already holds a
+ * pre-computed `eligibleCardIds` set. Avoids a redundant
+ * `computeEligibleCardIds` pass when the snapshot path shares the result
+ * across the queue and forecast axes (#1158).
+ *
+ * Pure — no I/O, no DOM access, no hooks.
+ *
+ * @param cards          Full card array from the saved session.
+ * @param eligibleCardIds Pre-computed set from `computeEligibleCardIds`.
+ * @param limits         Per-type daily new/review limits.
+ * @param today          UTC `YYYY-MM-DD` date string.
+ * @returns              `QueueCounts` with new / learning / review breakdowns
+ *                       and a convenience `totalCount` field.
+ */
+export function computeQueueCountFromEligible(
+  cards: readonly ReviewableCard[],
+  eligibleCardIds: ReadonlySet<number>,
+  limits: DailyLimits,
+  today: string,
+): QueueCounts {
+  const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
+    cards,
+    limits,
+    today,
+    eligibleCardIds,
+  );
+  return {
+    newCount: newQueue.length,
+    learningCount: learningCardIds.length,
+    reviewCount: reviewQueue.length,
+    totalCount: newQueue.length + learningCardIds.length + reviewQueue.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // computeQueueCount
 // ---------------------------------------------------------------------------
 
@@ -164,18 +203,7 @@ export function computeQueueCount(
   today: string,
 ): QueueCounts {
   const eligibleCardIds = computeEligibleCardIds(cards, settings);
-  const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
-    cards,
-    limits,
-    today,
-    eligibleCardIds,
-  );
-  return {
-    newCount: newQueue.length,
-    learningCount: learningCardIds.length,
-    reviewCount: reviewQueue.length,
-    totalCount: newQueue.length + learningCardIds.length + reviewQueue.length,
-  };
+  return computeQueueCountFromEligible(cards, eligibleCardIds, limits, today);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,22 +271,13 @@ export function computeDashboardSnapshot(
 
   if (needsQueue) {
     // Compute eligible card IDs once and share between the queue (via
-    // buildSessionQueues) and the forecast future-bar loop. Both axes gate on
-    // the same eligibility predicate, so running computeEligibleCardIds once
-    // avoids a redundant O(n) pass over the full card collection (#1149).
+    // computeQueueCountFromEligible) and the forecast future-bar loop. Both
+    // axes gate on the same eligibility predicate, so running
+    // computeEligibleCardIds once avoids a redundant O(n) pass over the full
+    // card collection (#1149). The helper keeps the queue-assembly logic in one
+    // place and is reused by computeQueueCount too (#1158).
     const eligibleCardIds = computeEligibleCardIds(cards, settings);
-    const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
-      cards,
-      limits,
-      today,
-      eligibleCardIds,
-    );
-    const counts: QueueCounts = {
-      newCount: newQueue.length,
-      learningCount: learningCardIds.length,
-      reviewCount: reviewQueue.length,
-      totalCount: newQueue.length + learningCardIds.length + reviewQueue.length,
-    };
+    const counts = computeQueueCountFromEligible(cards, eligibleCardIds, limits, today);
 
     if (wants("queue")) {
       queue = counts;
