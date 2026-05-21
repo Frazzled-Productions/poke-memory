@@ -28,7 +28,8 @@ import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { computeDirectionBreakdown, enabledDirectionsFromSettings } from "@/lib/stats/direction-breakdown";
 import { computeRetentionComparison } from "@/lib/stats/retention";
 import { computeGradeDistribution, computeGradeTrend } from "@/lib/stats/grade-distribution";
-import { computeDashboardSnapshot, type DashboardSnapshot } from "@/lib/stats/dashboard-snapshot";
+import { type DashboardSnapshot } from "@/lib/stats/dashboard-snapshot";
+import { useDashboardSnapshot, useProvideDashboardSnapshotInput } from "@/components/stats/DashboardSnapshotContext";
 import { CompletionProjection } from "@/components/stats/CompletionProjection";
 import DueForecast from "@/components/stats/DueForecast";
 import { FirstMasteryHint } from "@/components/stats/FirstMasteryHint";
@@ -460,31 +461,39 @@ export default function StatsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageVersion, anyFlagOn, supabase, user]);
 
-  // Single unified snapshot — replaces the standalone computeStats, patchForecastTodayBar,
-  // computeCompletionProjection, projectTimeToFirstMastery, computeDifficultyHistogram,
-  // and meanDifficulty calls (#1121).
-  const snapshot: DashboardSnapshot | null = useMemo(() => {
+  // Provide the full snapshot input to the shared DashboardSnapshotContext.
+  // Stats reads all axes from the returned snapshot (#1139, simplified in #1151).
+  const snapshotSettings = useMemo(() => ({
+    nameCardsEnabled: cardTypeSettings.nameCardsEnabled,
+    evolutionCardsEnabled: cardTypeSettings.evolutionCardsEnabled,
+    reverseCardsEnabled: cardTypeSettings.reverseCardsEnabled,
+    reverseEvolutionCardsEnabled: cardTypeSettings.reverseEvolutionCardsEnabled,
+    cryCardsEnabled: cardTypeSettings.cryCardsEnabled,
+    alternateFormsEnabled,
+    practiceScope,
+  }), [cardTypeSettings, alternateFormsEnabled, practiceScope]);
+
+  const snapshotOptions = useMemo(() => ({
+    masteryRepetitions: masteryRepetitions ?? undefined,
+    forceAllMastered: flags.pretendAllMastered,
+    retentionTarget,
+  }), [masteryRepetitions, flags.pretendAllMastered, retentionTarget]);
+
+  const snapshotInput = useMemo(() => {
     if (cards === null || masteryRepetitions === null) return null;
-    return computeDashboardSnapshot(
+    return {
       cards,
-      {
-        nameCardsEnabled: cardTypeSettings.nameCardsEnabled,
-        evolutionCardsEnabled: cardTypeSettings.evolutionCardsEnabled,
-        reverseCardsEnabled: cardTypeSettings.reverseCardsEnabled,
-        reverseEvolutionCardsEnabled: cardTypeSettings.reverseEvolutionCardsEnabled,
-        cryCardsEnabled: cardTypeSettings.cryCardsEnabled,
-        alternateFormsEnabled,
-        practiceScope,
-      },
-      sessionLimits,
-      todayString(new Date()),
-      {
-        masteryRepetitions,
-        forceAllMastered: flags.pretendAllMastered,
-        retentionTarget,
-      },
-    );
-  }, [cards, cardTypeSettings, alternateFormsEnabled, practiceScope, sessionLimits, masteryRepetitions, flags.pretendAllMastered, retentionTarget]);
+      settings: snapshotSettings,
+      limits: sessionLimits,
+      today: todayString(new Date()),
+      options: snapshotOptions,
+    };
+  }, [cards, masteryRepetitions, snapshotSettings, sessionLimits, snapshotOptions]);
+
+  useProvideDashboardSnapshotInput(snapshotInput);
+
+  // Read the memoised snapshot from context — computed once per unique input set (#1139).
+  const snapshot: DashboardSnapshot | null = useDashboardSnapshot();
 
   const reviewCharts =
     cards !== null && snapshot !== null
