@@ -112,9 +112,19 @@ jobs:
           fetch-depth: 0
 
       - name: Configure git identity
+        # `--global` is required because this job runs inside the
+        # `mcr.microsoft.com/playwright:v1.60.0-noble` container, where the
+        # default working directory is not `$GITHUB_WORKSPACE`. A bare
+        # `git config` (which defaults to `--local`) fails with
+        # `fatal: not in a git directory` because there is no `.git` in cwd.
+        # `safe.directory` is also needed: the container runs as root by
+        # default and `actions/checkout` chowns the workspace to the `runner`
+        # user, so git's dubious-ownership check would otherwise reject the
+        # later `git add` / `commit` / `push` steps.
         run: |
-          git config user.name "poke-memory-bot[bot]"
-          git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
+          git config --global user.name "poke-memory-bot[bot]"
+          git config --global user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Cache npm
         uses: actions/cache@v4
