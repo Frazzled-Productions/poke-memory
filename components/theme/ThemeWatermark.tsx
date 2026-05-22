@@ -8,6 +8,7 @@ import {
   SETTINGS_SAVED_EVENT,
   type UserSettings,
 } from "@/lib/settings/persistence";
+import { THEME_WATERMARK_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 function readIntensity(): string {
   if (typeof window === "undefined") return "accents";
@@ -71,8 +72,8 @@ export function ThemeWatermark() {
         <Image
           src={favourite.spriteUrl}
           alt=""
-          width={180}
-          height={180}
+          width={THEME_WATERMARK_SPRITE_SIZE}
+          height={THEME_WATERMARK_SPRITE_SIZE}
           className="h-[180px] w-[180px] object-contain"
           priority={false}
         />

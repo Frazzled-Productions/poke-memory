@@ -88,6 +88,16 @@ describe("classifyRequest", () => {
     expect(result.cacheName).toBe(CACHE_NAMES.sprites);
   });
 
+  it("routes a pre-generated WebP sprite URL to the sprites bucket", () => {
+    // With the custom loader, sprites are served from static WebP files under
+    // /sprites/pokemon/webp/<id>/<width>.webp — they match the /sprites/ prefix
+    // rule directly, no /_next/image indirection needed.
+    const url = `${ORIGIN}/sprites/pokemon/webp/25/320.webp`;
+    const result = classifyRequest(url, ORIGIN);
+    expect(result.strategy).toBe("cache-first");
+    expect(result.cacheName).toBe(CACHE_NAMES.sprites);
+  });
+
   it("routes a raw sprite URL (not via next/image) to the sprites bucket", () => {
     // The Pokédex grid exemption uses a plain <img> rather than next/image;
     // the raw /sprites/ path must still classify correctly.
@@ -143,13 +153,13 @@ describe("shouldCache", () => {
 });
 
 describe("cache config constants", () => {
-  it("caps the sprite cache above the full offline-download pack size (~9,225 entries)", () => {
-    // The offline-download feature writes up to ~9,225 sprite URLs into the
-    // sprite bucket (8 next/image optimised-width variants + 1 raw PNG per
-    // species × ~1,025 species). The cap must exceed this to prevent
+  it("caps the sprite cache above the full offline-download pack size (~11,740 entries)", () => {
+    // The offline-download feature writes up to ~11,740 sprite URLs into the
+    // sprite bucket (10 pre-generated WebP width variants + 1 raw PNG per
+    // species/form × ~1,067 entries). The cap must exceed this to prevent
     // ExpirationPlugin from culling downloaded sprites during a long offline
     // session.
-    expect(SPRITE_CACHE_MAX_ENTRIES).toBeGreaterThan(9_225);
+    expect(SPRITE_CACHE_MAX_ENTRIES).toBeGreaterThan(11_740);
   });
 
   it("keeps sprites for a long, positive duration", () => {

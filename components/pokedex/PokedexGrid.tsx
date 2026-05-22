@@ -24,10 +24,14 @@ function zeroPad(id: number): string {
 // next/image's automatic sizing wrapper adds per-cell DOM overhead with no
 // responsive benefit. A plain `loading="lazy"` <img> gives exactly the
 // by-design pop-in we want for off-screen tiles, and a blanket preload of the
-// full set would be counter-productive. The size literal below is intentionally
-// kept inline rather than using POKEDEX_GRID_SPRITE_SIZE — this surface opts
-// out of next/image entirely, so it does not participate in the optimiser-variant
-// cache that the shared size constants exist for.
+// full set would be counter-productive.
+//
+// This surface intentionally serves the raw PNG (`/sprites/pokemon/<id>.png`),
+// not the pre-generated WebP variants. The raw PNG is slightly larger but
+// avoids loading 1025 of these images through the global imageLoader path.
+// The size literal below is intentionally kept inline — this surface opts out
+// of next/image entirely, so it does not participate in the loader's WebP
+// variant routing that the shared size constants exist for.
 function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
   const { flags } = useSuperuser();
   const { id, name, spriteUrl, cardClass: rawCardClass } = pokemon;

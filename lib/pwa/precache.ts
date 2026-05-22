@@ -6,10 +6,11 @@
  * without a network connection.
  *
  * Strategy:
- *  - Sprites are cached at every render width used by the app so
- *    `next/image` serves optimised variants from the cache (not the network).
- *    The raw /sprites/... path is also cached for the Pokédex-grid exemption
- *    which uses a plain <img>.
+ *  - Sprites are cached as pre-generated static WebP files at every render
+ *    width used by the app. The browser fetches these directly from
+ *    `/sprites/pokemon/webp/<id>/<width>.webp` — the `/_next/image` endpoint
+ *    is no longer used for sprites. The raw `/sprites/pokemon/<id>.png` path
+ *    is also cached for the Pokédex-grid plain-`<img>` exemption.
  *  - Cries are cached once at their canonical /cries/<id>.ogg URL.
  *  - Each URL is checked with `cache.match` before fetching — already-cached
  *    assets are skipped, making the operation idempotent and resumable.
@@ -20,33 +21,18 @@
 
 import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
 import { KEY_OFFLINE_DOWNLOADED_AT } from "@/lib/storage/keys";
-import {
-  PRACTICE_SPRITE_SIZE,
-  PICKER_SPRITE_SIZE,
-  POKEDEX_GRID_SPRITE_SIZE,
-  POKEDEX_DETAIL_SPRITE_SIZE,
-  POKEDEX_NODE_SPRITE_SIZE,
-  POKEDEX_FORM_SPRITE_SIZE,
-  PASTURE_SPRITE_SIZE,
-  STATS_SPRITE_SIZE,
-} from "@/lib/sprites/sizes";
+import { GENERATED_SPRITE_WIDTHS } from "@/lib/sprites/imageLoaderHelpers";
+import { spriteVariantUrl } from "@/lib/sprites/url";
 
-/** Bounded concurrency for parallel fetches — mirrors Next.js image optimiser. */
+/** Bounded concurrency for parallel fetches. */
 const CONCURRENCY = 6;
 
-/** All render widths used across app surfaces. Deduped. */
-const SPRITE_RENDER_WIDTHS: number[] = Array.from(
-  new Set([
-    PRACTICE_SPRITE_SIZE,
-    PICKER_SPRITE_SIZE,
-    POKEDEX_DETAIL_SPRITE_SIZE,
-    POKEDEX_FORM_SPRITE_SIZE,
-    POKEDEX_GRID_SPRITE_SIZE,
-    POKEDEX_NODE_SPRITE_SIZE,
-    PASTURE_SPRITE_SIZE,
-    STATS_SPRITE_SIZE,
-  ]),
-);
+/**
+ * All pre-generated WebP render widths. These match the folder names under
+ * `public/sprites/pokemon/webp/<id>/`. Imported directly from the loader
+ * helpers so the two stay in sync automatically.
+ */
+const SPRITE_RENDER_WIDTHS: readonly number[] = GENERATED_SPRITE_WIDTHS;
 
 /**
  * localStorage key that records the timestamp of the last completed download.
@@ -79,35 +65,28 @@ type PrecacheOptions = {
  * Build the full list of URLs to populate for a given set of species IDs.
  *
  * For each ID we produce:
- *  - Optimised sprite variant URLs at each render width
- *    (`/_next/image?url=%2Fsprites%2Fpokemon%2F<id>.png&w=<w>&q=75`)
- *  - The raw sprite path for the Pokédex-grid <img> exemption
- *    (`/sprites/pokemon/<id>.png`)
- *  - The cry audio URL (`/cries/<id>.ogg`), if present in the seed
- *    (callers pass only IDs that have a cry, or all IDs — we skip null
- *    cries implicitly by always including the URL and letting the fetch
- *    result in a 404 which is counted as failed, not downloaded)
+ *  - Pre-generated static WebP sprite paths at each render width
+ *    (`/sprites/pokemon/webp/<id>/<width>.webp`) — served as static files,
+ *    no `/_next/image` endpoint involvement.
+ *  - The raw PNG sprite path for the Pokédex-grid <img> exemption
+ *    (`/sprites/pokemon/<id>.png`).
+ *  - The cry audio URL (`/cries/<id>.ogg`), if present in the seed.
  *
- * The raw sprite and cry URLs go to the sprites / cries SW cache buckets via
- * the service-worker `classifyRequest` rules that are already in place from
- * #1166. The /_next/image variant URLs also route to the sprites bucket
- * because `classifyRequest` decodes the `url` param and classifies the
- * underlying path.
+ * All sprite paths start with `/sprites/` so `classifyRequest` in
+ * `cacheStrategy.ts` routes them to the sprites cache bucket via the
+ * `classifyPath` prefix rule.
  */
 export function buildPrecacheUrls(ids: number[]): string[] {
   const urls: string[] = [];
 
   for (const id of ids) {
-    // Optimised sprite variants — one per render width.
-    const rawSpritePath = `/sprites/pokemon/${id}.png`;
+    // Pre-generated WebP variants — one per render width.
     for (const w of SPRITE_RENDER_WIDTHS) {
-      urls.push(
-        `/_next/image?url=${encodeURIComponent(rawSpritePath)}&w=${w}&q=75`,
-      );
+      urls.push(spriteVariantUrl(id, w));
     }
 
-    // Raw sprite path for the Pokédex-grid <img> exemption.
-    urls.push(rawSpritePath);
+    // Raw PNG path for the Pokédex-grid <img> exemption.
+    urls.push(`/sprites/pokemon/${id}.png`);
 
     // Cry audio.
     urls.push(`/cries/${id}.ogg`);
@@ -120,8 +99,8 @@ export function buildPrecacheUrls(ids: number[]): string[] {
  * Fetch and cache a single URL.
  *
  * Opens the appropriate cache bucket based on the URL path:
- *  - /_next/image variants and raw /sprites/... → versioned sprites cache
- *  - /cries/...                                 → versioned cries cache
+ *  - /sprites/... (WebP variants and raw PNGs) → versioned sprites cache
+ *  - /cries/...                                → versioned cries cache
  *
  * The versioned names (e.g. "poke-memory-sprites-v2") are derived from
  * `versionedCacheName` — the same helper used by the service worker's
