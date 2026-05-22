@@ -875,3 +875,246 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     expect(parsed.body).toBe("14 new cards ready to practise.");
   });
 });
+
+// ─── #1159: practice-scope filtering ─────────────────────────────────────────
+
+describe("POST /api/push/send-daily — practice scope filtering (#1159)", () => {
+  const SUB = {
+    id: "sub-1",
+    user_id: "user-a",
+    endpoint: "https://push.example/a",
+    p256dh: "p256-a",
+    auth_secret: "auth-a",
+  };
+
+  it("passes all cards when practiceScope is absent (empty scope default)", async () => {
+    // No practiceScope in settings → defaults to EMPTY_SCOPE → all cards pass.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          nameCardsEnabled: true,
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 10,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 10,
+          maxNewCryPerDay: 10,
+          // no practiceScope key
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1",   first_seen: null }, // Bulbasaur (Gen 1)
+        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null }, // Chikorita (Gen 2)
+        { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null }, // Treecko (Gen 3)
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // All 3 cards pass (empty scope = no restriction).
+    expect(parsed.body).toContain("3");
+  });
+
+  it("filters out cards outside the user's gens scope", async () => {
+    // Scope: Gen 1 only. Chikorita (Gen 2) and Treecko (Gen 3) must be excluded.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          nameCardsEnabled: true,
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 10,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 10,
+          maxNewCryPerDay: 10,
+          practiceScope: {
+            gens: [1],
+            types: [],
+            presets: [],
+            formCategories: { mode: "all" },
+            games: [],
+          },
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1",   first_seen: null }, // Bulbasaur (Gen 1) — kept
+        { user_id: "user-a", card_type: "name", subject_key: "4",   first_seen: null }, // Charmander (Gen 1) — kept
+        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null }, // Chikorita (Gen 2) — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null }, // Treecko (Gen 3) — excluded
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // Only Gen 1 cards (ids 1 and 4) survive — due count = 2.
+    expect(parsed.body).toContain("2");
+    expect(parsed.body).not.toContain("4 cards");
+  });
+
+  it("filters out cards outside the user's types scope", async () => {
+    // Scope: Fire types only. Bulbasaur (Grass/Poison) must be excluded.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          nameCardsEnabled: true,
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 10,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 10,
+          maxNewCryPerDay: 10,
+          practiceScope: {
+            gens: [],
+            types: ["fire"],
+            presets: [],
+            formCategories: { mode: "all" },
+            games: [],
+          },
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null }, // Bulbasaur (Grass) — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null }, // Charmander (Fire) — kept
+        { user_id: "user-a", card_type: "name", subject_key: "6", first_seen: null }, // Charizard (Fire/Flying) — kept
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // Charmander + Charizard pass; Bulbasaur is excluded.
+    expect(parsed.body).toContain("2");
+    expect(parsed.body).not.toContain("3");
+  });
+
+  it("anchors evolution-edge scope check on the pre-evo (fromId)", async () => {
+    // Evolution card Charmander(4)>>>Charmeleon(5): pre-evo = Charmander (Fire).
+    // Fire scope → kept. Bulbasaur(1)>>>Ivysaur(2): pre-evo = Bulbasaur (Grass) → excluded.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          nameCardsEnabled: false,
+          evolutionCardsEnabled: true,
+          reverseEvolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 10,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 10,
+          maxNewCryPerDay: 10,
+          practiceScope: {
+            gens: [],
+            types: ["fire"],
+            presets: [],
+            formCategories: { mode: "all" },
+            games: [],
+          },
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "4>>>5",   first_seen: null }, // Charmander(Fire)→Charmeleon — kept
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "1>>>2",   first_seen: null }, // Bulbasaur(Grass)→Ivysaur — excluded
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "5>>>6",   first_seen: null }, // Charmeleon(Fire)→Charizard — kept
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // Charmander→Charmeleon and Charmeleon→Charizard both pass; Bulbasaur→Ivysaur is excluded.
+    expect(parsed.body).toContain("2");
+    expect(parsed.body).not.toContain("3");
+  });
+
+  it("filters out-of-scope due cards but preserves the new-card estimate", async () => {
+    // Gen 1 scope but due rows are Gen 2. The scope filter removes them from
+    // the due count (dueCount = 0). The new-card estimate is computed from the
+    // daily-cap headroom for enabled directions — it cannot be scoped without
+    // knowing which specific seed cards are in-scope and unseen, so the route
+    // sends a "new cards ready" notification (the estimate reflects remaining
+    // Gen-1 headroom even though the route does not compute it explicitly).
+    // This is the accepted approximation documented in the issue (#1159):
+    // the due count is now scope-accurate; the new-card estimate is cap-based.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          nameCardsEnabled: true,
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: false,
+          reverseCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 10,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 10,
+          maxNewCryPerDay: 10,
+          practiceScope: {
+            gens: [1],
+            types: [],
+            presets: [],
+            formCategories: { mode: "all" },
+            games: [],
+          },
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null }, // Chikorita (Gen 2) — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "155", first_seen: null }, // Cyndaquil (Gen 2) — excluded
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sent: number };
+    // dueCount = 0 (Gen 2 rows excluded by scope); newEstimate = 10 (name headroom).
+    // The route still sends a notification for the new-card headroom.
+    expect(body.sent).toBe(1);
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // dueCount=0, newEstimate=10 → new-only copy.
+    expect(parsed.body).toContain("new");
+    expect(parsed.body).toContain("10");
+  });
+});
