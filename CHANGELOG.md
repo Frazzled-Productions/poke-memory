@@ -6,6 +6,23 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.15] - 2026-05-22
+
+### Added
+
+- New Offline section in Settings with a one-tap "Download for offline use" button. Pre-fetches every sprite and cry so you can practise without a connection. Shows progress, supports stop and resume, and skips already-cached assets.
+
+### Changed
+
+- Daily push reminders now respect your practice scope (gens, types, games, presets, form categories) so the "cards due" count matches what you'd actually see on device.
+- Internal: share the card-eligibility predicate between the on-device PWA badge and the daily push reminder so future card-type additions only need to be wired in one place.
+- PWA now updates silently in the background when you switch away from the tab, instead of showing a refresh banner. Mid-practice the update is deferred so an in-progress card is never interrupted.
+- Show an offline-aware message on the error screen when you're not connected, with a clear "Go to practice" route to previously seen cards.
+
+### Fixed
+
+- Offline practice now correctly serves sprites and cries from the cache. Previously, optimised sprite URLs and cry audio fell through to the network-first bucket and failed offline.
+
 ## [0.10.14] - 2026-05-21
 
 ### Fixed
@@ -1327,7 +1344,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.14...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.15...HEAD
+[0.10.15]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.15
 [0.10.14]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.14
 [0.10.13]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.13
 [0.10.12]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.12
