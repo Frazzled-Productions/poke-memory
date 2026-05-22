@@ -101,6 +101,24 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
     ],
   },
   {
+    sectionId: "offline-heading",
+    terms: [
+      "offline",
+      "download",
+      "download for offline use",
+      "precache",
+      "pre-fetch",
+      "no connection",
+      "without connection",
+      "wi-fi",
+      "wifi",
+      "storage",
+      "sprites",
+      "cries",
+      "cache",
+    ],
+  },
+  {
     sectionId: "account-data-heading",
     terms: [
       "account",

@@ -45,14 +45,13 @@ import {
   SPRITE_CACHE_MAX_AGE_SECONDS,
   SPRITE_CACHE_MAX_ENTRIES,
   classifyRequest,
+  versionedCacheName,
 } from "@/lib/pwa/cacheStrategy";
 
-/**
- * Cache-version tag. Bump this string whenever a release must discard every
- * previously cached response (e.g. an app-shell format change that would
- * otherwise be served stale). It is appended to every cache name below.
- */
-const SW_CACHE_VERSION = "v2";
+// SW_CACHE_VERSION and versionedCacheName are imported from lib/pwa/cacheStrategy.ts —
+// the single source of truth for the cache-version suffix. Both this worker and
+// the offline precache orchestrator (lib/pwa/precache.ts) derive their cache
+// names from that one constant so their reads and writes target the same buckets.
 
 /** IndexedDB database/store names — must match lib/idb/db.ts exactly. */
 const IDB_DB_NAME = "poke-memory";
@@ -160,7 +159,37 @@ interface NotificationOptionsLite {
 
 declare const self: ServiceWorkerScope;
 
-const versioned = (name: string) => `${name}-${SW_CACHE_VERSION}`;
+/**
+ * `dpl`-stripping cache-key normalisation plugin for the `/_next/image` route.
+ *
+ * In production on Vercel, Next.js appends `&dpl=<NEXT_DEPLOYMENT_ID>` to
+ * every `/_next/image?...` request URL (confirmed in
+ * `node_modules/next/dist/shared/lib/image-loader.js`, line 106):
+ *
+ *   return `${config.path}?url=...&w=...&q=...${src.startsWith('/') && deploymentId ? `&dpl=${deploymentId}` : ''}`;
+ *
+ * The offline precache orchestrator (`lib/pwa/precache.ts`) constructs URLs
+ * WITHOUT `dpl`, so without this plugin a runtime `cache.match()` would fail
+ * every precached sprite because the request URL has `&dpl=...` appended while
+ * the stored key does not.
+ *
+ * Contract: `dpl` is stripped from the cache key for BOTH reads (`match`) and
+ * writes (`put`). The precache writes dpl-free URLs; the runtime handler reads
+ * with a dpl-stripped key. Both sides therefore normalise to the same key,
+ * guaranteeing a cache hit.  The `w`, `q`, and `url` params are NOT stripped —
+ * each variant (width / quality / source) is a distinct cache entry.
+ *
+ * This plugin is attached ONLY to the `/_next/image` sprites route. Raw sprite
+ * paths (`/sprites/pokemon/<id>.png`) and cry paths (`/cries/<id>.ogg`) do not
+ * carry `dpl` and do not need normalisation.
+ */
+const stripDplPlugin = {
+  cacheKeyWillBeUsed: ({ request }: { request: Request }): string => {
+    const url = new URL(request.url);
+    url.searchParams.delete("dpl");
+    return url.toString();
+  },
+};
 
 /**
  * Runtime caching routes. Each `matcher` delegates to the pure
@@ -170,12 +199,21 @@ const versioned = (name: string) => `${name}-${SW_CACHE_VERSION}`;
 const runtimeCaching: RuntimeCaching[] = [
   {
     // Sprite art — immutable per URL, cache-first, large cap.
+    //
+    // `stripDplPlugin` normalises the cache key for `/_next/image` requests by
+    // removing the `&dpl=<deployment-id>` query parameter that Vercel/Next.js
+    // appends at runtime. Without this, the precache (which writes dpl-free
+    // URLs) and the runtime handler (which reads dpl-decorated URLs) would
+    // target different cache entries — meaning every precached sprite would be
+    // invisible. Raw `/sprites/pokemon/<id>.png` paths carry no `dpl` param, so
+    // the plugin is a no-op for them.
     matcher: ({ url, request }) =>
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.sprites,
     handler: new CacheFirst({
-      cacheName: versioned(CACHE_NAMES.sprites),
+      cacheName: versionedCacheName(CACHE_NAMES.sprites),
       plugins: [
+        stripDplPlugin,
         new ExpirationPlugin({
           maxEntries: SPRITE_CACHE_MAX_ENTRIES,
           maxAgeSeconds: SPRITE_CACHE_MAX_AGE_SECONDS,
@@ -190,7 +228,7 @@ const runtimeCaching: RuntimeCaching[] = [
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.cries,
     handler: new CacheFirst({
-      cacheName: versioned(CACHE_NAMES.cries),
+      cacheName: versionedCacheName(CACHE_NAMES.cries),
       plugins: [
         new ExpirationPlugin({
           maxEntries: CRY_CACHE_MAX_ENTRIES,
@@ -206,7 +244,7 @@ const runtimeCaching: RuntimeCaching[] = [
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.static,
     handler: new CacheFirst({
-      cacheName: versioned(CACHE_NAMES.static),
+      cacheName: versionedCacheName(CACHE_NAMES.static),
       plugins: [
         new ExpirationPlugin({
           maxEntries: 128,
@@ -221,7 +259,7 @@ const runtimeCaching: RuntimeCaching[] = [
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.fonts,
     handler: new StaleWhileRevalidate({
-      cacheName: versioned(CACHE_NAMES.fonts),
+      cacheName: versionedCacheName(CACHE_NAMES.fonts),
       plugins: [
         new ExpirationPlugin({
           maxEntries: 16,
@@ -236,7 +274,7 @@ const runtimeCaching: RuntimeCaching[] = [
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.pages,
     handler: new NetworkFirst({
-      cacheName: versioned(CACHE_NAMES.pages),
+      cacheName: versionedCacheName(CACHE_NAMES.pages),
       networkTimeoutSeconds: 10,
       plugins: [
         new ExpirationPlugin({

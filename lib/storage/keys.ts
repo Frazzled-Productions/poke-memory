@@ -99,6 +99,16 @@ export const KEY_PERSIST_REQUESTED = "poke-memory:storage-persist-requested:v1";
  */
 export const KEY_REVIEW_SESSION_ACTIVE = "poke-memory:session-active";
 
+// ─── Offline download ─────────────────────────────────────────────────────────
+
+/**
+ * Records the ISO timestamp of the last completed offline asset download
+ * (sprites + cries). Written by the offline precache orchestrator
+ * (`lib/pwa/precache.ts`) after a successful `precacheAll` run and read by
+ * `OfflineSection` to show the last-downloaded date.
+ */
+export const KEY_OFFLINE_DOWNLOADED_AT = "poke-memory:offline-downloaded-at";
+
 // ─── Per-device shuffle salt ──────────────────────────────────────────────────
 
 /**
