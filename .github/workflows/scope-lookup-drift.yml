@@ -17,9 +17,9 @@ on:
       - "lib/pokemon/generated.json"
       - "lib/pokemon/scopeLookup.ts"
       - "scripts/generate-scope-lookup.mjs"
+      - "scripts/seed-pokemon.mjs"
+      - "scripts/seed-version-groups.mjs"
       - ".github/workflows/scope-lookup-drift.yml"
-  push:
-    branches: [main]
 
 concurrency:
   group: scope-lookup-drift-${{ github.ref }}
