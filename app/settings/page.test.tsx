@@ -197,6 +197,10 @@ vi.mock("@/components/auth/LinkIdentitiesSection", () => ({
   LinkIdentitiesSection: () => <div data-testid="link-identities" />,
 }));
 
+vi.mock("@/components/settings/OfflineSection", () => ({
+  OfflineSection: () => <div data-testid="offline-section" />,
+}));
+
 // Render CollapsibleSection as a transparent wrapper so toggles are always
 // accessible without relying on localStorage / hash state.
 vi.mock("@/components/settings/CollapsibleSection", () => ({

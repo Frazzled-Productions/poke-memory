@@ -11,10 +11,11 @@
  *
  * - `cache-first`   — serve from cache, only hit the network on a miss. Used
  *                     for immutable, content-addressed assets: sprites under
- *                     `public/sprites/**` and Next.js build output under
- *                     `/_next/static/**`. These never change for a given URL,
- *                     so a cached copy is always correct and an offline
- *                     practice session can render every sprite.
+ *                     `public/sprites/**`, cries under `public/cries/**`, and
+ *                     Next.js build output under `/_next/static/**`. These
+ *                     never change for a given URL, so a cached copy is always
+ *                     correct and an offline practice session can render every
+ *                     sprite and play every cry.
  * - `network-first` — try the network, fall back to cache when offline. Used
  *                     for navigations and same-origin data so a connected user
  *                     always sees fresh content but an offline user still gets
@@ -26,6 +27,32 @@
  *                     Supabase sync endpoint) so offline reads never return a
  *                     stale cloud response and sync semantics are unchanged.
  */
+
+/**
+ * Cache-version suffix used by the service worker.
+ *
+ * Bumping this value changes every derived cache name (see {@link versionedCacheName}),
+ * which causes the browser to treat all previously cached responses as stale and
+ * re-fetch them from the network. Only bump when a deploy must discard every
+ * prior cached response (e.g. a format change that would otherwise be served stale).
+ *
+ * THIS CONSTANT IS THE SINGLE SOURCE OF TRUTH.  Both the service worker
+ * (`app/sw.ts`) and the offline precache orchestrator (`lib/pwa/precache.ts`)
+ * derive their cache names from this value so that writes from `precache.ts`
+ * and reads from the SW's `CacheFirst` handler always target the same bucket.
+ */
+export const SW_CACHE_VERSION = "v2";
+
+/**
+ * Append the cache-version suffix to a base cache name.
+ *
+ * Example: `versionedCacheName("poke-memory-sprites")` → `"poke-memory-sprites-v2"`.
+ *
+ * Callers should always use this helper rather than constructing the versioned
+ * name by hand so that a version bump is a single-line change.
+ */
+export const versionedCacheName = (name: string): string => `${name}-${SW_CACHE_VERSION}`;
+
 export type CacheStrategy =
   | "cache-first"
   | "network-first"
@@ -35,6 +62,7 @@ export type CacheStrategy =
 /** Named cache buckets, one per asset class, so each can expire independently. */
 export const CACHE_NAMES = {
   sprites: "poke-memory-sprites",
+  cries: "poke-memory-cries",
   static: "poke-memory-static",
   fonts: "poke-memory-fonts",
   pages: "poke-memory-pages",
@@ -48,10 +76,68 @@ export const SPRITE_CACHE_MAX_ENTRIES = 1300;
 /** Sprite art is immutable per URL; keep it for a long time. */
 export const SPRITE_CACHE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
 
+/**
+ * Up to 1025 species cries plus regional forms — cap generously.
+ * Mirrors the sprite cap since the species count is the same.
+ */
+export const CRY_CACHE_MAX_ENTRIES = 1300;
+
+/** Cry audio is immutable per URL; keep it as long as sprite art. */
+export const CRY_CACHE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
+
 const FONT_EXTENSION = /\.(?:woff2?|ttf|otf|eot)$/i;
 
 /**
+ * Classify a same-origin path into a caching strategy.
+ *
+ * This helper is intentionally path-only so that {@link classifyRequest} can
+ * call it once for the raw request path and again for the decoded `url` query
+ * param of `/_next/image` requests — without duplicating the rule set and
+ * without risking infinite recursion (it never calls back into
+ * `classifyRequest`).
+ *
+ * @param path  The pathname component of a same-origin URL (e.g. `/sprites/pokemon/25.png`).
+ * @returns     A classification result, or `null` when no specific rule
+ *              matches (caller should fall back to the pages bucket).
+ */
+function classifyPath(path: string): { strategy: CacheStrategy; cacheName: CacheName } | null {
+  // Self-hosted sprite art — immutable per URL. Cache-first so an offline
+  // practice session renders every card.
+  if (path.startsWith("/sprites/")) {
+    return { strategy: "cache-first", cacheName: CACHE_NAMES.sprites };
+  }
+
+  // Self-hosted cry audio — immutable per URL. Cache-first so offline practice
+  // can play every cry without a network request.
+  if (path.startsWith("/cries/")) {
+    return { strategy: "cache-first", cacheName: CACHE_NAMES.cries };
+  }
+
+  // Next.js build output is content-hashed, so a URL never changes meaning.
+  if (path.startsWith("/_next/static/")) {
+    return { strategy: "cache-first", cacheName: CACHE_NAMES.static };
+  }
+
+  // Fonts — render instantly from cache, refresh in the background.
+  if (FONT_EXTENSION.test(path)) {
+    return { strategy: "stale-while-revalidate", cacheName: CACHE_NAMES.fonts };
+  }
+
+  return null;
+}
+
+/**
  * Classify a request into a runtime caching strategy.
+ *
+ * Handles the `/_next/image` optimiser path by decoding the `url` query param
+ * and re-applying the classification rules to the underlying asset path. This
+ * ensures optimised sprite variants (requested as `/_next/image?url=%2Fsprites%2F...`)
+ * route to the sprites cache rather than the network-first pages bucket, so
+ * offline practice correctly serves cached sprites.
+ *
+ * One level of indirection only — the decoded `url` is classified via
+ * {@link classifyPath}, not via a recursive `classifyRequest` call, so there
+ * is no possibility of a recursion bomb.
  *
  * @param url        The fully-qualified request URL.
  * @param origin     The app's own origin (e.g. `https://pokememory.com`).
@@ -81,20 +167,42 @@ export function classifyRequest(
 
   const path = parsed.pathname;
 
-  // Self-hosted sprite art — immutable per URL. Cache-first so an offline
-  // practice session renders every card.
-  if (path.startsWith("/sprites/")) {
-    return { strategy: "cache-first", cacheName: CACHE_NAMES.sprites };
+  // `/_next/image` is the Next.js image-optimisation endpoint. The browser
+  // requests `/_next/image?url=%2Fsprites%2F...` rather than the raw asset
+  // path, so the path-based rules below would not match. Decode the `url`
+  // query param and re-classify against the underlying asset path so that
+  // optimised sprite variants still land in the sprites cache.
+  //
+  // Only one level of indirection: we call `classifyPath`, not `classifyRequest`,
+  // so there is no recursion risk. Cross-origin optimiser URLs (e.g. GitHub
+  // avatars) resolve to `null` from `classifyPath` and fall through to the
+  // pages bucket — which is fine, because the outer cross-origin guard above
+  // has already handled the case where the *request itself* is cross-origin;
+  // here the request is same-origin (`/_next/image` is served by our app) but
+  // the underlying image source may be external.
+  if (path === "/_next/image") {
+    const rawParam = parsed.searchParams.get("url");
+    if (rawParam !== null) {
+      let decodedPath: string;
+      try {
+        decodedPath = new URL(decodeURIComponent(rawParam), origin).pathname;
+      } catch {
+        // Malformed url param — fall through to pages bucket.
+        decodedPath = "";
+      }
+      const innerResult = classifyPath(decodedPath);
+      if (innerResult !== null) {
+        return innerResult;
+      }
+    }
+    // Non-sprite optimiser request (other same-origin assets, cross-origin
+    // image sources) — fall through to the pages bucket below.
   }
 
-  // Next.js build output is content-hashed, so a URL never changes meaning.
-  if (path.startsWith("/_next/static/")) {
-    return { strategy: "cache-first", cacheName: CACHE_NAMES.static };
-  }
-
-  // Fonts — render instantly from cache, refresh in the background.
-  if (FONT_EXTENSION.test(path)) {
-    return { strategy: "stale-while-revalidate", cacheName: CACHE_NAMES.fonts };
+  // Apply path-based classification for all other same-origin paths.
+  const pathResult = classifyPath(path);
+  if (pathResult !== null) {
+    return pathResult;
   }
 
   // Top-level navigations — network-first so a connected user gets fresh

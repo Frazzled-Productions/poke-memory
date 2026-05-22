@@ -1,10 +1,20 @@
-import type { ReviewableCard, CardTypeOpts } from "@/lib/review/session";
-import { cardTypeIsEnabled } from "@/lib/review/session";
+import type { ReviewableCard } from "@/lib/review/session";
 import { generationOf } from "@/lib/stats/derive";
 import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
 import { KEY_LEGACY_PRACTICE_SCOPE } from "@/lib/storage/keys";
 import { versionGroupLabel } from "@/lib/pokemon/versionGroupLabels";
+import { isCardEligible, type CardEligibilitySettings } from "@/lib/eligibility";
+import { STARTER_IDS } from "@/lib/pokemon/starterIds";
+// Import and re-export lightweight scope constants so server-side routes can
+// import them from scopeConstants directly (no seed dependency), while all
+// existing callers that import from this module continue to work unchanged.
+import {
+  EMPTY_SCOPE,
+  isScopeEmpty,
+  parseFormCategoryFilter,
+} from "@/lib/eligibility/scopeConstants";
+export { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter };
 
 export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains";
 
@@ -71,14 +81,6 @@ export type PracticeScope = {
   games?: string[];
 };
 
-export const EMPTY_SCOPE: PracticeScope = {
-  gens: [],
-  types: [],
-  presets: [],
-  formCategories: { mode: "all" },
-  games: [],
-};
-
 /**
  * Pre-#333 storage key. The scope is now folded into `UserSettings` and
  * synced with the rest of settings via Supabase. The legacy key is read
@@ -86,18 +88,6 @@ export const EMPTY_SCOPE: PracticeScope = {
  * `readLegacyScope` / `clearLegacyScope` below.
  */
 const LEGACY_SCOPE_KEY = KEY_LEGACY_PRACTICE_SCOPE;
-
-const STARTER_IDS: ReadonlySet<number> = new Set([
-  1, 4, 7,
-  152, 155, 158,
-  252, 255, 258,
-  387, 390, 393,
-  495, 498, 501,
-  650, 653, 656,
-  722, 725, 728,
-  810, 813, 816,
-  906, 909, 912,
-]);
 
 /** Cards in the SEED set tagged `isLegendary` (excludes mythicals by design). */
 function legendaryIds(): ReadonlySet<number> {
@@ -108,16 +98,6 @@ let _legendaryIds: ReadonlySet<number> | null = null;
 function getLegendaryIds(): ReadonlySet<number> {
   if (_legendaryIds === null) _legendaryIds = legendaryIds();
   return _legendaryIds;
-}
-
-export function isScopeEmpty(scope: PracticeScope): boolean {
-  return (
-    scope.gens.length === 0 &&
-    scope.types.length === 0 &&
-    scope.presets.length === 0 &&
-    (scope.formCategories?.mode ?? "all") === "all" &&
-    (scope.games?.length ?? 0) === 0
-  );
 }
 
 /**
@@ -296,6 +276,26 @@ export function cardMatchesScope(
 }
 
 /**
+ * Map a `ReviewableCard` to the `EligibilityInput` shape consumed by the
+ * shared `isCardEligible` predicate in `lib/eligibility`.
+ *
+ * The client card object uses the in-memory `cardType` strings `"evolution"`
+ * and `"reverse-evolution"`, while the shared predicate (and the DB) use
+ * the persisted slugs `"evolution-edge"` and `"reverse-evolution-edge"`.
+ * This adapter normalises to the DB convention so both callers of
+ * `isCardEligible` produce identical inputs for the same logical card.
+ *
+ * `subjectKey` is already present on every `ReviewableCard` (set by
+ * `buildSession` / `hydrateSession`), so no encoding is needed here.
+ */
+function toEligibilityInput(card: ReviewableCard): { cardType: string; subjectKey: string } {
+  let cardType = card.cardType as string;
+  if (cardType === "evolution") cardType = "evolution-edge";
+  else if (cardType === "reverse-evolution") cardType = "reverse-evolution-edge";
+  return { cardType, subjectKey: card.subjectKey };
+}
+
+/**
  * Two-tier eligibility check (#658). Returns true when the card should surface
  * in a practice session, applying the master `alternateFormsEnabled` gate
  * **before** the `practiceScope` filter.
@@ -312,6 +312,11 @@ export function cardMatchesScope(
  * Use this function as the single eligibility chokepoint in the session
  * builder / scope-change handler instead of calling `cardMatchesScope` directly
  * when the forms gate setting is available.
+ *
+ * The alt-forms exclusion is delegated to the shared `isCardEligible` predicate
+ * in `lib/eligibility` (#1160). All card-type flags are set to `true` here
+ * because the type-enable gate lives in `computeEligibleCardIds`; this function
+ * only owns the alt-forms check and the scope filter.
  */
 export function cardIsEligible(
   card: ReviewableCard,
@@ -319,19 +324,17 @@ export function cardIsEligible(
   alternateFormsEnabled: boolean,
   context: ScopeMatchContext = {},
 ): boolean {
-  // Gate: exclude all form cards when the master toggle is off.
-  // A card is only gated OUT when it is *definitely* a non-default form —
-  // undefined (pre-#445 seed) is treated as default form via `?? true`, so
-  // old cards are never incorrectly excluded.
-  if (!alternateFormsEnabled) {
-    if (
-      card.cardType !== "evolution" &&
-      card.cardType !== "reverse-evolution" &&
-      ((card as { isDefaultForm?: boolean }).isDefaultForm ?? true) === false
-    ) {
-      return false;
-    }
-  }
+  // Delegate the alt-forms gate to the shared predicate. All card-type flags
+  // are true so only the `alternateFormsEnabled` axis is active.
+  const altFormsSettings: CardEligibilitySettings = {
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: true,
+    reverseEvolutionCardsEnabled: true,
+    reverseCardsEnabled: true,
+    cryCardsEnabled: true,
+    alternateFormsEnabled,
+  };
+  if (!isCardEligible(toEligibilityInput(card), altFormsSettings)) return false;
   if (isScopeEmpty(scope)) return true;
   return cardMatchesScope(card, scope, context);
 }
@@ -340,14 +343,10 @@ export function cardIsEligible(
  * Minimal settings surface consumed by `computeEligibleCardIds`. Matches the
  * subset of `UserSettings` that drives eligibility so the helper stays
  * decoupled from the full settings type and is easy to test.
+ *
+ * Re-exports `CardEligibilitySettings` fields plus `practiceScope`.
  */
-export type EligibilitySettings = {
-  nameCardsEnabled: boolean;
-  evolutionCardsEnabled: boolean;
-  reverseCardsEnabled: boolean;
-  reverseEvolutionCardsEnabled: boolean;
-  cryCardsEnabled: boolean;
-  alternateFormsEnabled: boolean;
+export type EligibilitySettings = CardEligibilitySettings & {
   practiceScope: PracticeScope;
 };
 
@@ -360,7 +359,11 @@ export type EligibilitySettings = {
  * The three-tier gate applied here mirrors `ReviewSession.tsx`:
  *   1. Card-type enabled (nameCardsEnabled, evolutionCardsEnabled, etc.)
  *   2. `alternateFormsEnabled` master toggle
- *   3. `practiceScope` filter via `cardIsEligible`
+ *   3. `practiceScope` filter via `cardMatchesScope`
+ *
+ * Gates 1 and 2 are delegated to `isCardEligible` from `lib/eligibility`
+ * (#1160) so they share a single source of truth with the daily Web Push
+ * route. Gate 3 (practice scope) is client-side only and stays here.
  *
  * @param cards   The full persisted card set (from `loadSession`).
  * @param settings  Subset of `UserSettings` that drives eligibility.
@@ -376,20 +379,17 @@ export function computeEligibleCardIds(
   settings: EligibilitySettings,
   context: ScopeMatchContext = {},
 ): Set<number> {
-  const cardTypeOpts: CardTypeOpts = {
-    nameEnabled: settings.nameCardsEnabled,
-    evolutionEnabled: settings.evolutionCardsEnabled,
-    reverseEnabled: settings.reverseCardsEnabled,
-    reverseEvolutionEnabled: settings.reverseEvolutionCardsEnabled,
-    cryEnabled: settings.cryCardsEnabled,
-  };
+  const scopeEmpty = isScopeEmpty(settings.practiceScope);
   return new Set(
     cards
-      .filter(
-        (c) =>
-          cardTypeIsEnabled(c, cardTypeOpts) &&
-          cardIsEligible(c, settings.practiceScope, settings.alternateFormsEnabled, context),
-      )
+      .filter((c) => {
+        // Gates 1 + 2: card-type enable flags + alternateFormsEnabled.
+        // Shared with the server-side Web Push eligibility filter (#1160).
+        if (!isCardEligible(toEligibilityInput(c), settings)) return false;
+        // Gate 3: practice scope (client-only — localStorage-backed).
+        if (scopeEmpty) return true;
+        return cardMatchesScope(c, settings.practiceScope, context);
+      })
       .map((c) => c.id),
   );
 }
@@ -498,31 +498,6 @@ export function countMatchingSpecies(
       count += 1;
   }
   return count;
-}
-
-const VALID_FORM_CATEGORIES: readonly FormCategory[] = [
-  "default", "regional", "mega", "gmax", "primal", "forme",
-];
-
-/**
- * Internal: parse a raw JSON value into a `FormCategoryFilter`.
- * Returns `{mode:'all'}` on absent / malformed input so persisted scopes
- * without this field silently upgrade to the safe default.
- */
-export function parseFormCategoryFilter(value: unknown): FormCategoryFilter {
-  if (typeof value !== "object" || value === null) return { mode: "all" };
-  const obj = value as Record<string, unknown>;
-  if (obj.mode === "default-only") return { mode: "default-only" };
-  if (obj.mode === "include") {
-    const cats = Array.isArray(obj.categories)
-      ? (obj.categories as unknown[]).filter(
-          (v): v is FormCategory =>
-            typeof v === "string" && (VALID_FORM_CATEGORIES as readonly string[]).includes(v),
-        )
-      : [];
-    return { mode: "include", categories: cats };
-  }
-  return { mode: "all" };
 }
 
 /**

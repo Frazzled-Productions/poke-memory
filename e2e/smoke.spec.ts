@@ -1413,3 +1413,21 @@ test.describe("Document title due-count badge (#1062)", () => {
     expect(titleAfterGrade).toContain("Poké Memory");
   });
 });
+
+test.describe("PWA update UX (#1162)", () => {
+  // The bottom "Refresh to update" banner was removed in #1162 in favour of a
+  // silent activator that swaps the new SW in on the next safe visibility
+  // tick. The banner had `role="alert"` and `aria-label="App update available"`;
+  // both must be absent regardless of SW state. Tests run in non-PWA preview
+  // environments so a "no SW waiting" baseline is the expected steady state,
+  // which is the case the banner used to render in if anything went wrong.
+  test("does not render a 'refresh to update' banner on any page", async ({ page }) => {
+    for (const path of ["/", "/pokedex", "/stats"]) {
+      await page.goto(path);
+      await expect(
+        page.getByRole("alert", { name: "App update available" }),
+      ).toHaveCount(0);
+      await expect(page.getByText("A new version is ready")).toHaveCount(0);
+    }
+  });
+});

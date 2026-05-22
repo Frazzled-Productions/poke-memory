@@ -3,6 +3,11 @@ import { timingSafeEqual } from "node:crypto";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { todayInTimezone } from "@/lib/utils/format-date";
+import { isCardEligible } from "@/lib/eligibility";
+import { scopeMatchesEntry, resolveAnchorId } from "@/lib/eligibility/scopePredicate";
+import { SCOPE_LOOKUP } from "@/lib/pokemon/scopeLookup";
+import type { PracticeScope } from "@/lib/review/scope";
+import { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter } from "@/lib/eligibility/scopeConstants";
 
 /**
  * Daily Web Push reminder route (#1056).
@@ -88,8 +93,9 @@ function isAuthorized(headerValue: string | null, secret: string): boolean {
  * The estimate is capped by per-direction daily new-card limits summed
  * across enabled directions — it does not include cards whose `first_seen`
  * is already today (those are cards started during today's session, not
- * "truly new"). It does not account for practice scope (localStorage-only),
- * learning-step state, or `maxReviewsPerDay` caps.
+ * "truly new"). It does not account for learning-step state or
+ * `maxReviewsPerDay` caps. Practice scope is applied in `rowIsEligible`
+ * before the due and new counts are tallied (#1159).
  */
 export function buildDailyMessage(dueCount: number, newEstimate: number = 0): PushPayload {
   const title = "Time to practise";
@@ -127,6 +133,13 @@ type SettingsRow = {
   settings: Record<string, unknown> | null;
 };
 
+// ---------------------------------------------------------------------------
+// Scope lookup map — built once at module load from the compact lookup table.
+// Keyed by pokemon id (same as card subject_key for name/reverse/cry cards;
+// for evolution cards we resolve the pre-evo anchor id via resolveAnchorId).
+// ---------------------------------------------------------------------------
+const SCOPE_LOOKUP_MAP = new Map(SCOPE_LOOKUP.map((e) => [e.id, e]));
+
 /**
  * The per-user eligibility flags extracted from the `settings` JSONB.
  * Mirrors the relevant fields from `UserSettings` in lib/settings/persistence.ts.
@@ -144,6 +157,12 @@ type UserEligibility = {
   maxNewEvolutionPerDay: number;
   maxNewReversePerDay: number;
   maxNewCryPerDay: number;
+  /**
+   * Practice scope axes persisted to `user_settings.settings` JSONB (#1159).
+   * Empty scope (all axes empty) means no restriction — all species are eligible.
+   * Defaults to EMPTY_SCOPE so users without a stored scope value see all cards.
+   */
+  practiceScope: PracticeScope;
 };
 
 /** DEFAULT_SETTINGS-aligned fallbacks, used when a JSONB field is missing or invalid. */
@@ -158,7 +177,68 @@ const DEFAULT_ELIGIBILITY: UserEligibility = {
   maxNewEvolutionPerDay: 5,
   maxNewReversePerDay: 10,
   maxNewCryPerDay: 10,
+  practiceScope: EMPTY_SCOPE,
 };
+
+/**
+ * Parse a `PracticeScope` from a raw JSONB value.
+ *
+ * Permissive: invalid / missing sub-fields default to the empty-axis value.
+ * Mirrors the structure of `validatePracticeScope` in
+ * `lib/settings/persistence.ts` without importing that module (which carries
+ * heavy seed imports via `lib/review/scope.ts` when the full `SEED_POKEMON`
+ * constant is involved).
+ *
+ * Returns `EMPTY_SCOPE` on absent / malformed input so users with no stored
+ * scope see all cards — same defensive default as the app itself.
+ */
+function parsePracticeScope(raw: unknown): PracticeScope {
+  if (typeof raw !== "object" || raw === null) return EMPTY_SCOPE;
+  const obj = raw as Record<string, unknown>;
+
+  const gens: number[] = [];
+  if (Array.isArray(obj.gens)) {
+    const seen = new Set<number>();
+    for (const g of obj.gens) {
+      if (typeof g !== "number" || !Number.isInteger(g) || g < 1 || g > 9) continue;
+      if (seen.has(g)) continue;
+      seen.add(g);
+      gens.push(g);
+    }
+  }
+
+  const types: string[] = [];
+  if (Array.isArray(obj.types)) {
+    for (const t of obj.types) {
+      if (typeof t === "string") types.push(t);
+    }
+  }
+
+  const VALID_PRESETS = new Set(["starters", "legendaries", "incomplete-chains"]);
+  const presets: PracticeScope["presets"] = [];
+  if (Array.isArray(obj.presets)) {
+    const seen = new Set<string>();
+    for (const p of obj.presets) {
+      if (typeof p !== "string" || !VALID_PRESETS.has(p) || seen.has(p)) continue;
+      seen.add(p);
+      presets.push(p as PracticeScope["presets"][number]);
+    }
+  }
+
+  const formCategories = parseFormCategoryFilter(obj.formCategories);
+
+  const games: string[] = [];
+  if (Array.isArray(obj.games)) {
+    const seen = new Set<string>();
+    for (const g of obj.games) {
+      if (typeof g !== "string" || seen.has(g)) continue;
+      seen.add(g);
+      games.push(g);
+    }
+  }
+
+  return { gens, types, presets, formCategories, games };
+}
 
 /**
  * Parse the per-user eligibility settings from the raw JSONB blob. Permissive:
@@ -188,85 +268,70 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
     maxNewEvolutionPerDay: numField("maxNewEvolutionPerDay", DEFAULT_ELIGIBILITY.maxNewEvolutionPerDay),
     maxNewReversePerDay:   numField("maxNewReversePerDay",   DEFAULT_ELIGIBILITY.maxNewReversePerDay),
     maxNewCryPerDay:       numField("maxNewCryPerDay",       DEFAULT_ELIGIBILITY.maxNewCryPerDay),
+    practiceScope: parsePracticeScope(s.practiceScope),
   };
 }
 
 /**
- * Returns true when a card row is eligible under the user's settings.
+ * Returns true when a card row is eligible under the user's settings and
+ * practice scope.
+ *
+ * Three gates, in order:
+ *
+ *   1. Card-type enabled flags + alt-forms toggle (delegated to
+ *      `isCardEligible` from `lib/eligibility` — shared with the on-device
+ *      PWA badge filter via `lib/review/scope.ts` `computeEligibleCardIds`).
+ *
+ *   2. Practice scope (gens / types / games / presets / formCategories) via
+ *      `scopeMatchesEntry` from `lib/eligibility/scopePredicate` (#1159).
+ *      An empty scope (all axes empty) passes every card.
+ *
+ *      The scope is anchored on the pre-evo species for evolution cards,
+ *      matching the client-side behaviour in `cardMatchesScope` where
+ *      evolution cards filter on `card.preEvoId`.
+ *
+ *      Unknown card_type values pass both gates so future card types are not
+ *      silently dropped while we await a route update.
  *
  * Card-type gates:
- *   - `name`                 → nameCardsEnabled
- *   - `evolution-edge`       → evolutionCardsEnabled
+ *   - `name`                   → nameCardsEnabled
+ *   - `evolution-edge`         → evolutionCardsEnabled
  *   - `reverse-evolution-edge` → reverseEvolutionCardsEnabled
- *   - `reverse`              → reverseCardsEnabled
- *   - `cry`                  → cryCardsEnabled
+ *   - `reverse`                → reverseCardsEnabled
+ *   - `cry`                    → cryCardsEnabled
  *
  * Alt-forms gate (when `alternateFormsEnabled` is false):
  *   - For `name` / `reverse` / `cry` cards, the subject_key is the numeric
  *     species id. Ids >= 10000 are alt-form variants and are excluded.
  *   - For `evolution-edge` / `reverse-evolution-edge` cards, the subject_key
- *     is `"<preEvoId>>>><postEvoId>"`. Exclude if either endpoint id >= 10000.
- *
- * Unknown card_type values pass through so future card types are not
- * silently dropped while we await a route update.
+ *     is `"<fromId>>><toId>"`. Exclude if either endpoint id >= 10000.
  */
 function rowIsEligible(
   cardType: string,
   subjectKey: string,
   eligibility: UserEligibility,
 ): boolean {
-  // Card-type gate.
-  switch (cardType) {
-    case "name":
-      if (!eligibility.nameCardsEnabled) return false;
-      break;
-    case "evolution-edge":
-      if (!eligibility.evolutionCardsEnabled) return false;
-      break;
-    case "reverse-evolution-edge":
-      if (!eligibility.reverseEvolutionCardsEnabled) return false;
-      break;
-    case "reverse":
-      if (!eligibility.reverseCardsEnabled) return false;
-      break;
-    case "cry":
-      if (!eligibility.cryCardsEnabled) return false;
-      break;
-    default:
-      // Unknown type: pass through.
-      break;
+  // Gate 1: card-type flags + alt-forms toggle.
+  if (!isCardEligible({ cardType, subjectKey }, eligibility)) return false;
+
+  // Gate 2: practice scope. Skip when scope is empty (fast path).
+  const scope = eligibility.practiceScope;
+  if (isScopeEmpty(scope)) return true;
+
+  const anchorId = resolveAnchorId(cardType, subjectKey);
+  if (anchorId === null) {
+    // Unknown card type — pass through (forward-compatible, same as gate 1).
+    return true;
   }
 
-  // Alt-forms gate.
-  if (!eligibility.alternateFormsEnabled) {
-    if (
-      cardType === "name" ||
-      cardType === "reverse" ||
-      cardType === "cry"
-    ) {
-      const id = parseInt(subjectKey, 10);
-      if (!isNaN(id) && id >= 10000) return false;
-    } else if (
-      cardType === "evolution-edge" ||
-      cardType === "reverse-evolution-edge"
-    ) {
-      // subject_key format: "<preEvoId>>><postEvoId>" — split on ">>>".
-      // The separator used in Subject.forEdge is ">>>" (three greater-than signs).
-      const parts = subjectKey.split(">>>");
-      if (parts.length === 2) {
-        const preId = parseInt(parts[0], 10);
-        const postId = parseInt(parts[1], 10);
-        if (
-          (!isNaN(preId) && preId >= 10000) ||
-          (!isNaN(postId) && postId >= 10000)
-        ) {
-          return false;
-        }
-      }
-    }
+  const entry = SCOPE_LOOKUP_MAP.get(anchorId);
+  if (entry === undefined) {
+    // Species not in lookup (e.g. a legacy retired card id). Pass through
+    // defensively rather than silently excluding a potentially valid card.
+    return true;
   }
 
-  return true;
+  return scopeMatchesEntry(entry, scope);
 }
 
 /**

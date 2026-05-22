@@ -5,6 +5,8 @@ import {
   CACHE_NAMES,
   SPRITE_CACHE_MAX_ENTRIES,
   SPRITE_CACHE_MAX_AGE_SECONDS,
+  CRY_CACHE_MAX_ENTRIES,
+  CRY_CACHE_MAX_AGE_SECONDS,
 } from "./cacheStrategy";
 
 const ORIGIN = "https://pokememory.com";
@@ -71,6 +73,49 @@ describe("classifyRequest", () => {
     const result = classifyRequest(`${ORIGIN}/pokedex/sprites/info`, ORIGIN, "navigate");
     expect(result.strategy).toBe("network-first");
   });
+
+  it("caches cry audio cache-first under the cries bucket", () => {
+    const result = classifyRequest(`${ORIGIN}/cries/25.ogg`, ORIGIN);
+    expect(result.strategy).toBe("cache-first");
+    expect(result.cacheName).toBe(CACHE_NAMES.cries);
+  });
+
+  it("routes an optimised sprite URL (/_next/image) to the sprites bucket", () => {
+    // next/image encodes the src path into the `url` query param.
+    const url = `${ORIGIN}/_next/image?url=%2Fsprites%2Fpokemon%2F25.png&w=384&q=75`;
+    const result = classifyRequest(url, ORIGIN);
+    expect(result.strategy).toBe("cache-first");
+    expect(result.cacheName).toBe(CACHE_NAMES.sprites);
+  });
+
+  it("routes a raw sprite URL (not via next/image) to the sprites bucket", () => {
+    // The Pokédex grid exemption uses a plain <img> rather than next/image;
+    // the raw /sprites/ path must still classify correctly.
+    const result = classifyRequest(`${ORIGIN}/sprites/pokemon/25.png`, ORIGIN);
+    expect(result.strategy).toBe("cache-first");
+    expect(result.cacheName).toBe(CACHE_NAMES.sprites);
+  });
+
+  it("falls through to the pages bucket for /_next/image with a cross-origin source", () => {
+    // A GitHub avatar routed through the optimiser: the request itself is
+    // same-origin, but the decoded `url` param is cross-origin, so no
+    // immutable-asset rule matches and it falls through to network-first.
+    const encoded = encodeURIComponent("https://avatars.githubusercontent.com/u/123");
+    const url = `${ORIGIN}/_next/image?url=${encoded}&w=96&q=75`;
+    const result = classifyRequest(url, ORIGIN);
+    expect(result.strategy).toBe("network-first");
+    expect(result.cacheName).toBe(CACHE_NAMES.pages);
+  });
+
+  it("falls through to the pages bucket for /_next/image with a non-immutable same-origin source", () => {
+    // An image from a dynamic page route (not a sprite or cry) should still
+    // be network-first, not silently cached.
+    const encoded = encodeURIComponent("/some-dynamic-page/hero.jpg");
+    const url = `${ORIGIN}/_next/image?url=${encoded}&w=800&q=80`;
+    const result = classifyRequest(url, ORIGIN);
+    expect(result.strategy).toBe("network-first");
+    expect(result.cacheName).toBe(CACHE_NAMES.pages);
+  });
 });
 
 describe("shouldCache", () => {
@@ -92,6 +137,14 @@ describe("cache config constants", () => {
 
   it("keeps sprites for a long, positive duration", () => {
     expect(SPRITE_CACHE_MAX_AGE_SECONDS).toBeGreaterThan(0);
+  });
+
+  it("caps the cry cache above the full 1025-species set", () => {
+    expect(CRY_CACHE_MAX_ENTRIES).toBeGreaterThan(1025);
+  });
+
+  it("keeps cries for a long, positive duration", () => {
+    expect(CRY_CACHE_MAX_AGE_SECONDS).toBeGreaterThan(0);
   });
 
   it("exposes a distinct cache name per asset class", () => {

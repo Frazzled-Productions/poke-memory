@@ -14,6 +14,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeDashboardSnapshot,
   computeQueueCount,
+  computeQueueCountFromEligible,
   type SnapshotAxis,
 } from "./dashboard-snapshot";
 import { DEFAULT_LIMITS, buildSessionQueues, type ReviewableCard, type NameReviewCard, type EvolutionReviewCard, type ReverseReviewCard } from "@/lib/review/session";
@@ -1068,5 +1069,38 @@ describe("computeQueueCount", () => {
     expect(result).toHaveProperty("reviewCount");
     expect(result).toHaveProperty("totalCount");
     expect(typeof result.totalCount).toBe("number");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeQueueCountFromEligible — lower-level helper (#1158)
+// ---------------------------------------------------------------------------
+
+describe("computeQueueCountFromEligible", () => {
+  it("produces the same result as computeQueueCount given the same inputs", () => {
+    const cards: ReviewableCard[] = [newCard(1), newCard(2), learningCard(10, "2026-05-18")];
+    const settings = makeSettings();
+    const eligibleCardIds = computeEligibleCardIds(cards, settings);
+
+    const fromEligible = computeQueueCountFromEligible(cards, eligibleCardIds, DEFAULT_LIMITS, TODAY);
+    const fromCount = computeQueueCount(cards, settings, DEFAULT_LIMITS, TODAY);
+
+    expect(fromEligible).toEqual(fromCount);
+  });
+
+  it("respects a pre-filtered eligible set — excluding a card reduces the total", () => {
+    const cards: ReviewableCard[] = [newCard(1), newCard(2), newCard(3)];
+    const settings = makeSettings();
+    const allEligible = computeEligibleCardIds(cards, settings);
+
+    // Manually exclude one card from the eligible set.
+    const subset = new Set(allEligible);
+    const [removedId] = Array.from(subset);
+    subset.delete(removedId);
+
+    const full = computeQueueCountFromEligible(cards, allEligible, DEFAULT_LIMITS, TODAY);
+    const partial = computeQueueCountFromEligible(cards, subset, DEFAULT_LIMITS, TODAY);
+
+    expect(partial.totalCount).toBe(full.totalCount - 1);
   });
 });
