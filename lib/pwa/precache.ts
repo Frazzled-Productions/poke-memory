@@ -18,7 +18,8 @@
  *    was completed before cancellation.
  */
 
-import { CACHE_NAMES } from "./cacheStrategy";
+import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
+import { KEY_OFFLINE_DOWNLOADED_AT } from "@/lib/storage/keys";
 import {
   PRACTICE_SPRITE_SIZE,
   PICKER_SPRITE_SIZE,
@@ -47,8 +48,13 @@ const SPRITE_RENDER_WIDTHS: number[] = Array.from(
   ]),
 );
 
-/** localStorage key that records the timestamp of the last completed download. */
-export const OFFLINE_DOWNLOADED_AT_KEY = "poke-memory:offline-downloaded-at";
+/**
+ * localStorage key that records the timestamp of the last completed download.
+ *
+ * Canonical definition lives in `lib/storage/keys.ts`; re-exported here for
+ * backwards-compatibility so existing callers can import from either location.
+ */
+export const OFFLINE_DOWNLOADED_AT_KEY = KEY_OFFLINE_DOWNLOADED_AT;
 
 export type PrecacheProgress = {
   done: number;
@@ -114,8 +120,13 @@ export function buildPrecacheUrls(ids: number[]): string[] {
  * Fetch and cache a single URL.
  *
  * Opens the appropriate cache bucket based on the URL path:
- *  - /_next/image variants and raw /sprites/... → sprites cache
- *  - /cries/...                                 → cries cache
+ *  - /_next/image variants and raw /sprites/... → versioned sprites cache
+ *  - /cries/...                                 → versioned cries cache
+ *
+ * The versioned names (e.g. "poke-memory-sprites-v2") are derived from
+ * `versionedCacheName` — the same helper used by the service worker's
+ * `CacheFirst` route handlers — so writes from this function always land in
+ * the exact bucket the SW reads from.
  *
  * Returns `'skipped'` when the entry already exists in the cache.
  * Returns `'failed'`  when the network request returns a non-ok response.
@@ -125,9 +136,12 @@ async function fetchAndCache(
   url: string,
   signal: AbortSignal,
 ): Promise<"downloaded" | "skipped" | "failed"> {
-  // Determine which cache bucket this URL belongs to.
+  // Determine which cache bucket this URL belongs to and derive the versioned
+  // name so the precache writes match the SW's CacheFirst reads exactly.
   const isCry = url.startsWith("/cries/");
-  const cacheName = isCry ? CACHE_NAMES.cries : CACHE_NAMES.sprites;
+  const cacheName = isCry
+    ? versionedCacheName(CACHE_NAMES.cries)
+    : versionedCacheName(CACHE_NAMES.sprites);
 
   let cache: Cache;
   try {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildPrecacheUrls, precacheAll, OFFLINE_DOWNLOADED_AT_KEY } from "./precache";
+import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
 
 // ---------------------------------------------------------------------------
 // Helpers to build a minimal CacheStorage stub.
@@ -86,6 +87,41 @@ describe("precacheAll", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("opens the versioned sprites cache bucket — byte-identical to the SW runtime handler", async () => {
+    // This test pins the contract between the precache orchestrator and the
+    // service worker's CacheFirst route: both must open the SAME cache name.
+    // If this assertion fails after a SW_CACHE_VERSION bump, it means the
+    // SW and the precache have diverged and precached assets will be invisible.
+    const openedNames: string[] = [];
+    const fakeCache = {
+      match: vi.fn(async () => undefined),
+      put: vi.fn(async () => undefined),
+    };
+    vi.stubGlobal("caches", {
+      open: vi.fn(async (name: string) => {
+        openedNames.push(name);
+        return fakeCache;
+      }),
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("data", { status: 200 })),
+    );
+
+    await precacheAll({ ids: [25] });
+
+    const expectedSpritesName = versionedCacheName(CACHE_NAMES.sprites);
+    const expectedCriesName = versionedCacheName(CACHE_NAMES.cries);
+
+    // The precache must open only the versioned bucket names.
+    expect(openedNames).toContain(expectedSpritesName);
+    expect(openedNames).toContain(expectedCriesName);
+
+    // It must NOT open the unversioned names (those are the wrong buckets).
+    expect(openedNames).not.toContain(CACHE_NAMES.sprites);
+    expect(openedNames).not.toContain(CACHE_NAMES.cries);
   });
 
   it("returns zero counts for an empty ID list", async () => {

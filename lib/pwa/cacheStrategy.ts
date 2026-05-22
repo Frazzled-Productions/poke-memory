@@ -27,6 +27,31 @@
  *                     Supabase sync endpoint) so offline reads never return a
  *                     stale cloud response and sync semantics are unchanged.
  */
+
+/**
+ * Cache-version suffix used by the service worker.
+ *
+ * Bumping this value changes every derived cache name (see {@link versionedCacheName}),
+ * which causes the browser to treat all previously cached responses as stale and
+ * re-fetch them from the network. Only bump when a deploy must discard every
+ * prior cached response (e.g. a format change that would otherwise be served stale).
+ *
+ * THIS CONSTANT IS THE SINGLE SOURCE OF TRUTH.  Both the service worker
+ * (`app/sw.ts`) and the offline precache orchestrator (`lib/pwa/precache.ts`)
+ * derive their cache names from this value so that writes from `precache.ts`
+ * and reads from the SW's `CacheFirst` handler always target the same bucket.
+ */
+export const SW_CACHE_VERSION = "v2";
+
+/**
+ * Append the cache-version suffix to a base cache name.
+ *
+ * Example: `versionedCacheName("poke-memory-sprites")` → `"poke-memory-sprites-v2"`.
+ *
+ * Callers should always use this helper rather than constructing the versioned
+ * name by hand so that a version bump is a single-line change.
+ */
+export const versionedCacheName = (name: string): string => `${name}-${SW_CACHE_VERSION}`;
 export type CacheStrategy =
   | "cache-first"
   | "network-first"
