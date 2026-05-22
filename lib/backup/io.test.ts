@@ -87,6 +87,7 @@ const VALID_SETTINGS: UserSettings = {
   ttsVolume: 1,
   timezone: null,
   dateFormat: null,
+  waitForAudioOnGrade: true,
   mobileNav: "bottom" as const,
 };
 

@@ -98,6 +98,10 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "volume",
       "rate",
       "speed",
+      "wait for audio",
+      "audio wait",
+      "lag",
+      "swap speed",
     ],
   },
   {

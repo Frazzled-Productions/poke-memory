@@ -1,10 +1,17 @@
 /**
- * Safety-valve timeout for sprite decode. If any sprite is slow (e.g. a cold
- * CDN edge), we let the caller proceed anyway so the UI is never stuck. Sprites
- * are self-hosted static assets, so in practice decode completes well under
- * 100 ms after the first visit.
+ * Default safety-valve timeout for sprite decode. If any sprite is slow
+ * (e.g. a cold CDN edge), we let the caller proceed anyway so the UI is never
+ * stuck. Sprites are self-hosted static assets, so in practice decode
+ * completes well under 100 ms after the first visit.
  */
 export const DECODE_TIMEOUT_MS = 500;
+
+/**
+ * Tighter ceiling used on the grade critical path (#1191). The swap should
+ * be bounded even on a cold sprite — 150 ms is enough to eliminate visible
+ * pop-in on already-warmed assets while not noticeably delaying the swap.
+ */
+export const DECODE_GRADE_TIMEOUT_MS = 150;
 
 /**
  * Decode a list of sprite URLs via `HTMLImageElement.decode()` so the browser
@@ -15,13 +22,19 @@ export const DECODE_TIMEOUT_MS = 500;
  * that were warmed into the network cache by `SpritePreloader`. A warmed fetch
  * is not a warmed decode — this call bridges that gap.
  *
- * A combined `Promise.race` with a {@link DECODE_TIMEOUT_MS} timeout acts as a
- * safety valve: if any image is unexpectedly slow the UI advances anyway rather
- * than blocking indefinitely.
+ * A combined `Promise.race` with a timeout acts as a safety valve: if any
+ * image is unexpectedly slow the UI advances anyway rather than blocking
+ * indefinitely.
  *
  * @param urls - Sprite URLs to decode. Empty arrays resolve immediately.
+ * @param timeoutMs - Safety-valve ceiling in milliseconds. Defaults to
+ *   {@link DECODE_TIMEOUT_MS} (500 ms). Pass {@link DECODE_GRADE_TIMEOUT_MS}
+ *   (150 ms) on the grade critical path where speed is the priority.
  */
-export async function decodeSpriteUrls(urls: readonly string[]): Promise<void> {
+export async function decodeSpriteUrls(
+  urls: readonly string[],
+  timeoutMs = DECODE_TIMEOUT_MS,
+): Promise<void> {
   if (urls.length === 0) return;
   const decodes = urls.map((url) => {
     const img = new window.Image();
@@ -37,6 +50,6 @@ export async function decodeSpriteUrls(urls: readonly string[]): Promise<void> {
   });
   await Promise.race([
     Promise.all(decodes),
-    new Promise<void>((resolve) => setTimeout(resolve, DECODE_TIMEOUT_MS)),
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
   ]);
 }

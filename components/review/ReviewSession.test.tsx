@@ -203,6 +203,7 @@ const { mockDecodeSpriteUrls } = vi.hoisted(() => ({
 vi.mock("@/lib/sprites/decode", () => ({
   decodeSpriteUrls: mockDecodeSpriteUrls,
   DECODE_TIMEOUT_MS: 500,
+  DECODE_GRADE_TIMEOUT_MS: 150,
 }));
 
 // Spy on nextReview using the real implementation by default — individual tests
@@ -2837,6 +2838,31 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       expect(
         screen.getByRole("button", { name: /undo last grade/i }),
       ).toBeInTheDocument(),
+    );
+  });
+
+  it("flip branch (name card): undo button disappears after clicking Undo (#1191 ref-based snapshot)", async () => {
+    const user = userEvent.setup();
+    mockLoadSettings.mockReturnValue(flipSettings);
+    render(<ReviewSession />);
+
+    const reveal = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(reveal);
+    // Grade Again so the card stays in the session.
+    await user.click(screen.getByRole("button", { name: /again/i }));
+
+    // Wait for the undo button to appear (snapshot populated).
+    const undoBtn = await screen.findByRole("button", { name: /undo last grade/i });
+
+    // Click Undo — the ref-based snapshot should be consumed and the button removed.
+    await user.click(undoBtn);
+
+    // After undo the card is back in its revealed state (setRevealed(true) is
+    // called during undo) so the grade buttons are visible, not the Reveal prompt.
+    await screen.findByRole("group", { name: /grade your answer/i });
+    // The undo button should now be gone.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /undo last grade/i })).not.toBeInTheDocument(),
     );
   });
 
