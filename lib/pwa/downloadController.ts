@@ -44,7 +44,7 @@ export type DownloadState =
 let currentState: DownloadState = { phase: "idle" };
 let abortController: AbortController | null = null;
 const listeners = new Set<(state: DownloadState) => void>();
-/** Set to true after the first subscribe() call has seeded state from localStorage. */
+/** Set to true once seedFromStorage() has run (triggered by getState() or subscribe()). */
 let storageSeedDone = false;
 
 function setState(next: DownloadState): void {
@@ -55,14 +55,17 @@ function setState(next: DownloadState): void {
 }
 
 /**
- * Lazily seed the singleton from localStorage on the first subscription.
+ * Lazily seed the singleton from localStorage on first access.
+ *
+ * Called by both getState() and subscribe() so the first caller — whether
+ * the useState initialiser or the subscribe effect — gets correct state.
  *
  * The module may be imported in a server context (during SSR) where
- * `window` / `localStorage` are unavailable, so we defer the read until
- * we know we are in a browser and a consumer is actually subscribing.
+ * `window` / `localStorage` are unavailable; the typeof guard ensures it
+ * no-ops safely. Runs at most once per page load.
  *
- * Only runs once and only when the current phase is still "idle" — an
- * active or completed download from this session takes precedence.
+ * Only mutates currentState when the phase is still "idle" — an active or
+ * completed download from this session takes precedence.
  */
 function seedFromStorage(): void {
   if (storageSeedDone) return;
@@ -112,9 +115,9 @@ export function getState(): DownloadState {
  * Subscribe to state changes. The listener is called immediately with
  * the current state, and again on every subsequent transition.
  *
- * On the first subscription this also seeds state from localStorage so
- * a completed download from a previous page load is reflected without
- * the component having to read localStorage itself.
+ * Also calls seedFromStorage() (idempotent) so that a completed download
+ * from a previous page load is reflected even if the subscribe effect
+ * fires before getState() has been called.
  *
  * Returns an unsubscribe function that removes the listener.
  */
