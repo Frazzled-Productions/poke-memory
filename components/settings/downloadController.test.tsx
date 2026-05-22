@@ -53,6 +53,29 @@ describe("downloadController", () => {
     it("starts in the idle phase", () => {
       expect(getState()).toEqual({ phase: "idle" });
     });
+
+    it("returns { phase: 'done' } on first call when localStorage holds a prior-download timestamp", () => {
+      // Regression guard for Finding 1 on PR #1185: getState() must seed from
+      // localStorage so useState(getState) in OfflineSection already reflects a
+      // returning user's prior download on the very first render — no flash.
+      window.localStorage.setItem(
+        precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+        "2026-05-01T10:00:00.000Z",
+      );
+
+      const state = getState();
+
+      expect(state.phase).toBe("done");
+      if (state.phase === "done") {
+        expect(state.downloadedAt).toBe("2026-05-01T10:00:00.000Z");
+      }
+    });
+
+    it("returns idle when localStorage has no prior-download timestamp", () => {
+      // Ensure getState() does not produce a false "done" when storage is empty.
+      const state = getState();
+      expect(state.phase).toBe("idle");
+    });
   });
 
   describe("subscribe", () => {

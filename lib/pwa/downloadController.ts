@@ -13,16 +13,16 @@
  * whose cleanest fix is a shared module outside the component tree.
  *
  * Public API:
- *   startDownload(ids, onProgress, onDone)  — begins a precacheAll run; no-op
- *                                             if one is already in progress.
- *   stopDownload()                          — explicitly aborts the active run.
- *   subscribe(listener)                     — registers a DownloadState
- *                                             listener; returns an unsubscribe
- *                                             function. Immediately calls the
- *                                             listener with the current state.
- *   getState()                              — returns the current DownloadState
- *                                             synchronously (useful for initial
- *                                             render without a flash).
+ *   startDownload(ids)  — begins a precacheAll run; no-op if one is already
+ *                         in progress.
+ *   stopDownload()      — explicitly aborts the active run.
+ *   subscribe(listener) — registers a DownloadState listener; returns an
+ *                         unsubscribe function. Immediately calls the listener
+ *                         with the current state.
+ *   getState()          — returns the current DownloadState synchronously,
+ *                         seeding from localStorage on first call so that
+ *                         useState(getState) reflects a prior download on the
+ *                         very first render.
  */
 
 import { precacheAll, OFFLINE_DOWNLOADED_AT_KEY, type PrecacheProgress, type PrecacheSummary } from "./precache";
@@ -90,10 +90,21 @@ function seedFromStorage(): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the current download state synchronously.
- * Useful for initialising component state without a loading flash.
+ * Returns the current download state synchronously, seeding from localStorage
+ * on the first call so that a returning user's prior-download timestamp is
+ * reflected on the very first render — no "Download" → "Update" flash.
+ *
+ * Safe to use as a React `useState` initialiser:
+ *   const [state, setState] = useState(getState);
+ *
+ * SSR note: `seedFromStorage` short-circuits when `window` is unavailable, so
+ * the server always returns `{ phase: "idle" }`. The client's `useState`
+ * initialiser runs after React has committed the server HTML and will return
+ * the localStorage-seeded value. This is the same pattern used by the pre-PR
+ * version of OfflineSection.tsx and is safe for a `"use client"` component.
  */
 export function getState(): DownloadState {
+  seedFromStorage();
   return currentState;
 }
 

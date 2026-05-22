@@ -81,6 +81,32 @@ describe("OfflineSection", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows 'Update' synchronously on first render for a returning user (no flash)", () => {
+    // Regression guard for Finding 1 on PR #1185: getState() must seed from
+    // localStorage so useState(getState) already returns { phase: "done" } on
+    // the very first synchronous render. The "Download" button must never be
+    // committed to the DOM — not even as a transient state before effects run.
+    //
+    // In @testing-library/react, render() commits the initial tree
+    // synchronously and then flushes effects. If getState() did NOT seed from
+    // storage, the initial tree would contain "Download" and only flip to
+    // "Update" after the subscribe() effect fired — a visible label flash for
+    // real users. This test guards against that regression.
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-05-01T10:00:00.000Z",
+    );
+
+    // Act without awaiting any async events — we are asserting the
+    // synchronously committed initial render, not a state transition.
+    const { container } = render(<OfflineSection />);
+
+    // "Update" must be present in the committed tree.
+    expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
+    // "Download" must never appear — not even transiently.
+    expect(container.querySelector("button")).toHaveTextContent(/update/i);
+  });
+
   it("shows progress and a Stop button while downloading", async () => {
     // Delay precacheAll so we can assert the in-progress state.
     let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;

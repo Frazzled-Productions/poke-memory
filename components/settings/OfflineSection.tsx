@@ -63,8 +63,11 @@ export function OfflineSection() {
     return subscribe(setDownloadState);
   }, []);
 
-  // Read storage estimate on mount.
+  // Read storage estimate on mount. Skip when the initial phase is already
+  // "done" — the phase-change effect below fires in that case and makes the
+  // same call, so the mount call would be a duplicate.
   useEffect(() => {
+    if (downloadState.phase === "done") return;
     if (!("storage" in navigator) || !("estimate" in navigator.storage)) return;
     void navigator.storage.estimate().then((estimate) => {
       if (estimate.usage !== undefined && estimate.quota !== undefined) {
@@ -74,7 +77,7 @@ export function OfflineSection() {
         });
       }
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional mount-only
 
   // Warn before a full page unload during an active download.
   // Note: in-PWA navigations (client-side route changes) do NOT trigger
