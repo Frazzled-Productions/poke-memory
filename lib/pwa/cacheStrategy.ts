@@ -52,6 +52,7 @@ export const SW_CACHE_VERSION = "v2";
  * name by hand so that a version bump is a single-line change.
  */
 export const versionedCacheName = (name: string): string => `${name}-${SW_CACHE_VERSION}`;
+
 export type CacheStrategy =
   | "cache-first"
   | "network-first"
