@@ -12,6 +12,7 @@
     "lint": "eslint && npm run lint:em-dash",
     "lint:em-dash": "node scripts/check-no-em-dash.mjs",
     "seed": "node scripts/seed-pokemon.mjs",
+    "generate:scope-lookup": "node scripts/generate-scope-lookup.mjs",
     "audit:forms": "node scripts/audit-form-categories.mjs",
     "seed:tts": "node --env-file-if-exists=.env.local scripts/seed-tts-audio.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
