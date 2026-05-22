@@ -1,5 +1,5 @@
 /**
- * Unit tests for the shared review-session-active flag.
+ * Unit tests for the reference-counted review-session-active flag (#1178).
  *
  * Runs in the node vitest project (no DOM), so `window` is stubbed per test
  * to exercise both the SSR guard and the localStorage paths.
@@ -50,41 +50,125 @@ describe("sessionActive — SSR guard", () => {
   });
 });
 
-describe("sessionActive — browser path", () => {
-  it("markSessionActive sets the flag and isSessionActive reads it", () => {
+describe("sessionActive — browser path (reference count)", () => {
+  it("isSessionActive returns false when no session is active", () => {
     const storage = makeStorage();
     vi.stubGlobal("window", { localStorage: storage });
 
     expect(isSessionActive()).toBe(false);
+  });
+
+  it("markSessionActive increments count and isSessionActive returns true", () => {
+    const storage = makeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+
     markSessionActive();
     expect(isSessionActive()).toBe(true);
     expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBe("1");
   });
 
-  it("markSessionInactive clears the flag", () => {
-    const storage = makeStorage({ [KEY_REVIEW_SESSION_ACTIVE]: "1" });
-    vi.stubGlobal("window", { localStorage: storage });
-
-    expect(isSessionActive()).toBe(true);
-    markSessionInactive();
-    expect(isSessionActive()).toBe(false);
-    expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBeNull();
-  });
-
-  it("markSessionActive is idempotent", () => {
+  it("markSessionActive twice gives count 2", () => {
     const storage = makeStorage();
     vi.stubGlobal("window", { localStorage: storage });
 
     markSessionActive();
     markSessionActive();
+    expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBe("2");
     expect(isSessionActive()).toBe(true);
   });
 
-  it("isSessionActive returns false for any value other than the active marker", () => {
+  it("markSessionInactive decrements count", () => {
+    const storage = makeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+
+    markSessionActive();
+    markSessionActive();
+    markSessionInactive();
+    expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBe("1");
+    expect(isSessionActive()).toBe(true);
+  });
+
+  it("markSessionInactive clears the key when count reaches zero", () => {
+    const storage = makeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+
+    markSessionActive();
+    markSessionInactive();
+    expect(isSessionActive()).toBe(false);
+    expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBeNull();
+  });
+
+  it("markSessionInactive clamps at 0 — count never goes negative", () => {
+    const storage = makeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+
+    markSessionInactive();
+    markSessionInactive();
+    expect(isSessionActive()).toBe(false);
+    expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBeNull();
+  });
+
+  it("close-one-of-two scenario: second tab closing leaves first tab protected", () => {
+    const storage = makeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+
+    // Two tabs mount ReviewSession
+    markSessionActive(); // Tab A mounts
+    markSessionActive(); // Tab B mounts
+    expect(isSessionActive()).toBe(true);
+
+    // Tab A closes/navigates away and calls markSessionInactive
+    markSessionInactive(); // Tab A unmounts
+    // Tab B still has a live session — flag must remain active
+    expect(isSessionActive()).toBe(true);
+
+    // Tab B closes too
+    markSessionInactive(); // Tab B unmounts
+    expect(isSessionActive()).toBe(false);
+  });
+});
+
+describe("sessionActive — legacy and corrupt value handling", () => {
+  it('legacy active boolean string "1" is treated as count 1 (active)', () => {
+    // The old implementation stored "1" when active — parseInt("1", 10) === 1
+    const storage = makeStorage({ [KEY_REVIEW_SESSION_ACTIVE]: "1" });
+    vi.stubGlobal("window", { localStorage: storage });
+
+    expect(isSessionActive()).toBe(true);
+  });
+
+  it('legacy "0" string is treated as count 0 (inactive)', () => {
     const storage = makeStorage({ [KEY_REVIEW_SESSION_ACTIVE]: "0" });
     vi.stubGlobal("window", { localStorage: storage });
 
     expect(isSessionActive()).toBe(false);
+  });
+
+  it("unparseable value (NaN) is treated as 0 — falls through to allow background work", () => {
+    // e.g. if something wrote a non-numeric value
+    const storage = makeStorage({ [KEY_REVIEW_SESSION_ACTIVE]: "corrupt" });
+    vi.stubGlobal("window", { localStorage: storage });
+
+    expect(isSessionActive()).toBe(false);
+  });
+
+  it("markSessionActive after a corrupt value writes count 1", () => {
+    const storage = makeStorage({ [KEY_REVIEW_SESSION_ACTIVE]: "corrupt" });
+    vi.stubGlobal("window", { localStorage: storage });
+
+    // NaN treated as 0, so incrementing gives 1
+    markSessionActive();
+    expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBe("1");
+    expect(isSessionActive()).toBe(true);
+  });
+
+  it("markSessionInactive after a corrupt value clamps to 0 and removes key", () => {
+    const storage = makeStorage({ [KEY_REVIEW_SESSION_ACTIVE]: "corrupt" });
+    vi.stubGlobal("window", { localStorage: storage });
+
+    markSessionInactive();
+    expect(isSessionActive()).toBe(false);
+    expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBeNull();
   });
 });
 
@@ -126,5 +210,25 @@ describe("sessionActive — storage failures", () => {
     });
 
     expect(isSessionActive()).toBe(false);
+  });
+
+  it("markSessionActive is a no-op when getItem throws (count stays unknowable)", () => {
+    vi.stubGlobal("window", {
+      localStorage: {
+        ...makeStorage(),
+        getItem: () => {
+          throw new Error("storage disabled");
+        },
+        setItem: () => {
+          throw new Error("storage disabled");
+        },
+        removeItem: () => {
+          throw new Error("storage disabled");
+        },
+      } as Storage,
+    });
+
+    expect(() => markSessionActive()).not.toThrow();
+    expect(() => markSessionInactive()).not.toThrow();
   });
 });
