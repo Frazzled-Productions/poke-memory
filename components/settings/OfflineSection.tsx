@@ -10,6 +10,13 @@ import {
 } from "@/lib/pwa/precache";
 import { cardPanelPadded } from "@/lib/utils/class-names";
 
+/**
+ * Species IDs eligible for offline caching — all default-form entries in the
+ * seed. Computed once at module load since `SEED_POKEMON` is a static import;
+ * this avoids re-running the filter+map on every render.
+ */
+const ALL_OFFLINE_IDS: number[] = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
+
 type DownloadState =
   | { phase: "idle" }
   | { phase: "downloading"; progress: PrecacheProgress }
@@ -50,8 +57,6 @@ function readDownloadedAt(): string | null {
  * caches so practice sessions work without a network connection.
  */
 export function OfflineSection() {
-  const allIds = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
-
   const [downloadState, setDownloadState] = useState<DownloadState>(() => {
     // Initialise synchronously from localStorage so the button label is
     // correct on first paint without a flash.
@@ -109,7 +114,7 @@ export function OfflineSection() {
 
     try {
       const summary = await precacheAll({
-        ids: allIds,
+        ids: ALL_OFFLINE_IDS,
         signal: controller.signal,
         onProgress: (progress) => {
           setDownloadState({ phase: "downloading", progress });
@@ -119,6 +124,19 @@ export function OfflineSection() {
       if (controller.signal.aborted) {
         // User cancelled — return to idle so they can restart.
         setDownloadState({ phase: "idle" });
+        return;
+      }
+
+      // Total failure guard: when nothing was downloaded and at least one URL
+      // failed, the caches API is likely unavailable (e.g. non-HTTPS, blocked
+      // by the browser, or a persistent network failure). Showing "Downloaded
+      // on <date>" in this state would be a false success — transition to the
+      // error phase instead and do NOT write the timestamp.
+      if (summary.downloaded === 0 && summary.failed > 0) {
+        setDownloadState({
+          phase: "error",
+          message: "Download failed. Check your connection and try again.",
+        });
         return;
       }
 

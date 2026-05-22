@@ -188,4 +188,38 @@ describe("OfflineSection", () => {
     );
     expect(screen.getByRole("alert")).toHaveTextContent(/download failed/i);
   });
+
+  it("shows an error and does NOT write a timestamp when downloaded=0 and failed>0 (total failure)", async () => {
+    // Simulates the caches API being unavailable: every URL counted as failed,
+    // none downloaded. The component must transition to the error phase and must
+    // NOT write a timestamp to localStorage (which would display "Downloaded on
+    // <date>" — a false success).
+    vi.spyOn(precacheModule, "precacheAll").mockResolvedValue({
+      totalRequested: 100,
+      downloaded: 0,
+      skipped: 0,
+      failed: 100,
+    });
+
+    const user = userEvent.setup();
+    render(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toBeInTheDocument(),
+    );
+
+    // Must surface the user-facing error message.
+    expect(screen.getByRole("alert")).toHaveTextContent(/download failed/i);
+
+    // Must NOT transition to "done" — no "Downloaded on" text, no Update button.
+    expect(screen.queryByText(/downloaded on/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /update/i })).not.toBeInTheDocument();
+
+    // Must NOT have written the timestamp to localStorage.
+    expect(
+      window.localStorage.getItem(precacheModule.OFFLINE_DOWNLOADED_AT_KEY),
+    ).toBeNull();
+  });
 });
