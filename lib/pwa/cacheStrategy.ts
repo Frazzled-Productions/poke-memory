@@ -26,6 +26,23 @@
  * - `network-only`  — never cache. Used for cross-origin requests (e.g. the
  *                     Supabase sync endpoint) so offline reads never return a
  *                     stale cloud response and sync semantics are unchanged.
+ *
+ * Asset buckets
+ * -------------
+ * - **Sprites** (`poke-memory-sprites-v2`): self-hosted official-artwork PNGs
+ *   under `/sprites/pokemon/<id>.png`, plus pre-generated static WebP variants
+ *   at `/sprites/pokemon/webp/<id>/<width>.webp` (10 width variants per sprite,
+ *   ~12,914 entries total when the full offline pack is downloaded). Sprites
+ *   are served directly as static files — the `/_next/image` endpoint is no
+ *   longer used for sprites. The entry cap must exceed the offline pack size —
+ *   see {@link SPRITE_CACHE_MAX_ENTRIES}.
+ * - **Cries** (`poke-memory-cries-v2`): self-hosted OGG audio under
+ *   `/cries/<id>.ogg`, one file per species (~1,025 entries plus regional forms).
+ * - **Static** (`poke-memory-static-v2`): content-hashed Next.js build output
+ *   under `/_next/static/`.
+ * - **Fonts** (`poke-memory-fonts-v2`): web fonts (woff2/woff/ttf/otf/eot).
+ * - **Pages** (`poke-memory-pages-v2`): navigations, RSC payloads, data
+ *   requests, and any asset that does not match a more-specific bucket.
  */
 
 /**
@@ -70,8 +87,25 @@ export const CACHE_NAMES = {
 
 export type CacheName = (typeof CACHE_NAMES)[keyof typeof CACHE_NAMES];
 
-/** Up to 1025 species sprites plus evolution art — cap generously. */
-export const SPRITE_CACHE_MAX_ENTRIES = 1300;
+/**
+ * Maximum entries for the sprite cache bucket.
+ *
+ * The offline-download feature (#1168) writes ~12,914 sprite URLs into this
+ * bucket: 10 pre-generated WebP width variants
+ * (`/sprites/pokemon/webp/<id>/<width>.webp`) + 1 raw PNG
+ * (`/sprites/pokemon/<id>.png`) per species, across ~1,174 species/forms
+ * (11 URLs × 1,174 IDs = 12,914 entries).
+ * The cap must comfortably exceed that pack size so that `ExpirationPlugin`
+ * does not evict offline-downloaded sprites as the user practises — culled
+ * entries become permanent cache misses and broken images for the remainder
+ * of an offline session.
+ *
+ * 15,000 gives ~16% headroom above the ~12,914-entry offline pack, leaving
+ * room for additional evolution/alt-form art and organic runtime caching
+ * without triggering LRU eviction. The opt-in offline download already
+ * implies the user accepted the storage cost.
+ */
+export const SPRITE_CACHE_MAX_ENTRIES = 15_000;
 
 /** Sprite art is immutable per URL; keep it for a long time. */
 export const SPRITE_CACHE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
@@ -183,16 +217,24 @@ export function classifyRequest(
   if (path === "/_next/image") {
     const rawParam = parsed.searchParams.get("url");
     if (rawParam !== null) {
-      let decodedPath: string;
+      let innerParsed: URL | null = null;
       try {
-        decodedPath = new URL(decodeURIComponent(rawParam), origin).pathname;
+        innerParsed = new URL(decodeURIComponent(rawParam), origin);
       } catch {
         // Malformed url param — fall through to pages bucket.
-        decodedPath = "";
       }
-      const innerResult = classifyPath(decodedPath);
-      if (innerResult !== null) {
-        return innerResult;
+      // Same-origin guard: only route to an immutable-asset bucket when the
+      // decoded source URL belongs to our own origin. A future `remotePatterns`
+      // entry whose path happens to start with `/sprites/` or `/cries/` must
+      // not be mis-classified into our local sprite or cry bucket. Cross-origin
+      // optimiser URLs (e.g. GitHub avatars, external CDNs) fall through to
+      // the pages bucket — they are already handled as network-first there,
+      // which is the correct behaviour for mutable remote assets.
+      if (innerParsed !== null && innerParsed.origin === origin) {
+        const innerResult = classifyPath(innerParsed.pathname);
+        if (innerResult !== null) {
+          return innerResult;
+        }
       }
     }
     // Non-sprite optimiser request (other same-origin assets, cross-origin

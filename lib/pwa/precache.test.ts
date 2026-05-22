@@ -40,15 +40,22 @@ function makeOkFetch(extraUrls: Set<string> = new Set()) {
 // ---------------------------------------------------------------------------
 
 describe("buildPrecacheUrls", () => {
-  it("includes at least one /_next/image variant per species", () => {
+  it("includes pre-generated WebP variants for each sprite width", () => {
+    // Sprites are now served as static WebP files — no /_next/image endpoint.
+    const urls = buildPrecacheUrls([25]);
+    const webpUrls = urls.filter((u) => u.startsWith("/sprites/pokemon/webp/"));
+    expect(webpUrls.length).toBeGreaterThan(0);
+    // Each WebP URL must reference species 25 and include a numeric width.
+    for (const u of webpUrls) {
+      expect(u).toContain("/sprites/pokemon/webp/25/");
+      expect(u).toMatch(/\/sprites\/pokemon\/webp\/25\/\d+\.webp$/);
+    }
+  });
+
+  it("does NOT include /_next/image URLs (dead path since #1186)", () => {
     const urls = buildPrecacheUrls([25]);
     const nextImageUrls = urls.filter((u) => u.startsWith("/_next/image"));
-    expect(nextImageUrls.length).toBeGreaterThan(0);
-    // Each /_next/image URL must encode the sprite path and include a width param.
-    for (const u of nextImageUrls) {
-      expect(u).toContain(encodeURIComponent("/sprites/pokemon/25.png"));
-      expect(u).toMatch(/&w=\d+/);
-    }
+    expect(nextImageUrls).toHaveLength(0);
   });
 
   it("includes the raw sprite path for the Pokédex-grid <img> exemption", () => {
@@ -65,7 +72,7 @@ describe("buildPrecacheUrls", () => {
     const urls = buildPrecacheUrls([1, 2, 3]);
     // Each ID contributes at least one raw sprite URL — three total.
     const rawSprites = urls.filter(
-      (u) => u.startsWith("/sprites/pokemon/") && !u.startsWith("/_next/image"),
+      (u) => u.match(/^\/sprites\/pokemon\/\d+\.png$/),
     );
     expect(rawSprites).toContain("/sprites/pokemon/1.png");
     expect(rawSprites).toContain("/sprites/pokemon/2.png");

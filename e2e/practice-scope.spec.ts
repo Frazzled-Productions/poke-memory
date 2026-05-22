@@ -129,22 +129,28 @@ test.describe("Practice scope (#333)", () => {
     // Capture the sprite src that's rendered before any scope action. The
     // PokemonCard renders a single img with alt="A Pokémon sprite, answer
     // hidden" pre-reveal; the SpritePreloader uses alt="" so this locator is
-    // unique. The src points at a /sprites/pokemon/<id>.png path that
-    // encodes the displayed card's species; under next/image it is wrapped
-    // as /_next/image?url=...%2Fsprites%2Fpokemon%2F<id>.png. We decode the
-    // id from whichever form is rendered.
+    // unique. The custom next/image loader (#1186) rewrites the src to the
+    // pre-generated static WebP path /sprites/pokemon/webp/<id>/<width>.webp.
+    // The Pokédex grid is the only surface that still serves raw PNG paths.
+    // We decode the species id from whichever format is rendered.
     const onScreenSprite = page.getByAltText("A Pokémon sprite, answer hidden");
     await expect(onScreenSprite).toBeVisible();
     const initialSrc = await onScreenSprite.getAttribute("src");
     expect(initialSrc).toBeTruthy();
 
-    // Extract the species id from the sprite URL. Falls back to a defensive
-    // null if the URL shape is unexpected, in which case the test bails out
-    // rather than picking a possibly-in-scope generation.
+    // Extract the species id from the sprite URL. Handles both the legacy
+    // PNG path (/sprites/pokemon/<id>.png) and the static WebP path introduced
+    // by #1186 (/sprites/pokemon/webp/<id>/<width>.webp). Also tolerates an
+    // absolute-URL prefix (http://host/sprites/...) and percent-encoded forms.
+    // Falls back to null if the URL shape is unexpected, in which case the
+    // test bails out rather than picking a possibly-in-scope generation.
     function speciesIdFromSrc(src: string | null): number | null {
       if (src === null) return null;
       const decoded = decodeURIComponent(src);
-      const match = decoded.match(/\/sprites\/pokemon\/(\d+)\.png/);
+      // Matches both:
+      //   /sprites/pokemon/189.png          (legacy PNG / Pokédex grid)
+      //   /sprites/pokemon/webp/189/320.webp (static WebP via custom loader)
+      const match = decoded.match(/\/sprites\/pokemon\/(?:webp\/)?(\d+)[/.]/);
       if (!match) return null;
       return Number(match[1]);
     }

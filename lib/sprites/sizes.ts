@@ -65,3 +65,20 @@ export const PASTURE_SPRITE_SIZE = 56;
 
 /** Sprite size used in the Stats page "worst cards" list (48 px square). */
 export const STATS_SPRITE_SIZE = 48;
+
+// ---------------------------------------------------------------------------
+// Theme / chrome surfaces
+// ---------------------------------------------------------------------------
+
+/**
+ * Sprite size used by the `FavouriteMascot` nav badge (32 px square).
+ * Sits in the nav header as a small decorative icon.
+ */
+export const FAVOURITE_MASCOT_SPRITE_SIZE = 32;
+
+/**
+ * Sprite size used by the `ThemeWatermark` decorative background sprite
+ * (180 px square). Renders at low opacity in the corner at `tinted` / `full`
+ * theme intensities.
+ */
+export const THEME_WATERMARK_SPRITE_SIZE = 180;

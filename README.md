@@ -109,11 +109,14 @@ Sign in with GitHub or Google (the **Sign in** button in the nav) to sync your r
 
 ```bash
 npm install
-npm run seed   # one-time fetch of all 1025 species from PokéAPI (~1–2 min)
-npm run dev    # http://localhost:3000
+npm run seed           # one-time fetch of all 1025 species from PokéAPI (~1–2 min)
+npm run seed:sprites   # one-time pre-generate WebP sprite variants (~1–2 min)
+npm run dev            # http://localhost:3000
 ```
 
-The seed step writes `lib/pokemon/generated.json`, which is committed to the repo, so the seed is only required if that file is missing or you want to regenerate it (e.g. after a new Pokémon generation ships).
+The seed step writes `lib/pokemon/generated.json` and downloads raw PNGs to `public/sprites/pokemon/`. Both are committed to the repo, so the seed is only required if those files are missing or you want to regenerate them (e.g. after a new Pokémon generation ships).
+
+`npm run seed:sprites` converts the raw PNGs to optimised WebP at each render width and writes them under `public/sprites/pokemon/webp/`. These files are also committed, so this step is only required if the WebP tree is missing or a new size constant has been added to `lib/sprites/sizes.ts`.
 
 Pre-generated name audio under `public/audio/names/` is likewise committed. To regenerate it — for example after a new generation ships — set `GOOGLE_CLOUD_TTS_API_KEY` in `.env.local` and run `npm run seed:tts`.
 

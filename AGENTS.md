@@ -119,12 +119,13 @@ Two things to remember at runtime without leaving AGENTS.md:
 
 ### Sprite rendering
 
-The canonical reference — `next/image` vs. plain `<img>`, when `priority` / `loading` apply, the `lib/sprites/sizes.ts` size constants, when to use `SpritePreloader` / `decodeSpriteUrls` / `useSpritePrefetch`, and the deliberate Pokédex-grid exemption — lives in **[docs/sprites.md](docs/sprites.md)**. Read it before adding a sprite-rendering surface or touching `lib/sprites/` or `components/sprites/`.
+The canonical reference — `next/image` vs. plain `<img>`, when `priority` / `loading` apply, the `lib/sprites/sizes.ts` size constants, when to use `SpritePreloader` / `decodeSpriteUrls` / `useSpritePrefetch`, the deliberate Pokédex-grid exemption, and the pre-generated WebP delivery model — lives in **[docs/sprites.md](docs/sprites.md)**. Read it before adding a sprite-rendering surface or touching `lib/sprites/` or `components/sprites/`.
 
 Headline rules:
 
 - **Default to `next/image`.** The only exemption is the Pokédex grid (`PokedexGrid.tsx`), which keeps a plain lazy `<img>` to avoid per-cell wrapper overhead across ~1025 tiles — documented inline and in docs/sprites.md.
-- **Sprite sizes are named constants in `lib/sprites/sizes.ts`.** Never inline a sprite pixel literal; the size must match the painted CSS size or the optimiser serves an uncached variant.
+- **`/_next/image` is NOT used for sprites.** A global custom loader (`lib/sprites/imageLoader.ts`) redirects sprite paths to pre-generated static WebP files under `public/sprites/pokemon/webp/`, bypassing Vercel Image Optimisation entirely. Run `npm run seed:sprites` after adding a new size constant.
+- **Sprite sizes are named constants in `lib/sprites/sizes.ts`.** Never inline a sprite pixel literal; the size must match the painted CSS size or the wrong WebP variant is served.
 - **`priority` is for the above-the-fold focal sprite only.** Off-screen / list-tile sprites stay lazy; decorative chrome is explicitly `priority={false}`.
 
 ### Spaced repetition

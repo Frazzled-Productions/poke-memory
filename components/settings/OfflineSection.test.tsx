@@ -1,15 +1,18 @@
 /**
  * Component tests for OfflineSection.
  *
- * The precacheAll function is mocked so tests do not hit the real Cache API.
- * localStorage is stubbed manually because jsdom does not always ship it.
+ * The downloadController singleton is tested via its real module — we
+ * mock precacheAll at the lib/pwa/precache level to avoid hitting the
+ * real Cache API. We also test the remount-during-download scenario that
+ * was the root cause of #1180.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import * as precacheModule from "@/lib/pwa/precache";
+import { _resetForTesting } from "@/lib/pwa/downloadController";
 
 // ------------------------------------------------------------------
 // localStorage stub — jsdom does not always ship localStorage.
@@ -27,6 +30,9 @@ function makeLocalStorage(): Storage {
 }
 
 beforeEach(() => {
+  // Reset the singleton before each test so tests don't bleed into each other.
+  _resetForTesting();
+
   Object.defineProperty(window, "localStorage", {
     value: makeLocalStorage(),
     configurable: true,
@@ -36,6 +42,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  _resetForTesting();
   delete (window as unknown as { localStorage?: unknown }).localStorage;
 });
 
@@ -72,6 +79,32 @@ describe("OfflineSection", () => {
     expect(
       screen.queryByRole("button", { name: /^download$/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows 'Update' synchronously on first render for a returning user (no flash)", () => {
+    // Regression guard for Finding 1 on PR #1185: getState() must seed from
+    // localStorage so useState(getState) already returns { phase: "done" } on
+    // the very first synchronous render. The "Download" button must never be
+    // committed to the DOM — not even as a transient state before effects run.
+    //
+    // In @testing-library/react, render() commits the initial tree
+    // synchronously and then flushes effects. If getState() did NOT seed from
+    // storage, the initial tree would contain "Download" and only flip to
+    // "Update" after the subscribe() effect fired — a visible label flash for
+    // real users. This test guards against that regression.
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-05-01T10:00:00.000Z",
+    );
+
+    // Act without awaiting any async events — we are asserting the
+    // synchronously committed initial render, not a state transition.
+    const { container } = render(<OfflineSection />);
+
+    // "Update" must be present in the committed tree.
+    expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
+    // "Download" must never appear — not even transiently.
+    expect(container.querySelector("button")).toHaveTextContent(/update/i);
   });
 
   it("shows progress and a Stop button while downloading", async () => {
@@ -164,7 +197,7 @@ describe("OfflineSection", () => {
 
     await user.click(screen.getByRole("button", { name: /stop/i }));
 
-    // The component calls abort on the controller.
+    // The controller was aborted.
     expect(abortCalled).toBe(true);
 
     // After abort resolves the component returns to idle.
@@ -186,7 +219,8 @@ describe("OfflineSection", () => {
     await waitFor(() =>
       expect(screen.getByRole("alert")).toBeInTheDocument(),
     );
-    expect(screen.getByRole("alert")).toHaveTextContent(/download failed/i);
+    // The error alert shows the actual error message from the thrown Error.
+    expect(screen.getByRole("alert")).toHaveTextContent(/network error/i);
   });
 
   it("shows an error and does NOT write a timestamp when downloaded=0 and failed>0 (total failure)", async () => {
@@ -221,5 +255,73 @@ describe("OfflineSection", () => {
     expect(
       window.localStorage.getItem(precacheModule.OFFLINE_DOWNLOADED_AT_KEY),
     ).toBeNull();
+  });
+
+  it("remounting during an active download shows live progress without aborting", async () => {
+    // This is the regression test for #1180: a client-side navigation that
+    // unmounts and remounts OfflineSection must not abort the download.
+    //
+    // We simulate the scenario by:
+    //  1. Rendering the component and starting a download.
+    //  2. Unmounting (simulates navigation away).
+    //  3. Remounting (simulates navigation back).
+    //  4. Asserting the download is still running and the progress is live.
+
+    let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
+    let reportProgress!: (p: precacheModule.PrecacheProgress) => void;
+
+    vi.spyOn(precacheModule, "precacheAll").mockImplementation(
+      ({ onProgress }) => {
+        reportProgress = (p) => onProgress?.(p);
+        return new Promise<precacheModule.PrecacheSummary>((resolve) => {
+          resolvePrecache = resolve;
+        });
+      },
+    );
+
+    const user = userEvent.setup();
+    const { unmount } = render(<OfflineSection />);
+
+    // Start the download.
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    // Report initial progress tick.
+    act(() => {
+      reportProgress({ done: 5, total: 100, bytesSoFar: 125_000 });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("progressbar")).toBeInTheDocument(),
+    );
+
+    // Unmount (navigation away). This must NOT abort the download.
+    unmount();
+
+    // Advance progress while unmounted.
+    act(() => {
+      reportProgress({ done: 50, total: 100, bytesSoFar: 1_250_000 });
+    });
+
+    // Remount (navigation back).
+    render(<OfflineSection />);
+
+    // The remounted component must immediately show the in-progress state.
+    await waitFor(() =>
+      expect(screen.getByRole("progressbar")).toBeInTheDocument(),
+    );
+    // The Stop button must be present — the download is still running.
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+
+    // Resolve the download so the test doesn't leak a pending promise.
+    resolvePrecache({
+      totalRequested: 100,
+      downloaded: 100,
+      skipped: 0,
+      failed: 0,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
   });
 });

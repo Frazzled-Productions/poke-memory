@@ -24,9 +24,12 @@ type Props = {
  * Off-screen sprite preloader (#705, extended in #708).
  *
  * Renders each URL as a hidden, eagerly-loaded `next/image` at the correct
- * size so the browser fetches the exact optimised variant ahead of time.
- * When the real card later mounts an `<Image>` with the same `src` and
- * `width`, it is served from cache and appears without the pop-in delay.
+ * size so the browser fetches the exact pre-generated WebP variant ahead of
+ * time. The global custom loader redirects sprite paths to
+ * `/sprites/pokemon/webp/<id>/<width>.webp` automatically — no `/_next/image`
+ * endpoint is involved. When the real card later mounts an `<Image>` with the
+ * same `src` and `width`, it is served from cache and appears without the
+ * pop-in delay.
  *
  * Two entry-point props:
  * - `urls` — flip-card sprites rendered at {@link PRACTICE_SPRITE_SIZE}.
