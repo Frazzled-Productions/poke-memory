@@ -596,6 +596,34 @@ test.describe("Pokédex page", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Sprite loader — WebP static files (#1186)
+// ---------------------------------------------------------------------------
+
+test.describe("Sprite loader serves pre-generated WebP variants (#1186)", () => {
+  test("a rendered sprite has a src pointing to the static WebP tree, not /_next/image", async ({
+    page,
+  }) => {
+    // The practice page renders a next/image sprite on the active card.
+    // The global custom loader must redirect the sprite src to the pre-generated
+    // WebP path (/sprites/pokemon/webp/<id>/<width>.webp), bypassing /_next/image.
+    //
+    // This is a cross-layer assertion (e2e/** is normally playwright-owned) — kept
+    // to one small assertion as documented in the PR description.
+    await page.goto("/");
+
+    // Wait for a visible image whose src contains the WebP sprite tree.
+    // Use a broad locator (any img element) because next/image renders an <img>.
+    const webpSprite = page.locator("img[src*='/sprites/pokemon/webp/']").first();
+    await expect(webpSprite).toBeVisible({ timeout: 15_000 });
+
+    // Confirm the src does NOT go through the /_next/image endpoint.
+    const src = await webpSprite.getAttribute("src");
+    expect(src).not.toContain("/_next/image");
+    expect(src).toContain("/sprites/pokemon/webp/");
+  });
+});
+
 test.describe("Settings page", () => {
   // NOTE: We do NOT use addInitScript for localStorage.clear() here because
   // addInitScript runs on every navigation including page.reload(), which would

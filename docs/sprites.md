@@ -2,7 +2,7 @@
 
 Canonical reference for how Pokémon sprites are rendered across the app. AGENTS.md keeps a short pointer here. Read this before adding a new sprite-rendering surface or touching `lib/sprites/`, `components/sprites/`, or any existing surface's `<Image>` / `<img>` call.
 
-**Status:** Settled 2026-05-18 (#932, #933). Follows the shared-primitive extraction in #929 and the adoption work in #930/#931.
+**Status:** Updated 2026-05-22 (#1186 — static WebP pre-generation, custom `next/image` loader). Settled 2026-05-18 (#932, #933). Follows the shared-primitive extraction in #929 and the adoption work in #930/#931.
 
 ## TL;DR
 
@@ -10,6 +10,17 @@ Canonical reference for how Pokémon sprites are rendered across the app. AGENTS
 - **Sprite sizes live in one place** — `lib/sprites/sizes.ts`. Never hard-code a sprite pixel size at a call site; import the named constant for the surface.
 - **`priority` is for above-the-fold hero sprites only.** Off-screen and below-the-fold sprites use the `next/image` default (lazy) loading; never set `priority` on them.
 - **Network warming vs. decode warming are two different gaps.** `SpritePreloader` warms the *network* cache ahead of time; `decodeSpriteUrls` / `useSpritePrefetch().decodeAhead` bridges the *fetch → GPU-decode* gap just before a state swap. A surface with a visible transition often needs both.
+- **`/_next/image` is NOT used for sprites.** The global custom loader (`lib/sprites/imageLoader.ts`) redirects sprite paths directly to pre-generated static WebP files; no Vercel Image Optimisation transformations are billed.
+
+## The static WebP tree
+
+Sprites are pre-generated at every render width used across the app and committed to the repository under `public/sprites/pokemon/webp/<id>/<width>.webp`. The script is `npm run seed:sprites` (wraps `scripts/optimise-sprites.mjs`, which uses `sharp` as a Next.js transitive dependency). Source PNGs are ~475 px wide; no variant wider than the source resolution is generated (the cap is 320 px today, matching the largest render width).
+
+The custom `next/image` loader (`lib/sprites/imageLoader.ts`) is configured globally in `next.config.ts` (`images.loader = 'custom'`, `images.loaderFile`). Every `<Image src="/sprites/pokemon/..." width={N} />` call is automatically redirected to `/sprites/pokemon/webp/<id>/<snapped-width>.webp` — no call-site changes needed. GitHub avatar URLs and anything else pass through unchanged.
+
+`next.config.ts` also sets `images.deviceSizes` and `images.imageSizes` to exactly the union of pre-generated widths so the loader only ever receives widths it has files for.
+
+**When adding a new sprite surface:** add a size constant to `lib/sprites/sizes.ts`, add it to `GENERATED_SPRITE_WIDTHS` in `lib/sprites/imageLoaderHelpers.ts`, and run `npm run seed:sprites` to generate the new width folder. Commit the generated WebP files.
 
 ## The shared primitive (`lib/sprites/` + `components/sprites/`)
 
@@ -18,15 +29,18 @@ Sprite infrastructure is neutral and lives outside `lib/review/` so non-review s
 | Module | Role |
 |---|---|
 | `lib/sprites/sizes.ts` | Single source of truth for sprite render sizes (CSS px). |
+| `lib/sprites/url.ts` | Pure URL helpers: `spriteVariantUrl(id, width)` and `rawSpriteUrl(id)`. |
+| `lib/sprites/imageLoaderHelpers.ts` | `GENERATED_SPRITE_WIDTHS` (the canonical generated width set) and `snapToGeneratedWidth(requested)`. Pure, unit-tested. |
+| `lib/sprites/imageLoader.ts` | Global `next/image` loader — redirects sprite paths to pre-generated WebP; passes GitHub avatars and everything else through unchanged. |
 | `lib/sprites/decode.ts` | `decodeSpriteUrls(urls)` — races each `HTMLImageElement.decode()` against a 500 ms safety-valve timeout. Pure, framework-agnostic. |
 | `lib/sprites/useSpritePrefetch.ts` | `useSpritePrefetch()` hook — exposes a `decodeAhead(urls)` callback wrapping `decodeSpriteUrls`. Mounts no DOM. |
-| `components/sprites/SpritePreloader.tsx` | Renders hidden, eagerly-loaded `next/image` elements so the browser fetches the exact optimised variant ahead of time. |
+| `components/sprites/SpritePreloader.tsx` | Renders hidden, eagerly-loaded `next/image` elements so the browser fetches the exact pre-generated WebP variant ahead of time. |
 
 `lib/review/sprites.ts` re-exports `PRACTICE_SPRITE_SIZE` / `PICKER_SPRITE_SIZE` from `lib/sprites/sizes.ts` and keeps `preloadableSpriteUrls(card)` — that helper is `ReviewableCard`-shaped and stays review-specific. `components/review/SpritePreloader.tsx` is a re-export shim kept for legacy import paths; new code should import from `@/components/sprites/SpritePreloader`.
 
 ## `next/image` vs. plain `<img>`
 
-**Use `next/image` by default.** It serves an optimised, correctly-sized variant, sets explicit dimensions (so there is no layout shift), and integrates with `SpritePreloader` — the preloader's hidden `<Image>` and the visible `<Image>` share a `src` + `width`, so the visible one is served from cache.
+**Use `next/image` by default.** It resolves to the pre-generated static WebP variant via the global loader (no Vercel Image Optimisation transformation), sets explicit dimensions (so there is no layout shift), and integrates with `SpritePreloader` — the preloader's hidden `<Image>` and the visible `<Image>` share a `src` + `width`, so the visible one is served from cache.
 
 **Use a plain `<img>` only with a documented reason.** Today the single exemption is the Pokédex grid (below). Any future plain-`<img>` surface must carry an inline comment explaining why and the `// eslint-disable-next-line @next/next/no-img-element` directive, and should be recorded here.
 
@@ -45,9 +59,11 @@ Sprite infrastructure is neutral and lives outside `lib/review/` so non-review s
 
 Rule of thumb: `priority` is reserved for the one sprite that *is* the page (or card). Everything else is lazy. Decorative chrome is explicitly `priority={false}`.
 
+**Note on `priority` deprecation:** In Next.js 16, `priority` is deprecated in favour of `preload`. A repo-wide migration is tracked as a follow-up — do not migrate call sites in this PR.
+
 ## Sprite sizes (`lib/sprites/sizes.ts`)
 
-All sprite render sizes are named constants. The size passed to `next/image` (and to `SpritePreloader`) must match the CSS size the element actually paints at — a mismatch fetches a different optimiser variant and produces no cache benefit.
+All sprite render sizes are named constants. The size passed to `next/image` (and to `SpritePreloader`) must match the CSS size the element actually paints at — a mismatch fetches a different WebP variant and produces no cache benefit.
 
 | Constant | px | Surface |
 |---|---|---|
@@ -59,14 +75,16 @@ All sprite render sizes are named constants. The size passed to `next/image` (an
 | `POKEDEX_FORM_SPRITE_SIZE` | 120 | Pokédex detail alternate-form blocks |
 | `PASTURE_SPRITE_SIZE` | 56 | Pasture tile |
 | `STATS_SPRITE_SIZE` | 48 | Stats "worst cards" list |
+| `FAVOURITE_MASCOT_SPRITE_SIZE` | 32 | `FavouriteMascot` nav badge |
+| `THEME_WATERMARK_SPRITE_SIZE` | 180 | `ThemeWatermark` decorative background sprite |
 
-When adding a surface, add a constant rather than inlining a literal, and use it at the call site. When two surfaces genuinely share a size, share the constant. A few existing review call sites (`PokemonCard`, `SpritePicker`) still pass the size as an inline literal that happens to match the constant — converging them on the imported constant is a welcome follow-up, but new surfaces should import from day one.
+When adding a surface, add a constant rather than inlining a literal, and use it at the call site. When two surfaces genuinely share a size, share the constant.
 
 ## Preload and decode-ahead
 
 Two distinct performance gaps, two distinct tools. They are independent — a surface may need neither, one, or both.
 
-- **`SpritePreloader`** — warms the *network* cache. Mount it with the URL set you expect to render soon (the next review card's sprites, the evo-chain nodes about to appear in a detail panel). The hidden `<Image>` fetches the exact variant; when the real element mounts with the same `src` + `width` it is served from cache. Use for surfaces that render a *known, bounded* set of sprites soon.
+- **`SpritePreloader`** — warms the *network* cache. Mount it with the URL set you expect to render soon (the next review card's sprites, the evo-chain nodes about to appear in a detail panel). The hidden `<Image>` fetches the exact pre-generated WebP variant; when the real element mounts with the same `src` + `width` it is served from cache. Use for surfaces that render a *known, bounded* set of sprites soon.
 - **`decodeSpriteUrls` / `useSpritePrefetch().decodeAhead`** — bridges the *fetch → GPU-decode* gap. A warmed fetch is not a warmed decode: React can advance to the next card synchronously while the browser still needs to decode the image bytes, causing a brief pop-in. Call `decodeAhead([...urls])` and `await` it *immediately before* a state transition (card flip, grade, minigame advance) so the swap happens with the sprite already decoded.
 
 Current consumers:
@@ -79,7 +97,7 @@ Current consumers:
 
 ## The Pokédex grid exemption (#932)
 
-The Pokédex grid (`components/pokedex/PokedexGrid.tsx`, ~1025 tiles) is the **one deliberate exemption** from the "default to `next/image`" rule. It keeps a plain lazy `<img>`.
+The Pokédex grid (`components/pokedex/PokedexGrid.tsx`, ~1025 tiles) is the **one deliberate exemption** from the "default to `next/image`" rule. It keeps a plain lazy `<img>` pointing at the raw PNG (`/sprites/pokemon/<id>.png`).
 
 **Decision (the maintainer, #932): exempt the grid.** Rationale:
 
@@ -93,7 +111,9 @@ The exemption is recorded inline in `PokedexGrid.tsx` (the comment above the `<i
 
 1. Use `next/image` unless you have a documented reason not to (and if not, record the exemption here).
 2. Add a named size constant to `lib/sprites/sizes.ts`; pass it as both `width` and `height`. Match the painted CSS size.
-3. Set `priority` only if the sprite is the above-the-fold focal point of the route. Decorative chrome gets `priority={false}`. Everything else stays lazy.
-4. If the surface renders a known, bounded sprite set soon, mount `SpritePreloader` to warm the network cache.
-5. If the surface has a visible state transition, `await decodeAhead([...])` immediately before the swap.
-6. Never inline a sprite pixel literal, and never preload an unbounded set.
+3. Add the new size to `GENERATED_SPRITE_WIDTHS` in `lib/sprites/imageLoaderHelpers.ts` (the deduped `Set` handles duplicates automatically — just add the constant).
+4. Run `npm run seed:sprites` to generate the new width folder under `public/sprites/pokemon/webp/`. Commit the generated WebP files.
+5. Set `priority` only if the sprite is the above-the-fold focal point of the route. Decorative chrome gets `priority={false}`. Everything else stays lazy.
+6. If the surface renders a known, bounded sprite set soon, mount `SpritePreloader` to warm the network cache.
+7. If the surface has a visible state transition, `await decodeAhead([...])` immediately before the swap.
+8. Never inline a sprite pixel literal, and never preload an unbounded set.

@@ -30,10 +30,12 @@
  * Asset buckets
  * -------------
  * - **Sprites** (`poke-memory-sprites-v2`): self-hosted official-artwork PNGs
- *   under `/sprites/pokemon/<id>.png`, plus the `/_next/image`-optimised
- *   variants the browser requests at runtime (8 width breakpoints per sprite,
- *   ~9,225 entries total when the full offline pack is downloaded). The entry
- *   cap must exceed the offline pack size — see {@link SPRITE_CACHE_MAX_ENTRIES}.
+ *   under `/sprites/pokemon/<id>.png`, plus pre-generated static WebP variants
+ *   at `/sprites/pokemon/webp/<id>/<width>.webp` (10 width variants per sprite,
+ *   ~12,914 entries total when the full offline pack is downloaded). Sprites
+ *   are served directly as static files — the `/_next/image` endpoint is no
+ *   longer used for sprites. The entry cap must exceed the offline pack size —
+ *   see {@link SPRITE_CACHE_MAX_ENTRIES}.
  * - **Cries** (`poke-memory-cries-v2`): self-hosted OGG audio under
  *   `/cries/<id>.ogg`, one file per species (~1,025 entries plus regional forms).
  * - **Static** (`poke-memory-static-v2`): content-hashed Next.js build output
@@ -88,19 +90,22 @@ export type CacheName = (typeof CACHE_NAMES)[keyof typeof CACHE_NAMES];
 /**
  * Maximum entries for the sprite cache bucket.
  *
- * The offline-download feature (#1168) writes ~9,225 sprite URLs into this
- * bucket: 8 `/_next/image` optimised-width variants + 1 raw `/sprites/pokemon/<id>.png`
- * per species, across ~1,025 species. The cap must comfortably exceed that
- * pack size so that `ExpirationPlugin` does not evict offline-downloaded
- * sprites as the user practises — culled entries become permanent cache misses
- * and broken images for the remainder of an offline session.
+ * The offline-download feature (#1168) writes ~12,914 sprite URLs into this
+ * bucket: 10 pre-generated WebP width variants
+ * (`/sprites/pokemon/webp/<id>/<width>.webp`) + 1 raw PNG
+ * (`/sprites/pokemon/<id>.png`) per species, across ~1,174 species/forms
+ * (11 URLs × 1,174 IDs = 12,914 entries).
+ * The cap must comfortably exceed that pack size so that `ExpirationPlugin`
+ * does not evict offline-downloaded sprites as the user practises — culled
+ * entries become permanent cache misses and broken images for the remainder
+ * of an offline session.
  *
- * 12,000 gives ~30 % headroom above the ~9,225-entry offline pack, leaving
+ * 15,000 gives ~16% headroom above the ~12,914-entry offline pack, leaving
  * room for additional evolution/alt-form art and organic runtime caching
- * without triggering LRU eviction. The opt-in 166 MB offline download already
+ * without triggering LRU eviction. The opt-in offline download already
  * implies the user accepted the storage cost.
  */
-export const SPRITE_CACHE_MAX_ENTRIES = 12_000;
+export const SPRITE_CACHE_MAX_ENTRIES = 15_000;
 
 /** Sprite art is immutable per URL; keep it for a long time. */
 export const SPRITE_CACHE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
