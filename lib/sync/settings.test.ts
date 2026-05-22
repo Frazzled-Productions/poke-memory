@@ -64,6 +64,7 @@ const SAMPLE: UserSettings = {
   ttsVoice: null,
   ttsRate: 1,
   ttsVolume: 1,
+  waitForAudioOnGrade: true,
   timezone: null,
   dateFormat: null,
   mobileNav: "bottom" as const,

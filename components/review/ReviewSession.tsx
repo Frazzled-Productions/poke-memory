@@ -7,7 +7,7 @@ import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { SpritePreloader, type SizedSpriteUrl } from "@/components/sprites/SpritePreloader";
 import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites";
-import { decodeSpriteUrls } from "@/lib/sprites/decode";
+import { decodeSpriteUrls, DECODE_GRADE_TIMEOUT_MS } from "@/lib/sprites/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { QueueStateBadge } from "@/components/review/QueueStateBadge";
 import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/GradeButtons";
@@ -626,8 +626,14 @@ export function ReviewSession() {
   const [cardPresentationCount, setCardPresentationCount] = useState(0);
 
   // Single-step undo: snapshot of pre-grade state. Captured in handleGrade
-  // and consumed by handleUndo. Cleared when the next grade fires.
-  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
+  // and consumed by handleUndo. Cleared when the next grade fires. Held in a
+  // ref because it is only read by the undo handler, never by render — moving
+  // to a ref avoids forcing React to retain two full card-list copies in state
+  // and re-rendering undo-snapshot consumers on every grade (#1191).
+  const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
+  // Separate boolean state so the undo-button visibility can trigger a render
+  // when the snapshot changes, without passing the full snapshot into state.
+  const [hasUndoSnap, setHasUndoSnap] = useState(false);
 
   const { quotaExceeded, dismiss, notifySaveResult } = useStorageQuota();
 
@@ -1021,7 +1027,7 @@ export function ReviewSession() {
   // returns; the body short-circuits when there is nothing to undo.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (undoSnapshot === null || grading) return;
+      if (undoSnapshotRef.current === null || grading) return;
       if (
         (e.key === "z" || e.key === "Z") &&
         (e.metaKey || e.ctrlKey) &&
@@ -1032,37 +1038,40 @@ export function ReviewSession() {
         // cannot be async itself, so we call void on an immediately-invoked
         // async arrow that awaits saveSession and removeGradeEntry.
         void (async () => {
-          setCards(undoSnapshot.cards);
-          setSessionGrades(undoSnapshot.sessionGrades);
-          setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
-          setSessionDirectionGrades(undoSnapshot.sessionDirectionGrades);
-          setNewCardsThisSession(undoSnapshot.newCardsThisSession);
-          setMasteredThisSession(undoSnapshot.masteredThisSession);
-          setLearningQueue(undoSnapshot.learningQueue);
-          notifySaveResult(await saveSession({ cards: undoSnapshot.cards, limits }));
-          if (undoSnapshot.gradeLogOccurredAt !== null) {
-            await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
+          const snapshot = undoSnapshotRef.current;
+          if (snapshot === null) return;
+          setCards(snapshot.cards);
+          setSessionGrades(snapshot.sessionGrades);
+          setSessionGradeSeq(snapshot.sessionGradeSeq);
+          setSessionDirectionGrades(snapshot.sessionDirectionGrades);
+          setNewCardsThisSession(snapshot.newCardsThisSession);
+          setMasteredThisSession(snapshot.masteredThisSession);
+          setLearningQueue(snapshot.learningQueue);
+          notifySaveResult(await saveSession({ cards: snapshot.cards, limits }));
+          if (snapshot.gradeLogOccurredAt !== null) {
+            await removeGradeEntry(snapshot.gradeLogOccurredAt);
           }
           // Roll back persisted daily summary to match reverted state (#685).
           // Skipped while a superuser flag is on so QA grade sequences never
           // reach localStorage — consistent with the cloud write-guard.
           if (!superuserGuarded) {
-            const kbSeq = undoSnapshot.sessionGradeSeq;
+            const kbSeq = snapshot.sessionGradeSeq;
             saveDailySummary({
               date: todayString(new Date(), timezone),
               gradeSequence: kbSeq,
               reviewed: kbSeq.length,
-              newCards: undoSnapshot.newCardsThisSession,
-              mastered: undoSnapshot.masteredThisSession,
+              newCards: snapshot.newCardsThisSession,
+              mastered: snapshot.masteredThisSession,
             });
           }
-          setDisplayedCardId(undoSnapshot.cardId);
-          revealedCardId.current = undoSnapshot.cardId;
+          setDisplayedCardId(snapshot.cardId);
+          revealedCardId.current = snapshot.cardId;
           setRevealed(true);
           // Bump presentation counter so SpritePicker remounts with fresh
           // shuffle if the user re-grades this reverse card (#496).
           setCardPresentationCount((n) => n + 1);
-          setUndoSnapshot(null);
+          undoSnapshotRef.current = null;
+          setHasUndoSnap(false);
         })();
       }
     }
@@ -1072,8 +1081,11 @@ export function ReviewSession() {
     // timezone starts as "UTC" and is set once on mount, so including it
     // causes exactly one extra registration (UTC → real tz) and is otherwise
     // stable — the dep is needed so the persist call sees the real timezone.
+    // undoSnapshotRef is a stable ref object — its identity never changes, so
+    // it is intentionally omitted from deps. The closure reads .current at
+    // call time, which is always the latest snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [undoSnapshot, grading, limits, timezone]);
+  }, [grading, limits, timezone]);
 
   // Update stable callback refs every render so the keyboard handler below
   // always dispatches to the latest handleReveal / handleGrade without needing
@@ -1538,7 +1550,7 @@ export function ReviewSession() {
           <ReviewCardLayout
             variant="countdown"
             queueCounts={{ newCount, learningCount, reviewCount }}
-            hasUndoSnapshot={undoSnapshot !== null}
+            hasUndoSnapshot={hasUndoSnap}
             onUndo={handleUndo}
             showOutOfScopeHint={false}
             cardRegion={
@@ -1880,13 +1892,18 @@ export function ReviewSession() {
           // `preloadableSpriteUrls` returns [] for reverse cards (it feeds the
           // 320 px flip-card pipeline), so decode the picker tile sprites
           // directly here instead.
+          // Use the tighter grade-path ceiling (#1191) — sprites are
+          // self-hosted and already network-warmed, so 150 ms is sufficient.
           const target = SEED_BY_ID.get(nextCard.pokemonId);
           if (target) {
             const distractors = pickDistractors(nextCard.pokemonId, SEED_POKEMON, 3, String(nextCard.id));
-            await decodeSpriteUrls([target, ...distractors].map((p) => p.spriteUrl));
+            await decodeSpriteUrls(
+              [target, ...distractors].map((p) => p.spriteUrl),
+              DECODE_GRADE_TIMEOUT_MS,
+            );
           }
         } else {
-          await decodeSpriteUrls(preloadableSpriteUrls(nextCard));
+          await decodeSpriteUrls(preloadableSpriteUrls(nextCard), DECODE_GRADE_TIMEOUT_MS);
         }
       }
     }
@@ -1895,22 +1912,28 @@ export function ReviewSession() {
     // These are invisible side-effects that do not change the rendered card, so
     // they run before the audio wait. The visible swap (setCards + state
     // resets below) is deferred until any in-progress cry / TTS finishes (#732).
-    setUndoSnapshot(snapshot);
+    undoSnapshotRef.current = snapshot;
+    setHasUndoSnap(true);
     enqueueGrade({ ...effectiveCard, state: nextState });
 
     // Derive new/mastered transitions now (while effectiveCard / nextState are
     // in scope) so the values are available after the audio wait below.
+    // Reuse `settings` already loaded at the top of this handler — no extra
+    // loadSettings() calls needed here (#1191).
     const wasNew = effectiveCard.state.firstSeen === null;
-    const wasMastered = isMastered(effectiveCard.state, loadSettings().masteryRepetitions);
-    const nowMastered = isMastered(nextState, loadSettings().masteryRepetitions);
+    const wasMastered = isMastered(effectiveCard.state, settings.masteryRepetitions);
+    const nowMastered = isMastered(nextState, settings.masteryRepetitions);
 
-    // Wait for any in-progress cry and/or TTS playback to finish before
-    // swapping the visible card. Resolves immediately when audio features are
-    // off or nothing is currently playing. A 5-second safety net in each
-    // helper prevents an infinite wait on decoding errors or unexpected browser
-    // behaviour. The decode-ahead above still runs immediately — only the
-    // visible swap is deferred (#732).
-    await waitForAudio();
+    // Optionally wait for any in-progress cry and/or TTS playback to finish
+    // before swapping the visible card. When `waitForAudioOnGrade` is on
+    // (default), today's behaviour is preserved — the swap is deferred until
+    // audio finishes. When off, the swap fires immediately and audio continues
+    // playing under the next card: cry/TTS are global and are not cut off,
+    // only overlapped. This removes the ~1-3 s audio-wait lag from the grade
+    // critical path for users who prefer speed (#1191 / #732).
+    if (settings.waitForAudioOnGrade) {
+      await waitForAudio();
+    }
 
     // Guard against advancing after the component has unmounted (e.g. the user
     // navigated away during the audio wait). Clear the grading flag so it is
@@ -2049,42 +2072,44 @@ export function ReviewSession() {
   }
 
   async function handleUndo() {
-    if (undoSnapshot === null || grading) return;
+    const snapshot = undoSnapshotRef.current;
+    if (snapshot === null || grading) return;
     // Revert local state to the pre-grade snapshot.
-    setCards(undoSnapshot.cards);
-    setSessionGrades(undoSnapshot.sessionGrades);
-    setSessionGradeSeq(undoSnapshot.sessionGradeSeq);
-    setSessionDirectionGrades(undoSnapshot.sessionDirectionGrades);
-    setNewCardsThisSession(undoSnapshot.newCardsThisSession);
-    setMasteredThisSession(undoSnapshot.masteredThisSession);
-    setLearningQueue(undoSnapshot.learningQueue);
-    notifySaveResult(await saveSession({ cards: undoSnapshot.cards, limits }));
-    if (undoSnapshot.gradeLogOccurredAt !== null) {
-      await removeGradeEntry(undoSnapshot.gradeLogOccurredAt);
+    setCards(snapshot.cards);
+    setSessionGrades(snapshot.sessionGrades);
+    setSessionGradeSeq(snapshot.sessionGradeSeq);
+    setSessionDirectionGrades(snapshot.sessionDirectionGrades);
+    setNewCardsThisSession(snapshot.newCardsThisSession);
+    setMasteredThisSession(snapshot.masteredThisSession);
+    setLearningQueue(snapshot.learningQueue);
+    notifySaveResult(await saveSession({ cards: snapshot.cards, limits }));
+    if (snapshot.gradeLogOccurredAt !== null) {
+      await removeGradeEntry(snapshot.gradeLogOccurredAt);
     }
     // Roll back the persisted daily summary to match the reverted state (#685).
     // Skipped while a superuser flag is on so QA grade sequences never reach
     // localStorage — consistent with the cloud write-guard.
     if (!superuserGuarded) {
-      const seq = undoSnapshot.sessionGradeSeq;
+      const seq = snapshot.sessionGradeSeq;
       saveDailySummary({
         date: todayString(new Date(), timezone),
         gradeSequence: seq,
         reviewed: seq.length,
-        newCards: undoSnapshot.newCardsThisSession,
-        mastered: undoSnapshot.masteredThisSession,
+        newCards: snapshot.newCardsThisSession,
+        mastered: snapshot.masteredThisSession,
       });
     }
     // Make the undone card the current revealed card so the user lands
     // back on the prompt they just graded. Also reset the display lock so
     // the undo card is locked in from this point (#839).
-    setDisplayedCardId(undoSnapshot.cardId);
-    revealedCardId.current = undoSnapshot.cardId;
+    setDisplayedCardId(snapshot.cardId);
+    revealedCardId.current = snapshot.cardId;
     setRevealed(true);
     // Bump the presentation counter so SpritePicker remounts with a fresh
     // shuffle if the user re-grades this reverse card (#496).
     setCardPresentationCount((n) => n + 1);
-    setUndoSnapshot(null);
+    undoSnapshotRef.current = null;
+    setHasUndoSnap(false);
   }
 
   // --- Active review UI ---
@@ -2179,7 +2204,7 @@ export function ReviewSession() {
         }
         showOutOfScopeHint={outOfScopeLearningSet.has(effectiveCard.id)}
         queueCounts={{ newCount, learningCount, reviewCount }}
-        hasUndoSnapshot={undoSnapshot !== null}
+        hasUndoSnapshot={hasUndoSnap}
         onUndo={handleUndo}
         statsPanel={
           /* Session stats are hidden on mobile to keep grade buttons in view (#1087) */
@@ -2253,7 +2278,7 @@ export function ReviewSession() {
         belowCard={undefined}
         showOutOfScopeHint={outOfScopeLearningSet.has(effectiveCard.id)}
         queueCounts={{ newCount, learningCount, reviewCount }}
-        hasUndoSnapshot={undoSnapshot !== null}
+        hasUndoSnapshot={hasUndoSnap}
         onUndo={handleUndo}
         statsPanel={
           /* Session stats are hidden on mobile to keep the picker in view (#1087) */
@@ -2362,7 +2387,7 @@ export function ReviewSession() {
       }
       showOutOfScopeHint={outOfScopeLearningSet.has(effectiveCard.id)}
       queueCounts={{ newCount, learningCount, reviewCount }}
-      hasUndoSnapshot={undoSnapshot !== null}
+      hasUndoSnapshot={hasUndoSnap}
       onUndo={handleUndo}
       statsPanel={
         /* Session stats are hidden on mobile to keep grade buttons in view (#1087) */

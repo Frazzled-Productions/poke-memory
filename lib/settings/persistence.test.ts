@@ -140,6 +140,7 @@ describe('loadSettings migration', () => {
       ttsVoice: 'Daniel:en-GB',
       ttsRate: 1.5,
       ttsVolume: 0.75,
+      waitForAudioOnGrade: false,
       timezone: 'Europe/London',
       dateFormat: 'dmy' as const,
       mobileNav: 'bottom' as const,
@@ -147,6 +148,28 @@ describe('loadSettings migration', () => {
     saveSettings(custom);
     const loaded = loadSettings();
     expect(loaded).toEqual(custom);
+  });
+});
+
+describe('loadSettings: waitForAudioOnGrade (#1191)', () => {
+  it('defaults to true when the field is absent (existing records get the safe default)', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    expect(loadSettings().waitForAudioOnGrade).toBe(true);
+  });
+
+  it('round-trips false correctly', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, waitForAudioOnGrade: false });
+    expect(loadSettings().waitForAudioOnGrade).toBe(false);
+  });
+
+  it('round-trips true correctly', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, waitForAudioOnGrade: true });
+    expect(loadSettings().waitForAudioOnGrade).toBe(true);
+  });
+
+  it('non-boolean value falls back to default (true)', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ waitForAudioOnGrade: 'yes' }));
+    expect(loadSettings().waitForAudioOnGrade).toBe(true);
   });
 });
 
