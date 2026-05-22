@@ -6,6 +6,15 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.16] - 2026-05-22
+
+### Fixed
+
+- Fixed a sync glitch where closing one of two open practice tabs could allow a background cloud pull to fire in the remaining tab mid-session. The session-active flag is now a reference count so both tabs must close before background sync resumes.
+- Offline download no longer stops when navigating to another page within the app. Starting a download and then going to Stats or any other section and back now shows live progress on return.
+- Fixed offline sprite cache being progressively culled during a long offline session. The sprite cache entry cap was raised from 1,300 to 12,000 to accommodate the full offline-download pack (~9,225 URLs across all species and width variants), preventing broken images when practising offline after completing an offline download.
+- Sprite images are now served as pre-generated static WebP files, eliminating Vercel Image Optimisation transformation costs.
+
 ## [0.10.15] - 2026-05-22
 
 ### Added
@@ -1344,7 +1353,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.15...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.16...HEAD
+[0.10.16]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.16
 [0.10.15]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.15
 [0.10.14]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.14
 [0.10.13]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.13
