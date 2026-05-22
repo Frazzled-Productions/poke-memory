@@ -107,6 +107,18 @@ describe("classifyRequest", () => {
     expect(result.cacheName).toBe(CACHE_NAMES.pages);
   });
 
+  it("falls through to the pages bucket for /_next/image with a cross-origin /sprites/ path", () => {
+    // A cross-origin URL whose path begins with /sprites/ must NOT be routed
+    // into the local sprite bucket. The same-origin guard must reject it even
+    // though the pathname would otherwise match the sprites prefix rule.
+    const encoded = encodeURIComponent("https://malicious.example/sprites/pokemon/25.png");
+    const url = `${ORIGIN}/_next/image?url=${encoded}&w=384&q=75`;
+    const result = classifyRequest(url, ORIGIN);
+    // Must fall through to the pages (network-first) bucket, not the sprite bucket.
+    expect(result.strategy).toBe("network-first");
+    expect(result.cacheName).toBe(CACHE_NAMES.pages);
+  });
+
   it("falls through to the pages bucket for /_next/image with a non-immutable same-origin source", () => {
     // An image from a dynamic page route (not a sprite or cry) should still
     // be network-first, not silently cached.
@@ -131,8 +143,13 @@ describe("shouldCache", () => {
 });
 
 describe("cache config constants", () => {
-  it("caps the sprite cache above the full 1025-species set", () => {
-    expect(SPRITE_CACHE_MAX_ENTRIES).toBeGreaterThan(1025);
+  it("caps the sprite cache above the full offline-download pack size (~9,225 entries)", () => {
+    // The offline-download feature writes up to ~9,225 sprite URLs into the
+    // sprite bucket (8 next/image optimised-width variants + 1 raw PNG per
+    // species × ~1,025 species). The cap must exceed this to prevent
+    // ExpirationPlugin from culling downloaded sprites during a long offline
+    // session.
+    expect(SPRITE_CACHE_MAX_ENTRIES).toBeGreaterThan(9_225);
   });
 
   it("keeps sprites for a long, positive duration", () => {
