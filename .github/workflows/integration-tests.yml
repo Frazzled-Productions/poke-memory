@@ -12,6 +12,9 @@ name: Integration Tests
 # The `integration-tests` PR label remains an explicit opt-in escape hatch for
 # changes that fall outside the path filter but still need DB-level
 # verification.  Manual runs use the workflow_dispatch trigger below.
+# Note: `paths-ignore` is evaluated uniformly for all `types:`, including
+# `labeled`.  Adding the label to a sprite-only PR will not trigger this
+# workflow — use workflow_dispatch for that case instead.
 #
 # `paths-ignore` on the `pull_request` trigger short-circuits the workflow
 # entirely on PRs whose diff is confined to sprite assets under

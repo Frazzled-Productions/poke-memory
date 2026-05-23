@@ -21,6 +21,9 @@ name: Visual Regression
 # integration-tests.yml is scoped. The `visual-regression` PR label is an
 # explicit opt-in escape hatch for changes outside the path filter; manual
 # runs use workflow_dispatch.
+# Note: `paths-ignore` is evaluated uniformly for all `types:`, including
+# `labeled`.  Adding the label to a sprite-only PR will not trigger this
+# workflow — use workflow_dispatch for that case instead.
 #
 # `paths-ignore` on the `pull_request` trigger short-circuits the workflow
 # entirely on PRs whose diff is confined to the committed baselines under
