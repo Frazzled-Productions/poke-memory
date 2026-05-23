@@ -3184,24 +3184,45 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
   });
 
   it("surfaces the storage-error banner when saveSession fails (#1196)", async () => {
-    // When the session blob cannot be written, the existing StorageQuotaBanner
-    // (role="alert") must appear so the user knows the grade did not persist.
     // Use a 4-card session (FIXTURE_CARDS_4) so the session stays in the active
     // review UI after one grade — the banner only renders in the active-review
     // branches, not the session-complete screen that appears when the last card
     // is graduated with Easy.
-    vi.mocked(saveSession).mockResolvedValue({ ok: false, reason: "quota" });
+    //
+    // Mount-time saveSession call count (both must succeed so quotaExceeded stays
+    // false before the grade click):
+    //   1. ReviewSession.tsx:839 — fresh-session initial save (loadSession → null)
+    //   2. ReviewSession.tsx:899 — post-reconciliation save (unconditional)
+    // Line 858 does NOT fire because FIXTURE_CARDS_4 cards have learningStep: null
+    // (buildSession initialises new cards with learningStep: null, so stampedAny
+    // stays false). If a future change adds a third unconditional mount-time save,
+    // add a third mockResolvedValueOnce here.
+    vi.mocked(saveSession)
+      .mockResolvedValueOnce({ ok: true }) // ReviewSession.tsx:839 — fresh-session initial save
+      .mockResolvedValueOnce({ ok: true }) // ReviewSession.tsx:899 — post-reconciliation save
+      .mockResolvedValue({ ok: false, reason: "quota" }); // grade-path call and beyond
     mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
     const user = userEvent.setup();
     render(<ReviewSession />);
 
+    // Wait for mount to settle — both Once calls consumed, quotaExceeded still false.
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+
+    // Banner must NOT be present before the grade click — rules out mount-time
+    // contamination and proves the Once chain is correctly sized.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    // Trigger the grade-path failure.
     await user.click(revealBtn);
     await user.click(screen.getByRole("button", { name: /easy/i }));
 
     // The StorageQuotaBanner has role="alert" and contains the text below.
+    // This assertion would fail if notifySaveResult(saveResult) were removed from
+    // the grade-path persistence chain — because quotaExceeded would never flip
+    // after the grade and the pre-grade assertion already ruled out mount-time
+    // contamination.
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
