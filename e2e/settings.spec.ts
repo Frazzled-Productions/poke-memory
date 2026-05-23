@@ -646,7 +646,7 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
   });
 });
 
-test.describe("Settings — reverse-card feedback delay gating (#1205)", () => {
+test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205)", () => {
   test("feedback delay control is absent when reverse cards are off (default)", async ({
     page,
   }) => {
@@ -678,6 +678,10 @@ test.describe("Settings — reverse-card feedback delay gating (#1205)", () => {
     await expect(
       page.getByRole("group", { name: /reverse card feedback delay/i }),
     ).toBeVisible();
+
+    // Verify the radio inputs are interactive — "core interaction succeeds" bar.
+    await page.getByRole("radio", { name: /default/i }).click();
+    await expect(page.getByRole("radio", { name: /default/i })).toBeChecked();
   });
 });
 
