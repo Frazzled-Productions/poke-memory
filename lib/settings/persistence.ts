@@ -204,6 +204,14 @@ export type UserSettings = {
    */
   ttsVolume: number;
   /**
+   * When true (default), `handleGrade` waits for any in-progress cry and/or
+   * TTS to finish before swapping to the next card (#1191). When false, the
+   * visible swap fires immediately and audio continues playing under the next
+   * card — cry/TTS are global and are not cut off, only overlapped. Turning
+   * this off removes the ~1-3 s audio-wait lag from the grading critical path.
+   */
+  waitForAudioOnGrade: boolean;
+  /**
    * User's IANA timezone (#508). Null means "not yet detected" — the
    * Settings page auto-detects via Intl on first load and writes it back.
    * Stored as a scalar column in user_settings (NOT inside the JSONB blob)
@@ -250,6 +258,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   ttsVoice: null,
   ttsRate: 1,
   ttsVolume: 1,
+  // Default on: preserves today's behaviour. Users who want the faster swap
+  // can turn this off in Settings → Audio (#1191).
+  waitForAudioOnGrade: true,
   timezone: null,
   dateFormat: null,
 };
@@ -440,6 +451,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
       obj.appVisitCount >= 0
         ? obj.appVisitCount
         : DEFAULT_SETTINGS.appVisitCount,
+    waitForAudioOnGrade: bool(obj, "waitForAudioOnGrade"),
     ttsVoice: str(obj, "ttsVoice"),
     ttsRate:
       typeof obj.ttsRate === "number" && Number.isFinite(obj.ttsRate)

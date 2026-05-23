@@ -203,12 +203,19 @@ const { mockDecodeSpriteUrls } = vi.hoisted(() => ({
 vi.mock("@/lib/sprites/decode", () => ({
   decodeSpriteUrls: mockDecodeSpriteUrls,
   DECODE_TIMEOUT_MS: 500,
+  DECODE_GRADE_TIMEOUT_MS: 150,
 }));
 
 // Spy on nextReview using the real implementation by default — individual tests
 // can override with mockImplementationOnce to inject errors.
+// Expose the real function so tests that temporarily swap the implementation
+// (e.g. the hasMastered transition test) can restore it cleanly.
+const { realNextReview } = vi.hoisted(() => ({
+  realNextReview: { current: null as null | ((...args: Parameters<typeof import("@/lib/srs/scheduler").nextReview>) => ReturnType<typeof import("@/lib/srs/scheduler").nextReview>) },
+}));
 vi.mock("@/lib/srs/scheduler", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/srs/scheduler")>();
+  realNextReview.current = actual.nextReview as typeof realNextReview.current;
   return {
     ...actual,
     nextReview: vi.fn(actual.nextReview),
@@ -2808,6 +2815,30 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     earnedBadges: [],
   };
 
+  // jsdom on this Node version does not ship localStorage out of the box.
+  // Install a fresh in-memory stub before each test so localStorage-touching
+  // code paths (saveDailySummary, writeHasMasteredFlag) do not throw and can
+  // be asserted against.
+  function makeLocalStorage(): Storage {
+    const store = new Map<string, string>();
+    return {
+      get length() { return store.size; },
+      clear: () => store.clear(),
+      getItem: (k) => store.get(k) ?? null,
+      key: (i) => Array.from(store.keys())[i] ?? null,
+      removeItem: (k) => { store.delete(k); },
+      setItem: (k, v) => { store.set(k, String(v)); },
+    };
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -2837,6 +2868,31 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       expect(
         screen.getByRole("button", { name: /undo last grade/i }),
       ).toBeInTheDocument(),
+    );
+  });
+
+  it("flip branch (name card): undo button disappears after clicking Undo (#1191 ref-based snapshot)", async () => {
+    const user = userEvent.setup();
+    mockLoadSettings.mockReturnValue(flipSettings);
+    render(<ReviewSession />);
+
+    const reveal = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(reveal);
+    // Grade Again so the card stays in the session.
+    await user.click(screen.getByRole("button", { name: /again/i }));
+
+    // Wait for the undo button to appear (snapshot populated).
+    const undoBtn = await screen.findByRole("button", { name: /undo last grade/i });
+
+    // Click Undo — the ref-based snapshot should be consumed and the button removed.
+    await user.click(undoBtn);
+
+    // After undo the card is back in its revealed state (setRevealed(true) is
+    // called during undo) so the grade buttons are visible, not the Reveal prompt.
+    await screen.findByRole("group", { name: /grade your answer/i });
+    // The undo button should now be gone.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /undo last grade/i })).not.toBeInTheDocument(),
     );
   });
 
@@ -2905,6 +2961,109 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     expect(
       screen.getByRole("status", { name: /queue counts/i }),
     ).toBeInTheDocument();
+  });
+
+  it("instant-swap (#1191): card advances before saveSession resolves (setCards fires before persistence)", async () => {
+    // Grade a card; verify the visible swap happens even while saveSession is
+    // still pending. This is the core behavioural contract of the ordering
+    // invert introduced in PR 2 of #1191.
+    const user = userEvent.setup();
+    mockLoadSettings.mockReturnValue(flipSettings);
+    render(<ReviewSession />);
+
+    // Wait for the first card to appear and reveal it.
+    const reveal = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(reveal);
+
+    // Grade buttons are now visible.
+    await screen.findByRole("group", { name: /grade your answer/i });
+
+    // Stall saveSession indefinitely so we can assert the card has already
+    // swapped before the persistence promise resolves.
+    let resolveSaveSession!: () => void;
+    vi.mocked(saveSession).mockImplementation(
+      () =>
+        new Promise<import("@/lib/review/persistence").SaveResult>((resolve) => {
+          resolveSaveSession = () => resolve({ ok: true });
+        }),
+    );
+
+    await user.click(screen.getByRole("button", { name: /again/i }));
+
+    // The visible swap should have happened: the card is no longer in the
+    // revealed state (Reveal button is gone or grade buttons are gone).
+    // React batches the state updates so we wait one tick.
+    await waitFor(() =>
+      expect(screen.queryByRole("group", { name: /grade your answer/i })).not.toBeInTheDocument(),
+    );
+
+    // saveSession hasn't resolved yet — the swap was independent.
+    expect(resolveSaveSession).toBeDefined();
+    // Unblock the persistence chain so the test can clean up cleanly.
+    resolveSaveSession();
+    // Restore saveSession to its default so the stalled mockImplementation does
+    // not leak into the next test (vi.clearAllMocks preserves implementations).
+    vi.mocked(saveSession).mockResolvedValue({ ok: true });
+  });
+
+  it("hasMastered flag is written on mastery transition and not on non-mastery grades (#1191 Class A item 3)", async () => {
+    // The describe-level beforeEach installs a fresh in-memory localStorage
+    // stub before this test runs, so window.localStorage is usable here.
+    //
+    // Grade a card with nextReview mocked to return a state that satisfies
+    // isMastered (reps=3 >= masteryRepetitions=3, scheduledDays=21 >= 21).
+    const user = userEvent.setup();
+    mockLoadSettings.mockReturnValue({ ...flipSettings, masteryRepetitions: 3 });
+
+    render(<ReviewSession />);
+
+    // Flag should not be set before the grade.
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v1")).toBeNull();
+
+    // Reveal and grade Easy — nextReview is mocked to return a mastered state,
+    // transitioning the card from unmastered to mastered.
+    const reveal = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(reveal);
+    await screen.findByRole("group", { name: /grade your answer/i });
+
+    // `previewIntervals` calls nextReview 4 times per render to compute
+    // grade-button labels, so the mockReturnValueOnce queue is already consumed
+    // by the time we reach this point. Switch to mockImplementation for the
+    // entire remaining duration of this test so handleGrade gets the mastered
+    // state regardless of call count.
+    vi.mocked(nextReview).mockImplementation(() => ({
+      stability: 10,
+      difficulty: 5,
+      elapsedDays: 1,
+      scheduledDays: 21,
+      reps: 3,
+      lapses: 0,
+      fsrsState: "review" as const,
+      dueDate: "2026-06-14",
+      lastReview: "2026-05-24",
+      firstSeen: "2026-05-01",
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    }));
+
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    // Wait for the visible swap (grade buttons disappear).
+    await waitFor(() =>
+      expect(screen.queryByRole("group", { name: /grade your answer/i })).not.toBeInTheDocument(),
+    );
+
+    // writeHasMasteredFlag must have written "true" on the mastery transition.
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v1")).toBe("true");
+
+    // Restore the real nextReview implementation so the mockImplementation set
+    // above does not leak into subsequent tests. vi.clearAllMocks preserves
+    // implementations, so an explicit restore is required here.
+    if (realNextReview.current) {
+      vi.mocked(nextReview).mockImplementation(realNextReview.current);
+    }
   });
 
   it("countdown branch: QueueCounterRow is present while waiting for a learning card", async () => {

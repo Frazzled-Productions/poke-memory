@@ -1429,6 +1429,39 @@ export default function SettingsPage() {
                   />
                 )}
                 <VoiceQualityHint />
+                {/* Audio-wait setting: only useful when cry or TTS is on */}
+                {(settings.playCryOnReveal || settings.speakNameOnReveal) && (
+                <div className={cardPanelPadded}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Wait for audio before next card
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        When on (default), the next card waits until the cry and spoken name finish before appearing. Turn off for a faster swap: audio continues playing under the next card and is not cut off.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-label="Wait for audio before next card"
+                      aria-checked={settings.waitForAudioOnGrade}
+                      onClick={() => handleToggle("waitForAudioOnGrade")}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                        settings.waitForAudioOnGrade
+                          ? "bg-foreground"
+                          : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                          settings.waitForAudioOnGrade ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+                )}
               </CollapsibleSection>
               )}
 
