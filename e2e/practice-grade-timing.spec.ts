@@ -11,13 +11,15 @@
  *   - chromium only: mobile-safari has too much CI variance for sub-second
  *     wall-clock assertions. One engine is sufficient to catch a regression
  *     where the reorder is undone.
- *   - 500 ms assertion bar (not the <100 ms issue target): the issue target is
- *     an aspirational product goal. 500 ms is generous enough to be
- *     deterministic on shared CI runners (cold decode, GC pauses) while still
- *     catching a pathological regression.
+ *   - 250 ms median / 600 ms max bars: empirically tuned from observed CI
+ *     samples (median ~124 ms, max ~280 ms on shared GitHub-hosted chromium
+ *     runners). ~2x headroom catches a 2x regression (e.g. a partial undo of
+ *     the reorder that re-adds 100-200 ms to the critical path) while
+ *     absorbing cold-cache and GC variance. The issue's <100 ms target is the
+ *     aspirational product goal; the CI bars are the regression guard.
  *   - Median over 5 samples: resistant to single GC-pause outliers. A max
- *     guard (1500 ms per sample) catches pathological outliers without
- *     tightening the median bar.
+ *     guard catches a single pathological outlier without tightening the
+ *     median bar.
  *   - Timing inside page.evaluate: avoids IPC overhead (50-200 ms per round
  *     trip) that would otherwise inflate every measurement.
  */
@@ -152,7 +154,7 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
     await seedSessionIdb(page, SESSION_WITH_SIX_DUE_NAME_CARDS);
   });
 
-  test("median grade→next-card swap time is under 500 ms across five review cards", async ({
+  test("median grade→next-card swap time is under 250 ms across five review cards", async ({
     page,
   }) => {
     await page.goto("/");
@@ -238,19 +240,22 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
 
     // Median guard: catches a regression where the reorder is undone and the
     // swap reverts to the slow persistence-first path (typically 300-800 ms
-    // extra per grade on a shared CI runner).
+    // extra per grade on a shared CI runner). 250 ms is ~2x the observed
+    // CI median (124 ms) — tight enough to catch a 2x regression, loose
+    // enough to absorb runner-to-runner variance.
     expect(
       med,
-      `Median swap time (${med.toFixed(0)} ms) exceeded 500 ms threshold. ` +
+      `Median swap time (${med.toFixed(0)} ms) exceeded 250 ms threshold. ` +
         `All samples: [${samples.map((s) => s.toFixed(0)).join(", ")}] ms`,
-    ).toBeLessThan(500);
+    ).toBeLessThan(250);
 
     // Max guard: catches a single pathological outlier (e.g. the reorder
-    // regressed only for a specific card type or grade path).
+    // regressed only for a specific card type or grade path). 600 ms is ~2x
+    // the observed CI max (280 ms) — enough headroom for cold-cache decode.
     expect(
       max,
-      `Max swap time (${max.toFixed(0)} ms) exceeded 1500 ms threshold. ` +
+      `Max swap time (${max.toFixed(0)} ms) exceeded 600 ms threshold. ` +
         `All samples: [${samples.map((s) => s.toFixed(0)).join(", ")}] ms`,
-    ).toBeLessThan(1500);
+    ).toBeLessThan(600);
   });
 });
