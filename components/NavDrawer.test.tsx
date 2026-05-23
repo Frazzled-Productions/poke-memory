@@ -92,7 +92,27 @@ import { NavDrawer } from "@/components/NavDrawer";
 
 // ---------------------------------------------------------------------------
 
+// jsdom on this Node version does not ship localStorage out of the box.
+// Install an in-memory stub before each test, matching the pattern used in
+// ReviewSession.test.tsx.
+function makeLocalStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() { return store.size; },
+    clear: () => store.clear(),
+    getItem: (k) => store.get(k) ?? null,
+    key: (i) => Array.from(store.keys())[i] ?? null,
+    removeItem: (k) => { store.delete(k); },
+    setItem: (k, v) => { store.set(k, String(v)); },
+  };
+}
+
 beforeEach(() => {
+  Object.defineProperty(window, "localStorage", {
+    value: makeLocalStorage(),
+    configurable: true,
+    writable: true,
+  });
   mockPathname.value = "/";
   mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: false } });
   mockLoadSession.mockResolvedValue(null);
@@ -242,7 +262,7 @@ describe("NavDrawer", () => {
     });
   });
 
-  it("shows Pasture link when SESSION_CHANGED_EVENT fires after an IDB write", async () => {
+  it("shows Pasture link when KEY_HAS_MASTERED flag is set to 'true'", async () => {
     // Start with no mastered cards — Pasture should be hidden.
     mockLoadSession.mockResolvedValue(null);
     mockFilterMastered.mockReturnValue([]);
@@ -253,12 +273,13 @@ describe("NavDrawer", () => {
     await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
     expect(screen.queryByRole("link", { name: "Pasture" })).toBeNull();
 
-    // Simulate an IDB write completing: stub loadSession to return a mastered
-    // card, then fire the CustomEvent that saveSession dispatches post-write.
-    mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }] });
-    mockFilterMastered.mockReturnValue([{ id: 1 }]);
+    // Simulate ReviewSession writing the lightweight mastery flag after a
+    // name card crosses the mastery threshold (#1191). The component re-reads
+    // the flag whenever its effect re-runs (here we trigger it via
+    // SETTINGS_SAVED_EVENT so settingsVersion bumps and the effect fires).
+    localStorage.setItem("poke-memory:has-mastered:v1", "true");
     act(() => {
-      window.dispatchEvent(new CustomEvent("poke-memory:session-changed"));
+      window.dispatchEvent(new Event("poke-memory:settings-saved"));
     });
 
     await waitFor(() => {

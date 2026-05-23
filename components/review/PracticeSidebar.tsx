@@ -10,7 +10,7 @@
  * GRADE_LOG_APPENDED_EVENT that ReviewSession fires after each grade.
  */
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   loadGradeLog,
@@ -79,7 +79,13 @@ function GradeTallyRow({
 // PracticeSidebar
 // ---------------------------------------------------------------------------
 
-export function PracticeSidebar() {
+/**
+ * `PracticeSidebar` takes no props from the parent, so wrapping in `memo`
+ * prevents spurious re-renders triggered by `setCards` and other state
+ * updates in `ReviewSession` — the sidebar manages its own state via the
+ * `GRADE_LOG_APPENDED_EVENT` listener (#1191 Class B item 8).
+ */
+export const PracticeSidebar = memo(function PracticeSidebar() {
   const [todayGrades, setTodayGrades] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -204,4 +210,4 @@ export function PracticeSidebar() {
       </Link>
     </aside>
   );
-}
+});
