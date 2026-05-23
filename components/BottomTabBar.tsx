@@ -197,12 +197,12 @@ function BottomTabBarInner() {
   useEffect(() => {
     // Fast path: read the lightweight flag written by ReviewSession. Falls
     // back to loading the full session only when the flag is absent (first
-    // load after upgrading, or after a session reset).
+    // load after upgrading, or after a session reset). Once the flag is
+    // `"true"`, at least one species is mastered and the Pasture tab should
+    // be shown. We only cache `"true"` — a missing or non-"true" flag means
+    // we do the full check so that threshold changes (via SETTINGS_SAVED_EVENT)
+    // are always reflected correctly.
     async function load() {
-      // Fast path: once the flag is `"true"`, at least one species is mastered
-      // and the Pasture tab should be shown. We only cache `"true"` — a
-      // missing or non-"true" flag means we do the full check so that threshold
-      // changes (via SETTINGS_SAVED_EVENT) are always reflected correctly.
       if (localStorage.getItem(KEY_HAS_MASTERED) === "true") {
         setHasMastered(true);
         return;
