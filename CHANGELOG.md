@@ -6,6 +6,13 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.17] - 2026-05-23
+
+### Changed
+
+- Practice: grading now swaps to the next card immediately, with saving the session, recording the review, and refreshing the bottom-tab badges all happening in the background. Reduces the perceived delay between grading and seeing the next card.
+- Practice: added a "Wait for audio before next card" toggle in Settings (Audio section). When off, the next card appears immediately after grading and any in-progress cry or spoken name continues playing under it. Default on, preserving existing behaviour. Also tightened the sprite-decode ceiling on the grade critical path from 500 ms to 150 ms and removed two redundant settings reads per grade.
+
 ## [0.10.16] - 2026-05-22
 
 ### Fixed
@@ -1353,7 +1360,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.16...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.17...HEAD
+[0.10.17]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.17
 [0.10.16]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.16
 [0.10.15]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.15
 [0.10.14]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.14
