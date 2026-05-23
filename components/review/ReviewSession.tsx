@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
@@ -64,6 +64,7 @@ import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
 import { triggerHaptic } from "@/lib/review/haptic";
 import { markSessionActive, markSessionInactive } from "@/lib/review/sessionActive";
+import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
   loadDailySummary,
@@ -164,6 +165,35 @@ function formatCountdown(ms: number): string {
   return `${minutes}m ${seconds}s`;
 }
 
+/**
+ * Write the lightweight "has mastered at least one species" flag to
+ * localStorage and dispatch a `StorageEvent` so same-tab subscribers
+ * (`NavLinks`, `BottomTabBar`) update without needing to re-parse the whole
+ * session blob from IDB (#1191 Class A item 3).
+ *
+ * Only called when the flag value actually changes (false → true on the first
+ * mastery, or true → false if the session is reset). Skips when any superuser
+ * flag is on so QA sessions don't pollute local state.
+ */
+function writeHasMasteredFlag(val: boolean): void {
+  if (typeof window === "undefined") return;
+  const storage = window.localStorage;
+  if (!storage) return;
+  const str = val ? "true" : "false";
+  try {
+    storage.setItem(KEY_HAS_MASTERED, str);
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: KEY_HAS_MASTERED,
+        newValue: str,
+        storageArea: storage,
+      }),
+    );
+  } catch {
+    // Quota or non-standard environment — silently skip.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components: end states
 // ---------------------------------------------------------------------------
@@ -175,7 +205,13 @@ type PerTypeTodayCounts = {
   cry: { newIntroducedToday: number; reviewsDoneToday: number };
 };
 
-function TodayPill({
+/**
+ * `TodayPill` receives only primitive/plain-object props from `ReviewSession`.
+ * `React.memo` skips re-renders when none of the props have shallowly changed
+ * — primarily useful between grading batches when the card flips but the daily
+ * counters haven't changed yet (#1191 Class B item 8).
+ */
+const TodayPill = React.memo(function TodayPill({
   perType,
   nameEnabled,
   evolutionEnabled,
@@ -268,7 +304,7 @@ function TodayPill({
       )}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Per-direction accuracy row (#994)
@@ -667,6 +703,12 @@ export function ReviewSession() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
+
+  // Serialises background persistence work across rapid grades (#1191).
+  // Each grade chains its saveSession + appendGradeEntry work onto this
+  // promise so concurrent IDB reads inside appendGradeEntry never miss a
+  // preceding write from the current grade.
+  const persistenceChainRef = useRef<Promise<void>>(Promise.resolve());
 
   // Ref attached to the swipeable card container. Swipe-to-grade is active
   // only for flip-card types (name / evolution / cry) — reverse cards use
@@ -1805,20 +1847,15 @@ export function ReviewSession() {
       card.id === effectiveCard.id ? { ...card, state: nextState } : card,
     );
 
-    notifySaveResult(await saveSession({ cards: newCards, limits }));
     const today = todayString(now);
-    const gradeLog = await loadGradeLog();
-    const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
-    const dueQueueEmpty = !newCards.some(
-      (c) =>
-        c.state.learningStep === null &&
-        c.state.lastReview !== null &&
-        c.state.dueDate <= today &&
-        c.state.lastReview !== today,
-    );
-    recordReview(today, gradedToday, dueQueueEmpty);
-    const appended = await appendGradeEntry({ date: today, grade, cardType: effectiveCard.cardType, subjectKey: effectiveCard.subjectKey });
-    snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
+
+    // Derive new/mastered transitions now (while effectiveCard / nextState are
+    // in scope) so the values are available for the visible swap below and for
+    // the background persistence chain. Reuse `settings` already loaded at
+    // the top of this handler (#1191).
+    const wasNew = effectiveCard.state.firstSeen === null;
+    const wasMastered = isMastered(effectiveCard.state, settings.masteryRepetitions);
+    const nowMastered = isMastered(nextState, settings.masteryRepetitions);
 
     // Decode-ahead: fetch and decode the next card's sprite(s) before advancing
     // React state. `SpritePreloader` has already warmed the network cache —
@@ -1908,22 +1945,6 @@ export function ReviewSession() {
       }
     }
 
-    // Commit the grade to the undo snapshot and the cloud-sync queue.
-    // These are invisible side-effects that do not change the rendered card, so
-    // they run before the audio wait. The visible swap (setCards + state
-    // resets below) is deferred until any in-progress cry / TTS finishes (#732).
-    undoSnapshotRef.current = snapshot;
-    setHasUndoSnap(true);
-    enqueueGrade({ ...effectiveCard, state: nextState });
-
-    // Derive new/mastered transitions now (while effectiveCard / nextState are
-    // in scope) so the values are available after the audio wait below.
-    // Reuse `settings` already loaded at the top of this handler — no extra
-    // loadSettings() calls needed here (#1191).
-    const wasNew = effectiveCard.state.firstSeen === null;
-    const wasMastered = isMastered(effectiveCard.state, settings.masteryRepetitions);
-    const nowMastered = isMastered(nextState, settings.masteryRepetitions);
-
     // Optionally wait for any in-progress cry and/or TTS playback to finish
     // before swapping the visible card. When `waitForAudioOnGrade` is on
     // (default), today's behaviour is preserved — the swap is deferred until
@@ -1943,6 +1964,15 @@ export function ReviewSession() {
       setGrading(false);
       return;
     }
+
+    // ── Visible swap ────────────────────────────────────────────────────────
+    // Commit the grade to the undo snapshot and the cloud-sync queue, then
+    // immediately update all visible state (#1191 Class B item 5).
+    // Persistence (saveSession, appendGradeEntry, recordReview) runs in the
+    // background so it does not block the swap.
+    undoSnapshotRef.current = snapshot;
+    setHasUndoSnap(true);
+    enqueueGrade({ ...effectiveCard, state: nextState });
 
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
@@ -1968,62 +1998,12 @@ export function ReviewSession() {
     }
     if (!wasMastered && nowMastered) {
       setMasteredThisSession((n) => n + 1);
-      // Badge award (#420). Only fires when a card just crossed the mastery
-      // threshold — `checkBadges` is then O(catalog × ids-per-badge) against a
-      // Set, which is cheap. Non-name directions never contribute to badge
-      // criteria, so a `cry`/`reverse`/`evolution` mastery cannot earn one.
-      //
-      // Superuser guard: with `pretendAllMastered` on, every species is
-      // already "mastered" — the first grade would award every badge and
-      // persist that to localStorage. `AutoSyncOnChange` suppresses the
-      // cloud write, but exit cleanup does not restore `user_settings`, so
-      // the fake earned-set would survive the QA session. Skip the award
-      // path entirely while any flag is on. The catalog overlay on Stats
-      // continues to show all badges read-only.
-      if (effectiveCard.cardType === "name" && !superuserGuarded) {
-        const masteredIds = masteredSpeciesIds(
-          newCards,
-          settings.masteryRepetitions,
-          false,
-        );
-        const earnedIds = new Set(settings.earnedBadges.map((b) => b.id));
-        const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIds);
-        if (newlyEarned.length > 0) {
-          const nowIso = now.toISOString();
-          const nextSettings: UserSettings = {
-            ...settings,
-            earnedBadges: [
-              ...settings.earnedBadges,
-              ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
-            ],
-          };
-          saveSettings(nextSettings);
-          setPendingBadgeToasts((prev) => [...prev, ...newlyEarned]);
-        }
+      // Write the lightweight "has mastered" flag so NavLinks / BottomTabBar
+      // can reveal the Pasture tab without re-parsing the full session blob
+      // from IDB on every SESSION_CHANGED_EVENT (#1191 Class A item 3).
+      if (!superuserGuarded) {
+        writeHasMasteredFlag(true);
       }
-    }
-
-    // Persist the cumulative daily summary so the share button survives a
-    // reload (#685). React state setters above are async; compute totals from
-    // the pre-grade snapshot + this grade.  snapshot.sessionGradeSeq is
-    // already the day's cumulative sequence (hydrated at mount), so writing
-    // directly is correct — no need to re-read and merge from localStorage.
-    // Skipped while a superuser flag is on so QA grade sequences never reach
-    // localStorage — consistent with the cloud write-guard.
-    if (!superuserGuarded) {
-      const nextGradeSeq = [...snapshot.sessionGradeSeq, grade];
-      const nextNewCards =
-        snapshot.newCardsThisSession +
-        (wasNew && nextState.firstSeen !== null ? 1 : 0);
-      const nextMastered =
-        snapshot.masteredThisSession + (!wasMastered && nowMastered ? 1 : 0);
-      saveDailySummary({
-        date: todayString(now, timezone),
-        gradeSequence: nextGradeSeq,
-        reviewed: nextGradeSeq.length,
-        newCards: nextNewCards,
-        mastered: nextMastered,
-      });
     }
 
     // Update the learning queue based on the new state.
@@ -2069,6 +2049,105 @@ export function ReviewSession() {
     // so the "please retry" banner is no longer relevant.
     setGradeError(null);
     setGrading(false);
+
+    // ── Background persistence ───────────────────────────────────────────────
+    // saveSession, recordReview, and appendGradeEntry run after the visible
+    // swap so they do not delay the next card appearing on screen (#1191).
+    //
+    // Chained onto `persistenceChainRef` so that rapid back-to-back grades
+    // never race inside appendGradeEntry: the second grade's IDB read waits
+    // for the first grade's IDB write to commit, preserving the ordered log.
+    //
+    // snapshot.gradeLogOccurredAt is mutated in-place after appendGradeEntry
+    // resolves. Undo reads it from undoSnapshotRef.current at click-time; if
+    // the user undoes before persistence completes the entry is simply left in
+    // the grade log (a minor non-critical omission in an extremely narrow race
+    // window — the same behaviour as if IDB were slow under the old ordering).
+    persistenceChainRef.current = persistenceChainRef.current.then(async () => {
+      if (!isMountedRef.current) return;
+      try {
+        notifySaveResult(await saveSession({ cards: newCards, limits }));
+      } catch (err) {
+        console.error("[handleGrade] saveSession failed in background:", err);
+      }
+      const gradeLog = await loadGradeLog();
+      const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
+      const dueQueueEmpty = !newCards.some(
+        (c) =>
+          c.state.learningStep === null &&
+          c.state.lastReview !== null &&
+          c.state.dueDate <= today &&
+          c.state.lastReview !== today,
+      );
+      recordReview(today, gradedToday, dueQueueEmpty);
+      const appended = await appendGradeEntry({
+        date: today,
+        grade,
+        cardType: effectiveCard.cardType,
+        subjectKey: effectiveCard.subjectKey,
+      });
+      snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
+    });
+
+    // Persist the cumulative daily summary so the share button survives a
+    // reload (#685). React state setters above are async; compute totals from
+    // the pre-grade snapshot + this grade. snapshot.sessionGradeSeq is
+    // already the day's cumulative sequence (hydrated at mount), so writing
+    // directly is correct — no need to re-read and merge from localStorage.
+    // Skipped while a superuser flag is on so QA grade sequences never reach
+    // localStorage — consistent with the cloud write-guard.
+    if (!superuserGuarded) {
+      const nextGradeSeq = [...snapshot.sessionGradeSeq, grade];
+      const nextNewCards =
+        snapshot.newCardsThisSession +
+        (wasNew && nextState.firstSeen !== null ? 1 : 0);
+      const nextMastered =
+        snapshot.masteredThisSession + (!wasMastered && nowMastered ? 1 : 0);
+      saveDailySummary({
+        date: todayString(now, timezone),
+        gradeSequence: nextGradeSeq,
+        reviewed: nextGradeSeq.length,
+        newCards: nextNewCards,
+        mastered: nextMastered,
+      });
+    }
+
+    // Badge award (#420). Deferred to a macrotask so the heavy
+    // `masteredSpeciesIds` scan and Set construction run after the visible
+    // swap commits (#1191 Class B item 9). The toast can appear a frame later
+    // — that is the deliberate trade for instant swap. Only fires when a name
+    // card just crossed the mastery threshold.
+    //
+    // Superuser guard: skip entirely while any flag is on — see the full
+    // rationale in the comment below.
+    if (!wasMastered && nowMastered && effectiveCard.cardType === "name" && !superuserGuarded) {
+      // Capture values needed inside the timeout closure now, before they
+      // go stale.
+      const masteredCheckCards = newCards;
+      const masteredCheckSettings = settings;
+      setTimeout(() => {
+        if (!isMountedRef.current) return;
+        const masteredIds = masteredSpeciesIds(
+          masteredCheckCards,
+          masteredCheckSettings.masteryRepetitions,
+          false,
+        );
+        const earnedIds = new Set(masteredCheckSettings.earnedBadges.map((b) => b.id));
+        const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIds);
+        if (newlyEarned.length > 0) {
+          const nowIso = now.toISOString();
+          const nextSettings: UserSettings = {
+            ...masteredCheckSettings,
+            earnedBadges: [
+              ...masteredCheckSettings.earnedBadges,
+              ...newlyEarned.map((b) => ({ id: b.id, earnedAt: nowIso })),
+            ],
+          };
+          saveSettings(nextSettings);
+          setPendingBadgeToasts((prev) => [...prev, ...newlyEarned]);
+        }
+      }, 0);
+    }
   }
 
   async function handleUndo() {

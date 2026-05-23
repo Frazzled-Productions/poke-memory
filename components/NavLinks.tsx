@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AuthButton } from "@/components/auth/AuthButton";
-import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY, SESSION_CHANGED_EVENT } from "@/lib/review/persistence";
+import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
+import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
 
 const NAV_LINKS = [
   { href: "/", label: "Practice" },
@@ -26,14 +27,20 @@ export function NavLinks() {
   const pathname = usePathname();
   const { flags } = useSuperuser();
   const [hasMastered, setHasMastered] = useState(false);
-  // Re-runs the mastery check when the session key changes — native cross-tab
-  // events and the synthetic dispatch from pullAndMerge / pasture sparkle
-  // clears both flow through this hook.
+  // Re-runs the mastery check when the session key changes via a cross-tab
+  // StorageEvent (e.g. sync pull from another tab, or the E2E seed helper).
+  // The per-grade SESSION_CHANGED_EVENT is no longer the trigger — instead,
+  // ReviewSession writes KEY_HAS_MASTERED on the first mastery transition so
+  // the Pasture link appears without re-parsing the full IDB blob on every
+  // grade (#1191 Class A item 3).
   const sessionVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   // Also re-runs when the user saves Settings, so a change to the
   // masteryRepetitions threshold re-derives Pasture link visibility without
   // waiting for an unrelated session storage bump.
   const [settingsVersion, setSettingsVersion] = useState(0);
+  // Responds to ReviewSession writing KEY_HAS_MASTERED when a card first
+  // crosses the mastery threshold, or when the flag is cleared on reset.
+  const hasMasteredVersion = useLocalStorageKey(KEY_HAS_MASTERED);
   // Tracks the write epoch seen when the mastery effect last attached its
   // listener, to detect writes that happened before React hydrated.
   const epochAtLastAttach = useRef<number>(0);
@@ -47,20 +54,27 @@ export function NavLinks() {
   }, []);
 
   useEffect(() => {
+    // Fast path: once the flag is `"true"`, at least one species is mastered
+    // and the Pasture link should be shown. We only cache `"true"` — a
+    // missing or non-"true" flag means we do the full check so that threshold
+    // changes (via SETTINGS_SAVED_EVENT) are always reflected correctly.
     async function load() {
+      if (
+        typeof localStorage !== "undefined" &&
+        localStorage.getItem(KEY_HAS_MASTERED) === "true"
+      ) {
+        setHasMastered(true);
+        return;
+      }
+      // Flag absent or "false" — do the full check.
       const session = await loadSession();
       const masteryRepetitions = loadSettings().masteryRepetitions;
-      setHasMastered(
+      const result =
         session !== null &&
-          filterMastered(session.cards, false, masteryRepetitions).length > 0,
-      );
+        filterMastered(session.cards, false, masteryRepetitions).length > 0;
+      setHasMastered(result);
     }
     void load();
-    // Also listen for the CustomEvent dispatched after every IDB write (including
-    // the E2E test seed helper). WebKit does not reliably propagate synthetic
-    // StorageEvents to same-tab `storage` listeners, so the CustomEvent is the
-    // authoritative post-write signal on mobile-safari.
-    window.addEventListener(SESSION_CHANGED_EVENT, load);
 
     // Catch-up check: if a write happened before this effect registered its
     // listener (e.g. the E2E seed fires tx.oncomplete before React hydrates),
@@ -70,9 +84,7 @@ export function NavLinks() {
       epochAtLastAttach.current = epochNow;
       requestAnimationFrame(() => { void load(); });
     }
-
-    return () => window.removeEventListener(SESSION_CHANGED_EVENT, load);
-  }, [sessionVersion, settingsVersion]);
+  }, [sessionVersion, settingsVersion, hasMasteredVersion]);
 
   const showPasture = hasMastered || flags.pretendAllMastered;
 
