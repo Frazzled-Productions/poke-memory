@@ -646,6 +646,50 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
   });
 });
 
+test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205)", () => {
+  test("feedback delay control is absent when reverse cards are off (default)", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    // Expand the Audio section.
+    await page.getByRole("button", { name: /^audio$/i }).click();
+
+    // The fieldset must not be in the DOM when reverseCardsEnabled is false.
+    await expect(
+      page.getByRole("group", { name: /reverse card feedback delay/i }),
+    ).toHaveCount(0);
+  });
+
+  test("feedback delay control is visible after enabling reverse cards", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    // Enable reverse cards via the Practice section toggle.
+    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("switch", { name: /enable reverse cards/i }).click();
+
+    // The re-enable dialog appears — choose to reuse saved progress.
+    await page.getByRole("button", { name: /reuse my saved progress/i }).click();
+
+    // Expand the Audio section and verify the control is now present.
+    await page.getByRole("button", { name: /^audio$/i }).click();
+    await expect(
+      page.getByRole("group", { name: /reverse card feedback delay/i }),
+    ).toBeVisible();
+
+    // Verify the radio inputs are interactive — "core interaction succeeds" bar.
+    // The default value is "default", so click "off" to exercise a real change.
+    // The native radio inputs are sr-only and the labels intercept pointer
+    // events; click the label by its accessible text so the interaction lands
+    // on the surface the user actually clicks.
+    await page.getByText("Off", { exact: true }).click();
+    await expect(page.getByRole("radio", { name: /off/i })).toBeChecked();
+    await expect(page.getByRole("radio", { name: /default/i })).not.toBeChecked();
+  });
+});
+
 test.describe("Settings — Offline section (#1168)", () => {
   test("Offline section heading and Download button are present", async ({
     page,

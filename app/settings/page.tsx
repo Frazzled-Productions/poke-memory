@@ -1464,6 +1464,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Reverse-card feedback delay (#1200) */}
+                {settings.reverseCardsEnabled && (
                 <div className={cardPanelPadded}>
                   <p className="text-sm font-medium text-foreground">
                     Reverse card feedback delay
@@ -1506,6 +1507,7 @@ export default function SettingsPage() {
                     ))}
                   </fieldset>
                 </div>
+                )}
               </CollapsibleSection>
               )}
 
