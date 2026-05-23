@@ -70,11 +70,15 @@ export async function seedIdb(
           } catch {
             // Non-standard envs.
           }
-          // Dispatch the same CustomEvent that saveSession emits so nav
-          // components' mastery-check effects re-fire after the seed transaction
-          // commits. WebKit does not reliably propagate synthetic StorageEvents
-          // to same-tab `storage` listeners, so this CustomEvent is the
-          // authoritative post-seed signal for mobile-safari.
+          // Dispatch the same CustomEvent that saveSession emits. Nav
+          // components (BottomTabBar, NavDrawer, NavLinks) no longer subscribe
+          // to this event directly — they track the KEY_HAS_MASTERED localStorage
+          // flag instead. The event is still dispatched here for any other
+          // subscriber that may be listening, and as belt-and-suspenders in case
+          // WebKit does not reliably propagate synthetic StorageEvents to
+          // same-tab `storage` listeners. E2E tests that need Pasture-tab
+          // visibility mid-session without a reload should set KEY_HAS_MASTERED
+          // in localStorage directly.
           //
           // The string "poke-memory:session-changed" is intentionally hardcoded
           // here. This function is serialised to a string by page.addInitScript

@@ -5,7 +5,7 @@ import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard, CryReviewCard } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
-import { loadGradeLog } from "@/lib/gradelog/persistence";
+import { loadGradeLog, appendGradeEntry } from "@/lib/gradelog/persistence";
 import { STORAGE_KEY as DAILY_SUMMARY_KEY } from "@/lib/review/dailySummaryPersistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { CRY_ID_OFFSET } from "@/lib/pokemon/seed";
@@ -3110,5 +3110,122 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     expect(
       screen.getByRole("status", { name: /queue counts/i }),
     ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: orphan grade-log entry on saveSession failure (#1196)
+// ---------------------------------------------------------------------------
+
+describe("persistenceChainRef: split-write guard (#1196)", () => {
+  /** Minimal name-card-only settings — same shape as flipSettings above. */
+  const nameOnlySettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    reverseCardsEnabled: false,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 0,
+    cryCardsEnabled: false,
+    maxNewCryPerDay: 0,
+    maxReviewsCryPerDay: 0,
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
+  };
+
+  it("does not call appendGradeEntry when saveSession fails (quota)", async () => {
+    // saveSession returns { ok: false } — IDB or localStorage full.
+    vi.mocked(saveSession).mockResolvedValue({ ok: false, reason: "quota" });
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    // Clear the mount-time saveSession call counter so we can reliably detect
+    // the grade-triggered call below.
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    vi.mocked(saveSession).mockClear();
+
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    // Wait for saveSession to be called by the grade handler — this signals the
+    // persistence chain settled. Then assert appendGradeEntry was NOT called.
+    await waitFor(() => {
+      expect(vi.mocked(saveSession)).toHaveBeenCalled();
+    });
+    // appendGradeEntry must NOT have been called — the session blob did not
+    // persist, so writing the grade log would create an orphan entry (#1196).
+    expect(vi.mocked(appendGradeEntry)).not.toHaveBeenCalled();
+  });
+
+  it("does not call appendGradeEntry when saveSession fails (unknown)", async () => {
+    vi.mocked(saveSession).mockResolvedValue({ ok: false, reason: "unknown" });
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    vi.mocked(saveSession).mockClear();
+
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    await waitFor(() => {
+      expect(vi.mocked(saveSession)).toHaveBeenCalled();
+    });
+    expect(vi.mocked(appendGradeEntry)).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the storage-error banner when saveSession fails (#1196)", async () => {
+    // When the session blob cannot be written, the existing StorageQuotaBanner
+    // (role="alert") must appear so the user knows the grade did not persist.
+    // Use a 4-card session (FIXTURE_CARDS_4) so the session stays in the active
+    // review UI after one grade — the banner only renders in the active-review
+    // branches, not the session-complete screen that appears when the last card
+    // is graduated with Easy.
+    vi.mocked(saveSession).mockResolvedValue({ ok: false, reason: "quota" });
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    // The StorageQuotaBanner has role="alert" and contains the text below.
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/progress saving is disabled/i),
+    ).toBeInTheDocument();
+  });
+
+  it("calls appendGradeEntry on the happy path when saveSession succeeds", async () => {
+    // Regression guard: the guard must not suppress the grade-log write on success.
+    vi.mocked(saveSession).mockResolvedValue({ ok: true });
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    // appendGradeEntry is called inside the persistence chain, which resolves
+    // after saveSession. Polling until it is called confirms the chain settled.
+    await waitFor(() => {
+      expect(vi.mocked(appendGradeEntry)).toHaveBeenCalledOnce();
+    });
   });
 });

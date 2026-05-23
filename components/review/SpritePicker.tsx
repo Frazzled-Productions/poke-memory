@@ -6,11 +6,24 @@ import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { speakName } from "@/lib/audio/tts";
 import { playCry } from "@/lib/audio/cry";
+import { loadSettings } from "@/lib/settings/persistence";
+import type { UserSettings } from "@/lib/settings/persistence";
 
-// How long to show correctness feedback before advancing (ms).
-// Correct tap: brief highlight. Incorrect tap: time to see the right answer.
-const CORRECT_FEEDBACK_MS = 600;
-const INCORRECT_FEEDBACK_MS = 1200;
+/**
+ * Maps the tri-state delay setting to concrete millisecond values.
+ *
+ * Defensive default: any input that is not exactly "off" or "fast" returns
+ * the "default" mapping (600 / 1200 ms). This handles `undefined` from
+ * in-flight settings blobs that pre-date this field, and any unknown
+ * future value, without throwing on the destructure at the call site.
+ */
+export function resolveReverseFeedbackDelayMs(
+  setting: UserSettings["reverseFeedbackDelay"] | undefined,
+): { correctMs: number; incorrectMs: number } {
+  if (setting === "off") return { correctMs: 0, incorrectMs: 0 };
+  if (setting === "fast") return { correctMs: 250, incorrectMs: 500 };
+  return { correctMs: 600, incorrectMs: 1200 };
+}
 
 type Tile = SeedPokemon & { isCorrect: boolean };
 
@@ -89,16 +102,22 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
       speakName(targetPokemon.displayName, targetPokemon.id);
     }
 
+    // Resolve the feedback delay from settings at tap time so changes made
+    // in Settings take effect on the next tap without requiring a remount.
+    const { correctMs, incorrectMs } = resolveReverseFeedbackDelayMs(
+      loadSettings().reverseFeedbackDelay,
+    );
+
     if (tile.isCorrect) {
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         onGrade(true);
-      }, CORRECT_FEEDBACK_MS);
+      }, correctMs);
     } else {
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         onGrade(false);
-      }, INCORRECT_FEEDBACK_MS);
+      }, incorrectMs);
     }
   }
 

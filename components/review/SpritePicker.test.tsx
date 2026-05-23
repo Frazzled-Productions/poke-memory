@@ -1,6 +1,6 @@
 import { render, screen, act, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { SpritePicker, fisherYatesShuffle } from "@/components/review/SpritePicker";
+import { SpritePicker, fisherYatesShuffle, resolveReverseFeedbackDelayMs } from "@/components/review/SpritePicker";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 
 // ---------------------------------------------------------------------------
@@ -21,6 +21,13 @@ vi.mock("@/lib/audio/tts", () => ({
 const { mockPlayCry } = vi.hoisted(() => ({ mockPlayCry: vi.fn() }));
 
 vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
+
+// SpritePicker calls loadSettings() at tap time to resolve the feedback delay.
+// Default the mock to "default" so existing timer-based assertions remain valid
+// (they were written for 600/1200 ms, which is the "default" mapping).
+vi.mock("@/lib/settings/persistence", () => ({
+  loadSettings: vi.fn(() => ({ reverseFeedbackDelay: "default" })),
+}));
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -352,5 +359,27 @@ describe("SpritePicker speakNameOnAnswer", () => {
     act(() => { fireEvent.click(correctTile); });
 
     expect(mockSpeakName).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveReverseFeedbackDelayMs — unit tests (#1200)
+// ---------------------------------------------------------------------------
+
+describe("resolveReverseFeedbackDelayMs", () => {
+  it('returns 0/0 for "off"', () => {
+    expect(resolveReverseFeedbackDelayMs("off")).toEqual({ correctMs: 0, incorrectMs: 0 });
+  });
+
+  it('returns 250/500 for "fast"', () => {
+    expect(resolveReverseFeedbackDelayMs("fast")).toEqual({ correctMs: 250, incorrectMs: 500 });
+  });
+
+  it('returns 600/1200 for "default"', () => {
+    expect(resolveReverseFeedbackDelayMs("default")).toEqual({ correctMs: 600, incorrectMs: 1200 });
+  });
+
+  it("returns the default mapping for undefined (in-flight settings blobs without the field)", () => {
+    expect(resolveReverseFeedbackDelayMs(undefined)).toEqual({ correctMs: 600, incorrectMs: 1200 });
   });
 });
