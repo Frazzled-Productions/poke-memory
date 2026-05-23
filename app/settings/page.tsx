@@ -1472,7 +1472,7 @@ export default function SettingsPage() {
                     How long the sprite picker lingers on the correct or incorrect highlight before advancing to the next card.
                     Off: no pause. Fast: 250 ms correct / 500 ms incorrect. Default: 600 ms / 1200 ms.
                   </p>
-                  <fieldset className="mt-3 flex gap-2" aria-label="Reverse card feedback delay">
+                  <fieldset className="mt-3 flex gap-2">
                     <legend className="sr-only">Reverse card feedback delay</legend>
                     {(
                       [
