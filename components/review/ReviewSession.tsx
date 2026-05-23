@@ -2065,10 +2065,20 @@ export function ReviewSession() {
     // window — the same behaviour as if IDB were slow under the old ordering).
     persistenceChainRef.current = persistenceChainRef.current.then(async () => {
       if (!isMountedRef.current) return;
-      try {
-        notifySaveResult(await saveSession({ cards: newCards, limits }));
-      } catch (err) {
-        console.error("[handleGrade] saveSession failed in background:", err);
+      // saveSession resolves with { ok: true } or { ok: false } — it never
+      // rejects. Only append to the grade log when the session blob persisted
+      // successfully; writing the grade log on a failed session write would
+      // create a split-write where the grade log advanced past the saved state
+      // (#1196). Surface the failure via notifySaveResult so the user sees the
+      // existing storage-error banner.
+      const saveResult = await saveSession({ cards: newCards, limits });
+      notifySaveResult(saveResult);
+      if (!saveResult.ok) {
+        console.error(
+          "[handleGrade] saveSession failed — skipping grade-log append to avoid split-write:",
+          saveResult.reason,
+        );
+        return;
       }
       const gradeLog = await loadGradeLog();
       const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
