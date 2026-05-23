@@ -690,6 +690,103 @@ test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205)",
   });
 });
 
+test.describe("Settings — reverse-card feedback delay control (#1207)", () => {
+  // Pre-seed reverseCardsEnabled so the fieldset renders without needing the
+  // multi-step enable-reverse-cards flow (Practice toggle + dialog). The
+  // file-level beforeEach already calls addOnboardingPreDismiss, which runs as
+  // addInitScript #1 before page load. This describe-level addInitScript runs
+  // as #2 — it reads the settings key written by #1 and merges in the flag.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (typeof parsed === "object" && parsed !== null) {
+              existing = parsed as Record<string, unknown>;
+            }
+          } catch { /* malformed JSON — treat as empty */ }
+        }
+        localStorage.setItem(KEY, JSON.stringify({
+          ...existing,
+          reverseCardsEnabled: true,
+        }));
+      } catch { /* localStorage unavailable — ignore */ }
+    });
+  });
+
+  test("all three options render with correct labels", async ({ page }) => {
+    await page.goto("/settings");
+
+    // Expand the Audio section to reveal the fieldset.
+    await page.getByRole("button", { name: /^audio$/i }).click();
+
+    const group = page.getByRole("group", { name: /reverse card feedback delay/i });
+    await expect(group).toBeVisible();
+
+    // All three radio options must be present with their exact labels.
+    await expect(group.getByRole("radio", { name: "Off" })).toBeVisible();
+    await expect(group.getByRole("radio", { name: "Fast" })).toBeVisible();
+    await expect(group.getByRole("radio", { name: "Default" })).toBeVisible();
+  });
+
+  test("selecting a non-default option updates the checked state", async ({ page }) => {
+    await page.goto("/settings");
+
+    await page.getByRole("button", { name: /^audio$/i }).click();
+
+    const group = page.getByRole("group", { name: /reverse card feedback delay/i });
+    await expect(group).toBeVisible();
+
+    // The factory default is "default" — "Default" radio must start checked.
+    await expect(group.getByRole("radio", { name: "Default" })).toBeChecked();
+    await expect(group.getByRole("radio", { name: "Off" })).not.toBeChecked();
+    await expect(group.getByRole("radio", { name: "Fast" })).not.toBeChecked();
+
+    // The native radio inputs are sr-only; the label intercepts pointer events.
+    // Click the "Fast" label text to change the selection.
+    await group.getByText("Fast", { exact: true }).click();
+
+    await expect(group.getByRole("radio", { name: "Fast" })).toBeChecked();
+    await expect(group.getByRole("radio", { name: "Default" })).not.toBeChecked();
+    await expect(group.getByRole("radio", { name: "Off" })).not.toBeChecked();
+  });
+
+  test("selected value is preserved after a page reload (persistence round-trip)", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    await page.getByRole("button", { name: /^audio$/i }).click();
+
+    const group = page.getByRole("group", { name: /reverse card feedback delay/i });
+    await expect(group).toBeVisible();
+
+    // Select "Off" — the onChange handler calls saveSettings immediately, so
+    // no explicit Save button click is needed before reloading.
+    await group.getByText("Off", { exact: true }).click();
+    await expect(group.getByRole("radio", { name: "Off" })).toBeChecked();
+
+    // Reload the page. addInitScript does not re-run on reload, but the
+    // setting is already persisted in localStorage by the onChange handler,
+    // so reverseCardsEnabled remains true and "Off" remains selected.
+    await page.reload();
+
+    // Re-expand the Audio section after reload.
+    await page.getByRole("button", { name: /^audio$/i }).click();
+
+    const groupAfterReload = page.getByRole("group", {
+      name: /reverse card feedback delay/i,
+    });
+    await expect(groupAfterReload).toBeVisible();
+    await expect(groupAfterReload.getByRole("radio", { name: "Off" })).toBeChecked();
+    await expect(groupAfterReload.getByRole("radio", { name: "Default" })).not.toBeChecked();
+  });
+});
+
 test.describe("Settings — Offline section (#1168)", () => {
   test("Offline section heading and Download button are present", async ({
     page,
