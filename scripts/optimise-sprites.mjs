@@ -52,8 +52,13 @@ const GENERATED_WIDTHS = [32, 40, 48, 56, 64, 120, 150, 180, 192, 320];
 /** Maximum source width we will generate variants for. Source PNGs are ~475 px. */
 const SOURCE_RESOLUTION_CAP = 475;
 
-/** WebP quality (0–100). Matches Vercel's default quality parameter. */
-const QUALITY = 75;
+/**
+ * WebP quality (0–100). Lowered from 75 to 65 after the A/B in #1190 / #1192
+ * showed ~2.4 MiB / 4.5% repo-size saving with no visible regression at the
+ * painted sizes the app uses. q65 captures ~70% of the achievable saving
+ * while leaving a comfortable margin above the encoder's artefact frontier.
+ */
+const QUALITY = 65;
 
 /** Number of sprites to process in parallel. */
 const CONCURRENCY = 20;
