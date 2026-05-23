@@ -378,4 +378,8 @@ describe("resolveReverseFeedbackDelayMs", () => {
   it('returns 600/1200 for "default"', () => {
     expect(resolveReverseFeedbackDelayMs("default")).toEqual({ correctMs: 600, incorrectMs: 1200 });
   });
+
+  it("returns the default mapping for undefined (in-flight settings blobs without the field)", () => {
+    expect(resolveReverseFeedbackDelayMs(undefined)).toEqual({ correctMs: 600, incorrectMs: 1200 });
+  });
 });

@@ -9,18 +9,20 @@ import { playCry } from "@/lib/audio/cry";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
 
-/** Maps the tri-state delay setting to concrete millisecond values. */
+/**
+ * Maps the tri-state delay setting to concrete millisecond values.
+ *
+ * Defensive default: any input that is not exactly "off" or "fast" returns
+ * the "default" mapping (600 / 1200 ms). This handles `undefined` from
+ * in-flight settings blobs that pre-date this field, and any unknown
+ * future value, without throwing on the destructure at the call site.
+ */
 export function resolveReverseFeedbackDelayMs(
-  setting: UserSettings["reverseFeedbackDelay"],
+  setting: UserSettings["reverseFeedbackDelay"] | undefined,
 ): { correctMs: number; incorrectMs: number } {
-  switch (setting) {
-    case "off":
-      return { correctMs: 0, incorrectMs: 0 };
-    case "fast":
-      return { correctMs: 250, incorrectMs: 500 };
-    case "default":
-      return { correctMs: 600, incorrectMs: 1200 };
-  }
+  if (setting === "off") return { correctMs: 0, incorrectMs: 0 };
+  if (setting === "fast") return { correctMs: 250, incorrectMs: 500 };
+  return { correctMs: 600, incorrectMs: 1200 };
 }
 
 type Tile = SeedPokemon & { isCorrect: boolean };
