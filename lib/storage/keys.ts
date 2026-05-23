@@ -112,16 +112,21 @@ export const KEY_OFFLINE_DOWNLOADED_AT = "poke-memory:offline-downloaded-at";
 // ─── Pasture tab visibility shortcut ─────────────────────────────────────────
 
 /**
- * Boolean flag written to localStorage by `ReviewSession` the moment a card
- * first crosses the mastery threshold. Read by `NavLinks` and `BottomTabBar`
+ * Boolean flag written to localStorage by `ReviewSession` the moment a name
+ * card first crosses the mastery threshold. Read by `NavLinks` and `BottomTabBar`
  * so they can show/hide the Pasture tab without re-parsing the full session
  * blob from IDB on every `SESSION_CHANGED_EVENT` (Class A item 3 of #1191).
  *
- * Value is `"true"` when at least one species is mastered, absent or `"false"`
- * otherwise. A missing key falls back to a one-shot `loadSession`+`filterMastered`
- * check on mount so existing users see the tab immediately after upgrading.
+ * Value is `"true"` when at least one species name card is mastered, absent or
+ * `"false"` otherwise. A missing key falls back to a one-shot
+ * `loadSession`+`filterMastered` check on mount so existing users see the tab
+ * immediately after upgrading.
+ *
+ * v1 → v2 bump (#1219): v1 was written on any card type reaching mastery, not
+ * just name cards. Bumping the key orphans any stuck-true v1 values so the nav
+ * components fall through to the full check on next load.
  */
-export const KEY_HAS_MASTERED = "poke-memory:has-mastered:v1";
+export const KEY_HAS_MASTERED = "poke-memory:has-mastered:v2";
 
 // ─── Per-device shuffle salt ──────────────────────────────────────────────────
 
