@@ -680,8 +680,13 @@ test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205)",
     ).toBeVisible();
 
     // Verify the radio inputs are interactive — "core interaction succeeds" bar.
-    await page.getByRole("radio", { name: /default/i }).click();
-    await expect(page.getByRole("radio", { name: /default/i })).toBeChecked();
+    // The default value is "default", so click "off" to exercise a real change.
+    // The native radio inputs are sr-only and the labels intercept pointer
+    // events; click the label by its accessible text so the interaction lands
+    // on the surface the user actually clicks.
+    await page.getByText("Off", { exact: true }).click();
+    await expect(page.getByRole("radio", { name: /off/i })).toBeChecked();
+    await expect(page.getByRole("radio", { name: /default/i })).not.toBeChecked();
   });
 });
 
