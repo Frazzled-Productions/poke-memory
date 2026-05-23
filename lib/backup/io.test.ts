@@ -88,6 +88,7 @@ const VALID_SETTINGS: UserSettings = {
   timezone: null,
   dateFormat: null,
   waitForAudioOnGrade: true,
+  reverseFeedbackDelay: "default" as const,
   mobileNav: "bottom" as const,
 };
 
