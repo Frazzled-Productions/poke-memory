@@ -3198,9 +3198,9 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     // stays false). If a future change adds a third unconditional mount-time save,
     // add a third mockResolvedValueOnce here.
     vi.mocked(saveSession)
-      .mockResolvedValueOnce({ ok: true }) // ReviewSession.tsx:839 — fresh-session initial save
-      .mockResolvedValueOnce({ ok: true }) // ReviewSession.tsx:899 — post-reconciliation save
-      .mockResolvedValue({ ok: false, reason: "quota" }); // grade-path call and beyond
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValue({ ok: false, reason: "quota" });
     mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
@@ -3210,9 +3210,14 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     // Wait for mount to settle — both Once calls consumed, quotaExceeded still false.
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
 
-    // Banner must NOT be present before the grade click — rules out mount-time
-    // contamination and proves the Once chain is correctly sized.
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // The StorageQuotaBanner must NOT be present before the grade click —
+    // rules out mount-time contamination and proves the Once chain is sized
+    // correctly. Scoped to the banner's accessible text rather than a bare
+    // queryByRole("alert"), because GradeErrorBanner also carries role="alert"
+    // and would mask a regression that surfaced that banner instead.
+    expect(
+      screen.queryByText(/progress saving is disabled/i),
+    ).not.toBeInTheDocument();
 
     // Trigger the grade-path failure.
     await user.click(revealBtn);
