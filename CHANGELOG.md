@@ -6,6 +6,14 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.19] - 2026-05-23
+
+### Fixed
+
+- Reverse card feedback delay control on the Settings page now only appears when reverse cards are enabled, matching the hide-when-off pattern used by every other per-reverse-card sub-setting.
+- Removed a redundant `aria-label` from the reverse card feedback delay fieldset on the Settings page; the `<legend>` now provides the accessible name as per the ARIA spec.
+- CI: Visual Regression and Integration Tests workflows no longer fail on the decide step when a PR contains a large sprite-file diff (e.g. a quality regen).
+
 ## [0.10.18] - 2026-05-23
 
 ### Added
@@ -1374,7 +1382,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.18...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.19...HEAD
+[0.10.19]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.19
 [0.10.18]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.18
 [0.10.17]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.17
 [0.10.16]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.16
