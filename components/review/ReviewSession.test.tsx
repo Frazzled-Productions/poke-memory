@@ -3018,7 +3018,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     render(<ReviewSession />);
 
     // Flag should not be set before the grade.
-    expect(window.localStorage.getItem("poke-memory:has-mastered:v1")).toBeNull();
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
 
     // Reveal and grade Easy — nextReview is mocked to return a mastered state,
     // transitioning the card from unmastered to mastered.
@@ -3056,11 +3056,87 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     );
 
     // writeHasMasteredFlag must have written "true" on the mastery transition.
-    expect(window.localStorage.getItem("poke-memory:has-mastered:v1")).toBe("true");
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBe("true");
 
     // Restore the real nextReview implementation so the mockImplementation set
     // above does not leak into subsequent tests. vi.clearAllMocks preserves
     // implementations, so an explicit restore is required here.
+    if (realNextReview.current) {
+      vi.mocked(nextReview).mockImplementation(realNextReview.current);
+    }
+  });
+
+  it("hasMastered flag is NOT written when a non-name card (reverse) transitions into mastery (#1219)", async () => {
+    // Guard: mastering a reverse card must not flip the flag because
+    // filterMastered (lib/pasture/arrivals.ts) only counts name cards.
+    //
+    // Use the 4-card seed with reverse-only settings so the session renders a
+    // SpritePicker. nextReview is mocked to return a mastered state so that
+    // tapping the correct tile triggers the wasMastered→nowMastered transition.
+    const user = userEvent.setup();
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: true,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    // Flag must be absent before any grade.
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
+
+    render(<ReviewSession />);
+
+    // Wait for the SpritePicker tiles to appear.
+    await waitFor(() =>
+      expect(screen.getAllByRole("button").some((b) => b.getAttribute("aria-label"))).toBe(true),
+    );
+
+    // Mock nextReview to return a mastered state so the transition fires.
+    vi.mocked(nextReview).mockImplementation(() => ({
+      stability: 10,
+      difficulty: 5,
+      elapsedDays: 1,
+      scheduledDays: 21,
+      reps: 3,
+      lapses: 0,
+      fsrsState: "review" as const,
+      dueDate: "2026-06-14",
+      lastReview: "2026-05-24",
+      firstSeen: "2026-05-01",
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    }));
+
+    // Tap any tile (correct or incorrect — handleGrade fires either way, and
+    // nextReview is fully mocked so the resulting state is mastered regardless).
+    const tiles = screen
+      .getAllByRole("button")
+      .filter((b) => ["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"].includes(b.getAttribute("aria-label") ?? ""));
+    expect(tiles.length).toBeGreaterThan(0);
+    await user.click(tiles[0]);
+
+    // Wait for the grade to be processed (tiles swap or feedback appears).
+    await waitFor(() => expect(saveSession).toHaveBeenCalled());
+
+    // The flag must remain absent — a reverse card mastery must not flip it.
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
+
+    // Restore so the mocked implementation does not leak into subsequent tests.
     if (realNextReview.current) {
       vi.mocked(nextReview).mockImplementation(realNextReview.current);
     }

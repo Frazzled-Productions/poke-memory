@@ -2001,7 +2001,10 @@ export function ReviewSession() {
       // Write the lightweight "has mastered" flag so NavLinks / BottomTabBar
       // can reveal the Pasture tab without re-parsing the full session blob
       // from IDB on every SESSION_CHANGED_EVENT (#1191 Class A item 3).
-      if (!superuserGuarded) {
+      // Guard on cardType "name": filterMastered (lib/pasture/arrivals.ts) only
+      // counts name cards, so mastering a reverse/cry/evolution card must not
+      // flip the flag (#1219).
+      if (effectiveCard.cardType === "name" && !superuserGuarded) {
         writeHasMasteredFlag(true);
       }
     }

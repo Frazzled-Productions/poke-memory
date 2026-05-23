@@ -277,7 +277,7 @@ describe("NavDrawer", () => {
     // name card crosses the mastery threshold (#1191). The component re-reads
     // the flag whenever its effect re-runs (here we trigger it via
     // SETTINGS_SAVED_EVENT so settingsVersion bumps and the effect fires).
-    localStorage.setItem("poke-memory:has-mastered:v1", "true");
+    localStorage.setItem("poke-memory:has-mastered:v2", "true");
     act(() => {
       window.dispatchEvent(new Event("poke-memory:settings-saved"));
     });
