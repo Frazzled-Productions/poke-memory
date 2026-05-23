@@ -770,13 +770,13 @@ test.describe("Settings — reverse-card feedback delay control (#1207)", () => 
     await group.getByText("Off", { exact: true }).click();
     await expect(group.getByRole("radio", { name: "Off" })).toBeChecked();
 
-    // Reload the page. addInitScript does not re-run on reload, but the
-    // setting is already persisted in localStorage by the onChange handler,
-    // so reverseCardsEnabled remains true and "Off" remains selected.
+    // Reload the page. The setting is already persisted in localStorage by
+    // the onChange handler, so reverseCardsEnabled remains true and "Off"
+    // remains selected. CollapsibleSection also persists its open/closed
+    // state under poke-memory:settings-section:audio-heading, so the Audio
+    // section reopens itself on reload — no click needed (clicking would
+    // toggle it closed again).
     await page.reload();
-
-    // Re-expand the Audio section after reload.
-    await page.getByRole("button", { name: /^audio$/i }).click();
 
     const groupAfterReload = page.getByRole("group", {
       name: /reverse card feedback delay/i,
