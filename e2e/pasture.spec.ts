@@ -116,10 +116,13 @@ test.describe("Pasture nav guard", () => {
     await awaitSeedIdb(page);
 
     // Reload after the IDB seed commits so the BottomTabBar's mastery-check
-    // useEffect runs against committed data. The seed helper now also dispatches
-    // a `poke-memory:session-changed` CustomEvent on tx.oncomplete, which
-    // BottomTabBar subscribes to — but the reload is kept as belt-and-suspenders
-    // for environments where the CustomEvent dispatch races with initial mount.
+    // useEffect runs against committed data. BottomTabBar (and NavDrawer) no
+    // longer subscribe to `poke-memory:session-changed` — they read the
+    // KEY_HAS_MASTERED localStorage flag on mount instead. The reload is the
+    // reliable trigger here; it ensures the flag is visible to both components
+    // on their initial mount. If a future E2E test needs Pasture-tab visibility
+    // mid-session without a reload, it should set KEY_HAS_MASTERED in
+    // localStorage before navigating.
     await page.reload();
     await awaitSeedIdb(page);
 

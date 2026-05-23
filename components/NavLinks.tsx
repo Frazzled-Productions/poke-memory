@@ -59,10 +59,8 @@ export function NavLinks() {
     // missing or non-"true" flag means we do the full check so that threshold
     // changes (via SETTINGS_SAVED_EVENT) are always reflected correctly.
     async function load() {
-      if (
-        typeof localStorage !== "undefined" &&
-        localStorage.getItem(KEY_HAS_MASTERED) === "true"
-      ) {
+      // useEffect already gates this to browser-only; no SSR guard needed.
+      if (localStorage.getItem(KEY_HAS_MASTERED) === "true") {
         setHasMastered(true);
         return;
       }

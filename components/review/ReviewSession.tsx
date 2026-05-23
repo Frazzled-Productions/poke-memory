@@ -1391,7 +1391,7 @@ export function ReviewSession() {
     // Learn-ahead: only when there are no other cards to show. Pull the
     // earliest learning card forward if it's within LEARN_AHEAD_MS.
     // This avoids the "wait N minutes" screen when the queue is otherwise
-    // empty (matches Anki's default 20-minute learn-ahead behavior).
+    // empty (matches Anki's default 20-minute learn-ahead behaviour).
     if (currentCardId === null) {
       const ahead = learningQueue
         .filter((e) => e.dueAt > now && e.dueAt <= now + LEARN_AHEAD_MS)
