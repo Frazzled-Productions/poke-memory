@@ -31,15 +31,15 @@ import {
   SEED_POKEMON_IDS,
   EVOLUTION_CARD_IDS,
 } from "./helpers/completedSession";
-import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 // ---------------------------------------------------------------------------
 // Session fixture: all known cards future-due so hydrateSession adds nothing,
-// then override five name cards (ids 1–5) to be past-due review cards. They
-// are served by the review queue in order, giving five consecutive swap cycles.
+// then override six name cards (ids 1–6) to be past-due review cards. Five
+// are graded in the measurement loop; the sixth stays on the queue so the
+// fifth grade reveals the next card rather than ending the session.
 // ---------------------------------------------------------------------------
 
-const DUE_CARD_IDS = [1, 2, 3, 4, 5];
+const DUE_CARD_IDS = [1, 2, 3, 4, 5, 6];
 
 const REVIEW_DUE_STATE = {
   stability: 10,
@@ -63,8 +63,8 @@ const baseSession = buildCompletedSession({
   evolutionCardIds: EVOLUTION_CARD_IDS,
 });
 
-/** Session with exactly five past-due name cards, all others future-due. */
-const SESSION_WITH_FIVE_DUE_NAME_CARDS = {
+/** Session with six past-due name cards; five are graded in the loop, the sixth prevents session-end on the last grade. */
+const SESSION_WITH_SIX_DUE_NAME_CARDS = {
   ...baseSession,
   cards: (baseSession.cards as Array<{ id: number; [key: string]: unknown }>).map(
     (c) =>
@@ -97,6 +97,7 @@ const SESSION_WITH_FIVE_DUE_NAME_CARDS = {
 //   cryCardsEnabled: false
 //   maxNewPerDay: 0             — no new cards introduced mid-session
 //   maxReviewsPerDay: 100       — high daily cap so session never stalls
+//   mobileNav: "bottom"         — avoids the hamburger-nav migration default
 // ---------------------------------------------------------------------------
 const TIMING_SETTINGS = {
   waitForAudioOnGrade: false,
@@ -110,6 +111,7 @@ const TIMING_SETTINGS = {
   cryCardsEnabled: false,
   maxNewPerDay: 0,
   maxReviewsPerDay: 100,
+  mobileNav: "bottom",
   onboarding: { firstVisitOnboardingDismissed: true },
 };
 
@@ -147,7 +149,7 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
 
     // Seed the session AFTER settings so IdbMigration.tsx skips the
     // localStorage read and never overwrites our IDB payload.
-    await seedSessionIdb(page, SESSION_WITH_FIVE_DUE_NAME_CARDS);
+    await seedSessionIdb(page, SESSION_WITH_SIX_DUE_NAME_CARDS);
   });
 
   test("median grade→next-card swap time is under 500 ms across five review cards", async ({
@@ -215,7 +217,7 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
             // requestAnimationFrame, which is throttled in background tabs.
             setTimeout(check, 16);
           }
-          setTimeout(check, 16);
+          check(); // immediate pre-check before the first polling interval
         });
 
         return performance.now() - t0;
