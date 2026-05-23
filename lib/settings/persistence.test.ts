@@ -141,6 +141,7 @@ describe('loadSettings migration', () => {
       ttsRate: 1.5,
       ttsVolume: 0.75,
       waitForAudioOnGrade: false,
+      reverseFeedbackDelay: 'fast' as const,
       timezone: 'Europe/London',
       dateFormat: 'dmy' as const,
       mobileNav: 'bottom' as const,
@@ -717,5 +718,33 @@ describe('coercion helper: str fields fall back to DEFAULT_SETTINGS on wrong typ
       JSON.stringify({ ...DEFAULT_SETTINGS, timezone: 'Europe/London' }),
     );
     expect(loadSettings().timezone).toBe('Europe/London');
+  });
+});
+
+describe('reverseFeedbackDelay migration (#1200)', () => {
+  it('defaults to "default" when the field is absent (pre-#1200 record)', () => {
+    const { reverseFeedbackDelay: _omitted, ...withoutField } = DEFAULT_SETTINGS;
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify(withoutField));
+    expect(loadSettings().reverseFeedbackDelay).toBe('default');
+  });
+
+  it('round-trips each valid value', () => {
+    for (const value of ['off', 'fast', 'default'] as const) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, reverseFeedbackDelay: value }),
+      );
+      expect(loadSettings().reverseFeedbackDelay).toBe(value);
+    }
+  });
+
+  it('falls back to "default" for unknown/invalid stored values', () => {
+    for (const bad of ['instant', 'slow', 42, null, true, {}]) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, reverseFeedbackDelay: bad }),
+      );
+      expect(loadSettings().reverseFeedbackDelay).toBe('default');
+    }
   });
 });

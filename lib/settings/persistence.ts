@@ -212,6 +212,15 @@ export type UserSettings = {
    */
   waitForAudioOnGrade: boolean;
   /**
+   * Controls how long the sprite-picker lingers on the correct/incorrect
+   * feedback colouring before auto-advancing (#1200).
+   * - `"off"`     — 0 ms / 0 ms (no pause; advances immediately).
+   * - `"fast"`    — 250 ms correct / 500 ms incorrect.
+   * - `"default"` — 600 ms correct / 1200 ms incorrect (original hardcoded values).
+   * Defaults to `"default"` so existing users keep the behaviour they know.
+   */
+  reverseFeedbackDelay: "off" | "fast" | "default";
+  /**
    * User's IANA timezone (#508). Null means "not yet detected" — the
    * Settings page auto-detects via Intl on first load and writes it back.
    * Stored as a scalar column in user_settings (NOT inside the JSONB blob)
@@ -261,6 +270,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   // Default on: preserves today's behaviour. Users who want the faster swap
   // can turn this off in Settings → Audio (#1191).
   waitForAudioOnGrade: true,
+  // Default "default": preserves the original 600/1200 ms behaviour for
+  // existing users who have not explicitly chosen a delay (#1200).
+  reverseFeedbackDelay: "default" as const,
   timezone: null,
   dateFormat: null,
 };
@@ -452,6 +464,14 @@ function parseStoredSettings(raw: string | null): UserSettings {
         ? obj.appVisitCount
         : DEFAULT_SETTINGS.appVisitCount,
     waitForAudioOnGrade: bool(obj, "waitForAudioOnGrade"),
+    // Existing-user migration (#1200): records without this field get
+    // "default" so they keep the original 600/1200 ms behaviour.
+    reverseFeedbackDelay:
+      obj.reverseFeedbackDelay === "off" ||
+      obj.reverseFeedbackDelay === "fast" ||
+      obj.reverseFeedbackDelay === "default"
+        ? obj.reverseFeedbackDelay
+        : "default",
     ttsVoice: str(obj, "ttsVoice"),
     ttsRate:
       typeof obj.ttsRate === "number" && Number.isFinite(obj.ttsRate)

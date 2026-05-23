@@ -102,6 +102,11 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "audio wait",
       "lag",
       "swap speed",
+      "reverse card feedback delay",
+      "feedback delay",
+      "sprite picker delay",
+      "advance speed",
+      "picker timing",
     ],
   },
   {

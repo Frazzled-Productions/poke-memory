@@ -1462,6 +1462,50 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 )}
+
+                {/* Reverse-card feedback delay (#1200) */}
+                <div className={cardPanelPadded}>
+                  <p className="text-sm font-medium text-foreground">
+                    Reverse card feedback delay
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    How long the sprite picker lingers on the correct or incorrect highlight before advancing to the next card.
+                    Off: no pause. Fast: 250 ms correct / 500 ms incorrect. Default: 600 ms / 1200 ms.
+                  </p>
+                  <fieldset className="mt-3 flex gap-2" aria-label="Reverse card feedback delay">
+                    <legend className="sr-only">Reverse card feedback delay</legend>
+                    {(
+                      [
+                        { value: "off", label: "Off" },
+                        { value: "fast", label: "Fast" },
+                        { value: "default", label: "Default" },
+                      ] as const
+                    ).map(({ value, label }) => (
+                      <label
+                        key={value}
+                        className={`flex flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-foreground focus-within:ring-offset-2 ${
+                          settings.reverseFeedbackDelay === value
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-zinc-300 bg-background text-foreground hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="reverseFeedbackDelay"
+                          value={value}
+                          checked={settings.reverseFeedbackDelay === value}
+                          onChange={() => {
+                            const updated = { ...settings, reverseFeedbackDelay: value };
+                            setSettings(updated);
+                            saveSettings(updated);
+                          }}
+                          className="sr-only"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </fieldset>
+                </div>
               </CollapsibleSection>
               )}
 
