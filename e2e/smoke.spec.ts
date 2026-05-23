@@ -1410,16 +1410,12 @@ test.describe("Document title due-count badge (#1062)", () => {
       );
     });
 
-    // Wait for the DocumentTitleBadge hook to apply the prefix.
-    await page.waitForFunction(
-      () => /^\(\d+\)/.test(document.title),
-      { timeout: 10_000 },
-    );
-
-    const titleWithBadge = await page.title();
-    expect(titleWithBadge).toMatch(/^\(\d+\)/);
-    // The base title must still be present after the prefix.
-    expect(titleWithBadge).toContain("Poké Memory");
+    // Wait for the DocumentTitleBadge hook to apply the prefix. Use
+    // toHaveTitle for its auto-polling behaviour: the hook re-runs on
+    // mutation-observer ticks and can briefly flip the prefix off between
+    // an initial set and a follow-up sync, so a one-shot read after
+    // waitForFunction races with that. toHaveTitle keeps polling.
+    await expect(page).toHaveTitle(/^\(\d+\) .*Poké Memory/, { timeout: 10_000 });
 
     // Grade the card — this should clear the prefix.
     const reveal = page.getByRole("button", { name: "Reveal" });
@@ -1431,14 +1427,7 @@ test.describe("Document title due-count badge (#1062)", () => {
     await gradeGroup.getByRole("button", { name: "Good" }).click();
 
     // After grading the only due card the count drops to zero; prefix must clear.
-    await page.waitForFunction(
-      () => !/^\(\d+\)/.test(document.title),
-      { timeout: 10_000 },
-    );
-
-    const titleAfterGrade = await page.title();
-    expect(titleAfterGrade).not.toMatch(/^\(\d+\)/);
-    expect(titleAfterGrade).toContain("Poké Memory");
+    await expect(page).toHaveTitle(/^Poké Memory/, { timeout: 10_000 });
   });
 });
 
