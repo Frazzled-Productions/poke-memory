@@ -6,6 +6,18 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.20] - 2026-05-24
+
+### Changed
+
+- Added an end-to-end smoke test covering the reverse-card feedback delay setting.
+- Tightened the storage-error banner unit test so it specifically exercises the grade-path failure rather than the mount-time path.
+
+### Fixed
+
+- The undo button no longer activates when a grade fails to persist; the visible state now matches the persisted state.
+- Pasture tab no longer appears after mastering a non-name card (reverse, cry, or evolution). Affected users' nav state is reset automatically on next load.
+
 ## [0.10.19] - 2026-05-23
 
 ### Fixed
@@ -1382,7 +1394,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.19...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.20...HEAD
+[0.10.20]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.20
 [0.10.19]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.19
 [0.10.18]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.18
 [0.10.17]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.17
