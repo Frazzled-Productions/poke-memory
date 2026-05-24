@@ -69,6 +69,12 @@ const SAMPLE: UserSettings = {
   timezone: null,
   dateFormat: null,
   mobileNav: "bottom" as const,
+  streakProtection: {
+    balance: 0,
+    spendDates: [],
+    daysSinceLastEarn: 0,
+    lastEarnCheckDate: null,
+  },
 };
 
 describe("pushSettings", () => {

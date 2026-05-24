@@ -10,6 +10,11 @@ import {
 } from "@/lib/review/scope";
 import type { DateFormat } from "@/lib/utils/format-date";
 import { KEY_SETTINGS } from "@/lib/storage/keys";
+import {
+  DEFAULT_STREAK_PROTECTION,
+  validateStreakProtection,
+  type StreakProtection,
+} from "@/lib/streak/tokens";
 
 // localStorage key for all user-configurable settings
 export const STORAGE_KEY = KEY_SETTINGS;
@@ -232,6 +237,15 @@ export type UserSettings = {
    * Same storage rationale as `timezone` above.
    */
   dateFormat: DateFormat | null;
+  /**
+   * Streak protection state (#1227). Tokens auto-preserve a streak across a
+   * single missed day. Earned 1 per 30 consecutive review days, capped at 3,
+   * with a hard "no two spends in a row" guard. The full rules and tunables
+   * live in `lib/streak/tokens.ts`. Stored inside the JSONB blob so the
+   * existing settings sync carries the state across devices; the per-key
+   * merge in `merge_user_settings` keeps disjoint device writes safe.
+   */
+  streakProtection: StreakProtection;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -275,6 +289,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   reverseFeedbackDelay: "default" as const,
   timezone: null,
   dateFormat: null,
+  streakProtection: { ...DEFAULT_STREAK_PROTECTION },
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -494,6 +509,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
       obj.mobileNav === "bottom" || obj.mobileNav === "hamburger"
         ? obj.mobileNav
         : "hamburger",
+    streakProtection: validateStreakProtection(obj.streakProtection),
   };
 }
 

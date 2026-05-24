@@ -12,7 +12,7 @@ import { loadSettings } from "@/lib/settings/persistence";
 import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
-import { computeStreak, loadStreakData } from "@/lib/streak";
+import { computeStreak, effectiveStreakDates, loadStreakData } from "@/lib/streak";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
 import { buildCollectionTimeline, type CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { CollectionTimeline as CollectionTimelineWidget } from "@/components/journey/CollectionTimeline";
@@ -435,10 +435,18 @@ export default function JourneyPage() {
         practiceScope: settings.practiceScope,
       });
       const dates = loadStreakData();
-      setStreakDates(dates);
+      // Compose review dates with any token-spend bridges so both the
+      // current-streak counter and the longest-streak record reflect
+      // preserved days (#1227). Defensive ?? covers test mocks that omit
+      // the field.
+      const effectiveDates = effectiveStreakDates(
+        dates,
+        settings.streakProtection?.spendDates ?? [],
+      );
+      setStreakDates(effectiveDates);
       const tz = settings.timezone ?? "UTC";
       const today = todayString(new Date(), tz);
-      setCurrentStreak(computeStreak(dates, today));
+      setCurrentStreak(computeStreak(effectiveDates, today));
       const log = await loadGradeLog();
       setGradeLog(log);
 
