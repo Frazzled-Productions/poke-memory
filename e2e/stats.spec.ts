@@ -493,6 +493,61 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
   });
 });
 
+test.describe("Stats page — streak protection card (#1227)", () => {
+  test("renders with zero tokens for a fresh guest", async ({ page }) => {
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Streak protection" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // 0 + " tokens" — verified via the explicit aria-label on the count.
+    await expect(page.getByLabel("0 protection tokens")).toBeVisible();
+  });
+
+  test("reflects a seeded non-zero balance and shows the spend history line", async ({
+    page,
+  }) => {
+    // Seed a settings record with two tokens held and one prior spend so the
+    // card renders the balance and the history line. The Stats page also runs
+    // `runStreakProtection` on mount; with a fresh single-day streakDates set
+    // and yesterday gap, that pass is a no-op on this seed because the streak
+    // was never alive before yesterday.
+    await page.addInitScript(() => {
+      const KEY = "poke-memory:settings:v1";
+      const raw = localStorage.getItem(KEY);
+      const existing =
+        raw !== null
+          ? (JSON.parse(raw) as Record<string, unknown>)
+          : { mobileNav: "bottom" };
+      const onboarding =
+        typeof existing.onboarding === "object" && existing.onboarding !== null
+          ? (existing.onboarding as Record<string, unknown>)
+          : {};
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({
+          ...existing,
+          onboarding: { ...onboarding, firstVisitOnboardingDismissed: true },
+          streakProtection: {
+            balance: 2,
+            spendDates: ["2026-05-08"],
+            daysSinceLastEarn: 5,
+            lastEarnCheckDate: "2026-05-09",
+          },
+        }),
+      );
+    });
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Streak protection" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel("2 protection tokens")).toBeVisible();
+    await expect(page.getByTestId("streak-protection-last-spend")).toBeVisible();
+    await expect(page.getByTestId("streak-protection-last-spend")).toContainText(
+      /Streak preserved on/,
+    );
+  });
+});
+
 test.describe("Stats page — heatmap hover tooltip", () => {
   test("hovering a heatmap cell shows a tooltip with the date and review count", async ({
     page,

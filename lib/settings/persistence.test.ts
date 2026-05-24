@@ -145,6 +145,12 @@ describe('loadSettings migration', () => {
       timezone: 'Europe/London',
       dateFormat: 'dmy' as const,
       mobileNav: 'bottom' as const,
+      streakProtection: {
+        balance: 2,
+        spendDates: ['2026-05-08'],
+        daysSinceLastEarn: 12,
+        lastEarnCheckDate: '2026-05-09',
+      },
     };
     saveSettings(custom);
     const loaded = loadSettings();

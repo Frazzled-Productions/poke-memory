@@ -18,6 +18,8 @@ import { BADGE_CATALOG } from "@/lib/badges/catalog";
 import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { saveStreakData } from "@/lib/streak/persistence";
+import { runStreakProtection } from "@/lib/streak/runProtection";
+import { StreakProtectionCard } from "@/components/stats/StreakProtectionCard";
 import { loadGradeLog, saveGradeLog, computeGradeTotals, type GradeTotals } from "@/lib/gradelog/persistence";
 import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
 import { pullStreak } from "@/lib/sync/streak";
@@ -374,8 +376,16 @@ export default function StatsPage() {
 
   useEffect(() => {
     async function load() {
+      // Load settings first so the protection pass can evaluate `today` in
+      // the user's timezone — the `streakDates` set is populated using the
+      // user's local tz (see ReviewSession), so running protection against
+      // UTC would cause off-by-one boundary errors at high UTC offsets.
       const settings = loadSettings();
       if (settings.timezone) setUserTimezone(settings.timezone);
+      // Drive a streak-protection pass on every Stats mount so a missed-day
+      // token spend (if any) is recorded before the page renders the
+      // protection card (#1227). Idempotent across same-day mounts.
+      runStreakProtection(todayString(new Date(), settings.timezone ?? "UTC"));
       if (settings.dateFormat) setUserDateFormat(settings.dateFormat);
       const saved = await loadSession();
       const sessionCards = saved !== null
@@ -642,6 +652,10 @@ export default function StatsPage() {
                 />
               )}
               <DueForecast forecast={snapshot.dueForecast ?? []} fmt={userDateFormat} tz={userTimezone} />
+              <StreakProtectionCard
+                dateFormat={userDateFormat}
+                timezone={userTimezone}
+              />
               <StrugglingCards struggling={snapshot.struggling ?? []} />
             </section>
 

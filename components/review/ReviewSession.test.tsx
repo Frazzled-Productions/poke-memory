@@ -165,6 +165,7 @@ vi.mock("@/lib/streak", () => ({
   recordReview: vi.fn(),
   loadStreakData: vi.fn(() => []),
   computeStreak: vi.fn(() => 0),
+  effectiveStreakDates: vi.fn((dates: string[]) => dates),
 }));
 
 vi.mock("@/lib/auth/AuthContext", () => ({
