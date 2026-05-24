@@ -1966,12 +1966,15 @@ export function ReviewSession() {
     }
 
     // ── Visible swap ────────────────────────────────────────────────────────
-    // Commit the grade to the undo snapshot and the cloud-sync queue, then
-    // immediately update all visible state (#1191 Class B item 5).
-    // Persistence (saveSession, appendGradeEntry, recordReview) runs in the
-    // background so it does not block the swap.
-    undoSnapshotRef.current = snapshot;
-    setHasUndoSnap(true);
+    // Commit the grade to the cloud-sync queue and immediately update all
+    // visible state (#1191 Class B item 5). Persistence (saveSession,
+    // appendGradeEntry, recordReview) runs in the background so it does not
+    // block the swap.
+    //
+    // The undo snapshot is NOT set here. It is set inside the persistence
+    // chain only after saveSession confirms the write succeeded (#1209).
+    // This keeps the undo button's enabled state consistent with persisted
+    // state: a failed save leaves no snapshot, so undo stays disabled.
     enqueueGrade({ ...effectiveCard, state: nextState });
 
     setCards(newCards);
@@ -2081,8 +2084,15 @@ export function ReviewSession() {
           "[handleGrade] saveSession failed — skipping grade-log append to avoid split-write:",
           saveResult.reason,
         );
+        // Do NOT set the undo snapshot on a failed save (#1209). The undo
+        // button stays disabled so its enabled state matches persisted state.
         return;
       }
+      // Session persisted successfully — arm the undo snapshot now so the
+      // undo button only becomes active when there is a durable write to
+      // revert (#1209).
+      undoSnapshotRef.current = snapshot;
+      setHasUndoSnap(true);
       const gradeLog = await loadGradeLog();
       const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
       const dueQueueEmpty = !newCards.some(

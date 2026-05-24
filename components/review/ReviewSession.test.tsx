@@ -3331,3 +3331,115 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Undo snap consistent with persistence state (#1209)
+// ---------------------------------------------------------------------------
+
+describe("undo snap: only armed after successful saveSession (#1209)", () => {
+  /** Minimal name-card-only settings — same shape as nameOnlySettings above. */
+  const nameOnlySettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    reverseCardsEnabled: false,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 0,
+    cryCardsEnabled: false,
+    maxNewCryPerDay: 0,
+    maxReviewsCryPerDay: 0,
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
+  };
+
+  // Install an in-memory localStorage stub so saveDailySummary etc. do not throw.
+  function makeLocalStorage(): Storage {
+    const store = new Map<string, string>();
+    return {
+      get length() { return store.size; },
+      clear: () => store.clear(),
+      getItem: (k) => store.get(k) ?? null,
+      key: (i) => Array.from(store.keys())[i] ?? null,
+      removeItem: (k) => { store.delete(k); },
+      setItem: (k, v) => { store.set(k, String(v)); },
+    };
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  it("undo button is NOT shown when saveSession fails on grade (#1209)", async () => {
+    // Mount-time saves succeed; the grade-path save fails.
+    // Two Once calls cover the mount-time saves (same rationale as the
+    // "surfaces the storage-error banner" test above). After both are consumed,
+    // every subsequent call returns failure so the grade-path persistence chain
+    // exits early without arming the undo snapshot.
+    vi.mocked(saveSession)
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValue({ ok: false, reason: "quota" });
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    // Wait for mount to settle — the two Once calls are consumed.
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+
+    // Undo button must NOT be present before any grade (sanity baseline).
+    expect(
+      screen.queryByRole("button", { name: /undo last grade/i }),
+    ).not.toBeInTheDocument();
+
+    // Trigger a grade against the failing saveSession.
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /again/i }));
+
+    // Wait for the grade-path saveSession call to resolve (persistence chain settled).
+    await waitFor(() => {
+      // saveSession will have been called at least three times total by now
+      // (two mount-time + one grade-path).
+      expect(vi.mocked(saveSession).mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    // The undo button must NOT be active — the snapshot was never armed because
+    // saveSession returned { ok: false } (#1209).
+    expect(
+      screen.queryByRole("button", { name: /undo last grade/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("undo button IS shown when saveSession succeeds on grade (happy path, #1209 regression guard)", async () => {
+    // All saves succeed — undo snap should be armed and the button rendered.
+    vi.mocked(saveSession).mockResolvedValue({ ok: true });
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+
+    // Grade Again so the card re-enters the queue and the session stays active.
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /again/i }));
+
+    // After a successful save, the undo snap is armed and the button should appear.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /undo last grade/i }),
+      ).toBeInTheDocument(),
+    );
+  });
+});
