@@ -28,10 +28,11 @@
 //     A card_reviews row exists for the subject, but it looks like the
 //     scheduler never actually processed grades against it
 //     (`last_review IS NULL` or `reps = 0`) despite the same subject
-//     receiving ≥3 grade_log entries in the last 48h. This catches the
-//     case Option A misses: the row was written once (e.g. during the
-//     initial pull / merge) but every subsequent per-grade update was
-//     silently dropped.
+//     receiving ≥3 grade_log entries inside the persistence window
+//     (between 2 and 4 days ago, see "Re-learning false positives on
+//     Option B" below). This catches the case Option A misses: the row
+//     was written once (e.g. during the initial pull / merge) but every
+//     subsequent per-grade update was silently dropped.
 //
 // In-step false positives (#1221)
 // -------------------------------
@@ -53,9 +54,46 @@
 // delay does not hide them — it just removes the noise from the leading
 // edge.
 //
-// Option B does not need the same grace because its shape is "row
-// exists and is stuck", not "row absent". An in-step card has no
-// card_reviews row at all, so it cannot match Option B.
+// Re-learning false positives on Option B (#1229)
+// -----------------------------------------------
+// Option B also needs a 2-day grace, for a subtler reason than Option A.
+// The pull-normalisation branch in `lib/sync/cloud.ts::applyCloudRow`
+// resets a card to fresh state (`reps = 0`, `lastReview = null`,
+// `firstSeen = null`) whenever a cloud row arrives with the invariant-
+// violating shape `first_seen != null && last_review == null`. After the
+// reset the local card is genuinely "new" again, so a subsequent grade
+// pushes it back into learning steps (`firstSeen` set, `lastReview`
+// still null) and `isSyncSafe()` correctly blocks the per-grade upsert
+// until graduation. Meanwhile the cloud `card_reviews` row remains in
+// its pre-reset stuck shape (`reps = 0` or `last_review IS NULL`) and
+// the user keeps tapping Again/Hard/Good, producing grade_log entries.
+// Without a grace period, Option B would fire for this user on day one
+// of re-learning even though nothing is broken — the row will be
+// rewritten the moment the card graduates.
+//
+// We apply the same 2-day persistence window to Option B's CTE as Option
+// A has on its CTE: a stuck row whose latest grade_log entry is still
+// ≥2 days old is no longer a re-learning session in progress, it is a
+// genuine stuck row. Real "row stuck stale" breaks reappear in the same
+// window the next day and the day after, so the delay does not hide
+// them — it just removes the leading-edge noise.
+//
+// Option A detection floor (#1230)
+// --------------------------------
+// Option A's CTE filters on `entry_date >= CURRENT_DATE - 4 days` (i.e.
+// OPTION_A_LOWER_BOUND_DAYS_AGO). This is a hard look-back floor:
+// subjects whose most-recent grade is older than 4 days ago do not enter
+// the CTE at all and are therefore invisible to the alert. An
+// infrequently-reviewed card that hit the #584 break and was then left
+// alone for a week would not be caught here.
+//
+// We accept the floor deliberately. The narrow window keeps the query
+// cheap and the false-positive surface small, and the operator who lands
+// on a "we missed a stale-card break for two weeks" incident can widen
+// OPTION_A_LOWER_BOUND_DAYS_AGO at that point. If we ever need broader
+// coverage without paying the per-tick cost, the right shape is a
+// periodic deeper sweep (e.g. weekly) using the same Option A logic
+// with a wider lower bound, not a permanently widened floor here.
 //
 // card_type normalisation (#970)
 // ------------------------------
@@ -119,11 +157,21 @@ const DEFAULT_THRESHOLD = 0;
 const OPTION_A_UPPER_BOUND_DAYS_AGO = 2;
 const OPTION_A_LOWER_BOUND_DAYS_AGO = 4;
 
-// Option B "recent activity" window. ≥3 grades inside the last 2 days
-// is a strong signal the user is actively reviewing the card; if the
+// Option B "recent activity" window. ≥3 grades inside the look-back is
+// a strong signal the user is actively reviewing the card; if the
 // card_reviews row is still stuck at reps=0 / last_review IS NULL after
 // that many grades, the per-grade upsert is broken.
-const OPTION_B_WINDOW_DAYS = 2;
+//
+// The window is offset by OPTION_B_UPPER_BOUND_DAYS_AGO for the same
+// re-learning false-positive reason described in the header (#1229):
+// the pull-normalisation reset path produces a card_reviews row with
+// reps=0 / last_review=null and accumulating grade_log entries while
+// the card is in learning steps, which would otherwise match Option B
+// during the leading edge of a re-learning session. We give the row a
+// 2-day grace to either graduate (which rewrites it) or persist as
+// genuinely stuck (which is the real signal).
+const OPTION_B_UPPER_BOUND_DAYS_AGO = 2;
+const OPTION_B_LOWER_BOUND_DAYS_AGO = 4;
 const OPTION_B_MIN_GRADES = 3;
 
 // Option A query — "row never written".
@@ -172,13 +220,19 @@ ORDER BY missing_subjects DESC;
 
 // Option B query — "row stuck stale".
 //
-// Find subjects with ≥OPTION_B_MIN_GRADES grade_log entries in the last
-// OPTION_B_WINDOW_DAYS days, normalised to the card_reviews vocabulary,
+// Find subjects with ≥OPTION_B_MIN_GRADES grade_log entries inside the
+// persistence window (entry_date between LOWER_BOUND and UPPER_BOUND
+// days ago, both inclusive), normalised to the card_reviews vocabulary,
 // then JOIN (not LEFT JOIN) to card_reviews. The row must exist; the
 // failure shape is "exists but stuck". A stuck row has either
 // `last_review IS NULL` (never been processed by the scheduler at all)
 // or `reps = 0` (scheduler never registered a successful review). Both
 // are inconsistent with multiple recent grades.
+//
+// The HAVING `MAX(entry_date) <= ... UPPER_BOUND days ago` clause gives
+// re-learning sessions a 2-day grace to graduate before counting them
+// as stuck (#1229). See the header rationale for why this matches
+// Option A's offset.
 //
 // Aggregating to one row per user keeps the alert compact and matches
 // the Option A shape, so the markdown can render them in parallel.
@@ -192,11 +246,13 @@ WITH recent_grades AS (
       ELSE card_type
     END AS card_type,
     subject_key,
-    COUNT(*) AS grade_count
+    COUNT(*) AS grade_count,
+    MAX(entry_date) AS last_entry_date
   FROM grade_log
-  WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_B_WINDOW_DAYS} days')::date
+  WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_B_LOWER_BOUND_DAYS_AGO} days')::date
   GROUP BY user_id, card_type, subject_key
   HAVING COUNT(*) >= ${OPTION_B_MIN_GRADES}
+     AND MAX(entry_date) <= (CURRENT_DATE - INTERVAL '${OPTION_B_UPPER_BOUND_DAYS_AGO} days')::date
 )
 SELECT
   r.user_id::text AS user_id,
@@ -278,7 +334,7 @@ function formatOptionBSection(rows) {
   lines.push("### Option B — `card_reviews` row exists but is stuck");
   lines.push("");
   lines.push(
-    `**${rows.length} user(s)** have a \`card_reviews\` row whose \`last_review IS NULL\` or \`reps = 0\` despite the same subject receiving **≥${OPTION_B_MIN_GRADES} grade_log entries in the last ${OPTION_B_WINDOW_DAYS * 24}h**.`,
+    `**${rows.length} user(s)** have a \`card_reviews\` row whose \`last_review IS NULL\` or \`reps = 0\` despite the same subject receiving **≥${OPTION_B_MIN_GRADES} grade_log entries between ${OPTION_B_UPPER_BOUND_DAYS_AGO} and ${OPTION_B_LOWER_BOUND_DAYS_AGO} days ago**.`,
   );
   lines.push("");
   lines.push("This is the failure shape Option A cannot see: the per-grade");
@@ -286,6 +342,14 @@ function formatOptionBSection(rows) {
   lines.push("but every subsequent update was silently dropped. The scheduler");
   lines.push("never advanced the row, so the user's review history is");
   lines.push("effectively frozen even though the client thinks it is syncing.");
+  lines.push("");
+  lines.push("The 2-day offset is the re-learning grace period introduced in");
+  lines.push("#1229: the pull-normalisation reset path in `lib/sync/cloud.ts`");
+  lines.push("can leave a `card_reviews` row at `reps = 0` while the user is");
+  lines.push("actively re-learning the card, and `isSyncSafe()` blocks the");
+  lines.push("per-grade upsert until graduation. A subject whose latest grade");
+  lines.push("is ≥2 days old and the row is still stuck is no longer mid");
+  lines.push("re-learning — it is a genuine stuck row.");
   lines.push("");
   lines.push("| user_id (prefix) | stuck subjects |");
   lines.push("|---|---:|");
@@ -384,7 +448,7 @@ async function main() {
   // Always emit a one-line summary to stderr so the workflow log shows
   // what we saw, regardless of whether we're alerting.
   console.error(
-    `[divergence-check] Option A: ${rowsA.length} user(s) with subjects ≥${OPTION_A_UPPER_BOUND_DAYS_AGO}d old missing a card_reviews row (${flaggedA.length} above threshold). Option B: ${rowsB.length} user(s) with stuck card_reviews rows despite ≥${OPTION_B_MIN_GRADES} recent grades (${flaggedB.length} above threshold).`,
+    `[divergence-check] Option A: ${rowsA.length} user(s) with subjects ≥${OPTION_A_UPPER_BOUND_DAYS_AGO}d old missing a card_reviews row (${flaggedA.length} above threshold). Option B: ${rowsB.length} user(s) with stuck card_reviews rows despite ≥${OPTION_B_MIN_GRADES} grades ≥${OPTION_B_UPPER_BOUND_DAYS_AGO}d old (${flaggedB.length} above threshold).`,
   );
 
   if (flaggedA.length === 0 && flaggedB.length === 0) {
@@ -424,7 +488,8 @@ async function main() {
           })),
         },
         option_b: {
-          window_hours: OPTION_B_WINDOW_DAYS * 24,
+          upper_bound_days_ago: OPTION_B_UPPER_BOUND_DAYS_AGO,
+          lower_bound_days_ago: OPTION_B_LOWER_BOUND_DAYS_AGO,
           min_grades: OPTION_B_MIN_GRADES,
           user_count: flaggedB.length,
           users: flaggedB.map((r) => ({
