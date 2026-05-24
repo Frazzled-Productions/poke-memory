@@ -28,12 +28,16 @@ export function StreakBadge() {
   // (which writes `seenStreakMilestones`) is reflected on the next event.
   useEffect(() => {
     function refresh() {
-      const today = todayString(new Date());
+      // Load settings before computing `today` so the protection pass and
+      // streak computation both honour the user's timezone — the streakDates
+      // set is populated in the user's local tz (see ReviewSession), so a
+      // UTC `today` would cause off-by-one boundary errors at high offsets.
+      const settings = loadSettings();
+      const today = todayString(new Date(), settings.timezone ?? "UTC");
       // Run the streak-protection step before computing the streak so a token
       // spend (if any) bridges yesterday's gap. The step is idempotent across
       // same-day calls.
       runStreakProtection(today);
-      const settings = loadSettings();
       const s = computeStreak(
         effectiveStreakDates(
           loadStreakData(),

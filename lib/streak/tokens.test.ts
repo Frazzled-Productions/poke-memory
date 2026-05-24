@@ -94,6 +94,77 @@ describe("applyProtectionStep — earn leg", () => {
   });
 });
 
+describe("applyProtectionStep — earn-counter reset on streak break", () => {
+  // Build an ISO date sequence by offsetting from a base date.
+  function isoOffset(base: string, days: number): string {
+    const d = new Date(base + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  it("resets the earn counter when the streak is broken without a bridging spend", () => {
+    // User reviews 20 consecutive days starting 2026-04-01, takes a 14-day
+    // break, then reviews 10 more days. The earn counter must reflect only
+    // the latest 10 consecutive review days, not 30 — no token earned.
+    const base = "2026-04-01";
+    const reviews: string[] = [];
+    for (let i = 0; i < 20; i++) reviews.push(isoOffset(base, i));
+    // 14-day break: days 20..33 are missing.
+    for (let i = 34; i < 44; i++) reviews.push(isoOffset(base, i));
+
+    let state: StreakProtection = { ...DEFAULT_STREAK_PROTECTION };
+
+    // Walk every review day through `applyProtectionStep` so the
+    // `lastEarnCheckDate` chain matches a real user's daily passes.
+    for (const day of reviews) {
+      state = applyProtectionStep(state, reviews, day).protection;
+    }
+
+    expect(state.balance).toBe(0);
+    expect(state.daysSinceLastEarn).toBe(10);
+    expect(state.lastEarnCheckDate).toBe(reviews[reviews.length - 1]);
+  });
+
+  it("preserves the earn counter across a day bridged by a token spend", () => {
+    // User reviews 20 days, misses day 21, a token bridges day 21, then
+    // reviews day 22. The counter should read 22 (no reset), not 0 or 1.
+    const base = "2026-04-01";
+    const reviews: string[] = [];
+    for (let i = 0; i < 20; i++) reviews.push(isoOffset(base, i));
+    reviews.push(isoOffset(base, 21)); // resume on day 22 (i.e. base+21)
+
+    const bridgedDay = isoOffset(base, 20); // the missed day 21 itself
+
+    let state: StreakProtection = { ...DEFAULT_STREAK_PROTECTION };
+    // Walk the first 20 review days normally.
+    for (let i = 0; i < 20; i++) {
+      state = applyProtectionStep(state, reviews, reviews[i]).protection;
+    }
+    expect(state.daysSinceLastEarn).toBe(20);
+
+    // Inject a token spend for the missed day. In production the spend leg
+    // would fire on the resume-day pass; we set it directly so the test
+    // isolates the earn-counter behaviour from the spend-leg preconditions.
+    state = { ...state, spendDates: [bridgedDay] };
+
+    // Resume on day 22.
+    state = applyProtectionStep(state, reviews, reviews[20]).protection;
+    expect(state.daysSinceLastEarn).toBe(21);
+    expect(state.lastEarnCheckDate).toBe(reviews[20]);
+  });
+
+  it("does not reset when consecutive review days are unbroken", () => {
+    // Two adjacent review days — the chain is intact, no reset.
+    const start: StreakProtection = {
+      ...DEFAULT_STREAK_PROTECTION,
+      daysSinceLastEarn: 5,
+      lastEarnCheckDate: "2026-05-08",
+    };
+    const result = applyProtectionStep(start, ["2026-05-08", "2026-05-09"], "2026-05-09");
+    expect(result.protection.daysSinceLastEarn).toBe(6);
+  });
+});
+
 describe("applyProtectionStep — spend leg", () => {
   it("auto-spends a token to bridge yesterday when balance >= 1", () => {
     const start: StreakProtection = { ...DEFAULT_STREAK_PROTECTION, balance: 2 };

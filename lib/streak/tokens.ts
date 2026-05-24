@@ -135,7 +135,11 @@ export type ProtectionStepResult = {
  *     `daysSinceLastEarn` increments by one (guarded by `lastEarnCheckDate`
  *     so multiple grade events in the same day count once). When the counter
  *     reaches `EARN_INTERVAL_DAYS`, balance is incremented (clamped to
- *     `MAX_BALANCE`) and the counter resets to 0.
+ *     `MAX_BALANCE`) and the counter resets to 0. If any day strictly between
+ *     `lastEarnCheckDate` and `today` is neither a review day nor a spend
+ *     day, the consecutive-review chain was broken — the counter resets to 0
+ *     before incrementing for today, so the 30-day clock only counts
+ *     *sustained* practice (#1227 scarcity invariant).
  *
  *   - Spend: if today is NOT a review day (yet) but the streak would otherwise
  *     have broken because yesterday is missing, and the day before yesterday
@@ -164,6 +168,19 @@ export function applyProtectionStep(
   // not already counted today. The check fires daily — at most one increment
   // per calendar day, regardless of how many grade events fire.
   if (dateSet.has(today) && next.lastEarnCheckDate !== today) {
+    // Reset the consecutive-review counter if the chain between
+    // `lastEarnCheckDate` and `today` is broken — any interstitial day that
+    // is neither a review day nor bridged by a spend means the user did not
+    // sustain the streak, so the earn clock must start over. Token spends
+    // legitimately bridge a missed day (the streak is preserved) so they
+    // also preserve the earn counter.
+    if (
+      next.lastEarnCheckDate !== null &&
+      hasUnbridgedGap(next.lastEarnCheckDate, today, dateSet, spendSet)
+    ) {
+      next = { ...next, daysSinceLastEarn: 0 };
+    }
+
     const incrementedDays = next.daysSinceLastEarn + 1;
     if (incrementedDays >= EARN_INTERVAL_DAYS) {
       const nextBalance = Math.min(next.balance + 1, MAX_BALANCE);
@@ -244,4 +261,28 @@ function offsetDate(date: string, days: number): string {
   const d = new Date(date + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
   return isoDate(d);
+}
+
+/**
+ * Returns true when at least one ISO date strictly between `from` and `to`
+ * (exclusive at both ends) is neither in `dateSet` nor in `spendSet` — i.e.
+ * the user missed a day that no token spend covered. Used to decide whether
+ * the earn counter should reset before incrementing for `to`.
+ *
+ * Adjacent dates (`to = from + 1`) have no interstitial range and always
+ * return false. If `to <= from` the range is empty and the function returns
+ * false (a no-op guard against pathological inputs).
+ */
+function hasUnbridgedGap(
+  from: string,
+  to: string,
+  dateSet: ReadonlySet<string>,
+  spendSet: ReadonlySet<string>,
+): boolean {
+  let cursor = offsetDate(from, 1);
+  while (cursor < to) {
+    if (!dateSet.has(cursor) && !spendSet.has(cursor)) return true;
+    cursor = offsetDate(cursor, 1);
+  }
+  return false;
 }
