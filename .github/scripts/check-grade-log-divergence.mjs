@@ -246,8 +246,7 @@ WITH recent_grades AS (
       ELSE card_type
     END AS card_type,
     subject_key,
-    COUNT(*) AS grade_count,
-    MAX(entry_date) AS last_entry_date
+    COUNT(*) AS grade_count
   FROM grade_log
   WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_B_LOWER_BOUND_DAYS_AGO} days')::date
   GROUP BY user_id, card_type, subject_key
