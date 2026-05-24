@@ -90,6 +90,12 @@ const VALID_SETTINGS: UserSettings = {
   waitForAudioOnGrade: true,
   reverseFeedbackDelay: "default" as const,
   mobileNav: "bottom" as const,
+  streakProtection: {
+    balance: 0,
+    spendDates: [],
+    daysSinceLastEarn: 0,
+    lastEarnCheckDate: null,
+  },
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

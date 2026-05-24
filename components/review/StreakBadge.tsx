@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   computeStreak,
+  effectiveStreakDates,
   loadStreakData,
   STREAK_UPDATED_EVENT,
 } from "@/lib/streak";
+import { runStreakProtection } from "@/lib/streak/runProtection";
 import { findPendingMilestone } from "@/lib/streak/milestones";
 import { todayString } from "@/lib/review/session";
 import {
@@ -27,9 +29,20 @@ export function StreakBadge() {
   useEffect(() => {
     function refresh() {
       const today = todayString(new Date());
-      const s = computeStreak(loadStreakData(), today);
+      // Run the streak-protection step before computing the streak so a token
+      // spend (if any) bridges yesterday's gap. The step is idempotent across
+      // same-day calls.
+      runStreakProtection(today);
+      const settings = loadSettings();
+      const s = computeStreak(
+        effectiveStreakDates(
+          loadStreakData(),
+          settings.streakProtection?.spendDates ?? [],
+        ),
+        today,
+      );
       setStreak(s);
-      const seen = loadSettings().seenStreakMilestones;
+      const seen = settings.seenStreakMilestones;
       if (flags.forceNextStreakMilestone) {
         // QA cheat: fire the smallest un-seen milestone regardless of actual
         // streak. Picks from STREAK_MILESTONES via findPendingMilestone with

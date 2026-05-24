@@ -70,7 +70,7 @@ import {
   loadDailySummary,
   saveDailySummary,
 } from "@/lib/review/dailySummaryPersistence";
-import { computeStreak, loadStreakData } from "@/lib/streak";
+import { computeStreak, effectiveStreakDates, loadStreakData } from "@/lib/streak";
 import {
   EMPTY_SCOPE,
   cardIsEligible,
@@ -1639,7 +1639,16 @@ export function ReviewSession() {
       sessionGradeSeq.length > 0
         ? {
             date: todayTz,
-            streak: computeStreak(loadStreakData(), today),
+            // Use protection-aware streak (#1227) so a preserved day is
+            // reflected in the daily summary the user shares. Defensive ??
+            // covers test mocks that omit the field.
+            streak: computeStreak(
+              effectiveStreakDates(
+                loadStreakData(),
+                loadSettings().streakProtection?.spendDates ?? [],
+              ),
+              today,
+            ),
             reviewed: sessionGradeSeq.length,
             newCards: newCardsThisSession,
             mastered: masteredThisSession,

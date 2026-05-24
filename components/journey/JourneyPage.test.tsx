@@ -186,6 +186,12 @@ vi.mock("@/lib/settings/persistence", () => ({
     earnedBadges: [],
     retentionTarget: 0.9,
     timezone: "UTC",
+    streakProtection: {
+      balance: 0,
+      spendDates: [],
+      daysSinceLastEarn: 0,
+      lastEarnCheckDate: null,
+    },
   })),
   saveSettings: vi.fn(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
@@ -194,6 +200,7 @@ vi.mock("@/lib/settings/persistence", () => ({
 vi.mock("@/lib/streak", () => ({
   loadStreakData: vi.fn(() => []),
   computeStreak: vi.fn(() => 0),
+  effectiveStreakDates: vi.fn((dates: string[]) => dates),
   recordReview: vi.fn(),
 }));
 
