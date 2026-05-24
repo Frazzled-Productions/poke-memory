@@ -6,6 +6,17 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.21] - 2026-05-24
+
+### Added
+
+- Streak protection tokens. Earn one token for every 30 consecutive review days (capped at 3) and an unused token is spent automatically on a missed day to keep your streak alive, with no two protected days in a row allowed. Balance and history are shown on the Stats page.
+
+### Fixed
+
+- Monitoring no longer alerts on in-step cards: the grade_log vs card_reviews divergence check now applies a 2-day persistence window to the "row never written" query, and adds a second query that catches the "row exists but is stuck" failure shape.
+- Monitoring divergence check: Option B now applies the same 2-day persistence window as Option A, so re-learning sessions after a pull-normalisation reset no longer trigger spurious "row stuck stale" alerts. Also documents Option A's 4-day detection floor in the script header.
+
 ## [0.10.20] - 2026-05-24
 
 ### Changed
@@ -1394,7 +1405,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.20...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.21...HEAD
+[0.10.21]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.21
 [0.10.20]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.20
 [0.10.19]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.19
 [0.10.18]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.18
