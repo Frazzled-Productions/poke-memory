@@ -3018,7 +3018,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     render(<ReviewSession />);
 
     // Flag should not be set before the grade.
-    expect(window.localStorage.getItem("poke-memory:has-mastered:v1")).toBeNull();
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
 
     // Reveal and grade Easy — nextReview is mocked to return a mastered state,
     // transitioning the card from unmastered to mastered.
@@ -3056,11 +3056,87 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     );
 
     // writeHasMasteredFlag must have written "true" on the mastery transition.
-    expect(window.localStorage.getItem("poke-memory:has-mastered:v1")).toBe("true");
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBe("true");
 
     // Restore the real nextReview implementation so the mockImplementation set
     // above does not leak into subsequent tests. vi.clearAllMocks preserves
     // implementations, so an explicit restore is required here.
+    if (realNextReview.current) {
+      vi.mocked(nextReview).mockImplementation(realNextReview.current);
+    }
+  });
+
+  it("hasMastered flag is NOT written when a non-name card (reverse) transitions into mastery (#1219)", async () => {
+    // Guard: mastering a reverse card must not flip the flag because
+    // filterMastered (lib/pasture/arrivals.ts) only counts name cards.
+    //
+    // Use the 4-card seed with reverse-only settings so the session renders a
+    // SpritePicker. nextReview is mocked to return a mastered state so that
+    // tapping the correct tile triggers the wasMastered→nowMastered transition.
+    const user = userEvent.setup();
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      reverseCardsEnabled: true,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: false,
+      evolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    // Flag must be absent before any grade.
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
+
+    render(<ReviewSession />);
+
+    // Wait for the SpritePicker tiles to appear.
+    await waitFor(() =>
+      expect(screen.getAllByRole("button").some((b) => b.getAttribute("aria-label"))).toBe(true),
+    );
+
+    // Mock nextReview to return a mastered state so the transition fires.
+    vi.mocked(nextReview).mockImplementation(() => ({
+      stability: 10,
+      difficulty: 5,
+      elapsedDays: 1,
+      scheduledDays: 21,
+      reps: 3,
+      lapses: 0,
+      fsrsState: "review" as const,
+      dueDate: "2026-06-14",
+      lastReview: "2026-05-24",
+      firstSeen: "2026-05-01",
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    }));
+
+    // Tap any tile (correct or incorrect — handleGrade fires either way, and
+    // nextReview is fully mocked so the resulting state is mastered regardless).
+    const tiles = screen
+      .getAllByRole("button")
+      .filter((b) => ["Bulbasaur", "Ivysaur", "Venusaur", "Charmander"].includes(b.getAttribute("aria-label") ?? ""));
+    expect(tiles.length).toBeGreaterThan(0);
+    await user.click(tiles[0]);
+
+    // Wait for the grade to be processed (tiles swap or feedback appears).
+    await waitFor(() => expect(saveSession).toHaveBeenCalled());
+
+    // The flag must remain absent — a reverse card mastery must not flip it.
+    expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
+
+    // Restore so the mocked implementation does not leak into subsequent tests.
     if (realNextReview.current) {
       vi.mocked(nextReview).mockImplementation(realNextReview.current);
     }
@@ -3253,5 +3329,117 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     await waitFor(() => {
       expect(vi.mocked(appendGradeEntry)).toHaveBeenCalledOnce();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Undo snap consistent with persistence state (#1209)
+// ---------------------------------------------------------------------------
+
+describe("undo snap: only armed after successful saveSession (#1209)", () => {
+  /** Minimal name-card-only settings — same shape as nameOnlySettings above. */
+  const nameOnlySettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    reverseCardsEnabled: false,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 0,
+    cryCardsEnabled: false,
+    maxNewCryPerDay: 0,
+    maxReviewsCryPerDay: 0,
+    nameCardsEnabled: true,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
+  };
+
+  // Install an in-memory localStorage stub so saveDailySummary etc. do not throw.
+  function makeLocalStorage(): Storage {
+    const store = new Map<string, string>();
+    return {
+      get length() { return store.size; },
+      clear: () => store.clear(),
+      getItem: (k) => store.get(k) ?? null,
+      key: (i) => Array.from(store.keys())[i] ?? null,
+      removeItem: (k) => { store.delete(k); },
+      setItem: (k, v) => { store.set(k, String(v)); },
+    };
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  it("undo button is NOT shown when saveSession fails on grade (#1209)", async () => {
+    // Mount-time saves succeed; the grade-path save fails.
+    // Two Once calls cover the mount-time saves (same rationale as the
+    // "surfaces the storage-error banner" test above). After both are consumed,
+    // every subsequent call returns failure so the grade-path persistence chain
+    // exits early without arming the undo snapshot.
+    vi.mocked(saveSession)
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValue({ ok: false, reason: "quota" });
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    // Wait for mount to settle — the two Once calls are consumed.
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+
+    // Undo button must NOT be present before any grade (sanity baseline).
+    expect(
+      screen.queryByRole("button", { name: /undo last grade/i }),
+    ).not.toBeInTheDocument();
+
+    // Trigger a grade against the failing saveSession.
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /again/i }));
+
+    // Wait for the grade-path saveSession call to resolve (persistence chain settled).
+    await waitFor(() => {
+      // saveSession will have been called at least three times total by now
+      // (two mount-time + one grade-path).
+      expect(vi.mocked(saveSession).mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    // The undo button must NOT be active — the snapshot was never armed because
+    // saveSession returned { ok: false } (#1209).
+    expect(
+      screen.queryByRole("button", { name: /undo last grade/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("undo button IS shown when saveSession succeeds on grade (happy path, #1209 regression guard)", async () => {
+    // All saves succeed — undo snap should be armed and the button rendered.
+    vi.mocked(saveSession).mockResolvedValue({ ok: true });
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+
+    const user = userEvent.setup();
+    render(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /reveal/i });
+
+    // Grade Again so the card re-enters the queue and the session stays active.
+    await user.click(revealBtn);
+    await user.click(screen.getByRole("button", { name: /again/i }));
+
+    // After a successful save, the undo snap is armed and the button should appear.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /undo last grade/i }),
+      ).toBeInTheDocument(),
+    );
   });
 });
