@@ -238,12 +238,13 @@ export type UserSettings = {
    */
   dateFormat: DateFormat | null;
   /**
-   * Streak protection state (#1227). Tokens auto-preserve a streak across a
-   * single missed day. Earned 1 per 30 consecutive review days, capped at 3,
-   * with a hard "no two spends in a row" guard. The full rules and tunables
-   * live in `lib/streak/tokens.ts`. Stored inside the JSONB blob so the
-   * existing settings sync carries the state across devices; the per-key
-   * merge in `merge_user_settings` keeps disjoint device writes safe.
+   * Streak protection state (#1227, revised #1245). Tokens auto-preserve a
+   * streak across a missed day. Earned 1 per 30 consecutive review days,
+   * capped at 3; scarcity is the only gate (consecutive spends are
+   * permitted). The full rules and tunables live in `lib/streak/tokens.ts`.
+   * Stored inside the JSONB blob so the existing settings sync carries the
+   * state across devices; the per-key merge in `merge_user_settings` keeps
+   * disjoint device writes safe.
    */
   streakProtection: StreakProtection;
 };

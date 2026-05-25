@@ -191,16 +191,68 @@ describe("applyProtectionStep — spend leg", () => {
     expect(result.protection.balance).toBe(3);
   });
 
-  it("rejects two consecutive spends (consecutive-use guard)", () => {
+  it("allows two consecutive spends when balance permits (#1245)", () => {
     const start: StreakProtection = {
       ...DEFAULT_STREAK_PROTECTION,
       balance: 3,
       spendDates: ["2026-05-07"], // day-before-yesterday was a prior spend
     };
-    // Yesterday missing too. The guard says: nope, can't chain two spends.
+    // Yesterday missing too. With the consecutive-use cap removed, the second
+    // spend should fire and bridge yesterday.
     const result = applyProtectionStep(start, ["2026-05-06"], "2026-05-09");
-    expect(result.spent).toBe(false);
-    expect(result.protection.balance).toBe(3);
+    expect(result.spent).toBe(true);
+    expect(result.protection.balance).toBe(2);
+    expect(result.protection.spendDates).toEqual(["2026-05-07", "2026-05-08"]);
+  });
+
+  it("bridges a 3-day gap when balance is 3 (trip use-case from #1245)", () => {
+    // User has built up a 3-token balance, then misses 3 consecutive days.
+    // Walk through each resume day: each pass should spend one token.
+    //
+    // Setup: reviewed on 2026-05-04. Missed 05, 06, 07. Resumes 08.
+    // On 2026-05-08: yesterday (07) missing, day-before (06) missing — no spend (streak dead, gap > 1).
+    // So we simulate the typical case where each single-day gap gets bridged
+    // at the resume of the *next* day, stepping through contiguous misses.
+    //
+    // More realistic: reviewed 05-03, missed 05-04, 05-05, 05-06, resumes 05-07.
+    // The spend leg fires once per pass (bridges exactly one day). We drive
+    // three days of "resume" to consume all three tokens.
+
+    // Day 1 of trip: reviewed 05-01, missed 05-02. Resume 05-03 → spends for 05-02.
+    const after1 = applyProtectionStep(
+      { ...DEFAULT_STREAK_PROTECTION, balance: 3 },
+      ["2026-05-01"],
+      "2026-05-03",
+    );
+    expect(after1.spent).toBe(true);
+    expect(after1.protection.balance).toBe(2);
+    expect(after1.protection.spendDates).toEqual(["2026-05-02"]);
+
+    // Day 2: missed 05-03 (above is a spend day, not review). Resume 05-04 →
+    // day-before (05-02) is in spendDates so streak is alive; spends for 05-03.
+    const after2 = applyProtectionStep(
+      after1.protection,
+      ["2026-05-01"],
+      "2026-05-04",
+    );
+    expect(after2.spent).toBe(true);
+    expect(after2.protection.balance).toBe(1);
+    expect(after2.protection.spendDates).toEqual(["2026-05-02", "2026-05-03"]);
+
+    // Day 3: missed 05-04. Resume 05-05 → day-before (05-03) is in spendDates;
+    // spends for 05-04.
+    const after3 = applyProtectionStep(
+      after2.protection,
+      ["2026-05-01"],
+      "2026-05-05",
+    );
+    expect(after3.spent).toBe(true);
+    expect(after3.protection.balance).toBe(0);
+    expect(after3.protection.spendDates).toEqual([
+      "2026-05-02",
+      "2026-05-03",
+      "2026-05-04",
+    ]);
   });
 
   it("does not double-spend if yesterday is already in spendDates", () => {

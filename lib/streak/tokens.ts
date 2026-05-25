@@ -1,5 +1,5 @@
 /**
- * Streak protection via earned tokens (#1227).
+ * Streak protection via earned tokens (#1227, revised #1245).
  *
  * Tokens are scarce, earned currency that automatically preserve a streak
  * across a missed day. The rules:
@@ -11,13 +11,11 @@
  * 2. Cap. The balance is capped at `MAX_BALANCE`. Earning a token while the
  *    balance is already at the cap is a no-op (the counter still resets, so
  *    the next earn requires another `EARN_INTERVAL_DAYS` of reviews).
- * 3. Consecutive-use limit. A token cannot be spent on day N if a token was
- *    already spent on day N-1. Two spends in a row are never permitted —
- *    "life happens" must not blur into "I'm not really doing this".
- * 4. Spend trigger. Automatic on a missed day, iff balance >= 1 AND yesterday
- *    was not itself a spend day AND the streak was alive before the gap. The
- *    spend bridges exactly one missed day. If the user does not have a token,
- *    the streak resets as before.
+ * 3. Spend trigger. Automatic on a missed day, iff balance >= 1 AND the
+ *    streak was alive before the gap. The spend bridges exactly one missed
+ *    day. If the user does not have a token, the streak resets as before.
+ *    Consecutive spends are permitted — scarcity (earn rate + balance cap)
+ *    is the only gate (#1245).
  *
  * The full design is documented in #1227. These constants are tunable; if a
  * value feels wrong mid-implementation, surface it in a follow-up issue
@@ -42,8 +40,8 @@ export type StreakProtection = {
   balance: number;
   /**
    * ISO dates ("YYYY-MM-DD") on which a token was auto-spent to preserve the
-   * streak. Sorted ascending. The list is the source of truth for both the
-   * consecutive-use guard and the user-visible spend history.
+   * streak. Sorted ascending. The list is the source of truth for the
+   * user-visible spend history.
    */
   spendDates: string[];
   /**
@@ -143,10 +141,9 @@ export type ProtectionStepResult = {
  *
  *   - Spend: if today is NOT a review day (yet) but the streak would otherwise
  *     have broken because yesterday is missing, and the day before yesterday
- *     IS in `streakDates` or `spendDates`, and balance >= 1, and yesterday is
- *     not preceded by another spend (consecutive-use guard), a token is spent
+ *     IS in `streakDates` or `spendDates`, and balance >= 1, a token is spent
  *     to bridge yesterday. `spendDates` gains `yesterday` and `balance`
- *     decrements.
+ *     decrements. Consecutive spends are permitted (#1245).
  *
  * `today` and the `streakDates` set use ISO date strings ("YYYY-MM-DD"),
  * matching the existing streak storage. The function never mutates its
@@ -201,21 +198,18 @@ export function applyProtectionStep(
   }
 
   // Spend leg. Triggered when yesterday is missing AND the day before was a
-  // review day (or itself a prior spend). The consecutive-use guard rejects a
-  // spend when day-before-yesterday is in `spendDates` — that would make two
-  // protection days in a row.
+  // review day (or itself a prior spend), and balance >= 1. Consecutive spends
+  // are permitted — scarcity (earn rate + balance cap) is the only gate (#1245).
   const yesterday = offsetDate(today, -1);
   const dayBefore = offsetDate(today, -2);
 
   const yesterdayMissing = !dateSet.has(yesterday) && !spendSet.has(yesterday);
   const streakAliveBeforeYesterday =
     dateSet.has(dayBefore) || spendSet.has(dayBefore);
-  const dayBeforeWasSpend = spendSet.has(dayBefore);
 
   if (
     yesterdayMissing &&
     streakAliveBeforeYesterday &&
-    !dayBeforeWasSpend &&
     next.balance >= 1
   ) {
     spent = true;
