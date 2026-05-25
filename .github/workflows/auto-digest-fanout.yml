@@ -34,7 +34,8 @@ jobs:
     # duplicates — it only means the job doesn't start for that event.
     if: |
       contains(github.event.issue.body, '<!-- auto-codequality-suggest -->') ||
-      contains(github.event.issue.body, '<!-- auto-app-suggest -->')
+      contains(github.event.issue.body, '<!-- auto-app-suggest -->') ||
+      contains(github.event.issue.body, '<!-- auto-workflow-suggest -->')
 
     steps:
       - name: Mint App installation token
@@ -66,7 +67,25 @@ jobs:
           body = open('/tmp/issue-body.txt').read()
 
           # Detect digest type so child issues inherit the correct labels.
-          is_app_suggest = '<!-- auto-app-suggest -->' in body
+          # Each suggest workflow stamps its own marker comment at the top of
+          # the digest body; that marker drives both the area label and any
+          # extra labels (e.g. `enhancement` for app-suggest only).
+          DIGEST_CONFIG = {
+              '<!-- auto-app-suggest -->':         {'area': 'area:app',      'extra': ['enhancement']},
+              '<!-- auto-codequality-suggest -->': {'area': 'area:app',      'extra': []},
+              '<!-- auto-workflow-suggest -->':    {'area': 'area:workflow', 'extra': []},
+          }
+          digest_cfg = None
+          for marker, cfg in DIGEST_CONFIG.items():
+              if marker in body:
+                  digest_cfg = cfg
+                  break
+          if digest_cfg is None:
+              # Should not happen — the workflow-level `if:` guard restricts
+              # this job to issues carrying one of the known markers. Bail
+              # rather than guess at labels.
+              print('No known digest marker found in issue body — aborting.')
+              sys.exit(0)
 
           # Ensure all labels used by child issues exist before any gh issue create
           # call. Missing labels cause gh to exit non-zero, aborting after a child
@@ -77,6 +96,7 @@ jobs:
               'priority:next':  ('e4e669', 'Important, address in the next cycle'),
               'priority:later': ('e4e4e4', 'Nice to have, no urgent timeline'),
               'area:app':       ('e4e669', 'App codebase improvements'),
+              'area:workflow':  ('0075ca', 'Workflow and automation improvements'),
               'enhancement':    ('a2eeef', 'New feature or request'),
           }
           existing_raw = subprocess.run(
@@ -136,9 +156,9 @@ jobs:
 
               open('/tmp/child-body.txt', 'w').write(child_body)
 
-              labels = ['--label', priority, '--label', 'area:app']
-              if is_app_suggest:
-                  labels += ['--label', 'enhancement']
+              labels = ['--label', priority, '--label', digest_cfg['area']]
+              for extra in digest_cfg['extra']:
+                  labels += ['--label', extra]
 
               # `gh issue create` does not support --json; it prints the new
               # issue URL on stdout. Parse the trailing number out of that.
