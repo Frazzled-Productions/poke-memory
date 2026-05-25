@@ -86,7 +86,6 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
         <p className={cn("text-xs", mutedText)}>
           Tokens cover one missed day, automatically. Earn one for every{" "}
           {EARN_INTERVAL_DAYS} consecutive review days, up to {MAX_BALANCE}.
-          Two protected days in a row are not allowed.
         </p>
         {balance < MAX_BALANCE && (
           <p className={cn("text-xs", mutedText)}>
