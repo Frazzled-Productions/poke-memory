@@ -14,7 +14,7 @@ import {
   STORAGE_KEY,
 } from "@/lib/settings/persistence";
 import { saveStreakData } from "@/lib/streak/persistence";
-import { EARN_INTERVAL_DAYS } from "@/lib/streak/tokens";
+import { EARN_INTERVAL_DAYS, DEFAULT_STREAK_PROTECTION } from "@/lib/streak/tokens";
 
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
@@ -55,6 +55,7 @@ describe("runStreakProtection", () => {
     saveSettings({
       ...loadSettings(),
       streakProtection: {
+        ...DEFAULT_STREAK_PROTECTION,
         balance: 0,
         spendDates: [],
         daysSinceLastEarn: 5,
@@ -76,6 +77,7 @@ describe("runStreakProtection", () => {
     saveSettings({
       ...loadSettings(),
       streakProtection: {
+        ...DEFAULT_STREAK_PROTECTION,
         balance: 2,
         spendDates: [],
         daysSinceLastEarn: 0,
@@ -97,6 +99,7 @@ describe("runStreakProtection", () => {
     saveSettings({
       ...loadSettings(),
       streakProtection: {
+        ...DEFAULT_STREAK_PROTECTION,
         balance: 0,
         spendDates: [],
         daysSinceLastEarn: 5,
@@ -117,6 +120,7 @@ describe("runStreakProtection", () => {
     saveSettings({
       ...loadSettings(),
       streakProtection: {
+        ...DEFAULT_STREAK_PROTECTION,
         balance: 0,
         spendDates: [],
         daysSinceLastEarn: EARN_INTERVAL_DAYS - 1,

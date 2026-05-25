@@ -9,5 +9,11 @@ export {
   DEFAULT_STREAK_PROTECTION,
   EARN_INTERVAL_DAYS,
   MAX_BALANCE,
+  MAX_PROTECTION_EVENTS,
 } from "./tokens";
-export type { StreakProtection, ProtectionStepResult } from "./tokens";
+export type {
+  StreakProtection,
+  ProtectionStepResult,
+  ProtectionEvent,
+  ProtectionEventKind,
+} from "./tokens";

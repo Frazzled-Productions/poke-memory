@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   loadSettings,
+  saveSettings,
   SETTINGS_SAVED_EVENT,
 } from "@/lib/settings/persistence";
 import {
   EARN_INTERVAL_DAYS,
   MAX_BALANCE,
   type StreakProtection,
+  type ProtectionEvent,
 } from "@/lib/streak";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, mutedText } from "@/lib/utils/class-names";
@@ -21,11 +23,24 @@ type Props = {
   timezone: string;
 };
 
+/** Human-readable label for each event kind. British English; no em dashes. */
+function eventLabel(kind: ProtectionEvent["kind"]): string {
+  switch (kind) {
+    case "earned":
+      return "Earned";
+    case "spent":
+      return "Used";
+    case "earned-and-spent":
+      return "Earned + used";
+  }
+}
+
 /**
- * Streak-protection summary for the Stats page (#1227).
+ * Streak-protection summary for the Stats page (#1227, #1233).
  *
  * Surfaces the current token balance, a short explanation of how tokens are
- * earned and spent, and a one-line history entry for the most recent spend.
+ * earned and spent, a capped recent-events list (last 3), and a one-time
+ * banner the first time the user sees an earn-and-spend-same-day event.
  * Reads `streakProtection` from `user_settings` and listens for settings-saved
  * events so the panel refreshes when a token is earned, spent, or pulled from
  * the cloud.
@@ -57,6 +72,31 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
     EARN_INTERVAL_DAYS - state.daysSinceLastEarn,
   );
 
+  // Most recent earned-and-spent event (newest last in the array).
+  const events = state.protectionEvents ?? [];
+  const latestEarnAndSpent = [...events]
+    .reverse()
+    .find((e) => e.kind === "earned-and-spent");
+
+  const showBanner =
+    latestEarnAndSpent !== undefined &&
+    state.lastAcknowledgedProtectionEventDate !== latestEarnAndSpent.date;
+
+  function dismissBanner() {
+    if (latestEarnAndSpent === undefined) return;
+    const settings = loadSettings();
+    saveSettings({
+      ...settings,
+      streakProtection: {
+        ...settings.streakProtection,
+        lastAcknowledgedProtectionEventDate: latestEarnAndSpent.date,
+      },
+    });
+  }
+
+  // Last 3 events, most recent first.
+  const recentEvents = [...events].reverse().slice(0, 3);
+
   return (
     <section
       aria-labelledby="streak-protection-heading"
@@ -69,6 +109,26 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
         Streak protection
       </h2>
       <div className={cn("flex flex-col gap-2", cardPanel)}>
+        {showBanner && (
+          <div
+            role="status"
+            data-testid="streak-protection-earn-spend-banner"
+            className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+          >
+            <span>
+              You earned a streak protection token and used it the same day to
+              cover yesterday. Your streak is safe.
+            </span>
+            <button
+              type="button"
+              onClick={dismissBanner}
+              aria-label="Dismiss streak protection notice"
+              className="shrink-0 rounded text-amber-600 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-1 dark:text-amber-400 dark:hover:text-amber-200"
+            >
+              ×
+            </button>
+          </div>
+        )}
         <div className="flex items-baseline gap-2">
           <span
             className="text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400"
@@ -102,6 +162,27 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
             Streak preserved on {formatDate(lastSpend, dateFormat, timezone)}.{" "}
             {balance === 1 ? "1 token remaining" : `${balance} tokens remaining`}.
           </p>
+        )}
+        {recentEvents.length > 0 && (
+          <div
+            className="mt-1"
+            data-testid="streak-protection-recent-events"
+          >
+            <p className={cn("mb-1 text-xs font-medium", mutedText)}>
+              Recent protection
+            </p>
+            <ul className="flex flex-col gap-0.5">
+              {recentEvents.map((event, index) => (
+                <li
+                  key={`${event.date}-${index}`}
+                  className={cn("text-xs", mutedText)}
+                >
+                  {formatDate(event.date, dateFormat, timezone)} -{" "}
+                  {eventLabel(event.kind)}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </section>
