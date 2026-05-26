@@ -63,6 +63,27 @@ describe('loadSettings migration', () => {
     expect(settings.evolutionCardsEnabled).toBe(true);
   });
 
+  it('silently ignores stale reverseCardsEnabled field from old stored data (#1234)', () => {
+    // Since #1234 reverseCardsEnabled no longer exists on UserSettings.
+    // Old localStorage blobs may still carry it; loadSettings just ignores it.
+    const partial = {
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false, // stale field — should be ignored
+      evolutionCardsEnabled: true,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+    };
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify(partial));
+    const settings = loadSettings();
+    // reverseCardsEnabled no longer exists on the type — no property to check.
+    // evolutionCardsEnabled must round-trip correctly (not corrupted by the stale field).
+    expect(settings.evolutionCardsEnabled).toBe(true);
+  });
+
   it('stored object missing evolutionCardsEnabled defaults to true', () => {
     const partial = {
       masteryRepetitions: 3,

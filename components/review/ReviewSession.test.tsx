@@ -572,7 +572,7 @@ describe("ReviewSession onboarding nudges (#702)", () => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
     );
     expect(
-      screen.getByText(/reverse cards, reverse-evolution cards/i),
+      screen.getByText(/reverse-evolution cards or alternate-form cards/i),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /open practice settings/i }),

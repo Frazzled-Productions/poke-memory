@@ -474,8 +474,8 @@ function EndOfSessionScreen({
             ctaLabel="Open practice settings"
           >
             <p>
-              Try reverse cards, reverse-evolution cards, or alternate-form
-              cards for a fresh challenge.
+              Try reverse-evolution cards or alternate-form cards for a fresh
+              challenge.
             </p>
           </OnboardingHint>
         </div>

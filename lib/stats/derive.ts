@@ -1,5 +1,6 @@
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import { POKEMON_TYPES } from "@/lib/pokemon/types";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { addDaysToIsoDate as sharedAddDaysToIsoDate } from "@/lib/utils/dates";
@@ -194,14 +195,38 @@ export const DUE_FORECAST_DAYS = 14;
  *     STRUGGLING_DIFFICULTY_CUTOFF). Sorted by FSRS difficulty descending,
  *     tie-broken by fewer reps then lower id.
  *   - `perGeneration` covers all 9 generations even when introduced=0.
+ *
+ * Since #1234 the function accepts the **full** mixed card array (all card
+ * types), not just name cards. It filters internally and builds the set of
+ * species IDs whose reverse card also passes the mastery gate before counting
+ * a species as mastered — matching the rule in `filterMastered` and
+ * `masteredSpeciesIds`. Callers that previously filtered to name cards first
+ * should now pass the full array; the stats figures will then correctly reflect
+ * the both-legs-required mastery rule.
  */
 export function computeStats(
-  cards: readonly NameReviewCard[],
+  cards: readonly ReviewableCard[],
   today: string,
   strugglingLimit = 10,
   masteryRepetitions = MASTERY_REPETITIONS,
   forceAllMastered = false,
 ): StatsResult {
+  // Build the set of species IDs whose reverse card has cleared the mastery
+  // gate. Reverse card ID = REVERSE_ID_OFFSET + pokemonId; subtracting the
+  // offset recovers the species/pokemon ID that pairs with the name card.
+  // In forceAllMastered mode every reverse is considered mastered.
+  const masteredReverseSpecies = new Set<number>();
+  for (const card of cards) {
+    if (card.cardType !== "reverse") continue;
+    const speciesId = card.id - REVERSE_ID_OFFSET;
+    if (speciesId > 0 && (forceAllMastered || isMastered(card.state, masteryRepetitions))) {
+      masteredReverseSpecies.add(speciesId);
+    }
+  }
+
+  // Extract name cards for the per-species stats loop below.
+  const nameCards = cards.filter((c): c is NameReviewCard => c.cardType === "name");
+
   // Pre-compute the 14 forecast date strings so the inner loop can do a
   // single Map lookup per card instead of a 14-way comparison chain.
   const forecastDates: string[] = [];
@@ -232,18 +257,25 @@ export function computeStats(
   let learning   = 0;
   let mastered   = 0;
 
-  // Cards eligible for "struggling" — introduced cards only.
+  // Cards eligible for "struggling" — introduced name cards only.
   const introducedCards: NameReviewCard[] = [];
 
-  for (const card of cards) {
+  for (const card of nameCards) {
     const state = card.state;
     const isIntroduced  = state.lastReview !== null;
-    const isCardMastered = isMastered(state, masteryRepetitions);
+    // Since #1234, species-level mastery requires BOTH name AND reverse cards
+    // to pass the FSRS gate. Check that the paired reverse card is also
+    // mastered before counting this species as mastered.
+    const nameCardMastered = isMastered(state, masteryRepetitions);
+    const isSpeciesMastered = forceAllMastered
+      ? true
+      : nameCardMastered && masteredReverseSpecies.has(card.id);
+    const isCardMastered = forceAllMastered ? true : nameCardMastered;
 
     // Mastery / learning / locked tallies.
     if (isIntroduced) {
       introduced++;
-      if (isCardMastered) {
+      if (isSpeciesMastered) {
         mastered++;
       } else {
         learning++;
@@ -275,7 +307,7 @@ export function computeStats(
       const idx = gen - 1;
       genTotal[idx]++;
       if (isIntroduced)   genIntroduced[idx]++;
-      if (isCardMastered) genMastered[idx]++;
+      if (isSpeciesMastered) genMastered[idx]++;
     }
 
     // Per-type tallies. A dual-type card increments both buckets, so the
@@ -286,8 +318,8 @@ export function computeStats(
       const total = typeTotal.get(t);
       if (total === undefined) continue;
       typeTotal.set(t, total + 1);
-      if (isIntroduced)   typeIntroduced.set(t, (typeIntroduced.get(t) ?? 0) + 1);
-      if (isCardMastered) typeMastered.set(t, (typeMastered.get(t) ?? 0) + 1);
+      if (isIntroduced)      typeIntroduced.set(t, (typeIntroduced.get(t) ?? 0) + 1);
+      if (isSpeciesMastered) typeMastered.set(t, (typeMastered.get(t) ?? 0) + 1);
     }
   }
 
@@ -356,10 +388,10 @@ export function computeStats(
     // schedule view, not a completion metric). Struggling is cleared because
     // a fully-mastered user has nothing to struggle with.
     return {
-      totalCards: cards.length,
-      introduced: cards.length,
+      totalCards: nameCards.length,
+      introduced: nameCards.length,
       learning: 0,
-      mastered: cards.length,
+      mastered: nameCards.length,
       locked: 0,
       dueForecast,
       perGeneration: perGeneration.map((g) => ({
@@ -377,11 +409,11 @@ export function computeStats(
   }
 
   return {
-    totalCards: cards.length,
+    totalCards: nameCards.length,
     introduced,
     learning,
     mastered,
-    locked: cards.length - introduced,
+    locked: nameCards.length - introduced,
     dueForecast,
     perGeneration,
     perType,

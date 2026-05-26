@@ -617,24 +617,53 @@ describe("forecast axis — all card types", () => {
 // mastery axis
 // ---------------------------------------------------------------------------
 
+/** A mastered reverse card. Paired with a name card of the same pokemonId. */
+function masteredReverseCard(pokemonId: number): ReverseReviewCard {
+  return makeReverseCard(pokemonId, {
+    lastReview: "2026-04-01",
+    firstSeen: "2026-02-01",
+    reps: 5,
+    scheduledDays: 30,
+    dueDate: "2026-05-01",
+    fsrsState: "review",
+  });
+}
+
 describe("mastery axis", () => {
   it("counts are correct for mixed cards", () => {
+    // Since #1234, species mastery requires BOTH name AND reverse cards to
+    // clear the FSRS gate. Seed paired mastered reverse cards for the two
+    // species (20, 21) that are expected to appear as mastered.
     const cards: ReviewableCard[] = [
       newCard(1),
       newCard(2),
       learningCard(10),
       masteredCard(20),
       masteredCard(21),
+      masteredReverseCard(20),
+      masteredReverseCard(21),
     ];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["mastery"],
     });
     const m = snapshot.mastery!;
+    // totalCards counts only name cards (~1025 species)
     expect(m.totalCards).toBe(5);
     expect(m.introduced).toBe(3);  // learningCard(10) + two mastered
-    expect(m.mastered).toBe(2);
-    expect(m.learning).toBe(1);
+    expect(m.mastered).toBe(2);    // both name+reverse mastered
+    expect(m.learning).toBe(1);    // learningCard(10): name introduced but not species-mastered
     expect(m.locked).toBe(2);
+  });
+
+  it("a name card mastered without a mastered reverse card is not counted as mastered", () => {
+    // Only name card for species 20 is mastered — no paired reverse card.
+    const cards: ReviewableCard[] = [masteredCard(20)];
+    const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
+      include: ["mastery"],
+    });
+    const m = snapshot.mastery!;
+    expect(m.mastered).toBe(0);
+    expect(m.learning).toBe(1);  // introduced but not species-mastered
   });
 
   it("forceAllMastered overrides counts to all-mastered", () => {

@@ -32,6 +32,9 @@ test.beforeEach(async ({ page }) => {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Numeric offset added to a pokémon ID to produce its reverse-card ID. */
+const REVERSE_ID_OFFSET = 2_000_000;
+
 /**
  * A minimal mastered name-card in the current FSRS session shape.
  *
@@ -74,10 +77,51 @@ function masteredCard(
 }
 
 /**
+ * A minimal mastered reverse card paired with a mastered name card.
+ *
+ * Since #1234, filterMastered requires BOTH the name card AND the paired
+ * reverse card to pass the FSRS mastery gate before a species appears in the
+ * Pasture. Seed this alongside every masteredCard that is expected to appear.
+ *
+ * The reverse-card ID is REVERSE_ID_OFFSET + pokémonId.
+ */
+function masteredReverseCard(pokemonId: number) {
+  return {
+    id: REVERSE_ID_OFFSET + pokemonId,
+    cardType: "reverse",
+    pokemonId,
+    speciesId: pokemonId,
+    name: `Pokemon ${pokemonId}`,
+    spriteUrl: `/sprites/pokemon/${pokemonId}.png`,
+    state: {
+      stability: 30,
+      difficulty: 5,
+      elapsedDays: 0,
+      scheduledDays: 28,
+      reps: 4,
+      lapses: 0,
+      fsrsState: "review",
+      dueDate: "2026-06-10",
+      lastReview: "2026-05-13",
+      firstSeen: "2026-03-01",
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    },
+  };
+}
+
+/**
  * Seeds localStorage with the given cards and default per-type limits before
  * the page loads. Call inside `page.addInitScript`.
+ *
+ * Callers should pass BOTH name cards AND their paired reverse cards for any
+ * species expected to appear as mastered (filterMastered requires both legs
+ * since #1234).
  */
-function buildSession(cards: ReturnType<typeof masteredCard>[]) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildSession(cards: any[]) {
   return {
     cards,
     limits: {
@@ -110,7 +154,11 @@ test.describe("Pasture nav guard", () => {
     page,
   }, testInfo) => {
     // Caterpie is in the Forest habitat. reps=4, scheduledDays=28 → mastered.
-    await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
+    // Pair with a mastered reverse card — filterMastered requires both legs (#1234).
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
+    ]));
 
     await page.goto("/");
     await awaitSeedIdb(page);
@@ -147,9 +195,13 @@ test.describe("Pasture page — with mastered cards", () => {
     // Seed two mastered cards from different habitats so at least two zones render.
     // Caterpie: forest → "Forest" zone
     // Tentacool: sea   → "Open Sea" zone
+    // Pair each name card with a mastered reverse card — filterMastered requires
+    // both legs since #1234.
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
       masteredCard(72, "Tentacool", "sea"),
+      masteredReverseCard(72),
     ]));
   });
 
@@ -193,7 +245,11 @@ test.describe("Pasture page — sparkle clears on tap", () => {
     page,
   }) => {
     // Seed exactly one mastered card with seenInPasture = false (new arrival).
-    await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest", false)]));
+    // Pair with a mastered reverse card — filterMastered requires both legs (#1234).
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest", false),
+      masteredReverseCard(10),
+    ]));
 
     await page.goto("/pasture");
     await awaitSeedIdb(page);
@@ -254,7 +310,9 @@ test.describe("Pasture page — idle behaviour", () => {
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
       masteredCard(72, "Tentacool", "sea"),
+      masteredReverseCard(72),
     ]));
   });
 
@@ -289,7 +347,10 @@ test.describe("Pasture page — idle behaviour", () => {
     const ctx = await browser.newContext({ reducedMotion: "reduce" });
     const page = await ctx.newPage();
 
-    await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
+    ]));
 
     await page.goto("/pasture");
     await awaitSeedIdb(page);
@@ -307,7 +368,9 @@ test.describe("Pasture page — name search", () => {
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
       masteredCard(72, "Tentacool", "sea"),
+      masteredReverseCard(72),
     ]));
   });
 
@@ -354,7 +417,9 @@ test.describe("Pasture page — biome landscape view", () => {
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
       masteredCard(72, "Tentacool", "sea"),
+      masteredReverseCard(72),
     ]));
   });
 
@@ -482,10 +547,13 @@ test.describe("Pasture — biome landscape view with pretendAllMastered", () => 
 
 test.describe("Pasture page — biome stats (#623)", () => {
   test.beforeEach(async ({ page }) => {
-    // Two forest cards so the stats strip appears for the Forest zone.
+    // Two forest name cards with paired reverse cards so the stats strip
+    // appears for the Forest zone. filterMastered requires both legs (#1234).
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
       masteredCard(11, "Metapod", "forest"),
+      masteredReverseCard(11),
     ]));
   });
 
@@ -575,8 +643,11 @@ test.describe("Pasture page — reacts to clearLocalProgress storage event", () 
   test("clearing IDB and dispatching the synthetic storage event re-renders the empty state", async ({
     page,
   }) => {
-    // Start with one mastered card so the page renders a populated state.
-    await seedSessionIdb(page, buildSession([masteredCard(10, "Caterpie", "forest")]));
+    // Start with one mastered card (+ paired reverse) so the page renders a populated state.
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
+    ]));
 
     await page.goto("/pasture");
     await awaitSeedIdb(page);
@@ -625,13 +696,17 @@ test.describe("Pasture page — type filter", () => {
   //   Caterpie   (id=10,  Bug,   Gen I,  forest)
   //   Charmander (id=4,   Fire,  Gen I,  mountain)
   //   Chikorita  (id=152, Grass, Gen II, grassland)
+  // Each name card is paired with a mastered reverse card (#1234).
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(
       page,
       buildSession([
         masteredCard(10,  "Caterpie",   "forest",    false, { types: ["bug"],   speciesId: 10  }),
+        masteredReverseCard(10),
         masteredCard(4,   "Charmander", "mountain",  false, { types: ["fire"],  speciesId: 4   }),
+        masteredReverseCard(4),
         masteredCard(152, "Chikorita",  "grassland", false, { types: ["grass"], speciesId: 152 }),
+        masteredReverseCard(152),
       ]),
     );
   });
@@ -703,7 +778,9 @@ test.describe("Pasture page — generation filter", () => {
       page,
       buildSession([
         masteredCard(10,  "Caterpie",  "forest",    false, { types: ["bug"],   speciesId: 10  }),
+        masteredReverseCard(10),
         masteredCard(152, "Chikorita", "grassland", false, { types: ["grass"], speciesId: 152 }),
+        masteredReverseCard(152),
       ]),
     );
   });

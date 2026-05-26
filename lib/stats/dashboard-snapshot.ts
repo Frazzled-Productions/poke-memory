@@ -249,13 +249,17 @@ export function computeDashboardSnapshot(
   // `computeStats` is required for mastery and struggling axes.
   // The forecast axis now builds its future bars directly from the full card
   // set (all card types), so it no longer depends on computeStats.
+  //
+  // Pass the full mixed card array so computeStats can build the
+  // mastered-reverse species set and apply the both-legs-required mastery
+  // rule introduced in #1234. It filters to name cards internally.
   const needsStats =
     wants("mastery") || wants("struggling");
 
   let statsResult: StatsResult | null = null;
   if (needsStats) {
     statsResult = computeStats(
-      nameCards,
+      cards,
       today,
       strugglingLimit,
       masteryRepetitions,
