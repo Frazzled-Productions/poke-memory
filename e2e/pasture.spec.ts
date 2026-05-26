@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import { getPrimaryNavContainer } from "./helpers/navHelpers";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { REVERSE_ID_OFFSET, masteredReverseCard } from "./helpers/mastery";
 
 // Pre-dismiss the first-visit onboarding modal and explicitly opt in to the
 // bottom tab bar before every test.
@@ -32,8 +33,10 @@ test.beforeEach(async ({ page }) => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Numeric offset added to a pokémon ID to produce its reverse-card ID. */
-const REVERSE_ID_OFFSET = 2_000_000;
+// REVERSE_ID_OFFSET and masteredReverseCard are re-exported from helpers/mastery.ts.
+// Keep them accessible in this file so local callers (seedPasture, test bodies)
+// continue to work without changes.
+export { REVERSE_ID_OFFSET, masteredReverseCard };
 
 /**
  * A minimal mastered name-card in the current FSRS session shape.
@@ -72,42 +75,6 @@ function masteredCard(
       stepStartedAt: null,
       hiddenSince: null,
       seenInPasture,
-    },
-  };
-}
-
-/**
- * A minimal mastered reverse card paired with a mastered name card.
- *
- * Since #1234, filterMastered requires BOTH the name card AND the paired
- * reverse card to pass the FSRS mastery gate before a species appears in the
- * Pasture. Seed this alongside every masteredCard that is expected to appear.
- *
- * The reverse-card ID is REVERSE_ID_OFFSET + pokémonId.
- */
-function masteredReverseCard(pokemonId: number) {
-  return {
-    id: REVERSE_ID_OFFSET + pokemonId,
-    cardType: "reverse",
-    pokemonId,
-    speciesId: pokemonId,
-    name: `Pokemon ${pokemonId}`,
-    spriteUrl: `/sprites/pokemon/${pokemonId}.png`,
-    state: {
-      stability: 30,
-      difficulty: 5,
-      elapsedDays: 0,
-      scheduledDays: 28,
-      reps: 4,
-      lapses: 0,
-      fsrsState: "review",
-      dueDate: "2026-06-10",
-      lastReview: "2026-05-13",
-      firstSeen: "2026-03-01",
-      learningStep: null,
-      stepStartedAt: null,
-      hiddenSince: null,
-      seenInPasture: false,
     },
   };
 }

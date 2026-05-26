@@ -105,9 +105,9 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsPerDay: 100,
           maxNewEvolutionPerDay: 5,
           maxReviewsEvolutionPerDay: 50,
-          nameCardsEnabled: true,
+          // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+          // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           maxNewReversePerDay: 10,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
@@ -228,9 +228,9 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsPerDay: 100,
           maxNewEvolutionPerDay: 5,
           maxReviewsEvolutionPerDay: 50,
-          nameCardsEnabled: true,
+          // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+          // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: true,
-          reverseCardsEnabled: false,
           maxNewReversePerDay: 10,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
@@ -359,9 +359,9 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsPerDay: 100,
           maxNewEvolutionPerDay: 5,
           maxReviewsEvolutionPerDay: 50,
-          nameCardsEnabled: true,
+          // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+          // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           maxNewReversePerDay: 10,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
@@ -392,10 +392,12 @@ test.describe("Practice scope (#333)", () => {
     const noMatch = page.getByText(/no Pok[ée]mon match your scope/i);
     const reveal = page.getByRole("button", { name: /reveal/i });
 
-    // Wait for either the reveal button or the no-match state.
+    // Wait for either the reveal button or the no-match state. Use a generous
+    // timeout — since #1234 the session builds both name and reverse cards for
+    // every species (~2× the card set), which takes longer on WebKit.
     await Promise.race([
-      reveal.waitFor({ state: "visible", timeout: 10_000 }),
-      noMatch.waitFor({ state: "visible", timeout: 10_000 }),
+      reveal.waitFor({ state: "visible", timeout: 15_000 }),
+      noMatch.waitFor({ state: "visible", timeout: 15_000 }),
     ]);
 
     if (await noMatch.isVisible()) {
@@ -606,9 +608,9 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
           maxReviewsPerDay: 100,
           maxNewEvolutionPerDay: 5,
           maxReviewsEvolutionPerDay: 50,
-          nameCardsEnabled: true,
+          // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+          // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: true,
-          reverseCardsEnabled: false,
           maxNewReversePerDay: 10,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
@@ -704,10 +706,11 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     await expect(scopePanel.getByText(/of \d+ Pok[ée]mon match/)).toBeVisible();
 
     // A practice card should still render — the no-match empty-state must NOT
-    // appear.
+    // appear. Use a generous timeout — since #1234 the session includes reverse
+    // cards for every species (~2× the card set), which takes longer on WebKit.
     const reveal = page.getByRole("button", { name: /reveal/i });
     const noMatch = page.getByText(/no Pok[ée]mon match your scope/i);
-    await expect(reveal).toBeVisible();
+    await expect(reveal).toBeVisible({ timeout: 10_000 });
     await expect(noMatch).not.toBeVisible();
   });
 

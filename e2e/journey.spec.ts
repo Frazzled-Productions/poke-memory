@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { isMobileProject } from "./helpers/navHelpers";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { REVERSE_ID_OFFSET, masteredReverseCard } from "./helpers/mastery";
 
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
@@ -332,37 +333,53 @@ test.describe("Journey page — milestone share card", () => {
   test("banner appears when mastery crosses a count threshold", async ({
     page,
   }) => {
-    // Seed 10 mastered name cards into localStorage before the page loads.
+    // Seed 10 mastered species (name + reverse cards each) into localStorage
+    // before the page loads. Since #1234, a species is mastered only when BOTH
+    // the name card AND the paired reverse card pass the FSRS mastery gate
+    // (reps >= 3 AND scheduledDays >= 21). The REVERSE_ID_OFFSET constant keeps
+    // reverse-card IDs disjoint from name-card IDs.
     // The storage key must match STORAGE_KEY in lib/review/persistence.ts.
-    // Each card requires `name` and `spriteUrl` to pass isReviewCardShaped
-    // validation; `loadSession` falls back to localStorage when IDB is empty.
-    await page.addInitScript(() => {
+    await page.addInitScript((reverseOffset) => {
       // Mastery requires reps >= 3 AND scheduledDays >= 21.
-      const cards = Array.from({ length: 10 }, (_, i) => ({
-        id: i + 1,
-        speciesId: i + 1,
-        cardType: "name",
-        subjectKey: String(i + 1),
-        name: `Pokemon ${i + 1}`,
-        spriteUrl: `/sprites/pokemon/${i + 1}.png`,
-        types: ["normal"],
-        state: {
-          stability: 30,
-          difficulty: 5,
-          elapsedDays: 0,
-          scheduledDays: 21,
-          reps: 3,
-          lapses: 0,
-          fsrsState: "review",
-          dueDate: "2099-01-01",
-          lastReview: "2025-01-01",
-          firstSeen: "2024-12-01",
-          learningStep: null,
-          stepStartedAt: null,
-          hiddenSince: null,
-          seenInPasture: false,
-        },
-      }));
+      const masteredState = {
+        stability: 30,
+        difficulty: 5,
+        elapsedDays: 0,
+        scheduledDays: 21,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review",
+        dueDate: "2099-01-01",
+        lastReview: "2025-01-01",
+        firstSeen: "2024-12-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      };
+      const cards = [
+        // Name cards for species 1-10.
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: i + 1,
+          speciesId: i + 1,
+          cardType: "name",
+          subjectKey: String(i + 1),
+          name: `Pokemon ${i + 1}`,
+          spriteUrl: `/sprites/pokemon/${i + 1}.png`,
+          types: ["normal"],
+          state: masteredState,
+        })),
+        // Paired reverse cards for species 1-10. Both legs must be mastered.
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: reverseOffset + (i + 1),
+          cardType: "reverse",
+          pokemonId: i + 1,
+          speciesId: i + 1,
+          name: `Pokemon ${i + 1}`,
+          spriteUrl: `/sprites/pokemon/${i + 1}.png`,
+          state: masteredState,
+        })),
+      ];
       window.localStorage.setItem(
         "poke-memory:review-session:v1",
         JSON.stringify({
@@ -375,7 +392,7 @@ test.describe("Journey page — milestone share card", () => {
           },
         }),
       );
-    });
+    }, REVERSE_ID_OFFSET);
     await page.goto("/journey");
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
@@ -408,39 +425,55 @@ test.describe("Journey page — next badge proximity hint", () => {
   test("hint renders and shows the nearest badge when some Pokémon are mastered", async ({
     page,
   }) => {
-    // Seed one mastered name card for species 74 (Geodude). Boulder Badge
-    // requires 74 and 95 — so 1 remaining, which is the smallest gap and
-    // therefore Boulder Badge is the hint target.
-    await page.addInitScript(() => {
-      const card = {
-        id: 74,
-        speciesId: 74,
-        cardType: "name",
-        subjectKey: "74",
-        name: "Geodude",
-        spriteUrl: "/sprites/pokemon/74.png",
-        types: ["rock", "ground"],
-        state: {
-          stability: 30,
-          difficulty: 5,
-          elapsedDays: 0,
-          scheduledDays: 21,
-          reps: 3,
-          lapses: 0,
-          fsrsState: "review",
-          dueDate: "2099-01-01",
-          lastReview: "2025-01-01",
-          firstSeen: "2024-12-01",
-          learningStep: null,
-          stepStartedAt: null,
-          hiddenSince: null,
-          seenInPasture: false,
-        },
+    // Seed one mastered species (74 = Geodude) — both name AND reverse cards.
+    // Boulder Badge requires species 74 and 95 — so 1 remaining after Geodude
+    // is mastered, which is the smallest gap across all badges and therefore
+    // Boulder Badge becomes the hint target.
+    // Since #1234, mastery requires both the name card and the paired reverse
+    // card to pass the FSRS gate; seeding only the name card leaves the species
+    // unmastered and the hint count stays at 2.
+    await page.addInitScript((reverseOffset) => {
+      const masteredState = {
+        stability: 30,
+        difficulty: 5,
+        elapsedDays: 0,
+        scheduledDays: 21,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review",
+        dueDate: "2099-01-01",
+        lastReview: "2025-01-01",
+        firstSeen: "2024-12-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
       };
+      const cards = [
+        {
+          id: 74,
+          speciesId: 74,
+          cardType: "name",
+          subjectKey: "74",
+          name: "Geodude",
+          spriteUrl: "/sprites/pokemon/74.png",
+          types: ["rock", "ground"],
+          state: masteredState,
+        },
+        {
+          id: reverseOffset + 74,
+          cardType: "reverse",
+          pokemonId: 74,
+          speciesId: 74,
+          name: "Geodude",
+          spriteUrl: "/sprites/pokemon/74.png",
+          state: masteredState,
+        },
+      ];
       window.localStorage.setItem(
         "poke-memory:review-session:v1",
         JSON.stringify({
-          cards: [card],
+          cards,
           limits: {
             name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
             evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
@@ -449,7 +482,7 @@ test.describe("Journey page — next badge proximity hint", () => {
           },
         }),
       );
-    });
+    }, REVERSE_ID_OFFSET);
     await page.goto("/journey");
     await expect(
       page.getByRole("heading", { level: 2, name: "Gym badges" }),

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { REVERSE_ID_OFFSET, masteredReverseCard } from "./helpers/mastery";
 
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
@@ -358,10 +359,29 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
   test("hides the hint once at least one card is mastered", async ({
     page,
   }) => {
-    // Seed one mastered card plus one not-yet-mastered card. mastered >= 1
-    // suppresses the hint.
-    await page.addInitScript(() => {
+    // Seed one mastered species (Bulbasaur, id=1) plus one not-yet-mastered
+    // species (Charmander, id=4). mastered >= 1 suppresses the hint.
+    // Since #1234, a species is mastered only when BOTH the name card AND the
+    // paired reverse card pass the FSRS gate. Seed both legs for Bulbasaur.
+    await page.addInitScript((reverseOffset) => {
+      const masteredState = {
+        stability: 30,
+        difficulty: 5,
+        elapsedDays: 0,
+        scheduledDays: 30,
+        reps: 5,
+        lapses: 0,
+        fsrsState: "review",
+        dueDate: "2099-01-01",
+        lastReview: "2025-01-01",
+        firstSeen: "2024-12-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      };
       const cards = [
+        // Bulbasaur name card — mastered.
         {
           id: 1,
           speciesId: 1,
@@ -370,23 +390,19 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
           name: "Bulbasaur",
           spriteUrl: "/sprites/pokemon/1.png",
           types: ["grass", "poison"],
-          state: {
-            stability: 30,
-            difficulty: 5,
-            elapsedDays: 0,
-            scheduledDays: 30,
-            reps: 5,
-            lapses: 0,
-            fsrsState: "review",
-            dueDate: "2099-01-01",
-            lastReview: "2025-01-01",
-            firstSeen: "2024-12-01",
-            learningStep: null,
-            stepStartedAt: null,
-            hiddenSince: null,
-            seenInPasture: false,
-          },
+          state: masteredState,
         },
+        // Bulbasaur reverse card — also mastered (required since #1234).
+        {
+          id: reverseOffset + 1,
+          cardType: "reverse",
+          pokemonId: 1,
+          speciesId: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          state: masteredState,
+        },
+        // Charmander name card — not yet mastered.
         {
           id: 4,
           speciesId: 4,
@@ -425,7 +441,7 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
           },
         }),
       );
-    });
+    }, REVERSE_ID_OFFSET);
     await page.goto("/stats");
     await expect(
       page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),

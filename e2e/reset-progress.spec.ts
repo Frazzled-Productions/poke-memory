@@ -114,6 +114,8 @@ test.describe("Reset-progress dialog (#766)", () => {
     const endState = page.getByRole("heading", {
       name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
     });
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 10_000 });
+    // 15 s: after #1234 the card set is ~2× larger (name + reverse for all
+    // species), so hydration takes longer on WebKit.
+    await expect(reveal.or(endState)).toBeVisible({ timeout: 15_000 });
   });
 });

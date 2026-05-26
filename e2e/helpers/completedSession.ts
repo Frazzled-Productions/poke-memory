@@ -1,19 +1,21 @@
 import seedData from "../../lib/pokemon/generated.json";
+import { REVERSE_ID_OFFSET } from "./mastery";
 
 // ---------------------------------------------------------------------------
 // Shared SESSION_COMPLETE seed builder.
 //
 // ReviewSession calls hydrateSession(saved, SEED_POKEMON, ...) on load, which
-// appends any SEED_POKEMON or SEED_EVOLUTION_CARDS entries missing from the
-// saved session. To prevent those from queuing as new cards (which would show
-// a Reveal button instead of the complete screen), every known card ID must be
-// pre-seeded as already reviewed (lastReview non-null, dueDate far in the
-// future) so it is ineligible for both the review queue and the new queue —
-// the necessary condition for SESSION_COMPLETE.
+// appends any SEED_POKEMON, SEED_EVOLUTION_CARDS, or reverse-card entries
+// missing from the saved session. Since #1234 reverse cards are always enabled
+// (reverseEnabled is hardcoded true in ReviewSession.tsx), hydrateSession adds
+// a reverse card for every species not already in savedIds. To prevent those
+// from queuing as new cards (which would show a Reveal button instead of the
+// complete screen), every known reverse card ID must be pre-seeded alongside
+// the name and evolution cards.
 // ---------------------------------------------------------------------------
 
 const EDGE_ID_BASE = 1_500_000;
-const REVERSE_ID_OFFSET = 2_000_000;
+// REVERSE_ID_OFFSET imported from helpers/mastery.ts
 const MAX_SPECIES_ID = 999_999; // alternate-form IDs (10001+) are above this
 
 /**
@@ -132,6 +134,26 @@ export function buildCompletedSession(args: {
       postEvoSpriteUrl: "/sprites/pokemon/2.png",
       triggerPhrase: "at level 16",
       state: { ...reviewedState },
+    });
+  }
+
+  // Reverse cards — one per species ID (including alternate forms). Since #1234
+  // reverse cards are always enabled: hydrateSession adds a reverse card for
+  // every species whose REVERSE_ID_OFFSET + id is not already in savedIds. Seed
+  // them all as future-due so none enter the new or review queue, which is the
+  // necessary condition for SESSION_COMPLETE.
+  for (const id of pokemonIds) {
+    cards.push({
+      id: REVERSE_ID_OFFSET + id,
+      name: "pokemon-" + id,
+      spriteUrl: "/sprites/pokemon/" + id + ".png",
+      cardType: "reverse",
+      pokemonId: id,
+      speciesId: id,
+      state: {
+        ...reviewedState,
+        firstSeen: SEEN_SPECIES_IDS.has(id) ? PAST_DATE : null,
+      },
     });
   }
 
