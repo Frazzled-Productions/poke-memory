@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { biomeStats } from "./stats";
 import { filterMastered } from "./arrivals";
 import type { ReviewState } from "@/lib/srs/scheduler";
-import type { NameReviewCard } from "@/lib/review/session";
+import type { NameReviewCard, ReviewableCard } from "@/lib/review/session";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -102,6 +102,28 @@ function makeCard(
   } as NameReviewCard;
 }
 
+/**
+ * Build a reverse card for a given species ID. The reverse card ID is
+ * REVERSE_ID_OFFSET (2_000_000) + speciesId, matching the convention in
+ * lib/pasture/arrivals.ts.
+ */
+function makeReverseCard(speciesId: number, state: ReviewState): ReviewableCard {
+  return {
+    id: 2_000_000 + speciesId,
+    speciesId,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `Pokemon ${speciesId} (reverse)`,
+    cardType: "reverse",
+    subjectKey: String(speciesId),
+    name: `Pokemon ${speciesId}`,
+    spriteUrl: `/sprites/${speciesId}.png`,
+    types: ["normal"],
+    state,
+  } as unknown as ReviewableCard;
+}
+
 // ---------------------------------------------------------------------------
 // biomeStats — basic operation
 // ---------------------------------------------------------------------------
@@ -199,8 +221,11 @@ describe("biomeStats — masteryRepetitions < 3 (regression #1013)", () => {
     // This is the exact scenario that was broken: a user sets masteryRepetitions=2.
     // filterMastered passes the card (reps >= 2 && scheduledDays >= 21).
     // biomeStats must count it — not silently drop it via a hardcoded isMastered() re-check.
-    const allCards: NameReviewCard[] = [
-      makeCard(1, "Bulbasaur", "grassland", masteredAtThreshold2State()),
+    // Since #1234, both name AND reverse must pass the threshold for species mastery.
+    const threshold2State = masteredAtThreshold2State();
+    const allCards: ReviewableCard[] = [
+      makeCard(1, "Bulbasaur", "grassland", threshold2State),
+      makeReverseCard(1, threshold2State), // paired reverse at the same threshold
     ];
     // Simulate what the caller does: pre-filter at masteryRepetitions=2.
     const preFiltered = filterMastered(allCards, false, 2) as NameReviewCard[];
@@ -211,13 +236,16 @@ describe("biomeStats — masteryRepetitions < 3 (regression #1013)", () => {
   });
 
   it("counts a card with reps=1 when the caller pre-filters at masteryRepetitions=1", () => {
+    // Since #1234, supply a paired reverse card at the same threshold.
+    const at1RepState = makeState({ reps: 1, scheduledDays: 21, firstSeen: "2026-04-01", fsrsState: "review" });
     const cardAt1Rep: NameReviewCard = makeCard(
       4,
       "Charmander",
       "mountain",
-      makeState({ reps: 1, scheduledDays: 21, firstSeen: "2026-04-01", fsrsState: "review" }),
+      at1RepState,
     );
-    const preFiltered = filterMastered([cardAt1Rep], false, 1) as NameReviewCard[];
+    const reverseAt1Rep = makeReverseCard(4, at1RepState);
+    const preFiltered = filterMastered([cardAt1Rep, reverseAt1Rep], false, 1) as NameReviewCard[];
     expect(preFiltered.length).toBe(1);
 
     const stats = biomeStats("mountain", preFiltered);

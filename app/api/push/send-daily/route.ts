@@ -145,12 +145,13 @@ const SCOPE_LOOKUP_MAP = new Map(SCOPE_LOOKUP.map((e) => [e.id, e]));
  * Mirrors the relevant fields from `UserSettings` in lib/settings/persistence.ts.
  * Defaults match `DEFAULT_SETTINGS` so users with missing/partial JSONB
  * fall back to the same behaviour as the app itself.
+ *
+ * Name and reverse are always on since #1234. They are not represented here;
+ * `isCardEligible` and `computeNewEstimate` treat them as always active.
  */
 type UserEligibility = {
-  nameCardsEnabled: boolean;
   evolutionCardsEnabled: boolean;
   reverseEvolutionCardsEnabled: boolean;
-  reverseCardsEnabled: boolean;
   cryCardsEnabled: boolean;
   alternateFormsEnabled: boolean;
   maxNewPerDay: number;
@@ -167,10 +168,8 @@ type UserEligibility = {
 
 /** DEFAULT_SETTINGS-aligned fallbacks, used when a JSONB field is missing or invalid. */
 const DEFAULT_ELIGIBILITY: UserEligibility = {
-  nameCardsEnabled: true,
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
-  reverseCardsEnabled: false,
   cryCardsEnabled: false,
   alternateFormsEnabled: false,
   maxNewPerDay: 10,
@@ -258,10 +257,8 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
     return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : defaultVal;
   }
   return {
-    nameCardsEnabled:             boolField("nameCardsEnabled",             DEFAULT_ELIGIBILITY.nameCardsEnabled),
     evolutionCardsEnabled:        boolField("evolutionCardsEnabled",        DEFAULT_ELIGIBILITY.evolutionCardsEnabled),
     reverseEvolutionCardsEnabled: boolField("reverseEvolutionCardsEnabled", DEFAULT_ELIGIBILITY.reverseEvolutionCardsEnabled),
-    reverseCardsEnabled:          boolField("reverseCardsEnabled",          DEFAULT_ELIGIBILITY.reverseCardsEnabled),
     cryCardsEnabled:              boolField("cryCardsEnabled",              DEFAULT_ELIGIBILITY.cryCardsEnabled),
     alternateFormsEnabled:        boolField("alternateFormsEnabled",        DEFAULT_ELIGIBILITY.alternateFormsEnabled),
     maxNewPerDay:          numField("maxNewPerDay",          DEFAULT_ELIGIBILITY.maxNewPerDay),
@@ -294,10 +291,10 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
  *      silently dropped while we await a route update.
  *
  * Card-type gates:
- *   - `name`                   → nameCardsEnabled
+ *   - `name`                   → always on (#1234)
+ *   - `reverse`                → always on (#1234)
  *   - `evolution-edge`         → evolutionCardsEnabled
  *   - `reverse-evolution-edge` → reverseEvolutionCardsEnabled
- *   - `reverse`                → reverseCardsEnabled
  *   - `cry`                    → cryCardsEnabled
  *
  * Alt-forms gate (when `alternateFormsEnabled` is false):
@@ -361,12 +358,15 @@ function computeNewEstimate(
 ): number {
   let estimate = 0;
 
-  if (eligibility.nameCardsEnabled) {
-    estimate += Math.max(
-      0,
-      eligibility.maxNewPerDay - (startedTodayCounts["name"] ?? 0),
-    );
-  }
+  // Name and reverse are always on since #1234.
+  estimate += Math.max(
+    0,
+    eligibility.maxNewPerDay - (startedTodayCounts["name"] ?? 0),
+  );
+  estimate += Math.max(
+    0,
+    eligibility.maxNewReversePerDay - (startedTodayCounts["reverse"] ?? 0),
+  );
   if (eligibility.evolutionCardsEnabled) {
     estimate += Math.max(
       0,
@@ -377,12 +377,6 @@ function computeNewEstimate(
     estimate += Math.max(
       0,
       eligibility.maxNewEvolutionPerDay - (startedTodayCounts["reverse-evolution-edge"] ?? 0),
-    );
-  }
-  if (eligibility.reverseCardsEnabled) {
-    estimate += Math.max(
-      0,
-      eligibility.maxNewReversePerDay - (startedTodayCounts["reverse"] ?? 0),
     );
   }
   if (eligibility.cryCardsEnabled) {
@@ -506,7 +500,8 @@ export async function POST(request: Request) {
   // hidden_since IS NULL`, then aggregate client-side.
   //
   // For each row we apply the per-user eligibility gate:
-  //   - Card-type enable flags (nameCardsEnabled, etc.) from settings JSONB.
+  //   - Card-type enable flags (evolutionCardsEnabled, etc.) from settings JSONB.
+  //     Name and reverse are always on since #1234.
   //   - Alt-forms exclusion: when alternateFormsEnabled is false, rows with
   //     subject_key that resolves to an alt-form species id (>= 10000) are
   //     skipped (#1153).

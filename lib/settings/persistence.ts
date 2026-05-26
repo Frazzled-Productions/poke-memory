@@ -101,10 +101,8 @@ export type UserSettings = {
   maxReviewsPerDay: number;          // soft daily cap for name reviews
   maxNewEvolutionPerDay: number;     // hard daily cap for new evolution cards
   maxReviewsEvolutionPerDay: number; // soft daily cap for evolution reviews
-  nameCardsEnabled: boolean;         // show sprite as prompt; type/select the name
   evolutionCardsEnabled: boolean;    // show sprite; identify evolution chain
   reverseEvolutionCardsEnabled: boolean; // reverse-direction evolution edge cards (#343)
-  reverseCardsEnabled: boolean;      // show name as prompt; reveal sprite
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
   playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
@@ -255,10 +253,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxReviewsPerDay: 100,
   maxNewEvolutionPerDay: 5,
   maxReviewsEvolutionPerDay: 50,
-  nameCardsEnabled: true,
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
-  reverseCardsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
@@ -433,10 +429,8 @@ function parseStoredSettings(raw: string | null): UserSettings {
     maxReviewsPerDay:          num(obj, "maxReviewsPerDay"),
     maxNewEvolutionPerDay:     num(obj, "maxNewEvolutionPerDay"),
     maxReviewsEvolutionPerDay: num(obj, "maxReviewsEvolutionPerDay"),
-    nameCardsEnabled:             bool(obj, "nameCardsEnabled"),
     evolutionCardsEnabled:        bool(obj, "evolutionCardsEnabled"),
     reverseEvolutionCardsEnabled: bool(obj, "reverseEvolutionCardsEnabled"),
-    reverseCardsEnabled:          bool(obj, "reverseCardsEnabled"),
     maxNewReversePerDay:     num(obj, "maxNewReversePerDay"),
     maxReviewsReversePerDay: num(obj, "maxReviewsReversePerDay"),
     playCryOnReveal:   bool(obj, "playCryOnReveal"),

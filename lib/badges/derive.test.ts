@@ -45,21 +45,30 @@ describe("masteredSpeciesIds", () => {
   });
 
   it("returns only species whose name card meets the mastery rule", () => {
+    // Since #1234, species mastery requires BOTH name AND reverse to be mastered.
+    // Supply paired reverse cards (id = 2_000_000 + speciesId) for ids 1 and 25.
     const cards: ReviewableCard[] = [
-      nameCard(1, mkState(3, 21)), // mastered — exactly at both thresholds
-      nameCard(4, mkState(2, 21)), // reps one below threshold (N-1)
-      nameCard(7, mkState(3, 20)), // scheduledDays one below threshold (N-1)
-      nameCard(25, mkState(5, 60)), // mastered — comfortably above both
+      nameCard(1, mkState(3, 21)),       // name mastered — exactly at both thresholds
+      reverseCard(2_000_001, mkState(3, 21)), // reverse mastered — species 1 fully mastered
+      nameCard(4, mkState(2, 21)),       // name: reps one below threshold (N-1) — not mastered
+      reverseCard(2_000_004, mkState(3, 21)), // reverse mastered — but name not, so species not
+      nameCard(7, mkState(3, 20)),       // name: scheduledDays one below threshold (N-1) — not mastered
+      reverseCard(2_000_007, mkState(3, 21)), // reverse mastered — but name not
+      nameCard(25, mkState(5, 60)),      // name mastered — comfortably above both
+      reverseCard(2_000_025, mkState(5, 60)), // reverse mastered — species 25 fully mastered
     ];
     expect([...masteredSpeciesIds(cards, 3, false)].sort((a, b) => a - b)).toEqual([1, 25]);
   });
 
-  it("ignores non-name card directions", () => {
+  it("ignores non-name card directions when computing the result set", () => {
+    // Since #1234, both name AND reverse must be mastered for species mastery.
+    // A mastered name card with a mastered reverse → species 1 in the set.
+    // A mastered reverse with no name card → not in the set.
     const cards: ReviewableCard[] = [
       nameCard(1, mkState(3, 21)),
-      // Reverse card for the same species — should not double-count or
-      // contribute if the name card were missing.
-      reverseCard(2_000_001, mkState(99, 99)),
+      reverseCard(2_000_001, mkState(99, 99)), // paired reverse — both mastered
+      // No name card for species 4 — reverse alone is not enough.
+      reverseCard(2_000_004, mkState(99, 99)),
     ];
     expect([...masteredSpeciesIds(cards, 3, false)]).toEqual([1]);
   });
@@ -78,11 +87,16 @@ describe("masteredSpeciesIds", () => {
   });
 
   it("respects a custom masteryRepetitions threshold", () => {
+    // Supply paired reverse cards so the two-leg mastery rule is satisfied
+    // for the species that qualify. At threshold 4, only id 4's name card
+    // meets the reps gate — id 1 has reps=3 which is below 4.
     const cards: ReviewableCard[] = [
       nameCard(1, mkState(3, 21)),
+      reverseCard(2_000_001, mkState(4, 21)),
       nameCard(4, mkState(4, 21)),
+      reverseCard(2_000_004, mkState(4, 21)),
     ];
-    // Requires reps >= 4 — only id 4 qualifies.
+    // Requires reps >= 4 — only id 4 qualifies (name reps=4 and reverse reps=4).
     expect([...masteredSpeciesIds(cards, 4, false)]).toEqual([4]);
   });
 });

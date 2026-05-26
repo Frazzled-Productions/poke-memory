@@ -12,6 +12,9 @@ import { isMastered, MASTERY_REPETITIONS } from "@/lib/stats/derive";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
+/** The numeric offset added to a pokémon ID to produce its reverse-card ID. */
+const REVERSE_ID_OFFSET = 2_000_000;
+
 /**
  * The ReviewSession shape as stored in localStorage / passed through sync.
  * Deliberately minimal — only the fields this module touches.
@@ -41,9 +44,13 @@ export function justBecameMastered(
 }
 
 /**
- * Filters a card array to mastered name-cards only. Evolution, reverse, and
- * cry cards are excluded — the pasture shows one entry per species, keyed on
- * the name card.
+ * Filters a card array to species-mastered name-cards only. Evolution, reverse,
+ * and cry cards are excluded — the pasture shows one entry per species, keyed
+ * on the name card.
+ *
+ * Since #1234, a species is mastered when BOTH its name card AND its paired
+ * reverse card have cleared the FSRS mastery gate. A name card alone is not
+ * sufficient.
  *
  * When `forceAllMastered` is true (superuser `pretendAllMastered` flag), the
  * mastery predicate is bypassed and every name-type card flows through. The
@@ -59,9 +66,25 @@ export function filterMastered(
   forceAllMastered = false,
   masteryRepetitions: number = MASTERY_REPETITIONS,
 ): ReviewableCard[] {
+  // Build a quick set of species IDs whose reverse card is mastered.
+  // Reverse card ID = REVERSE_ID_OFFSET + pokemonId.
+  const masteredReverseSpecies = new Set<number>();
+  for (const card of cards) {
+    if (card.cardType !== "reverse") continue;
+    const speciesId = card.id - REVERSE_ID_OFFSET;
+    if (speciesId > 0 && (forceAllMastered || isMastered(card.state, masteryRepetitions))) {
+      masteredReverseSpecies.add(speciesId);
+    }
+  }
+
   return cards.filter((card) => {
     if (card.cardType !== "name") return false;
-    return forceAllMastered || isMastered(card.state, masteryRepetitions);
+    if (forceAllMastered) return true;
+    // Both name and reverse must be mastered for species-level mastery (#1234).
+    return (
+      isMastered(card.state, masteryRepetitions) &&
+      masteredReverseSpecies.has(card.id)
+    );
   });
 }
 

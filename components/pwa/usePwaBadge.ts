@@ -67,9 +67,7 @@ export function usePwaBadge(): void {
       const { totalCount } = computeQueueCount(
         session.cards,
         {
-          nameCardsEnabled: settings.nameCardsEnabled,
           evolutionCardsEnabled: settings.evolutionCardsEnabled,
-          reverseCardsEnabled: settings.reverseCardsEnabled,
           reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
           cryCardsEnabled: settings.cryCardsEnabled,
           alternateFormsEnabled: settings.alternateFormsEnabled,

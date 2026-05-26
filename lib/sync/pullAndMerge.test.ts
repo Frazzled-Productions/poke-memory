@@ -53,9 +53,7 @@ vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: vi.fn(),
   saveSettings: vi.fn(),
   DEFAULT_SETTINGS: {
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
-    reverseCardsEnabled: false,
     reverseEvolutionCardsEnabled: false,
     cryCardsEnabled: false,
   },
@@ -141,9 +139,7 @@ describe("pullAndMerge", () => {
     mockBuildSession.mockReturnValue([]);
     mockHasStoredSettings.mockReturnValue(false);
     mockLoadSettings.mockReturnValue({
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
-      reverseCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
       cryCardsEnabled: false,
     } as ReturnType<typeof loadSettings>);
@@ -196,9 +192,7 @@ describe("pullAndMerge", () => {
     mockHasStoredSettings.mockReturnValue(false);
     mockPullUserSettingsRow.mockResolvedValue({
       settings: {
-        nameCardsEnabled: true,
         evolutionCardsEnabled: true,
-        reverseCardsEnabled: true,
         reverseEvolutionCardsEnabled: false,
         cryCardsEnabled: true,
       } as ReturnType<typeof loadSettings>,
@@ -206,9 +200,7 @@ describe("pullAndMerge", () => {
     });
     // After settings pull, loadSettings reflects the pulled values.
     mockLoadSettings.mockReturnValue({
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
-      reverseCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       cryCardsEnabled: true,
     } as ReturnType<typeof loadSettings>);

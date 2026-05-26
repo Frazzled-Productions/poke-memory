@@ -537,9 +537,8 @@ export function ReviewSession() {
   // null = SSR / not-yet-hydrated. Same pattern as before.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
-  const [reverseEnabled, setReverseEnabled] = useState(false);
+  const [reverseEnabled, setReverseEnabled] = useState(true);
   const [reverseEvolutionEnabled, setReverseEvolutionEnabled] = useState(false);
-  const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
@@ -632,9 +631,7 @@ export function ReviewSession() {
       const eligibleIds = computeEligibleCardIds(
         cards,
         {
-          nameCardsEnabled,
           evolutionCardsEnabled,
-          reverseCardsEnabled: reverseEnabled,
           reverseEvolutionCardsEnabled: reverseEvolutionEnabled,
           cryCardsEnabled: cryCardsEnabled,
           alternateFormsEnabled,
@@ -797,8 +794,9 @@ export function ReviewSession() {
       let sessionCards: ReviewableCard[];
       let sessionLimits: DailyLimits;
 
-      const enabled = settings.reverseCardsEnabled;
-      const nameEnabled = settings.nameCardsEnabled;
+      // Name and reverse are always on since #1234.
+      const enabled = true;
+      const nameEnabled = true;
       const evolutionEnabled = settings.evolutionCardsEnabled;
       const reverseEvolutionEnabledLocal = settings.reverseEvolutionCardsEnabled;
       const cryEnabled = settings.cryCardsEnabled;
@@ -883,9 +881,7 @@ export function ReviewSession() {
       const eligibleIds = computeEligibleCardIds(
         sessionCards,
         {
-          nameCardsEnabled: nameEnabled,
           evolutionCardsEnabled: evolutionEnabled,
-          reverseCardsEnabled: enabled,
           reverseEvolutionCardsEnabled: reverseEvolutionEnabledLocal,
           cryCardsEnabled: cryEnabled,
           alternateFormsEnabled: formsEnabled,
@@ -900,14 +896,12 @@ export function ReviewSession() {
 
       setCards(sessionCards);
       setLimits(sessionLimits);
-      setReverseEnabled(enabled);
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
-      setNameCardsEnabled(nameEnabled);
       setEvolutionCardsEnabled(evolutionEnabled);
       setCryCardsEnabled(cryEnabled);
       setAlternateFormsEnabled(formsEnabled);
       setCardTypesAllOn(
-        enabled && reverseEvolutionEnabledLocal && formsEnabled,
+        reverseEvolutionEnabledLocal && formsEnabled,
       );
       setScope(persistedScope);
       setMasteryRepetitions(settings.masteryRepetitions);
@@ -1292,14 +1286,21 @@ export function ReviewSession() {
     );
   }
 
-  // --- All card types disabled ---
+  // --- All opt-in card types disabled ---
+  // Name and reverse are always on since #1234, so this guard covers only
+  // the unlikely case where evolution, reverse-evolution, and cry are all off
+  // AND the practiceScope has no cards. In practice, name+reverse being always
+  // on means the session will always have at least some cards unless the scope
+  // explicitly excludes everything (handled below). We keep the guard for
+  // correctness but it will only fire for the evolution/cry-only opt-in combos.
   if (
-    !nameCardsEnabled &&
     !evolutionCardsEnabled &&
     !reverseEnabled &&
     !reverseEvolutionEnabled &&
     !cryCardsEnabled
   ) {
+    // This branch is unreachable with default settings since reverseEnabled is
+    // always true. Kept as a safety net.
     return (
       <div className="flex flex-col items-center gap-4 text-center">
         <p className="text-2xl font-semibold text-foreground">No card types enabled</p>
@@ -1524,7 +1525,7 @@ export function ReviewSession() {
     // eligibleCardIds — so that alternate-form and scope filters do not
     // suppress the wall for genuinely-enabled card types (#835).
     const endStateTypeOpts = {
-      nameEnabled: nameCardsEnabled,
+      nameEnabled: true,
       evolutionEnabled: evolutionCardsEnabled,
       reverseEnabled,
       reverseEvolutionEnabled,
@@ -1599,7 +1600,7 @@ export function ReviewSession() {
               <CountdownScreen
                 dueAt={earliestDueAt}
                 perType={perType}
-                nameEnabled={nameCardsEnabled}
+                nameEnabled={true}
                 evolutionEnabled={evolutionCardsEnabled}
                 reverseEnabled={reverseEnabled}
                 reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -1667,7 +1668,7 @@ export function ReviewSession() {
         <EndOfSessionScreen
           variant={variant}
           perType={perType}
-          nameEnabled={nameCardsEnabled}
+          nameEnabled={true}
           evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
           reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -2396,7 +2397,7 @@ export function ReviewSession() {
           <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
             <TodayPill
               perType={perType}
-              nameEnabled={nameCardsEnabled}
+              nameEnabled={true}
               evolutionEnabled={evolutionCardsEnabled}
               reverseEnabled={reverseEnabled}
               reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -2505,7 +2506,7 @@ export function ReviewSession() {
         <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
           <TodayPill
             perType={perType}
-            nameEnabled={nameCardsEnabled}
+            nameEnabled={true}
             evolutionEnabled={evolutionCardsEnabled}
             reverseEnabled={reverseEnabled}
             reverseEvolutionEnabled={reverseEvolutionEnabled}

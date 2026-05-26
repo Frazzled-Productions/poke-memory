@@ -1023,13 +1023,11 @@ describe("cardIsEligible: size-variant formCategory regression (#837)", () => {
 // computeEligibleCardIds (#1108)
 // ---------------------------------------------------------------------------
 
-/** Minimal settings for computeEligibleCardIds tests — all directions on,
- *  alternate forms off, empty scope. */
+/** Minimal settings for computeEligibleCardIds tests — enrichment off,
+ *  alternate forms off, empty scope. Name and reverse are always on (#1234). */
 function defaultSettings() {
   return {
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
-    reverseCardsEnabled: false,
     reverseEvolutionCardsEnabled: false,
     cryCardsEnabled: false,
     alternateFormsEnabled: false,
@@ -1053,13 +1051,13 @@ describe("computeEligibleCardIds", () => {
     expect(result).toEqual(new Set([1, 4, 7]));
   });
 
-  it("excludes cards whose card type is disabled", () => {
-    // A 'reverse' card should be excluded when reverseCardsEnabled is false.
-    const rev: NameReviewCard = { ...nameCard(1), cardType: "reverse" as "name" };
-    const cards = [nameCard(1), rev];
-    const result = computeEligibleCardIds(cards, { ...defaultSettings(), reverseCardsEnabled: false });
-    // Only the name card (id=1) passes; the reverse card also has id=1 but
-    // cardType 'reverse' is gated out, so the Set should only contain 1.
+  it("excludes cards whose enrichment card type is disabled", () => {
+    // Evolution cards should be excluded when evolutionCardsEnabled is false.
+    // (Name and reverse are always on since #1234 and cannot be disabled.)
+    const evolutionCard = evoCard(1500011, 4, 5); // Charmander→Charmeleon
+    const cards = [nameCard(1), evolutionCard];
+    const result = computeEligibleCardIds(cards, { ...defaultSettings(), evolutionCardsEnabled: false });
+    // Only the name card (id=1) passes; the evolution card is gated out.
     expect(result).toEqual(new Set([1]));
   });
 

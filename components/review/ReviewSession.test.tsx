@@ -2,7 +2,7 @@ import { render, screen, waitFor, act, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
-import type { NameReviewCard, CryReviewCard } from "@/lib/review/session";
+import type { NameReviewCard, CryReviewCard, ReverseReviewCard } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadGradeLog, appendGradeEntry } from "@/lib/gradelog/persistence";
@@ -29,7 +29,7 @@ vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
 
 // vi.mock factories are hoisted — define seed data via vi.hoisted so the
 // factory closure can reference it before the module-level const is initialised.
-const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.hoisted(() => {
+const { FIXTURE_CARD, FIXTURE_CARDS_4, GRADUATED_REVERSE_CARD, mockSeedPokemon, mockLoadSettings } = vi.hoisted(() => {
   const card: NameReviewCard = {
     id: 1,
     speciesId: 1,
@@ -86,25 +86,57 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, mockSeedPokemon, mockLoadSettings } = vi.
   // Partial so individual tests can pass any subset of settings via
   // mockReturnValue without TS demanding the full UserSettings surface,
   // while still key-name-checking every field against UserSettings.
+  //
+  // Name and reverse are always on since #1234. maxNewReversePerDay is set to 0
+  // here so the single-card fixtures stay single-card (no reverse card queued).
+  // Tests that specifically exercise the reverse flow override this to 10.
   const defaultSettings: Partial<UserSettings> = {
     masteryRepetitions: 3,
     maxNewPerDay: 10,
     maxReviewsPerDay: 100,
     maxNewEvolutionPerDay: 5,
     maxReviewsEvolutionPerDay: 50,
-    reverseCardsEnabled: false,
-    maxNewReversePerDay: 10,
+    maxNewReversePerDay: 0,
     maxReviewsReversePerDay: 100,
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
     playCryOnReveal: false,
     practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
     earnedBadges: [] as { id: string; earnedAt: string }[],
   };
 
+  // Graduated reverse card for Bulbasaur. Used alongside FIXTURE_CARD in
+  // loadSession fixtures to prevent hydrateSession (reverseEnabled=true since
+  // #1234) from adding a fresh unseen reverse card that would trigger newWall
+  // with maxNewReversePerDay=0 (the default single-card fixture cap).
+  // "Graduated" means lastReview !== null so hasMoreNewCardsOf("reverse") = false.
+  const graduatedReverseCard = {
+    ...card,
+    cardType: "reverse" as const,
+    id: 2_000_001,   // REVERSE_ID_OFFSET + speciesId 1
+    pokemonId: 1,
+    subjectKey: "1",
+    state: {
+      stability: 10,
+      difficulty: 5,
+      elapsedDays: 25,
+      scheduledDays: 25,
+      reps: 3,
+      lapses: 0,
+      fsrsState: "review" as const,
+      dueDate: "2099-01-01", // far future — not due
+      lastReview: "1970-01-01",
+      firstSeen: "1970-01-01",
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    },
+  };
+
   return {
     FIXTURE_CARD: card,
     FIXTURE_CARDS_4: [card, makeExtra(2, "Ivysaur"), makeExtra(3, "Venusaur"), makeExtra(4, "Charmander")],
+    GRADUATED_REVERSE_CARD: graduatedReverseCard,
     mockSeedPokemon: vi.fn(() => [card]),
     mockLoadSettings: vi.fn(() => defaultSettings),
   };
@@ -248,16 +280,16 @@ beforeEach(() => {
   // Restore default implementations that vi.clearAllMocks() wipes.
   mockDecodeSpriteUrls.mockResolvedValue(undefined);
   mockSeedPokemon.mockReturnValue([FIXTURE_CARD]);
+  // Name and reverse are always on since #1234. maxNewReversePerDay: 0 keeps
+  // single-card test fixtures working without introducing a reverse card.
   mockLoadSettings.mockReturnValue({
     masteryRepetitions: 3,
     maxNewPerDay: 10,
     maxReviewsPerDay: 100,
     maxNewEvolutionPerDay: 5,
     maxReviewsEvolutionPerDay: 50,
-    reverseCardsEnabled: false,
-    maxNewReversePerDay: 10,
+    maxNewReversePerDay: 0,
     maxReviewsReversePerDay: 100,
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
     playCryOnReveal: false,
     practiceScope: { gens: [], types: [], presets: [] },
@@ -300,10 +332,8 @@ describe("ReviewSession reveal flow", () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       playCryOnReveal: true,
       practiceScope: { gens: [], types: [], presets: [] },
@@ -320,6 +350,13 @@ describe("ReviewSession reveal flow", () => {
   });
 
   it("advances to next card and resets reveal state after grading", async () => {
+    // Pre-seed loadSession with a graduated reverse card so hydrateSession
+    // (reverseEnabled=true since #1234) doesn't add a fresh unseen reverse card
+    // that would trigger newWall with maxNewReversePerDay=0.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
     const user = userEvent.setup();
     render(<ReviewSession />);
 
@@ -384,10 +421,8 @@ describe("handleReveal decode-ahead (#930)", () => {
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       cryCardsEnabled: false,
@@ -519,6 +554,13 @@ describe("ReviewSession onboarding nudges (#702)", () => {
   // remains — it is still rendered by EndOfSessionScreen.
 
   it("shows the card-types hint on the session-complete screen", async () => {
+    // Pre-seed loadSession with a graduated reverse card so hydrateSession
+    // (reverseEnabled=true since #1234) doesn't add a fresh unseen reverse card
+    // that would trigger newWall with maxNewReversePerDay=0.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
     const user = userEvent.setup();
     render(<ReviewSession />);
 
@@ -547,12 +589,10 @@ describe("ReviewSession onboarding nudges (#702)", () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: true,
       reverseEvolutionCardsEnabled: true,
       alternateFormsEnabled: true,
-      maxNewReversePerDay: 10,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       playCryOnReveal: false,
       practiceScope: { gens: [], types: [], presets: [] },
@@ -570,16 +610,16 @@ describe("ReviewSession onboarding nudges (#702)", () => {
 });
 
 describe("ReviewSession reverse card flow", () => {
+  // Name and reverse are always on since #1234. Set maxNewPerDay: 0 and
+  // evolutionCardsEnabled: false so only reverse cards appear as new cards.
   const reverseSettings = {
     masteryRepetitions: 3,
-    maxNewPerDay: 10,
-    maxReviewsPerDay: 100,
-    maxNewEvolutionPerDay: 5,
-    maxReviewsEvolutionPerDay: 50,
-    reverseCardsEnabled: true,
+    maxNewPerDay: 0,
+    maxReviewsPerDay: 0,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
     maxNewReversePerDay: 10,
     maxReviewsReversePerDay: 100,
-    nameCardsEnabled: false,
     evolutionCardsEnabled: false,
     playCryOnReveal: false,
     practiceScope: { gens: [], types: [], presets: [] },
@@ -774,7 +814,9 @@ describe("Baseline: due review card reveal → grade cycle", () => {
     };
 
     mockSeedPokemon.mockReturnValue([reviewCard]);
-    vi.mocked(loadSession).mockResolvedValueOnce({ cards: [reviewCard], limits: DEFAULT_LIMITS });
+    // Include a graduated reverse card so hydrateSession (reverseEnabled=true since
+    // #1234) doesn't add a fresh unseen reverse card that would trigger newWall.
+    vi.mocked(loadSession).mockResolvedValueOnce({ cards: [reviewCard, GRADUATED_REVERSE_CARD], limits: DEFAULT_LIMITS });
 
     const user = userEvent.setup();
     render(<ReviewSession />);
@@ -1221,10 +1263,8 @@ describe("Practice scope (#333)", () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       playCryOnReveal: false,
       practiceScope: { gens: [9], types: [], presets: [] },
@@ -1279,10 +1319,8 @@ describe("Practice scope (#333)", () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       playCryOnReveal: false,
       // Excludes Bulbasaur (Gen I).
@@ -1323,10 +1361,8 @@ describe("Practice scope: Clear scope button (#835)", () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       playCryOnReveal: false,
       // Scope to Gen IX — Bulbasaur is Gen I, so zero match.
@@ -1406,10 +1442,8 @@ describe("Practice scope: stale display lock clears on scope change (#1088)", ()
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       playCryOnReveal: false,
       practiceScope: { gens: [], types: [], presets: [] },
@@ -1466,10 +1500,8 @@ describe("Practice scope: stale display lock clears on scope change (#1088)", ()
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       playCryOnReveal: false,
       practiceScope: { gens: [], types: [], presets: [] },
@@ -1585,8 +1617,8 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
 
   it("renders the error banner in the cry-card branch when nextReview throws", async () => {
     // Set up a session with cry cards enabled and name/evo limits zeroed out so
-    // the cry render branch is the active card. nameCardsEnabled must remain true
-    // so the "no card types enabled" guard does not fire before any card renders.
+    // the cry render branch is the active card. maxNewPerDay is set to 0 so
+    // no name cards enter the queue and cry is the only active card type.
     mockSeedPokemon.mockReturnValue([{ ...FIXTURE_CARD, cryUrl: "https://example.com/bulbasaur.ogg" }]);
     mockLoadSettings.mockReturnValue({
       masteryRepetitions: 3,
@@ -1594,13 +1626,11 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
       cryCardsEnabled: true,
       maxNewCryPerDay: 10,
       maxReviewsCryPerDay: 100,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: false,
       playCryOnReveal: false,
       practiceScope: { gens: [], types: [], presets: [] },
@@ -1642,13 +1672,11 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: true,
       maxNewReversePerDay: 10,
       maxReviewsReversePerDay: 100,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       playCryOnReveal: false,
       practiceScope: { gens: [], types: [], presets: [] },
@@ -1706,13 +1734,11 @@ describe("Card-type disable guards (#835)", () => {
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
       cryCardsEnabled: true,
       maxNewCryPerDay: 10,
       maxReviewsCryPerDay: 100,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -1733,21 +1759,23 @@ describe("Card-type disable guards (#835)", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows 'No card types enabled' when every type including cry is off", async () => {
-    // Complementary positive case: all types disabled → dead-end message.
+  it("never shows 'No card types enabled' because reverse is always on (#1234)", async () => {
+    // Since #1234, reverse cards are always enabled (reverseEnabled is hardcoded
+    // true in ReviewSession). The "No card types enabled" guard requires all of
+    // evolution, reverse, reverse-evolution, and cry to be off — an unreachable
+    // combination. Even with every opt-in type disabled, the session still builds
+    // reverse cards from the fixture seed and renders a Reveal button.
     mockLoadSettings.mockReturnValue({
       masteryRepetitions: 3,
-      maxNewPerDay: 10,
+      maxNewPerDay: 0,
       maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
       maxNewReversePerDay: 10,
       maxReviewsReversePerDay: 100,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -1757,26 +1785,55 @@ describe("Card-type disable guards (#835)", () => {
 
     render(<ReviewSession />);
 
+    // Reverse cards are queued — the guard never fires.
     await waitFor(() => {
       expect(
-        screen.getByText(/no card types enabled/i),
-      ).toBeInTheDocument();
+        screen.queryByText(/no card types enabled/i),
+      ).not.toBeInTheDocument();
     });
   });
 
-  it("does not produce NEW_CARDS_LOCKED after a daily new-card cap is hit on a now-disabled type", async () => {
-    // Scenario: name cards have hit their new-card cap (maxNewPerDay: 0 so any
-    // name card in storage would trigger the wall), but the user has since
-    // disabled name cards. Evolution cards are the active type, but the seed
-    // has no evolution cards, so the queue is empty.
+  it("does not produce NEW_CARDS_LOCKED when cry is capped and disabled (#835)", async () => {
+    // Scenario: cry new-card cap is 0 but cry cards are disabled (cryCardsEnabled=false).
+    // An unseen cry card in the session would naively trigger the wall, but
+    // hasMoreNewCardsOf checks cardTypeIsEnabled first — since cry is off, the
+    // cry card is excluded → SESSION_COMPLETE.
     //
-    // Without the fix: hasMoreNewCardsOf("name") iterates `cards!` without
-    // consulting eligibleCardIds → sees the unseen name card → returns true →
-    // NEW_CARDS_LOCKED fires even though name cards are off.
-    // With the fix: the name card is excluded from eligibleCardIds →
-    // hasMoreNewCardsOf finds nothing → SESSION_COMPLETE.
-    const unseenNameCard: NameReviewCard = {
+    // Seed pokemon has a cryUrl so buildSession/hydrateSession generates a cry card.
+    // Name + reverse: name card is graduated, reverse card is graduated so those
+    // queues are empty. Evolution: enabled but seed has no evo cards.
+    // The cry card is the only unseen card, but cry is off → no wall.
+    const seedWithCry: NameReviewCard = {
       ...FIXTURE_CARD,
+      cryUrl: "https://example.com/bulbasaur.ogg",
+    };
+    const graduatedNameCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      cryUrl: "https://example.com/bulbasaur.ogg",
+      state: {
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 25,
+        scheduledDays: 25,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2099-01-01",
+        lastReview: "1970-01-01",
+        firstSeen: "1970-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+    // Cry card (unseen) — id = CRY_ID_OFFSET + 1 = 3_000_001
+    const unseenCryCard = {
+      ...seedWithCry,
+      cardType: "cry" as const,
+      id: 3_000_001,
+      pokemonId: 1,
+      subjectKey: "1",
       state: {
         stability: 0,
         difficulty: 0,
@@ -1795,26 +1852,23 @@ describe("Card-type disable guards (#835)", () => {
       },
     };
 
-    mockSeedPokemon.mockReturnValue([unseenNameCard]);
+    mockSeedPokemon.mockReturnValue([seedWithCry]);
     vi.mocked(loadSession).mockResolvedValueOnce({
-      cards: [unseenNameCard],
+      // Graduated name + reverse; unseen cry card
+      cards: [graduatedNameCard, GRADUATED_REVERSE_CARD, unseenCryCard],
       limits: DEFAULT_LIMITS,
     });
-    // Name cards disabled; evolution cards enabled but seed has none.
-    // maxNewPerDay: 0 ensures name cards would fire the new-card wall if seen.
     mockLoadSettings.mockReturnValue({
       masteryRepetitions: 3,
       maxNewPerDay: 0,
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 10,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
-      cryCardsEnabled: false,
+      cryCardsEnabled: false, // ← cry disabled
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -1824,8 +1878,8 @@ describe("Card-type disable guards (#835)", () => {
 
     render(<ReviewSession />);
 
-    // With the fix, the disabled name card is excluded from eligibleCardIds and
-    // therefore excluded from hasMoreNewCardsOf — SESSION_COMPLETE, not NEW_CARDS_LOCKED.
+    // Cry card is excluded from hasMoreNewCardsOf because cryCardsEnabled=false.
+    // All other queues are empty → SESSION_COMPLETE, not NEW_CARDS_LOCKED.
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
     });
@@ -1866,13 +1920,11 @@ describe("Card-type disable guards (#835)", () => {
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
       cryCardsEnabled: true,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 100,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -1948,13 +2000,11 @@ describe("Card-type disable guards (#835)", () => {
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
       cryCardsEnabled: true,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -2000,6 +2050,22 @@ describe("Share today button persistence (#896)", () => {
     };
   }
 
+  /**
+   * Graduated reverse card for species 1 (Bulbasaur). Pre-seeding loadSession
+   * with both the name and reverse card prevents hydrateSession from appending
+   * a fresh unseen reverse card that would drive NEW_CARDS_LOCKED instead of
+   * SESSION_COMPLETE. Required since #1234 made reverse always-on.
+   */
+  function buildCompletedReverseCard(): ReverseReviewCard {
+    return {
+      ...buildCompletedNameCard(),
+      id: 2_000_001,          // REVERSE_ID_OFFSET + speciesId 1
+      pokemonId: 1,
+      cardType: "reverse",
+      subjectKey: "1",
+    } as unknown as ReverseReviewCard;
+  }
+
   function todayUtc(): string {
     return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(
       new Date(),
@@ -2040,8 +2106,11 @@ describe("Share today button persistence (#896)", () => {
 
   it("shows the Share today button on a fresh mount when a today-dated daily summary is persisted", async () => {
     const card = buildCompletedNameCard();
+    const reverseCard = buildCompletedReverseCard();
     mockSeedPokemon.mockReturnValue([card]);
-    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    // Both name and reverse are graduated — hydrateSession won't add an unseen
+    // reverse card that would drive NEW_CARDS_LOCKED instead of SESSION_COMPLETE.
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card, reverseCard], limits: DEFAULT_LIMITS });
     // A persisted daily-summary record dated today — the in-memory
     // sessionGradeSeq is empty on this fresh mount, so the button can only
     // appear if it hydrates from this persisted record.
@@ -2070,8 +2139,9 @@ describe("Share today button persistence (#896)", () => {
 
   it("reconstructs the Share today button from the grade log when no daily summary is persisted", async () => {
     const card = buildCompletedNameCard();
+    const reverseCard = buildCompletedReverseCard();
     mockSeedPokemon.mockReturnValue([card]);
-    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card, reverseCard], limits: DEFAULT_LIMITS });
     // No daily-summary record — but the durable grade log still has today's
     // grades, so the button must reconstruct from the log (#896).
     const today = todayUtc();
@@ -2095,8 +2165,9 @@ describe("Share today button persistence (#896)", () => {
 
   it("does not show the Share today button when neither the daily summary nor the grade log has today's grades", async () => {
     const card = buildCompletedNameCard();
+    const reverseCard = buildCompletedReverseCard();
     mockSeedPokemon.mockReturnValue([card]);
-    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
+    vi.mocked(loadSession).mockResolvedValue({ cards: [card, reverseCard], limits: DEFAULT_LIMITS });
     // Grade log only has entries from a previous day — nothing to share today.
     vi.mocked(loadGradeLog).mockResolvedValue([
       { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: 1 },
@@ -2136,11 +2207,29 @@ describe("Graduated-cards review queue hint (#880)", () => {
     };
   }
 
+  /**
+   * Graduated reverse card paired with buildCompletedNameCard().
+   * Pre-seeding loadSession with both prevents hydrateSession from appending a
+   * fresh unseen reverse card (id 2_000_001), which would cause the session to
+   * show the SpritePicker instead of the end-of-session screen.
+   */
+  function buildCompletedReverseCard(): ReverseReviewCard {
+    return {
+      ...buildCompletedNameCard(),
+      id: 2_000_001,        // REVERSE_ID_OFFSET + speciesId 1
+      pokemonId: 1,
+      cardType: "reverse",
+      subjectKey: "1",
+    } as unknown as ReverseReviewCard;
+  }
+
   it("shows the graduated-cards hint when more than one card direction is enabled", async () => {
-    const card = buildCompletedNameCard();
-    mockSeedPokemon.mockReturnValue([card]);
-    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
-    // Default settings enable both name and evolution cards (2 directions).
+    // Since #1234, name and reverse are always on (2 directions minimum), so the
+    // hint must always show when the session completes.
+    const nameCard = buildCompletedNameCard();
+    const reverseCard = buildCompletedReverseCard();
+    mockSeedPokemon.mockReturnValue([nameCard]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [nameCard, reverseCard], limits: DEFAULT_LIMITS });
     render(<ReviewSession />);
 
     await waitFor(() => {
@@ -2151,24 +2240,24 @@ describe("Graduated-cards review queue hint (#880)", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides the graduated-cards hint when only one card direction is enabled", async () => {
-    const card = buildCompletedNameCard();
-    mockSeedPokemon.mockReturnValue([card]);
-    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
-    // Only name cards enabled — there is no other direction to explain.
+  it("hint shows with name+reverse even when evolution and cry are off (#1234)", async () => {
+    // Since #1234, name and reverse are always on so enabledDirections is always
+    // at least 2 — the hint must show regardless of the optional card types.
+    const nameCard = buildCompletedNameCard();
+    const reverseCard = buildCompletedReverseCard();
+    mockSeedPokemon.mockReturnValue([nameCard]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [nameCard, reverseCard], limits: DEFAULT_LIMITS });
     mockLoadSettings.mockReturnValue({
       masteryRepetitions: 3,
       maxNewPerDay: 10,
       maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -2181,31 +2270,30 @@ describe("Graduated-cards review queue hint (#880)", () => {
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
     });
+    // name + reverse = 2 directions → hint must show.
     expect(
-      screen.queryByText(/reviews surface only graduated cards/i),
-    ).not.toBeInTheDocument();
+      screen.getByText(/reviews surface only graduated cards/i),
+    ).toBeInTheDocument();
   });
 
-  it("hides the graduated-cards hint when only reverse-evolution cards are enabled", async () => {
-    const card = buildCompletedNameCard();
-    mockSeedPokemon.mockReturnValue([card]);
-    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
-    // Only the reverse-evolution direction is on — a single direction, so the
-    // hint must stay hidden. This direction was previously omitted from the
-    // count entirely (#880).
+  it("hint shows when name, reverse, and reverse-evolution are all on (#880 regression guard)", async () => {
+    // Regression guard for #880: reverse-evolution was previously omitted from
+    // the direction count. Verify it is counted alongside name and reverse.
+    const nameCard = buildCompletedNameCard();
+    const reverseCard = buildCompletedReverseCard();
+    mockSeedPokemon.mockReturnValue([nameCard]);
+    vi.mocked(loadSession).mockResolvedValue({ cards: [nameCard, reverseCard], limits: DEFAULT_LIMITS });
     mockLoadSettings.mockReturnValue({
       masteryRepetitions: 3,
       maxNewPerDay: 10,
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
+      maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: true,
       playCryOnReveal: false,
@@ -2218,43 +2306,7 @@ describe("Graduated-cards review queue hint (#880)", () => {
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
     });
-    expect(
-      screen.queryByText(/reviews surface only graduated cards/i),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows the graduated-cards hint when name and reverse-evolution cards are enabled", async () => {
-    const card = buildCompletedNameCard();
-    mockSeedPokemon.mockReturnValue([card]);
-    vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: DEFAULT_LIMITS });
-    // Name plus reverse-evolution is two directions, so the hint must show.
-    // Before the count included reverseEvolutionCardsEnabled this combination
-    // counted as one direction and the hint never appeared (#880).
-    mockLoadSettings.mockReturnValue({
-      masteryRepetitions: 3,
-      maxNewPerDay: 10,
-      maxReviewsPerDay: 100,
-      maxNewEvolutionPerDay: 5,
-      maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
-      maxNewReversePerDay: 10,
-      maxReviewsReversePerDay: 100,
-      cryCardsEnabled: false,
-      maxNewCryPerDay: 0,
-      maxReviewsCryPerDay: 0,
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: false,
-      reverseEvolutionCardsEnabled: true,
-      playCryOnReveal: false,
-      practiceScope: { gens: [], types: [], presets: [] },
-      earnedBadges: [],
-    });
-
-    render(<ReviewSession />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
-    });
+    // name + reverse + reverse-evolution = 3 directions → hint must show.
     expect(
       screen.getByText(/reviews surface only graduated cards/i),
     ).toBeInTheDocument();
@@ -2344,13 +2396,11 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -2436,13 +2486,11 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 100,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -2505,13 +2553,11 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -2609,13 +2655,11 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -2704,6 +2748,13 @@ describe("Keyboard shortcuts (#1060)", () => {
   });
 
   it("grade key 5 (Easy) fires after reveal and completes the session", async () => {
+    // Pre-seed loadSession with a graduated reverse card so hydrateSession
+    // (reverseEnabled=true since #1234) doesn't add a fresh unseen reverse card
+    // that would trigger newWall with maxNewReversePerDay=0.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
     render(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
@@ -2803,13 +2854,11 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     maxReviewsPerDay: 100,
     maxNewEvolutionPerDay: 0,
     maxReviewsEvolutionPerDay: 0,
-    reverseCardsEnabled: false,
     maxNewReversePerDay: 0,
     maxReviewsReversePerDay: 0,
     cryCardsEnabled: false,
     maxNewCryPerDay: 0,
     maxReviewsCryPerDay: 0,
-    nameCardsEnabled: true,
     evolutionCardsEnabled: false,
     playCryOnReveal: false,
     practiceScope: { gens: [], types: [], presets: [] },
@@ -2905,13 +2954,11 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: true,
       maxNewReversePerDay: 10,
       maxReviewsReversePerDay: 100,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
       maxReviewsCryPerDay: 0,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       playCryOnReveal: false,
       practiceScope: { gens: [], types: [], presets: [] },
@@ -2937,16 +2984,13 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       maxReviewsPerDay: 0,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 0,
       maxReviewsReversePerDay: 0,
-      // All non-cry card types disabled so buildSession produces only a cry
-      // card. Without these, the name card (built first) would be served and
-      // the test would exercise the flip branch instead of the cry branch.
+      // maxNewPerDay: 0 and maxNewReversePerDay: 0 cap name and reverse so
+      // buildSession's cry card is the only one served via the new-card queue.
       cryCardsEnabled: true,
       maxNewCryPerDay: 10,
       maxReviewsCryPerDay: 100,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
       playCryOnReveal: false,
@@ -3082,10 +3126,8 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 0,
       maxReviewsEvolutionPerDay: 0,
-      reverseCardsEnabled: true,
       maxNewReversePerDay: 10,
       maxReviewsReversePerDay: 100,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       cryCardsEnabled: false,
       maxNewCryPerDay: 0,
@@ -3195,20 +3237,18 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
 // ---------------------------------------------------------------------------
 
 describe("persistenceChainRef: split-write guard (#1196)", () => {
-  /** Minimal name-card-only settings — same shape as flipSettings above. */
+  /** Minimal name-card-only settings — maxNewReversePerDay: 0 suppresses reverse cards. */
   const nameOnlySettings = {
     masteryRepetitions: 3,
     maxNewPerDay: 10,
     maxReviewsPerDay: 100,
     maxNewEvolutionPerDay: 0,
     maxReviewsEvolutionPerDay: 0,
-    reverseCardsEnabled: false,
     maxNewReversePerDay: 0,
     maxReviewsReversePerDay: 0,
     cryCardsEnabled: false,
     maxNewCryPerDay: 0,
     maxReviewsCryPerDay: 0,
-    nameCardsEnabled: true,
     evolutionCardsEnabled: false,
     playCryOnReveal: false,
     practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
@@ -3338,20 +3378,18 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
 // ---------------------------------------------------------------------------
 
 describe("undo snap: only armed after successful saveSession (#1209)", () => {
-  /** Minimal name-card-only settings — same shape as nameOnlySettings above. */
+  /** Minimal name-card-only settings — maxNewReversePerDay: 0 suppresses reverse cards. */
   const nameOnlySettings = {
     masteryRepetitions: 3,
     maxNewPerDay: 10,
     maxReviewsPerDay: 100,
     maxNewEvolutionPerDay: 0,
     maxReviewsEvolutionPerDay: 0,
-    reverseCardsEnabled: false,
     maxNewReversePerDay: 0,
     maxReviewsReversePerDay: 0,
     cryCardsEnabled: false,
     maxNewCryPerDay: 0,
     maxReviewsCryPerDay: 0,
-    nameCardsEnabled: true,
     evolutionCardsEnabled: false,
     playCryOnReveal: false,
     practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },

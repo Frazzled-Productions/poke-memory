@@ -133,9 +133,7 @@ function strugglingCard(id: number): NameReviewCard {
 
 function makeSettings(overrides: Partial<EligibilitySettings> = {}): EligibilitySettings {
   return {
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
-    reverseCardsEnabled: false,
     reverseEvolutionCardsEnabled: false,
     cryCardsEnabled: false,
     alternateFormsEnabled: false,
@@ -471,7 +469,8 @@ describe("forecast axis — all card types", () => {
       dueDate: futureDate(5),
       fsrsState: "review",
     });
-    const settings = makeSettings({ reverseCardsEnabled: true });
+    // Reverse is always on since #1234 — no override needed.
+    const settings = makeSettings();
     const snapshot = computeDashboardSnapshot(
       [reverseCard],
       settings,
@@ -1050,12 +1049,12 @@ describe("computeQueueCount", () => {
     expect(result.totalCount).toBe(2);
   });
 
-  it("respects card-type toggles — excludes disabled card types", () => {
-    // With only name cards enabled and no evolution/reverse cards in the
-    // fixture, the result should match queueTotal with the same settings.
+  it("respects card-type toggles — excludes disabled enrichment card types", () => {
+    // Name and reverse are always on (#1234). Only enrichment types are toggled.
+    // With evolution disabled and no evolution cards in the fixture, the result
+    // should match queueTotal with the same settings.
     const settings = makeSettings({
       evolutionCardsEnabled: false,
-      reverseCardsEnabled: false,
     });
     const cards: ReviewableCard[] = [newCard(1), newCard(2)];
     const result = computeQueueCount(cards, settings, DEFAULT_LIMITS, TODAY);
