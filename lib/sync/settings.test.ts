@@ -74,6 +74,8 @@ const SAMPLE: UserSettings = {
     spendDates: [],
     daysSinceLastEarn: 0,
     lastEarnCheckDate: null,
+    protectionEvents: [],
+    lastAcknowledgedProtectionEventDate: null,
   },
 };
 

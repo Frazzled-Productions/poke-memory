@@ -30,6 +30,24 @@ export const EARN_INTERVAL_DAYS = 30;
 /** Hard cap on the token balance. Once reached, further earns are no-ops. */
 export const MAX_BALANCE = 3;
 
+/** Maximum number of protection events stored in `protectionEvents`. */
+export const MAX_PROTECTION_EVENTS = 10;
+
+/**
+ * A single protection event recorded in the history list.
+ * - `"earned"` — a token was earned on this date (no spend that day).
+ * - `"spent"` — a token was spent on this date (no earn that day).
+ * - `"earned-and-spent"` — a token was earned AND spent in the same step
+ *   (the silent same-day case the user may not have noticed).
+ */
+export type ProtectionEventKind = "earned" | "spent" | "earned-and-spent";
+
+export type ProtectionEvent = {
+  /** ISO date ("YYYY-MM-DD") in UTC. */
+  date: string;
+  kind: ProtectionEventKind;
+};
+
 /**
  * Persisted shape for streak protection state. Lives inside the
  * `user_settings.settings` JSONB blob, so it follows the user across devices
@@ -57,6 +75,21 @@ export type StreakProtection = {
    * multiple grade events in the same day.
    */
   lastEarnCheckDate: string | null;
+  /**
+   * Capped history of protection events, newest last. At most
+   * `MAX_PROTECTION_EVENTS` entries; the oldest is dropped when a new entry
+   * would exceed the cap. Used to render the recent-protection list on the
+   * Stats page and to determine whether the one-time earn-and-spend banner
+   * should be shown.
+   */
+  protectionEvents: ProtectionEvent[];
+  /**
+   * The date of the most recent `earned-and-spent` event that the user has
+   * already acknowledged (i.e. the one-time banner was shown). When this
+   * matches the most recent `earned-and-spent` event's date, the banner is
+   * suppressed.
+   */
+  lastAcknowledgedProtectionEventDate: string | null;
 };
 
 /** Sensible defaults for a brand-new user. */
@@ -65,6 +98,8 @@ export const DEFAULT_STREAK_PROTECTION: StreakProtection = {
   spendDates: [],
   daysSinceLastEarn: 0,
   lastEarnCheckDate: null,
+  protectionEvents: [],
+  lastAcknowledgedProtectionEventDate: null,
 };
 
 /**
@@ -108,7 +143,44 @@ export function validateStreakProtection(value: unknown): StreakProtection {
       ? v.lastEarnCheckDate
       : null;
 
-  return { balance, spendDates, daysSinceLastEarn, lastEarnCheckDate };
+  const protectionEvents: ProtectionEvent[] = Array.isArray(v.protectionEvents)
+    ? v.protectionEvents.reduce<ProtectionEvent[]>((acc, entry) => {
+        if (
+          typeof entry === "object" &&
+          entry !== null &&
+          typeof (entry as Record<string, unknown>).date === "string" &&
+          /^\d{4}-\d{2}-\d{2}$/.test(
+            (entry as Record<string, unknown>).date as string,
+          ) &&
+          (
+            (entry as Record<string, unknown>).kind === "earned" ||
+            (entry as Record<string, unknown>).kind === "spent" ||
+            (entry as Record<string, unknown>).kind === "earned-and-spent"
+          )
+        ) {
+          acc.push({
+            date: (entry as Record<string, unknown>).date as string,
+            kind: (entry as Record<string, unknown>).kind as ProtectionEventKind,
+          });
+        }
+        return acc;
+      }, [])
+    : [];
+
+  const lastAcknowledgedProtectionEventDate =
+    typeof v.lastAcknowledgedProtectionEventDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(v.lastAcknowledgedProtectionEventDate)
+      ? v.lastAcknowledgedProtectionEventDate
+      : null;
+
+  return {
+    balance,
+    spendDates,
+    daysSinceLastEarn,
+    lastEarnCheckDate,
+    protectionEvents,
+    lastAcknowledgedProtectionEventDate,
+  };
 }
 
 /**
@@ -157,7 +229,11 @@ export function applyProtectionStep(
   const dateSet = new Set(streakDates);
   const spendSet = new Set(protection.spendDates);
 
-  let next: StreakProtection = { ...protection, spendDates: [...protection.spendDates] };
+  let next: StreakProtection = {
+    ...protection,
+    spendDates: [...protection.spendDates],
+    protectionEvents: [...(protection.protectionEvents ?? [])],
+  };
   let earned = false;
   let spent = false;
 
@@ -218,6 +294,24 @@ export function applyProtectionStep(
       ...next,
       balance: next.balance - 1,
       spendDates: mergedDates,
+    };
+  }
+
+  // Append a protection event when at least one of earn/spend fired. Earn-
+  // and-spend in the same step produces a single "earned-and-spent" entry so
+  // the user sees one clear record instead of two. The list is capped at
+  // MAX_PROTECTION_EVENTS; the oldest entry is dropped when the cap is hit.
+  if (earned || spent) {
+    const kind: ProtectionEventKind =
+      earned && spent ? "earned-and-spent" : earned ? "earned" : "spent";
+    const newEvent: ProtectionEvent = { date: today, kind };
+    const updatedEvents = [...next.protectionEvents, newEvent];
+    next = {
+      ...next,
+      protectionEvents:
+        updatedEvents.length > MAX_PROTECTION_EVENTS
+          ? updatedEvents.slice(updatedEvents.length - MAX_PROTECTION_EVENTS)
+          : updatedEvents,
     };
   }
 

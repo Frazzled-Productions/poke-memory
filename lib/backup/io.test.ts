@@ -95,6 +95,8 @@ const VALID_SETTINGS: UserSettings = {
     spendDates: [],
     daysSinceLastEarn: 0,
     lastEarnCheckDate: null,
+    protectionEvents: [],
+    lastAcknowledgedProtectionEventDate: null,
   },
 };
 

@@ -150,6 +150,8 @@ describe('loadSettings migration', () => {
         spendDates: ['2026-05-08'],
         daysSinceLastEarn: 12,
         lastEarnCheckDate: '2026-05-09',
+        protectionEvents: [],
+        lastAcknowledgedProtectionEventDate: null,
       },
     };
     saveSettings(custom);

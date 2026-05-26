@@ -7,6 +7,7 @@ import {
   DEFAULT_STREAK_PROTECTION,
   EARN_INTERVAL_DAYS,
   MAX_BALANCE,
+  MAX_PROTECTION_EVENTS,
   type StreakProtection,
 } from "./tokens";
 import { computeStreak } from "./compute";
@@ -42,6 +43,47 @@ describe("validateStreakProtection", () => {
 
   it("falls back when spendDates is not an array", () => {
     expect(validateStreakProtection({ spendDates: "x" }).spendDates).toEqual([]);
+  });
+
+  it("parses valid protectionEvents, dropping malformed entries", () => {
+    const out = validateStreakProtection({
+      protectionEvents: [
+        { date: "2026-05-01", kind: "earned" },
+        { date: "not-a-date", kind: "earned" },
+        { date: "2026-05-02", kind: "spent" },
+        { date: "2026-05-03", kind: "earned-and-spent" },
+        { date: "2026-05-04", kind: "unknown-kind" },
+        { date: "2026-05-05" },
+        42,
+      ],
+    });
+    expect(out.protectionEvents).toEqual([
+      { date: "2026-05-01", kind: "earned" },
+      { date: "2026-05-02", kind: "spent" },
+      { date: "2026-05-03", kind: "earned-and-spent" },
+    ]);
+  });
+
+  it("falls back to [] when protectionEvents is not an array", () => {
+    expect(
+      validateStreakProtection({ protectionEvents: "x" }).protectionEvents,
+    ).toEqual([]);
+  });
+
+  it("parses lastAcknowledgedProtectionEventDate when valid", () => {
+    expect(
+      validateStreakProtection({
+        lastAcknowledgedProtectionEventDate: "2026-05-01",
+      }).lastAcknowledgedProtectionEventDate,
+    ).toBe("2026-05-01");
+  });
+
+  it("returns null for malformed lastAcknowledgedProtectionEventDate", () => {
+    expect(
+      validateStreakProtection({
+        lastAcknowledgedProtectionEventDate: "not-a-date",
+      }).lastAcknowledgedProtectionEventDate,
+    ).toBeNull();
   });
 });
 
@@ -304,6 +346,114 @@ describe("applyProtectionStep — combined earn + spend", () => {
     expect(result.spent).toBe(true);
     expect(result.protection.balance).toBe(0);
     expect(result.protection.spendDates).toEqual(["2026-05-08"]);
+  });
+});
+
+describe("applyProtectionStep — protection event recording", () => {
+  it("records an 'earned' event when a token is earned but not spent", () => {
+    const start: StreakProtection = {
+      ...DEFAULT_STREAK_PROTECTION,
+      daysSinceLastEarn: EARN_INTERVAL_DAYS - 1,
+    };
+    const result = applyProtectionStep(start, ["2026-05-09"], "2026-05-09");
+    expect(result.earned).toBe(true);
+    expect(result.spent).toBe(false);
+    expect(result.protection.protectionEvents).toEqual([
+      { date: "2026-05-09", kind: "earned" },
+    ]);
+  });
+
+  it("records a 'spent' event when a token is spent but not earned", () => {
+    const start: StreakProtection = {
+      ...DEFAULT_STREAK_PROTECTION,
+      balance: 1,
+    };
+    // Reviewed two days ago, missed yesterday, today is not a review day (no earn).
+    const result = applyProtectionStep(start, ["2026-05-07"], "2026-05-09");
+    expect(result.earned).toBe(false);
+    expect(result.spent).toBe(true);
+    expect(result.protection.protectionEvents).toEqual([
+      { date: "2026-05-09", kind: "spent" },
+    ]);
+  });
+
+  it("records a single 'earned-and-spent' event when both fire in the same step", () => {
+    const start: StreakProtection = {
+      ...DEFAULT_STREAK_PROTECTION,
+      balance: 0,
+      daysSinceLastEarn: EARN_INTERVAL_DAYS - 1,
+    };
+    const result = applyProtectionStep(
+      start,
+      ["2026-05-07", "2026-05-09"],
+      "2026-05-09",
+    );
+    expect(result.earned).toBe(true);
+    expect(result.spent).toBe(true);
+    expect(result.protection.protectionEvents).toEqual([
+      { date: "2026-05-09", kind: "earned-and-spent" },
+    ]);
+  });
+
+  it("does not record an event when nothing happens", () => {
+    const result = applyProtectionStep(blank(), ["2026-05-09"], "2026-05-09");
+    expect(result.earned).toBe(false);
+    expect(result.spent).toBe(false);
+    expect(result.protection.protectionEvents).toEqual([]);
+  });
+
+  it("appends subsequent events to the existing list", () => {
+    const start: StreakProtection = {
+      ...DEFAULT_STREAK_PROTECTION,
+      balance: 1,
+      protectionEvents: [{ date: "2026-05-01", kind: "earned" }],
+    };
+    const result = applyProtectionStep(start, ["2026-05-07"], "2026-05-09");
+    expect(result.protection.protectionEvents).toEqual([
+      { date: "2026-05-01", kind: "earned" },
+      { date: "2026-05-09", kind: "spent" },
+    ]);
+  });
+
+  it("drops the oldest event when the cap is exceeded", () => {
+    // Build a state with MAX_PROTECTION_EVENTS entries already stored.
+    const existingEvents = Array.from(
+      { length: MAX_PROTECTION_EVENTS },
+      (_, i) => ({
+        date: `2026-0${Math.floor(i / 10) + 1}-${String((i % 10) + 1).padStart(2, "0")}`,
+        kind: "earned" as const,
+      }),
+    );
+    // Use realistic dates to avoid invalid ISO strings.
+    const filledEvents = Array.from({ length: MAX_PROTECTION_EVENTS }, (_, i) => ({
+      date: `2026-04-${String(i + 1).padStart(2, "0")}`,
+      kind: "earned" as const,
+    }));
+    const start: StreakProtection = {
+      ...DEFAULT_STREAK_PROTECTION,
+      balance: 1,
+      protectionEvents: filledEvents,
+    };
+    const result = applyProtectionStep(start, ["2026-05-07"], "2026-05-09");
+    expect(result.protection.protectionEvents).toHaveLength(MAX_PROTECTION_EVENTS);
+    // The newest entry is the one just added.
+    expect(
+      result.protection.protectionEvents[MAX_PROTECTION_EVENTS - 1],
+    ).toEqual({ date: "2026-05-09", kind: "spent" });
+    // The oldest entry (2026-04-01) was dropped.
+    expect(result.protection.protectionEvents[0].date).toBe("2026-04-02");
+  });
+
+  it("is idempotent — no duplicate event when the same day runs twice", () => {
+    // Earn fires once; a second call on the same day hits the
+    // lastEarnCheckDate guard so no new event is appended.
+    const start: StreakProtection = {
+      ...DEFAULT_STREAK_PROTECTION,
+      daysSinceLastEarn: EARN_INTERVAL_DAYS - 1,
+    };
+    const r1 = applyProtectionStep(start, ["2026-05-09"], "2026-05-09");
+    const r2 = applyProtectionStep(r1.protection, ["2026-05-09"], "2026-05-09");
+    expect(r2.protection.protectionEvents).toHaveLength(1);
   });
 });
 
