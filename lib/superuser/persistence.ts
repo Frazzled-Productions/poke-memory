@@ -16,7 +16,8 @@ export const FLAGS_KEY = KEY_SUPERUSER_FLAGS;
 
 export type SuperuserFlagKey =
   | "pretendAllMastered"
-  | "forceNextStreakMilestone";
+  | "forceNextStreakMilestone"
+  | "forceCardsGraduated";
 
 export type SuperuserFlags = {
   pretendAllMastered: boolean;
@@ -25,11 +26,17 @@ export type SuperuserFlags = {
   // Self-clears after the celebration is dismissed so QA gets a single
   // forced fire per toggle. See #419.
   forceNextStreakMilestone: boolean;
+  // When true, all cards are treated as graduated (learning phase bypassed).
+  // isInLearningPhase returns false for every card, so typed-entry mode kicks
+  // in immediately for name cards. Use to QA the typed-entry surface without
+  // grinding through learning steps. See #1270.
+  forceCardsGraduated: boolean;
 };
 
 export const DEFAULT_FLAGS: SuperuserFlags = {
   pretendAllMastered: false,
   forceNextStreakMilestone: false,
+  forceCardsGraduated: false,
 };
 
 export function isUnlocked(): boolean {
@@ -51,6 +58,7 @@ export function loadFlags(): SuperuserFlags {
     return {
       pretendAllMastered: parsed?.pretendAllMastered === true,
       forceNextStreakMilestone: parsed?.forceNextStreakMilestone === true,
+      forceCardsGraduated: parsed?.forceCardsGraduated === true,
     };
   } catch {
     return DEFAULT_FLAGS;

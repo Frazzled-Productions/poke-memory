@@ -2276,7 +2276,7 @@ export function ReviewSession() {
             </div>
           </>
         }
-        queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
+        queueStateBadge={<QueueStateBadge state={effectiveCard.state} forceCardsGraduated={superuserFlags.forceCardsGraduated} />}
         cardRegion={
           /* Swipeable card wrapper — pointer listeners attached here (#1052).
              PokemonCard reserves the revealed-state height in its answer container
@@ -2399,7 +2399,7 @@ export function ReviewSession() {
             />
           </>
         }
-        queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
+        queueStateBadge={<QueueStateBadge state={effectiveCard.state} forceCardsGraduated={superuserFlags.forceCardsGraduated} />}
         cardRegion={
           /* SpritePicker: overflow-y-auto is set by the "reverse" variant on
              the card region so very short viewports (e.g. iPhone SE, 667 px)
@@ -2460,8 +2460,12 @@ export function ReviewSession() {
   // null) OR when it is currently working through learning/relearning steps
   // (learningStep is not null). The scheduler sets lastReview only on graduation
   // or lapse — not on in-step touches — so this check is reliable.
+  //
+  // `forceCardsGraduated` (superuser flag #1270) bypasses this so typed-entry
+  // mode can be tested without grinding through learning steps.
   const isInLearningPhase =
     isNameCard &&
+    !superuserFlags.forceCardsGraduated &&
     (effectiveCard.state.lastReview === null ||
       effectiveCard.state.learningStep !== null);
   const isMcLearningActive = verifiedTypedEntryMode && isInLearningPhase;

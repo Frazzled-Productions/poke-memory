@@ -1,5 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import {
+  buildCompletedSession,
+  SEED_POKEMON_IDS,
+  EVOLUTION_CARD_IDS,
+} from "./helpers/completedSession";
 
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
@@ -9,7 +15,11 @@ test.beforeEach(async ({ page }) => {
 // visible without exercising the chord/tap gesture (awkward to drive across
 // desktop + mobile from Playwright). The chord/tap path is covered by unit
 // tests; this spec verifies the wiring from the persisted flag to surfaces.
-type SeedOptions = { unlocked: boolean; pretendAllMastered: boolean };
+type SeedOptions = {
+  unlocked: boolean;
+  pretendAllMastered: boolean;
+  forceCardsGraduated?: boolean;
+};
 
 async function seedSuperuser(page: Page, opts: SeedOptions): Promise<void> {
   await page.addInitScript((o: SeedOptions) => {
@@ -20,10 +30,54 @@ async function seedSuperuser(page: Page, opts: SeedOptions): Promise<void> {
     }
     window.localStorage.setItem(
       "poke-memory:superuser:flags:v1",
-      JSON.stringify({ pretendAllMastered: o.pretendAllMastered }),
+      JSON.stringify({
+        pretendAllMastered: o.pretendAllMastered,
+        forceCardsGraduated: o.forceCardsGraduated ?? false,
+      }),
     );
   }, opts);
 }
+
+// A session where Bulbasaur (id=1) is a new (learning-phase) name card.
+// All other cards are future-due with new-card caps set to 0 so only
+// Bulbasaur surfaces. Under `forceCardsGraduated` the typed-entry input
+// must appear instead of the MC card.
+const baseSession = buildCompletedSession({
+  pokemonIds: SEED_POKEMON_IDS,
+  evolutionCardIds: EVOLUTION_CARD_IDS,
+});
+const SESSION_BULBASAUR_LEARNING_ONLY = {
+  ...baseSession,
+  cards: (baseSession.cards as Array<{ id: number; [key: string]: unknown }>).map((c) =>
+    c.id === 1
+      ? {
+          ...c,
+          state: {
+            stability: 0,
+            difficulty: 5,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        }
+      : c,
+  ),
+  limits: {
+    name: { maxNewPerDay: 1, maxReviewsPerDay: 0 },
+    evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+  },
+};
 
 test.describe("Superuser mode", () => {
   test("Developer panel is hidden by default", async ({ page }) => {
@@ -78,5 +132,53 @@ test.describe("Superuser mode", () => {
       page.getByRole("heading", { level: 1, name: /Pasture/ }),
     ).toBeVisible();
     await expect(page.getByText(/Your pasture is empty/)).toHaveCount(0);
+  });
+
+  test("forceCardsGraduated flag shows the Developer toggle", async ({ page }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: false, forceCardsGraduated: false });
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Advanced", exact: true }).click();
+    const developerSection = page.getByRole("region", { name: /developer/i });
+    await expect(developerSection).toBeVisible({ timeout: 10_000 });
+    // The force-cards-graduated toggle must be present in the Developer panel.
+    const toggle = developerSection.getByRole("switch", { name: /force cards graduated/i });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("forceCardsGraduated + typed-entry: a learning-phase card renders typed-entry input, not MC", async ({
+    page,
+  }) => {
+    // Seed: superuser on, forceCardsGraduated on, typed-entry mode on.
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: false, forceCardsGraduated: true });
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = { mobileNav: "bottom" };
+        if (raw !== null) {
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (typeof parsed === "object" && parsed !== null) {
+              existing = parsed as Record<string, unknown>;
+            }
+          } catch { /* malformed */ }
+        }
+        localStorage.setItem(KEY, JSON.stringify({ ...existing, verifiedTypedEntryMode: true }));
+      } catch { /* localStorage unavailable */ }
+    });
+    // Pre-seed Bulbasaur in a learning-phase state (lastReview: null).
+    await seedSessionIdb(page, SESSION_BULBASAUR_LEARNING_ONLY);
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // With forceCardsGraduated on, isInLearningPhase is false, so typed-entry
+    // input must appear (not the MC buttons).
+    await expect(
+      page.getByRole("textbox", { name: /type the pokémon name/i }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // MC option buttons must NOT be present.
+    await expect(page.getByRole("button", { name: /^Arbok$/i })).not.toBeVisible();
   });
 });

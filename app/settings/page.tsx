@@ -1828,6 +1828,7 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           role="switch"
+                          aria-label="Pretend all Pokémon are mastered"
                           aria-checked={flags.pretendAllMastered}
                           onClick={() =>
                             void setFlag("pretendAllMastered", !flags.pretendAllMastered)
@@ -1863,6 +1864,7 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           role="switch"
+                          aria-label="Force next streak milestone"
                           aria-checked={flags.forceNextStreakMilestone}
                           onClick={() =>
                             void setFlag(
@@ -1879,6 +1881,45 @@ export default function SettingsPage() {
                           <span
                             className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
                               flags.forceNextStreakMilestone
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className={cn("mt-4", cardPanelPadded)}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Force cards graduated
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            Treat all cards as graduated. Use to test typed
+                            entry without grinding learning steps.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label="Force cards graduated"
+                          aria-checked={flags.forceCardsGraduated}
+                          onClick={() =>
+                            void setFlag(
+                              "forceCardsGraduated",
+                              !flags.forceCardsGraduated,
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            flags.forceCardsGraduated
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              flags.forceCardsGraduated
                                 ? "translate-x-5"
                                 : "translate-x-0"
                             }`}

@@ -2,8 +2,13 @@ import type { ReviewState } from "@/lib/srs/scheduler";
 
 type QueueState = "new" | "learning" | "review";
 
-function deriveQueueState(state: ReviewState): QueueState {
-  if (state.learningStep !== null) return "learning";
+function deriveQueueState(
+  state: ReviewState,
+  forceCardsGraduated: boolean,
+): QueueState {
+  // When forceCardsGraduated is active, the card is treated as graduated —
+  // suppress the "Learning" badge so QA developers see the correct state.
+  if (!forceCardsGraduated && state.learningStep !== null) return "learning";
   if (state.lastReview === null) return "new";
   return "review";
 }
@@ -22,10 +27,11 @@ const COLOURS: Record<QueueState, string> = {
 
 type Props = {
   state: ReviewState;
+  forceCardsGraduated?: boolean;
 };
 
-export function QueueStateBadge({ state }: Props) {
-  const queue = deriveQueueState(state);
+export function QueueStateBadge({ state, forceCardsGraduated = false }: Props) {
+  const queue = deriveQueueState(state, forceCardsGraduated);
   const label = LABELS[queue];
   return (
     <span
