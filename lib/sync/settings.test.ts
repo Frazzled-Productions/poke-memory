@@ -76,6 +76,8 @@ const SAMPLE: UserSettings = {
     lastAcknowledgedProtectionEventDate: null,
   },
   verifiedTypedEntryMode: false,
+  typedEntryOnboardingShown: false,
+  mcCardOnboardingShown: false,
 };
 
 describe("pushSettings", () => {

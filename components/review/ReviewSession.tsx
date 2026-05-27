@@ -549,6 +549,9 @@ export function ReviewSession() {
   // session-load effect. Same-tab toggles take effect on the next session via the
   // storage event; the in-flight card always uses the value captured at load time.
   const [verifiedTypedEntryMode, setVerifiedTypedEntryMode] = useState(false);
+  // One-time MC-card onboarding banner (#1271). true = banner has been shown
+  // (or the user already had this flag set), so it must not appear again.
+  const [mcCardOnboardingShown, setMcCardOnboardingShown] = useState(true);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -933,6 +936,7 @@ export function ReviewSession() {
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
+      setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
@@ -2013,6 +2017,21 @@ export function ReviewSession() {
     // state: a failed save leaves no snapshot, so undo stays disabled.
     enqueueGrade({ ...effectiveCard, state: nextState });
 
+    // Persist the MC-card onboarding flag after the first grade from an MC
+    // learning card (#1271). Runs once per user, then never again. Compute
+    // the MC-active check inline (mirrors the render-time `isMcLearningActive`).
+    const gradedCardIsInLearning =
+      effectiveCard.cardType === "name" &&
+      (effectiveCard.state.lastReview === null ||
+        effectiveCard.state.learningStep !== null);
+    if (verifiedTypedEntryMode && gradedCardIsInLearning && !mcCardOnboardingShown) {
+      setMcCardOnboardingShown(true);
+      const updatedSettings = loadSettings();
+      if (!updatedSettings.mcCardOnboardingShown) {
+        saveSettings({ ...updatedSettings, mcCardOnboardingShown: true });
+      }
+    }
+
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
     setSessionGradeSeq((prev) => [...prev, grade]);
@@ -2510,15 +2529,28 @@ export function ReviewSession() {
              Key includes cardPresentationCount so the component remounts (and
              resets chosen state) when the same card reappears via a learning-step
              replay, matching the SpritePicker pattern (#496). */
-          <MultipleChoiceNameCard
-            key={`${effectiveCard.id}-${cardPresentationCount}`}
-            spriteUrl={effectiveCard.spriteUrl}
-            canonicalName={effectiveCard.displayName}
-            options={mcOptions}
-            id={effectiveCard.id}
-            onGrade={handleGrade}
-            grading={grading}
-          />
+          <div className="flex flex-col gap-2 w-full">
+            {/* One-time learning-phase banner (#1271). Visible until the first
+                MC grade fires; after that `mcCardOnboardingShown` is true and
+                the banner never re-renders. */}
+            {!mcCardOnboardingShown && (
+              <div
+                role="note"
+                className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+              >
+                This card is in the learning phase. Pick the matching name from the options below. Verified typed entry will kick in once the card graduates.
+              </div>
+            )}
+            <MultipleChoiceNameCard
+              key={`${effectiveCard.id}-${cardPresentationCount}`}
+              spriteUrl={effectiveCard.spriteUrl}
+              canonicalName={effectiveCard.displayName}
+              options={mcOptions}
+              id={effectiveCard.id}
+              onGrade={handleGrade}
+              grading={grading}
+            />
+          </div>
         ) : isTypedEntryActive ? (
           /* Verified typed-entry (#1251): renders input, grades automatically,
              then the parent advances on the onGrade callback. The swipe-card

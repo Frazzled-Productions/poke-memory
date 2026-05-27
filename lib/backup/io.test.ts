@@ -95,6 +95,8 @@ const VALID_SETTINGS: UserSettings = {
     lastAcknowledgedProtectionEventDate: null,
   },
   verifiedTypedEntryMode: false,
+  typedEntryOnboardingShown: false,
+  mcCardOnboardingShown: false,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

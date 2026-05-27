@@ -439,6 +439,8 @@ export default function SettingsPage() {
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
   const [favouriteId, setFavouriteId] = useState<number | null>(null);
+  // One-time onboarding banner shown when verified typed entry is first enabled (#1271).
+  const [typedEntryBannerVisible, setTypedEntryBannerVisible] = useState(false);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -574,6 +576,27 @@ export default function SettingsPage() {
 
     setToggleError(null);
     setToggleErrorKey(null);
+
+    // First-enable onboarding for verified typed entry (#1271): when the user
+    // flips verifiedTypedEntryMode on for the first time ever, show a one-time
+    // banner explaining the MC ramp. The flag is persisted so the banner never
+    // re-fires after dismiss.
+    if (
+      key === "verifiedTypedEntryMode" &&
+      !settings.verifiedTypedEntryMode &&
+      !settings.typedEntryOnboardingShown
+    ) {
+      const updated = {
+        ...settings,
+        verifiedTypedEntryMode: true,
+        typedEntryOnboardingShown: true,
+      };
+      setSettings(updated);
+      setTypedEntryBannerVisible(true);
+      saveSettings(updated);
+      return;
+    }
+
     setSettings({ ...settings, [key]: !settings[key] });
   }
 
@@ -1040,6 +1063,30 @@ export default function SettingsPage() {
                           />
                         </button>
                       </div>
+                      {/* Always-visible inline help explaining the MC ramp (#1271) */}
+                      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                        New cards start as multiple choice during the learning phase. Once a card has been reviewed enough times to graduate, it switches to verified typed entry.
+                      </p>
+                      {/* One-time first-enable banner (#1271). Dismissed by the user; never re-fires. */}
+                      {typedEntryBannerVisible && (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className="mt-3 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
+                        >
+                          <p className="flex-1">
+                            Verified typed entry is on. New cards will show multiple choice for the first few reviews. Once a card graduates into long-term review, you will be asked to type the name.
+                          </p>
+                          <button
+                            type="button"
+                            aria-label="Dismiss typed entry notice"
+                            onClick={() => setTypedEntryBannerVisible(false)}
+                            className="shrink-0 text-blue-600 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:text-blue-400 dark:hover:text-blue-200"
+                          >
+                            <span aria-hidden="true">&#x2715;</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

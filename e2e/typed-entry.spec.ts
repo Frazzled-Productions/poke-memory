@@ -254,6 +254,141 @@ test.describe("Verified typed entry — Practice flow (#1251)", () => {
   });
 });
 
+// Helper: write settings to localStorage with verifiedTypedEntryMode on and
+// typedEntryOnboardingShown false (simulates a user enabling for the first time).
+async function enableTypedEntryFirstTime(page: import("@playwright/test").Page) {
+  await page.addInitScript(() => {
+    try {
+      const KEY = "poke-memory:settings:v1";
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({
+          mobileNav: "bottom",
+          verifiedTypedEntryMode: false,
+          typedEntryOnboardingShown: false,
+          mcCardOnboardingShown: false,
+          onboarding: { firstVisitOnboardingDismissed: true },
+        }),
+      );
+    } catch {
+      /* localStorage unavailable */
+    }
+  });
+}
+
+test.describe("Typed entry onboarding (#1271) — Settings touch 1 (inline help)", () => {
+  test("inline MC-ramp help text is always visible under the toggle", async ({ page }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    await expect(
+      page.getByText(/new cards start as multiple choice during the learning phase/i),
+    ).toBeVisible();
+  });
+});
+
+test.describe("Typed entry onboarding (#1271) — Settings touch 2 (first-enable banner)", () => {
+  test("first-enable banner appears when the toggle is turned on for the first time", async ({
+    page,
+  }) => {
+    await enableTypedEntryFirstTime(page);
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    // Banner should be absent before the toggle is flipped.
+    await expect(page.getByText(/verified typed entry is on/i)).not.toBeVisible();
+
+    // Flip the toggle on.
+    await page.getByRole("switch", { name: /verified typed entry for name cards/i }).click();
+
+    // Banner should appear.
+    await expect(page.getByText(/verified typed entry is on/i)).toBeVisible();
+
+    // Dismiss the banner.
+    await page.getByRole("button", { name: /dismiss typed entry notice/i }).click();
+
+    // Banner should be gone.
+    await expect(page.getByText(/verified typed entry is on/i)).not.toBeVisible();
+
+    // Reload: banner must not reappear (typedEntryOnboardingShown now true).
+    await page.reload();
+    await page.getByRole("button", { name: /^practice$/i }).click();
+    await expect(page.getByText(/verified typed entry is on/i)).not.toBeVisible();
+  });
+});
+
+test.describe("Typed entry onboarding (#1271) — Touch 3 (MC card banner)", () => {
+  test("one-time banner appears above the first MC card when mcCardOnboardingShown is false", async ({
+    page,
+  }) => {
+    await enableTypedEntry(page);
+    // Override mcCardOnboardingShown to false to trigger the banner.
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (typeof parsed === "object" && parsed !== null) {
+              existing = parsed as Record<string, unknown>;
+            }
+          } catch { /* ignore */ }
+        }
+        localStorage.setItem(KEY, JSON.stringify({ ...existing, mcCardOnboardingShown: false }));
+      } catch { /* localStorage unavailable */ }
+    });
+    await seedSessionIdb(page, SESSION_WITH_BULBASAUR_LEARNING);
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // Wait for MC card options to appear.
+    await expect(
+      page.getByRole("button", { name: /^Bulbasaur$/i }),
+    ).toBeVisible({ timeout: 10000 });
+
+    // The one-time banner should be visible.
+    await expect(
+      page.getByText(/this card is in the learning phase/i),
+    ).toBeVisible();
+  });
+
+  test("MC card banner is absent when mcCardOnboardingShown is true", async ({ page }) => {
+    await enableTypedEntry(page);
+    // Override mcCardOnboardingShown to true — banner should not appear.
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (typeof parsed === "object" && parsed !== null) {
+              existing = parsed as Record<string, unknown>;
+            }
+          } catch { /* ignore */ }
+        }
+        localStorage.setItem(KEY, JSON.stringify({ ...existing, mcCardOnboardingShown: true }));
+      } catch { /* localStorage unavailable */ }
+    });
+    await seedSessionIdb(page, SESSION_WITH_BULBASAUR_LEARNING);
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // Wait for MC card to render.
+    await expect(
+      page.getByRole("button", { name: /^Bulbasaur$/i }),
+    ).toBeVisible({ timeout: 10000 });
+
+    // Banner must not be present.
+    await expect(
+      page.getByText(/this card is in the learning phase/i),
+    ).not.toBeVisible();
+  });
+});
+
 test.describe("MC learning step — Practice flow (#1237)", () => {
   test("a new name card in learning phase shows 4 MC buttons, not the typed-entry input", async ({
     page,

@@ -3636,4 +3636,39 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
     });
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
+
+  it("shows the one-time MC-card banner above the first MC card when mcCardOnboardingShown is false (#1271)", async () => {
+    mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
+    mockLoadSettings.mockReturnValue({
+      ...typedModeSettings,
+      mcCardOnboardingShown: false,
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/this card is in the learning phase/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("does not show the MC-card banner when mcCardOnboardingShown is true (#1271)", async () => {
+    mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
+    mockLoadSettings.mockReturnValue({
+      ...typedModeSettings,
+      mcCardOnboardingShown: true,
+    });
+
+    render(<ReviewSession />);
+
+    // Wait for the MC card to render (option buttons appear).
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: /choose the pokémon name/i })).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByText(/this card is in the learning phase/i),
+    ).not.toBeInTheDocument();
+  });
 });
