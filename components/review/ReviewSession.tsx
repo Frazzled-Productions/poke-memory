@@ -2460,8 +2460,12 @@ export function ReviewSession() {
   // null) OR when it is currently working through learning/relearning steps
   // (learningStep is not null). The scheduler sets lastReview only on graduation
   // or lapse — not on in-step touches — so this check is reliable.
+  //
+  // `forceCardsGraduated` (superuser flag #1270) bypasses this so typed-entry
+  // mode can be tested without grinding through learning steps.
   const isInLearningPhase =
     isNameCard &&
+    !superuserFlags.forceCardsGraduated &&
     (effectiveCard.state.lastReview === null ||
       effectiveCard.state.learningStep !== null);
   const isMcLearningActive = verifiedTypedEntryMode && isInLearningPhase;

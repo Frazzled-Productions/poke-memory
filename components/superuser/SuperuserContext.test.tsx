@@ -121,13 +121,13 @@ vi.mock("@/lib/pokemon/seed", () => ({
 vi.mock("@/lib/superuser/persistence", () => ({
   isUnlocked: vi.fn(() => false),
   setUnlocked: vi.fn(),
-  loadFlags: vi.fn(() => ({ pretendAllMastered: true })),
+  loadFlags: vi.fn(() => ({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false })),
   saveFlags: vi.fn(),
   clearFlags: vi.fn(),
   anyFlagTrue: (f: Record<string, boolean>) => Object.values(f).some(Boolean),
   UNLOCKED_KEY: "poke-memory:superuser:unlocked:v1",
   FLAGS_KEY: "poke-memory:superuser:flags:v1",
-  DEFAULT_FLAGS: { pretendAllMastered: false },
+  DEFAULT_FLAGS: { pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false },
 }));
 
 function Harness({ onReady }: { onReady: (api: ReturnType<typeof useSuperuser>) => void }) {
