@@ -269,8 +269,21 @@ function defaultSettings() {
     ttsVoice: null,
     ttsRate: 1,
     ttsVolume: 1,
+    waitForAudioOnGrade: true,
+    reverseFeedbackDelay: "default" as const,
     timezone: "Europe/London",
     dateFormat: "dmy" as const,
+    streakProtection: {
+      balance: 0,
+      spendDates: [] as string[],
+      daysSinceLastEarn: 0,
+      lastEarnCheckDate: null,
+      protectionEvents: [],
+      lastAcknowledgedProtectionEventDate: null,
+    },
+    verifiedTypedEntryMode: false,
+    typedEntryOnboardingShown: false,
+    mcCardOnboardingShown: false,
   };
 }
 
@@ -585,6 +598,119 @@ describe("SettingsPage — updated descriptive copy (#835)", () => {
         /disabling hides these cards without losing your progress/i,
       );
       expect(allMatches.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Touch 1 + 2: inline help text and first-enable banner (#1271)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — typed-entry onboarding (#1271)", () => {
+  it("always renders the inline MC-ramp help text under the toggle", async () => {
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/new cards start as multiple choice during the learning phase/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows the first-enable banner when verifiedTypedEntryMode is toggled on for the first time (typedEntryOnboardingShown: false)", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      verifiedTypedEntryMode: false,
+      typedEntryOnboardingShown: false,
+    });
+
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /verified typed entry/i }),
+      ).toBeInTheDocument();
+    });
+
+    // Banner must be absent before the toggle is flipped.
+    expect(
+      screen.queryByText(/verified typed entry is on/i),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: /verified typed entry/i }));
+
+    // Banner must appear after first-enable.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/verified typed entry is on/i),
+      ).toBeInTheDocument();
+    });
+
+    // saveSettings must have been called with typedEntryOnboardingShown: true.
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        verifiedTypedEntryMode: true,
+        typedEntryOnboardingShown: true,
+      }),
+    );
+  });
+
+  it("does NOT show the first-enable banner when typedEntryOnboardingShown is already true", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      verifiedTypedEntryMode: false,
+      typedEntryOnboardingShown: true,
+    });
+
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /verified typed entry/i }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("switch", { name: /verified typed entry/i }));
+
+    // Banner must not appear — it was already shown once.
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/verified typed entry is on/i),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("dismisses the first-enable banner when the close button is clicked", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      verifiedTypedEntryMode: false,
+      typedEntryOnboardingShown: false,
+    });
+
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /verified typed entry/i }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("switch", { name: /verified typed entry/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/verified typed entry is on/i)).toBeInTheDocument();
+    });
+
+    // Click the dismiss button.
+    await user.click(screen.getByRole("button", { name: /dismiss typed entry notice/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/verified typed entry is on/i),
+      ).not.toBeInTheDocument();
     });
   });
 });

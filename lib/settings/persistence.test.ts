@@ -170,10 +170,41 @@ describe('loadSettings migration', () => {
         lastAcknowledgedProtectionEventDate: null,
       },
       verifiedTypedEntryMode: false,
+      typedEntryOnboardingShown: false,
+      mcCardOnboardingShown: false,
     };
     saveSettings(custom);
     const loaded = loadSettings();
     expect(loaded).toEqual(custom);
+  });
+});
+
+describe('loadSettings: typedEntryOnboardingShown / mcCardOnboardingShown (#1271)', () => {
+  it('defaults both to false when the fields are absent (back-fill for pre-#1271 records)', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    const settings = loadSettings();
+    expect(settings.typedEntryOnboardingShown).toBe(false);
+    expect(settings.mcCardOnboardingShown).toBe(false);
+  });
+
+  it('round-trips typedEntryOnboardingShown: true', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, typedEntryOnboardingShown: true });
+    expect(loadSettings().typedEntryOnboardingShown).toBe(true);
+  });
+
+  it('round-trips mcCardOnboardingShown: true', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, mcCardOnboardingShown: true });
+    expect(loadSettings().mcCardOnboardingShown).toBe(true);
+  });
+
+  it('non-boolean value falls back to false for typedEntryOnboardingShown', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ typedEntryOnboardingShown: 'yes' }));
+    expect(loadSettings().typedEntryOnboardingShown).toBe(false);
+  });
+
+  it('non-boolean value falls back to false for mcCardOnboardingShown', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ mcCardOnboardingShown: 'yes' }));
+    expect(loadSettings().mcCardOnboardingShown).toBe(false);
   });
 });
 

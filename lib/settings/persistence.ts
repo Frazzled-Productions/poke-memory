@@ -259,6 +259,18 @@ export type UserSettings = {
    * Default false: honour-system mode is preserved for all existing users.
    */
   verifiedTypedEntryMode: boolean;
+  /**
+   * One-time onboarding toast for typed entry (#1271). Set to true after the
+   * first-enable toast is shown so it never fires again. Default false — absent
+   * in pre-#1271 records; bool parser back-fills to false.
+   */
+  typedEntryOnboardingShown: boolean;
+  /**
+   * One-time banner above the first MC card (#1271). Set to true after the
+   * first MC card in typed-entry mode is graded so the banner never reappears.
+   * Default false — absent in pre-#1271 records; bool parser back-fills to false.
+   */
+  mcCardOnboardingShown: boolean;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -303,6 +315,10 @@ export const DEFAULT_SETTINGS: UserSettings = {
   streakProtection: { ...DEFAULT_STREAK_PROTECTION },
   // Default off: existing users keep the honour-system flow unchanged.
   verifiedTypedEntryMode: false,
+  // Default false: absent in pre-#1271 records; bool parser back-fills to false.
+  typedEntryOnboardingShown: false,
+  // Default false: absent in pre-#1271 records; bool parser back-fills to false.
+  mcCardOnboardingShown: false,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -524,6 +540,10 @@ function parseStoredSettings(raw: string | null): UserSettings {
     // Default false: existing records without this field keep the honour-system
     // flow unchanged (#1251).
     verifiedTypedEntryMode: bool(obj, "verifiedTypedEntryMode"),
+    // Default false: absent in pre-#1271 records (#1271).
+    typedEntryOnboardingShown: bool(obj, "typedEntryOnboardingShown"),
+    // Default false: absent in pre-#1271 records (#1271).
+    mcCardOnboardingShown: bool(obj, "mcCardOnboardingShown"),
   };
 }
 
