@@ -1,5 +1,39 @@
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 
+// Lazy-loaded flavor text map: populated on first call to `loadFlavorTexts()`.
+// `generated-flavor.json` is only fetched after the initial render so it never
+// blocks the critical JS evaluation path.
+let _flavorCache: Map<number, string[]> | null = null;
+let _flavorLoadPromise: Promise<Map<number, string[]>> | null = null;
+
+type FlavorEntry = { id: number; flavorTexts: string[] };
+
+/** Fetch and cache the flavor text lookup. Safe to call multiple times. */
+export async function loadFlavorTexts(): Promise<Map<number, string[]>> {
+  if (_flavorCache !== null) return _flavorCache;
+  if (_flavorLoadPromise !== null) return _flavorLoadPromise;
+  _flavorLoadPromise = (async () => {
+    try {
+      const res = await fetch("/pokemon-data/generated-flavor.json");
+      if (!res.ok) throw new Error(`Flavor fetch failed: ${res.status}`);
+      const entries = (await res.json()) as FlavorEntry[];
+      const map = new Map<number, string[]>(entries.map((e) => [e.id, e.flavorTexts]));
+      _flavorCache = map;
+      return map;
+    } catch {
+      // Non-fatal — facts panel renders without Pokédex entries.
+      _flavorCache = new Map();
+      return _flavorCache;
+    }
+  })();
+  return _flavorLoadPromise;
+}
+
+/** Return flavor texts for a given Pokémon id, or an empty array if not yet loaded. */
+export function getFlavorTexts(pokemonId: number): string[] {
+  return _flavorCache?.get(pokemonId) ?? [];
+}
+
 export type PokemonFact = {
   label: string;
   value: string;
@@ -156,7 +190,10 @@ export function getPokemonFacts(pokemon: SeedPokemon): PokemonFact[] {
     facts.push({ label: "Status", value: "Mythical" });
   }
 
-  for (const text of (pokemon.flavorTexts ?? [])) {
+  // flavorTexts is lazy-loaded and absent on the runtime SEED_POKEMON objects.
+  // Callers that want Pokédex entries should await loadFlavorTexts() first and
+  // pass the texts explicitly, or rely on the component using getFlavorTexts().
+  for (const text of (pokemon.flavorTexts ?? getFlavorTexts(pokemon.id))) {
     facts.push({ label: "Pokédex entry", value: text });
   }
 

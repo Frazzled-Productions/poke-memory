@@ -28,10 +28,9 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     await expect(modal).toHaveCount(0);
 
     // After dismissal the Practice card surface must be interactable.
-    // 10 s: the session builds ~2 050 cards from scratch, but with the
-    // reconcileHiddenState no-op fix (#1262) only one IDB write precedes
-    // the React render (the hydrateSession build-from-scratch write), which
-    // completes within the original budget.
+    // 10 s: fresh-visitor hydration builds ~2 050 cards from scratch. With the
+    // bundled seed chunk reduced from 2.9 MB to 1.2 MB (#1263) WebKit parses
+    // it in well under this window, including on CI.
     await expect(
       page.getByRole("button", { name: /reveal/i }).or(page.getByText(/all caught up/i)),
     ).toBeVisible({ timeout: 10_000 });

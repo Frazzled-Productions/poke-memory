@@ -67,8 +67,8 @@ test.describe("Practice page", () => {
     });
 
     // Since #1234 the session is seeded with both name and reverse cards for
-    // every species (~2× the card set). On WebKit this can take longer to build
-    // and write to IDB — use a generous timeout to avoid flaky failures.
+    // every species (~2× the card set). With the bundled seed chunk reduced
+    // from 2.9 MB to 1.2 MB (#1263), WebKit parses it well within 10 s.
     await expect(reveal.or(endState)).toBeVisible({ timeout: 10_000 });
   });
 

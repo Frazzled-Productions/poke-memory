@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCardClass } from "@/lib/review/useCardClass";
@@ -7,7 +8,7 @@ import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
 import { colStack } from "@/lib/utils/class-names";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
-import { getPokemonFacts } from "@/lib/pokemon/facts";
+import { getPokemonFacts, loadFlavorTexts } from "@/lib/pokemon/facts";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import type { CardClassOrPending } from "@/lib/review/useCardClass";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
@@ -212,6 +213,12 @@ export function PokemonDetailDisclosure({
   // the SRS schedule, so showing schedule info alongside faked-mastery UI
   // would be misleading.
   const nextReview = useNextReviewDate(id);
+
+  // Kick off flavor-text fetch the first time any disclosure opens. The cache
+  // is shared across all instances so concurrent disclosures only fetch once.
+  useEffect(() => {
+    void loadFlavorTexts();
+  }, []);
 
   const facts = getPokemonFacts(pokemon);
   const stages = buildStages(evolutionChain);

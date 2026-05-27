@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
+import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { SpritePreloader, type SizedSpriteUrl } from "@/components/sprites/SpritePreloader";
@@ -39,7 +40,7 @@ import { recordReview } from "@/lib/streak";
 import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
-import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
+import { getPokemonFacts, selectFact, loadFlavorTexts, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
 import { speakName, warmupTts } from "@/lib/audio/tts";
 import { waitForAudio } from "@/lib/audio/waitForAudio";
@@ -542,6 +543,10 @@ export function ReviewSession() {
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
+  // Verified typed-entry mode (#1251). Read into state on session load via the
+  // session-load effect. Same-tab toggles take effect on the next session via the
+  // storage event; the in-flight card always uses the value captured at load time.
+  const [verifiedTypedEntryMode, setVerifiedTypedEntryMode] = useState(false);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -704,6 +709,13 @@ export function ReviewSession() {
   useEffect(() => {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
+  }, []);
+
+  // Kick off flavor-text fetch in the background so it is warm by the time
+  // the user reveals their first card. Non-blocking: the critical render path
+  // does not wait for this.
+  useEffect(() => {
+    void loadFlavorTexts();
   }, []);
 
   // Serialises background persistence work across rapid grades (#1191).
@@ -905,7 +917,6 @@ export function ReviewSession() {
       if (reconcileChanged) {
         notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
       }
-
       setCards(sessionCards);
       setLimits(sessionLimits);
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
@@ -919,6 +930,7 @@ export function ReviewSession() {
       setMasteryRepetitions(settings.masteryRepetitions);
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
+      setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
@@ -2431,6 +2443,14 @@ export function ReviewSession() {
   }
 
   // Default branch: name, evolution, and reverse-evolution cards.
+  //
+  // When verifiedTypedEntryMode is on and the current card is a name card,
+  // render TypedEntryNameCard (typed input) instead of the honour-system
+  // PokemonCard + Reveal / grade-button flow. Evolution and reverse-evolution
+  // cards always use the existing flip flow regardless of the setting (#1251).
+  const isTypedEntryActive =
+    verifiedTypedEntryMode && effectiveCard.cardType === "name";
+
   return (
     <ReviewCardLayout
       variant="flip"
@@ -2451,40 +2471,58 @@ export function ReviewSession() {
       }
       queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
       cardRegion={
-        /* Swipeable card wrapper — pointer listeners attached here (#1052).
-           PokemonCard and EvolutionCard reserve the revealed-state height in
-           their inner answer container (min-h-[7rem]), so the card's bounding
-           box is the same size across reveal and centring does not cause the
-           sprite to drift (#1104). */
-        <div ref={cardRef} className="relative" data-testid="swipe-card">
-          {effectiveCard.cardType === "evolution" ||
-          effectiveCard.cardType === "reverse-evolution" ? (
-            <EvolutionCard
-              direction={effectiveCard.cardType}
-              preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
-              preEvoName={effectiveCard.preEvoName}
-              postEvoName={effectiveCard.postEvoName}
-              postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
-              triggerPhrase={effectiveCard.triggerPhrase}
-              revealed={revealed}
-              fact={currentFact}
-              preEvoId={effectiveCard.preEvoId}
-              postEvoId={effectiveCard.postEvoId}
-            />
-          ) : (
-            <PokemonCard
-              spriteUrl={effectiveCard.spriteUrl}
-              name={effectiveCard.displayName}
-              revealed={revealed}
-              fact={currentFact}
-              id={effectiveCard.id}
-            />
-          )}
-          {revealed && <SwipeHint swipeState={swipeState} />}
-        </div>
+        isTypedEntryActive ? (
+          /* Verified typed-entry (#1251): renders input, grades automatically,
+             then the parent advances on the onGrade callback. The swipe-card
+             wrapper is omitted because swipe-to-grade is not applicable here. */
+          <TypedEntryNameCard
+            key={effectiveCard.id}
+            spriteUrl={effectiveCard.spriteUrl}
+            canonicalName={effectiveCard.displayName}
+            id={effectiveCard.id}
+            onGrade={handleGrade}
+            grading={grading}
+          />
+        ) : (
+          /* Swipeable card wrapper — pointer listeners attached here (#1052).
+             PokemonCard and EvolutionCard reserve the revealed-state height in
+             their inner answer container (min-h-[7rem]), so the card's bounding
+             box is the same size across reveal and centring does not cause the
+             sprite to drift (#1104). */
+          <div ref={cardRef} className="relative" data-testid="swipe-card">
+            {effectiveCard.cardType === "evolution" ||
+            effectiveCard.cardType === "reverse-evolution" ? (
+              <EvolutionCard
+                direction={effectiveCard.cardType}
+                preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
+                preEvoName={effectiveCard.preEvoName}
+                postEvoName={effectiveCard.postEvoName}
+                postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
+                triggerPhrase={effectiveCard.triggerPhrase}
+                revealed={revealed}
+                fact={currentFact}
+                preEvoId={effectiveCard.preEvoId}
+                postEvoId={effectiveCard.postEvoId}
+              />
+            ) : (
+              <PokemonCard
+                spriteUrl={effectiveCard.spriteUrl}
+                name={effectiveCard.displayName}
+                revealed={revealed}
+                fact={currentFact}
+                id={effectiveCard.id}
+              />
+            )}
+            {revealed && <SwipeHint swipeState={swipeState} />}
+          </div>
+        )
       }
       controls={
-        revealed ? (
+        isTypedEntryActive ? (
+          // TypedEntryNameCard renders its own Submit / I don't know controls
+          // inline; the layout's controls slot is left empty.
+          undefined
+        ) : revealed ? (
           <GradeButtons
             onGrade={handleGrade}
             disabled={grading}
