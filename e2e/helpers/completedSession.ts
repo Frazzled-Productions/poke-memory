@@ -1,19 +1,21 @@
 import seedData from "../../lib/pokemon/generated.json";
+import { REVERSE_ID_OFFSET } from "./mastery";
 
 // ---------------------------------------------------------------------------
 // Shared SESSION_COMPLETE seed builder.
 //
 // ReviewSession calls hydrateSession(saved, SEED_POKEMON, ...) on load, which
-// appends any SEED_POKEMON or SEED_EVOLUTION_CARDS entries missing from the
-// saved session. To prevent those from queuing as new cards (which would show
-// a Reveal button instead of the complete screen), every known card ID must be
-// pre-seeded as already reviewed (lastReview non-null, dueDate far in the
-// future) so it is ineligible for both the review queue and the new queue —
-// the necessary condition for SESSION_COMPLETE.
+// appends any SEED_POKEMON, SEED_EVOLUTION_CARDS, or reverse-card entries
+// missing from the saved session. Since #1234 reverse cards are always enabled
+// (reverseEnabled is hardcoded true in ReviewSession.tsx), hydrateSession adds
+// a reverse card for every species not already in savedIds. To prevent those
+// from queuing as new cards (which would show a Reveal button instead of the
+// complete screen), every known reverse card ID must be pre-seeded alongside
+// the name and evolution cards.
 // ---------------------------------------------------------------------------
 
 const EDGE_ID_BASE = 1_500_000;
-const REVERSE_ID_OFFSET = 2_000_000;
+// REVERSE_ID_OFFSET imported from helpers/mastery.ts
 const MAX_SPECIES_ID = 999_999; // alternate-form IDs (10001+) are above this
 
 /**
@@ -135,6 +137,26 @@ export function buildCompletedSession(args: {
     });
   }
 
+  // Reverse cards — one per species ID (including alternate forms). Since #1234
+  // reverse cards are always enabled: hydrateSession adds a reverse card for
+  // every species whose REVERSE_ID_OFFSET + id is not already in savedIds. Seed
+  // them all as future-due so none enter the new or review queue, which is the
+  // necessary condition for SESSION_COMPLETE.
+  for (const id of pokemonIds) {
+    cards.push({
+      id: REVERSE_ID_OFFSET + id,
+      name: "pokemon-" + id,
+      spriteUrl: "/sprites/pokemon/" + id + ".png",
+      cardType: "reverse",
+      pokemonId: id,
+      speciesId: id,
+      state: {
+        ...reviewedState,
+        firstSeen: SEEN_SPECIES_IDS.has(id) ? PAST_DATE : null,
+      },
+    });
+  }
+
   return {
     cards,
     limits: {
@@ -144,4 +166,94 @@ export function buildCompletedSession(args: {
       cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
     },
   };
+}
+
+/**
+ * Build a "nearly completed" session suitable for tests that need a fast
+ * first render (Reveal button visible quickly) while still exercising a
+ * particular scope or card-type filter.
+ *
+ * All cards are present (so hydrateSession adds nothing and skips the
+ * first save), but a specified set of species IDs have their name and
+ * reverse cards reset to "new" state (lastReview: null). Those cards will
+ * appear in buildSessionQueues' newQueue on the first load.
+ *
+ * Callers must also seed the extra cards from `extraCards` (e.g. mastered
+ * evolution edges needed for preset logic) — pass them and they will be
+ * merged in, overriding any existing card with the same ID.
+ */
+export function buildActiveSession(args: {
+  pokemonIds: number[];
+  evolutionCardIds: number[];
+  /** Species IDs (base Pokémon IDs, not REVERSE_ID_OFFSET+N) whose name and
+   *  reverse cards should be in "new" state (lastReview: null). */
+  newSpeciesIds: number[];
+  /** Additional cards to merge in (e.g. mastered evolution edge cards).
+   *  A card in this list with an ID that matches a generated card replaces
+   *  the generated one. */
+  extraCards?: object[];
+}) {
+  const { pokemonIds, evolutionCardIds, newSpeciesIds, extraCards = [] } = args;
+
+  // Build the base completed session.
+  const base = buildCompletedSession({ pokemonIds, evolutionCardIds });
+
+  // The "new" state has no lastReview and no firstSeen, so buildSessionQueues
+  // treats it as an unseen new candidate. dueDate must be a string (not null)
+  // to pass isBaseCardShaped — use a past date so new cards are immediately due.
+  const newState = {
+    stability: 0,
+    difficulty: 5,
+    elapsedDays: 0,
+    scheduledDays: 0,
+    reps: 0,
+    lapses: 0,
+    fsrsState: "new",
+    dueDate: "2026-01-01",
+    lastReview: null,
+    firstSeen: null,
+    learningStep: null,
+    stepStartedAt: null,
+    hiddenSince: null,
+    seenInPasture: false,
+  };
+
+  const newSet = new Set(newSpeciesIds);
+
+  // Override name and reverse cards for the specified new species.
+  const cards = base.cards.map((c: object) => {
+    const card = c as { id: number; cardType: string; pokemonId?: number };
+    if (card.cardType === "name" && newSet.has(card.id)) {
+      return { ...card, state: { ...newState } };
+    }
+    if (card.cardType === "reverse") {
+      // Reverse card ID = REVERSE_ID_OFFSET + speciesId. Derive speciesId.
+      const speciesId = card.pokemonId ?? (card.id - REVERSE_ID_OFFSET);
+      if (newSet.has(speciesId)) {
+        return { ...card, state: { ...newState } };
+      }
+    }
+    return c;
+  });
+
+  // Merge extra cards: replace any existing card with the same ID, then
+  // append extras whose IDs were not already present.
+  const extraById = new Map<number, object>();
+  for (const ec of extraCards) {
+    const typed = ec as { id: number };
+    extraById.set(typed.id, ec);
+  }
+  const merged = cards
+    .map((c: object) => {
+      const typed = c as { id: number };
+      return extraById.has(typed.id) ? extraById.get(typed.id)! : c;
+    })
+    .concat(
+      extraCards.filter((ec) => {
+        const typed = ec as { id: number };
+        return !cards.some((c: object) => (c as { id: number }).id === typed.id);
+      }),
+    );
+
+  return { ...base, cards: merged };
 }

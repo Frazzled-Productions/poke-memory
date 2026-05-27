@@ -191,7 +191,7 @@ function RadialRing({
 // MasteryRings
 // ---------------------------------------------------------------------------
 
-function MasteryRings({ stats, nameCardsEnabled }: { stats: MasterySnapshot; nameCardsEnabled: boolean }) {
+function MasteryRings({ stats }: { stats: MasterySnapshot }) {
   const { totalCards, locked, learning, mastered } = stats;
   const masteredPct = pct(mastered, totalCards);
   const learningPct = pct(learning, totalCards);
@@ -238,11 +238,6 @@ function MasteryRings({ stats, nameCardsEnabled }: { stats: MasterySnapshot; nam
         className="mb-4 text-lg font-semibold text-foreground"
       >
         Mastery distribution
-        {!nameCardsEnabled && (
-          <span className="ml-2 text-sm font-normal text-zinc-400 dark:text-zinc-500">
-            (disabled)
-          </span>
-        )}
       </h2>
 
       <div
@@ -397,11 +392,8 @@ export default function JourneyPage() {
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<Awaited<ReturnType<typeof buildSession>> | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
-  const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [eligibilitySettings, setEligibilitySettings] = useState<EligibilitySettings>({
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
-    reverseCardsEnabled: false,
     reverseEvolutionCardsEnabled: false,
     cryCardsEnabled: false,
     alternateFormsEnabled: false,
@@ -424,11 +416,8 @@ export default function JourneyPage() {
         : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
-      setNameCardsEnabled(settings.nameCardsEnabled);
       setEligibilitySettings({
-        nameCardsEnabled: settings.nameCardsEnabled,
         evolutionCardsEnabled: settings.evolutionCardsEnabled,
-        reverseCardsEnabled: settings.reverseCardsEnabled,
         reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
         cryCardsEnabled: settings.cryCardsEnabled,
         alternateFormsEnabled: settings.alternateFormsEnabled,
@@ -685,7 +674,7 @@ export default function JourneyPage() {
             {records !== null ? <RecordsCard records={records} /> : null}
 
             {/* Mastery rings */}
-            <MasteryRings stats={masterySnapshot} nameCardsEnabled={nameCardsEnabled} />
+            <MasteryRings stats={masterySnapshot} />
 
             {/* Introduced ring */}
             <IntroducedRing stats={masterySnapshot} />

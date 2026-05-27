@@ -12,7 +12,8 @@ import {
   STRUGGLING_DIFFICULTY_CUTOFF,
 } from "./derive";
 import type { ReviewState } from "@/lib/srs/scheduler";
-import type { NameReviewCard } from "@/lib/review/session";
+import type { NameReviewCard, ReverseReviewCard, ReviewableCard } from "@/lib/review/session";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 
 const TODAY = "2026-05-10";
 
@@ -89,6 +90,59 @@ function formCard(
     formSlug: "alola",
     displayName: `Form of Pokemon ${speciesId}`,
   };
+}
+
+/**
+ * Build a minimal reverse card for the given pokemon ID. The reverse-card ID
+ * is REVERSE_ID_OFFSET + pokemonId, matching the convention in the seed and
+ * the mastery lookup in computeStats.
+ */
+function reverseCard(
+  pokemonId: number,
+  overrides: Partial<ReviewState> = {},
+): ReverseReviewCard {
+  return {
+    cardType: "reverse",
+    id: REVERSE_ID_OFFSET + pokemonId,
+    pokemonId,
+    speciesId: pokemonId,
+    isDefaultForm: true,
+    formCategory: "default",
+    formSlug: null,
+    displayName: `Pokemon ${pokemonId}`,
+    subjectKey: String(pokemonId),
+    name: `Pokemon ${pokemonId}`,
+    spriteUrl: "",
+    types: ["normal"],
+    stats: { hp: 50, attack: 50, defense: 50, specialAttack: 50, specialDefense: 50, speed: 50 },
+    flavorText: "A pokemon.",
+    flavorTexts: ["A pokemon."],
+    evolutionChain: [],
+    height: 10,
+    weight: 100,
+    baseExperience: 64,
+    genus: "Generic",
+    generation: "generation-i",
+    captureRate: 45,
+    baseHappiness: 50,
+    growthRate: "medium",
+    habitat: null,
+    genderRate: 0,
+    isLegendary: false,
+    isMythical: false,
+    cryUrl: null,
+    versionGroups: [],
+    state: state(overrides),
+  };
+}
+
+/** A reverse card that passes the mastery gate: reps >= threshold, scheduledDays >= 21. */
+function masteredReverse(pokemonId: number): ReverseReviewCard {
+  return reverseCard(pokemonId, {
+    lastReview: TODAY,
+    reps: MASTERY_REPETITIONS,
+    scheduledDays: MASTERY_INTERVAL_DAYS,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -208,30 +262,48 @@ describe("computeStats mastery boundary", () => {
     expect(result.learning).toBe(1);
   });
 
-  it("counts card meeting both thresholds as mastered", () => {
-    const cards = [card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS })];
+  it("counts card meeting both thresholds as mastered when paired reverse card is also mastered", () => {
+    // Since #1234, species mastery requires BOTH name AND reverse cards to
+    // pass the FSRS gate. Pass the full mixed array with a paired reverse card.
+    const cards: ReviewableCard[] = [
+      card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }),
+      masteredReverse(1),
+    ];
     const result = computeStats(cards, TODAY);
     expect(result.mastered).toBe(1);
     expect(result.learning).toBe(0);
   });
 
+  it("does not count name card as mastered when paired reverse card is absent", () => {
+    // Without a mastered reverse card the species is not species-mastered.
+    const cards: ReviewableCard[] = [
+      card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }),
+    ];
+    const result = computeStats(cards, TODAY);
+    expect(result.mastered).toBe(0);
+    expect(result.learning).toBe(1);  // introduced but not species-mastered
+  });
+
   it("respects caller-supplied masteryRepetitions parameter", () => {
-    const cards = [card(1, { lastReview: TODAY, reps:3, scheduledDays: MASTERY_INTERVAL_DAYS })];
+    const cards: ReviewableCard[] = [
+      card(1, { lastReview: TODAY, reps: 3, scheduledDays: MASTERY_INTERVAL_DAYS }),
+      masteredReverse(1),
+    ];
     expect(computeStats(cards, TODAY, 10, 3).mastered).toBe(1);
     expect(computeStats(cards, TODAY, 10, 4).mastered).toBe(0);
   });
 
-  it("totalCards reflects only name cards passed in — reverse cards filtered upstream do not inflate count", () => {
-    // computeStats receives cards.filter(c => c.cardType === "name") from the
-    // stats page, so reverse cards never reach it. This test documents that
-    // expectation: passing only name cards keeps totalCards at the name-card count.
-    const nameCards = [
-      card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }),
+  it("totalCards reflects only name cards in the mixed array", () => {
+    // computeStats accepts the full mixed array and counts only name cards
+    // for totalCards. Reverse cards are excluded from the species count.
+    const cards: ReviewableCard[] = [
+      card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }),
+      masteredReverse(1),
       card(2),
     ];
-    const result = computeStats(nameCards, TODAY);
-    expect(result.totalCards).toBe(2);
-    expect(result.mastered).toBe(1);
+    const result = computeStats(cards, TODAY);
+    expect(result.totalCards).toBe(2);  // 2 name cards, not 3 total
+    expect(result.mastered).toBe(1);    // species 1 has both legs mastered
   });
 });
 
@@ -281,10 +353,10 @@ describe("computeStats.dueForecast", () => {
   });
 
   it("perType covers all 18 types and double-counts dual-type cards", () => {
-    const cards = [
+    const cards: ReviewableCard[] = [
       // monotype fire, locked
       { ...card(1), types: ["fire"] },
-      // dual fire/flying, mastered
+      // dual fire/flying, species-mastered (name + paired reverse both mastered)
       {
         ...card(2, {
           lastReview: TODAY,
@@ -293,6 +365,7 @@ describe("computeStats.dueForecast", () => {
         }),
         types: ["fire", "flying"],
       },
+      masteredReverse(2),
       // unknown type — silently ignored
       { ...card(3), types: ["mystery"] },
     ];
@@ -412,12 +485,19 @@ describe("computeStats form-card generation bucketing", () => {
   it("buckets a form card into its species' generation via speciesId", () => {
     // Simulates Alolan Raichu: raw id=10100 (hypothetical form id),
     // speciesId=26 (Raichu, Gen I). The form should land in Gen I, not gen 0.
+    // Pair with a mastered reverse card so the species counts as mastered (#1234).
     const alolanRaichu = formCard(10100, 26, {
       lastReview: TODAY,
       reps: MASTERY_REPETITIONS,
       scheduledDays: MASTERY_INTERVAL_DAYS,
     });
-    const result = computeStats([alolanRaichu], TODAY);
+    // The reverse card ID uses the pokemon's own id (10100), not speciesId.
+    const alolanRaichuReverse = reverseCard(10100, {
+      lastReview: TODAY,
+      reps: MASTERY_REPETITIONS,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+    });
+    const result = computeStats([alolanRaichu, alolanRaichuReverse], TODAY);
     const gen1 = result.perGeneration.find((g) => g.gen === 1)!;
     expect(gen1.total).toBe(1);
     expect(gen1.mastered).toBe(1);
@@ -428,6 +508,8 @@ describe("computeStats form-card generation bucketing", () => {
 
   it("a base-species and its form card both count in the same generation", () => {
     // Raichu (speciesId=26, Gen I) + Alolan Raichu (id=10100, speciesId=26, Gen I)
+    // Raichu is species-mastered (name+reverse both mastered).
+    // Alolan Raichu is only name-introduced but not species-mastered (no reverse card).
     const raichu = card(26, {
       lastReview: TODAY,
       reps: MASTERY_REPETITIONS,
@@ -438,10 +520,12 @@ describe("computeStats form-card generation bucketing", () => {
       reps: 1,
       scheduledDays: 5,
     });
-    const result = computeStats([raichu, alolanRaichu], TODAY);
+    // Pair a mastered reverse card with Raichu (id=26) so species 26 counts as mastered.
+    const raichuReverse = masteredReverse(26);
+    const result = computeStats([raichu, alolanRaichu, raichuReverse], TODAY);
     const gen1 = result.perGeneration.find((g) => g.gen === 1)!;
-    expect(gen1.total).toBe(2);    // both cards
-    expect(gen1.mastered).toBe(1); // only Raichu mastered
+    expect(gen1.total).toBe(2);    // both name cards
+    expect(gen1.mastered).toBe(1); // only Raichu species-mastered (has paired reverse)
     expect(gen1.introduced).toBe(2);
   });
 });

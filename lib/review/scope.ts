@@ -324,13 +324,11 @@ export function cardIsEligible(
   alternateFormsEnabled: boolean,
   context: ScopeMatchContext = {},
 ): boolean {
-  // Delegate the alt-forms gate to the shared predicate. All card-type flags
-  // are true so only the `alternateFormsEnabled` axis is active.
+  // Delegate the alt-forms gate to the shared predicate. All opt-in card-type
+  // flags are true so only the `alternateFormsEnabled` axis is active.
   const altFormsSettings: CardEligibilitySettings = {
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
     reverseEvolutionCardsEnabled: true,
-    reverseCardsEnabled: true,
     cryCardsEnabled: true,
     alternateFormsEnabled,
   };
@@ -357,7 +355,7 @@ export type EligibilitySettings = CardEligibilitySettings & {
  * `useDocumentTitleBadge`) so all three surfaces always agree on the count.
  *
  * The three-tier gate applied here mirrors `ReviewSession.tsx`:
- *   1. Card-type enabled (nameCardsEnabled, evolutionCardsEnabled, etc.)
+ *   1. Card-type enabled (evolutionCardsEnabled, etc.; name/reverse always on)
  *   2. `alternateFormsEnabled` master toggle
  *   3. `practiceScope` filter via `cardMatchesScope`
  *

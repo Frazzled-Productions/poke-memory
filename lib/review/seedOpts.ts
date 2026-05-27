@@ -6,6 +6,9 @@ import type { UserSettings } from "@/lib/settings/persistence";
  * fallback seeding paths (auth callback, manual sync brand-new-device,
  * pullAndMerge brand-new-device) cannot drift from each other and miss a
  * card-type toggle — the failure mode behind #391.
+ *
+ * Name and reverse are always on since #1234. Only the opt-in enrichment
+ * directions (evolution, reverse-evolution, cry) are read from settings.
  */
 export function seedOptsFromSettings(settings: UserSettings): {
   nameEnabled: boolean;
@@ -15,9 +18,9 @@ export function seedOptsFromSettings(settings: UserSettings): {
   cryEnabled: boolean;
 } {
   return {
-    nameEnabled: settings.nameCardsEnabled,
+    nameEnabled: true,
     evolutionEnabled: settings.evolutionCardsEnabled,
-    reverseEnabled: settings.reverseCardsEnabled,
+    reverseEnabled: true,
     reverseEvolutionEnabled: settings.reverseEvolutionCardsEnabled,
     cryEnabled: settings.cryCardsEnabled,
   };

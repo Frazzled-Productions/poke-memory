@@ -69,12 +69,13 @@ type SettingsMockRow = {
 /**
  * All-enabled settings JSONB that matches DEFAULT_SETTINGS. Used when a test
  * just needs "every card type on" without caring about the specific values.
+ *
+ * Note: nameCardsEnabled and reverseCardsEnabled are not present — name and
+ * reverse are always on since #1234 and are no longer stored in settings.
  */
 const ALL_ENABLED_SETTINGS: Record<string, unknown> = {
-  nameCardsEnabled: true,
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: true,
-  reverseCardsEnabled: true,
   cryCardsEnabled: true,
   alternateFormsEnabled: true,
   maxNewPerDay: 10,
@@ -331,20 +332,20 @@ describe("POST /api/push/send-daily — happy path", () => {
           auth_secret: "auth-a",
         },
       ],
-      // All card types disabled → no due cards, no new estimate.
+      // All optional card types disabled + daily caps zeroed → no due cards,
+      // no new estimate. Name and reverse are always on since #1234, so the
+      // only way to reach estimate = 0 is to set both caps to 0.
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: false,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: false,
-          maxNewPerDay: 10,
+          maxNewPerDay: 0,
           maxNewEvolutionPerDay: 5,
-          maxNewReversePerDay: 10,
+          maxNewReversePerDay: 0,
           maxNewCryPerDay: 10,
         },
       }],
@@ -359,9 +360,10 @@ describe("POST /api/push/send-daily — happy path", () => {
   });
 
   it("sends a notification even when dueCount is 0 but newEstimate is positive (new cards only)", async () => {
-    // No due rows. Only name cards enabled, maxNewPerDay=10, no first_seen=today
-    // rows → estimate = 10 (name headroom). Other card types explicitly off so
-    // the estimate is deterministic.
+    // No due rows. Name cards always on (maxNewPerDay=10); reverse capped to 0
+    // so the estimate is deterministic (= 10). Other optional card types off.
+    // Since name and reverse are always on since #1234, maxNewReversePerDay=0
+    // is the way to isolate name-only headroom.
     const admin = buildAdminMock({
       subscriptions: [
         {
@@ -376,15 +378,13 @@ describe("POST /api/push/send-daily — happy path", () => {
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
           maxNewEvolutionPerDay: 5,
-          maxNewReversePerDay: 10,
+          maxNewReversePerDay: 0,
           maxNewCryPerDay: 10,
         },
       }],
@@ -400,7 +400,7 @@ describe("POST /api/push/send-daily — happy path", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // dueCount = 0, newEstimate = 10 → new-only copy.
+    // dueCount = 0, newEstimate = 10 (name headroom; reverse capped at 0) → new-only copy.
     expect(parsed.body).toContain("new");
     expect(parsed.body).toContain("10");
   });
@@ -521,17 +521,17 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
     expect(parsed.body).toContain("5");
   });
 
-  it("reverseCardsEnabled: false — excludes reverse card rows from due count", async () => {
+  it("reverse cards are always eligible — counts name and reverse due rows (#1234)", async () => {
+    // Since #1234, reverse is always on. All 3 due rows (1 name + 2 reverse)
+    // must be counted. The old reverseCardsEnabled: false toggle no longer exists.
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: true,
           reverseEvolutionCardsEnabled: true,
-          reverseCardsEnabled: false, // ← off
           cryCardsEnabled: true,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
@@ -542,8 +542,8 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
       }],
       due: [
         { user_id: "user-a", card_type: "name",    subject_key: "1", first_seen: null },
-        { user_id: "user-a", card_type: "reverse",  subject_key: "1", first_seen: null }, // excluded
-        { user_id: "user-a", card_type: "reverse",  subject_key: "2", first_seen: null }, // excluded
+        { user_id: "user-a", card_type: "reverse",  subject_key: "1", first_seen: null },
+        { user_id: "user-a", card_type: "reverse",  subject_key: "2", first_seen: null },
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -553,10 +553,8 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // Only 1 name card eligible; the 2 reverse cards are filtered out.
-    // The body starts with "1 card due" — use startsWith so the new-estimate
-    // portion of the combined copy does not interfere with the assertion.
-    expect(parsed.body.startsWith("1 card due")).toBe(true);
+    // All 3 rows are eligible — name and reverse are both always on.
+    expect(parsed.body.startsWith("3 cards due")).toBe(true);
   });
 
   it("alternateFormsEnabled: false — excludes name/reverse/cry rows with species id >= 10000", async () => {
@@ -566,10 +564,8 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: false, // ← alt-forms off
           maxNewPerDay: 10,
@@ -603,10 +599,8 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: false,
           evolutionCardsEnabled: true,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: false, // ← alt-forms off
           maxNewPerDay: 10,
@@ -633,20 +627,19 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
     expect(parsed.body).not.toContain("3");
   });
 
-  it("combined: reverseCardsEnabled off + alternateFormsEnabled off — reproduces the #1153 scenario", async () => {
+  it("combined: alternateFormsEnabled off — reproduces the #1153 scenario with always-on reverse (#1234)", async () => {
     // Mirrors the observed production data: 8 name rows (3 default + 5 alt),
     // 6 reverse rows (5 default + 1 alt), 4 evolution-edge, 1 reverse-evo-edge.
-    // With reverse off and alt-forms off, expected due count = 3 (name default only).
+    // With alt-forms off and reverse always on (since #1234), expected due count
+    // = 3 name default + 5 reverse default + 4 evo + 1 rev-evo = 13.
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: true,
           reverseEvolutionCardsEnabled: true,
-          reverseCardsEnabled: false,     // ← off
           cryCardsEnabled: false,
           alternateFormsEnabled: false,   // ← alt-forms off
           maxNewPerDay: 10,
@@ -666,12 +659,13 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         { user_id: "user-a", card_type: "name", subject_key: "10116",  first_seen: null },
         { user_id: "user-a", card_type: "name", subject_key: "10123",  first_seen: null },
         { user_id: "user-a", card_type: "name", subject_key: "10176",  first_seen: null },
-        // 6 reverse rows (excluded by reverseCardsEnabled: false)
+        // 5 reverse default (all eligible — reverse always on since #1234)
         { user_id: "user-a", card_type: "reverse", subject_key: "25",  first_seen: null },
         { user_id: "user-a", card_type: "reverse", subject_key: "26",  first_seen: null },
         { user_id: "user-a", card_type: "reverse", subject_key: "27",  first_seen: null },
         { user_id: "user-a", card_type: "reverse", subject_key: "28",  first_seen: null },
         { user_id: "user-a", card_type: "reverse", subject_key: "29",  first_seen: null },
+        // 1 reverse alt-form (excluded by alt-forms gate)
         { user_id: "user-a", card_type: "reverse", subject_key: "10027", first_seen: null },
         // 4 evolution-edge (default ids — all pass)
         { user_id: "user-a", card_type: "evolution-edge", subject_key: "1>>>2",   first_seen: null },
@@ -689,9 +683,9 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // 3 name (default) + 4 evolution-edge + 1 reverse-evolution-edge = 8 due.
-    // The push body must contain "8" and not "19" (the raw pre-filter count).
-    expect(parsed.body).toContain("8");
+    // 3 name (default) + 5 reverse (default) + 4 evolution-edge + 1 reverse-evolution-edge = 13 due.
+    // The push body must contain "13" and not "19" (the raw pre-filter count).
+    expect(parsed.body).toContain("13");
     expect(parsed.body).not.toContain("19");
   });
 });
@@ -706,22 +700,23 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
   };
 
   it("includes a new-card estimate in the push body when due rows exist", async () => {
-    // Due rows, none first_seen today → maxNewPerDay (10) headroom remains.
+    // Due rows, none first_seen today. Name always on (maxNewPerDay=10); reverse
+    // capped to 0 so the estimate is deterministic (= 10 name headroom only).
+    // Since name and reverse are always on since #1234, maxNewReversePerDay=0
+    // isolates name-only headroom for a simpler assertion.
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
           maxNewEvolutionPerDay: 5,
-          maxNewReversePerDay: 10,
+          maxNewReversePerDay: 0,
           maxNewCryPerDay: 10,
         },
       }],
@@ -738,14 +733,16 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // 3 due + 10 new headroom → combined copy.
+    // 3 due + 10 new headroom (name only; reverse capped at 0) → combined copy.
     expect(parsed.body).toContain("3");
     expect(parsed.body).toContain("10");
     expect(parsed.body).toContain("new");
   });
 
   it("reduces the new-card estimate by rows already started today", async () => {
-    // 5 cards started today (first_seen = "2026-05-20") → estimate = 10 - 5 = 5.
+    // 5 name cards started today (first_seen = "2026-05-20"). Name estimate =
+    // 10 - 5 = 5. Reverse is capped at 0 (maxNewReversePerDay=0) so only name
+    // headroom contributes to the estimate, keeping the assertion deterministic.
     const today = "2026-05-20";
     const due: DueRow[] = [
       { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: today },
@@ -760,15 +757,13 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
           maxNewEvolutionPerDay: 5,
-          maxNewReversePerDay: 10,
+          maxNewReversePerDay: 0,
           maxNewCryPerDay: 10,
         },
       }],
@@ -781,7 +776,7 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // 5 due (all first_seen today = due cards introduced today), estimate = 5.
+    // 5 due (all first_seen today = introduced today), name estimate = 5 (reverse capped at 0).
     // Pin the exact body string so both counts are asserted simultaneously —
     // a prior `toContain("5")` pair only proved the digit appeared once,
     // not that both quantities rendered correctly.
@@ -789,24 +784,32 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
   });
 
   it("clamps new-card estimate to 0 when daily cap already exhausted", async () => {
-    // All 10 new-card slots already used today → estimate = 0.
+    // All 10 name slots and all 10 reverse slots already used today → estimate = 0.
+    // Since name and reverse are always on since #1234, both caps must be exhausted
+    // to drive newEstimate to 0.
     const today = "2026-05-20";
-    const due: DueRow[] = Array.from({ length: 10 }, (_, i) => ({
-      user_id: "user-a",
-      card_type: "name",
-      subject_key: String(i + 1),
-      first_seen: today,
-    }));
+    const due: DueRow[] = [
+      ...Array.from({ length: 10 }, (_, i) => ({
+        user_id: "user-a",
+        card_type: "name",
+        subject_key: String(i + 1),
+        first_seen: today,
+      })),
+      ...Array.from({ length: 10 }, (_, i) => ({
+        user_id: "user-a",
+        card_type: "reverse",
+        subject_key: String(i + 1),
+        first_seen: today,
+      })),
+    ];
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
@@ -824,8 +827,8 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // dueCount = 10, newEstimate = 0 → due-only copy without "new".
-    expect(parsed.body).toContain("10");
+    // dueCount = 20 (10 name + 10 reverse), newEstimate = 0 → due-only copy without "new".
+    expect(parsed.body).toContain("20");
     expect(parsed.body).not.toContain("new");
   });
 
@@ -838,24 +841,23 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     // behaviour so a future refactor that "fixes" the over-count does so
     // intentionally rather than by accident.
     //
-    // Distinct fixture values chosen so the doubled estimate (7 + 7 = 14)
-    // cannot collide with any other cap in the settings blob (maxNewPerDay,
-    // maxNewReversePerDay, maxNewCryPerDay all differ from 7 and 14).
+    // Name and reverse are always on since #1234. To isolate the evo estimate,
+    // their daily caps are zeroed (maxNewPerDay=0, maxNewReversePerDay=0) so
+    // the total = 7 (evo) + 7 (rev-evo) = 14. Distinct fixture values chosen
+    // so the doubled estimate (14) cannot collide with any other cap.
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: false,
           evolutionCardsEnabled: true,         // draws maxNewEvolutionPerDay
           reverseEvolutionCardsEnabled: true,  // draws maxNewEvolutionPerDay again
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
-          maxNewPerDay: 10,
+          maxNewPerDay: 0,          // zero name cap to isolate evo estimate
           maxNewEvolutionPerDay: 7,
-          maxNewReversePerDay: 11,
+          maxNewReversePerDay: 0,   // zero reverse cap to isolate evo estimate
           maxNewCryPerDay: 13,
         },
       }],
@@ -895,10 +897,8 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
@@ -933,10 +933,8 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
@@ -979,10 +977,8 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
@@ -1025,10 +1021,8 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: false,
           evolutionCardsEnabled: true,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
@@ -1071,21 +1065,22 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
     // Gen-1 headroom even though the route does not compute it explicitly).
     // This is the accepted approximation documented in the issue (#1159):
     // the due count is now scope-accurate; the new-card estimate is cap-based.
+    //
+    // Reverse is always on since #1234. maxNewReversePerDay is set to 0 here
+    // so the estimate is deterministic (= 10 name headroom only).
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          nameCardsEnabled: true,
           evolutionCardsEnabled: false,
           reverseEvolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
           maxNewPerDay: 10,
           maxNewEvolutionPerDay: 5,
-          maxNewReversePerDay: 10,
+          maxNewReversePerDay: 0,
           maxNewCryPerDay: 10,
           practiceScope: {
             gens: [1],
@@ -1107,7 +1102,7 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
     const body = (await res.json()) as { sent: number };
-    // dueCount = 0 (Gen 2 rows excluded by scope); newEstimate = 10 (name headroom).
+    // dueCount = 0 (Gen 2 rows excluded by scope); newEstimate = 10 (name headroom; reverse capped at 0).
     // The route still sends a notification for the new-card headroom.
     expect(body.sent).toBe(1);
     const parsed = JSON.parse(

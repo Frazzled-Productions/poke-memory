@@ -92,4 +92,10 @@ Single-step, session-only. `ReviewSession` captures a pre-grade snapshot of `car
 
 ## Mastery
 
-`reps >= masteryRepetitions && scheduledDays >= 21`. The legacy `easeFactor` / `repetitions` field names survive on `StrugglingCard` (in `lib/stats/derive.ts`) — they are derived from FSRS state at the stats boundary so existing UI consumers stay stable.
+A **species** is mastered when **both** its name card and its reverse card satisfy the FSRS mastery gate: `reps >= masteryRepetitions && scheduledDays >= 21`. Both legs are required since #1234. Prior to that, only the name card was checked.
+
+Reverse cards are a required practice direction since #1234 (not opt-in). The `reverseCardsEnabled` and `nameCardsEnabled` settings fields have been removed. `filterMastered` (pasture), `masteredSpeciesIds` (badges), and `computeStats` all build a set of mastered-reverse species IDs and require membership in that set before counting a species as mastered.
+
+The `forceAllMastered` superuser flag bypasses both legs: any species is treated as mastered when the flag is on.
+
+The legacy `easeFactor` / `repetitions` field names survive on `StrugglingCard` (in `lib/stats/derive.ts`) — they are derived from FSRS state at the stats boundary so existing UI consumers stay stable.

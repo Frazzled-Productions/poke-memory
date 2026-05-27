@@ -30,10 +30,8 @@ const SAMPLE: UserSettings = {
   maxReviewsPerDay: 100,
   maxNewEvolutionPerDay: 5,
   maxReviewsEvolutionPerDay: 50,
-  nameCardsEnabled: true,
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
-  reverseCardsEnabled: false,
   alternateFormsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
@@ -74,7 +72,12 @@ const SAMPLE: UserSettings = {
     spendDates: [],
     daysSinceLastEarn: 0,
     lastEarnCheckDate: null,
+    protectionEvents: [],
+    lastAcknowledgedProtectionEventDate: null,
   },
+  verifiedTypedEntryMode: false,
+  typedEntryOnboardingShown: false,
+  mcCardOnboardingShown: false,
 };
 
 describe("pushSettings", () => {

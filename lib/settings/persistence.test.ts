@@ -42,22 +42,46 @@ describe('loadSettings migration', () => {
     expect(settings).toEqual(DEFAULT_SETTINGS);
   });
 
-  it('stored object missing nameCardsEnabled defaults to true', () => {
+  it('silently ignores stale nameCardsEnabled field from old stored data (#1234)', () => {
+    // Since #1234 nameCardsEnabled no longer exists on UserSettings.
+    // Old localStorage blobs may still have it; loadSettings just ignores it.
     const partial = {
       masteryRepetitions: 3,
       maxNewPerDay: 10,
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      // nameCardsEnabled intentionally absent
+      nameCardsEnabled: false, // stale field — should be ignored
       evolutionCardsEnabled: true,
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 10,
       maxReviewsReversePerDay: 100,
     };
     mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify(partial));
     const settings = loadSettings();
-    expect(settings.nameCardsEnabled).toBe(true);
+    // nameCardsEnabled no longer exists on the type — no property to check.
+    // evolutionCardsEnabled must round-trip correctly.
+    expect(settings.evolutionCardsEnabled).toBe(true);
+  });
+
+  it('silently ignores stale reverseCardsEnabled field from old stored data (#1234)', () => {
+    // Since #1234 reverseCardsEnabled no longer exists on UserSettings.
+    // Old localStorage blobs may still carry it; loadSettings just ignores it.
+    const partial = {
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false, // stale field — should be ignored
+      evolutionCardsEnabled: true,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+    };
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify(partial));
+    const settings = loadSettings();
+    // reverseCardsEnabled no longer exists on the type — no property to check.
+    // evolutionCardsEnabled must round-trip correctly (not corrupted by the stale field).
+    expect(settings.evolutionCardsEnabled).toBe(true);
   });
 
   it('stored object missing evolutionCardsEnabled defaults to true', () => {
@@ -67,9 +91,7 @@ describe('loadSettings migration', () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      nameCardsEnabled: true,
       // evolutionCardsEnabled intentionally absent
-      reverseCardsEnabled: false,
       maxNewReversePerDay: 10,
       maxReviewsReversePerDay: 100,
     };
@@ -78,25 +100,21 @@ describe('loadSettings migration', () => {
     expect(settings.evolutionCardsEnabled).toBe(true);
   });
 
-  it('stored object with both fields explicitly false respects them', () => {
+  it('stored object with evolutionCardsEnabled explicitly false respects it', () => {
     saveSettings({
       ...DEFAULT_SETTINGS,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
     });
     const settings = loadSettings();
-    expect(settings.nameCardsEnabled).toBe(false);
     expect(settings.evolutionCardsEnabled).toBe(false);
   });
 
-  it('stored object with both fields explicitly true respects them', () => {
+  it('stored object with evolutionCardsEnabled explicitly true respects it', () => {
     saveSettings({
       ...DEFAULT_SETTINGS,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
     });
     const settings = loadSettings();
-    expect(settings.nameCardsEnabled).toBe(true);
     expect(settings.evolutionCardsEnabled).toBe(true);
   });
 
@@ -116,10 +134,8 @@ describe('loadSettings migration', () => {
       maxReviewsPerDay: 200,
       maxNewEvolutionPerDay: 10,
       maxReviewsEvolutionPerDay: 75,
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: true,
-      reverseCardsEnabled: true,
       maxNewReversePerDay: 15,
       maxReviewsReversePerDay: 50,
       playCryOnReveal: true,
@@ -150,11 +166,45 @@ describe('loadSettings migration', () => {
         spendDates: ['2026-05-08'],
         daysSinceLastEarn: 12,
         lastEarnCheckDate: '2026-05-09',
+        protectionEvents: [],
+        lastAcknowledgedProtectionEventDate: null,
       },
+      verifiedTypedEntryMode: false,
+      typedEntryOnboardingShown: false,
+      mcCardOnboardingShown: false,
     };
     saveSettings(custom);
     const loaded = loadSettings();
     expect(loaded).toEqual(custom);
+  });
+});
+
+describe('loadSettings: typedEntryOnboardingShown / mcCardOnboardingShown (#1271)', () => {
+  it('defaults both to false when the fields are absent (back-fill for pre-#1271 records)', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    const settings = loadSettings();
+    expect(settings.typedEntryOnboardingShown).toBe(false);
+    expect(settings.mcCardOnboardingShown).toBe(false);
+  });
+
+  it('round-trips typedEntryOnboardingShown: true', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, typedEntryOnboardingShown: true });
+    expect(loadSettings().typedEntryOnboardingShown).toBe(true);
+  });
+
+  it('round-trips mcCardOnboardingShown: true', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, mcCardOnboardingShown: true });
+    expect(loadSettings().mcCardOnboardingShown).toBe(true);
+  });
+
+  it('non-boolean value falls back to false for typedEntryOnboardingShown', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ typedEntryOnboardingShown: 'yes' }));
+    expect(loadSettings().typedEntryOnboardingShown).toBe(false);
+  });
+
+  it('non-boolean value falls back to false for mcCardOnboardingShown', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ mcCardOnboardingShown: 'yes' }));
+    expect(loadSettings().mcCardOnboardingShown).toBe(false);
   });
 });
 
@@ -684,10 +734,8 @@ describe('coercion helper: num fields fall back to DEFAULT_SETTINGS on wrong typ
 
 describe('coercion helper: bool fields fall back to DEFAULT_SETTINGS on wrong type', () => {
   const boolFields = [
-    'nameCardsEnabled',
     'evolutionCardsEnabled',
     'reverseEvolutionCardsEnabled',
-    'reverseCardsEnabled',
     'playCryOnReveal',
     'speakNameOnReveal',
     'cryCardsEnabled',

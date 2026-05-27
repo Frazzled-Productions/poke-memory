@@ -1,5 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import {
+  SEED_POKEMON_IDS,
+  EVOLUTION_CARD_IDS,
+  buildActiveSession,
+} from "./helpers/completedSession";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 
 // E2E smoke for #333 "Allow filtering which cards to learn".
 //
@@ -27,13 +33,53 @@ import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 const SETTINGS_STORAGE_KEY = "poke-memory:settings:v1";
 
+// A small set of Gen I species IDs seeded as "new" cards so the session
+// renders a Reveal button quickly without building ~2 050 cards from scratch.
+// Both the name card (id=N) and its paired reverse card (id=REVERSE_ID_OFFSET+N)
+// are marked new so species-grouped admission (which requires both directions
+// to have budget) admits them on the first load.
+// Gen I species seeded as new so the session renders quickly and scope changes
+// to Generation I have candidates. Gen IX entries (906 Sprigatito, 909 Fuecoco)
+// are included so that when test #1088 seeded card is Gen I and it picks
+// "Generation IX" as the excluding scope, those Gen IX cards are available
+// in the new queue rather than future-due.
+const GEN1_NEW_SPECIES = [1, 4, 7, 25, 52, 906, 909]; // Bulbasaur, Charmander, Squirtle, Pikachu, Meowth, Sprigatito, Fuecoco
+
 test.describe("Practice scope (#333)", () => {
   test.beforeEach(async ({ page }) => {
     // Fresh slate — drop any settings/session state from a prior test so
     // the scope starts at its empty default.
     await page.addInitScript(() => localStorage.clear());
+
+    // Pre-seed the full card set (name + reverse for all species + evolution
+    // cards) with a handful of Gen I pairs in "new" state. This avoids the
+    // ~2 050-card build-from-scratch that the app would otherwise do, which
+    // blocks the React render behind two large IDB writes and causes the
+    // Reveal-button assertions to time out even on Chromium (#1257).
+    await seedSessionIdb(
+      page,
+      buildActiveSession({
+        pokemonIds: SEED_POKEMON_IDS,
+        evolutionCardIds: EVOLUTION_CARD_IDS,
+        newSpeciesIds: GEN1_NEW_SPECIES,
+      }),
+    );
+
+    // Set maxNewReversePerDay: 0 so the first displayed card is always a name
+    // card (has a Reveal button). Reverse cards use SpritePicker and have no
+    // Reveal button; if one were shown first, the Reveal-button assertions in
+    // the scope-filter tests would time out. Individual tests that need a
+    // different settings shape write their own full settings object, which
+    // clobbers this default (init-scripts run in registration order).
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ maxNewReversePerDay: 0, evolutionCardsEnabled: false }),
+      );
+    }, SETTINGS_STORAGE_KEY);
+
     // Pre-dismiss the first-visit modal so it does not block the scope controls.
-    // Registered after the clear script so the merge runs after the clear.
+    // Registered after the session seed so both init-scripts run in order.
     await addOnboardingPreDismiss(page);
   });
 
@@ -41,6 +87,7 @@ test.describe("Practice scope (#333)", () => {
     page,
   }) => {
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Open the Scope panel. The collapsed header is a button whose
     // accessible name combines "Scope" and the current label ("All Pokémon"
@@ -92,11 +139,12 @@ test.describe("Practice scope (#333)", () => {
     // a scope that excludes the on-screen card must swap it for the new queue
     // head immediately.
     //
-    // Seed settings with only name cards enabled so the first queued card is
-    // guaranteed to be a name card (rendered by PokemonCard with a single
-    // sprite and alt="A Pokémon sprite, answer hidden"). Evolution, reverse,
-    // and cry cards use different layouts and alt text, which would make the
-    // sprite locator below fail intermittently.
+    // Seed settings so the first queued card is guaranteed to be a name card
+    // (rendered by PokemonCard with alt="A Pokémon sprite, answer hidden").
+    // After #1234 reverse is always enabled, so we achieve name-only queue by
+    // setting maxNewReversePerDay to 0: buildSessionQueues pre-slices reverse
+    // candidates to an empty list, so species-grouped admission never includes
+    // reverse cards in the newQueue. Evolution and cry cards are also disabled.
     await page.addInitScript(
       ({ key }) => {
         const settings = {
@@ -105,10 +153,14 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsPerDay: 100,
           maxNewEvolutionPerDay: 5,
           maxReviewsEvolutionPerDay: 50,
-          nameCardsEnabled: true,
+          // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+          // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
-          maxNewReversePerDay: 10,
+          // maxNewReversePerDay: 0 ensures only name cards enter the new queue.
+          // Reverse cards are still part of the session (always enabled since
+          // #1234) but their daily new-card budget is exhausted, so they are
+          // held back while name cards are admitted solo.
+          maxNewReversePerDay: 0,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
           cryCardsEnabled: false,
@@ -125,6 +177,7 @@ test.describe("Practice scope (#333)", () => {
     // is not clobbered by the full-object write above.
     await addOnboardingPreDismiss(page);
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Capture the sprite src that's rendered before any scope action. The
     // PokemonCard renders a single img with alt="A Pokémon sprite, answer
@@ -228,10 +281,14 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsPerDay: 100,
           maxNewEvolutionPerDay: 5,
           maxReviewsEvolutionPerDay: 50,
-          nameCardsEnabled: true,
+          // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+          // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: true,
-          reverseCardsEnabled: false,
-          maxNewReversePerDay: 10,
+          // maxNewReversePerDay: 0 ensures only name cards (Reveal button)
+          // enter the new queue after scope is cleared. Reverse cards use
+          // SpritePicker and have no Reveal button; if one showed first the
+          // assertion at the bottom of this test would time out (#1257).
+          maxNewReversePerDay: 0,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
           cryCardsEnabled: false,
@@ -249,6 +306,7 @@ test.describe("Practice scope (#333)", () => {
     await addOnboardingPreDismiss(page);
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Empty-state copy. Component renders this in a styled <p>, not a
     // heading element, so match by visible text rather than role.
@@ -288,6 +346,7 @@ test.describe("Practice scope (#333)", () => {
     );
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Open the Scope panel.
     const scopeToggle = page
@@ -359,10 +418,16 @@ test.describe("Practice scope (#333)", () => {
           maxReviewsPerDay: 100,
           maxNewEvolutionPerDay: 5,
           maxReviewsEvolutionPerDay: 50,
-          nameCardsEnabled: true,
+          // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+          // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
-          maxNewReversePerDay: 10,
+          // maxNewReversePerDay: 0 so only name cards enter the new queue.
+          // Reverse cards (SpritePicker, no Reveal button) would otherwise
+          // appear first and prevent the Reveal-button assertion from resolving.
+          // The loop below checks revealed name text, which only exists on name
+          // cards, so keeping reverse cards out of the new queue makes the
+          // assertion reliable.
+          maxNewReversePerDay: 0,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
           cryCardsEnabled: false,
@@ -386,16 +451,19 @@ test.describe("Practice scope (#333)", () => {
     await addOnboardingPreDismiss(page);
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // If no cards match (should not happen with default-only on a 1025-entry
     // seed, but guard against it), skip rather than fail.
     const noMatch = page.getByText(/no Pok[ée]mon match your scope/i);
     const reveal = page.getByRole("button", { name: /reveal/i });
 
-    // Wait for either the reveal button or the no-match state.
+    // Wait for either the reveal button or the no-match state. Use a generous
+    // timeout — since #1234 the session builds both name and reverse cards for
+    // every species (~2× the card set), which takes longer on WebKit.
     await Promise.race([
-      reveal.waitFor({ state: "visible", timeout: 10_000 }),
-      noMatch.waitFor({ state: "visible", timeout: 10_000 }),
+      reveal.waitFor({ state: "visible", timeout: 15_000 }),
+      noMatch.waitFor({ state: "visible", timeout: 15_000 }),
     ]);
 
     if (await noMatch.isVisible()) {
@@ -454,6 +522,39 @@ test.describe("Practice scope (#333)", () => {
 // mastering — the same set the Journey tab's Evolution Wall "In progress"
 // filter shows. Membership is computed from review state, so the tests seed a
 // session to control which chains are in progress.
+// Mastered Bulbasaur → Ivysaur evolution edge (edgeId 1500001).
+// reps ≥ 3 + scheduledDays ≥ 21 satisfies the mastery gate, which places
+// the Bulbasaur family into "incomplete chains" (forward edge mastered but
+// reverse edge not yet seen). Both incomplete-chains tests require this card.
+const BULBASAUR_EVO_CARD = {
+  id: 1500001,
+  cardType: "evolution",
+  subjectKey: "1:2",
+  preEvoId: 1,
+  postEvoId: 2,
+  preEvoName: "bulbasaur",
+  postEvoName: "ivysaur",
+  preEvoSpriteUrl: "/sprites/pokemon/1.png",
+  postEvoSpriteUrl: "/sprites/pokemon/2.png",
+  triggerPhrase: "at level 16",
+  state: {
+    stability: 30,
+    difficulty: 5,
+    elapsedDays: 0,
+    scheduledDays: 21,
+    reps: 3,
+    lapses: 0,
+    fsrsState: "review",
+    dueDate: "2099-01-01",
+    lastReview: "2025-01-01",
+    firstSeen: "2024-12-01",
+    learningStep: null,
+    stepStartedAt: null,
+    hiddenSince: null,
+    seenInPasture: false,
+  },
+};
+
 test.describe("Practice scope — Incomplete evolution chains preset (#995)", () => {
   test("preset renders in the scope picker and is selectable", async ({
     page,
@@ -462,57 +563,31 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     // when this test selects the preset. Without any review state the set is
     // empty, the preset matches 0 Pokémon, and ReviewSession early-returns the
     // "No Pokémon match" UI — unmounting #scope-panel and the pill with it.
-    // Seeding edgeId 1500001 (Bulbasaur → Ivysaur, reps ≥ 3 + scheduledDays ≥
-    // 21) puts the Bulbasaur family into incomplete chains (forward edge
-    // mastered, reverse edge unseen), keeping the panel mounted after selection.
-    await page.addInitScript(() => {
-      localStorage.clear();
-      window.localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify({
-          cards: [
-            {
-              id: 1500001,
-              cardType: "evolution",
-              subjectKey: "1:2",
-              preEvoId: 1,
-              postEvoId: 2,
-              preEvoName: "bulbasaur",
-              postEvoName: "ivysaur",
-              preEvoSpriteUrl: "/sprites/pokemon/1.png",
-              postEvoSpriteUrl: "/sprites/pokemon/2.png",
-              triggerPhrase: "at level 16",
-              state: {
-                stability: 30,
-                difficulty: 5,
-                elapsedDays: 0,
-                scheduledDays: 21,
-                reps: 3,
-                lapses: 0,
-                fsrsState: "review",
-                dueDate: "2099-01-01",
-                lastReview: "2025-01-01",
-                firstSeen: "2024-12-01",
-                learningStep: null,
-                stepStartedAt: null,
-                hiddenSince: null,
-                seenInPasture: false,
-              },
-            },
-          ],
-          limits: {
-            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          },
-        }),
-      );
-    });
-    // Re-seed the onboarding pre-dismiss flag after the clear above so the
+    // edgeId 1500001 (Bulbasaur → Ivysaur, reps ≥ 3 + scheduledDays ≥ 21)
+    // puts the Bulbasaur family into incomplete chains (forward edge mastered,
+    // reverse edge unseen), keeping the panel mounted after selection.
+    //
+    // Use seedSessionIdb (IDB-backed) rather than localStorage so the app
+    // reads the pre-seeded data without the async IdbMigration step. Include
+    // the full card set so hydrateSession adds nothing new and skips its
+    // save, letting React hydrate before the assertion times out (#1257).
+    await page.addInitScript(() => localStorage.clear());
+    await seedSessionIdb(
+      page,
+      buildActiveSession({
+        pokemonIds: SEED_POKEMON_IDS,
+        evolutionCardIds: EVOLUTION_CARD_IDS,
+        // Bulbasaur (1) as new so the scope-panel mount isn't needed for a
+        // Reveal button — this test only asserts on the panel, not Reveal.
+        newSpeciesIds: [1],
+        extraCards: [BULBASAUR_EVO_CARD],
+      }),
+    );
+    // Re-seed the onboarding pre-dismiss flag after the seed so the
     // first-visit modal does not render and block scope-panel interactions.
     await addOnboardingPreDismiss(page);
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Open the Scope panel.
     const scopeToggle = page
@@ -552,52 +627,24 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     // Seed a session where the Bulbasaur → Ivysaur forward evolution edge
     // (edgeId 1500001) is mastered. With the reverse edge unmastered, the
     // Bulbasaur family is "in progress", so Bulbasaur (1), Ivysaur (2) and
-    // Venusaur (3) belong to the incomplete-chain set. Their name cards stay
-    // unseen (firstSeen: null) so they queue as new cards. The
+    // Venusaur (3) belong to the incomplete-chain set. Bulbasaur (1) is kept
+    // in "new" state so it queues as a new card under the preset. The
     // "Incomplete evolution chains" scope is pre-selected via settings.
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        "poke-memory:review-session:v1",
-        JSON.stringify({
-          cards: [
-            {
-              id: 1500001,
-              cardType: "evolution",
-              subjectKey: "1:2",
-              preEvoId: 1,
-              postEvoId: 2,
-              preEvoName: "bulbasaur",
-              postEvoName: "ivysaur",
-              preEvoSpriteUrl: "/sprites/pokemon/1.png",
-              postEvoSpriteUrl: "/sprites/pokemon/2.png",
-              triggerPhrase: "at level 16",
-              state: {
-                stability: 30,
-                difficulty: 5,
-                elapsedDays: 0,
-                scheduledDays: 21,
-                reps: 3,
-                lapses: 0,
-                fsrsState: "review",
-                dueDate: "2099-01-01",
-                lastReview: "2025-01-01",
-                firstSeen: "2024-12-01",
-                learningStep: null,
-                stepStartedAt: null,
-                hiddenSince: null,
-                seenInPasture: false,
-              },
-            },
-          ],
-          limits: {
-            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
-            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
-          },
-        }),
-      );
-    });
+    //
+    // Use seedSessionIdb so the full card set is already present in IDB.
+    // hydrateSession then adds nothing (skipping the first large IDB write),
+    // letting React hydrate quickly (#1257).
+    await seedSessionIdb(
+      page,
+      buildActiveSession({
+        pokemonIds: SEED_POKEMON_IDS,
+        evolutionCardIds: EVOLUTION_CARD_IDS,
+        // Bulbasaur (1), Ivysaur (2), Venusaur (3) as new so the
+        // incomplete-chains preset queue is non-empty and Reveal renders.
+        newSpeciesIds: [1, 2, 3],
+        extraCards: [BULBASAUR_EVO_CARD],
+      }),
+    );
     await page.addInitScript(
       ({ key }) => {
         const settings = {
@@ -606,10 +653,14 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
           maxReviewsPerDay: 100,
           maxNewEvolutionPerDay: 5,
           maxReviewsEvolutionPerDay: 50,
-          nameCardsEnabled: true,
+          // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+          // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: true,
-          reverseCardsEnabled: false,
-          maxNewReversePerDay: 10,
+          // maxNewReversePerDay: 0 so the first displayed card is always a
+          // name card (has a Reveal button). Reverse cards (SpritePicker) have
+          // no Reveal button; if one shows first the assertion at line 659
+          // would time out waiting for a button that is never rendered.
+          maxNewReversePerDay: 0,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
           cryCardsEnabled: false,
@@ -631,13 +682,16 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     await addOnboardingPreDismiss(page);
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // A practice card should render — the in-progress Bulbasaur family means
     // the preset's computed set is non-empty, so the session is not the
     // no-match empty state.
     const reveal = page.getByRole("button", { name: /reveal/i });
     const noMatch = page.getByText(/no Pok[ée]mon match your scope/i);
-    await expect(reveal).toBeVisible({ timeout: 15_000 });
+    // 10 s is enough now that the session is pre-seeded (hydrateSession is
+    // a no-op) — only one IDB write (reconcile save) precedes the render.
+    await expect(reveal).toBeVisible({ timeout: 10_000 });
     await expect(noMatch).not.toBeVisible();
 
     // The scope chip reflects the active preset.
@@ -653,9 +707,41 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
 // each containing a pill per available version-group with marketing labels.
 // Toggling a single game updates the live count and the scope label chip;
 // the practice session stays operable.
+// Gen II species kept as "new" so the Gold/Silver scope test sees a Reveal
+// button quickly. Totodile (158) and Cyndaquil (155) are Gen II starters.
+const GEN2_NEW_SPECIES = [152, 155, 158, 175, 179]; // Gen II starters + misc
+
 test.describe("Practice scope — Games axis (#1089)", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => localStorage.clear());
+
+    // Pre-seed the full card set with Gen II pairs in "new" state so the
+    // session renders without triggering a ~2 050-card build-from-scratch
+    // (which would time out the Reveal-button assertion on Chromium — #1257).
+    await seedSessionIdb(
+      page,
+      buildActiveSession({
+        pokemonIds: SEED_POKEMON_IDS,
+        evolutionCardIds: EVOLUTION_CARD_IDS,
+        newSpeciesIds: GEN2_NEW_SPECIES,
+      }),
+    );
+
+    // Seed settings with maxNewReversePerDay: 0 so the first displayed card is
+    // always a name card (has a Reveal button). Reverse cards use SpritePicker
+    // and have no Reveal button; if one shows first the assertion in
+    // "toggling Pokemon Gold/Silver" would time out (#1257).
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          maxNewReversePerDay: 0,
+          evolutionCardsEnabled: false,
+          onboarding: { firstVisitOnboardingDismissed: true },
+        }),
+      );
+    }, SETTINGS_STORAGE_KEY);
+
     // Re-seed the modal-dismiss flag and new-user mobileNav default so the
     // first-visit onboarding modal does not block scope-panel interactions
     // and the bottom tab bar appears as expected (#1103).
@@ -666,6 +752,7 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     page,
   }) => {
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Open the Scope panel.
     const scopeToggle = page
@@ -704,10 +791,11 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     await expect(scopePanel.getByText(/of \d+ Pok[ée]mon match/)).toBeVisible();
 
     // A practice card should still render — the no-match empty-state must NOT
-    // appear.
+    // appear. Use a generous timeout — since #1234 the session includes reverse
+    // cards for every species (~2× the card set), which takes longer on WebKit.
     const reveal = page.getByRole("button", { name: /reveal/i });
     const noMatch = page.getByText(/no Pok[ée]mon match your scope/i);
-    await expect(reveal).toBeVisible();
+    await expect(reveal).toBeVisible({ timeout: 10_000 });
     await expect(noMatch).not.toBeVisible();
   });
 
@@ -715,6 +803,7 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     page,
   }) => {
     await page.goto("/");
+    await awaitSeedIdb(page);
     const scopeToggle = page
       .getByRole("button", { expanded: false })
       .filter({ hasText: /scope/i })

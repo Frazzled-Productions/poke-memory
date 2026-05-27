@@ -3,6 +3,8 @@
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
+import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
+import { MultipleChoiceNameCard } from "@/components/review/MultipleChoiceNameCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { SpritePreloader, type SizedSpriteUrl } from "@/components/sprites/SpritePreloader";
@@ -17,6 +19,7 @@ import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
 import { pickDistractors } from "@/lib/pokemon/distractors";
+import { buildMcOptions } from "@/lib/srs/multipleChoiceDistractors";
 import {
   buildSession,
   buildSessionQueues,
@@ -39,7 +42,7 @@ import { recordReview } from "@/lib/streak";
 import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
-import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
+import { getPokemonFacts, selectFact, loadFlavorTexts, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
 import { speakName, warmupTts } from "@/lib/audio/tts";
 import { waitForAudio } from "@/lib/audio/waitForAudio";
@@ -474,8 +477,8 @@ function EndOfSessionScreen({
             ctaLabel="Open practice settings"
           >
             <p>
-              Try reverse cards, reverse-evolution cards, or alternate-form
-              cards for a fresh challenge.
+              Try reverse-evolution cards or alternate-form cards for a fresh
+              challenge.
             </p>
           </OnboardingHint>
         </div>
@@ -537,12 +540,19 @@ export function ReviewSession() {
   // null = SSR / not-yet-hydrated. Same pattern as before.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
-  const [reverseEnabled, setReverseEnabled] = useState(false);
+  const [reverseEnabled, setReverseEnabled] = useState(true);
   const [reverseEvolutionEnabled, setReverseEvolutionEnabled] = useState(false);
-  const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
+  // Verified typed-entry mode (#1251). Read into state on session load via the
+  // session-load effect. Same-tab toggles take effect on the next session via the
+  // storage event; the in-flight card always uses the value captured at load time.
+  const [verifiedTypedEntryMode, setVerifiedTypedEntryMode] = useState(false);
+  // Default true pre-hydration so the banner doesn't flash for users whose
+  // persisted setting is true. The session-load effect (~line 939) overwrites
+  // this with the actual persisted value (default false for new users).
+  const [mcCardOnboardingShown, setMcCardOnboardingShown] = useState(true);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -622,7 +632,12 @@ export function ReviewSession() {
     // are durable. Persist if any card mutated.
     if (cards !== null) {
       const today = todayString(new Date());
-      reconcileHiddenState(cards, next, today);
+      // `changed` is intentionally unused here — handleScopeChange always
+      // persists the full session after a scope change (line below) regardless
+      // of whether reconcile modified any card state. Pass the current
+      // incompleteChains context so the "Incomplete evolution chains" scope
+      // correctly identifies in-scope species during snooze reconciliation.
+      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains });
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
       // reload when toggling card-type gates, so the state is always current.
@@ -632,9 +647,7 @@ export function ReviewSession() {
       const eligibleIds = computeEligibleCardIds(
         cards,
         {
-          nameCardsEnabled,
           evolutionCardsEnabled,
-          reverseCardsEnabled: reverseEnabled,
           reverseEvolutionCardsEnabled: reverseEvolutionEnabled,
           cryCardsEnabled: cryCardsEnabled,
           alternateFormsEnabled,
@@ -702,6 +715,13 @@ export function ReviewSession() {
   useEffect(() => {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
+  }, []);
+
+  // Kick off flavor-text fetch in the background so it is warm by the time
+  // the user reveals their first card. Non-blocking: the critical render path
+  // does not wait for this.
+  useEffect(() => {
+    void loadFlavorTexts();
   }, []);
 
   // Serialises background persistence work across rapid grades (#1191).
@@ -797,8 +817,9 @@ export function ReviewSession() {
       let sessionCards: ReviewableCard[];
       let sessionLimits: DailyLimits;
 
-      const enabled = settings.reverseCardsEnabled;
-      const nameEnabled = settings.nameCardsEnabled;
+      // Name and reverse are always on since #1234.
+      const enabled = true;
+      const nameEnabled = true;
       const evolutionEnabled = settings.evolutionCardsEnabled;
       const reverseEvolutionEnabledLocal = settings.reverseEvolutionCardsEnabled;
       const cryEnabled = settings.cryCardsEnabled;
@@ -866,13 +887,15 @@ export function ReviewSession() {
       const persistedScope = settings.practiceScope;
       const formsEnabled = settings.alternateFormsEnabled;
       const today = todayString(now);
-      reconcileHiddenState(sessionCards, persistedScope, today);
       // Three-tier eligibility: card-type-enabled gate, then
       // `alternateFormsEnabled` gate, then scope filter (#658, #835).
       // Context for the "Incomplete evolution chains" preset (#995): derive
       // chain progress from the freshly-built/hydrated card set. The
       // `scopeContext` memo cannot be used here — it depends on `cards` state
       // which has not been set yet at this point in the load effect.
+      // Computed before reconcileHiddenState so the same context is passed to
+      // both — avoids a second pass over all cards and ensures reconciliation
+      // uses the correct in-progress set when the scope is "incomplete-chains".
       const loadScopeContext: ScopeMatchContext = {
         incompleteChainSpeciesIds: incompleteChainSpeciesIds(
           sessionCards,
@@ -880,12 +903,11 @@ export function ReviewSession() {
           superuserFlags.pretendAllMastered,
         ),
       };
+      const { changed: reconcileChanged } = reconcileHiddenState(sessionCards, persistedScope, today, loadScopeContext);
       const eligibleIds = computeEligibleCardIds(
         sessionCards,
         {
-          nameCardsEnabled: nameEnabled,
           evolutionCardsEnabled: evolutionEnabled,
-          reverseCardsEnabled: enabled,
           reverseEvolutionCardsEnabled: reverseEvolutionEnabledLocal,
           cryCardsEnabled: cryEnabled,
           alternateFormsEnabled: formsEnabled,
@@ -893,26 +915,29 @@ export function ReviewSession() {
         },
         loadScopeContext,
       );
-      // Persist whenever scope is active so reconciliation results survive a
-      // reload. When scope is empty, the only thing reconcileHiddenState can do
-      // is clear stale hiddenSince — still worth persisting if any cleared.
-      notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
-
+      // Only persist when reconcileHiddenState actually mutated card state
+      // (stamped or cleared hiddenSince, shifted dueDate). Skipping the save
+      // when nothing changed avoids a redundant ~600 KB IDB write on every
+      // page load — the main cause of hydration slowness after #1234 doubled
+      // the card count to ~2 050 (#1262).
+      if (reconcileChanged) {
+        notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
+      }
       setCards(sessionCards);
       setLimits(sessionLimits);
-      setReverseEnabled(enabled);
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
-      setNameCardsEnabled(nameEnabled);
       setEvolutionCardsEnabled(evolutionEnabled);
       setCryCardsEnabled(cryEnabled);
       setAlternateFormsEnabled(formsEnabled);
       setCardTypesAllOn(
-        enabled && reverseEvolutionEnabledLocal && formsEnabled,
+        reverseEvolutionEnabledLocal && formsEnabled,
       );
       setScope(persistedScope);
       setMasteryRepetitions(settings.masteryRepetitions);
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
+      setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
+      setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
@@ -1292,14 +1317,21 @@ export function ReviewSession() {
     );
   }
 
-  // --- All card types disabled ---
+  // --- All opt-in card types disabled ---
+  // Name and reverse are always on since #1234, so this guard covers only
+  // the unlikely case where evolution, reverse-evolution, and cry are all off
+  // AND the practiceScope has no cards. In practice, name+reverse being always
+  // on means the session will always have at least some cards unless the scope
+  // explicitly excludes everything (handled below). We keep the guard for
+  // correctness but it will only fire for the evolution/cry-only opt-in combos.
   if (
-    !nameCardsEnabled &&
     !evolutionCardsEnabled &&
     !reverseEnabled &&
     !reverseEvolutionEnabled &&
     !cryCardsEnabled
   ) {
+    // This branch is unreachable with default settings since reverseEnabled is
+    // always true. Kept as a safety net.
     return (
       <div className="flex flex-col items-center gap-4 text-center">
         <p className="text-2xl font-semibold text-foreground">No card types enabled</p>
@@ -1524,7 +1556,7 @@ export function ReviewSession() {
     // eligibleCardIds — so that alternate-form and scope filters do not
     // suppress the wall for genuinely-enabled card types (#835).
     const endStateTypeOpts = {
-      nameEnabled: nameCardsEnabled,
+      nameEnabled: true,
       evolutionEnabled: evolutionCardsEnabled,
       reverseEnabled,
       reverseEvolutionEnabled,
@@ -1599,7 +1631,7 @@ export function ReviewSession() {
               <CountdownScreen
                 dueAt={earliestDueAt}
                 perType={perType}
-                nameEnabled={nameCardsEnabled}
+                nameEnabled={true}
                 evolutionEnabled={evolutionCardsEnabled}
                 reverseEnabled={reverseEnabled}
                 reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -1667,7 +1699,7 @@ export function ReviewSession() {
         <EndOfSessionScreen
           variant={variant}
           perType={perType}
-          nameEnabled={nameCardsEnabled}
+          nameEnabled={true}
           evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
           reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -1986,6 +2018,21 @@ export function ReviewSession() {
     // state: a failed save leaves no snapshot, so undo stays disabled.
     enqueueGrade({ ...effectiveCard, state: nextState });
 
+    // Persist the MC-card onboarding flag after the first grade from an MC
+    // learning card (#1271). Runs once per user, then never again. Compute
+    // the MC-active check inline (mirrors the render-time `isMcLearningActive`).
+    const gradedCardIsInLearning =
+      effectiveCard.cardType === "name" &&
+      (effectiveCard.state.lastReview === null ||
+        effectiveCard.state.learningStep !== null);
+    if (verifiedTypedEntryMode && gradedCardIsInLearning && !mcCardOnboardingShown && !superuserGuarded) {
+      setMcCardOnboardingShown(true);
+      const updatedSettings = loadSettings();
+      if (!updatedSettings.mcCardOnboardingShown) {
+        saveSettings({ ...updatedSettings, mcCardOnboardingShown: true });
+      }
+    }
+
     setCards(newCards);
     setSessionGrades((prev) => ({ ...prev, [grade]: prev[grade] + 1 }));
     setSessionGradeSeq((prev) => [...prev, grade]);
@@ -2249,7 +2296,7 @@ export function ReviewSession() {
             </div>
           </>
         }
-        queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
+        queueStateBadge={<QueueStateBadge state={effectiveCard.state} forceCardsGraduated={superuserFlags.forceCardsGraduated} />}
         cardRegion={
           /* Swipeable card wrapper — pointer listeners attached here (#1052).
              PokemonCard reserves the revealed-state height in its answer container
@@ -2372,7 +2419,7 @@ export function ReviewSession() {
             />
           </>
         }
-        queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
+        queueStateBadge={<QueueStateBadge state={effectiveCard.state} forceCardsGraduated={superuserFlags.forceCardsGraduated} />}
         cardRegion={
           /* SpritePicker: overflow-y-auto is set by the "reverse" variant on
              the card region so very short viewports (e.g. iPhone SE, 667 px)
@@ -2396,7 +2443,7 @@ export function ReviewSession() {
           <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
             <TodayPill
               perType={perType}
-              nameEnabled={nameCardsEnabled}
+              nameEnabled={true}
               evolutionEnabled={evolutionCardsEnabled}
               reverseEnabled={reverseEnabled}
               reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -2418,6 +2465,48 @@ export function ReviewSession() {
   }
 
   // Default branch: name, evolution, and reverse-evolution cards.
+  //
+  // When verifiedTypedEntryMode is on and the current card is a name card, the
+  // renderer depends on the card's lifecycle phase (#1237):
+  //
+  //   - Learning phase (brand-new OR in a learning/relearning step)
+  //     → MultipleChoiceNameCard: sprite + 4 options, Good on correct, Again on wrong.
+  //   - Graduated (lastReview !== null AND learningStep === null)
+  //     → TypedEntryNameCard: typed-input verification.
+  //
+  // Evolution and reverse-evolution cards always use the existing flip flow.
+  const isNameCard = effectiveCard.cardType === "name";
+  // A card is in the learning phase when it has never graduated (lastReview is
+  // null) OR when it is currently working through learning/relearning steps
+  // (learningStep is not null). The scheduler sets lastReview only on graduation
+  // or lapse — not on in-step touches — so this check is reliable.
+  //
+  // `forceCardsGraduated` (superuser flag #1270) bypasses this so typed-entry
+  // mode can be tested without grinding through learning steps.
+  const isInLearningPhase =
+    isNameCard &&
+    !superuserFlags.forceCardsGraduated &&
+    (effectiveCard.state.lastReview === null ||
+      effectiveCard.state.learningStep !== null);
+  const isMcLearningActive = verifiedTypedEntryMode && isInLearningPhase;
+  const isTypedEntryActive =
+    verifiedTypedEntryMode && isNameCard && !isInLearningPhase;
+
+  // Pre-build MC options when we know we will render the MC card. The options
+  // array is stable per card id: the same 4 options and order appear on every
+  // replay during learning steps. This is deliberate — replays are about
+  // recognition, not re-puzzle-solving.
+  const mcOptions =
+    isMcLearningActive
+      ? buildMcOptions(
+          effectiveCard.id,
+          // effectiveCard is a NameReviewCard (SeedPokemon fields are spread onto it).
+          effectiveCard as Parameters<typeof buildMcOptions>[1],
+          SEED_POKEMON,
+          String(effectiveCard.id),
+        )
+      : null;
+
   return (
     <ReviewCardLayout
       variant="flip"
@@ -2438,40 +2527,91 @@ export function ReviewSession() {
       }
       queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
       cardRegion={
-        /* Swipeable card wrapper — pointer listeners attached here (#1052).
-           PokemonCard and EvolutionCard reserve the revealed-state height in
-           their inner answer container (min-h-[7rem]), so the card's bounding
-           box is the same size across reveal and centring does not cause the
-           sprite to drift (#1104). */
-        <div ref={cardRef} className="relative" data-testid="swipe-card">
-          {effectiveCard.cardType === "evolution" ||
-          effectiveCard.cardType === "reverse-evolution" ? (
-            <EvolutionCard
-              direction={effectiveCard.cardType}
-              preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
-              preEvoName={effectiveCard.preEvoName}
-              postEvoName={effectiveCard.postEvoName}
-              postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
-              triggerPhrase={effectiveCard.triggerPhrase}
-              revealed={revealed}
-              fact={currentFact}
-              preEvoId={effectiveCard.preEvoId}
-              postEvoId={effectiveCard.postEvoId}
-            />
-          ) : (
-            <PokemonCard
+        isMcLearningActive && mcOptions !== null ? (
+          /* Multiple-choice name card (#1237): sprite + 4 name buttons during the
+             learning-step phase. Correct → Good (4); wrong → Again (1). The
+             swipe-card wrapper is omitted; swipe-to-grade is not applicable.
+             Key includes cardPresentationCount so the component remounts (and
+             resets chosen state) when the same card reappears via a learning-step
+             replay, matching the SpritePicker pattern (#496). */
+          <div className="flex flex-col gap-2 w-full">
+            {/* One-time learning-phase banner (#1271). Visible until the first
+                MC grade fires; after that `mcCardOnboardingShown` is true and
+                the banner never re-renders. */}
+            {!mcCardOnboardingShown && (
+              <div
+                role="note"
+                className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+              >
+                This card is in the learning phase. Pick the matching name from the options below. Verified typed entry will kick in once the card graduates.
+              </div>
+            )}
+            <MultipleChoiceNameCard
+              key={`${effectiveCard.id}-${cardPresentationCount}`}
               spriteUrl={effectiveCard.spriteUrl}
-              name={effectiveCard.displayName}
-              revealed={revealed}
-              fact={currentFact}
+              canonicalName={effectiveCard.displayName}
+              options={mcOptions}
               id={effectiveCard.id}
+              onGrade={handleGrade}
+              grading={grading}
             />
-          )}
-          {revealed && <SwipeHint swipeState={swipeState} />}
-        </div>
+          </div>
+        ) : isTypedEntryActive ? (
+          /* Verified typed-entry (#1251): renders input, grades automatically,
+             then the parent advances on the onGrade callback. The swipe-card
+             wrapper is omitted because swipe-to-grade is not applicable here. */
+          <TypedEntryNameCard
+            key={effectiveCard.id}
+            spriteUrl={effectiveCard.spriteUrl}
+            canonicalName={effectiveCard.displayName}
+            id={effectiveCard.id}
+            onGrade={handleGrade}
+            grading={grading}
+          />
+        ) : (
+          /* Swipeable card wrapper — pointer listeners attached here (#1052).
+             PokemonCard and EvolutionCard reserve the revealed-state height in
+             their inner answer container (min-h-[7rem]), so the card's bounding
+             box is the same size across reveal and centring does not cause the
+             sprite to drift (#1104). */
+          <div ref={cardRef} className="relative" data-testid="swipe-card">
+            {effectiveCard.cardType === "evolution" ||
+            effectiveCard.cardType === "reverse-evolution" ? (
+              <EvolutionCard
+                direction={effectiveCard.cardType}
+                preEvoSpriteUrl={effectiveCard.preEvoSpriteUrl}
+                preEvoName={effectiveCard.preEvoName}
+                postEvoName={effectiveCard.postEvoName}
+                postEvoSpriteUrl={effectiveCard.postEvoSpriteUrl}
+                triggerPhrase={effectiveCard.triggerPhrase}
+                revealed={revealed}
+                fact={currentFact}
+                preEvoId={effectiveCard.preEvoId}
+                postEvoId={effectiveCard.postEvoId}
+              />
+            ) : (
+              <PokemonCard
+                spriteUrl={effectiveCard.spriteUrl}
+                name={effectiveCard.displayName}
+                revealed={revealed}
+                fact={currentFact}
+                id={effectiveCard.id}
+              />
+            )}
+            {revealed && <SwipeHint swipeState={swipeState} />}
+          </div>
+        )
       }
       controls={
-        revealed ? (
+        isMcLearningActive ? (
+          // MultipleChoiceNameCard renders its own option buttons inline;
+          // the layout's controls slot is left empty.
+          undefined
+        ) : isTypedEntryActive ? (
+          // TypedEntryNameCard renders its own Submit / I don't know controls
+          // inline; the layout's controls slot is left empty.
+          undefined
+        ) : revealed ? (
           <GradeButtons
             onGrade={handleGrade}
             disabled={grading}
@@ -2505,7 +2645,7 @@ export function ReviewSession() {
         <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
           <TodayPill
             perType={perType}
-            nameEnabled={nameCardsEnabled}
+            nameEnabled={true}
             evolutionEnabled={evolutionCardsEnabled}
             reverseEnabled={reverseEnabled}
             reverseEvolutionEnabled={reverseEvolutionEnabled}

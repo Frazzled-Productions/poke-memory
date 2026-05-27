@@ -227,8 +227,8 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Default settings fixture — nameCardsEnabled:true, evolutionCardsEnabled:false
-// so we can exercise both toggling-off (name) and toggling-on (evolution).
+// Default settings fixture — evolutionCardsEnabled:false so we can exercise
+// toggling-on. Name and reverse are always on since #1234; they have no toggles.
 // ---------------------------------------------------------------------------
 
 function defaultSettings() {
@@ -238,10 +238,8 @@ function defaultSettings() {
     maxReviewsPerDay: 100,
     maxNewEvolutionPerDay: 5,
     maxReviewsEvolutionPerDay: 50,
-    nameCardsEnabled: true,
     evolutionCardsEnabled: false,
     reverseEvolutionCardsEnabled: false,
-    reverseCardsEnabled: false,
     maxNewReversePerDay: 10,
     maxReviewsReversePerDay: 100,
     playCryOnReveal: false,
@@ -271,8 +269,21 @@ function defaultSettings() {
     ttsVoice: null,
     ttsRate: 1,
     ttsVolume: 1,
+    waitForAudioOnGrade: true,
+    reverseFeedbackDelay: "default" as const,
     timezone: "Europe/London",
     dateFormat: "dmy" as const,
+    streakProtection: {
+      balance: 0,
+      spendDates: [] as string[],
+      daysSinceLastEarn: 0,
+      lastEarnCheckDate: null,
+      protectionEvents: [],
+      lastAcknowledgedProtectionEventDate: null,
+    },
+    verifiedTypedEntryMode: false,
+    typedEntryOnboardingShown: false,
+    mcCardOnboardingShown: false,
   };
 }
 
@@ -296,23 +307,10 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 // Helpers: find card-type toggle switches by nearby label text.
 //
-// The toggle buttons for card types have no explicit aria-label. They are
-// visually associated with the "Enable X cards" heading via proximity inside
-// a flex container, but not programmatically linked. We locate each switch
-// by finding the "Enable X cards" text node and traversing up to the shared
-// container, then querying for the [role="switch"] inside it.
+// Name and reverse toggles have been removed since #1234 — those directions
+// are always on. Only the opt-in card types (evolution, reverse-evolution, cry)
+// have toggles.
 // ---------------------------------------------------------------------------
-
-function getNameCardsSwitch() {
-  // The text "Enable name cards" is inside a <p>. Its grandparent div
-  // contains the flex row with the toggle button.
-  const labelEl = screen.getByText("Enable name cards");
-  const container = labelEl.closest("div.flex.items-center.justify-between");
-  if (!container) throw new Error("Could not find name-cards toggle container");
-  const btn = container.querySelector('[role="switch"]');
-  if (!btn) throw new Error("Could not find name-cards switch button");
-  return btn as HTMLElement;
-}
 
 function getEvolutionCardsSwitch() {
   const labelEl = screen.getByText("Enable evolution cards");
@@ -328,22 +326,27 @@ function getEvolutionCardsSwitch() {
 // ---------------------------------------------------------------------------
 
 describe("SettingsPage — card-type toggle: disable (non-destructive, #835)", () => {
-  it("disabling an enabled card type updates the toggle without a confirm dialog", async () => {
+  it("disabling an opt-in card type updates the toggle without a confirm dialog", async () => {
+    // Use evolution cards since name/reverse no longer have toggles (#1234).
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      evolutionCardsEnabled: true, // start enabled so we can toggle it off
+    });
     const user = userEvent.setup();
     render(<SettingsPage />);
 
     // Wait for settings to load (the page starts with null and loads on effect).
     await waitFor(() => {
-      expect(screen.getByText("Enable name cards")).toBeInTheDocument();
+      expect(screen.getByText("Enable evolution cards")).toBeInTheDocument();
     });
 
-    const nameSwitchEl = getNameCardsSwitch();
-    // Name cards start enabled.
-    expect(nameSwitchEl).toHaveAttribute("aria-checked", "true");
+    const evoSwitchEl = getEvolutionCardsSwitch();
+    // Evolution cards start enabled.
+    expect(evoSwitchEl).toHaveAttribute("aria-checked", "true");
 
     // No window.confirm stub — the test would throw if confirm was called.
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    await user.click(nameSwitchEl);
+    await user.click(evoSwitchEl);
 
     // The toggle must have fired without calling window.confirm.
     expect(confirmSpy).not.toHaveBeenCalled();
@@ -351,7 +354,7 @@ describe("SettingsPage — card-type toggle: disable (non-destructive, #835)", (
 
     // The switch should now be unchecked.
     await waitFor(() => {
-      expect(getNameCardsSwitch()).toHaveAttribute("aria-checked", "false");
+      expect(getEvolutionCardsSwitch()).toHaveAttribute("aria-checked", "false");
     });
   });
 });
@@ -551,30 +554,35 @@ describe("SettingsPage — card-type toggle: re-enable dialog (#835)", () => {
 });
 
 describe("SettingsPage — multiple card-type re-enables (#835)", () => {
-  it("re-enabling name cards (which were disabled) also shows the dialog", async () => {
-    // Use a fixture where name cards are disabled and evolution is enabled.
+  it("re-enabling reverse-evolution cards (an opt-in type) shows the dialog", async () => {
+    // Name and reverse no longer have toggles since #1234 — they are always on.
+    // Verify the re-enable flow still works for an opt-in type (reverse-evolution).
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      nameCardsEnabled: false,
       evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false, // start disabled
     });
 
     const user = userEvent.setup();
     render(<SettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Enable name cards")).toBeInTheDocument();
+      expect(screen.getByText("Enable reverse-evolution cards")).toBeInTheDocument();
     });
 
-    const nameSwitchEl = getNameCardsSwitch();
-    expect(nameSwitchEl).toHaveAttribute("aria-checked", "false");
+    // Find the reverse-evolution switch.
+    const labelEl = screen.getByText("Enable reverse-evolution cards");
+    const container = labelEl.closest("div.flex.items-center.justify-between");
+    if (!container) throw new Error("Could not find reverse-evolution-cards toggle container");
+    const revEvoSwitch = container.querySelector('[role="switch"]') as HTMLElement;
+    expect(revEvoSwitch).toHaveAttribute("aria-checked", "false");
 
-    await user.click(nameSwitchEl);
+    await user.click(revEvoSwitch);
 
-    // Dialog must appear with the name-cards label from CARD_TYPE_DISPLAY_NAMES.
+    // Dialog must appear with the reverse-evolution-cards label.
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: /re-enable name cards/i }),
+        screen.getByRole("heading", { name: /re-enable reverse-evolution cards/i }),
       ).toBeInTheDocument();
     });
   });
@@ -590,6 +598,119 @@ describe("SettingsPage — updated descriptive copy (#835)", () => {
         /disabling hides these cards without losing your progress/i,
       );
       expect(allMatches.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Touch 1 + 2: inline help text and first-enable banner (#1271)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — typed-entry onboarding (#1271)", () => {
+  it("always renders the inline MC-ramp help text under the toggle", async () => {
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/new cards start as multiple choice during the learning phase/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows the first-enable banner when verifiedTypedEntryMode is toggled on for the first time (typedEntryOnboardingShown: false)", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      verifiedTypedEntryMode: false,
+      typedEntryOnboardingShown: false,
+    });
+
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /verified typed entry/i }),
+      ).toBeInTheDocument();
+    });
+
+    // Banner must be absent before the toggle is flipped.
+    expect(
+      screen.queryByText(/verified typed entry is on/i),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: /verified typed entry/i }));
+
+    // Banner must appear after first-enable.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/verified typed entry is on/i),
+      ).toBeInTheDocument();
+    });
+
+    // saveSettings must have been called with typedEntryOnboardingShown: true.
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        verifiedTypedEntryMode: true,
+        typedEntryOnboardingShown: true,
+      }),
+    );
+  });
+
+  it("does NOT show the first-enable banner when typedEntryOnboardingShown is already true", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      verifiedTypedEntryMode: false,
+      typedEntryOnboardingShown: true,
+    });
+
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /verified typed entry/i }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("switch", { name: /verified typed entry/i }));
+
+    // Banner must not appear — it was already shown once.
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/verified typed entry is on/i),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("dismisses the first-enable banner when the close button is clicked", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      verifiedTypedEntryMode: false,
+      typedEntryOnboardingShown: false,
+    });
+
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /verified typed entry/i }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("switch", { name: /verified typed entry/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/verified typed entry is on/i)).toBeInTheDocument();
+    });
+
+    // Click the dismiss button.
+    await user.click(screen.getByRole("button", { name: /dismiss typed entry notice/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/verified typed entry is on/i),
+      ).not.toBeInTheDocument();
     });
   });
 });

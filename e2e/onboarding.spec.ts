@@ -28,9 +28,12 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     await expect(modal).toHaveCount(0);
 
     // After dismissal the Practice card surface must be interactable.
+    // 10 s: fresh-visitor hydration builds ~2 050 cards from scratch. With the
+    // bundled seed chunk reduced from 2.9 MB to 1.2 MB (#1263) WebKit parses
+    // it in well under this window, including on CI.
     await expect(
       page.getByRole("button", { name: /reveal/i }).or(page.getByText(/all caught up/i)),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test("modal does not reappear after dismissal", async ({ page }) => {
@@ -93,13 +96,12 @@ test.describe("Feature nudges (#702)", () => {
   test("card-types nudge is absent when all card types are already enabled", async ({
     page,
   }) => {
-    // Seed settings with all card types on (reverse + reverse-evo + forms) and
-    // the modal already dismissed so the modal does not obscure the session.
+    // Seed settings with the modal already dismissed.
+    // reverseCardsEnabled was removed in #1234 — reverse is now always on.
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
         JSON.stringify({
-          reverseCardsEnabled: true,
           reverseEvolutionCardsEnabled: true,
           alternateFormsEnabled: true,
           onboarding: { firstVisitOnboardingDismissed: true },

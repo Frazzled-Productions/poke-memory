@@ -168,10 +168,14 @@ describe("justBecameMastered", () => {
 // ---------------------------------------------------------------------------
 
 describe("filterMastered", () => {
-  it("returns only mastered name cards", () => {
+  it("returns only species-mastered name cards (both name and reverse mastered)", () => {
+    // Since #1234, both name AND reverse must be mastered. Species 1 has both;
+    // species 2 and 3 have name cards that are not mastered.
     const cards = [
       makeCard(1, "name", masteredState),
+      makeCard(2_000_001, "reverse", masteredState), // paired reverse for species 1
       makeCard(2, "name", learningState),
+      makeCard(2_000_002, "reverse", masteredState), // mastered reverse but name not — excluded
       makeCard(3, "name", newState),
     ];
     const result = filterMastered(cards);
@@ -179,19 +183,23 @@ describe("filterMastered", () => {
     expect(result[0].id).toBe(1);
   });
 
-  it("excludes mastered evolution cards", () => {
+  it("excludes mastered evolution cards (not a species-mastery leg)", () => {
+    // The result set is name-cards only. Include the paired reverse so species 1
+    // qualifies, but confirm the evolution card is never in the output.
     const cards = [
       makeCard(1, "name", masteredState),
+      makeCard(2000001, "reverse", masteredState), // paired reverse — needed for species mastery
       makeCard(1500001, "evolution", masteredState),
     ];
-    // Evolution cards don't have cardType="name" so only the name card passes.
-    // Note: makeCard above puts cardType on the top-level object correctly.
     const result = filterMastered(cards);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe(1);
   });
 
-  it("excludes mastered reverse cards", () => {
+  it("excludes non-name card types from the output but reverse contributes to mastery gate", () => {
+    // Reverse card ID 2000001 corresponds to species 1.
+    // Species 1 is mastered because BOTH name (id=1) and reverse (id=2000001) are mastered.
+    // The output contains only the name card.
     const cards = [
       makeCard(1, "name", masteredState),
       makeCard(2000001, "reverse", masteredState),
@@ -201,9 +209,11 @@ describe("filterMastered", () => {
     expect(result[0].id).toBe(1);
   });
 
-  it("excludes mastered cry cards", () => {
+  it("excludes mastered cry cards (not a species-mastery leg)", () => {
+    // Include the paired reverse for species 1 so it is actually mastered.
     const cards = [
       makeCard(1, "name", masteredState),
+      makeCard(2000001, "reverse", masteredState), // paired reverse
       makeCard(3000001, "cry", masteredState),
     ];
     const result = filterMastered(cards);
@@ -244,26 +254,29 @@ describe("filterMastered", () => {
 
   it("honours a higher masteryRepetitions threshold", () => {
     // reps: 3 satisfies the default threshold but not a custom threshold of 5.
-    const cards = [makeCard(1, "name", masteredState)];
+    // Supply the paired reverse card too — both need to fail the higher threshold.
+    const cards = [
+      makeCard(1, "name", masteredState),
+      makeCard(2000001, "reverse", masteredState),
+    ];
     expect(filterMastered(cards, false, 5)).toHaveLength(0);
   });
 
   it("honours a lower masteryRepetitions threshold", () => {
-    // learningState has reps: 2 — not mastered under the default of 3, but
-    // mastered once the threshold drops to 2 (scheduledDays is already >= 21).
-    const lowRepCard = makeCard(
-      1,
-      "name",
-      makeState({
-        reps: 2,
-        scheduledDays: 21,
-        lastReview: "2026-05-01",
-        firstSeen: "2026-04-01",
-        fsrsState: "review",
-      }),
-    );
-    expect(filterMastered([lowRepCard], false)).toHaveLength(0);
-    expect(filterMastered([lowRepCard], false, 2)).toHaveLength(1);
+    // reps: 2 is not mastered under the default threshold of 3, but is mastered
+    // once the threshold drops to 2 (scheduledDays is already >= 21). Supply a
+    // paired reverse card at the same state so BOTH legs clear the lower threshold.
+    const lowRepState = makeState({
+      reps: 2,
+      scheduledDays: 21,
+      lastReview: "2026-05-01",
+      firstSeen: "2026-04-01",
+      fsrsState: "review",
+    });
+    const lowRepCard = makeCard(1, "name", lowRepState);
+    const lowRepReverse = makeCard(2000001, "reverse", lowRepState);
+    expect(filterMastered([lowRepCard, lowRepReverse], false)).toHaveLength(0);
+    expect(filterMastered([lowRepCard, lowRepReverse], false, 2)).toHaveLength(1);
   });
 
   it("forceAllMastered overrides a higher masteryRepetitions threshold", () => {

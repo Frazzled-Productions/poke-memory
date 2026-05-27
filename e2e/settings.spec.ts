@@ -321,121 +321,12 @@ test.describe("Settings page — search/filter (#662)", () => {
   });
 });
 
-test.describe("Settings — re-enable card type prompt (#835)", () => {
-  test("re-enabling a disabled card type shows the reuse-or-reset dialog", async ({
-    page,
-  }) => {
-    // Pre-seed localStorage so reverse cards are disabled (the default).
-    // Settings start with reverseCardsEnabled: false.
-    await page.goto("/settings");
-
-    // Expand the Practice section.
-    await page.getByRole("button", { name: /^practice$/i }).click();
-
-    // Reverse cards toggle must be present and off by default.
-    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
-    await expect(reverseToggle).toBeVisible();
-    await expect(reverseToggle).toHaveAttribute("aria-checked", "false");
-
-    // Clicking to enable should show the re-enable dialog, not toggle immediately.
-    await reverseToggle.click();
-
-    // The dialog must appear with the correct heading.
-    await expect(
-      page.getByRole("heading", { name: /re-enable reverse cards/i }),
-    ).toBeVisible();
-
-    // Both choice buttons and a cancel button must be present.
-    await expect(page.getByRole("button", { name: /reuse my saved progress/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /start fresh/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /cancel/i })).toBeVisible();
-  });
-
-  test("choosing 'Reuse my saved progress' closes the dialog and enables the toggle", async ({
-    page,
-  }) => {
-    await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
-
-    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
-    await reverseToggle.click();
-
-    // Dialog opens — choose reuse.
-    await page.getByRole("button", { name: /reuse my saved progress/i }).click();
-
-    // Dialog must close and the toggle must be on.
-    await expect(
-      page.getByRole("heading", { name: /re-enable reverse cards/i }),
-    ).not.toBeVisible();
-    await expect(reverseToggle).toHaveAttribute("aria-checked", "true");
-  });
-
-  test("choosing 'Start fresh' closes the dialog and enables the toggle", async ({
-    page,
-  }) => {
-    await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
-
-    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
-    await reverseToggle.click();
-
-    // Dialog opens — choose fresh start.
-    await page.getByRole("button", { name: /start fresh/i }).click();
-
-    // Dialog must close and the toggle must be on.
-    await expect(
-      page.getByRole("heading", { name: /re-enable reverse cards/i }),
-    ).not.toBeVisible();
-    await expect(reverseToggle).toHaveAttribute("aria-checked", "true");
-  });
-
-  test("Cancel closes the dialog without changing toggle state", async ({
-    page,
-  }) => {
-    await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
-
-    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
-    await reverseToggle.click();
-
-    // Dialog opens — cancel.
-    await page.getByRole("button", { name: /cancel/i }).click();
-
-    // Dialog must close and the toggle must remain off.
-    await expect(
-      page.getByRole("heading", { name: /re-enable reverse cards/i }),
-    ).not.toBeVisible();
-    await expect(reverseToggle).toHaveAttribute("aria-checked", "false");
-  });
-
-  test("disabling an enabled card type does not show a confirm dialog (non-destructive)", async ({
-    page,
-  }) => {
-    // Pre-enable reverse cards via localStorage so we can test disabling.
-    await page.addInitScript(() => {
-      const key = "poke-memory:settings:v1";
-      const raw = window.localStorage.getItem(key);
-      const settings = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-      settings.reverseCardsEnabled = true;
-      window.localStorage.setItem(key, JSON.stringify(settings));
-    });
-
-    await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
-
-    const reverseToggle = page.getByRole("switch", { name: /enable reverse cards/i });
-    await expect(reverseToggle).toHaveAttribute("aria-checked", "true");
-
-    // Clicking to disable must toggle immediately without any dialog.
-    await reverseToggle.click();
-    await expect(reverseToggle).toHaveAttribute("aria-checked", "false");
-
-    // The re-enable dialog must NOT appear.
-    await expect(
-      page.getByRole("heading", { name: /re-enable reverse cards/i }),
-    ).not.toBeVisible();
-  });
-});
+// The "re-enable card type prompt (#835)" describe block was removed in #1234.
+// Since #1234, reverse cards are a required practice direction — the
+// reverseCardsEnabled toggle and its re-enable dialog no longer exist on the
+// Settings page. The tests that exercised clicking that toggle, confirming the
+// dialog, and choosing "Reuse" / "Start fresh" / "Cancel" have been deleted
+// rather than left as dead assertions against a removed UI element.
 
 test.describe("Settings — CSV review history export (#918)", () => {
   test("Download CSV link is not visible for guests (no session)", async ({
@@ -646,8 +537,11 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
   });
 });
 
-test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205)", () => {
-  test("feedback delay control is absent when reverse cards are off (default)", async ({
+test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205 / #1234)", () => {
+  // Since #1234 reverse cards are always on — the reverseCardsEnabled toggle
+  // has been removed. The feedback delay fieldset is now unconditionally
+  // visible whenever the Audio section is expanded.
+  test("feedback delay control is always visible in the Audio section", async ({
     page,
   }) => {
     await page.goto("/settings");
@@ -655,26 +549,7 @@ test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205)",
     // Expand the Audio section.
     await page.getByRole("button", { name: /^audio$/i }).click();
 
-    // The fieldset must not be in the DOM when reverseCardsEnabled is false.
-    await expect(
-      page.getByRole("group", { name: /reverse card feedback delay/i }),
-    ).toHaveCount(0);
-  });
-
-  test("feedback delay control is visible after enabling reverse cards", async ({
-    page,
-  }) => {
-    await page.goto("/settings");
-
-    // Enable reverse cards via the Practice section toggle.
-    await page.getByRole("button", { name: /^practice$/i }).click();
-    await page.getByRole("switch", { name: /enable reverse cards/i }).click();
-
-    // The re-enable dialog appears — choose to reuse saved progress.
-    await page.getByRole("button", { name: /reuse my saved progress/i }).click();
-
-    // Expand the Audio section and verify the control is now present.
-    await page.getByRole("button", { name: /^audio$/i }).click();
+    // The fieldset must be present unconditionally (reverse is always on).
     await expect(
       page.getByRole("group", { name: /reverse card feedback delay/i }),
     ).toBeVisible();
@@ -691,32 +566,9 @@ test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205)",
 });
 
 test.describe("Settings — reverse-card feedback delay control (#1207)", () => {
-  // Pre-seed reverseCardsEnabled so the fieldset renders without needing the
-  // multi-step enable-reverse-cards flow (Practice toggle + dialog). The
-  // file-level beforeEach already calls addOnboardingPreDismiss, which runs as
-  // addInitScript #1 before page load. This describe-level addInitScript runs
-  // as #2 — it reads the settings key written by #1 and merges in the flag.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      try {
-        const KEY = "poke-memory:settings:v1";
-        const raw = localStorage.getItem(KEY);
-        let existing: Record<string, unknown> = {};
-        if (raw !== null) {
-          try {
-            const parsed = JSON.parse(raw) as unknown;
-            if (typeof parsed === "object" && parsed !== null) {
-              existing = parsed as Record<string, unknown>;
-            }
-          } catch { /* malformed JSON — treat as empty */ }
-        }
-        localStorage.setItem(KEY, JSON.stringify({
-          ...existing,
-          reverseCardsEnabled: true,
-        }));
-      } catch { /* localStorage unavailable — ignore */ }
-    });
-  });
+  // Since #1234 reverse cards are always on, so the feedback delay fieldset
+  // is unconditionally visible once the Audio section is expanded.
+  // No beforeEach setup is needed here — the fieldset renders by default.
 
   test("all three options render with correct labels", async ({ page }) => {
     await page.goto("/settings");
@@ -771,11 +623,11 @@ test.describe("Settings — reverse-card feedback delay control (#1207)", () => 
     await expect(group.getByRole("radio", { name: "Off" })).toBeChecked();
 
     // Reload the page. The setting is already persisted in localStorage by
-    // the onChange handler, so reverseCardsEnabled remains true and "Off"
-    // remains selected. CollapsibleSection also persists its open/closed
-    // state under poke-memory:settings-section:audio-heading, so the Audio
-    // section reopens itself on reload — no click needed (clicking would
-    // toggle it closed again).
+    // the onChange handler, so "Off" remains selected. CollapsibleSection
+    // also persists its open/closed state under
+    // poke-memory:settings-section:audio-heading, so the Audio section
+    // reopens itself on reload — no click needed (clicking would toggle it
+    // closed again).
     await page.reload();
 
     const groupAfterReload = page.getByRole("group", {

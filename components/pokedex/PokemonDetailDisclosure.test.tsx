@@ -49,6 +49,7 @@ vi.mock("@/lib/pokemon/seed", () => ({
 
 vi.mock("@/lib/pokemon/facts", () => ({
   getPokemonFacts: () => [],
+  loadFlavorTexts: () => Promise.resolve(new Map()),
 }));
 
 // useNextReviewDate — default to "not-started" so it never renders review-date

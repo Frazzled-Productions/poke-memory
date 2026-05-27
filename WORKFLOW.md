@@ -50,6 +50,15 @@ Standard flow for non-trivial work:
 
 When every box is ticked the issue *is* the plan and a planner round-trip would return precisely what the issue already says — validated by 25+ consecutive retros. If any box is unticked (a file is unnamed, an outcome is fuzzy, a design choice is open), run the planner. Implement directly only against an issue that meets the full checklist.
 
+**Planner-skip decision tree (#1248).** A simpler yes/no version of the checklist above, for quick triage:
+
+**Skip the planner when the issue body already contains:**
+- Root cause (what is broken and why)
+- Fix location (file path or function)
+- Acceptance criteria (what the change should achieve)
+
+If any of the three is missing, run the planner. If all three are present, go straight to implement.
+
 When *not* to use a sub-agent: small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value.
 
 **Hard rule — `workflow-expert` before writing GitHub Actions.** For any change to `.github/workflows/**` that involves marker-based dedup (HTML-comment idempotency markers) or GitHub search-index lookups, invoke `workflow-expert` **before** writing the change, not only as a reviewer afterwards. GitHub's search index strips HTML comments, so a `<!-- marker -->` dedup that relies on search to find prior comments silently fails — exactly the platform quirk a `workflow-expert` design-time pass surfaces before it costs a fix commit at auto-review time.
@@ -399,6 +408,8 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **What it does** | Runs `code-reviewer` sub-agent; posts `<!-- auto-review:N -->` comment; upgrades project status to **Ready to merge** if verdict is `Looks good to me`; auto-posts `/fix` if verdict is `Needs fixes` |
 | **Check gate** | Final job step exits non-zero when the latest verdict scoped to the current head SHA is `Needs fixes` — PR checks show red until a `/fix` cycle lands an approval at a new SHA |
 
+**Service Worker cache changes (#1247).** vitest cannot surface failures that only manifest under the deployed CDN's URL shape (versioned cache buckets, Vercel `dpl` image params, cache-tag expiry branches). Treat `code-reviewer` as a blocking gate, not advisory, for any change under `app/sw.ts`, `app/sw/**`, or `lib/pwa/**`. See retros #1166 and #1168 for the cases that prompted this.
+
 ---
 
 ### `auto-retro.yml` — Auto Retro
@@ -718,6 +729,10 @@ Runs on every `pull_request` event. Fails the `coverage` job on either a global-
 
 Runs on PRs that touch rendered UI (`components/**`, `app/**/*.tsx`, `app/globals.css`) or carry the `visual-regression` label. Compares committed Playwright screenshot baselines (`e2e/__screenshots__/`) against a fresh render of the two deterministic README surfaces (Stats, Journey) at a mobile and a desktop viewport, across the Chromium and WebKit engines. Practice, Pasture and Pokédex are excluded because their renders are not pixel-stable across runs (see `e2e/visual.spec.ts`). The job runs inside the pinned `mcr.microsoft.com/playwright` Docker image so Linux font rendering is deterministic; baselines are generated AND compared in the same image. A mismatch fails the `visual` job and uploads an expected/actual/diff report. Not a required check, and a non-matching PR does not run it. When a UI change is an intended visual update, regenerate baselines inside the Docker image (see the `visual-regression.yml` catalog entry above) and commit the changed PNGs in the same PR. For an in-CI one-click regeneration, dispatch `visual-baseline-update.yml` against the feature branch — it runs the same pinned image, refuses to push to `main` or `qa`, and is owner-gated. See the `visual-regression.yml` catalog entry for the exact local `docker run` command and the `visual-baseline-update.yml` entry for the CI path.
 
+### `paths-ignore` and label escape hatches don't compose (#1250)
+
+When a workflow uses `paths-ignore` on a `pull_request` trigger, GitHub still fires `labeled` events on the PR, but the workflow re-evaluates `paths-ignore` against the PR's changed files and skips the run. Applying the escape-hatch label has no effect. If you need a label-based override, drop `paths-ignore` and gate the work inside the job (e.g. `if: contains(github.event.pull_request.labels.*.name, 'X')`).
+
 ---
 
 ## Graceful exit & WIP salvage
@@ -729,6 +744,12 @@ When an implement (or continue) run hits its turn cap, times out, or errors mid-
 3. **Recovery footer** — only advertises `/continue` when the branch is confirmed on origin via `git ls-remote`. Falls back to `/go` if the salvage push itself failed.
 
 When resuming via `/continue`, the orchestrator checks `git log -1 --format=%s`. If the subject starts with `WIP:`, it inspects `git diff HEAD~1` and amends or reverts the WIP commit before continuing.
+
+**After a halt, decide before retrying (#1249):**
+- If the halted diff is already complete and the plan is a verbatim line-by-line spec, open the PR directly from the WIP commit rather than retrying the pipeline.
+- If the diff is incomplete or the plan needs interpretation, `/continue` to resume the pipeline.
+
+Retrying a complete-but-halted change tends to produce a second WIP commit and a follow-up cleanup PR (#1208 → #1217 + #1223).
 
 ---
 

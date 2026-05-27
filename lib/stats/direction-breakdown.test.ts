@@ -159,40 +159,36 @@ describe("computeSessionDirectionAccuracy", () => {
 });
 
 describe("enabledDirectionsFromSettings", () => {
-  it("includes only enabled directions", () => {
+  // Name and reverse are always on since #1234 — no per-direction toggle.
+  it("always includes name and reverse regardless of enrichment flags", () => {
     const enabled = enabledDirectionsFromSettings({
-      nameCardsEnabled: true,
-      evolutionCardsEnabled: true,
+      evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
-      reverseCardsEnabled: false,
       cryCardsEnabled: false,
     });
     expect(enabled.has("name")).toBe(true);
-    expect(enabled.has("evolution")).toBe(true);
+    expect(enabled.has("reverse")).toBe(true);
+    expect(enabled.has("evolution")).toBe(false);
     expect(enabled.has("reverse-evolution")).toBe(false);
-    expect(enabled.has("reverse")).toBe(false);
     expect(enabled.has("cry")).toBe(false);
   });
 
-  it("includes all five when all are enabled", () => {
+  it("includes all five when all enrichment flags are enabled", () => {
     const enabled = enabledDirectionsFromSettings({
-      nameCardsEnabled: true,
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: true,
-      reverseCardsEnabled: true,
       cryCardsEnabled: true,
     });
     expect(enabled.size).toBe(5);
   });
 
-  it("returns an empty set when all are disabled", () => {
+  it("returns name and reverse even when enrichment flags are all disabled", () => {
     const enabled = enabledDirectionsFromSettings({
-      nameCardsEnabled: false,
       evolutionCardsEnabled: false,
       reverseEvolutionCardsEnabled: false,
-      reverseCardsEnabled: false,
       cryCardsEnabled: false,
     });
-    expect(enabled.size).toBe(0);
+    // name and reverse are always on
+    expect(enabled.size).toBe(2);
   });
 });

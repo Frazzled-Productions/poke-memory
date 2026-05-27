@@ -1,4 +1,5 @@
-import seedData from "@/lib/pokemon/generated.json";
+import coreData from "@/lib/pokemon/generated-core.json";
+import chainsData from "@/lib/pokemon/generated-chains.json";
 import type { EvolutionDetail } from "@/lib/pokemon/triggers";
 import { triggerPhrase } from "@/lib/pokemon/triggers";
 import type { FormCategory } from "@/lib/pokemon/forms";
@@ -104,7 +105,31 @@ export type SeedPokemon = {
   versionGroups?: string[];
 };
 
-export const SEED_POKEMON: readonly SeedPokemon[] = seedData as unknown as readonly SeedPokemon[];
+// Reconstruct the full SeedPokemon array by joining the core data with the
+// deduplicated evolution chains. Each Pokémon in generated-core.json omits
+// `flavorTexts` and `evolutionChain` to reduce the bundled JS chunk size
+// (~1.2 MB bundled vs ~2.9 MB with both fields inline). The chain for each
+// Pokémon is resolved from the compact chains map in generated-chains.json.
+// `flavorTexts` stays absent from the runtime SEED_POKEMON (it is
+// `string[] | undefined`); the facts panel loads it lazily via
+// `loadFlavorTexts()` in `lib/pokemon/facts.ts`.
+
+type ChainsPayload = {
+  chains: Record<string, EvolutionNode[]>;
+  pokemonChain: Record<string, string>;
+};
+
+const _chainsPayload = chainsData as unknown as ChainsPayload;
+const _chainMap = _chainsPayload.chains;
+const _pokemonChainRef = _chainsPayload.pokemonChain;
+
+export const SEED_POKEMON: readonly SeedPokemon[] = (
+  coreData as unknown as Array<Omit<SeedPokemon, "evolutionChain" | "flavorTexts">>
+).map((p) => {
+  const chainHash = _pokemonChainRef[String(p.id)];
+  const evolutionChain: EvolutionNode[] = chainHash ? (_chainMap[chainHash] ?? []) : [];
+  return { ...p, evolutionChain, flavorTexts: undefined } as SeedPokemon;
+});
 
 // One card per (preEvo, postEvo) edge, with the trigger interpolated into the
 // prompt. Branching pre-evolutions (Eevee → 8 forms) produce 8 cards, one per

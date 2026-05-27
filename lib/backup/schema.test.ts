@@ -383,10 +383,15 @@ describe("isBackupFile — settings object", () => {
     expect(isBackupFile(b)).toBe(false);
   });
 
-  it("accepts settings without the optional reverseCardsEnabled field", () => {
-    // reverseCardsEnabled is optional — existing exports don't have it
+  it("accepts settings without optional direction-related fields", () => {
+    // reverseCardsEnabled and nameCardsEnabled were removed in #1234 — they are
+    // no longer in UserSettings. Old backup files may still carry these fields;
+    // isBackupFile tolerates extra unknown fields because isSettingsShaped only
+    // checks the required numeric fields.
     const b = validBackup();
-    delete (b.settings as Record<string, unknown>)["reverseCardsEnabled"];
+    // Simulate an old export that still has stale fields.
+    (b.settings as Record<string, unknown>)["reverseCardsEnabled"] = false;
+    (b.settings as Record<string, unknown>)["nameCardsEnabled"] = true;
     expect(isBackupFile(b)).toBe(true);
   });
 });

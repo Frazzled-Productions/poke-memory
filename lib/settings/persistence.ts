@@ -101,10 +101,8 @@ export type UserSettings = {
   maxReviewsPerDay: number;          // soft daily cap for name reviews
   maxNewEvolutionPerDay: number;     // hard daily cap for new evolution cards
   maxReviewsEvolutionPerDay: number; // soft daily cap for evolution reviews
-  nameCardsEnabled: boolean;         // show sprite as prompt; type/select the name
   evolutionCardsEnabled: boolean;    // show sprite; identify evolution chain
   reverseEvolutionCardsEnabled: boolean; // reverse-direction evolution edge cards (#343)
-  reverseCardsEnabled: boolean;      // show name as prompt; reveal sprite
   maxNewReversePerDay: number;       // hard daily cap for new reverse cards
   maxReviewsReversePerDay: number;   // soft daily cap for reverse reviews
   playCryOnReveal: boolean;          // play Pokémon cry audio on card reveal
@@ -238,14 +236,41 @@ export type UserSettings = {
    */
   dateFormat: DateFormat | null;
   /**
-   * Streak protection state (#1227). Tokens auto-preserve a streak across a
-   * single missed day. Earned 1 per 30 consecutive review days, capped at 3,
-   * with a hard "no two spends in a row" guard. The full rules and tunables
-   * live in `lib/streak/tokens.ts`. Stored inside the JSONB blob so the
-   * existing settings sync carries the state across devices; the per-key
-   * merge in `merge_user_settings` keeps disjoint device writes safe.
+   * Streak protection state (#1227, revised #1245). Tokens auto-preserve a
+   * streak across a missed day. Earned 1 per 30 consecutive review days,
+   * capped at 3; scarcity is the only gate (consecutive spends are
+   * permitted). The full rules and tunables live in `lib/streak/tokens.ts`.
+   * Stored inside the JSONB blob so the existing settings sync carries the
+   * state across devices; the per-key merge in `merge_user_settings` keeps
+   * disjoint device writes safe.
    */
   streakProtection: StreakProtection;
+  /**
+   * Opt-in verified typed entry mode (#1251). When true, name cards render a
+   * text input instead of the honour-system Reveal / grade buttons. The user
+   * types the name; the grade is computed automatically from the Levenshtein
+   * distance between their answer and the canonical species name.
+   *
+   * - Exact match (distance 0)       → Good (4)
+   * - Near miss (distance 1 or 2)    → Hard (2)
+   * - Wrong or empty (distance > 2)  → Again (1)
+   *
+   * Reverse, evolution, cry, and reverse-evolution cards are unaffected.
+   * Default false: honour-system mode is preserved for all existing users.
+   */
+  verifiedTypedEntryMode: boolean;
+  /**
+   * One-time onboarding toast for typed entry (#1271). Set to true after the
+   * first-enable toast is shown so it never fires again. Default false — absent
+   * in pre-#1271 records; bool parser back-fills to false.
+   */
+  typedEntryOnboardingShown: boolean;
+  /**
+   * One-time banner above the first MC card (#1271). Set to true after the
+   * first MC card in typed-entry mode is graded so the banner never reappears.
+   * Default false — absent in pre-#1271 records; bool parser back-fills to false.
+   */
+  mcCardOnboardingShown: boolean;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -254,10 +279,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maxReviewsPerDay: 100,
   maxNewEvolutionPerDay: 5,
   maxReviewsEvolutionPerDay: 50,
-  nameCardsEnabled: true,
   evolutionCardsEnabled: true,
   reverseEvolutionCardsEnabled: false,
-  reverseCardsEnabled: false,
   maxNewReversePerDay: 10,
   maxReviewsReversePerDay: 100,
   playCryOnReveal: false,
@@ -290,6 +313,12 @@ export const DEFAULT_SETTINGS: UserSettings = {
   timezone: null,
   dateFormat: null,
   streakProtection: { ...DEFAULT_STREAK_PROTECTION },
+  // Default off: existing users keep the honour-system flow unchanged.
+  verifiedTypedEntryMode: false,
+  // Default false: absent in pre-#1271 records; bool parser back-fills to false.
+  typedEntryOnboardingShown: false,
+  // Default false: absent in pre-#1271 records; bool parser back-fills to false.
+  mcCardOnboardingShown: false,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -432,10 +461,8 @@ function parseStoredSettings(raw: string | null): UserSettings {
     maxReviewsPerDay:          num(obj, "maxReviewsPerDay"),
     maxNewEvolutionPerDay:     num(obj, "maxNewEvolutionPerDay"),
     maxReviewsEvolutionPerDay: num(obj, "maxReviewsEvolutionPerDay"),
-    nameCardsEnabled:             bool(obj, "nameCardsEnabled"),
     evolutionCardsEnabled:        bool(obj, "evolutionCardsEnabled"),
     reverseEvolutionCardsEnabled: bool(obj, "reverseEvolutionCardsEnabled"),
-    reverseCardsEnabled:          bool(obj, "reverseCardsEnabled"),
     maxNewReversePerDay:     num(obj, "maxNewReversePerDay"),
     maxReviewsReversePerDay: num(obj, "maxReviewsReversePerDay"),
     playCryOnReveal:   bool(obj, "playCryOnReveal"),
@@ -510,6 +537,13 @@ function parseStoredSettings(raw: string | null): UserSettings {
         ? obj.mobileNav
         : "hamburger",
     streakProtection: validateStreakProtection(obj.streakProtection),
+    // Default false: existing records without this field keep the honour-system
+    // flow unchanged (#1251).
+    verifiedTypedEntryMode: bool(obj, "verifiedTypedEntryMode"),
+    // Default false: absent in pre-#1271 records (#1271).
+    typedEntryOnboardingShown: bool(obj, "typedEntryOnboardingShown"),
+    // Default false: absent in pre-#1271 records (#1271).
+    mcCardOnboardingShown: bool(obj, "mcCardOnboardingShown"),
   };
 }
 

@@ -179,8 +179,12 @@ jobs:
                 `priority:later` (use the repo label vocabulary)
             - If a proposal is about an agent definition change, name the
               specific agent file in `.claude/agents/`.
-            - Do NOT auto-file individual sub-issues. The digest is for human
-              triage — the maintainer files items they want as separate issues.
+            - Do NOT auto-file individual sub-issues. Each proposal carries a
+              checkbox (`- [ ] File this as an issue <!-- proposal:N -->`); when
+              the maintainer ticks a checkbox, `auto-digest-fanout.yml` files
+              the child issue automatically. The digest itself is still for
+              human triage — just write the checkboxes, do not call `gh issue
+              create` per proposal.
             - Do NOT recommend code changes to the app itself — only process
               and workflow improvements.
 
@@ -211,10 +215,19 @@ jobs:
             **Evidence:** <link(s)>
             **Priority:** `priority:next`
 
+            - [ ] File this as an issue <!-- proposal:1 -->
+
             ---
 
             ### 2. ...
             ```
+
+            The checkbox line is load-bearing: `auto-digest-fanout.yml` watches
+            for `- [x] ... <!-- proposal:N -->` and files the matching proposal
+            as a child issue with the extracted priority label and `area:workflow`.
+            The `<!-- proposal:N -->` marker MUST match the heading number `N`,
+            and every proposal heading must have exactly one corresponding
+            checkbox line beneath it.
 
             Then create the issue:
             ```

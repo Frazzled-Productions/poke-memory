@@ -51,4 +51,43 @@ describe("QueueStateBadge", () => {
     expect(screen.getByText("Review")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Card queue state: Review");
   });
+
+  it('suppresses "Learning" and shows "New" when forceCardsGraduated is true and card has no prior review', () => {
+    render(
+      <QueueStateBadge
+        state={makeState({ learningStep: 0, stepStartedAt: Date.now(), lastReview: null })}
+        forceCardsGraduated
+      />,
+    );
+    expect(screen.getByText("New")).toBeInTheDocument();
+    expect(screen.queryByText("Learning")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Card queue state: New");
+  });
+
+  it('suppresses "Learning" and shows "Review" when forceCardsGraduated is true and card has a prior review', () => {
+    render(
+      <QueueStateBadge
+        state={makeState({
+          learningStep: 1,
+          stepStartedAt: Date.now(),
+          lastReview: "2026-01-01",
+          reps: 2,
+        })}
+        forceCardsGraduated
+      />,
+    );
+    expect(screen.getByText("Review")).toBeInTheDocument();
+    expect(screen.queryByText("Learning")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Card queue state: Review");
+  });
+
+  it('still renders "Learning" when forceCardsGraduated is false', () => {
+    render(
+      <QueueStateBadge
+        state={makeState({ learningStep: 0, stepStartedAt: Date.now() })}
+        forceCardsGraduated={false}
+      />,
+    );
+    expect(screen.getByText("Learning")).toBeInTheDocument();
+  });
 });

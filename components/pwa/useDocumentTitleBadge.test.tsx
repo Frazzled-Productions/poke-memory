@@ -29,9 +29,7 @@ vi.mock("@/lib/review/persistence", () => ({
 
 const mockLoadSettings = vi.fn().mockReturnValue({
   timezone: "UTC",
-  nameCardsEnabled: true,
   evolutionCardsEnabled: true,
-  reverseCardsEnabled: false,
   reverseEvolutionCardsEnabled: false,
   cryCardsEnabled: false,
   alternateFormsEnabled: false,
@@ -92,9 +90,7 @@ beforeEach(() => {
   mockLoadSession.mockResolvedValue(null);
   mockLoadSettings.mockReturnValue({
     timezone: "UTC",
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
-    reverseCardsEnabled: false,
     reverseEvolutionCardsEnabled: false,
     cryCardsEnabled: false,
     alternateFormsEnabled: false,
@@ -301,7 +297,7 @@ describe("useDocumentTitleBadge", () => {
     await waitFor(() => {
       expect(mockComputeQueueCount).toHaveBeenCalledWith(
         cards,
-        expect.objectContaining({ nameCardsEnabled: true }),
+        expect.objectContaining({ evolutionCardsEnabled: true }),
         limits,
         expect.any(String), // today
       );
