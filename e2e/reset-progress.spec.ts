@@ -114,8 +114,10 @@ test.describe("Reset-progress dialog (#766)", () => {
     const endState = page.getByRole("heading", {
       name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
     });
-    // 15 s: after #1234 the card set is ~2× larger (name + reverse for all
-    // species), so hydration takes longer on WebKit.
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 15_000 });
+    // 25 s: after #1234 the session must build ~2 050 cards from scratch
+    // (name + reverse for every species) on a completely reset store.
+    // Two sequential IDB writes precede the React render — 25 s covers the
+    // worst case on the Playwright-controlled Chromium and WebKit runners.
+    await expect(reveal.or(endState)).toBeVisible({ timeout: 25_000 });
   });
 });

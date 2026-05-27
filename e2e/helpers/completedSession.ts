@@ -167,3 +167,92 @@ export function buildCompletedSession(args: {
     },
   };
 }
+
+/**
+ * Build a "nearly completed" session suitable for tests that need a fast
+ * first render (Reveal button visible quickly) while still exercising a
+ * particular scope or card-type filter.
+ *
+ * All cards are present (so hydrateSession adds nothing and skips the
+ * first save), but a specified set of species IDs have their name and
+ * reverse cards reset to "new" state (lastReview: null). Those cards will
+ * appear in buildSessionQueues' newQueue on the first load.
+ *
+ * Callers must also seed the extra cards from `extraCards` (e.g. mastered
+ * evolution edges needed for preset logic) — pass them and they will be
+ * merged in, overriding any existing card with the same ID.
+ */
+export function buildActiveSession(args: {
+  pokemonIds: number[];
+  evolutionCardIds: number[];
+  /** Species IDs (base Pokémon IDs, not REVERSE_ID_OFFSET+N) whose name and
+   *  reverse cards should be in "new" state (lastReview: null). */
+  newSpeciesIds: number[];
+  /** Additional cards to merge in (e.g. mastered evolution edge cards).
+   *  A card in this list with an ID that matches a generated card replaces
+   *  the generated one. */
+  extraCards?: object[];
+}) {
+  const { pokemonIds, evolutionCardIds, newSpeciesIds, extraCards = [] } = args;
+
+  // Build the base completed session.
+  const base = buildCompletedSession({ pokemonIds, evolutionCardIds });
+
+  // The "new" state has no lastReview and no firstSeen, so buildSessionQueues
+  // treats it as an unseen new candidate.
+  const newState = {
+    stability: 0,
+    difficulty: 5,
+    elapsedDays: 0,
+    scheduledDays: 0,
+    reps: 0,
+    lapses: 0,
+    fsrsState: "new",
+    dueDate: null,
+    lastReview: null,
+    firstSeen: null,
+    learningStep: null,
+    stepStartedAt: null,
+    hiddenSince: null,
+    seenInPasture: false,
+  };
+
+  const newSet = new Set(newSpeciesIds);
+
+  // Override name and reverse cards for the specified new species.
+  const cards = base.cards.map((c: object) => {
+    const card = c as { id: number; cardType: string; pokemonId?: number };
+    if (card.cardType === "name" && newSet.has(card.id)) {
+      return { ...card, state: { ...newState } };
+    }
+    if (card.cardType === "reverse") {
+      // Reverse card ID = REVERSE_ID_OFFSET + speciesId. Derive speciesId.
+      const speciesId = card.pokemonId ?? (card.id - REVERSE_ID_OFFSET);
+      if (newSet.has(speciesId)) {
+        return { ...card, state: { ...newState } };
+      }
+    }
+    return c;
+  });
+
+  // Merge extra cards: replace any existing card with the same ID, then
+  // append extras whose IDs were not already present.
+  const extraById = new Map<number, object>();
+  for (const ec of extraCards) {
+    const typed = ec as { id: number };
+    extraById.set(typed.id, ec);
+  }
+  const merged = cards
+    .map((c: object) => {
+      const typed = c as { id: number };
+      return extraById.has(typed.id) ? extraById.get(typed.id)! : c;
+    })
+    .concat(
+      extraCards.filter((ec) => {
+        const typed = ec as { id: number };
+        return !cards.some((c: object) => (c as { id: number }).id === typed.id);
+      }),
+    );
+
+  return { ...base, cards: merged };
+}
