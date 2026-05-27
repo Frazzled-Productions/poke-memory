@@ -623,8 +623,10 @@ export function ReviewSession() {
       const today = todayString(new Date());
       // `changed` is intentionally unused here — handleScopeChange always
       // persists the full session after a scope change (line below) regardless
-      // of whether reconcile modified any card state.
-      reconcileHiddenState(cards, next, today);
+      // of whether reconcile modified any card state. Pass the current
+      // incompleteChains context so the "Incomplete evolution chains" scope
+      // correctly identifies in-scope species during snooze reconciliation.
+      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains });
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
       // reload when toggling card-type gates, so the state is always current.
@@ -867,13 +869,15 @@ export function ReviewSession() {
       const persistedScope = settings.practiceScope;
       const formsEnabled = settings.alternateFormsEnabled;
       const today = todayString(now);
-      const { changed: reconcileChanged } = reconcileHiddenState(sessionCards, persistedScope, today);
       // Three-tier eligibility: card-type-enabled gate, then
       // `alternateFormsEnabled` gate, then scope filter (#658, #835).
       // Context for the "Incomplete evolution chains" preset (#995): derive
       // chain progress from the freshly-built/hydrated card set. The
       // `scopeContext` memo cannot be used here — it depends on `cards` state
       // which has not been set yet at this point in the load effect.
+      // Computed before reconcileHiddenState so the same context is passed to
+      // both — avoids a second pass over all cards and ensures reconciliation
+      // uses the correct in-progress set when the scope is "incomplete-chains".
       const loadScopeContext: ScopeMatchContext = {
         incompleteChainSpeciesIds: incompleteChainSpeciesIds(
           sessionCards,
@@ -881,6 +885,7 @@ export function ReviewSession() {
           superuserFlags.pretendAllMastered,
         ),
       };
+      const { changed: reconcileChanged } = reconcileHiddenState(sessionCards, persistedScope, today, loadScopeContext);
       const eligibleIds = computeEligibleCardIds(
         sessionCards,
         {

@@ -38,7 +38,12 @@ const SETTINGS_STORAGE_KEY = "poke-memory:settings:v1";
 // Both the name card (id=N) and its paired reverse card (id=REVERSE_ID_OFFSET+N)
 // are marked new so species-grouped admission (which requires both directions
 // to have budget) admits them on the first load.
-const GEN1_NEW_SPECIES = [1, 4, 7, 25, 52]; // Bulbasaur, Charmander, Squirtle, Pikachu, Meowth
+// Gen I species seeded as new so the session renders quickly and scope changes
+// to Generation I have candidates. Gen IX entries (906 Sprigatito, 909 Fuecoco)
+// are included so that when test #1088 seeded card is Gen I and it picks
+// "Generation IX" as the excluding scope, those Gen IX cards are available
+// in the new queue rather than future-due.
+const GEN1_NEW_SPECIES = [1, 4, 7, 25, 52, 906, 909]; // Bulbasaur, Charmander, Squirtle, Pikachu, Meowth, Sprigatito, Fuecoco
 
 test.describe("Practice scope (#333)", () => {
   test.beforeEach(async ({ page }) => {

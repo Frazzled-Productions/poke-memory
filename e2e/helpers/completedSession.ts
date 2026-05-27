@@ -199,7 +199,8 @@ export function buildActiveSession(args: {
   const base = buildCompletedSession({ pokemonIds, evolutionCardIds });
 
   // The "new" state has no lastReview and no firstSeen, so buildSessionQueues
-  // treats it as an unseen new candidate.
+  // treats it as an unseen new candidate. dueDate must be a string (not null)
+  // to pass isBaseCardShaped — use a past date so new cards are immediately due.
   const newState = {
     stability: 0,
     difficulty: 5,
@@ -208,7 +209,7 @@ export function buildActiveSession(args: {
     reps: 0,
     lapses: 0,
     fsrsState: "new",
-    dueDate: null,
+    dueDate: "2026-01-01",
     lastReview: null,
     firstSeen: null,
     learningStep: null,

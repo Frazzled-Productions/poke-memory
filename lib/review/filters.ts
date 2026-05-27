@@ -16,7 +16,7 @@
  * book-keeping on top.
  */
 
-import { cardMatchesScope, isScopeEmpty, type PracticeScope } from "@/lib/review/scope";
+import { cardMatchesScope, isScopeEmpty, type PracticeScope, type ScopeMatchContext } from "@/lib/review/scope";
 import type { ReviewableCard } from "@/lib/review/session";
 import { addDaysToIsoDate, daysBetweenIsoDates } from "@/lib/utils/dates";
 
@@ -67,6 +67,7 @@ export function reconcileHiddenState(
   cards: ReviewableCard[],
   scope: PracticeScope,
   today: string,
+  context: ScopeMatchContext = {},
 ): { session: ReviewableCard[]; changed: boolean } {
   const scopeEmpty = isScopeEmpty(scope);
   let changed = false;
@@ -76,7 +77,7 @@ export function reconcileHiddenState(
     // `cardMatchesScope` returns true for every card when the scope is
     // empty — by evaluating it directly we ensure the empty-scope mode
     // routes through the un-hide branch only.
-    const inScope = cardMatchesScope(card, scope);
+    const inScope = cardMatchesScope(card, scope, context);
     const hiddenSince = card.state.hiddenSince;
     if (!inScope && hiddenSince === null) {
       // Cannot reach this branch when `scopeEmpty` is true — guard kept
