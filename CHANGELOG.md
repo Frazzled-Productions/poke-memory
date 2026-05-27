@@ -6,6 +6,22 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.22] - 2026-05-27
+
+### Added
+
+- Streak protection now records earn/spend events. The Stats page lists the last few, and a one-time message appears the first time a token is earned and immediately spent to cover a missed day so you know what happened.
+- When verified typed entry mode is on, brand-new name cards now use multiple choice (sprite, four options) during the learning-step phase, then switch to typed entry once the card graduates. Easier introduction without losing the verification gate on mature cards.
+- Optional verified typed entry mode for name cards. Turn on in Settings - Practice to type the name instead of grading yourself. Grades are decided automatically based on how close your answer is.
+- First-visit load time reduced on WebKit (Safari). The bundled seed data chunk is now 1.2 MB instead of 2.9 MB after splitting out flavor texts and deduplicating evolution chains. Flavor texts are fetched in the background after first render so they don't block the practice session from starting.
+- When you turn on Verified Typed Entry, you will see a brief explanation that new cards start as multiple choice during the learning phase and switch to typed entry once they graduate. A one-time tip also appears above the first multiple-choice card.
+
+### Changed
+
+- A species is now mastered when **both** its name card and its reverse card have reached the FSRS mastery gate (`reps >= masteryRepetitions` and `scheduledDays >= 21`). Previously only the name card was required.
+- Reverse cards are now a required practice direction. The per-direction toggles for name and reverse have been removed from Settings. Evolution and cry remain opt-in. Existing users with reverse turned off will see reverse cards on their next session.
+- Streak protection tokens can now be spent on consecutive days. The previous one-token-per-gap cap has been removed; scarcity (1 token per 30 review days, balance capped at 3) is now the only limit, so a 3-token balance bridges a 3-day gap.
+
 ## [0.10.21] - 2026-05-24
 
 ### Added
@@ -1405,7 +1421,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.21...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.22...HEAD
+[0.10.22]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.22
 [0.10.21]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.21
 [0.10.20]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.20
 [0.10.19]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.19
