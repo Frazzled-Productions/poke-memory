@@ -3483,3 +3483,157 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Multiple-choice name card dispatch (#1237)
+// ---------------------------------------------------------------------------
+
+describe("ReviewSession MC name card dispatch (#1237)", () => {
+  /** Settings with verifiedTypedEntryMode on and all card types except name suppressed. */
+  const typedModeSettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 0,
+    cryCardsEnabled: false,
+    maxNewCryPerDay: 0,
+    maxReviewsCryPerDay: 0,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    verifiedTypedEntryMode: true,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
+  };
+
+  /** State for a brand-new card (never graded). */
+  const brandNewState = {
+    stability: 0,
+    difficulty: 0,
+    elapsedDays: 0,
+    scheduledDays: 0,
+    reps: 0,
+    lapses: 0,
+    fsrsState: "new" as const,
+    dueDate: "2026-05-27",
+    lastReview: null,
+    firstSeen: null,
+    learningStep: null,
+    stepStartedAt: null,
+    hiddenSince: null,
+    seenInPasture: false,
+  };
+
+  /** State for a card mid-learning-step (after first Again grade). */
+  const learningStepState = {
+    ...brandNewState,
+    learningStep: 0,
+    stepStartedAt: Date.now() - 1000, // overdue by 1s — eligible immediately
+  };
+
+  /** State for a graduated card (lastReview set, no learningStep). */
+  const graduatedState = {
+    ...brandNewState,
+    lastReview: "2026-05-26",
+    firstSeen: "2026-05-26",
+    scheduledDays: 1,
+    dueDate: "2026-05-27",
+    reps: 3,
+    fsrsState: "review" as const,
+  };
+
+  const FOUR_POKEMON = FIXTURE_CARDS_4;
+
+  it("renders MC card (4 option buttons) for a brand-new name card in typed mode", async () => {
+    mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
+    mockLoadSettings.mockReturnValue(typedModeSettings);
+
+    render(<ReviewSession />);
+
+    // MC card should render with option buttons (no Reveal button, no text input).
+    await waitFor(() => {
+      // At least 4 option buttons visible (2×2 grid).
+      const buttons = screen.getAllByRole("button").filter(
+        (b) => !/(undo|scope|clear)/i.test(b.getAttribute("aria-label") ?? b.textContent ?? ""),
+      );
+      expect(buttons.length).toBeGreaterThanOrEqual(4);
+    });
+    expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("renders MC card for a name card in an active learning step in typed mode", async () => {
+    // Provide a card already in a learning step — overdue so it surfaces
+    // immediately via the learning queue.
+    const learningCard = { ...FIXTURE_CARD, state: learningStepState };
+    mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [
+        { ...learningCard },
+        { ...GRADUATED_REVERSE_CARD },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+    mockLoadSettings.mockReturnValue(typedModeSettings);
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      const buttons = screen.getAllByRole("button").filter(
+        (b) => !/(undo|scope|clear)/i.test(b.getAttribute("aria-label") ?? b.textContent ?? ""),
+      );
+      expect(buttons.length).toBeGreaterThanOrEqual(4);
+    });
+  });
+
+  it("renders typed-entry card for a graduated name card in typed mode", async () => {
+    // Graduated card is due today.
+    const graduatedCard = { ...FIXTURE_CARD, state: graduatedState };
+    mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [
+        { ...graduatedCard },
+        { ...GRADUATED_REVERSE_CARD },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+    mockLoadSettings.mockReturnValue(typedModeSettings);
+
+    render(<ReviewSession />);
+
+    // TypedEntryNameCard renders a text input, not multiple-choice buttons.
+    await waitFor(() => {
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+  });
+
+  it("renders honour-system card (Reveal button) for a brand-new name card when typed mode is off", async () => {
+    mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
+    mockLoadSettings.mockReturnValue({
+      ...typedModeSettings,
+      verifiedTypedEntryMode: false,
+    });
+
+    render(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+});

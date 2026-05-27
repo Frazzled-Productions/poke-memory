@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
+import { MultipleChoiceNameCard } from "@/components/review/MultipleChoiceNameCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { SpritePreloader, type SizedSpriteUrl } from "@/components/sprites/SpritePreloader";
@@ -18,6 +19,7 @@ import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
 import { pickDistractors } from "@/lib/pokemon/distractors";
+import { buildMcOptions } from "@/lib/srs/multipleChoiceDistractors";
 import {
   buildSession,
   buildSessionQueues,
@@ -2444,12 +2446,41 @@ export function ReviewSession() {
 
   // Default branch: name, evolution, and reverse-evolution cards.
   //
-  // When verifiedTypedEntryMode is on and the current card is a name card,
-  // render TypedEntryNameCard (typed input) instead of the honour-system
-  // PokemonCard + Reveal / grade-button flow. Evolution and reverse-evolution
-  // cards always use the existing flip flow regardless of the setting (#1251).
+  // When verifiedTypedEntryMode is on and the current card is a name card, the
+  // renderer depends on the card's lifecycle phase (#1237):
+  //
+  //   - Learning phase (brand-new OR in a learning/relearning step)
+  //     → MultipleChoiceNameCard: sprite + 4 options, Good on correct, Again on wrong.
+  //   - Graduated (lastReview !== null AND learningStep === null)
+  //     → TypedEntryNameCard: typed-input verification.
+  //
+  // Evolution and reverse-evolution cards always use the existing flip flow.
+  const isNameCard = effectiveCard.cardType === "name";
+  // A card is in the learning phase when it has never graduated (lastReview is
+  // null) OR when it is currently working through learning/relearning steps
+  // (learningStep is not null). The scheduler sets lastReview only on graduation
+  // or lapse — not on in-step touches — so this check is reliable.
+  const isInLearningPhase =
+    isNameCard &&
+    (effectiveCard.state.lastReview === null ||
+      effectiveCard.state.learningStep !== null);
+  const isMcLearningActive = verifiedTypedEntryMode && isInLearningPhase;
   const isTypedEntryActive =
-    verifiedTypedEntryMode && effectiveCard.cardType === "name";
+    verifiedTypedEntryMode && isNameCard && !isInLearningPhase;
+
+  // Pre-build MC options when we know we will render the MC card. The options
+  // array is stable for a given card id + cardPresentationCount combination
+  // because buildMcOptions is deterministic given the same seed string.
+  const mcOptions =
+    isMcLearningActive && effectiveCard.cardType === "name"
+      ? buildMcOptions(
+          effectiveCard.id,
+          // effectiveCard is a NameReviewCard (SeedPokemon fields are spread onto it).
+          effectiveCard as Parameters<typeof buildMcOptions>[1],
+          SEED_POKEMON,
+          String(effectiveCard.id),
+        )
+      : null;
 
   return (
     <ReviewCardLayout
@@ -2471,7 +2502,23 @@ export function ReviewSession() {
       }
       queueStateBadge={<QueueStateBadge state={effectiveCard.state} />}
       cardRegion={
-        isTypedEntryActive ? (
+        isMcLearningActive && mcOptions !== null ? (
+          /* Multiple-choice name card (#1237): sprite + 4 name buttons during the
+             learning-step phase. Correct → Good (4); wrong → Again (1). The
+             swipe-card wrapper is omitted; swipe-to-grade is not applicable.
+             Key includes cardPresentationCount so the component remounts (and
+             resets chosen state) when the same card reappears via a learning-step
+             replay, matching the SpritePicker pattern (#496). */
+          <MultipleChoiceNameCard
+            key={`${effectiveCard.id}-${cardPresentationCount}`}
+            spriteUrl={effectiveCard.spriteUrl}
+            canonicalName={effectiveCard.displayName}
+            options={mcOptions}
+            id={effectiveCard.id}
+            onGrade={handleGrade}
+            grading={grading}
+          />
+        ) : isTypedEntryActive ? (
           /* Verified typed-entry (#1251): renders input, grades automatically,
              then the parent advances on the onGrade callback. The swipe-card
              wrapper is omitted because swipe-to-grade is not applicable here. */
@@ -2518,7 +2565,11 @@ export function ReviewSession() {
         )
       }
       controls={
-        isTypedEntryActive ? (
+        isMcLearningActive ? (
+          // MultipleChoiceNameCard renders its own option buttons inline;
+          // the layout's controls slot is left empty.
+          undefined
+        ) : isTypedEntryActive ? (
           // TypedEntryNameCard renders its own Submit / I don't know controls
           // inline; the layout's controls slot is left empty.
           undefined
