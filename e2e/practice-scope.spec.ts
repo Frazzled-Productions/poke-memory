@@ -5,7 +5,7 @@ import {
   EVOLUTION_CARD_IDS,
   buildActiveSession,
 } from "./helpers/completedSession";
-import { seedSessionIdb } from "./helpers/seedIdb";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 
 // E2E smoke for #333 "Allow filtering which cards to learn".
 //
@@ -82,6 +82,7 @@ test.describe("Practice scope (#333)", () => {
     page,
   }) => {
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Open the Scope panel. The collapsed header is a button whose
     // accessible name combines "Scope" and the current label ("All Pokémon"
@@ -171,6 +172,7 @@ test.describe("Practice scope (#333)", () => {
     // is not clobbered by the full-object write above.
     await addOnboardingPreDismiss(page);
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Capture the sprite src that's rendered before any scope action. The
     // PokemonCard renders a single img with alt="A Pokémon sprite, answer
@@ -277,7 +279,11 @@ test.describe("Practice scope (#333)", () => {
           // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
           // Name and reverse cards are now always on — omit these stale fields.
           evolutionCardsEnabled: true,
-          maxNewReversePerDay: 10,
+          // maxNewReversePerDay: 0 ensures only name cards (Reveal button)
+          // enter the new queue after scope is cleared. Reverse cards use
+          // SpritePicker and have no Reveal button; if one showed first the
+          // assertion at the bottom of this test would time out (#1257).
+          maxNewReversePerDay: 0,
           maxReviewsReversePerDay: 100,
           playCryOnReveal: false,
           cryCardsEnabled: false,
@@ -295,6 +301,7 @@ test.describe("Practice scope (#333)", () => {
     await addOnboardingPreDismiss(page);
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Empty-state copy. Component renders this in a styled <p>, not a
     // heading element, so match by visible text rather than role.
@@ -334,6 +341,7 @@ test.describe("Practice scope (#333)", () => {
     );
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Open the Scope panel.
     const scopeToggle = page
@@ -438,6 +446,7 @@ test.describe("Practice scope (#333)", () => {
     await addOnboardingPreDismiss(page);
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // If no cards match (should not happen with default-only on a 1025-entry
     // seed, but guard against it), skip rather than fail.
@@ -573,6 +582,7 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     // first-visit modal does not render and block scope-panel interactions.
     await addOnboardingPreDismiss(page);
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Open the Scope panel.
     const scopeToggle = page
@@ -667,6 +677,7 @@ test.describe("Practice scope — Incomplete evolution chains preset (#995)", ()
     await addOnboardingPreDismiss(page);
 
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // A practice card should render — the in-progress Bulbasaur family means
     // the preset's computed set is non-empty, so the session is not the
@@ -736,6 +747,7 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     page,
   }) => {
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Open the Scope panel.
     const scopeToggle = page
@@ -786,6 +798,7 @@ test.describe("Practice scope — Games axis (#1089)", () => {
     page,
   }) => {
     await page.goto("/");
+    await awaitSeedIdb(page);
     const scopeToggle = page
       .getByRole("button", { expanded: false })
       .filter({ hasText: /scope/i })

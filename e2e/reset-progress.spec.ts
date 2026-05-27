@@ -114,10 +114,11 @@ test.describe("Reset-progress dialog (#766)", () => {
     const endState = page.getByRole("heading", {
       name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
     });
-    // 25 s: after #1234 the session must build ~2 050 cards from scratch
+    // 15 s: after #1234 the session must build ~2 050 cards from scratch
     // (name + reverse for every species) on a completely reset store.
-    // Two sequential IDB writes precede the React render — 25 s covers the
-    // worst case on the Playwright-controlled Chromium and WebKit runners.
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 25_000 });
+    // With the reconcileHiddenState no-op fix (#1262) only one IDB write
+    // (the hydrateSession build-from-scratch write) precedes the React
+    // render, restoring the original 15 s budget.
+    await expect(reveal.or(endState)).toBeVisible({ timeout: 15_000 });
   });
 });
