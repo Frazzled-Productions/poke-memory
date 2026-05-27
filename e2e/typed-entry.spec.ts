@@ -244,9 +244,13 @@ test.describe("Verified typed entry — Practice flow (#1251)", () => {
     // Submit the answer.
     await page.getByRole("button", { name: /^submit$/i }).click();
 
-    // The input form should disappear and the "Correct!" feedback should appear.
+    // The input form should disappear and the "Correct!" feedback paragraph
+    // should appear (the SR-only aria-live span also contains the same text,
+    // so target the visible paragraph specifically).
     await expect(input).not.toBeVisible();
-    await expect(page.getByText(/correct!/i)).toBeVisible();
+    await expect(
+      page.getByRole("paragraph").filter({ hasText: /correct!/i }),
+    ).toBeVisible();
   });
 });
 
@@ -296,7 +300,11 @@ test.describe("MC learning step — Practice flow (#1237)", () => {
     // Click the correct answer.
     await page.getByRole("button", { name: /^Bulbasaur$/i }).click();
 
-    // "Correct!" feedback should appear.
-    await expect(page.getByText(/correct!/i)).toBeVisible();
+    // "Correct!" feedback paragraph should appear. The SR-only aria-live span
+    // also contains the same text, so target the visible paragraph specifically
+    // to avoid a strict-mode locator violation.
+    await expect(
+      page.getByRole("paragraph").filter({ hasText: /correct!/i }),
+    ).toBeVisible();
   });
 });
