@@ -169,6 +169,7 @@ describe('loadSettings migration', () => {
         protectionEvents: [],
         lastAcknowledgedProtectionEventDate: null,
       },
+      verifiedTypedEntryMode: false,
     };
     saveSettings(custom);
     const loaded = loadSettings();

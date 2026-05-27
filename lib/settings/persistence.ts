@@ -245,6 +245,20 @@ export type UserSettings = {
    * disjoint device writes safe.
    */
   streakProtection: StreakProtection;
+  /**
+   * Opt-in verified typed entry mode (#1251). When true, name cards render a
+   * text input instead of the honour-system Reveal / grade buttons. The user
+   * types the name; the grade is computed automatically from the Levenshtein
+   * distance between their answer and the canonical species name.
+   *
+   * - Exact match (distance 0)       → Good (4)
+   * - Near miss (distance 1 or 2)    → Hard (2)
+   * - Wrong or empty (distance > 2)  → Again (1)
+   *
+   * Reverse, evolution, cry, and reverse-evolution cards are unaffected.
+   * Default false: honour-system mode is preserved for all existing users.
+   */
+  verifiedTypedEntryMode: boolean;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -287,6 +301,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   timezone: null,
   dateFormat: null,
   streakProtection: { ...DEFAULT_STREAK_PROTECTION },
+  // Default off: existing users keep the honour-system flow unchanged.
+  verifiedTypedEntryMode: false,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -505,6 +521,9 @@ function parseStoredSettings(raw: string | null): UserSettings {
         ? obj.mobileNav
         : "hamburger",
     streakProtection: validateStreakProtection(obj.streakProtection),
+    // Default false: existing records without this field keep the honour-system
+    // flow unchanged (#1251).
+    verifiedTypedEntryMode: bool(obj, "verifiedTypedEntryMode"),
   };
 }
 

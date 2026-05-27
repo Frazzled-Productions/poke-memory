@@ -1010,6 +1010,37 @@ export default function SettingsPage() {
                         </p>
                       </div>
                     ))}
+                    {/* Verified typed entry (#1251) */}
+                    <div className={cardPanelPadded}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Verified typed entry for name cards
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            Type the name instead of grading yourself. Grades are decided automatically based on how close your answer is.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={settings.verifiedTypedEntryMode}
+                          aria-label="Verified typed entry for name cards"
+                          onClick={() => handleToggle("verifiedTypedEntryMode")}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            settings.verifiedTypedEntryMode
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              settings.verifiedTypedEntryMode ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

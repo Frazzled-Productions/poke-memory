@@ -75,6 +75,7 @@ const SAMPLE: UserSettings = {
     protectionEvents: [],
     lastAcknowledgedProtectionEventDate: null,
   },
+  verifiedTypedEntryMode: false,
 };
 
 describe("pushSettings", () => {
