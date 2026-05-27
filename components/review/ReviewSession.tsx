@@ -621,6 +621,9 @@ export function ReviewSession() {
     // are durable. Persist if any card mutated.
     if (cards !== null) {
       const today = todayString(new Date());
+      // `changed` is intentionally unused here — handleScopeChange always
+      // persists the full session after a scope change (line below) regardless
+      // of whether reconcile modified any card state.
       reconcileHiddenState(cards, next, today);
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
@@ -864,7 +867,7 @@ export function ReviewSession() {
       const persistedScope = settings.practiceScope;
       const formsEnabled = settings.alternateFormsEnabled;
       const today = todayString(now);
-      reconcileHiddenState(sessionCards, persistedScope, today);
+      const { changed: reconcileChanged } = reconcileHiddenState(sessionCards, persistedScope, today);
       // Three-tier eligibility: card-type-enabled gate, then
       // `alternateFormsEnabled` gate, then scope filter (#658, #835).
       // Context for the "Incomplete evolution chains" preset (#995): derive
@@ -889,10 +892,14 @@ export function ReviewSession() {
         },
         loadScopeContext,
       );
-      // Persist whenever scope is active so reconciliation results survive a
-      // reload. When scope is empty, the only thing reconcileHiddenState can do
-      // is clear stale hiddenSince — still worth persisting if any cleared.
-      notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
+      // Only persist when reconcileHiddenState actually mutated card state
+      // (stamped or cleared hiddenSince, shifted dueDate). Skipping the save
+      // when nothing changed avoids a redundant ~600 KB IDB write on every
+      // page load — the main cause of hydration slowness after #1234 doubled
+      // the card count to ~2 050 (#1262).
+      if (reconcileChanged) {
+        notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
+      }
 
       setCards(sessionCards);
       setLimits(sessionLimits);

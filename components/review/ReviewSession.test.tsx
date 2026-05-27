@@ -3306,16 +3306,17 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     // branches, not the session-complete screen that appears when the last card
     // is graduated with Easy.
     //
-    // Mount-time saveSession call count (both must succeed so quotaExceeded stays
+    // Mount-time saveSession call count (must succeed so quotaExceeded stays
     // false before the grade click):
-    //   1. ReviewSession.tsx:839 — fresh-session initial save (loadSession → null)
-    //   2. ReviewSession.tsx:899 — post-reconciliation save (unconditional)
+    //   1. ReviewSession.tsx:840 — fresh-session initial save (loadSession → null).
+    //   The post-reconciliation save (previously line 899) is now skipped when
+    //   reconcileHiddenState makes no changes (#1262). Fresh sessions built by
+    //   buildSession have firstSeen: null on all cards, so reconcile is always a
+    //   no-op and only the initial save fires.
     // Line 858 does NOT fire because FIXTURE_CARDS_4 cards have learningStep: null
     // (buildSession initialises new cards with learningStep: null, so stampedAny
-    // stays false). If a future change adds a third unconditional mount-time save,
-    // add a third mockResolvedValueOnce here.
+    // stays false).
     vi.mocked(saveSession)
-      .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValue({ ok: false, reason: "quota" });
     mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
@@ -3419,12 +3420,12 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
 
   it("undo button is NOT shown when saveSession fails on grade (#1209)", async () => {
     // Mount-time saves succeed; the grade-path save fails.
-    // Two Once calls cover the mount-time saves (same rationale as the
-    // "surfaces the storage-error banner" test above). After both are consumed,
-    // every subsequent call returns failure so the grade-path persistence chain
-    // exits early without arming the undo snapshot.
+    // One Once call covers the single mount-time save (fresh session: all cards have
+    // firstSeen=null → reconcileHiddenState is a no-op → changed=false → only the
+    // hydrateSession build-from-scratch write fires). After it is consumed, every
+    // subsequent call returns failure so the grade-path persistence chain exits early
+    // without arming the undo snapshot.
     vi.mocked(saveSession)
-      .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValue({ ok: false, reason: "quota" });
     mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
@@ -3433,7 +3434,7 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
     const user = userEvent.setup();
     render(<ReviewSession />);
 
-    // Wait for mount to settle — the two Once calls are consumed.
+    // Wait for mount to settle — the Once call is consumed.
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
 
     // Undo button must NOT be present before any grade (sanity baseline).
@@ -3447,9 +3448,9 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
 
     // Wait for the grade-path saveSession call to resolve (persistence chain settled).
     await waitFor(() => {
-      // saveSession will have been called at least three times total by now
-      // (two mount-time + one grade-path).
-      expect(vi.mocked(saveSession).mock.calls.length).toBeGreaterThanOrEqual(3);
+      // saveSession will have been called at least twice total by now
+      // (one mount-time + one grade-path).
+      expect(vi.mocked(saveSession).mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
     // The undo button must NOT be active — the snapshot was never armed because
