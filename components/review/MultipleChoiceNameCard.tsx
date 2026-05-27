@@ -9,7 +9,7 @@ import type { SeedPokemon } from "@/lib/pokemon/seed";
 
 // Feedback is held visible for this long before calling onGrade so the parent
 // can advance to the next card. Matches FEEDBACK_HOLD_MS in TypedEntryNameCard.
-const FEEDBACK_HOLD_MS = 1500;
+export const FEEDBACK_HOLD_MS = 1500;
 
 type Option = {
   pokemon: SeedPokemon;

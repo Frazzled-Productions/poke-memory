@@ -79,7 +79,9 @@ export function buildMcOptions(
 
   // Shuffle the four options deterministically so the correct answer is not
   // always in the first position. Use a separate hash pass keyed on "options"
-  // so the shuffle differs from the distractor-selection hash.
+  // so the shuffle differs from the distractor-selection hash. Only 4 distinct
+  // FNV inputs (idx 0–3) are needed here — the narrow range is intentional and
+  // the keys are distinct by construction (unique idx values).
   const optionSeedHash = fnv1a("options:" + seed + String(targetId));
   return all
     .map((item, idx) => ({ item, key: fnv1aUint32(idx, optionSeedHash) }))

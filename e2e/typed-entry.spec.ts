@@ -92,6 +92,47 @@ const SESSION_WITH_BULBASAUR_DUE = {
   },
 };
 
+// Build a session where Bulbasaur (id=1) is a new (learning-phase) name card.
+// All other cards are future-due so hydrateSession adds nothing new. With
+// verifiedTypedEntryMode on and lastReview===null, ReviewSession renders
+// MultipleChoiceNameCard instead of the flip card or typed-entry input.
+//
+// Bulbasaur's deterministic 4 options (FNV-1a seeded on "1"):
+//   Arbok | Cubone | Bulbasaur (correct) | Wartortle
+// The correct answer is always "Bulbasaur" regardless of button order.
+const SESSION_WITH_BULBASAUR_LEARNING = {
+  ...baseSession,
+  cards: (baseSession.cards as Array<{ id: number; [key: string]: unknown }>).map((c) =>
+    c.id === 1
+      ? {
+          ...c,
+          state: {
+            stability: 0,
+            difficulty: 5,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        }
+      : c,
+  ),
+  limits: {
+    name: { maxNewPerDay: 1, maxReviewsPerDay: 0 },
+    evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+  },
+};
+
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
 });
@@ -205,6 +246,57 @@ test.describe("Verified typed entry — Practice flow (#1251)", () => {
 
     // The input form should disappear and the "Correct!" feedback should appear.
     await expect(input).not.toBeVisible();
+    await expect(page.getByText(/correct!/i)).toBeVisible();
+  });
+});
+
+test.describe("MC learning step — Practice flow (#1237)", () => {
+  test("a new name card in learning phase shows 4 MC buttons, not the typed-entry input", async ({
+    page,
+  }) => {
+    // Pre-seed typed-entry mode on + Bulbasaur in learning phase (lastReview: null).
+    // With verifiedTypedEntryMode on and isInLearningPhase true, ReviewSession
+    // renders MultipleChoiceNameCard instead of the typed-entry input.
+    await enableTypedEntry(page);
+    await seedSessionIdb(page, SESSION_WITH_BULBASAUR_LEARNING);
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // The MC card renders 4 option buttons. We wait for any one of the expected
+    // distractor names to confirm the MC card is present.
+    // Bulbasaur's deterministic 4 options: Arbok, Cubone, Bulbasaur, Wartortle.
+    await expect(
+      page.getByRole("button", { name: /^Arbok$/i }),
+    ).toBeVisible({ timeout: 10000 });
+
+    // All 4 buttons must be present.
+    await expect(page.getByRole("button", { name: /^Arbok$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Cubone$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Bulbasaur$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Wartortle$/i })).toBeVisible();
+
+    // The typed-entry input must NOT be present.
+    await expect(
+      page.getByRole("textbox", { name: /type the pokémon name/i }),
+    ).not.toBeVisible();
+  });
+
+  test("clicking the correct MC option shows 'Correct!' feedback", async ({ page }) => {
+    // Same session: Bulbasaur in learning phase, typed-entry mode on.
+    await enableTypedEntry(page);
+    await seedSessionIdb(page, SESSION_WITH_BULBASAUR_LEARNING);
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // Wait for the MC card to render.
+    await expect(
+      page.getByRole("button", { name: /^Bulbasaur$/i }),
+    ).toBeVisible({ timeout: 10000 });
+
+    // Click the correct answer.
+    await page.getByRole("button", { name: /^Bulbasaur$/i }).click();
+
+    // "Correct!" feedback should appear.
     await expect(page.getByText(/correct!/i)).toBeVisible();
   });
 });

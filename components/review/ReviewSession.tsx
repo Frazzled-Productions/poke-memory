@@ -2469,10 +2469,11 @@ export function ReviewSession() {
     verifiedTypedEntryMode && isNameCard && !isInLearningPhase;
 
   // Pre-build MC options when we know we will render the MC card. The options
-  // array is stable for a given card id + cardPresentationCount combination
-  // because buildMcOptions is deterministic given the same seed string.
+  // array is stable per card id: the same 4 options and order appear on every
+  // replay during learning steps. This is deliberate — replays are about
+  // recognition, not re-puzzle-solving.
   const mcOptions =
-    isMcLearningActive && effectiveCard.cardType === "name"
+    isMcLearningActive
       ? buildMcOptions(
           effectiveCard.id,
           // effectiveCard is a NameReviewCard (SeedPokemon fields are spread onto it).

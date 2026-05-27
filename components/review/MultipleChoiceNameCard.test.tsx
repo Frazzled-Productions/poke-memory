@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { MultipleChoiceNameCard } from "./MultipleChoiceNameCard";
+import { MultipleChoiceNameCard, FEEDBACK_HOLD_MS } from "./MultipleChoiceNameCard";
 import type { Grade } from "@/lib/review/session";
 
 // Stub next/image — same pattern as TypedEntryNameCard.test.tsx.
@@ -11,8 +11,6 @@ vi.mock("next/image", () => ({
     return <img {...props} />;
   },
 }));
-
-const FEEDBACK_HOLD_MS = 1500;
 
 function makeOption(id: number, name: string, isCorrect: boolean) {
   return {
