@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { gradeTypedAnswer } from "@/lib/srs/typedEntryGrade";
@@ -42,7 +42,6 @@ export function TypedEntryNameCard({
   onGrade,
   grading = false,
 }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState("");
   // "submitted" tracks whether the user has pressed Submit or I don't know.
   // Once submitted we reveal the feedback so it is visible before the parent
@@ -98,7 +97,7 @@ export function TypedEntryNameCard({
       <DirectionBadge direction="name" />
       <Image
         src={spriteUrl}
-        alt="A Pokémon sprite — type the name below"
+        alt="A Pokémon sprite, type the name below"
         width={PRACTICE_SPRITE_SIZE}
         height={PRACTICE_SPRITE_SIZE}
         priority
@@ -106,18 +105,14 @@ export function TypedEntryNameCard({
       />
 
       {/*
-        Reserve the same min-height as PokemonCard's answer region (~7rem) so
-        the card's bounding box is stable across the pre/post submit states and
-        the sprite doesn't drift when feedback expands below it.
+        The aria-live region is always present in the DOM so screen readers
+        register it before any content is injected. It is empty pre-submit and
+        populated post-submit; only the children change, not the element itself.
+        Using "polite" because feedback is informational, not a critical alert.
       */}
-      <div className="min-h-[7rem] flex flex-col items-center justify-center gap-2 w-full max-w-xs">
-        {submitted ? (
-          /* Post-submit: show feedback, reveal answer when wrong/close */
-          <div
-            className="flex flex-col items-center gap-1 text-center"
-            aria-live="assertive"
-            aria-atomic="true"
-          >
+      <div aria-live="polite" role="status" aria-atomic="true">
+        {submitted && (
+          <div className="flex flex-col items-center gap-1 text-center">
             <p className={`text-base font-semibold ${feedbackInfo.colour}`}>
               {feedbackInfo.label}
             </p>
@@ -127,14 +122,22 @@ export function TypedEntryNameCard({
               </p>
             )}
           </div>
-        ) : (
+        )}
+      </div>
+
+      {/*
+        Reserve the same min-height as PokemonCard's answer region (~7rem) so
+        the card's bounding box is stable across the pre/post submit states and
+        the sprite doesn't drift when feedback expands below it.
+      */}
+      <div className="min-h-[7rem] flex flex-col items-center justify-center gap-2 w-full max-w-xs">
+        {!submitted && (
           /* Pre-submit: input form */
           <form
             onSubmit={handleFormSubmit}
             className="flex flex-col items-center gap-3 w-full"
           >
             <input
-              ref={inputRef}
               type="text"
               autoFocus
               autoComplete="off"

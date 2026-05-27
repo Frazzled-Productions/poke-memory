@@ -8,6 +8,12 @@
 
 import { test, expect } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
+import {
+  buildCompletedSession,
+  SEED_POKEMON_IDS,
+  EVOLUTION_CARD_IDS,
+} from "./helpers/completedSession";
 
 // Helper: write settings to localStorage with verifiedTypedEntryMode on.
 async function enableTypedEntry(page: import("@playwright/test").Page) {
@@ -44,6 +50,47 @@ async function enableTypedEntry(page: import("@playwright/test").Page) {
     }
   });
 }
+
+// Build a deterministic session where Bulbasaur (id=1) is the only due review
+// card. All other cards are future-due so hydrateSession adds nothing new.
+// Bulbasaur's canonical name is "Bulbasaur" (from the seed data), making the
+// happy-path typed-entry test fully deterministic.
+const baseSession = buildCompletedSession({
+  pokemonIds: SEED_POKEMON_IDS,
+  evolutionCardIds: EVOLUTION_CARD_IDS,
+});
+const SESSION_WITH_BULBASAUR_DUE = {
+  ...baseSession,
+  cards: (baseSession.cards as Array<{ id: number; [key: string]: unknown }>).map((c) =>
+    c.id === 1
+      ? {
+          ...c,
+          state: {
+            stability: 10,
+            difficulty: 5,
+            elapsedDays: 10,
+            scheduledDays: 10,
+            reps: 3,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2026-01-01",
+            lastReview: "2026-04-01",
+            firstSeen: "2026-03-01",
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        }
+      : c,
+  ),
+  limits: {
+    name: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+  },
+};
 
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
@@ -127,5 +174,29 @@ test.describe("Verified typed entry — Practice flow (#1251)", () => {
 
     // Feedback copy for a wrong answer: "Not quite."
     await expect(page.getByText(/not quite/i)).toBeVisible();
+  });
+
+  test("typing the correct name and submitting shows 'Correct!' feedback", async ({ page }) => {
+    // Seed typed-entry mode on, then seed Bulbasaur as the only due card so
+    // we know the canonical name to type.
+    await enableTypedEntry(page);
+    await seedSessionIdb(page, SESSION_WITH_BULBASAUR_DUE);
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // Wait for the typed-entry input to appear.
+    const input = page.getByRole("textbox", { name: /type the pokémon name/i });
+    await expect(input).toBeVisible({ timeout: 10000 });
+
+    // Type the exact canonical name (case-insensitive normalisation means any
+    // casing works, but the exact cased name is the clearest happy-path signal).
+    await input.fill("Bulbasaur");
+
+    // Submit the answer.
+    await page.getByRole("button", { name: /^submit$/i }).click();
+
+    // The input form should disappear and the "Correct!" feedback should appear.
+    await expect(input).not.toBeVisible();
+    await expect(page.getByText(/correct!/i)).toBeVisible();
   });
 });

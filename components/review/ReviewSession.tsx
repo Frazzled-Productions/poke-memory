@@ -543,9 +543,9 @@ export function ReviewSession() {
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
-  // Verified typed-entry mode (#1251). Read once at session load from settings;
-  // mid-session toggles take effect on the next card (the setting is re-read
-  // on every render via a local variable, so the in-flight card keeps its UI).
+  // Verified typed-entry mode (#1251). Read into state on session load via the
+  // session-load effect. Same-tab toggles take effect on the next session via the
+  // storage event; the in-flight card always uses the value captured at load time.
   const [verifiedTypedEntryMode, setVerifiedTypedEntryMode] = useState(false);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against

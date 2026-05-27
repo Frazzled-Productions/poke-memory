@@ -14,19 +14,21 @@ import type { Grade } from "@/lib/review/session";
  * Rules (applied in order):
  * 1. Trim leading/trailing whitespace.
  * 2. Lowercase.
- * 3. Remove all ASCII punctuation so "Mr. Mime" and "mr mime" both work.
- *    Only ASCII punctuation is stripped — accented characters in Pokémon names
- *    (e.g. "Flabébé") are preserved.
+ * 3. Remove all separators: ASCII punctuation (hyphens, periods, apostrophes,
+ *    etc.) AND spaces. This makes "Porygon-Z", "porygon z", and "porygonz" all
+ *    collapse to the same normalised form, so a user who types the name with a
+ *    space instead of a hyphen is not penalised. Only ASCII punctuation and
+ *    spaces are stripped — accented characters in Pokémon names (e.g. "Flabébé")
+ *    are preserved.
  */
 export function normaliseInput(input: string): string {
   return input
     .trim()
     .toLowerCase()
-    // Strip ASCII punctuation characters (., -, ', !, ?, : etc.) but keep letters
-    // and digits. The character class excludes whitespace so multi-word names
-    // still compare correctly.
+    // Strip ASCII punctuation characters (., -, ', !, ?, : etc.) AND spaces so
+    // separator variants ("Porygon-Z" / "porygon z" / "porygonz") all match.
     // eslint-disable-next-line no-useless-escape
-    .replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g, "");
+    .replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~\s]/g, "");
 }
 
 /**
