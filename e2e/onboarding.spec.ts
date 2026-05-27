@@ -28,11 +28,12 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     await expect(modal).toHaveCount(0);
 
     // After dismissal the Practice card surface must be interactable.
-    // 15 s: fresh-visitor hydration builds ~2 050 cards from scratch — this is
-    // at the perf cliff on CI WebKit/Chromium under load (#1262 / #1257).
+    // 10 s: fresh-visitor hydration builds ~2 050 cards from scratch. With the
+    // bundled seed chunk reduced from 2.9 MB to 1.2 MB (#1263) WebKit parses
+    // it in well under this window, including on CI.
     await expect(
       page.getByRole("button", { name: /reveal/i }).or(page.getByText(/all caught up/i)),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test("modal does not reappear after dismissal", async ({ page }) => {

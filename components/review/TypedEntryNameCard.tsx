@@ -1,11 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Image from "next/image";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { gradeTypedAnswer } from "@/lib/srs/typedEntryGrade";
 import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import type { Grade } from "@/lib/review/session";
+
+// Feedback is held visible for this long before calling onGrade so the parent
+// can advance to the next card. 1.5 s gives enough time for Playwright and
+// sighted users to read the result; wrong answers use the same delay.
+const FEEDBACK_HOLD_MS = 1500;
 
 type Props = {
   spriteUrl: string;
@@ -48,9 +53,11 @@ export function TypedEntryNameCard({
   // advances to the next card.
   const [submitted, setSubmitted] = useState(false);
   const [feedbackGrade, setFeedbackGrade] = useState<Grade | null>(null);
+  // Tracks whether onGrade has already been called so we never double-fire.
+  const gradedRef = useRef(false);
 
   function submit(skipAnswer: boolean) {
-    if (submitted || grading) return;
+    if (submitted || grading || gradedRef.current) return;
     let grade: Grade;
     if (skipAnswer) {
       grade = 1;
@@ -60,7 +67,15 @@ export function TypedEntryNameCard({
     }
     setFeedbackGrade(grade);
     setSubmitted(true);
-    onGrade(grade);
+    // Hold feedback visible for FEEDBACK_HOLD_MS before notifying the parent.
+    // This gives React time to render the result text before the parent
+    // unmounts this component (via key change) to advance to the next card.
+    // Without the delay the feedback is invisible in the test and on fast
+    // devices because the parent's state update races the render commit.
+    gradedRef.current = true;
+    setTimeout(() => {
+      onGrade(grade);
+    }, FEEDBACK_HOLD_MS);
   }
 
   function handleFormSubmit(e: React.FormEvent) {

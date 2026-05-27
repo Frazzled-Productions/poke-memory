@@ -136,16 +136,18 @@ test.describe("Verified typed entry — Practice flow (#1251)", () => {
   test("with the setting on, a name card shows the text input instead of the Reveal button", async ({
     page,
   }) => {
+    // Pre-seed Bulbasaur as the only due card so the input appears quickly,
+    // avoiding the fresh-visitor hydration cliff on WebKit (#1262 / #1257).
     await enableTypedEntry(page);
+    await seedSessionIdb(page, SESSION_WITH_BULBASAUR_DUE);
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // The practice page should render without crashing.
     await expect(page.getByRole("main")).toBeVisible();
 
-    // Wait for the session to load (the loading skeleton to disappear).
-    // When typed-entry mode is on, a name card renders an input instead of
-    // the Reveal button. Wait for either state to stabilise.
-    // Use a generous timeout because the session build reads IDB on first load.
+    // Wait for the session to load. With a pre-seeded session the input should
+    // appear well within the default assertion timeout.
     await expect(
       page.getByRole("textbox", { name: /type the pokémon name/i }),
     ).toBeVisible({ timeout: 10000 });

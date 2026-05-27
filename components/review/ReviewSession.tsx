@@ -40,7 +40,7 @@ import { recordReview } from "@/lib/streak";
 import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
 import { nextReview } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
-import { getPokemonFacts, selectFact, type PokemonFact } from "@/lib/pokemon/facts";
+import { getPokemonFacts, selectFact, loadFlavorTexts, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
 import { speakName, warmupTts } from "@/lib/audio/tts";
 import { waitForAudio } from "@/lib/audio/waitForAudio";
@@ -711,6 +711,13 @@ export function ReviewSession() {
     return () => { isMountedRef.current = false; };
   }, []);
 
+  // Kick off flavor-text fetch in the background so it is warm by the time
+  // the user reveals their first card. Non-blocking: the critical render path
+  // does not wait for this.
+  useEffect(() => {
+    void loadFlavorTexts();
+  }, []);
+
   // Serialises background persistence work across rapid grades (#1191).
   // Each grade chains its saveSession + appendGradeEntry work onto this
   // promise so concurrent IDB reads inside appendGradeEntry never miss a
@@ -910,7 +917,6 @@ export function ReviewSession() {
       if (reconcileChanged) {
         notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
       }
-
       setCards(sessionCards);
       setLimits(sessionLimits);
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
