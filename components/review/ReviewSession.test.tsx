@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard, CryReviewCard, ReverseReviewCard } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { saveSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadGradeLog, appendGradeEntry } from "@/lib/gradelog/persistence";
 import { STORAGE_KEY as DAILY_SUMMARY_KEY } from "@/lib/review/dailySummaryPersistence";
@@ -11,6 +12,7 @@ import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { CRY_ID_OFFSET } from "@/lib/pokemon/seed";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { nextReview } from "@/lib/srs/scheduler";
+import { FEEDBACK_HOLD_MS } from "@/components/review/MultipleChoiceNameCard";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -3670,5 +3672,49 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
     expect(
       screen.queryByText(/this card is in the learning phase/i),
     ).not.toBeInTheDocument();
+  });
+
+  it("banner disappears after first MC grade and persists mcCardOnboardingShown (#1271)", async () => {
+    // Arrange: session with no persisted state so Bulbasaur is brand-new and
+    // surfaces as an MC learning card.
+    mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
+    mockLoadSettings.mockReturnValue({
+      ...typedModeSettings,
+      mcCardOnboardingShown: false,
+    });
+
+    render(<ReviewSession />);
+
+    // Act step 1: wait for MC card and assert banner is visible.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/this card is in the learning phase/i),
+      ).toBeInTheDocument();
+      // The MC option group should also be present.
+      expect(
+        screen.getByRole("group", { name: /choose the pokémon name/i }),
+      ).toBeInTheDocument();
+    });
+
+    // Act step 2: click the correct option (Bulbasaur — the card's displayName).
+    // The button label is the pokemon displayName; Bulbasaur is always in FOUR_POKEMON.
+    const correctButton = screen.getByRole("button", { name: /^Bulbasaur$/i });
+
+    vi.useFakeTimers();
+    act(() => { fireEvent.click(correctButton); });
+
+    // Advance past FEEDBACK_HOLD_MS so onGrade fires and state updates flush.
+    await act(async () => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS + 100); });
+    vi.useRealTimers();
+
+    // Assert: banner is gone.
+    expect(
+      screen.queryByText(/this card is in the learning phase/i),
+    ).not.toBeInTheDocument();
+
+    // Assert: saveSettings was called with mcCardOnboardingShown: true.
+    expect(vi.mocked(saveSettings)).toHaveBeenCalledWith(
+      expect.objectContaining({ mcCardOnboardingShown: true }),
+    );
   });
 });

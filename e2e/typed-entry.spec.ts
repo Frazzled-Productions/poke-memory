@@ -51,6 +51,48 @@ async function enableTypedEntry(page: import("@playwright/test").Page) {
   });
 }
 
+// Helper: write settings with verifiedTypedEntryMode on, the typed-entry
+// onboarding already shown (so the toast doesn't interfere), and the MC-card
+// banner flag set to false (so the banner fires for the first MC card).
+// Used by Touch 3 tests that need all three flags set atomically without
+// chaining two addInitScript calls.
+async function enableTypedEntryWithMcBannerPending(page: import("@playwright/test").Page) {
+  await page.addInitScript(() => {
+    try {
+      const KEY = "poke-memory:settings:v1";
+      const raw = localStorage.getItem(KEY);
+      let existing: Record<string, unknown> = { mobileNav: "bottom" };
+      if (raw !== null) {
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (typeof parsed === "object" && parsed !== null) {
+            existing = parsed as Record<string, unknown>;
+          }
+        } catch {
+          /* malformed — keep defaults */
+        }
+      }
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({
+          ...existing,
+          verifiedTypedEntryMode: true,
+          typedEntryOnboardingShown: true,
+          mcCardOnboardingShown: false,
+          onboarding: {
+            ...(typeof existing.onboarding === "object" && existing.onboarding !== null
+              ? (existing.onboarding as Record<string, unknown>)
+              : {}),
+            firstVisitOnboardingDismissed: true,
+          },
+        }),
+      );
+    } catch {
+      /* localStorage unavailable */
+    }
+  });
+}
+
 // Build a deterministic session where Bulbasaur (id=1) is the only due review
 // card. All other cards are future-due so hydrateSession adds nothing new.
 // Bulbasaur's canonical name is "Bulbasaur" (from the seed data), making the
@@ -321,24 +363,10 @@ test.describe("Typed entry onboarding (#1271) — Touch 3 (MC card banner)", () 
   test("one-time banner appears above the first MC card when mcCardOnboardingShown is false", async ({
     page,
   }) => {
-    await enableTypedEntry(page);
-    // Override mcCardOnboardingShown to false to trigger the banner.
-    await page.addInitScript(() => {
-      try {
-        const KEY = "poke-memory:settings:v1";
-        const raw = localStorage.getItem(KEY);
-        let existing: Record<string, unknown> = {};
-        if (raw !== null) {
-          try {
-            const parsed = JSON.parse(raw) as unknown;
-            if (typeof parsed === "object" && parsed !== null) {
-              existing = parsed as Record<string, unknown>;
-            }
-          } catch { /* ignore */ }
-        }
-        localStorage.setItem(KEY, JSON.stringify({ ...existing, mcCardOnboardingShown: false }));
-      } catch { /* localStorage unavailable */ }
-    });
+    // enableTypedEntryWithMcBannerPending sets verifiedTypedEntryMode,
+    // typedEntryOnboardingShown, and mcCardOnboardingShown: false atomically
+    // so the banner fires without the typed-entry toast interfering.
+    await enableTypedEntryWithMcBannerPending(page);
     await seedSessionIdb(page, SESSION_WITH_BULBASAUR_LEARNING);
     await page.goto("/");
     await awaitSeedIdb(page);

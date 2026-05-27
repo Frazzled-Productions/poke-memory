@@ -549,8 +549,9 @@ export function ReviewSession() {
   // session-load effect. Same-tab toggles take effect on the next session via the
   // storage event; the in-flight card always uses the value captured at load time.
   const [verifiedTypedEntryMode, setVerifiedTypedEntryMode] = useState(false);
-  // One-time MC-card onboarding banner (#1271). true = banner has been shown
-  // (or the user already had this flag set), so it must not appear again.
+  // Default true pre-hydration so the banner doesn't flash for users whose
+  // persisted setting is true. The session-load effect (~line 939) overwrites
+  // this with the actual persisted value (default false for new users).
   const [mcCardOnboardingShown, setMcCardOnboardingShown] = useState(true);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
@@ -2024,7 +2025,7 @@ export function ReviewSession() {
       effectiveCard.cardType === "name" &&
       (effectiveCard.state.lastReview === null ||
         effectiveCard.state.learningStep !== null);
-    if (verifiedTypedEntryMode && gradedCardIsInLearning && !mcCardOnboardingShown) {
+    if (verifiedTypedEntryMode && gradedCardIsInLearning && !mcCardOnboardingShown && !superuserGuarded) {
       setMcCardOnboardingShown(true);
       const updatedSettings = loadSettings();
       if (!updatedSettings.mcCardOnboardingShown) {

@@ -588,7 +588,7 @@ export default function SettingsPage() {
     ) {
       const updated = {
         ...settings,
-        verifiedTypedEntryMode: true,
+        verifiedTypedEntryMode: !settings.verifiedTypedEntryMode,
         typedEntryOnboardingShown: true,
       };
       setSettings(updated);
