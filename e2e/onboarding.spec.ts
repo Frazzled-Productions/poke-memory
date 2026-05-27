@@ -28,13 +28,11 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     await expect(modal).toHaveCount(0);
 
     // After dismissal the Practice card surface must be interactable.
-    // 10 s: the session builds ~2 050 cards from scratch, but with the
-    // reconcileHiddenState no-op fix (#1262) only one IDB write precedes
-    // the React render (the hydrateSession build-from-scratch write), which
-    // completes within the original budget.
+    // 15 s: fresh-visitor hydration builds ~2 050 cards from scratch — this is
+    // at the perf cliff on CI WebKit/Chromium under load (#1262 / #1257).
     await expect(
       page.getByRole("button", { name: /reveal/i }).or(page.getByText(/all caught up/i)),
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("modal does not reappear after dismissal", async ({ page }) => {

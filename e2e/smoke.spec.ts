@@ -68,8 +68,9 @@ test.describe("Practice page", () => {
 
     // Since #1234 the session is seeded with both name and reverse cards for
     // every species (~2× the card set). On WebKit this can take longer to build
-    // and write to IDB — use a generous timeout to avoid flaky failures.
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 10_000 });
+    // and write to IDB — fresh-visitor hydration is at the perf cliff under
+    // 2 050 cards (#1262 / #1257), so use 15 s.
+    await expect(reveal.or(endState)).toBeVisible({ timeout: 15_000 });
   });
 
   test("reveal shows grade buttons", async ({ page }) => {

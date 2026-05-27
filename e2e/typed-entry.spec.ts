@@ -159,8 +159,12 @@ test.describe("Verified typed entry — Practice flow (#1251)", () => {
   });
 
   test("clicking I don't know fires a grade and moves off the input", async ({ page }) => {
+    // Pre-seed Bulbasaur as the only due card so the input appears in <2 s,
+    // avoiding the fresh-visitor hydration cliff under 2 050 cards (#1262 / #1257).
     await enableTypedEntry(page);
+    await seedSessionIdb(page, SESSION_WITH_BULBASAUR_DUE);
     await page.goto("/");
+    await awaitSeedIdb(page);
 
     // Wait for the typed-entry input to appear.
     const input = page.getByRole("textbox", { name: /type the pokémon name/i });
@@ -178,13 +182,15 @@ test.describe("Verified typed entry — Practice flow (#1251)", () => {
 
   test("typing the correct name and submitting shows 'Correct!' feedback", async ({ page }) => {
     // Seed typed-entry mode on, then seed Bulbasaur as the only due card so
-    // we know the canonical name to type.
+    // we know the canonical name to type. Pre-seeding avoids the fresh-visitor
+    // hydration cliff under 2 050 cards (#1262 / #1257).
     await enableTypedEntry(page);
     await seedSessionIdb(page, SESSION_WITH_BULBASAUR_DUE);
     await page.goto("/");
     await awaitSeedIdb(page);
 
-    // Wait for the typed-entry input to appear.
+    // With a pre-seeded session the input appears in <2 s (not the fresh-visitor
+    // ~10 s cliff), so the default assertion timeout is sufficient.
     const input = page.getByRole("textbox", { name: /type the pokémon name/i });
     await expect(input).toBeVisible({ timeout: 10000 });
 
