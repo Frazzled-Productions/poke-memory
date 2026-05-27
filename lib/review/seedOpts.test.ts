@@ -3,19 +3,33 @@ import { seedOptsFromSettings } from "./seedOpts";
 import { DEFAULT_SETTINGS } from "@/lib/settings/persistence";
 
 describe("seedOptsFromSettings", () => {
-  it("maps each *CardsEnabled toggle to the matching buildSession opt", () => {
+  it("name and reverse are always on regardless of other settings (#1234)", () => {
+    // Name and reverse are now always-on directions — no per-direction toggle.
     const opts = seedOptsFromSettings({
       ...DEFAULT_SETTINGS,
-      nameCardsEnabled: true,
       evolutionCardsEnabled: false,
-      reverseCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+    });
+
+    expect(opts.nameEnabled).toBe(true);
+    expect(opts.reverseEnabled).toBe(true);
+    expect(opts.evolutionEnabled).toBe(false);
+    expect(opts.reverseEvolutionEnabled).toBe(false);
+    expect(opts.cryEnabled).toBe(false);
+  });
+
+  it("maps opt-in enrichment toggles to the matching buildSession opts", () => {
+    const opts = seedOptsFromSettings({
+      ...DEFAULT_SETTINGS,
+      evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       cryCardsEnabled: true,
     });
 
     expect(opts).toEqual({
       nameEnabled: true,
-      evolutionEnabled: false,
+      evolutionEnabled: true,
       reverseEnabled: true,
       reverseEvolutionEnabled: false,
       cryEnabled: true,
@@ -23,15 +37,12 @@ describe("seedOptsFromSettings", () => {
   });
 
   // The defaults exist so that a brand-new install (no stored settings) still
-  // builds a usable session. Reverse/cry default OFF, name/evolution default
-  // ON — exactly what the toggles in Settings display before any user input.
-  it("returns the conservative default for unconfigured settings", () => {
-    expect(seedOptsFromSettings(DEFAULT_SETTINGS)).toEqual({
+  // builds a usable session. Name and reverse are always on; evolution/cry
+  // default to whatever is in DEFAULT_SETTINGS.
+  it("returns the correct default for unconfigured settings", () => {
+    expect(seedOptsFromSettings(DEFAULT_SETTINGS)).toMatchObject({
       nameEnabled: true,
-      evolutionEnabled: true,
-      reverseEnabled: false,
-      reverseEvolutionEnabled: false,
-      cryEnabled: false,
+      reverseEnabled: true,
     });
   });
 });

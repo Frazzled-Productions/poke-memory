@@ -272,11 +272,62 @@ describe("reconcileHiddenState", () => {
     expect(reverse.state.hiddenSince).toBe(TODAY);
   });
 
-  it("returns the mutated input array for chaining", () => {
+  it("returns { session } pointing to the same mutated input array", () => {
     const cards: ReviewableCard[] = [
       nameCardOf(BULBASAUR, { firstSeen: "2026-04-01", lastReview: "2026-05-01" }),
     ];
-    const returned = reconcileHiddenState(cards, SCOPE_GEN_II, TODAY);
-    expect(returned).toBe(cards);
+    const { session } = reconcileHiddenState(cards, SCOPE_GEN_II, TODAY);
+    expect(session).toBe(cards);
+  });
+
+  it("returns changed: true when a card's hiddenSince was stamped", () => {
+    const cards: ReviewableCard[] = [
+      nameCardOf(BULBASAUR, {
+        firstSeen: "2026-04-01",
+        lastReview: "2026-05-01",
+        dueDate: "2026-05-15",
+        reps: 2,
+      }),
+    ];
+    const { changed } = reconcileHiddenState(cards, SCOPE_GEN_II, TODAY);
+    expect(changed).toBe(true);
+  });
+
+  it("returns changed: true when a card's hiddenSince was cleared", () => {
+    const cards: ReviewableCard[] = [
+      nameCardOf(BULBASAUR, {
+        firstSeen: "2026-04-01",
+        lastReview: "2026-05-01",
+        dueDate: "2026-05-10",
+        reps: 2,
+        hiddenSince: "2026-05-02",
+      }),
+    ];
+    const { changed } = reconcileHiddenState(cards, SCOPE_GEN_I, TODAY);
+    expect(changed).toBe(true);
+  });
+
+  it("returns changed: false when no card state was modified (no-op short-circuit — #1262)", () => {
+    // Graduated card in scope, no hiddenSince: reconcile has nothing to do.
+    const cards: ReviewableCard[] = [
+      nameCardOf(BULBASAUR, {
+        firstSeen: "2026-04-01",
+        lastReview: "2026-05-01",
+        dueDate: "2026-05-15",
+        reps: 2,
+      }),
+    ];
+    const { changed } = reconcileHiddenState(cards, SCOPE_GEN_I, TODAY);
+    expect(changed).toBe(false);
+  });
+
+  it("returns changed: false when all cards are new (firstSeen: null) regardless of scope", () => {
+    // New cards are skipped entirely — reconcile is a no-op.
+    const cards: ReviewableCard[] = [
+      nameCardOf(BULBASAUR), // firstSeen: null
+      nameCardOf(CHIKORITA), // firstSeen: null
+    ];
+    const { changed } = reconcileHiddenState(cards, SCOPE_GEN_II, TODAY);
+    expect(changed).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import {
   buildCompletedSession,
 } from "./helpers/completedSession";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { REVERSE_ID_OFFSET } from "./helpers/mastery";
 
 // ---------------------------------------------------------------------------
 // Pre-seed a NEW_CARDS_LOCKED state for the `name` card type:
@@ -17,9 +18,9 @@ import { addOnboardingPreDismiss } from "./helpers/onboarding";
 //   - All other IDs are already-reviewed, not-due-today (no contribution to
 //     either counter) so they don't accidentally trigger the review soft-wall.
 //   - Evolution cards are seeded as reviewed, not-due — no evo queues populate.
-//
-// Default settings have reverseCardsEnabled === false and cryCardsEnabled ===
-// false, so we don't need to seed those types.
+//   - Reverse cards for ALL species are seeded as reviewed, future-due so that
+//     hydrateSession (which now always runs with reverseEnabled=true after
+//     #1234) does not add them as new cards and break the locked state.
 // ---------------------------------------------------------------------------
 
 function buildNewCardsLockedSession(args: {
@@ -93,6 +94,22 @@ function buildNewCardsLockedSession(args: {
       preEvoSpriteUrl: "/sprites/pokemon/1.png",
       postEvoSpriteUrl: "/sprites/pokemon/2.png",
       triggerPhrase: "at level 16",
+      state: { ...baseState },
+    });
+  }
+
+  // Seed all reverse cards as already-reviewed with a far-future due date.
+  // Since #1234 hydrateSession always runs with reverseEnabled=true — without
+  // these entries it would add every species as a fresh new reverse card,
+  // breaking the NEW_CARDS_LOCKED state by making new reverse cards available.
+  for (const id of pokemonIds) {
+    cards.push({
+      id: REVERSE_ID_OFFSET + id,
+      name: "pokemon-" + id,
+      spriteUrl: "/sprites/pokemon/" + id + ".png",
+      cardType: "reverse",
+      pokemonId: id,
+      speciesId: id,
       state: { ...baseState },
     });
   }

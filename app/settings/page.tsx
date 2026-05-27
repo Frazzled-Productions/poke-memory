@@ -357,9 +357,7 @@ const REVERSE_NUMERIC_FIELDS: FieldConfig[] = [
 
 /** Human-readable names for the card-type settings keys — used in the re-enable dialog. */
 const CARD_TYPE_DISPLAY_NAMES: Partial<Record<keyof UserSettings, string>> = {
-  nameCardsEnabled: "name cards",
   evolutionCardsEnabled: "evolution cards",
-  reverseCardsEnabled: "reverse cards",
   reverseEvolutionCardsEnabled: "reverse-evolution cards",
   cryCardsEnabled: "cry cards",
 };
@@ -553,32 +551,15 @@ export default function SettingsPage() {
   function handleToggle(key: keyof UserSettings) {
     if (settings === null) return;
 
-    // Interlocking guard: block if toggling off would leave all three types disabled.
-    const toggleKeys = ["nameCardsEnabled", "evolutionCardsEnabled", "reverseCardsEnabled"] as const;
-    if (toggleKeys.includes(key as typeof toggleKeys[number]) && settings[key] === true) {
-      const wouldAllBeOff = toggleKeys.every((k) => (k === key ? false : !settings[k]));
-      if (wouldAllBeOff) {
-        setToggleError("At least one card type must be enabled.");
-        setToggleErrorKey(key);
-        if (toggleErrorTimeoutRef.current !== null) clearTimeout(toggleErrorTimeoutRef.current);
-        toggleErrorTimeoutRef.current = setTimeout(() => {
-          toggleErrorTimeoutRef.current = null;
-          setToggleError(null);
-          setToggleErrorKey(null);
-        }, 3000);
-        return;
-      }
-    }
-
     // Card-type toggles: re-enable prompts and non-destructive disable.
     //
     // Disabling is now non-destructive — saved progress is preserved in
     // storage. When re-enabling, we show a prompt so the user can choose
     // between resuming saved progress (the default) or starting fresh.
+    //
+    // Name and reverse are always on since #1234 — they are not in this list.
     const cardTypeKeys = [
-      "nameCardsEnabled",
       "evolutionCardsEnabled",
-      "reverseCardsEnabled",
       "reverseEvolutionCardsEnabled",
       "cryCardsEnabled",
     ] as const;
@@ -613,9 +594,7 @@ export default function SettingsPage() {
     if (choice === "fresh") {
       // Reset cards of the re-enabled type to initial state in IDB.
       const cardTypeForKey: Record<string, string> = {
-        nameCardsEnabled: "name",
         evolutionCardsEnabled: "evolution",
-        reverseCardsEnabled: "reverse",
         reverseEvolutionCardsEnabled: "reverse-evolution",
         cryCardsEnabled: "cry",
       };
@@ -998,76 +977,39 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Name cards */}
+                {/* Name cards — always on since #1234 */}
                 <div id="name-cards-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Name cards
                   </p>
-                  <div className={cardPanelPadded}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Enable name cards
-                        </p>
+                  <div className={colStackLg}>
+                    {NAME_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                      <div
+                        key={key}
+                        className={cardPanelPadded}
+                      >
+                        <label
+                          htmlFor={key}
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {label}
+                        </label>
+                        <input
+                          id={key}
+                          type="number"
+                          min={min}
+                          max={max}
+                          step={1}
+                          value={draftValues[key] ?? String(settings[key])}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          onBlur={() => handleBlur(key, min)}
+                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                        />
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Show sprite as prompt; type the name. Disabling hides these cards without losing your progress.
+                          {helper}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={settings.nameCardsEnabled}
-                        onClick={() => handleToggle("nameCardsEnabled")}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                          settings.nameCardsEnabled
-                            ? "bg-foreground"
-                            : "bg-zinc-300 dark:bg-zinc-600"
-                        }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                            settings.nameCardsEnabled ? "translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                  {toggleError !== null && toggleErrorKey === "nameCardsEnabled" && (
-                    <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
-                      {toggleError}
-                    </p>
-                  )}
-                  <div className={settings.nameCardsEnabled ? undefined : "opacity-50"}>
-                    <div className={colStackLg}>
-                      {NAME_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
-                        <div
-                          key={key}
-                          className={cardPanelPadded}
-                        >
-                          <label
-                            htmlFor={key}
-                            className="block text-sm font-medium text-foreground"
-                          >
-                            {label}
-                          </label>
-                          <input
-                            id={key}
-                            type="number"
-                            min={min}
-                            max={max}
-                            step={1}
-                            value={draftValues[key] ?? String(settings[key])}
-                            onChange={(e) => handleChange(key, e.target.value)}
-                            onBlur={() => handleBlur(key, min)}
-                            disabled={!settings.nameCardsEnabled}
-                            className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                          />
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            {helper}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1219,78 +1161,38 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Reverse cards */}
+                {/* Reverse cards — always on since #1234 */}
                 <div id="reverse-heading" className={colStackLg}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Reverse cards
                   </p>
-                  <div className={cardPanelPadded}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Enable reverse cards
-                        </p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Show the Pokémon&apos;s name as the prompt; identify the sprite on reveal.
-                          Disabling hides these cards without losing your progress.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-label="Enable reverse cards"
-                        aria-checked={settings.reverseCardsEnabled}
-                        onClick={() => handleToggle("reverseCardsEnabled")}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                          settings.reverseCardsEnabled
-                            ? "bg-foreground"
-                            : "bg-zinc-300 dark:bg-zinc-600"
-                        }`}
+                  {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                    <div
+                      key={key}
+                      className={cardPanelPadded}
+                    >
+                      <label
+                        htmlFor={key}
+                        className="block text-sm font-medium text-foreground"
                       >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                            settings.reverseCardsEnabled ? "translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
+                        {label}
+                      </label>
+                      <input
+                        id={key}
+                        type="number"
+                        min={min}
+                        max={max}
+                        step={1}
+                        value={draftValues[key] ?? String(settings[key])}
+                        onChange={(e) => handleChange(key, e.target.value)}
+                        onBlur={() => handleBlur(key, min)}
+                        className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                      />
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        {helper}
+                      </p>
                     </div>
-                  </div>
-                  {toggleError !== null && toggleErrorKey === "reverseCardsEnabled" && (
-                    <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
-                      {toggleError}
-                    </p>
-                  )}
-                  {settings.reverseCardsEnabled && (
-                    <>
-                      {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
-                        <div
-                          key={key}
-                          className={cardPanelPadded}
-                        >
-                          <label
-                            htmlFor={key}
-                            className="block text-sm font-medium text-foreground"
-                          >
-                            {label}
-                          </label>
-                          <input
-                            id={key}
-                            type="number"
-                            min={min}
-                            max={max}
-                            step={1}
-                            value={draftValues[key] ?? String(settings[key])}
-                            onChange={(e) => handleChange(key, e.target.value)}
-                            onBlur={() => handleBlur(key, min)}
-                            className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                          />
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            {helper}
-                          </p>
-                        </div>
-                      ))}
-                    </>
-                  )}
+                  ))}
                 </div>
 
                 {/* Save */}
@@ -1463,8 +1365,7 @@ export default function SettingsPage() {
                 </div>
                 )}
 
-                {/* Reverse-card feedback delay (#1200) */}
-                {settings.reverseCardsEnabled && (
+                {/* Reverse-card feedback delay (#1200) — always shown since reverse is always on (#1234) */}
                 <div className={cardPanelPadded}>
                   <p className="text-sm font-medium text-foreground">
                     Reverse card feedback delay
@@ -1507,7 +1408,6 @@ export default function SettingsPage() {
                     ))}
                   </fieldset>
                 </div>
-                )}
               </CollapsibleSection>
               )}
 
@@ -2050,7 +1950,7 @@ export default function SettingsPage() {
             />
             <ReenableCardTypeDialog
               open={reenableKey !== null}
-              cardTypeName={CARD_TYPE_DISPLAY_NAMES[reenableKey ?? "nameCardsEnabled"] ?? "this card type"}
+              cardTypeName={CARD_TYPE_DISPLAY_NAMES[reenableKey ?? "evolutionCardsEnabled"] ?? "this card type"}
               onClose={() => setReenableKey(null)}
               onChoose={(choice) => { void handleReenableChoice(choice); }}
             />

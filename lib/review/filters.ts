@@ -16,7 +16,7 @@
  * book-keeping on top.
  */
 
-import { cardMatchesScope, isScopeEmpty, type PracticeScope } from "@/lib/review/scope";
+import { cardMatchesScope, isScopeEmpty, type PracticeScope, type ScopeMatchContext } from "@/lib/review/scope";
 import type { ReviewableCard } from "@/lib/review/session";
 import { addDaysToIsoDate, daysBetweenIsoDates } from "@/lib/utils/dates";
 
@@ -26,7 +26,7 @@ export const MAX_HIDDEN_SHIFT_DAYS = 365;
 /**
  * In-place reconciliation of `hiddenSince` and `dueDate` against the
  * active practice scope. Mutates each card whose state changes and
- * returns the same array for chaining.
+ * returns the mutated array together with a `changed` flag.
  *
  * The parameter is genuinely mutable: the function writes to
  * `card.state.hiddenSince` and `card.state.dueDate` on each affected card.
@@ -55,26 +55,36 @@ export const MAX_HIDDEN_SHIFT_DAYS = 365;
  * clearing stale `hiddenSince` — that branch is the user's escape hatch
  * when they manually clear the scope. Running this function after every
  * scope change keeps the data tidy.
+ *
+ * Returns `{ session, changed }` where `session` is the same (mutated)
+ * array and `changed` is true iff at least one card's state was modified.
+ * Callers that only care about the side-effect can ignore `changed`;
+ * callers that conditionally persist (e.g. the load effect in
+ * `ReviewSession`) gate their `saveSession` call on `changed === true`
+ * to avoid a redundant ~600 KB IDB write on every page load (#1262).
  */
 export function reconcileHiddenState(
   cards: ReviewableCard[],
   scope: PracticeScope,
   today: string,
-): ReviewableCard[] {
+  context: ScopeMatchContext = {},
+): { session: ReviewableCard[]; changed: boolean } {
   const scopeEmpty = isScopeEmpty(scope);
+  let changed = false;
   for (const card of cards) {
     if (card.state.firstSeen === null) continue;
     if (card.state.learningStep !== null) continue;
     // `cardMatchesScope` returns true for every card when the scope is
     // empty — by evaluating it directly we ensure the empty-scope mode
     // routes through the un-hide branch only.
-    const inScope = cardMatchesScope(card, scope);
+    const inScope = cardMatchesScope(card, scope, context);
     const hiddenSince = card.state.hiddenSince;
     if (!inScope && hiddenSince === null) {
       // Cannot reach this branch when `scopeEmpty` is true — guard kept
       // for clarity rather than correctness.
       if (scopeEmpty) continue;
       card.state.hiddenSince = today;
+      changed = true;
     } else if (inScope && hiddenSince !== null) {
       const raw = daysBetweenIsoDates(hiddenSince, today);
       const shift = Math.min(Math.max(raw, 0), MAX_HIDDEN_SHIFT_DAYS);
@@ -82,7 +92,8 @@ export function reconcileHiddenState(
         card.state.dueDate = addDaysToIsoDate(card.state.dueDate, shift);
       }
       card.state.hiddenSince = null;
+      changed = true;
     }
   }
-  return cards;
+  return { session: cards, changed };
 }

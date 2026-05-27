@@ -474,8 +474,8 @@ function EndOfSessionScreen({
             ctaLabel="Open practice settings"
           >
             <p>
-              Try reverse cards, reverse-evolution cards, or alternate-form
-              cards for a fresh challenge.
+              Try reverse-evolution cards or alternate-form cards for a fresh
+              challenge.
             </p>
           </OnboardingHint>
         </div>
@@ -537,9 +537,8 @@ export function ReviewSession() {
   // null = SSR / not-yet-hydrated. Same pattern as before.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
-  const [reverseEnabled, setReverseEnabled] = useState(false);
+  const [reverseEnabled, setReverseEnabled] = useState(true);
   const [reverseEvolutionEnabled, setReverseEvolutionEnabled] = useState(false);
-  const [nameCardsEnabled, setNameCardsEnabled] = useState(true);
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
@@ -622,7 +621,12 @@ export function ReviewSession() {
     // are durable. Persist if any card mutated.
     if (cards !== null) {
       const today = todayString(new Date());
-      reconcileHiddenState(cards, next, today);
+      // `changed` is intentionally unused here — handleScopeChange always
+      // persists the full session after a scope change (line below) regardless
+      // of whether reconcile modified any card state. Pass the current
+      // incompleteChains context so the "Incomplete evolution chains" scope
+      // correctly identifies in-scope species during snooze reconciliation.
+      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains });
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
       // reload when toggling card-type gates, so the state is always current.
@@ -632,9 +636,7 @@ export function ReviewSession() {
       const eligibleIds = computeEligibleCardIds(
         cards,
         {
-          nameCardsEnabled,
           evolutionCardsEnabled,
-          reverseCardsEnabled: reverseEnabled,
           reverseEvolutionCardsEnabled: reverseEvolutionEnabled,
           cryCardsEnabled: cryCardsEnabled,
           alternateFormsEnabled,
@@ -797,8 +799,9 @@ export function ReviewSession() {
       let sessionCards: ReviewableCard[];
       let sessionLimits: DailyLimits;
 
-      const enabled = settings.reverseCardsEnabled;
-      const nameEnabled = settings.nameCardsEnabled;
+      // Name and reverse are always on since #1234.
+      const enabled = true;
+      const nameEnabled = true;
       const evolutionEnabled = settings.evolutionCardsEnabled;
       const reverseEvolutionEnabledLocal = settings.reverseEvolutionCardsEnabled;
       const cryEnabled = settings.cryCardsEnabled;
@@ -866,13 +869,15 @@ export function ReviewSession() {
       const persistedScope = settings.practiceScope;
       const formsEnabled = settings.alternateFormsEnabled;
       const today = todayString(now);
-      reconcileHiddenState(sessionCards, persistedScope, today);
       // Three-tier eligibility: card-type-enabled gate, then
       // `alternateFormsEnabled` gate, then scope filter (#658, #835).
       // Context for the "Incomplete evolution chains" preset (#995): derive
       // chain progress from the freshly-built/hydrated card set. The
       // `scopeContext` memo cannot be used here — it depends on `cards` state
       // which has not been set yet at this point in the load effect.
+      // Computed before reconcileHiddenState so the same context is passed to
+      // both — avoids a second pass over all cards and ensures reconciliation
+      // uses the correct in-progress set when the scope is "incomplete-chains".
       const loadScopeContext: ScopeMatchContext = {
         incompleteChainSpeciesIds: incompleteChainSpeciesIds(
           sessionCards,
@@ -880,12 +885,11 @@ export function ReviewSession() {
           superuserFlags.pretendAllMastered,
         ),
       };
+      const { changed: reconcileChanged } = reconcileHiddenState(sessionCards, persistedScope, today, loadScopeContext);
       const eligibleIds = computeEligibleCardIds(
         sessionCards,
         {
-          nameCardsEnabled: nameEnabled,
           evolutionCardsEnabled: evolutionEnabled,
-          reverseCardsEnabled: enabled,
           reverseEvolutionCardsEnabled: reverseEvolutionEnabledLocal,
           cryCardsEnabled: cryEnabled,
           alternateFormsEnabled: formsEnabled,
@@ -893,21 +897,23 @@ export function ReviewSession() {
         },
         loadScopeContext,
       );
-      // Persist whenever scope is active so reconciliation results survive a
-      // reload. When scope is empty, the only thing reconcileHiddenState can do
-      // is clear stale hiddenSince — still worth persisting if any cleared.
-      notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
+      // Only persist when reconcileHiddenState actually mutated card state
+      // (stamped or cleared hiddenSince, shifted dueDate). Skipping the save
+      // when nothing changed avoids a redundant ~600 KB IDB write on every
+      // page load — the main cause of hydration slowness after #1234 doubled
+      // the card count to ~2 050 (#1262).
+      if (reconcileChanged) {
+        notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
+      }
 
       setCards(sessionCards);
       setLimits(sessionLimits);
-      setReverseEnabled(enabled);
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
-      setNameCardsEnabled(nameEnabled);
       setEvolutionCardsEnabled(evolutionEnabled);
       setCryCardsEnabled(cryEnabled);
       setAlternateFormsEnabled(formsEnabled);
       setCardTypesAllOn(
-        enabled && reverseEvolutionEnabledLocal && formsEnabled,
+        reverseEvolutionEnabledLocal && formsEnabled,
       );
       setScope(persistedScope);
       setMasteryRepetitions(settings.masteryRepetitions);
@@ -1292,14 +1298,21 @@ export function ReviewSession() {
     );
   }
 
-  // --- All card types disabled ---
+  // --- All opt-in card types disabled ---
+  // Name and reverse are always on since #1234, so this guard covers only
+  // the unlikely case where evolution, reverse-evolution, and cry are all off
+  // AND the practiceScope has no cards. In practice, name+reverse being always
+  // on means the session will always have at least some cards unless the scope
+  // explicitly excludes everything (handled below). We keep the guard for
+  // correctness but it will only fire for the evolution/cry-only opt-in combos.
   if (
-    !nameCardsEnabled &&
     !evolutionCardsEnabled &&
     !reverseEnabled &&
     !reverseEvolutionEnabled &&
     !cryCardsEnabled
   ) {
+    // This branch is unreachable with default settings since reverseEnabled is
+    // always true. Kept as a safety net.
     return (
       <div className="flex flex-col items-center gap-4 text-center">
         <p className="text-2xl font-semibold text-foreground">No card types enabled</p>
@@ -1524,7 +1537,7 @@ export function ReviewSession() {
     // eligibleCardIds — so that alternate-form and scope filters do not
     // suppress the wall for genuinely-enabled card types (#835).
     const endStateTypeOpts = {
-      nameEnabled: nameCardsEnabled,
+      nameEnabled: true,
       evolutionEnabled: evolutionCardsEnabled,
       reverseEnabled,
       reverseEvolutionEnabled,
@@ -1599,7 +1612,7 @@ export function ReviewSession() {
               <CountdownScreen
                 dueAt={earliestDueAt}
                 perType={perType}
-                nameEnabled={nameCardsEnabled}
+                nameEnabled={true}
                 evolutionEnabled={evolutionCardsEnabled}
                 reverseEnabled={reverseEnabled}
                 reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -1667,7 +1680,7 @@ export function ReviewSession() {
         <EndOfSessionScreen
           variant={variant}
           perType={perType}
-          nameEnabled={nameCardsEnabled}
+          nameEnabled={true}
           evolutionEnabled={evolutionCardsEnabled}
           reverseEnabled={reverseEnabled}
           reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -2396,7 +2409,7 @@ export function ReviewSession() {
           <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
             <TodayPill
               perType={perType}
-              nameEnabled={nameCardsEnabled}
+              nameEnabled={true}
               evolutionEnabled={evolutionCardsEnabled}
               reverseEnabled={reverseEnabled}
               reverseEvolutionEnabled={reverseEvolutionEnabled}
@@ -2505,7 +2518,7 @@ export function ReviewSession() {
         <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-4 sm:w-full flex-none">
           <TodayPill
             perType={perType}
-            nameEnabled={nameCardsEnabled}
+            nameEnabled={true}
             evolutionEnabled={evolutionCardsEnabled}
             reverseEnabled={reverseEnabled}
             reverseEvolutionEnabled={reverseEvolutionEnabled}

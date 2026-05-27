@@ -66,7 +66,10 @@ test.describe("Practice page", () => {
       name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
     });
 
-    await expect(reveal.or(endState)).toBeVisible();
+    // Since #1234 the session is seeded with both name and reverse cards for
+    // every species (~2× the card set). On WebKit this can take longer to build
+    // and write to IDB — use a generous timeout to avoid flaky failures.
+    await expect(reveal.or(endState)).toBeVisible({ timeout: 10_000 });
   });
 
   test("reveal shows grade buttons", async ({ page }) => {
@@ -295,10 +298,15 @@ test.describe("Practice page", () => {
       },
     });
     // Reverse-evolution cards are gated by a settings toggle (default off).
+    // Write to the correct key — poke-memory:settings:v1, not user-settings:v1
+    // (the latter was always a dead key; the app never reads from it).
     await page.addInitScript(() => {
+      const existing = JSON.parse(
+        localStorage.getItem("poke-memory:settings:v1") ?? "{}",
+      );
       localStorage.setItem(
-        "poke-memory:user-settings:v1",
-        JSON.stringify({ reverseEvolutionCardsEnabled: true }),
+        "poke-memory:settings:v1",
+        JSON.stringify({ ...existing, reverseEvolutionCardsEnabled: true }),
       );
     });
 
@@ -351,12 +359,9 @@ test.describe("Practice page", () => {
         cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
       },
     });
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "poke-memory:user-settings:v1",
-        JSON.stringify({ reverseCardsEnabled: true }),
-      );
-    });
+    // reverseCardsEnabled was removed in #1234 — reverse is always on.
+    // poke-memory:user-settings:v1 was also a dead key (app reads settings:v1).
+    // No settings override is needed here; the seeded reverse card will appear.
 
     await page.goto("/");
     await awaitSeedIdb(page);
@@ -1128,15 +1133,15 @@ test.describe("Evolution edge card prompt (#262)", () => {
         cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
       },
     });
-    // The session limits in the IDB payload are overridden by settings. Disable
-    // name/reverse/cry cards in settings so only the seeded evolution card can
-    // appear — it's a review card so the review queue is served first.
+    // The session limits in the IDB payload are overridden by settings. The
+    // seeded evolution card is a review-due card, so the review queue is served
+    // first — it appears before any new name/reverse cards regardless of which
+    // types are enabled. nameCardsEnabled and reverseCardsEnabled were removed
+    // in #1234 (name and reverse are now always on).
     await page.addInitScript(() => {
       window.localStorage.setItem(
         "poke-memory:settings:v1",
         JSON.stringify({
-          nameCardsEnabled: false,
-          reverseCardsEnabled: false,
           cryCardsEnabled: false,
           evolutionCardsEnabled: true,
           maxNewEvolutionPerDay: 10,
@@ -1263,21 +1268,10 @@ test.describe("Per-direction accuracy breakdown on session-end screen (#994)", (
 
   test("direction accuracy row appears after grading a card and reaching the completion screen", async ({ page }) => {
     await seedSessionIdb(page, sessionWithOneDueCard);
-    // Cap all new-card limits to 0 so only the one review-due name card appears.
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "poke-memory:user-settings:v1",
-        JSON.stringify({
-          maxNewPerDay: 0,
-          maxNewEvolutionPerDay: 0,
-          maxNewReversePerDay: 0,
-          maxNewCryPerDay: 0,
-          evolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
-          cryCardsEnabled: false,
-        }),
-      );
-    });
+    // buildCompletedSession seeds all reverse cards as future-due so hydrateSession
+    // adds no new cards. The dead poke-memory:user-settings:v1 key was removed in
+    // #1234 — limits now come from poke-memory:settings:v1 defaults, and since
+    // every species has a seeded reverse card there are no new cards to introduce.
 
     await page.goto("/");
     await awaitSeedIdb(page);
@@ -1377,21 +1371,11 @@ test.describe("Document title due-count badge (#1062)", () => {
     // have a far-future due date so hydrateSession adds no new entries and the
     // badge reflects exactly one due card.
     await seedSessionIdb(page, sessionWithOneDueCard);
-    // Disable new-card introduction so the session stays at exactly one review.
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "poke-memory:user-settings:v1",
-        JSON.stringify({
-          maxNewPerDay: 0,
-          maxNewEvolutionPerDay: 0,
-          maxNewReversePerDay: 0,
-          maxNewCryPerDay: 0,
-          evolutionCardsEnabled: false,
-          reverseCardsEnabled: false,
-          cryCardsEnabled: false,
-        }),
-      );
-    });
+    // buildCompletedSession seeds all reverse cards as future-due so hydrateSession
+    // adds no new cards. The poke-memory:user-settings:v1 key was always a dead
+    // key — the app reads from poke-memory:settings:v1. Removed in this sweep
+    // (#1234): limits come from poke-memory:settings:v1 defaults, and since every
+    // species has a seeded reverse card, hydrateSession adds nothing new.
 
     await page.goto("/");
     await awaitSeedIdb(page);

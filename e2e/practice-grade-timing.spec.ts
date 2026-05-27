@@ -93,13 +93,14 @@ const SESSION_WITH_SIX_DUE_NAME_CARDS = {
 //   speakNameOnReveal: false
 //   playCryOnAnswer: false
 //   speakNameOnAnswer: false
-//   nameCardsEnabled: true      — keep name cards explicitly on
 //   evolutionCardsEnabled: false
-//   reverseCardsEnabled: false
 //   cryCardsEnabled: false
 //   maxNewPerDay: 0             — no new cards introduced mid-session
 //   maxReviewsPerDay: 100       — high daily cap so session never stalls
 //   mobileNav: "bottom"         — avoids the hamburger-nav migration default
+//
+// nameCardsEnabled and reverseCardsEnabled were removed in #1234.
+// Name and reverse cards are now always on — omit these stale fields.
 // ---------------------------------------------------------------------------
 const TIMING_SETTINGS = {
   waitForAudioOnGrade: false,
@@ -107,9 +108,7 @@ const TIMING_SETTINGS = {
   speakNameOnReveal: false,
   playCryOnAnswer: false,
   speakNameOnAnswer: false,
-  nameCardsEnabled: true,
   evolutionCardsEnabled: false,
-  reverseCardsEnabled: false,
   cryCardsEnabled: false,
   maxNewPerDay: 0,
   maxReviewsPerDay: 100,

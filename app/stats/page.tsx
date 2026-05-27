@@ -348,16 +348,12 @@ export default function StatsPage() {
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [cardTypeSettings, setCardTypeSettings] = useState<{
-    nameCardsEnabled: boolean;
     evolutionCardsEnabled: boolean;
     reverseEvolutionCardsEnabled: boolean;
-    reverseCardsEnabled: boolean;
     cryCardsEnabled: boolean;
   }>({
-    nameCardsEnabled: true,
     evolutionCardsEnabled: true,
     reverseEvolutionCardsEnabled: false,
-    reverseCardsEnabled: false,
     cryCardsEnabled: false,
   });
   const [userTimezone, setUserTimezone] = useState("UTC");
@@ -389,15 +385,13 @@ export default function StatsPage() {
       if (settings.dateFormat) setUserDateFormat(settings.dateFormat);
       const saved = await loadSession();
       const sessionCards = saved !== null
-        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled })
-        : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: settings.reverseCardsEnabled, nameEnabled: settings.nameCardsEnabled, evolutionEnabled: settings.evolutionCardsEnabled });
+        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled })
+        : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
       setCardTypeSettings({
-        nameCardsEnabled: settings.nameCardsEnabled,
         evolutionCardsEnabled: settings.evolutionCardsEnabled,
         reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
-        reverseCardsEnabled: settings.reverseCardsEnabled,
         cryCardsEnabled: settings.cryCardsEnabled,
       });
       setAlternateFormsEnabled(settings.alternateFormsEnabled);
@@ -474,9 +468,7 @@ export default function StatsPage() {
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Stats reads all axes from the returned snapshot (#1139, simplified in #1151).
   const snapshotSettings = useMemo(() => ({
-    nameCardsEnabled: cardTypeSettings.nameCardsEnabled,
     evolutionCardsEnabled: cardTypeSettings.evolutionCardsEnabled,
-    reverseCardsEnabled: cardTypeSettings.reverseCardsEnabled,
     reverseEvolutionCardsEnabled: cardTypeSettings.reverseEvolutionCardsEnabled,
     cryCardsEnabled: cardTypeSettings.cryCardsEnabled,
     alternateFormsEnabled,

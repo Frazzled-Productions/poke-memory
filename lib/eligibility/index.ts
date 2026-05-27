@@ -6,7 +6,8 @@
  * (`app/api/push/send-daily/route.ts` `rowIsEligible`) apply the same
  * two-axis gate:
  *
- *   1. Card-type enabled flags (`nameCardsEnabled`, `evolutionCardsEnabled`, etc.)
+ *   1. Card-type enabled flags (`evolutionCardsEnabled`, etc.)
+ *      Name and reverse are always on (#1234) — no per-direction toggle.
  *   2. `alternateFormsEnabled` — excludes alt-form cards (species id >= 10000)
  *      when false.
  *
@@ -49,12 +50,13 @@ export type EligibilityInput = {
  * Settings surface consumed by `isCardEligible`. Matches the relevant
  * subset of `UserSettings` in `lib/settings/persistence.ts` and the
  * `UserEligibility` shape in `app/api/push/send-daily/route.ts`.
+ *
+ * Name and reverse card directions are always on since #1234. They are not
+ * represented here — their absence means "always pass".
  */
 export type CardEligibilitySettings = {
-  nameCardsEnabled: boolean;
   evolutionCardsEnabled: boolean;
   reverseEvolutionCardsEnabled: boolean;
-  reverseCardsEnabled: boolean;
   cryCardsEnabled: boolean;
   alternateFormsEnabled: boolean;
 };
@@ -82,10 +84,10 @@ export const ALT_FORM_ID_THRESHOLD = 10000;
  * given `settings`.
  *
  * Gate 1 — card-type enabled flags:
- *   - `"name"`                   → `nameCardsEnabled`
+ *   - `"name"`                   → always on (#1234)
+ *   - `"reverse"`                → always on (#1234)
  *   - `"evolution-edge"`         → `evolutionCardsEnabled`
  *   - `"reverse-evolution-edge"` → `reverseEvolutionCardsEnabled`
- *   - `"reverse"`                → `reverseCardsEnabled`
  *   - `"cry"`                    → `cryCardsEnabled`
  *   - unknown type               → pass through (forward-compatible)
  *
@@ -107,18 +109,17 @@ export function isCardEligible(
   const { cardType, subjectKey } = input;
 
   // ── Gate 1: card-type enabled ───────────────────────────────────────────
+  // name and reverse are always on since #1234 — no guard needed.
   switch (cardType) {
     case "name":
-      if (!settings.nameCardsEnabled) return false;
+    case "reverse":
+      // Always eligible — no per-direction toggle.
       break;
     case "evolution-edge":
       if (!settings.evolutionCardsEnabled) return false;
       break;
     case "reverse-evolution-edge":
       if (!settings.reverseEvolutionCardsEnabled) return false;
-      break;
-    case "reverse":
-      if (!settings.reverseCardsEnabled) return false;
       break;
     case "cry":
       if (!settings.cryCardsEnabled) return false;

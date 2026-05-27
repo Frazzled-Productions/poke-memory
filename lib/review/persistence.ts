@@ -298,6 +298,15 @@ function loadSessionLS(): SavedSession | null {
 export async function loadSession(): Promise<SavedSession | null> {
   if (typeof window === "undefined") return null;
 
+  // E2E test hook: seedIdb (e2e/helpers/seedIdb.ts) sets __seedIdbReady before
+  // page.goto. Awaiting it here ensures the seed transaction has committed
+  // before we open our own IDB read, eliminating a race where the app's
+  // load-effect idbGet resolves before the seed tx.oncomplete fires. This
+  // promise is never set in production so the await is a no-op there.
+  if (window.__seedIdbReady) {
+    await window.__seedIdbReady;
+  }
+
   if (!isIdbAvailable()) {
     return loadSessionLS();
   }
@@ -373,6 +382,11 @@ export const SESSION_CHANGED_EVENT = "poke-memory:session-changed";
 declare global {
   interface Window {
     __pokeMemorySessionWriteEpoch?: number;
+    // Set by the E2E seed helper (e2e/helpers/seedIdb.ts) before page.goto.
+    // Resolves when the IDB seed transaction commits. loadSession awaits this
+    // when present so the app never reads IDB before the test seed is durable.
+    // Never set in production — the guard is a no-op outside the test harness.
+    __seedIdbReady?: Promise<void>;
   }
 }
 

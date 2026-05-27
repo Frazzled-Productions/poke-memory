@@ -89,19 +89,21 @@ export function computeDirectionBreakdown(
  * Build the set of enabled card directions from the card-type flags in
  * UserSettings. Extracted here so the Stats page and unit tests can share the
  * same mapping without importing the full settings module.
+ *
+ * Name and reverse are always on since #1234. Only the opt-in enrichment
+ * directions (evolution, reverse-evolution, cry) are conditionally included.
  */
 export function enabledDirectionsFromSettings(settings: {
-  nameCardsEnabled: boolean;
   evolutionCardsEnabled: boolean;
   reverseEvolutionCardsEnabled: boolean;
-  reverseCardsEnabled: boolean;
   cryCardsEnabled: boolean;
 }): ReadonlySet<CardDirection> {
   const enabled = new Set<CardDirection>();
-  if (settings.nameCardsEnabled) enabled.add("name");
+  // Name and reverse are always enabled (#1234).
+  enabled.add("name");
+  enabled.add("reverse");
   if (settings.evolutionCardsEnabled) enabled.add("evolution");
   if (settings.reverseEvolutionCardsEnabled) enabled.add("reverse-evolution");
-  if (settings.reverseCardsEnabled) enabled.add("reverse");
   if (settings.cryCardsEnabled) enabled.add("cry");
   return enabled;
 }
