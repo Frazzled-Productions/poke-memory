@@ -1828,6 +1828,7 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           role="switch"
+                          aria-label="Pretend all Pokémon are mastered"
                           aria-checked={flags.pretendAllMastered}
                           onClick={() =>
                             void setFlag("pretendAllMastered", !flags.pretendAllMastered)
@@ -1863,6 +1864,7 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           role="switch"
+                          aria-label="Force next streak milestone"
                           aria-checked={flags.forceNextStreakMilestone}
                           onClick={() =>
                             void setFlag(
@@ -1901,6 +1903,7 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           role="switch"
+                          aria-label="Force cards graduated"
                           aria-checked={flags.forceCardsGraduated}
                           onClick={() =>
                             void setFlag(
