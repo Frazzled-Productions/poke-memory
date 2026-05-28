@@ -97,6 +97,10 @@ export async function GET(): Promise<NextResponse> {
   try {
     supabase = (await createClient()) as unknown as SupabaseClient;
   } catch (err) {
+    // Re-throw Next.js internal prerender-control errors (identified by their
+    // `.digest` property). Swallowing these during build causes the prerender
+    // to record a 503 instead of deferring the route to request-time rendering.
+    if (err !== null && typeof err === "object" && "digest" in err) throw err;
     console.error("[/api/export] Supabase client construction failed", err);
     return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
   }

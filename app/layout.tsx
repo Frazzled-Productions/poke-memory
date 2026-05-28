@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
-import { setRequestLocale } from "next-intl/server";
-import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
-import { resolveLocale } from "@/i18n/request";
+import { LocaleProvider } from "@/components/i18n/LocaleProvider";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -145,21 +142,24 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Resolve locale from cookie OUTSIDE any 'use cache' function so we can
-  // safely read cookies(). setRequestLocale makes the locale available to all
-  // Server Components in this render via React cache(). See i18n/request.ts.
-  const locale = await resolveLocale();
-  setRequestLocale(locale);
-  const messages = await getMessages();
+  // Locale is resolved inside <LocaleProvider> which is wrapped in <Suspense>
+  // below. This keeps RootLayout itself free of dynamic cookie reads, so
+  // statically-generated routes (e.g. /pokedex/[id]) can prerender without
+  // hitting "Uncached data accessed outside of <Suspense>" (#1260).
+  //
+  // We default lang="en" on the <html> element here. The actual locale is
+  // available to Server Components via setRequestLocale() inside LocaleProvider,
+  // and to Client Components via NextIntlClientProvider. The lang attribute is
+  // an accessibility hint only — it does not need to be dynamic at the shell level.
 
   return (
     <html
-      lang={locale}
+      lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
@@ -181,63 +181,68 @@ export default async function RootLayout({
       </head>
       <body className="min-h-dvh flex flex-col">
         {/*
-          NextIntlClientProvider makes the message catalogue available to Client
-          Components via useTranslations(). The locale and messages are resolved
-          server-side (from the cookie) in the layout above (#1260).
+          LocaleProvider is wrapped in Suspense so the cookie read it performs
+          (resolveLocale → cookies()) is isolated from the static shell.
+          Without this boundary, routes with generateStaticParams (e.g.
+          /pokedex/[id]) fail prerendering with "Uncached data accessed outside
+          of <Suspense>" because the dynamic cookie read propagates up through
+          the layout (#1260).
         */}
-        <NextIntlClientProvider locale={locale} messages={messages}>
-        {/*
-          #app-root wraps all persistent page chrome. FirstVisitOnboardingModal
-          renders via createPortal directly onto <body> and toggles `inert` +
-          `aria-hidden` on this element while open, preventing the screen-reader
-          virtual cursor from escaping into background content.
-        */}
-        <div id="app-root" className="contents">
-          <AuthProvider>
-            <SuperuserProvider>
-              <DashboardSnapshotProvider>
-                <FavouriteThemeProvider>
-                  <ThemeWatermark />
-                  <Nav />
-                  <Suspense fallback={null}>
-                    <SyncOnVisible />
-                  </Suspense>
-                  <SignInPull />
-                  <AutoSyncOnChange />
-                  <OnlineReconnectSync />
-                  <PwaInstallNudge />
-                  {/*
-                    MobileNavPaddingWrapper adds bottom padding on mobile only when
-                    the bottom tab bar is active, so the fixed bar never overlaps content.
-                    The padding is removed automatically when the user switches to the
-                    hamburger nav style via Settings.
-                  */}
-                  <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
-                  <Footer />
-                  {/*
-                    BottomTabBar is always mounted but returns null internally when
-                    mobileNav === 'hamburger'. The single Suspense boundary here is
-                    sufficient — the component has its own inner Suspense for the
-                    async mastery check.
-                  */}
-                  <BottomTabBar />
-                </FavouriteThemeProvider>
-              </DashboardSnapshotProvider>
-            </SuperuserProvider>
-          </AuthProvider>
-        </div>
-        <IdbMigration />
-        {/* Requests persistent storage to protect against 7-day ITP eviction (#1057). */}
-        <StoragePersistenceRequester />
-        {/* Registers the offline service worker and surfaces the update prompt (#703). */}
-        <ServiceWorkerProvider />
-        {/* Syncs the installed-PWA app icon badge with cards due today (#916). */}
-        <PwaBadge />
-        {/* Prefixes the browser tab title with a due-card count for desktop users (#1062). */}
-        <DocumentTitleBadge />
-        <Analytics />
-        <SpeedInsights />
-        </NextIntlClientProvider>
+        <Suspense fallback={null}>
+          <LocaleProvider>
+            {/*
+              #app-root wraps all persistent page chrome. FirstVisitOnboardingModal
+              renders via createPortal directly onto <body> and toggles `inert` +
+              `aria-hidden` on this element while open, preventing the screen-reader
+              virtual cursor from escaping into background content.
+            */}
+            <div id="app-root" className="contents">
+              <AuthProvider>
+                <SuperuserProvider>
+                  <DashboardSnapshotProvider>
+                    <FavouriteThemeProvider>
+                      <ThemeWatermark />
+                      <Nav />
+                      <Suspense fallback={null}>
+                        <SyncOnVisible />
+                      </Suspense>
+                      <SignInPull />
+                      <AutoSyncOnChange />
+                      <OnlineReconnectSync />
+                      <PwaInstallNudge />
+                      {/*
+                        MobileNavPaddingWrapper adds bottom padding on mobile only when
+                        the bottom tab bar is active, so the fixed bar never overlaps content.
+                        The padding is removed automatically when the user switches to the
+                        hamburger nav style via Settings.
+                      */}
+                      <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
+                      <Footer />
+                      {/*
+                        BottomTabBar is always mounted but returns null internally when
+                        mobileNav === 'hamburger'. The single Suspense boundary here is
+                        sufficient — the component has its own inner Suspense for the
+                        async mastery check.
+                      */}
+                      <BottomTabBar />
+                    </FavouriteThemeProvider>
+                  </DashboardSnapshotProvider>
+                </SuperuserProvider>
+              </AuthProvider>
+            </div>
+            <IdbMigration />
+            {/* Requests persistent storage to protect against 7-day ITP eviction (#1057). */}
+            <StoragePersistenceRequester />
+            {/* Registers the offline service worker and surfaces the update prompt (#703). */}
+            <ServiceWorkerProvider />
+            {/* Syncs the installed-PWA app icon badge with cards due today (#916). */}
+            <PwaBadge />
+            {/* Prefixes the browser tab title with a due-card count for desktop users (#1062). */}
+            <DocumentTitleBadge />
+            <Analytics />
+            <SpeedInsights />
+          </LocaleProvider>
+        </Suspense>
       </body>
     </html>
   );
