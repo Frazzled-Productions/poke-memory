@@ -155,12 +155,12 @@ describe("pushSession", () => {
     expect(batchArg[0].subject_key).toBe("1");
   });
 
-  it("uses (user_id, card_type, subject_key) as the conflict target", async () => {
+  it("uses (user_id, card_type, subject_key, locale) as the conflict target (#1259)", async () => {
     const client = makeSupabaseClient();
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
     await pushSession(client, "user-1", [safeCard]);
     const [, conflictArg] = client._upsertSpy.mock.calls[0] as [unknown, { onConflict: string }];
-    expect(conflictArg.onConflict).toBe("user_id,card_type,subject_key");
+    expect(conflictArg.onConflict).toBe("user_id,card_type,subject_key,locale");
   });
 
   it("warns when an unsafe card is skipped", async () => {
@@ -211,7 +211,7 @@ describe("pushSingleCard", () => {
     expect(client._upsertSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("upsert uses (user_id, card_type, subject_key) as the conflict target", async () => {
+  it("upsert uses (user_id, card_type, subject_key, locale) as the conflict target (#1259)", async () => {
     const client = makeSupabaseClient();
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
     await pushSingleCard(client, "user-1", safeCard);
@@ -221,7 +221,7 @@ describe("pushSingleCard", () => {
     ];
     expect(rowArg.card_type).toBe("name");
     expect(rowArg.subject_key).toBe("1");
-    expect(conflictArg.onConflict).toBe("user_id,card_type,subject_key");
+    expect(conflictArg.onConflict).toBe("user_id,card_type,subject_key,locale");
   });
 });
 
@@ -693,5 +693,76 @@ describe("applyCloudAuthoritative", () => {
     const first = applyCloudAuthoritative(seed, [], cloud, defaultOpts, now);
     const second = applyCloudAuthoritative(seed, [], cloud, defaultOpts, now);
     expect(first).toEqual(second);
+  });
+});
+
+// ─── locale round-trip (#1259) ────────────────────────────────────────────────
+
+describe("locale round-trip (#1259)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("pushSession sends locale field in every row", async () => {
+    const client = makeSupabaseClient();
+    // A card without an explicit locale defaults to "en"
+    const card = makeCard(1, "2026-05-10", "2026-05-10");
+    await pushSession(client, "user-1", [card]);
+    const [batchArg] = client._upsertSpy.mock.calls[0] as [
+      Array<{ locale: string }>,
+      unknown,
+    ];
+    expect(batchArg[0].locale).toBe("en");
+  });
+
+  it("pushSingleCard sends locale field in the row", async () => {
+    const client = makeSupabaseClient();
+    const card = makeCard(1, "2026-05-10", "2026-05-10");
+    await pushSingleCard(client, "user-1", card);
+    const [rowArg] = client._upsertSpy.mock.calls[0] as [{ locale: string }, unknown];
+    expect(rowArg.locale).toBe("en");
+  });
+
+  it("mergeCloudIntoLocal: two cloud rows for the same species in different locales are kept separate", () => {
+    // The local card array has one "en" name card for species 5 and one "ja" name card for species 5.
+    const enCard: ReviewableCard = { ...makeCard(5, null, null), locale: "en" as const };
+    const jaCard: ReviewableCard = {
+      ...makeCard(5, null, null),
+      id: 5,        // same id
+      locale: "ja" as const,
+    };
+
+    const enRow: CloudRow = {
+      ...makeCloudRow(5, "2026-05-01", "2026-05-10"),
+      locale: "en",
+    };
+    const jaRow: CloudRow = {
+      ...makeCloudRow(5, "2026-05-02", "2026-05-11"),
+      locale: "ja",
+    };
+
+    const merged = mergeCloudIntoLocal([enCard, jaCard], [enRow, jaRow]);
+    // Both cards should exist and adopt their respective cloud rows.
+    const mergedEn = merged.find((c) => (c as ReviewableCard & { locale?: string }).locale === "en");
+    const mergedJa = merged.find((c) => (c as ReviewableCard & { locale?: string }).locale === "ja");
+    expect(mergedEn?.state.lastReview).toBe("2026-05-10");
+    expect(mergedJa?.state.lastReview).toBe("2026-05-11");
+  });
+
+  it("mergeCloudIntoLocal: cloud row with locale='ja' does not update an 'en' local card", () => {
+    // An "en" local card must not be overwritten by a "ja" cloud row.
+    const enCard: ReviewableCard = { ...makeCard(7, null, null), locale: "en" as const };
+    const jaRow: CloudRow = {
+      ...makeCloudRow(7, "2026-05-01", "2026-05-10"),
+      locale: "ja",
+    };
+    const [merged] = mergeCloudIntoLocal([enCard], [jaRow]);
+    // The "en" card should be unchanged — no matching cloud row.
+    expect(merged.state.lastReview).toBeNull();
+    expect(merged).toBe(enCard);
   });
 });

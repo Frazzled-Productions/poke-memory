@@ -1,4 +1,5 @@
 import type { UserSettings } from "@/lib/settings/persistence";
+import type { AppLocale } from "@/i18n/locales";
 
 /**
  * Maps `UserSettings.*CardsEnabled` toggles to the `opts` shape that
@@ -9,6 +10,9 @@ import type { UserSettings } from "@/lib/settings/persistence";
  *
  * Name and reverse are always on since #1234. Only the opt-in enrichment
  * directions (evolution, reverse-evolution, cry) are read from settings.
+ *
+ * Also carries `locale` from `settings.pokemonNameLocale` so every build/
+ * hydrate path stamps the correct locale onto new cards (#1259).
  */
 export function seedOptsFromSettings(settings: UserSettings): {
   nameEnabled: boolean;
@@ -16,6 +20,7 @@ export function seedOptsFromSettings(settings: UserSettings): {
   reverseEnabled: boolean;
   reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
+  locale: AppLocale;
 } {
   return {
     nameEnabled: true,
@@ -23,5 +28,6 @@ export function seedOptsFromSettings(settings: UserSettings): {
     reverseEnabled: true,
     reverseEvolutionEnabled: settings.reverseEvolutionCardsEnabled,
     cryEnabled: settings.cryCardsEnabled,
+    locale: settings.pokemonNameLocale,
   };
 }

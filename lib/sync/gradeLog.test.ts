@@ -70,8 +70,8 @@ describe("pushGradeLog", () => {
     expect(from).toHaveBeenCalledWith("grade_log");
     expect(upsert).toHaveBeenCalledWith(
       [
-        { user_id: "user-1", occurred_at: 100, entry_date: "2026-05-12", card_type: "name", grade: 4, subject_key: null },
-        { user_id: "user-1", occurred_at: 101, entry_date: "2026-05-12", card_type: "evolution", grade: 1, subject_key: null },
+        { user_id: "user-1", occurred_at: 100, entry_date: "2026-05-12", card_type: "name", grade: 4, subject_key: null, locale: "en" },
+        { user_id: "user-1", occurred_at: 101, entry_date: "2026-05-12", card_type: "evolution", grade: 1, subject_key: null, locale: "en" },
       ],
       { onConflict: "user_id,occurred_at", ignoreDuplicates: true },
     );
@@ -121,8 +121,8 @@ describe("pullGradeLog", () => {
     ]);
     const result = await pullGradeLog(client, "u");
     expect(result).toEqual([
-      { occurredAt: 200, date: "2026-05-12", cardType: "name", grade: 4 },
-      { occurredAt: 201, date: "2026-05-12", cardType: "reverse", grade: 5 },
+      { occurredAt: 200, date: "2026-05-12", cardType: "name", grade: 4, locale: "en" },
+      { occurredAt: 201, date: "2026-05-12", cardType: "reverse", grade: 5, locale: "en" },
     ]);
   });
 
@@ -139,5 +139,35 @@ describe("pullGradeLog", () => {
   it("returns null on supabase error", async () => {
     const { client } = makeClientWithOrderedSelect(null, { message: "boom" });
     expect(await pullGradeLog(client, "u")).toBeNull();
+  });
+
+  it("maps locale from cloud rows (#1259)", async () => {
+    const { client } = makeClientWithOrderedSelect([
+      { occurred_at: 400, entry_date: "2026-05-12", card_type: "name", grade: 4, subject_key: "1", locale: "ja" },
+      { occurred_at: 401, entry_date: "2026-05-12", card_type: "name", grade: 5, subject_key: "1", locale: null },
+    ]);
+    const result = await pullGradeLog(client, "u");
+    expect(result?.[0].locale).toBe("ja");
+    expect(result?.[1].locale).toBe("en"); // null in cloud → "en" default
+  });
+});
+
+describe("pushGradeLog locale (#1259)", () => {
+  it("sends locale field in each row", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    const entries = [
+      makeEntry(500, { date: "2026-05-12", grade: 4, cardType: "name", locale: "ja" }),
+    ];
+    await pushGradeLog(client, "u", entries);
+    const row = (upsert.mock.calls[0][0] as { locale: string }[])[0];
+    expect(row.locale).toBe("ja");
+  });
+
+  it("defaults locale to en when not set on the entry", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    const entries = [makeEntry(600, { date: "2026-05-12", grade: 4, cardType: "name" })];
+    await pushGradeLog(client, "u", entries);
+    const row = (upsert.mock.calls[0][0] as { locale: string }[])[0];
+    expect(row.locale).toBe("en");
   });
 });

@@ -235,10 +235,10 @@ describe("POST /api/sync", () => {
 
     // The route must target the card_reviews table.
     expect(fromMock).toHaveBeenCalledWith("card_reviews");
-    // The composite conflict key must match the DB unique constraint.
+    // The composite conflict key must match the DB unique constraint (migration 029 adds locale).
     expect(upsertMock).toHaveBeenCalledWith(
       expect.any(Array),
-      { onConflict: "user_id,card_type,subject_key" },
+      { onConflict: "user_id,card_type,subject_key,locale" },
     );
   });
 

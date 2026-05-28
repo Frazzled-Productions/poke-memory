@@ -284,6 +284,51 @@ describe("filterMastered", () => {
     // Even with a threshold the card cannot meet, forceAllMastered lets it through.
     expect(filterMastered(cards, true, 10)).toHaveLength(1);
   });
+
+  it("locale scoping: only returns name cards whose locale matches (#1259)", () => {
+    // Species 1 is mastered in "ja"; species 2 is mastered in "en".
+    const jaName = { ...makeCard(1, "name", masteredState), locale: "ja" as const };
+    const jaReverse = { ...makeCard(2_000_001, "reverse", masteredState), locale: "ja" as const };
+    const enName = { ...makeCard(2, "name", masteredState), locale: "en" as const };
+    const enReverse = { ...makeCard(2_000_002, "reverse", masteredState), locale: "en" as const };
+
+    const all: ReturnType<typeof makeCard>[] = [jaName, jaReverse, enName, enReverse];
+
+    const jaResult = filterMastered(all as ReturnType<typeof makeCard>[], false, 3, "ja");
+    expect(jaResult).toHaveLength(1);
+    expect(jaResult[0].id).toBe(1);
+
+    const enResult = filterMastered(all as ReturnType<typeof makeCard>[], false, 3, "en");
+    expect(enResult).toHaveLength(1);
+    expect(enResult[0].id).toBe(2);
+  });
+
+  it("locale scoping: cards without locale field default to en (#1259)", () => {
+    // Pre-#1259 cards have no locale — they default to "en".
+    const cards = [
+      makeCard(1, "name", masteredState),       // no locale → en
+      makeCard(2_000_001, "reverse", masteredState), // no locale → en
+    ];
+    // Scoped to "en" — should find species 1
+    expect(filterMastered(cards, false, 3, "en")).toHaveLength(1);
+    // Scoped to "ja" — should find nothing
+    expect(filterMastered(cards, false, 3, "ja")).toHaveLength(0);
+  });
+
+  it("forceAllMastered with locale: only returns name cards for the given locale (#1259)", () => {
+    // forceAllMastered bypasses the FSRS gate but still respects locale.
+    const jaName = { ...makeCard(1, "name", newState), locale: "ja" as const };
+    const enName = { ...makeCard(2, "name", newState), locale: "en" as const };
+    const cards = [jaName, enName];
+
+    const jaResult = filterMastered(cards as ReturnType<typeof makeCard>[], true, 3, "ja");
+    expect(jaResult).toHaveLength(1);
+    expect(jaResult[0].id).toBe(1);
+
+    const enResult = filterMastered(cards as ReturnType<typeof makeCard>[], true, 3, "en");
+    expect(enResult).toHaveLength(1);
+    expect(enResult[0].id).toBe(2);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -33,6 +33,7 @@ describe("seedOptsFromSettings", () => {
       reverseEnabled: true,
       reverseEvolutionEnabled: false,
       cryEnabled: true,
+      locale: "en", // DEFAULT_SETTINGS.pokemonNameLocale = "en" (#1259)
     });
   });
 
@@ -44,5 +45,19 @@ describe("seedOptsFromSettings", () => {
       nameEnabled: true,
       reverseEnabled: true,
     });
+  });
+
+  it("threads pokemonNameLocale through as locale (#1259)", () => {
+    const opts = seedOptsFromSettings({
+      ...DEFAULT_SETTINGS,
+      pokemonNameLocale: "ja",
+    });
+    expect(opts.locale).toBe("ja");
+  });
+
+  it("defaults locale to en when pokemonNameLocale is not set (#1259)", () => {
+    // DEFAULT_SETTINGS should have pokemonNameLocale set to "en"
+    const opts = seedOptsFromSettings(DEFAULT_SETTINGS);
+    expect(opts.locale).toBe("en");
   });
 });
