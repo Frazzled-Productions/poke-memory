@@ -133,6 +133,8 @@ Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
 2. **Real conflicts only.** Disjoint batches almost never conflict. If `gh pr merge` reports a genuine merge conflict (two PRs touched the same lines), rebase *that one PR* onto `origin/qa` with `--force-with-lease`, resolve, push, and retry the merge. This is the rare exception, not the per-PR norm.
 
+   **After one fix-round fails to converge, use `/investigate-ci-failure` rather than dispatching a second sweep.** If a batch PR's CI is still red after the first fix agent runs, do not dispatch another agent of the same shape — the second sweep will not converge either (memory: `feedback_investigate_after_sweep_fail`; worked examples in `#1234` and `#1263`). Hand off to `.claude/skills/investigate-ci-failure.md`, which forces a logic-vs-perf triage and mandates Playwright traces for perf-shape failures before any code change.
+
 3. **Detached-HEAD noise.** When the session runs from a detached HEAD (the parallel-jobs case), `gh pr merge` prints a harmless `could not determine current branch` notice *after* a successful merge. Confirm the merge landed with `gh pr view <PR> --json state` rather than trusting the command's exit code.
 
 ## Wrap-up
