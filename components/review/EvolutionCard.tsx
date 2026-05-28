@@ -1,6 +1,9 @@
+"use client";
+
 import type { PokemonFact } from "@/lib/pokemon/facts";
 import { EvolutionCardLayout } from "@/components/review/EvolutionCardLayout";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 
 type Props = {
   /**
@@ -31,7 +34,10 @@ type Props = {
  * hidden before reveal.
  *
  * `preEvoId` and `postEvoId` are threaded through to `EvolutionCardLayout` so
- * it can resolve locale-aware names at render time (#1260).
+ * it can resolve locale-aware names at render time. The question-side name
+ * shown in the prompt sentence (e.g. "What does X evolve into?") is also
+ * resolved here via the same hook so it updates on `pokemonNameLocale` change
+ * without a session rebuild (#1260).
  */
 export function EvolutionCard({
   direction,
@@ -45,11 +51,23 @@ export function EvolutionCard({
   preEvoId,
   postEvoId,
 }: Props) {
+  // Resolve both sides so the question-side prompt and any downstream
+  // assertion use the locale-aware name. The layout resolves them again
+  // internally — the duplicate call is cheap (memoised by ID).
+  const { name: resolvedPreEvoName } = useLocalePokemonName(
+    preEvoId ?? undefined,
+    preEvoName,
+  );
+  const { name: resolvedPostEvoName } = useLocalePokemonName(
+    postEvoId ?? undefined,
+    postEvoName,
+  );
+
   if (direction === "reverse-evolution") {
     const prompt = (
       <>
-        Which Pokémon evolves into <span className="capitalize">{postEvoName}</span>
-        <NameTtsButton name={postEvoName} id={postEvoId} size="inline" />
+        Which Pokémon evolves into <span className="capitalize">{resolvedPostEvoName}</span>
+        <NameTtsButton name={resolvedPostEvoName} id={postEvoId} size="inline" />
         {triggerPhrase ? <> {triggerPhrase}</> : null}?
       </>
     );
@@ -75,8 +93,8 @@ export function EvolutionCard({
 
   const prompt = (
     <>
-      What does <span className="capitalize">{preEvoName}</span>
-      <NameTtsButton name={preEvoName} id={preEvoId} size="inline" />{" "}
+      What does <span className="capitalize">{resolvedPreEvoName}</span>
+      <NameTtsButton name={resolvedPreEvoName} id={preEvoId} size="inline" />{" "}
       evolve into{triggerPhrase ? <> {triggerPhrase}</> : null}?
     </>
   );
