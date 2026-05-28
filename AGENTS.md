@@ -324,6 +324,8 @@ The smoke subset is intentionally smaller than CI's full e2e matrix — the goal
 
 **Auto-review on PR open.** `auto-review.yml` fires when a PR opens and posts `<!-- auto-review:1 -->`. Do not run `code-reviewer` yourself in the implement stage — it runs automatically after the PR is open.
 
+**CI failure that does not converge — `/investigate-ci-failure`.** If a fix-round fails to converge (the next CI run is still red on the same shape), do not dispatch a second sweep agent. The second sweep will not converge either — sweep agents pattern-match on test names and tweak fixtures or bump timeouts, which is the wrong tool when the real cause is a production-code regression, a perf-budget breach, or a bundle-size cliff. Use the `/investigate-ci-failure` skill (`.claude/skills/investigate-ci-failure.md`) instead: it forces a logic-vs-perf triage, mandates Playwright traces for perf-shape failures, and requires reading the production code path (not just the test) for logic-shape failures before any code change. Memory: `feedback_investigate_after_sweep_fail`; worked examples in `#1234` and `#1263`.
+
 ### Privacy
 
 Two paths exist -- guest and authenticated. The constraints differ.
