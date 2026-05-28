@@ -111,7 +111,13 @@ jobs:
       - uses: actions/setup-node@v6
         if: steps.idem.outputs.skip == 'false'
         with:
-          node-version: '20'
+          # Must match the Node version used by the other `npm ci` workflows
+          # (ci.yml, coverage.yml, integration-tests.yml all use Node 24, per
+          # .nvmrc). Drifting to Node 20 here fails `npm ci` with a missing
+          # @swc/helpers transitive — the lock file was resolved under Node 24's
+          # newer npm and Node 20's older npm resolves peer deps differently.
+          # See #1274.
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
