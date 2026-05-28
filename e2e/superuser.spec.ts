@@ -118,9 +118,12 @@ test.describe("Superuser mode", () => {
     // Generation I has 151 species; under the flag both numerator and
     // denominator should be 151. The exact tally is rendered inside each
     // generation section's heading.
+    // 20 s: the Pokédex page renders ~1 025 tiles and the next-intl Suspense
+    // boundary from #1260 adds a hydration round-trip that pushes WebKit over
+    // the previous 10 s ceiling.
     await expect(
       page.getByText(/Generation I.*151\s*\/\s*151/i).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: 20_000 });
   });
 
   test("pretendAllMastered populates the Pasture", async ({ page }) => {
