@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullSettings, pullSettingsWithTimestamp, pushSettings, pushRegionalPrefs, pullRegionalPrefs } from "./settings";
 import type { UserSettings } from "@/lib/settings/persistence";
 import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
+import { DEFAULT_LABS_FLAGS } from "@/lib/labs/flags";
 
 function makeClientWithRpc(error: null | object = null) {
   const rpc = vi.fn().mockResolvedValue({ error });
@@ -78,6 +79,7 @@ const SAMPLE: UserSettings = {
   verifiedTypedEntryMode: false,
   typedEntryOnboardingShown: false,
   mcCardOnboardingShown: false,
+  labsFlags: { ...DEFAULT_LABS_FLAGS },
 };
 
 describe("pushSettings", () => {

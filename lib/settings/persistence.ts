@@ -15,6 +15,11 @@ import {
   validateStreakProtection,
   type StreakProtection,
 } from "@/lib/streak/tokens";
+import {
+  DEFAULT_LABS_FLAGS,
+  parseLabsFlags,
+  type LabsFlags,
+} from "@/lib/labs/flags";
 
 // localStorage key for all user-configurable settings
 export const STORAGE_KEY = KEY_SETTINGS;
@@ -271,6 +276,17 @@ export type UserSettings = {
    * Default false — absent in pre-#1271 records; bool parser back-fills to false.
    */
   mcCardOnboardingShown: boolean;
+  /**
+   * Opt-in feature flags for preview / pre-release features (#1258).
+   * Distinct from Superuser/Developer flags (which are QA cheats).
+   * Labs flags are real user preferences: they sync normally and are never
+   * suppressed by the superuser write-guard.
+   *
+   * Stored in the JSONB blob; missing keys back-fill from DEFAULT_LABS_FLAGS
+   * on read (no migration needed). The registry of known flags lives in
+   * `lib/labs/flags.ts`.
+   */
+  labsFlags: LabsFlags;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -319,6 +335,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   typedEntryOnboardingShown: false,
   // Default false: absent in pre-#1271 records; bool parser back-fills to false.
   mcCardOnboardingShown: false,
+  // Empty registry on initial ship (#1258); back-fill on read from DEFAULT_LABS_FLAGS.
+  labsFlags: { ...DEFAULT_LABS_FLAGS },
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -544,6 +562,8 @@ function parseStoredSettings(raw: string | null): UserSettings {
     typedEntryOnboardingShown: bool(obj, "typedEntryOnboardingShown"),
     // Default false: absent in pre-#1271 records (#1271).
     mcCardOnboardingShown: bool(obj, "mcCardOnboardingShown"),
+    // Back-fill missing keys from the registry; unknown keys silently dropped (#1258).
+    labsFlags: parseLabsFlags(obj.labsFlags),
   };
 }
 

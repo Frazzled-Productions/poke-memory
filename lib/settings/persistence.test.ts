@@ -6,6 +6,7 @@ import {
   DEFAULT_ONBOARDING,
   type ThemeIntensity,
 } from '@/lib/settings/persistence';
+import { DEFAULT_LABS_FLAGS } from '@/lib/labs/flags';
 
 const STORAGE_KEY = 'poke-memory:settings:v1';
 
@@ -124,7 +125,7 @@ describe('loadSettings migration', () => {
     // mobileNav defaults to 'hamburger' for existing records without the field
     // (preserving the pre-#661 experience for existing users). All other fields
     // match DEFAULT_SETTINGS.
-    expect(settings).toEqual({ ...DEFAULT_SETTINGS, mobileNav: 'hamburger' });
+    expect(settings).toEqual({ ...DEFAULT_SETTINGS, mobileNav: 'hamburger', labsFlags: { ...DEFAULT_LABS_FLAGS } });
   });
 
   it('saveSettings + loadSettings round-trips all settings correctly', () => {
@@ -172,6 +173,7 @@ describe('loadSettings migration', () => {
       verifiedTypedEntryMode: false,
       typedEntryOnboardingShown: false,
       mcCardOnboardingShown: false,
+      labsFlags: { ...DEFAULT_LABS_FLAGS },
     };
     saveSettings(custom);
     const loaded = loadSettings();
