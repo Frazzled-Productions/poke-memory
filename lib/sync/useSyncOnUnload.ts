@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
-import { loadSyncStatus, saveSyncStatus, clearPendingQueue } from "@/lib/sync/persistence";
+import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
@@ -68,6 +68,19 @@ export function useSyncOnUnload(
       pushingRef.current = true;
       const now = new Date().toISOString();
       const prev = loadSyncStatus();
+
+      // Persist the unsynced cards to localStorage BEFORE attempting the
+      // beacon / fetch. The per-grade debounce (500 ms) and the enqueue
+      // cleanup may not have fired yet when the page hides, so at this point
+      // the pending queue in localStorage could be empty even though
+      // pendingQueueRef (in-memory) has cards. Persisting here ensures that
+      // if the beacon fails AND the OS kills the page before the 500 ms
+      // debounce or the React cleanup effect runs, the cards are available for
+      // useOnlineReconnectSync and useRetryPush on the next app open (#1288).
+      // Only write when the queue is non-empty — clearPendingQueue is called
+      // after a successful push, so we must not overwrite that with stale data.
+      savePendingQueue(unsynced);
+
       const payload = buildBeaconPayload(unsynced);
 
       if (event.type === "pagehide") {
