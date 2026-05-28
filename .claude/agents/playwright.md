@@ -29,14 +29,15 @@ The orchestrator should tell you:
    - If the orchestrator's brief is **more** detailed than the issue body, that is fine — proceed against the brief. The cross-check is one-directional: it surfaces dropped scope, not added detail.
    - Multi-issue briefs: cross-check against every referenced issue.
    - Skip the cross-check only for **trivial** changes where the issue body is the brief verbatim and contains no acceptance-criteria section. Document the skip in your first message.
-2. Read the diff or changed files to understand what's new or modified.
-3. Read the affected page/component source to find testable elements — headings, buttons, ARIA labels, text content.
-4. Read existing `e2e/` specs to match patterns and avoid duplicating coverage.
-5. Write or update specs. One spec file per feature area:
+2. **Centralisation check.** Before adding a new selector pattern, fixture, or computation of a domain concept (Pokémon name, date display, mastery count, sprite URL), check whether an existing test helper or fixture produces this value. If yes, use it. If no but the concept is referenced in other specs, propose centralising in the same PR rather than adding another fragmented selector. Test fixtures and selectors that reference Pokémon-shaped data should share helpers for the same reason production code does — see AGENTS.md "Single source of truth for shared concepts".
+3. Read the diff or changed files to understand what's new or modified.
+4. Read the affected page/component source to find testable elements — headings, buttons, ARIA labels, text content.
+5. Read existing `e2e/` specs to match patterns and avoid duplicating coverage.
+6. Write or update specs. One spec file per feature area:
    - `e2e/smoke.spec.ts` — cross-cutting (navigation, page loads, core flows)
    - `e2e/<feature>.spec.ts` — feature-specific flows (e.g. `e2e/pokedex.spec.ts`)
-6. If a change modifies text content or accessible names that existing tests assert on, update those assertions.
-7. **PR body — acceptance criteria coverage.** In your PR body (or in your handback to the orchestrator if you don't open the PR yourself), include an `## Acceptance criteria covered` section listing every E2E-relevant criterion from the issue body, marked `[x]` for criteria this PR addresses and `[ ] deferred — <reason>` for any intentionally deferred. The reviewer (and `code-reviewer`) reads the same issue body and uses this section as the structured starting point.
+7. If a change modifies text content or accessible names that existing tests assert on, update those assertions.
+8. **PR body — acceptance criteria coverage.** In your PR body (or in your handback to the orchestrator if you don't open the PR yourself), include an `## Acceptance criteria covered` section listing every E2E-relevant criterion from the issue body, marked `[x]` for criteria this PR addresses and `[ ] deferred — <reason>` for any intentionally deferred. The reviewer (and `code-reviewer`) reads the same issue body and uses this section as the structured starting point.
 
 ## Selector rules
 - **First choice**: `getByRole` with accessible name — e.g. `page.getByRole('button', { name: 'Reveal' })`
