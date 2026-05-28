@@ -14,7 +14,7 @@ import {
   totalDirectionReviews,
   type DirectionBreakdownRow,
 } from "@/lib/stats/direction-breakdown";
-import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
 
 type Props = {
   /** One row per card direction, from `computeDirectionBreakdown`. */
@@ -47,7 +47,7 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
       <p className="font-semibold text-foreground">{datum.label}</p>
       {datum.hasData ? (
         <>
-          <p className="mt-1 tabular-nums text-zinc-600 dark:text-zinc-300">
+          <p className={`mt-1 ${statValue}`}>
             Accuracy: {datum.accuracyPct}%
           </p>
           <p className="tabular-nums text-zinc-500 dark:text-zinc-400">

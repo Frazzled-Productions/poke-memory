@@ -9,7 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { GradeDistribution, GradeTrendPoint } from "@/lib/stats/grade-distribution";
-import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Colour palette — consistent with GradeBreakdownBar and the Stats accent vocabulary
@@ -50,7 +50,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonl
         w/c {d.weekStart}
       </p>
       {rows.map(({ label, key, count }) => (
-        <p key={key} className="tabular-nums text-zinc-600 dark:text-zinc-300">
+        <p key={key} className={statValue}>
           <span
             className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
             style={{ backgroundColor: GRADE_COLOURS[key] }}
