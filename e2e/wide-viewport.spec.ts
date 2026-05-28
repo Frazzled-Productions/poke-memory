@@ -52,9 +52,12 @@ test.describe("Practice page — session-progress sidebar (lg: layout)", () => {
     const endState = page.getByRole("heading", {
       name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
     });
-    // 15 s: after #1234 the card set is ~2× larger (name + reverse for all
-    // species), so hydration takes longer on WebKit.
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 15_000 });
+    // 30 s: this is the narrowest path (mobile-safari only — see the
+    // test.skip above), which combines the post-#1234 doubled card-set
+    // hydration cost AND the #1260 next-intl Suspense boundary AND the
+    // narrow-viewport-specific layout work. Other mobile-safari practice
+    // tests pass at 20 s; this one consistently needs more.
+    await expect(reveal.or(endState)).toBeVisible({ timeout: 30_000 });
 
     // On mobile, the sidebar element exists in the DOM but is hidden via CSS.
     // Playwright's toBeVisible() checks CSS visibility (display:none / opacity 0).
