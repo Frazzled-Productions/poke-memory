@@ -12,6 +12,20 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 
 ## Process
 1. Read the relevant existing code first — don't plan in a vacuum.
+
+   **Pre-flight: staleness check (#1322).** Before any other planning work, run `.github/scripts/check-issue-staleness.sh <N>` against the issue number. If the script reports `STALE: yes`, do **not** plan — report the staleness verdict (age + commits touching referenced files) back to the orchestrator so the user can either confirm the ACs still hold or update the issue. The orchestrator surfaces the prompt via `AskUserQuestion`; resume planning only after the user confirms. Skip this step only when the issue is trivial (typo fix, doc tweak, single-line workflow change) per the planner-skip checklist in WORKFLOW.md.
+
+   **Pre-flight: AC-quality check (#1321).** For non-trivial issues, read the issue body and assess whether the `## Acceptance criteria` section exists and is concrete enough to test against. A criterion is **testable** when an implementer or reviewer can read it and produce a yes/no verdict from a build, test run, screenshot, or diff inspection. Examples:
+   - Testable: "the Settings page renders a new 'Sync paused' label when `flags.pretendAllMastered` is on", "`pullSession` returns the merged card set when both local and cloud have entries".
+   - Not testable (vague): "works well", "is intuitive", "looks nice", "the user experience is good", "performs well".
+
+   If the section is missing entirely or any criterion is vague, **do not draft a plan yet**. Instead:
+   1. Draft a proposed list of concrete, testable ACs from the issue body's intent (what the issue is trying to achieve).
+   2. Surface the draft ACs back to the orchestrator in your normal output, under a top-level `## Proposed acceptance criteria` heading **before** the plan body. Mark each one with `[proposed]` so the orchestrator knows it needs user approval.
+   3. The orchestrator runs `AskUserQuestion` to get user approval; on approval it posts the agreed checklist as a comment on the issue, then re-dispatches you with the formalised ACs in scope. The downstream implementer and reviewer cross-checks anchor on that comment.
+
+   Trivial issues (typo fixes, doc tweaks, one-liner workflow changes — the same set that may skip the planner entirely per WORKFLOW.md) are exempt from the AC-quality check.
+
 2. Identify unknowns. Tag each one for the orchestrator:
    - `[EXPERT-RESEARCH]` — has an objectively-correct answer a domain specialist can produce. Name the specialist (`next16-expert`, `pokeapi-expert`, `srs-expert`, or `supabase-expert`). Example: "what conflict resolution rule preserves FSRS scheduling integrity?" → srs-expert. Example: "should this feature use a new table or extend `user_settings.settings`?" → supabase-expert.
    - `[USER-DECISION + RESEARCH]` — needs maintainer judgment, but a project-specific options brief from `researcher` would meaningfully improve the decision (comparative tradeoffs, current ecosystem state, what fits this codebase). Example: "which backend provider?" → researcher surveys options against this project's constraints.
@@ -53,3 +67,33 @@ This line is consumed by the implement job's staleness gate. It must be the lite
 ## What you don't do
 - Don't write code. Plans only.
 - Don't speculate beyond what the codebase tells you. If you don't know, mark it as a research-first item.
+
+## Worked example: AC-quality check flow
+
+A maintainer files this issue:
+
+> **Title:** "Pasture page should feel snappier"
+>
+> **Body:** "The Pasture page is a bit slow to render when the user has lots of caught Pokémon. We should improve it so it feels good."
+
+The body has no `## Acceptance criteria` section and the existing prose is subjective ("feels good", "snappier"). The planner does **not** proceed to step 2. Instead it returns:
+
+```
+## Proposed acceptance criteria
+
+These ACs are not yet in the issue body. The orchestrator must surface them
+to the user via AskUserQuestion before planning continues.
+
+- [proposed] First contentful paint of the Pasture page is under 1.5s on the
+  pinned mobile-safari Playwright project.
+- [proposed] The grid renders all caught Pokémon without virtualisation gaps
+  (verified by a Playwright assertion that counts rendered tiles).
+- [proposed] No regression in `lib/pasture/*` unit tests; new render-perf
+  test added under `e2e/pasture.spec.ts`.
+- [proposed] Bundle size for the Pasture route does not grow by more than
+  2KB gzipped, measured against `qa`.
+
+(Plan omitted pending AC confirmation.)
+```
+
+The orchestrator runs `AskUserQuestion` with those four items. On approval it posts the agreed list as a comment on the issue, then re-dispatches the planner with the formalised ACs in the issue body's scope. The downstream `code-reviewer` reads that comment when it does the post-implementation cross-check (per the cross-check rules referenced in issue #1321), so the loop is closed.

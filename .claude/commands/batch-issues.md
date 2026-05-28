@@ -59,7 +59,17 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
    - **`qa` ahead** (`ahead > 0`): a previous batch was drained into `qa` but never promoted. Stop and ask the maintainer whether to **promote** (open the `qa -> main` PR for the existing work first) or **discard** (`git push origin +origin/main:qa`) before starting a new batch — do not silently stack a new batch on top.
    - If `qa` does not exist at all, stop and surface it — the qa staging-branch setup (#806) has not been applied.
 
-5. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
+5. **Per-issue staleness check (#1322).** For every non-trivial issue surfaced in step 1, run:
+
+   ```bash
+   .github/scripts/check-issue-staleness.sh <N>
+   ```
+
+   The script prints a structured verdict (`STALE: yes|no` plus reasons). For any issue that reports `STALE: yes` (default 3-day age threshold, or git activity on backtick-quoted file paths in the body since `createdAt`), include it in the **Decisions first** AskUserQuestion round below — the maintainer either confirms the ACs still hold (proceed) or marks the issue for an amend (skip this batch). Per-issue threshold overrides live on the issue itself as a `stale-check:N` label (or `stale-check:off` to disable the age branch); see the script header for the precedence rules.
+
+   Skip the staleness check for trivial issues (typo fixes, doc tweaks, one-liner workflow changes) — they are exempt under the same rule that lets them skip the planner.
+
+6. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
 
    - **Code** — a concrete, implementable change. Goes into the implementation batches.
    - **Analysis** — a read-only audit or umbrella issue whose deliverable is a report plus scoped follow-up issues, not a PR.
