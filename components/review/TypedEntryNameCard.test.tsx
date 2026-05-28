@@ -190,7 +190,7 @@ describe("TypedEntryNameCard — locale-aware answer reveal", () => {
     // Feedback should show the locale name, not the English canonical.
     expect(screen.getByText("ピカチュウ")).toBeInTheDocument();
     expect(screen.queryByText("Pikachu")).not.toBeInTheDocument();
-    act(() => { vi.advanceTimersByTime(1500); });
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
     vi.useRealTimers();
   });
 });

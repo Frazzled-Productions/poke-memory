@@ -226,24 +226,27 @@ describe("MultipleChoiceNameCard — locale-aware names", () => {
       "@/components/review/MultipleChoiceNameCard"
     );
     vi.useFakeTimers();
-    render(
-      <LocaleMCCard
-        spriteUrl="/sprites/1.png"
-        canonicalName="Bulbasaur"
-        options={DEFAULT_OPTIONS}
-        id={1}
-        onGrade={vi.fn()}
-      />,
-    );
-    // Click a wrong answer (Charmander is option id=4, resolves to English).
-    fireEvent.click(screen.getByText("Charmander"));
-    // Feedback should show the locale name, not the English canonical.
-    const feedbackRegion = screen
-      .getAllByRole("status")
-      .find((el) => el.getAttribute("aria-atomic") === "true")!;
-    expect(feedbackRegion).toHaveTextContent("フシギダネ");
-    expect(feedbackRegion).not.toHaveTextContent("Bulbasaur");
-    act(() => { vi.advanceTimersByTime(HOLD); });
-    vi.useRealTimers();
+    try {
+      render(
+        <LocaleMCCard
+          spriteUrl="/sprites/1.png"
+          canonicalName="Bulbasaur"
+          options={DEFAULT_OPTIONS}
+          id={1}
+          onGrade={vi.fn()}
+        />,
+      );
+      // Click a wrong answer (Charmander is option id=4, resolves to English).
+      fireEvent.click(screen.getByText("Charmander"));
+      // Feedback should show the locale name, not the English canonical.
+      const feedbackRegion = screen
+        .getAllByRole("status")
+        .find((el) => el.getAttribute("aria-atomic") === "true")!;
+      expect(feedbackRegion).toHaveTextContent("フシギダネ");
+      expect(feedbackRegion).not.toHaveTextContent("Bulbasaur");
+      act(() => { vi.advanceTimersByTime(HOLD); });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

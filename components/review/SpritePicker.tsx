@@ -43,7 +43,7 @@ type TileProps = {
  * unconditionally — hooks may not be called inside array maps (#1260 followup).
  */
 function SpritePickerTile({ tile, answered, selectedId, onTap, tileClassName }: TileProps) {
-  const { name: localeName } = useLocalePokemonName(tile.id, tile.displayName);
+  const { name: localeName } = useLocalePokemonName(tile.speciesId, tile.displayName);
 
   const ariaLabel = !answered
     ? localeName
@@ -126,7 +126,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
   // feedback label. Falls back to the English displayName synchronously
   // until the locale sidecar loads (#1260 followup).
   const { name: targetLocaleName } = useLocalePokemonName(
-    targetPokemon.id,
+    targetPokemon.speciesId,
     targetPokemon.displayName,
   );
 

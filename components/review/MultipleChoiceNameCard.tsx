@@ -52,7 +52,7 @@ function NameOptionButton({
   onChoose,
 }: NameOptionButtonProps) {
   const { name: localeName } = useLocalePokemonName(
-    option.pokemon.id,
+    option.pokemon.speciesId,
     option.pokemon.displayName,
   );
   const wasChosen = submitted && index === chosenIndex;
