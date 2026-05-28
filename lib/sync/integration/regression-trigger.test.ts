@@ -635,49 +635,48 @@ describe("regression trigger (integration)", () => {
     // After migration 029, the PK is (user_id, card_type, subject_key, locale).
     // The same (user, card_type, subject_key) in "en" and "ja" must coexist as
     // independent rows — this is the key correctness guarantee for per-locale FSRS.
-    const client = await pool.connect();
-    try {
-      await withUser(client, USER_ID, async (c) => {
-        // Insert the "en" row — locale defaults to "en".
-        // Use current_date for first_seen / last_review so the
-        // reject_pre_reset_card_reviews trigger does not fire when a prior
-        // migration-022 test has stamped last_reset_at = now().
-        await c.query(
-          `INSERT INTO card_reviews
-             (user_id, card_type, subject_key,
-              stability, difficulty, elapsed_days, scheduled_days,
-              reps, lapses, fsrs_state,
-              due_date, last_review, first_seen,
-              seen_in_pasture, updated_at)
-           VALUES ($1, 'name', '501',
-                   2.0, 5.0, 1, 3,
-                   2, 0, 'review',
-                   current_date + 10, current_date, current_date,
-                   false, now())`,
-          [USER_ID],
-        );
+    //
+    // Both inserts go through pool.query (not withUser) so the rows are committed
+    // and visible to the subsequent SELECT. withUser always rolls back its
+    // transaction for test isolation, which would cause the SELECT to return 0 rows.
+    //
+    // Use now() for first_seen / last_review so the reject_pre_reset_card_reviews
+    // trigger does not fire: a prior migration-022 test stamps last_reset_at=now(),
+    // and the trigger rejects any first_seen < last_reset_at. current_date resolves
+    // to midnight UTC which is earlier than now() whenever the DB clock is past
+    // midnight — i.e. always.
 
-        // Insert the "ja" row — same identity except locale.
-        await expect(
-          c.query(
-            `INSERT INTO card_reviews
-               (user_id, card_type, subject_key, locale,
-                stability, difficulty, elapsed_days, scheduled_days,
-                reps, lapses, fsrs_state,
-                due_date, last_review, first_seen,
-                seen_in_pasture, updated_at)
-             VALUES ($1, 'name', '501', 'ja',
-                     1.5, 5.0, 1, 2,
-                     1, 0, 'review',
-                     current_date + 10, current_date, current_date,
-                     false, now())`,
-            [USER_ID],
-          ),
-        ).resolves.toBeDefined();
-      });
-    } finally {
-      client.release();
-    }
+    // Insert the "en" row — locale defaults to "en".
+    await pool.query(
+      `INSERT INTO card_reviews
+         (user_id, card_type, subject_key,
+          stability, difficulty, elapsed_days, scheduled_days,
+          reps, lapses, fsrs_state,
+          due_date, last_review, first_seen,
+          seen_in_pasture, updated_at)
+       VALUES ($1, 'name', '501',
+               2.0, 5.0, 1, 3,
+               2, 0, 'review',
+               current_date + 10, now()::date, now()::date,
+               false, now())`,
+      [USER_ID],
+    );
+
+    // Insert the "ja" row — same identity except locale.
+    await pool.query(
+      `INSERT INTO card_reviews
+         (user_id, card_type, subject_key, locale,
+          stability, difficulty, elapsed_days, scheduled_days,
+          reps, lapses, fsrs_state,
+          due_date, last_review, first_seen,
+          seen_in_pasture, updated_at)
+       VALUES ($1, 'name', '501', 'ja',
+               1.5, 5.0, 1, 2,
+               1, 0, 'review',
+               current_date + 10, now()::date, now()::date,
+               false, now())`,
+      [USER_ID],
+    );
 
     // Verify both rows exist with independent reps values.
     const { rows } = await pool.query(
