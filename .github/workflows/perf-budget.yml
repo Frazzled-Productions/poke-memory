@@ -9,14 +9,15 @@ name: Perf budget
 # the gate prevents the body from executing without the env var.
 #
 # Status: NON-REQUIRED initially. After one week of stable baseline the
-# `perf-budget` job ID can be added to the `qa-staging` / `main-protection`
+# `perf-budget` aggregator job (the single stable check-name produced by
+# this workflow) can be added to the `qa-staging` / `main-protection`
 # rulesets' required-checks list — no spec or workflow change needed.
 # See WORKFLOW.md "Perf budget gate" for budgets, ratchet rules, and the
 # promotion criterion.
 #
-# Modelled on the `e2e-browser` job in ci.yml: same pinned Playwright
-# image, same build-then-serve pattern, same matrix shape so the wall-clock
-# stays comparable.
+# Modelled on the `e2e-browser` + `e2e` aggregator pattern in ci.yml:
+# same pinned Playwright image, same build-then-serve pattern, same
+# matrix shape, and a `changes` filter so docs-only PRs are a no-op.
 
 on:
   pull_request:
@@ -28,8 +29,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  perf-budget:
+  # Classify the PR so the heavy matrix legs can skip when irrelevant.
+  # On push to main/qa, both outputs are forced true so the budget is
+  # always evaluated post-merge as a safety net.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      perf_relevant: ${{ steps.decide.outputs.perf_relevant }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Detect changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            perf_relevant:
+              - 'app/**'
+              - 'components/**'
+              - 'lib/**'
+              - 'public/**'
+              - 'e2e/perf-budget.spec.ts'
+              - 'playwright.config.ts'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'next.config.ts'
+              - '.github/workflows/perf-budget.yml'
+      - name: Decide outputs (force true on push)
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "perf_relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "perf_relevant=${{ steps.filter.outputs.perf_relevant }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  perf-budget-browser:
     name: Perf budget (${{ matrix.project }})
+    needs: changes
     runs-on: ubuntu-latest
     # Browsers + system deps baked into the image. The tag MUST track the
     # @playwright/test version resolved in package-lock.json. Node 24
@@ -46,9 +87,15 @@ jobs:
       matrix:
         project: [chromium, mobile-safari]
     steps:
+      - name: Skip notice (no perf-relevant change)
+        if: needs.changes.outputs.perf_relevant != 'true'
+        run: echo "No perf-relevant changes detected — skipping perf budget run."
+
       - uses: actions/checkout@v6
+        if: needs.changes.outputs.perf_relevant == 'true'
 
       - name: Cache npm
+        if: needs.changes.outputs.perf_relevant == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.npm
@@ -57,11 +104,14 @@ jobs:
             npm-${{ runner.os }}-
 
       - run: npm ci
+        if: needs.changes.outputs.perf_relevant == 'true'
 
       - name: Build
+        if: needs.changes.outputs.perf_relevant == 'true'
         run: npm run build
 
       - name: Start Next.js and run perf budget spec
+        if: needs.changes.outputs.perf_relevant == 'true'
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
           PERF_BUDGET: "1"
@@ -75,14 +125,14 @@ jobs:
           npx playwright test e2e/perf-budget.spec.ts --project=${{ matrix.project }}
 
       - name: Stop Next.js
-        if: always()
+        if: always() && needs.changes.outputs.perf_relevant == 'true'
         run: |
           if [ -f /tmp/next.pid ]; then
             kill "$(cat /tmp/next.pid)" 2>/dev/null || true
           fi
 
       - name: Upload Playwright report
-        if: failure()
+        if: failure() && needs.changes.outputs.perf_relevant == 'true'
         uses: actions/upload-artifact@v7
         with:
           # Per-project name: two matrix legs uploading the same artifact
@@ -95,3 +145,24 @@ jobs:
           # artifact and leave the maintainer without diff data. Mirrors
           # the ci.yml e2e-browser policy (#1127).
           if-no-files-found: error
+
+  perf-budget:
+    # Aggregator: a single stable check-name for the ruleset to require.
+    # Mirrors the ci.yml `e2e` aggregator. Keeping the required-check name
+    # stable means promoting this gate to required is a one-line ruleset
+    # edit, regardless of how the matrix grows or shrinks.
+    needs: [perf-budget-browser]
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Verify all perf-budget matrix legs passed
+        run: |
+          result="${{ needs.perf-budget-browser.result }}"
+          echo "perf-budget-browser matrix result: $result"
+          # A skipped matrix (docs-only change) is a pass. Anything other
+          # than success or skipped — failure, cancelled — fails the gate.
+          if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+            echo "::error::One or more perf-budget matrix legs did not pass (result: $result)."
+            exit 1
+          fi
