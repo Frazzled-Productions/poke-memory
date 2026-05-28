@@ -20,13 +20,23 @@ The orchestrator should tell you:
 2. Which pages/flows are affected.
 
 ## Process
-1. Read the diff or changed files to understand what's new or modified.
-2. Read the affected page/component source to find testable elements — headings, buttons, ARIA labels, text content.
-3. Read existing `e2e/` specs to match patterns and avoid duplicating coverage.
-4. Write or update specs. One spec file per feature area:
+1. **Issue-body cross-check.** Before writing any specs, identify the issue number(s) the brief is implementing — from the orchestrator's prompt, the branch name (e.g. `fix/1259-...`), or a separately-passed `issue=N` argument. For each issue:
+   - Run `gh issue view <N> --json title,body,labels` to fetch the body verbatim. Do not rely on the orchestrator's summary.
+   - Extract every acceptance criterion (typically a `## Acceptance criteria` checklist, or numbered "must"/"should" lines in `## Design`). Treat the checklist as the canonical contract.
+   - Compare against the brief from the orchestrator. List the criteria the brief **covers** and the criteria the brief **does not mention**.
+   - If the brief omits one or more E2E-relevant criteria (visible user flow, page render, interactive control), **stop before writing specs**. Report the gap as: `Issue #N lists these acceptance criteria not covered by the brief: [list]. Are these intentional deferrals (state which and why), or did the brief drop them?` Wait for the orchestrator's resolution.
+   - If the orchestrator confirms the omissions are intentional, proceed with the brief as-is and record the deferral in the PR body under `## Acceptance criteria covered`. If the orchestrator extends the brief to cover the missing criteria, proceed against the extended brief.
+   - If the orchestrator's brief is **more** detailed than the issue body, that is fine — proceed against the brief. The cross-check is one-directional: it surfaces dropped scope, not added detail.
+   - Multi-issue briefs: cross-check against every referenced issue.
+   - Skip the cross-check only for **trivial** changes where the issue body is the brief verbatim and contains no acceptance-criteria section. Document the skip in your first message.
+2. Read the diff or changed files to understand what's new or modified.
+3. Read the affected page/component source to find testable elements — headings, buttons, ARIA labels, text content.
+4. Read existing `e2e/` specs to match patterns and avoid duplicating coverage.
+5. Write or update specs. One spec file per feature area:
    - `e2e/smoke.spec.ts` — cross-cutting (navigation, page loads, core flows)
    - `e2e/<feature>.spec.ts` — feature-specific flows (e.g. `e2e/pokedex.spec.ts`)
-5. If a change modifies text content or accessible names that existing tests assert on, update those assertions.
+6. If a change modifies text content or accessible names that existing tests assert on, update those assertions.
+7. **PR body — acceptance criteria coverage.** In your PR body (or in your handback to the orchestrator if you don't open the PR yourself), include an `## Acceptance criteria covered` section listing every E2E-relevant criterion from the issue body, marked `[x]` for criteria this PR addresses and `[ ] deferred — <reason>` for any intentionally deferred. The reviewer (and `code-reviewer`) reads the same issue body and uses this section as the structured starting point.
 
 ## Selector rules
 - **First choice**: `getByRole` with accessible name — e.g. `page.getByRole('button', { name: 'Reveal' })`
