@@ -92,7 +92,10 @@ DEFAULT_THRESHOLD_DAYS=3
 THRESHOLD_DAYS="${STALE_THRESHOLD_DAYS:-$DEFAULT_THRESHOLD_DAYS}"
 AGE_CHECK_DISABLED="no"
 
-# Per-issue label override: stale-check:N or stale-check:off
+# Per-issue label override: stale-check:N or stale-check:off. If both are
+# applied to the same issue (operator error), stale-check:off wins because
+# `AGE_CHECK_DISABLED=yes` short-circuits the age comparison below
+# regardless of any THRESHOLD_DAYS value set here.
 while IFS= read -r label; do
   if [[ "$label" == "stale-check:off" ]]; then
     AGE_CHECK_DISABLED="yes"
@@ -131,16 +134,23 @@ fi
 # ---- Extract referenced files --------------------------------------------
 
 # Grab backtick-quoted tokens that look like file paths with one of the
-# allowed extensions. Allow optional `**` glob suffixes — strip those before
-# passing to git log.
+# allowed extensions. Glob-suffixed paths in issue bodies (e.g.
+# `lib/sync/**`) are intentionally not matched here — `git log` accepts
+# pathspecs but the path-existence check below filters them out anyway, so
+# we keep the regex tight to concrete files.
 EXTRACTED=$(printf '%s\n' "$BODY" \
   | grep -oE '`[a-zA-Z0-9_/.-]+\.(ts|tsx|mjs|sql|md|yml)`' \
   | sed 's/`//g' \
   | sort -u \
   || true)
 
-# Filter to paths that actually exist in the tree — broken or moved paths
-# would generate noise from git log and obscure the real signal.
+# Filter to paths that exist in the current tree — broken or moved paths
+# would generate noise from `git log` on the worktree-relative pathspec.
+# Note: a path whose deletion since `createdAt` is itself a strong "the
+# landscape has shifted" signal would be silently dropped here. Callers
+# who care about that specific signal should inspect the issue body
+# manually. The age-based branch still fires for sufficiently old issues
+# regardless of which paths they reference.
 REFERENCED_FILES=()
 if [[ -n "$EXTRACTED" ]]; then
   while IFS= read -r path; do
