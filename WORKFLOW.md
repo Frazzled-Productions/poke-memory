@@ -25,6 +25,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [playwright](.claude/agents/playwright.md) | E2E smoke tests after user-facing changes; owns `e2e/**` | No |
 | [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change | Yes |
 | [privacy-expert](.claude/agents/privacy-expert.md) | Data-protection / compliance advice — GDPR/UK-GDPR controller obligations, Children's Code, PECR/cookies, privacy notice + Terms drafting, DPIA upkeep, sub-processor classification | Yes |
+| [i18n-expert](.claude/agents/i18n-expert.md) | Multi-locale design — `pokemonNameLocale` vs. `appLocale`, transliteration sources (rōmaji, pinyin), message catalogs, `next-intl` routing, locale-aware sync, `<lang>` placement, adding a new locale | Yes |
 | [workflow-expert](.claude/agents/workflow-expert.md) | Reviews GitHub Actions / orchestration changes — idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
 
 ---
