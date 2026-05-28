@@ -11,6 +11,15 @@ vi.mock("next/image", () => ({
 
 vi.mock("@/lib/audio/tts", () => ({ speakName: vi.fn() }));
 
+// Return the English name synchronously so tests are deterministic and do not
+// depend on localStorage or the locale sidecar being loaded.
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (_id: number | undefined, englishName: string) => ({
+    name: englishName,
+    transliteration: null,
+  }),
+}));
+
 const PRE_SPRITE = "https://example.com/charmander.png";
 const POST_SPRITE = "https://example.com/charmeleon.png";
 

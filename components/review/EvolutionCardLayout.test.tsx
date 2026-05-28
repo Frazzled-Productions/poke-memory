@@ -5,6 +5,11 @@
  * row, the hidden-side logic, the reveal state, and the fact block. The
  * per-direction wrapper tests in EvolutionCard.test.tsx cover the prompt
  * sentence and badge in context.
+ *
+ * `useLocalePokemonName` is mocked to return the English fallback synchronously,
+ * which is the same behaviour callers see before the locale-names sidecar loads.
+ * Locale-resolution behaviour is tested separately in
+ * `components/i18n/useLocalePokemonName.test.tsx`.
  */
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
@@ -18,6 +23,20 @@ vi.mock("next/image", () => ({
 }));
 
 vi.mock("@/lib/audio/tts", () => ({ speakName: vi.fn() }));
+
+// Return the English name synchronously so layout tests are deterministic.
+// Using vi.fn() so individual tests can override the implementation.
+const mockUseLocalePokemonName = vi.fn(
+  (_id: number | undefined, englishName: string) => ({
+    name: englishName,
+    transliteration: null as string | null,
+  }),
+);
+
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (id: number | undefined, englishName: string) =>
+    mockUseLocalePokemonName(id, englishName),
+}));
 
 const PRE_SPRITE = "https://example.com/charmander.png";
 const POST_SPRITE = "https://example.com/charmeleon.png";
@@ -156,6 +175,43 @@ describe("EvolutionCardLayout — sprites at intrinsic 320px", () => {
     render(<EvolutionCardLayout {...BASE_PROPS} hiddenSide="post" revealed={true} />);
     expect(screen.getByAltText("charmander")).toHaveAttribute("width", "320");
     expect(screen.getByAltText("charmeleon")).toHaveAttribute("width", "320");
+  });
+});
+
+describe("EvolutionCardLayout — locale-aware name rendering (#1260)", () => {
+  it("uses the locale-resolved name for alt text and revealed answer when IDs are provided", () => {
+    // Override the mock to return Japanese names for this test.
+    mockUseLocalePokemonName.mockImplementation((_id, englishName) => {
+      const map: Record<string, string> = {
+        charmander: "ヒトカゲ",
+        charmeleon: "リザード",
+      };
+      return { name: map[englishName] ?? englishName, transliteration: null };
+    });
+
+    render(
+      <EvolutionCardLayout
+        {...BASE_PROPS}
+        hiddenSide="post"
+        revealed={true}
+        preEvoId={4}
+        postEvoId={5}
+        answerId={5}
+      />,
+    );
+
+    // Sprites use locale-resolved names as alt text.
+    expect(screen.getByAltText("ヒトカゲ")).toHaveAttribute("src", PRE_SPRITE);
+    expect(screen.getByAltText("リザード")).toHaveAttribute("src", POST_SPRITE);
+
+    // Revealed answer row shows the locale name.
+    expect(screen.getByText("リザード")).toBeInTheDocument();
+
+    // Restore mock to the default (return englishName).
+    mockUseLocalePokemonName.mockImplementation((_id, englishName) => ({
+      name: englishName,
+      transliteration: null,
+    }));
   });
 });
 

@@ -174,6 +174,7 @@ describe('loadSettings migration', () => {
       typedEntryOnboardingShown: false,
       mcCardOnboardingShown: false,
       labsFlags: { ...DEFAULT_LABS_FLAGS },
+      pokemonNameLocale: 'ja' as const,
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -802,5 +803,37 @@ describe('reverseFeedbackDelay migration (#1200)', () => {
       );
       expect(loadSettings().reverseFeedbackDelay).toBe('default');
     }
+  });
+});
+
+describe('loadSettings: pokemonNameLocale (#1260)', () => {
+  it('defaults to "en" when the field is absent (back-fill for pre-#1260 records)', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    expect(loadSettings().pokemonNameLocale).toBe('en');
+  });
+
+  it('round-trips all valid locale values', () => {
+    for (const locale of ['en', 'ja', 'zh-Hans', 'zh-Hant'] as const) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, pokemonNameLocale: locale }),
+      );
+      expect(loadSettings().pokemonNameLocale).toBe(locale);
+    }
+  });
+
+  it('falls back to "en" for unknown locale values', () => {
+    for (const bad of ['fr', 'de', 'zh', '', 42, null, true, {}]) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, pokemonNameLocale: bad }),
+      );
+      expect(loadSettings().pokemonNameLocale).toBe('en');
+    }
+  });
+
+  it('saveSettings + loadSettings round-trips pokemonNameLocale: "ja"', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, pokemonNameLocale: 'ja' });
+    expect(loadSettings().pokemonNameLocale).toBe('ja');
   });
 });

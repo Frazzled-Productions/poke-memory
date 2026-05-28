@@ -76,27 +76,29 @@ test.describe("i18n — Languages Labs flag (#1260)", () => {
     await expect(page.getByText("Languages")).toBeVisible();
   });
 
-  test("enabling Languages flag reveals a locale selector", async ({ page }) => {
+  test("enabling Languages flag reveals both locale selectors", async ({ page }) => {
     await enableLanguagesFlag(page);
     await page.goto("/settings");
 
     // Expand Labs section.
     await page.getByRole("button", { name: /^labs$/i }).click();
 
-    // The locale selector should be visible because the flag is on.
-    // Use the element ID directly to avoid a strict-mode violation: getByLabel("Language")
-    // (non-exact) matches both the "Languages" switch toggle and the "Language" select label.
-    const localeSelect = page.locator("#labs-locale-select");
-    await expect(localeSelect).toBeVisible();
+    // Both selectors should be visible because the flag is on.
+    const appLocaleSelect = page.locator("#labs-app-locale-select");
+    const pokemonNameLocaleSelect = page.locator("#labs-pokemon-name-locale-select");
+    await expect(appLocaleSelect).toBeVisible();
+    await expect(pokemonNameLocaleSelect).toBeVisible();
 
-    // All four locales must be present as options.
-    await expect(localeSelect.locator('option[value="en"]')).toHaveCount(1);
-    await expect(localeSelect.locator('option[value="ja"]')).toHaveCount(1);
-    await expect(localeSelect.locator('option[value="zh-Hans"]')).toHaveCount(1);
-    await expect(localeSelect.locator('option[value="zh-Hant"]')).toHaveCount(1);
+    // Both selectors must offer all four locales.
+    for (const select of [appLocaleSelect, pokemonNameLocaleSelect]) {
+      await expect(select.locator('option[value="en"]')).toHaveCount(1);
+      await expect(select.locator('option[value="ja"]')).toHaveCount(1);
+      await expect(select.locator('option[value="zh-Hans"]')).toHaveCount(1);
+      await expect(select.locator('option[value="zh-Hant"]')).toHaveCount(1);
+    }
   });
 
-  test("switching locale to ja sets poke-memory:locale cookie", async ({
+  test("app language and Pokémon name language selectors are independent", async ({
     page,
     context,
   }) => {
@@ -106,19 +108,54 @@ test.describe("i18n — Languages Labs flag (#1260)", () => {
     // Expand Labs section.
     await page.getByRole("button", { name: /^labs$/i }).click();
 
-    // Use the element ID directly to avoid a strict-mode violation: getByLabel("Language")
-    // (non-exact) matches both the "Languages" switch toggle and the "Language" select label.
-    const localeSelect = page.locator("#labs-locale-select");
-    await expect(localeSelect).toBeVisible();
+    const appLocaleSelect = page.locator("#labs-app-locale-select");
+    const pokemonNameLocaleSelect = page.locator("#labs-pokemon-name-locale-select");
+    await expect(appLocaleSelect).toBeVisible();
+    await expect(pokemonNameLocaleSelect).toBeVisible();
+
+    // Switch app language to Japanese — should write the cookie.
+    await appLocaleSelect.selectOption("ja");
+    await page.waitForFunction(
+      () => document.cookie.includes("poke-memory:locale=ja"),
+      null,
+      { timeout: 5_000 },
+    );
+
+    // Switch Pokémon name language to Simplified Chinese — should write settings, NOT the cookie.
+    await pokemonNameLocaleSelect.selectOption("zh-Hans");
+
+    // Cookie should still be "ja" (only the app language select writes it).
+    const cookies = await context.cookies();
+    const localeCookie = cookies.find((c) => c.name === LOCALE_COOKIE);
+    expect(localeCookie?.value).toBe("ja");
+
+    // The settings selector itself shows zh-Hans (controlled by localStorage).
+    await expect(pokemonNameLocaleSelect).toHaveValue("zh-Hans");
+
+    // Verify pokemonNameLocale was written to localStorage settings.
+    const settingsRaw = await page.evaluate((key) => localStorage.getItem(key), SETTINGS_KEY);
+    expect(settingsRaw).not.toBeNull();
+    const settings = JSON.parse(settingsRaw!) as Record<string, unknown>;
+    expect(settings.pokemonNameLocale).toBe("zh-Hans");
+  });
+
+  test("switching app locale to ja sets poke-memory:locale cookie", async ({
+    page,
+    context,
+  }) => {
+    await enableLanguagesFlag(page);
+    await page.goto("/settings");
+
+    // Expand Labs section.
+    await page.getByRole("button", { name: /^labs$/i }).click();
+
+    const appLocaleSelect = page.locator("#labs-app-locale-select");
+    await expect(appLocaleSelect).toBeVisible();
 
     // Switch to Japanese.
-    await localeSelect.selectOption("ja");
+    await appLocaleSelect.selectOption("ja");
 
     // Wait for the Server Action to commit by polling document.cookie directly.
-    // On WebKit the Server Action response lags the synchronous cookie read, so
-    // a fixed timeout is racey. waitForFunction polls the exact value being
-    // asserted, giving the action up to 5 s to propagate without over-waiting
-    // on fast browsers.
     await page.waitForFunction(
       () => document.cookie.includes("poke-memory:locale=ja"),
       null,

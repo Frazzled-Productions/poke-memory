@@ -29,6 +29,9 @@ type Props = {
  * Both directions delegate to `EvolutionCardLayout`; the only differences are
  * the prompt sentence, the badge direction, and which side of the arrow is
  * hidden before reveal.
+ *
+ * `preEvoId` and `postEvoId` are threaded through to `EvolutionCardLayout` so
+ * it can resolve locale-aware names at render time (#1260).
  */
 export function EvolutionCard({
   direction,
@@ -58,8 +61,10 @@ export function EvolutionCard({
         hiddenSide="pre"
         preEvoSpriteUrl={preEvoSpriteUrl}
         preEvoName={preEvoName}
+        preEvoId={preEvoId}
         postEvoSpriteUrl={postEvoSpriteUrl}
         postEvoName={postEvoName}
+        postEvoId={postEvoId}
         answerName={preEvoName}
         answerId={preEvoId}
         revealed={revealed}
@@ -83,8 +88,10 @@ export function EvolutionCard({
       hiddenSide="post"
       preEvoSpriteUrl={preEvoSpriteUrl}
       preEvoName={preEvoName}
+      preEvoId={preEvoId}
       postEvoSpriteUrl={postEvoSpriteUrl}
       postEvoName={postEvoName}
+      postEvoId={postEvoId}
       answerName={postEvoName}
       answerId={postEvoId}
       revealed={revealed}

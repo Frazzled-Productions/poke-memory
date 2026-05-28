@@ -20,6 +20,7 @@ import {
   parseLabsFlags,
   type LabsFlags,
 } from "@/lib/labs/flags";
+import { DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
 
 // localStorage key for all user-configurable settings
 export const STORAGE_KEY = KEY_SETTINGS;
@@ -287,6 +288,14 @@ export type UserSettings = {
    * `lib/labs/flags.ts`.
    */
   labsFlags: LabsFlags;
+  /**
+   * Locale for Pokémon name display (#1260). Independent from the app UI
+   * locale (which is stored in the `poke-memory:locale` cookie). A user can
+   * practise Japanese names while keeping the app UI in English, or vice
+   * versa. Defaults to `"en"`. Only active when the `languages` Labs flag is
+   * on. Absent in pre-#1260 records; back-fills to `"en"` on read.
+   */
+  pokemonNameLocale: AppLocale;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -337,6 +346,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   mcCardOnboardingShown: false,
   // Empty registry on initial ship (#1258); back-fill on read from DEFAULT_LABS_FLAGS.
   labsFlags: { ...DEFAULT_LABS_FLAGS },
+  // Default "en": absent in pre-#1260 records; back-fills to English on read.
+  pokemonNameLocale: DEFAULT_LOCALE,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -564,6 +575,15 @@ function parseStoredSettings(raw: string | null): UserSettings {
     mcCardOnboardingShown: bool(obj, "mcCardOnboardingShown"),
     // Back-fill missing keys from the registry; unknown keys silently dropped (#1258).
     labsFlags: parseLabsFlags(obj.labsFlags),
+    // Default "en": absent in pre-#1260 records (#1260). Only accepted locale
+    // values are kept; anything else falls back to English.
+    pokemonNameLocale:
+      obj.pokemonNameLocale === "en" ||
+      obj.pokemonNameLocale === "ja" ||
+      obj.pokemonNameLocale === "zh-Hans" ||
+      obj.pokemonNameLocale === "zh-Hant"
+        ? (obj.pokemonNameLocale as AppLocale)
+        : DEFAULT_LOCALE,
   };
 }
 

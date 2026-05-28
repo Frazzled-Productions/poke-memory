@@ -1904,37 +1904,72 @@ export default function SettingsPage() {
                           </button>
                         </div>
 
-                        {/* Locale picker — only shown when languages flag is on */}
+                        {/* Locale pickers — only shown when languages flag is on.
+                            Two independent selectors: one for the app UI, one
+                            for Pokémon names (#1260). */}
                         {key === "languages" && (settings.labsFlags[key] ?? false) && (
-                          <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-                            <label
-                              htmlFor="labs-locale-select"
-                              className="block text-sm font-medium text-foreground"
-                            >
-                              Language
-                            </label>
-                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                              Pokémon names will be shown in the chosen language.
-                              App UI translation is in progress.
-                            </p>
-                            <select
-                              id="labs-locale-select"
-                              value={activeLocale}
-                              onChange={(e) => {
-                                const next = e.target.value as AppLocale;
-                                setActiveLocale(next);
-                                void setLocaleCookie(next).then(() => {
-                                  router.refresh();
-                                });
-                              }}
-                              className="mt-2 rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                            >
-                              {SUPPORTED_LOCALES.map((loc) => (
-                                <option key={loc} value={loc}>
-                                  {LOCALE_LABELS[loc]}
-                                </option>
-                              ))}
-                            </select>
+                          <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 flex flex-col gap-4">
+                            {/* App language — writes the locale cookie */}
+                            <div>
+                              <label
+                                htmlFor="labs-app-locale-select"
+                                className="block text-sm font-medium text-foreground"
+                              >
+                                App language
+                              </label>
+                              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                Controls the app UI language. App UI translation is in progress.
+                              </p>
+                              <select
+                                id="labs-app-locale-select"
+                                value={activeLocale}
+                                onChange={(e) => {
+                                  const next = e.target.value as AppLocale;
+                                  setActiveLocale(next);
+                                  void setLocaleCookie(next).then(() => {
+                                    router.refresh();
+                                  });
+                                }}
+                                className="mt-2 rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                              >
+                                {SUPPORTED_LOCALES.map((loc) => (
+                                  <option key={loc} value={loc}>
+                                    {LOCALE_LABELS[loc]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Pokémon name language — writes pokemonNameLocale in settings */}
+                            <div>
+                              <label
+                                htmlFor="labs-pokemon-name-locale-select"
+                                className="block text-sm font-medium text-foreground"
+                              >
+                                Pokémon name language
+                              </label>
+                              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                Pokémon names on cards will be shown in this language.
+                                Independent of the app language above.
+                              </p>
+                              <select
+                                id="labs-pokemon-name-locale-select"
+                                value={settings.pokemonNameLocale}
+                                onChange={(e) => {
+                                  const next = e.target.value as AppLocale;
+                                  const updated = { ...settings, pokemonNameLocale: next };
+                                  setSettings(updated);
+                                  saveSettings(updated);
+                                }}
+                                className="mt-2 rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                              >
+                                {SUPPORTED_LOCALES.map((loc) => (
+                                  <option key={loc} value={loc}>
+                                    {LOCALE_LABELS[loc]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         )}
                       </div>

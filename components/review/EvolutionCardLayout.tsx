@@ -1,9 +1,12 @@
+"use client";
+
 import Image from "next/image";
 import type { ReactNode } from "react";
 import type { PokemonFact } from "@/lib/pokemon/facts";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import type { CardDirection } from "@/components/review/DirectionBadge";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 
 export const SPRITE_CLASS = "h-24 w-24 object-contain sm:h-48 sm:w-48";
 export const ARROW_CLASS =
@@ -23,12 +26,18 @@ type Props = {
    */
   hiddenSide: "pre" | "post";
   preEvoSpriteUrl: string;
+  /** English fallback name for the pre-evolution Pokémon. */
   preEvoName: string;
+  /** Species ID for the pre-evolution — used to resolve locale-aware name. */
+  preEvoId?: number | null;
   postEvoSpriteUrl: string;
+  /** English fallback name for the post-evolution Pokémon. */
   postEvoName: string;
+  /** Species ID for the post-evolution — used to resolve locale-aware name. */
+  postEvoId?: number | null;
   /** Name of the Pokémon shown after reveal in the answer row. */
   answerName: string;
-  /** Numeric ID of the answer Pokémon, used for TTS. */
+  /** Numeric ID of the answer Pokémon, used for TTS and locale resolution. */
   answerId?: number | null;
   revealed: boolean;
   fact?: PokemonFact | null;
@@ -44,6 +53,10 @@ type Props = {
  *
  * The always-visible sprite gets the `priority` attribute; the hidden/revealed
  * sprite does not, matching the original per-card behaviour.
+ *
+ * Locale-aware names are resolved internally via `useLocalePokemonName` so
+ * that switching `pokemonNameLocale` in Settings updates in-flight cards
+ * without requiring a session rebuild (#1260).
  */
 export function EvolutionCardLayout({
   direction,
@@ -51,19 +64,42 @@ export function EvolutionCardLayout({
   hiddenSide,
   preEvoSpriteUrl,
   preEvoName,
+  preEvoId,
   postEvoSpriteUrl,
   postEvoName,
+  postEvoId,
   answerName,
   answerId,
   revealed,
   fact,
 }: Props) {
+  // Resolve locale-aware names at render time so locale changes take effect
+  // immediately without a session rebuild. The English name is always used as
+  // a synchronous fallback.
+  const { name: resolvedPreEvoName } = useLocalePokemonName(
+    preEvoId ?? undefined,
+    preEvoName,
+  );
+  const { name: resolvedPostEvoName } = useLocalePokemonName(
+    postEvoId ?? undefined,
+    postEvoName,
+  );
+  // The answer name is the locale-resolved name for whichever side is revealed.
+  // We re-derive it from the already-resolved names rather than calling the
+  // hook a third time, since answerId always matches either preEvoId or postEvoId.
+  const resolvedAnswerName =
+    answerId != null && answerId === preEvoId
+      ? resolvedPreEvoName
+      : answerId != null && answerId === postEvoId
+        ? resolvedPostEvoName
+        : answerName;
+
   // The always-visible sprite gets `priority` for LCP; the hidden/revealed
   // sprite does not — preserving the original per-card behaviour.
   const preEvoImg = (
     <Image
       src={preEvoSpriteUrl}
-      alt={preEvoName}
+      alt={resolvedPreEvoName}
       width={320}
       height={320}
       priority={hiddenSide !== "pre"}
@@ -74,7 +110,7 @@ export function EvolutionCardLayout({
   const postEvoImg = (
     <Image
       src={postEvoSpriteUrl}
-      alt={postEvoName}
+      alt={resolvedPostEvoName}
       width={320}
       height={320}
       priority={hiddenSide !== "post"}
@@ -118,9 +154,9 @@ export function EvolutionCardLayout({
           <>
             <div className="flex items-center gap-2">
               <span className="text-2xl font-semibold tracking-wide capitalize text-foreground sm:text-3xl">
-                {answerName}
+                {resolvedAnswerName}
               </span>
-              <NameTtsButton name={answerName} id={answerId} size="reveal" />
+              <NameTtsButton name={resolvedAnswerName} id={answerId} size="reveal" />
             </div>
             {fact && (
               <div className="w-full mt-1 text-center sm:mt-2">
