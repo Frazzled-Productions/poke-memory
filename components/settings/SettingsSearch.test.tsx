@@ -175,16 +175,16 @@ function getVisibleSectionIds(query: string): Set<string> {
 }
 
 describe("Settings page filter logic", () => {
-  it("returns all 6 sections when query is empty", () => {
+  it("returns all 7 sections when query is empty", () => {
     const visible = getVisibleSectionIds("");
-    expect(visible.size).toBe(6);
-    for (const id of ["appearance-heading", "practice-heading", "audio-heading", "offline-heading", "account-data-heading", "advanced-heading"]) {
+    expect(visible.size).toBe(7);
+    for (const id of ["appearance-heading", "practice-heading", "audio-heading", "offline-heading", "account-data-heading", "labs-heading", "advanced-heading"]) {
       expect(visible.has(id)).toBe(true);
     }
   });
 
-  it("returns all 6 sections when query is whitespace-only", () => {
-    expect(getVisibleSectionIds("   ").size).toBe(6);
+  it("returns all 7 sections when query is whitespace-only", () => {
+    expect(getVisibleSectionIds("   ").size).toBe(7);
   });
 
   it("filters to only Audio when query is 'cry'", () => {
@@ -223,9 +223,9 @@ describe("Settings page filter logic", () => {
     expect(getVisibleSectionIds("BACKUP").has("account-data-heading")).toBe(true);
   });
 
-  it("clearing the query restores all 6 sections", () => {
+  it("clearing the query restores all 7 sections", () => {
     expect(getVisibleSectionIds("cry").size).toBe(1);
-    expect(getVisibleSectionIds("").size).toBe(6);
+    expect(getVisibleSectionIds("").size).toBe(7);
   });
 
   it("'voice' matches only Audio", () => {

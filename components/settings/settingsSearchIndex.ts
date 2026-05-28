@@ -167,6 +167,23 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
     ],
   },
   {
+    sectionId: "labs-heading",
+    terms: [
+      "labs",
+      "preview",
+      "experimental",
+      "beta",
+      "languages",
+      "locale",
+      "language",
+      "japanese",
+      "chinese",
+      "translation",
+      "pokémon names",
+      "pokemon names",
+    ],
+  },
+  {
     sectionId: "advanced-heading",
     terms: [
       "advanced",
