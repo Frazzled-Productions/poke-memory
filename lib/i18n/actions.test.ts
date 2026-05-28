@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSet = vi.fn();
-const mockHeaders = vi.fn<[], Headers>();
+const mockHeaders = vi.fn<() => Headers>();
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({ set: mockSet }),
