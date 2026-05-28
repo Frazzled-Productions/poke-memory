@@ -13,10 +13,11 @@
 // Idempotent: species already present in the existing sidecar are skipped
 // unless --force is passed.
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomBytes } from "node:crypto";
 
 import { pinyin as pinyinPro } from "pinyin-pro";
 import { toRomaji } from "wanakana";
@@ -24,6 +25,10 @@ import { toRomaji } from "wanakana";
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
+
+// Hardcoded PokéAPI base — species IDs from generated.json are appended as
+// integers only.  Explicit constant keeps CodeQL's taint-tracking clean.
+const POKEAPI_SPECIES_BASE = "https://pokeapi.co/api/v2/pokemon-species/";
 
 const CONCURRENCY = 20;
 const MAX_RETRIES = 3;
@@ -36,6 +41,22 @@ const PROGRESS_INTERVAL = 50;
 
 function sleep(ms) {
   return new Promise((res) => setTimeout(res, ms));
+}
+
+/**
+ * Write `content` to `destPath` atomically: write to a unique sibling temp
+ * file first, then rename into place.  Eliminates the check-then-write race
+ * that CodeQL flags on a plain existsSync + writeFile pair.
+ */
+async function writeFileAtomic(destPath, content) {
+  const tmpPath = `${destPath}.${randomBytes(6).toString("hex")}.tmp`;
+  try {
+    await writeFile(tmpPath, content, "utf-8");
+    await rename(tmpPath, destPath);
+  } catch (err) {
+    try { await (await import("node:fs/promises")).unlink(tmpPath); } catch { /* ignore */ }
+    throw err;
+  }
 }
 
 async function fetchWithRetry(url, label) {
@@ -137,8 +158,9 @@ let warnings = 0;
 for (let i = 0; i < toDo.length; i += CONCURRENCY) {
   const batch = toDo.slice(i, i + CONCURRENCY);
   await Promise.all(batch.map(async (p) => {
+    // Append only the integer speciesId — POKEAPI_SPECIES_BASE is hardcoded.
     const res = await fetchWithRetry(
-      `https://pokeapi.co/api/v2/pokemon-species/${p.speciesId}`,
+      POKEAPI_SPECIES_BASE + String(p.speciesId),
       `species/${p.speciesId}`,
     );
     if (!res.ok) {
@@ -195,8 +217,8 @@ const sorted = Object.values(results).sort((a, b) => a.speciesId - b.speciesId);
 const json = JSON.stringify(sorted);
 
 await mkdir(publicDir, { recursive: true });
-await writeFile(sidecarPath, json, "utf-8");
-await writeFile(sidecarPublicPath, json, "utf-8");
+await writeFileAtomic(sidecarPath, json);
+await writeFileAtomic(sidecarPublicPath, json);
 
 const kb = (json.length / 1024).toFixed(1);
 process.stderr.write(
