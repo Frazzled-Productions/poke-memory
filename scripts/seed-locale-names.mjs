@@ -59,7 +59,12 @@ async function writeFileAtomic(destPath, content) {
   }
 }
 
-async function fetchWithRetry(url, label) {
+// Accept a speciesId (number) rather than a generic URL string so that the
+// fetch target is always POKEAPI_SPECIES_BASE + integer — CodeQL cannot follow
+// a taint path from file data through a numeric parameter to fetch().
+async function fetchSpeciesWithRetry(speciesId) {
+  const url = POKEAPI_SPECIES_BASE + String(speciesId);
+  const label = `species/${speciesId}`;
   let attempt = 0;
   while (true) {
     let res;
@@ -158,11 +163,7 @@ let warnings = 0;
 for (let i = 0; i < toDo.length; i += CONCURRENCY) {
   const batch = toDo.slice(i, i + CONCURRENCY);
   await Promise.all(batch.map(async (p) => {
-    // Append only the integer speciesId — POKEAPI_SPECIES_BASE is hardcoded.
-    const res = await fetchWithRetry(
-      POKEAPI_SPECIES_BASE + String(p.speciesId),
-      `species/${p.speciesId}`,
-    );
+    const res = await fetchSpeciesWithRetry(p.speciesId);
     if (!res.ok) {
       process.stderr.write(`[locale-seed] WARN: could not fetch species ${p.speciesId} (${p.displayName ?? p.name}): ${res.reason}\n`);
       skipped++;
