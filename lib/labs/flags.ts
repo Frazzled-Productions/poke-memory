@@ -25,16 +25,22 @@
  * Each key is the canonical flag identifier used as a key in
  * `UserSettings.labsFlags`.
  *
- * Currently empty — infrastructure only (#1258).
+ * Registry updated in #1260 to add the `languages` flag.
  */
 export const LABS_FLAGS = {
-  // Future flags are registered here. Example shape:
-  //
-  // languages: {
-  //   label: "Languages",
-  //   description: "Multi-locale Pokémon names and app UI translation. Translations are machine-generated; feedback welcome.",
-  //   default: false,
-  // },
+  /**
+   * Multi-locale Pokémon names and app UI translation (#1260).
+   * When on, a locale selector appears in Settings > Labs and Pokémon names
+   * are shown in the chosen language (Japanese, Simplified Chinese, or
+   * Traditional Chinese). App UI strings are translated stubs for now;
+   * machine translation is tracked in a follow-up issue.
+   */
+  languages: {
+    label: "Languages",
+    description:
+      "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese. Translations are machine-generated; feedback welcome.",
+    default: false,
+  },
 } as const;
 
 /**

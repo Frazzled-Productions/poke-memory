@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
+import { setRequestLocale } from "next-intl/server";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "next-intl/server";
+import { resolveLocale } from "@/i18n/request";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -141,14 +145,21 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Resolve locale from cookie OUTSIDE any 'use cache' function so we can
+  // safely read cookies(). setRequestLocale makes the locale available to all
+  // Server Components in this render via React cache(). See i18n/request.ts.
+  const locale = resolveLocale();
+  setRequestLocale(locale);
+  const messages = await getMessages();
+
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
@@ -169,6 +180,12 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-dvh flex flex-col">
+        {/*
+          NextIntlClientProvider makes the message catalogue available to Client
+          Components via useTranslations(). The locale and messages are resolved
+          server-side (from the cookie) in the layout above (#1260).
+        */}
+        <NextIntlClientProvider locale={locale} messages={messages}>
         {/*
           #app-root wraps all persistent page chrome. FirstVisitOnboardingModal
           renders via createPortal directly onto <body> and toggles `inert` +
@@ -220,6 +237,7 @@ export default function RootLayout({
         <DocumentTitleBadge />
         <Analytics />
         <SpeedInsights />
+        </NextIntlClientProvider>
       </body>
     </html>
   );

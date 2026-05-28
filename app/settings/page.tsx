@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   loadSettings,
   saveSettings,
@@ -58,6 +59,8 @@ import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg, sectionLabel } from "@/lib/utils/class-names";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
+import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
+import { setLocaleCookie } from "@/lib/i18n/actions";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -425,12 +428,33 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "danger-zone-heading": "advanced-heading",
 };
 
+/** Human-readable labels for each supported locale. */
+const LOCALE_LABELS: Record<AppLocale, string> = {
+  en: "English",
+  ja: "Japanese",
+  "zh-Hans": "Simplified Chinese",
+  "zh-Hant": "Traditional Chinese",
+};
+
+/** Read the active locale from document.cookie without importing the hook. */
+function readActiveLocale(): AppLocale {
+  if (typeof document === "undefined") return DEFAULT_LOCALE;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${LOCALE_COOKIE}=`));
+  const v = match?.split("=")[1];
+  if (v && (SUPPORTED_LOCALES as readonly string[]).includes(v)) return v as AppLocale;
+  return DEFAULT_LOCALE;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
+  const t = useTranslations();
   const { user, supabase } = useAuth();
   const { updateFavourite } = useFavourite();
   const { unlocked, flags, setFlag, anyFlagOn } = useSuperuser();
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [activeLocale, setActiveLocale] = useState<AppLocale>(DEFAULT_LOCALE);
   const [draftValues, setDraftValues] = useState<Partial<Record<keyof UserSettings, string>>>({});
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -480,6 +504,7 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
+    setActiveLocale(readActiveLocale());
     const loaded = loadSettings();
 
     // Auto-detect regional prefs on first load when not yet set.
@@ -753,7 +778,7 @@ export default function SettingsPage() {
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
       <div className="w-full max-w-3xl">
         <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
-          Settings
+          {t("settings.heading")}
         </h1>
 
         {settings === null ? (
@@ -1878,6 +1903,40 @@ export default function SettingsPage() {
                             />
                           </button>
                         </div>
+
+                        {/* Locale picker — only shown when languages flag is on */}
+                        {key === "languages" && (settings.labsFlags[key] ?? false) && (
+                          <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                            <label
+                              htmlFor="labs-locale-select"
+                              className="block text-sm font-medium text-foreground"
+                            >
+                              Language
+                            </label>
+                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              Pokémon names will be shown in the chosen language.
+                              App UI translation is in progress.
+                            </p>
+                            <select
+                              id="labs-locale-select"
+                              value={activeLocale}
+                              onChange={(e) => {
+                                const next = e.target.value as AppLocale;
+                                setActiveLocale(next);
+                                void setLocaleCookie(next).then(() => {
+                                  router.refresh();
+                                });
+                              }}
+                              className="mt-2 rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                            >
+                              {SUPPORTED_LOCALES.map((loc) => (
+                                <option key={loc} value={loc}>
+                                  {LOCALE_LABELS[loc]}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     ),
                   )}

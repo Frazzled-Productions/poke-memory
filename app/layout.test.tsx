@@ -53,6 +53,29 @@ vi.mock("@/components/pwa/StoragePersistenceRequester", () => ({
 vi.mock("@/components/pwa/PwaBadge", () => ({ PwaBadge: () => null }));
 vi.mock("@/components/pwa/DocumentTitleBadge", () => ({ DocumentTitleBadge: () => null }));
 
+// next-intl server APIs are not available in jsdom — stub them out.
+vi.mock("next-intl/server", () => ({
+  setRequestLocale: () => undefined,
+  getMessages: () => Promise.resolve({}),
+}));
+vi.mock("next-intl", () => ({
+  NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+// i18n/request imports next/headers (server-only); stub for jsdom tests.
+vi.mock("@/i18n/request", () => ({
+  resolveLocale: () => "en",
+  SUPPORTED_LOCALES: ["en", "ja", "zh-Hans", "zh-Hant"],
+  LOCALE_COOKIE: "poke-memory:locale",
+  DEFAULT_LOCALE: "en",
+}));
+// i18n/locales has no server-only imports — the real module can be used,
+// but explicitly mock it here for clarity and to ensure test isolation.
+vi.mock("@/i18n/locales", () => ({
+  SUPPORTED_LOCALES: ["en", "ja", "zh-Hans", "zh-Hant"],
+  LOCALE_COOKIE: "poke-memory:locale",
+  DEFAULT_LOCALE: "en",
+}));
+
 // ---------------------------------------------------------------------------
 // Subject under test
 // ---------------------------------------------------------------------------
@@ -141,10 +164,11 @@ describe("Root layout — metadata export", () => {
 });
 
 describe("Root layout — body structure (#1103)", () => {
-  it("wraps persistent chrome in #app-root so FirstVisitOnboardingModal can toggle inert (#1103)", () => {
+  it("wraps persistent chrome in #app-root so FirstVisitOnboardingModal can toggle inert (#1103)", async () => {
     // Render the layout function to a React element tree. We don't mount it via
     // @testing-library because RTL can't render <html>/<body> in jsdom.
-    const tree = RootLayout({ children: null });
+    // RootLayout is async (reads locale and messages server-side), so we await it.
+    const tree = await RootLayout({ children: null });
 
     const appRoot = findElement(
       tree,
@@ -155,7 +179,7 @@ describe("Root layout — body structure (#1103)", () => {
 
     // children must be threaded through the wrapper, not rendered as siblings.
     const childrenMarker = Symbol("kids");
-    const treeWithKids = RootLayout({
+    const treeWithKids = await RootLayout({
       // Pass an element we can identify by its key to verify the children slot.
       children: (
         <span data-testid="layout-children" data-marker={String(childrenMarker)} />

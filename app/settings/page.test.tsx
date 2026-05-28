@@ -201,6 +201,27 @@ vi.mock("@/components/settings/OfflineSection", () => ({
   OfflineSection: () => <div data-testid="offline-section" />,
 }));
 
+// Stub next-intl — t() returns the key name so tests can match on it or on
+// the plain English fallback without caring about translations.
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => {
+    const map: Record<string, string> = {
+      "settings.heading": "Settings",
+    };
+    return map[key] ?? key;
+  },
+}));
+
+vi.mock("@/i18n/locales", () => ({
+  SUPPORTED_LOCALES: ["en", "ja", "zh-Hans", "zh-Hant"],
+  LOCALE_COOKIE: "poke-memory:locale",
+  DEFAULT_LOCALE: "en",
+}));
+
+vi.mock("@/lib/i18n/actions", () => ({
+  setLocaleCookie: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Render CollapsibleSection as a transparent wrapper so toggles are always
 // accessible without relying on localStorage / hash state.
 vi.mock("@/components/settings/CollapsibleSection", () => ({
@@ -284,6 +305,7 @@ function defaultSettings() {
     verifiedTypedEntryMode: false,
     typedEntryOnboardingShown: false,
     mcCardOnboardingShown: false,
+    labsFlags: { languages: false },
   };
 }
 
