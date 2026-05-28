@@ -18,6 +18,7 @@ vi.mock("@/lib/sync/cloud", () => ({
 vi.mock("@/lib/sync/persistence", () => ({
   loadSyncStatus: vi.fn(),
   saveSyncStatus: vi.fn(),
+  savePendingQueue: vi.fn(),
   clearPendingQueue: vi.fn(),
 }));
 
@@ -25,7 +26,7 @@ vi.mock("@/lib/sync/backgroundSync", () => ({
   registerBackgroundSync: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
+import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
@@ -193,6 +194,99 @@ describe("useSyncOnUnload — visibilitychange path (fetch+keepalive)", () => {
     const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(init.keepalive).toBe(true);
     expect(init.method).toBe("POST");
+  });
+});
+
+// ─── Pre-beacon pending-queue persistence (#1288) ─────────────────────────────
+//
+// useSyncOnUnload must persist the unsynced cards to localStorage BEFORE
+// sending the beacon / fetch. This guarantees that if the beacon fails AND the
+// OS kills the page before the 500 ms debounce or React cleanup runs, the cards
+// survive in the persisted queue for useOnlineReconnectSync on the next open.
+
+describe("useSyncOnUnload — pre-beacon queue persistence (#1288)", () => {
+  let beacon: ReturnType<typeof vi.fn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.mocked(loadSyncStatus).mockReturnValue(ZERO_STATUS);
+    beacon = vi.fn(() => true);
+    Object.defineProperty(navigator, "sendBeacon", {
+      value: beacon,
+      configurable: true,
+      writable: true,
+    });
+    fetchSpy = vi.spyOn(global, "fetch");
+    vi.clearAllMocks();
+    vi.mocked(loadSyncStatus).mockReturnValue(ZERO_STATUS);
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "sendBeacon", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    fetchSpy.mockRestore();
+    vi.clearAllMocks();
+  });
+
+  it("persists the queue to localStorage before calling sendBeacon (pagehide)", () => {
+    const callOrder: string[] = [];
+    vi.mocked(savePendingQueue).mockImplementation(() => { callOrder.push("savePendingQueue"); });
+    beacon.mockImplementation(() => { callOrder.push("sendBeacon"); return true; });
+
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+    act(() => firePagehide());
+
+    expect(callOrder.indexOf("savePendingQueue")).toBeLessThan(callOrder.indexOf("sendBeacon"));
+  });
+
+  it("persists the queue to localStorage before calling fetch (visibilitychange)", async () => {
+    const callOrder: string[] = [];
+    vi.mocked(savePendingQueue).mockImplementation(() => { callOrder.push("savePendingQueue"); });
+    fetchSpy.mockImplementation(async () => {
+      callOrder.push("fetch");
+      return new Response(null, { status: 200 });
+    });
+
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(callOrder).toContain("fetch"));
+    expect(callOrder.indexOf("savePendingQueue")).toBeLessThan(callOrder.indexOf("fetch"));
+  });
+
+  it("clears the queue after a successful sendBeacon (pagehide)", () => {
+    beacon.mockReturnValue(true);
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+    act(() => firePagehide());
+
+    expect(clearPendingQueue).toHaveBeenCalled();
+  });
+
+  it("does NOT clear the queue after a failed sendBeacon (pagehide)", () => {
+    beacon.mockReturnValue(false);
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+    act(() => firePagehide());
+
+    expect(clearPendingQueue).not.toHaveBeenCalled();
+  });
+
+  it("clears the queue after a successful fetch (visibilitychange)", async () => {
+    fetchSpy.mockResolvedValue(new Response(null, { status: 200 }));
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(clearPendingQueue).toHaveBeenCalled());
+  });
+
+  it("does NOT clear the queue when no unsynced cards", () => {
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0)));
+    act(() => firePagehide());
+
+    expect(savePendingQueue).not.toHaveBeenCalled();
+    expect(clearPendingQueue).not.toHaveBeenCalled();
   });
 });
 
