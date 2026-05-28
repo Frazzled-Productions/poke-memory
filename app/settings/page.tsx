@@ -57,6 +57,7 @@ import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg } from "@/lib/utils/class-names";
+import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -369,6 +370,7 @@ const TOP_LEVEL_SECTION_IDS = [
   "audio-heading",
   "offline-heading",
   "account-data-heading",
+  "labs-heading",
   "advanced-heading",
 ] as const;
 
@@ -390,6 +392,7 @@ const ALL_ANCHOR_IDS = [
   "backup-heading",
   "regional-heading",
   "about-heading",
+  "labs-heading",
   "developer-heading",
   "danger-zone-heading",
 ] as const;
@@ -1814,6 +1817,70 @@ export default function SettingsPage() {
                     </a>
                     .
                   </p>
+                </div>
+              </CollapsibleSection>
+              )}
+
+              {/* ── Labs ───────────────────────────────────────────────────── */}
+              {/* The Labs section only renders when there is at least one registered flag. */}
+              {visibleSectionIds.has("labs-heading") && Object.keys(LABS_FLAGS).length > 0 && (
+              <CollapsibleSection
+                sectionId="labs-heading"
+                heading="Labs"
+                forceOpen={targetCategoryId === "labs-heading"}
+                transientOpen={isFiltering}
+              >
+                <div id="labs-heading" className={colStackLg}>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Preview features that are in active development. These may
+                    change or be removed. Your feedback helps shape what ships.
+                  </p>
+                  {(Object.entries(LABS_FLAGS) as [LabsFlagKey, { label: string; description: string; default: boolean }][]).map(
+                    ([key, meta]) => (
+                      <div key={key} className={cardPanelPadded}>
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {meta.label}
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              {meta.description}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-label={meta.label}
+                            aria-checked={settings.labsFlags[key] ?? false}
+                            onClick={() => {
+                              const updated = {
+                                ...settings,
+                                labsFlags: {
+                                  ...settings.labsFlags,
+                                  [key]: !(settings.labsFlags[key] ?? false),
+                                },
+                              };
+                              setSettings(updated);
+                              saveSettings(updated);
+                            }}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                              settings.labsFlags[key] ?? false
+                                ? "bg-foreground"
+                                : "bg-zinc-300 dark:bg-zinc-600"
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                                settings.labsFlags[key] ?? false
+                                  ? "translate-x-5"
+                                  : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    ),
+                  )}
                 </div>
               </CollapsibleSection>
               )}
