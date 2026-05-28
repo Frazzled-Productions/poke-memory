@@ -1,6 +1,7 @@
 // scripts/seed-pokemon.mjs
 // Fetches all canonical Pokémon species from PokéAPI and writes
-// lib/pokemon/generated.json.  Run with: node scripts/seed-pokemon.mjs
+// lib/pokemon/generated.json + lib/pokemon/generated-locale-names.json.
+// Run with: node scripts/seed-pokemon.mjs
 // Node 20+ — uses global fetch, node:fs/promises, node:path, node:url.
 
 import { writeFile, mkdir, readFile, rename } from "node:fs/promises";
@@ -8,6 +9,24 @@ import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
+
+// Build-time transliteration: pinyin-pro (zh-Hans / zh-Hant) and wanakana
+// (ja rōmaji fallback).  Both are devDependencies — never imported at runtime.
+import { pinyin as pinyinPro } from "pinyin-pro";
+import { toRomaji } from "wanakana";
+
+/** Generate pinyin with tone marks for a Chinese name. */
+function generatePinyin(name) {
+  return pinyinPro(name, { toneType: "symbol" }).trim();
+}
+
+/** Normalise a PokéAPI ja-roma string; fall back to wanakana if absent. */
+function normaliseRomaji(jaRoma, jaKana) {
+  if (jaRoma) return jaRoma.replace(/\s+/g, " ").trim();
+  // Defensive fallback — research confirms full Gen 1-9 coverage, but we
+  // should not crash for any future species that might be missing ja-roma.
+  return toRomaji(jaKana).trim();
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -636,6 +655,43 @@ async function processSpecies(speciesId) {
   const flavorText = flavorTexts[0] ?? "";
   const evolutionChainUrl = speciesData.evolution_chain?.url ?? null;
 
+  // ------------------------------------------------------------------
+  // Multi-locale names (#1259)
+  // PokéAPI language codes (lowercase): ja, zh-hans, zh-hant, ja-roma
+  // ------------------------------------------------------------------
+  const namesArr = speciesData.names ?? [];
+  const jaName = namesArr.find((n) => n.language?.name === "ja")?.name ?? "";
+  const zhHansName = namesArr.find((n) => n.language?.name === "zh-hans")?.name ?? "";
+  const zhHantName = namesArr.find((n) => n.language?.name === "zh-hant")?.name ?? "";
+  const jaRoma = namesArr.find((n) => n.language?.name === "ja-roma")?.name ?? "";
+
+  // Log warnings for any missing locale names (should not happen for Gen 1-9).
+  if (!jaName) process.stderr.write(`[seed] WARN: no ja name for species ${speciesId} (${speciesDisplayName})\n`);
+  if (!zhHansName) process.stderr.write(`[seed] WARN: no zh-hans name for species ${speciesId} (${speciesDisplayName})\n`);
+  if (!zhHantName) process.stderr.write(`[seed] WARN: no zh-hant name for species ${speciesId} (${speciesDisplayName})\n`);
+  if (!jaRoma && jaName) process.stderr.write(`[seed] WARN: no ja-roma for species ${speciesId} (${speciesDisplayName}), falling back to wanakana\n`);
+
+  // Transliterations: rōmaji from PokéAPI; pinyin from pinyin-pro at build time.
+  const romajiResult = normaliseRomaji(jaRoma, jaName);
+  const pinyinHans = zhHansName ? generatePinyin(zhHansName) : "";
+  const pinyinHant = zhHantName ? generatePinyin(zhHantName) : "";
+
+  // Build the locale-names entry for this species.
+  const localeNamesEntry = {
+    speciesId,
+    nameByLocale: {
+      en: speciesDisplayName,
+      ja: jaName || speciesDisplayName,
+      "zh-Hans": zhHansName || speciesDisplayName,
+      "zh-Hant": zhHantName || speciesDisplayName,
+    },
+    transliterationByLocale: {
+      ja: romajiResult || speciesDisplayName,
+      "zh-Hans": pinyinHans || speciesDisplayName,
+      "zh-Hant": pinyinHant || speciesDisplayName,
+    },
+  };
+
   const genus = speciesData.genera?.find(g => g.language?.name === "en")?.genus ?? null;
   const generation = speciesData.generation?.name ?? null;
   const captureRate = speciesData.capture_rate ?? null;
@@ -730,6 +786,8 @@ async function processSpecies(speciesId) {
     isLegendary,
     isMythical,
     evolutionChainUrl,
+    // Locale names entry carried along until writeLocaleNamesSidecar() collects them.
+    _localeNamesEntry: localeNamesEntry,
   });
 
   // ------------------------------------------------------------------
@@ -854,10 +912,11 @@ async function processSpecies(speciesId) {
 // ---------------------------------------------------------------------------
 
 /**
- * Split the full records array into three smaller files:
- *   generated-core.json    — all fields except flavorTexts and evolutionChain
- *   generated-chains.json  — deduplicated evolution chains + pokemon→chain refs
- *   generated-flavor.json  — id + flavorTexts (copied to public/ for lazy fetch)
+ * Split the full records array into four smaller files:
+ *   generated-core.json         — all fields except flavorTexts and evolutionChain
+ *   generated-chains.json       — deduplicated evolution chains + pokemon→chain refs
+ *   generated-flavor.json       — id + flavorTexts (copied to public/ for lazy fetch)
+ *   generated-locale-names.json — per-species locale names + transliterations (#1259)
  */
 async function writeSplitSeedFiles(records, outputPath) {
   const { createHash } = await import("node:crypto");
@@ -870,7 +929,8 @@ async function writeSplitSeedFiles(records, outputPath) {
   await mkdir(publicDir, { recursive: true });
 
   // --- generated-core.json ---
-  const coreRecords = records.map(({ flavorTexts: _ft, evolutionChain: _ec, ...rest }) => rest);
+  // Strip flavorTexts, evolutionChain, and the seed-time _localeNamesEntry field.
+  const coreRecords = records.map(({ flavorTexts: _ft, evolutionChain: _ec, _localeNamesEntry: _ln, ...rest }) => rest);
   await writeFile(
     resolvePath(libDir, "generated-core.json"),
     JSON.stringify(coreRecords),
@@ -900,6 +960,25 @@ async function writeSplitSeedFiles(records, outputPath) {
   const flavorJson = JSON.stringify(flavorRecords);
   await writeFile(resolvePath(libDir, "generated-flavor.json"), flavorJson, "utf-8");
   await writeFile(resolvePath(publicDir, "generated-flavor.json"), flavorJson, "utf-8");
+
+  // --- generated-locale-names.json (#1259) ---
+  // Collect one entry per default-form species (alternate forms share the
+  // species' names).  The _localeNamesEntry field is present only on default
+  // forms; alternate forms carry no entry.
+  const localeNamesRecords = records
+    .filter((p) => p.isDefaultForm && p._localeNamesEntry)
+    .map((p) => p._localeNamesEntry);
+
+  // Sort by speciesId for deterministic output.
+  localeNamesRecords.sort((a, b) => a.speciesId - b.speciesId);
+
+  const localeNamesJson = JSON.stringify(localeNamesRecords);
+  await writeFile(resolvePath(libDir, "generated-locale-names.json"), localeNamesJson, "utf-8");
+  await writeFile(resolvePath(publicDir, "generated-locale-names.json"), localeNamesJson, "utf-8");
+
+  process.stderr.write(
+    `[seed] Locale names: ${localeNamesRecords.length} species entries written to generated-locale-names.json\n`,
+  );
 }
 
 async function main() {
@@ -1135,6 +1214,9 @@ async function main() {
   // ------------------------------------------------------------------
   // Step 4: Merge chains, sort, and write output
   // ------------------------------------------------------------------
+  // Note: _localeNamesEntry is preserved here for writeSplitSeedFiles to
+  // collect into generated-locale-names.json; it is stripped from
+  // generated.json itself via the final JSON serialisation step below.
   const records = partialRecords.map(({ evolutionChainUrl: _url, remoteSpriteUrl, remoteCryUrl, ...rest }) => ({
     ...rest,
     spriteUrl: failedSpriteIds.has(rest.id)
@@ -1152,7 +1234,10 @@ async function main() {
   // (if present) to preserve existing IDs across re-seeds.
   await allocateEdgeIds(records, outputPath);
 
-  const json = JSON.stringify(records, null, 2) + "\n";
+  // Strip the seed-time _localeNamesEntry field from the persisted generated.json
+  // (it is written to the separate sidecar by writeSplitSeedFiles below).
+  const recordsForJson = records.map(({ _localeNamesEntry: _ln, ...rest }) => rest);
+  const json = JSON.stringify(recordsForJson, null, 2) + "\n";
   await writeFile(outputPath, json, "utf-8");
 
   process.stderr.write(
@@ -1172,7 +1257,7 @@ async function main() {
   // generated-flavor.json  — id + flavorTexts (served from public/ at runtime)
   // -------------------------------------------------------------------------
   await writeSplitSeedFiles(records, outputPath);
-  process.stderr.write("[seed] Wrote split seed files (core / chains / flavor)\n");
+  process.stderr.write("[seed] Wrote split seed files (core / chains / flavor / locale-names)\n");
 
   if (skipped > 0) {
     process.stderr.write(
