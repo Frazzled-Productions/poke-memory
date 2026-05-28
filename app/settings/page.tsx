@@ -56,7 +56,7 @@ import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
-import { cardPanelPadded, colStackLg } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStackLg, sectionLabel } from "@/lib/utils/class-names";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 
 /**
@@ -816,7 +816,7 @@ export default function SettingsPage() {
 
                 {/* Mobile navigation style (#661) — bottom tab bar vs hamburger */}
                 <div id="mobile-nav-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Mobile navigation
                   </p>
                   <div className={cardPanelPadded}>
@@ -868,7 +868,7 @@ export default function SettingsPage() {
               >
                 {/* Scheduler knobs */}
                 <div id="scheduler-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Scheduler
                   </p>
                   <OnboardingHint id="settingsHintDismissed" title="What recall target does">
@@ -965,7 +965,7 @@ export default function SettingsPage() {
                     the brand-new card through the simulated-Easy FSRS path —
                     real graduated state, not synthesised mastery. */}
                 <div id="known-quiz-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Quickstart
                   </p>
                   <div className={cardPanelPadded}>
@@ -1005,7 +1005,7 @@ export default function SettingsPage() {
 
                 {/* Name cards — always on since #1234 */}
                 <div id="name-cards-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Name cards
                   </p>
                   <div className={colStackLg}>
@@ -1096,7 +1096,7 @@ export default function SettingsPage() {
 
                 {/* Evolution cards */}
                 <div id="evolution-cards-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Evolution cards
                   </p>
                   <div className={cardPanelPadded}>
@@ -1169,7 +1169,7 @@ export default function SettingsPage() {
 
                 {/* Reverse-evolution cards */}
                 <div id="reverse-evolution-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Reverse-evolution cards
                   </p>
                   <div className={cardPanelPadded}>
@@ -1207,7 +1207,7 @@ export default function SettingsPage() {
 
                 {/* Alternate forms (#658) */}
                 <div id="alternate-forms-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Alternate forms
                   </p>
                   <div className={cardPanelPadded}>
@@ -1244,7 +1244,7 @@ export default function SettingsPage() {
 
                 {/* Reverse cards — always on since #1234 */}
                 <div id="reverse-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Reverse cards
                   </p>
                   {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
@@ -1307,7 +1307,7 @@ export default function SettingsPage() {
               >
                 {/* Cry cards */}
                 <div id="cry-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Cry → name cards
                   </p>
                   <div className={cardPanelPadded}>
@@ -1501,7 +1501,7 @@ export default function SettingsPage() {
                 transientOpen={isFiltering}
               >
                 <div id="offline-download-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Download
                   </p>
                   <OfflineSection />
@@ -1532,7 +1532,7 @@ export default function SettingsPage() {
 
                 {/* Onboarding explainer */}
                 <div id="onboarding-heading" className={cn("flex flex-col gap-3", cardPanelPadded)}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     How this works
                   </p>
                   <p className="text-sm text-foreground">
@@ -1592,7 +1592,7 @@ export default function SettingsPage() {
 
                 {/* Backup */}
                 <div id="backup-heading" className={cn(cardPanelPadded, "flex flex-col gap-3")}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Backup
                   </p>
                   <div>
@@ -1664,7 +1664,7 @@ export default function SettingsPage() {
 
                 {/* Regional */}
                 <div id="regional-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Regional
                   </p>
 
@@ -1758,7 +1758,7 @@ export default function SettingsPage() {
 
                 {/* About */}
                 <div id="about-heading" className={cn(cardPanelPadded, "flex flex-col gap-3")}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     About
                   </p>
                   <div>

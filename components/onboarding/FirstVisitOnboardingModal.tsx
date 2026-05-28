@@ -27,6 +27,8 @@ import {
   saveSettings,
 } from "@/lib/settings/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { cn } from "@/lib/utils/cn";
+import { sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
   /** Called when the modal closes so the parent can update its state. */
@@ -211,7 +213,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
           <section aria-labelledby="modal-grading-heading">
             <h3
               id="modal-grading-heading"
-              className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+              className={cn("mb-2", sectionLabel)}
             >
               How to grade
             </h3>
@@ -240,7 +242,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
           <section aria-labelledby="modal-audio-heading">
             <h3
               id="modal-audio-heading"
-              className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+              className={cn("mb-2", sectionLabel)}
             >
               Adding sound (optional)
             </h3>
@@ -266,7 +268,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
             >
               <h3
                 id="modal-storage-heading"
-                className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+                className={cn("mb-1", sectionLabel)}
               >
                 Your progress is saved on this device
               </h3>

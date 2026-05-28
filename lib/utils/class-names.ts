@@ -39,3 +39,25 @@ export const chartTickText = "text-zinc-400 dark:text-zinc-500";
  * empty-state copy, and supporting metadata throughout the app.
  */
 export const mutedText = "text-sm text-zinc-500 dark:text-zinc-400";
+
+/**
+ * Uppercase section/group label used in Settings panels and onboarding
+ * surfaces. Applied to `<p>`, `<legend>`, and `<h3>` elements that head a
+ * labelled group of controls.
+ */
+export const sectionLabel =
+  "text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400";
+
+/**
+ * Modal `<dialog>` panel with the standard rounded border, shadow, and
+ * semi-transparent backdrop. Completes the `cardPanel` / `cardPanelPadded`
+ * panel family for the dialog surface.
+ */
+export const dialogPanel =
+  "rounded-xl border border-zinc-200 bg-background p-6 shadow-xl backdrop:bg-black/50 dark:border-zinc-800";
+
+/**
+ * Numeric value text on Stats chart tooltip cards. Tabular figures with a
+ * neutral muted tone, consistent across all six chart components.
+ */
+export const statValue = "tabular-nums text-zinc-600 dark:text-zinc-300";

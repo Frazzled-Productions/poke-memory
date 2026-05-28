@@ -52,6 +52,7 @@ import {
   applyKnownGrades,
   eligibleCardsForKnownQuiz,
 } from "@/lib/onboarding/applyKnownGrades";
+import { dialogPanel, sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
   /**
@@ -297,7 +298,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
     <div className="flex flex-col gap-4">
       {/* Generation switcher */}
       <fieldset className="flex flex-col gap-2">
-        <legend className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        <legend className={sectionLabel}>
           Generation
         </legend>
         <div role="tablist" aria-label="Choose a generation" className="flex flex-wrap gap-2">
@@ -440,7 +441,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         ref={dialogRef}
         aria-labelledby="bulk-confirm-title"
         aria-describedby="bulk-confirm-desc"
-        className="rounded-xl border border-zinc-200 bg-background p-6 shadow-xl backdrop:bg-black/50 dark:border-zinc-800"
+        className={dialogPanel}
       >
         <h3 id="bulk-confirm-title" className="text-lg font-semibold text-foreground">
           Mark every Pokémon in {GEN_RANGES.find((r) => r.gen === activeGen)?.name}?

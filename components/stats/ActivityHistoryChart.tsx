@@ -11,7 +11,7 @@ import {
 import type { ActivityPoint } from "@/lib/stats/activity-history";
 import { isActivityHistoryEmpty } from "@/lib/stats/activity-history";
 import type { DateFormat } from "@/lib/utils/format-date";
-import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette — consistent with other Stats components (zinc/emerald/rose)
@@ -61,7 +61,7 @@ function ChartTooltip({
   return (
     <div className="rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700">
       <p className="mb-1 font-semibold text-foreground">{label}</p>
-      <p className="tabular-nums text-zinc-600 dark:text-zinc-300">
+      <p className={statValue}>
         <span
           className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
           style={{ backgroundColor: REVIEWS_COLOUR }}
@@ -69,7 +69,7 @@ function ChartTooltip({
         Reviews: {d.reviews.toLocaleString("en-GB")}
       </p>
       {d.introduced > 0 && (
-        <p className="tabular-nums text-zinc-600 dark:text-zinc-300">
+        <p className={statValue}>
           <span
             className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
             style={{ backgroundColor: INTRODUCED_COLOUR }}

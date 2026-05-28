@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { dialogPanel } from "@/lib/utils/class-names";
 
 export type ReenableChoice = "reuse" | "fresh";
 
@@ -52,7 +53,7 @@ export function ReenableCardTypeDialog({ open, cardTypeName, onClose, onChoose }
       ref={dialogRef}
       aria-labelledby="reenable-dialog-title"
       aria-describedby="reenable-dialog-desc"
-      className="rounded-xl border border-zinc-200 bg-background p-6 shadow-xl backdrop:bg-black/50 dark:border-zinc-800"
+      className={dialogPanel}
     >
       <h2 id="reenable-dialog-title" className="text-lg font-semibold text-foreground">
         Re-enable {cardTypeName}?

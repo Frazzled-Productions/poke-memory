@@ -13,7 +13,7 @@ import {
   totalHistogramCards,
   type DifficultyBucket,
 } from "@/lib/stats/difficulty-histogram";
-import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
 
 type Props = {
   /** The nine difficulty buckets, from `computeDifficultyHistogram`. */
@@ -46,7 +46,7 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
       <p className="font-semibold text-foreground">
         Difficulty {datum.lower} to {datum.upper}
       </p>
-      <p className="mt-1 tabular-nums text-zinc-600 dark:text-zinc-300">
+      <p className={`mt-1 ${statValue}`}>
         {datum.count} card{datum.count === 1 ? "" : "s"}
       </p>
     </div>

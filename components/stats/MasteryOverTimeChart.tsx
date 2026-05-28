@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
 import type { DateFormat } from "@/lib/utils/format-date";
-import { cardPanel, chartTickText, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette — consistent with other Stats components (zinc/emerald/rose)
@@ -40,7 +40,7 @@ function ChartTooltip({
   return (
     <div className="rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700">
       <p className="font-semibold text-foreground">{d.date}</p>
-      <p className="mt-0.5 tabular-nums text-zinc-600 dark:text-zinc-300">
+      <p className={`mt-0.5 ${statValue}`}>
         <span
           className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
           style={{ backgroundColor: AREA_COLOUR }}
