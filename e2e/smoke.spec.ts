@@ -69,10 +69,11 @@ test.describe("Practice page", () => {
     // Since #1234 the session is seeded with both name and reverse cards for
     // every species (~2× the card set). With the bundled seed chunk reduced
     // from 2.9 MB to 1.2 MB (#1263), WebKit parses it well within 10 s on its
-    // own. The timeout is raised to 20 s to absorb the additional next-intl
-    // Suspense boundary introduced in #1260, which adds a hydration round-trip
-    // that pushes WebKit over the previous 10 s ceiling.
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 20_000 });
+    // own. After #1260's next-intl Suspense boundary added a hydration round-
+    // trip, 20 s proved insufficient on mobile-safari (3/3 retries failed).
+    // Raised to 30 s to match wide-viewport.spec.ts's budget for the same
+    // root cause. Tracked in #1306.
+    await expect(reveal.or(endState)).toBeVisible({ timeout: 30_000 });
   });
 
   test("reveal shows grade buttons", async ({ page }) => {
