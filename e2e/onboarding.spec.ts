@@ -28,12 +28,14 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     await expect(modal).toHaveCount(0);
 
     // After dismissal the Practice card surface must be interactable.
-    // 10 s: fresh-visitor hydration builds ~2 050 cards from scratch. With the
+    // 20 s: fresh-visitor hydration builds ~2 050 cards from scratch. With the
     // bundled seed chunk reduced from 2.9 MB to 1.2 MB (#1263) WebKit parses
-    // it in well under this window, including on CI.
+    // it well within this window, including on CI. The extra headroom over the
+    // previous 10 s accounts for the next-intl Suspense boundary introduced in
+    // #1260, which adds a hydration round-trip that pushes WebKit over 10 s.
     await expect(
       page.getByRole("button", { name: /reveal/i }).or(page.getByText(/all caught up/i)),
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: 20_000 });
   });
 
   test("modal does not reappear after dismissal", async ({ page }) => {

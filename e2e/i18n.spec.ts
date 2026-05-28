@@ -114,8 +114,16 @@ test.describe("i18n — Languages Labs flag (#1260)", () => {
     // Switch to Japanese.
     await localeSelect.selectOption("ja");
 
-    // Wait briefly for the Server Action to fire and the cookie to be set.
-    await page.waitForTimeout(1000);
+    // Wait for the Server Action to commit by polling document.cookie directly.
+    // On WebKit the Server Action response lags the synchronous cookie read, so
+    // a fixed timeout is racey. waitForFunction polls the exact value being
+    // asserted, giving the action up to 5 s to propagate without over-waiting
+    // on fast browsers.
+    await page.waitForFunction(
+      () => document.cookie.includes("poke-memory:locale=ja"),
+      null,
+      { timeout: 5_000 },
+    );
 
     // Verify the cookie was written.
     const cookies = await context.cookies();
