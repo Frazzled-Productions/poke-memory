@@ -202,4 +202,30 @@ test.describe("Higher-or-Lower mini-game", () => {
     await expect(page.getByText(/which has higher/i)).toBeVisible();
     await expect(gameRegion.getByRole("button")).toHaveCount(2);
   });
+
+  test("nav links remain interactive on the all-caught-up screen (#1275)", async ({ page }) => {
+    // Regression test: the bottom tab bar and header nav links were
+    // unresponsive on the all-caught-up screen when the Higher-or-Lower
+    // mini-game was visible, because the end-of-session container lacked
+    // flex-1/overflow-y-auto and caused the body to scroll.
+    await seedSessionIdb(page, buildCompletedSession({
+      pokemonIds: SEED_POKEMON_IDS,
+      evolutionCardIds: EVOLUTION_CARD_IDS,
+    }));
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    await expect(page.getByText("All caught up!")).toBeVisible();
+
+    // Confirm the mini-game is present so this test exercises the problematic layout.
+    const gameRegion = page.getByRole("region", {
+      name: /higher or lower mini-game/i,
+    });
+    await expect(gameRegion).toBeVisible();
+
+    // The Stats nav link must be clickable — not blocked by any overlay or scroll state.
+    const statsLink = page.getByRole("navigation").getByRole("link", { name: "Stats" }).first();
+    await statsLink.click();
+    await expect(page).toHaveURL("/stats");
+  });
 });
