@@ -54,6 +54,32 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 
 These are decisions made through deliberate research/discussion, not guesses. Add to this section only when a real decision is locked in.
 
+### Single source of truth for shared concepts
+
+When the same domain concept appears at multiple call sites — Pokémon names rendered in UI, dates formatted for display, sprite URLs resolved, mastery counted, locale-aware text, accessibility attributes attached, class-name literals reused — **every site routes through ONE shared helper, hook, or component**. Never duplicate the logic site-by-site, even if "it's just a one-liner here". The fragmentation pattern is the failure mode this rule prevents.
+
+**Why this is load-bearing.** The #1259 / #1260 multi-locale rollout shipped repeated rounds of partial fixes (#1311 → #1318 → audit-fix) because Pokémon names were rendered directly via `.displayName` in many separate components (`PokemonCard`, `EvolutionCardLayout`, `EvolutionCard`, `SpritePicker`, `MultipleChoiceNameCard`, …). Each render became a separate locale gap and each fix only exposed the next site that hadn't been audited. With a single `useLocalePokemonName(id, fallback)` hook used everywhere, the locale switch (or any future re-styling, accessibility attribute, or A/B test) would live in ONE place and adding locale support would have been one helper edit plus a mechanical import across the call sites.
+
+**How to apply.**
+
+- **Before writing a new render or computation**, ask: "is this concept already produced somewhere? If yes, can I import from there?" If no but the concept is rendered elsewhere, **centralise the existing call sites in the same PR**, rather than adding another fragmented call site.
+- **When adding a cross-cutting concern** (locale, theme, accessibility attribute, analytics tag) to the codebase, the first step is to centralise the existing call sites, then add the new concern in the helper. Adding the concern alongside the existing fragments is the failure pattern.
+- **When reviewing a PR**, flag any new direct field access on a domain object (`p.displayName`, `card.name`, `pokemon.sprite`) that should go through a helper — `code-reviewer` raises this as a **Blocker** tagged "fragmentation".
+- **When orchestrating**, if a brief mentions a domain concept (Pokémon name, date display, mastery count), include a "centralisation check" in the brief: identify the existing helper, or propose a new one with the existing call sites to centralise.
+
+**Existing helpers — use these, do not re-derive.**
+
+- `useLocalePokemonName(id, fallback)` from `lib/i18n/useLocalePokemonName.ts` — Pokémon name rendering (locale-aware).
+- `formatDate(iso, fmt, tz)` and `formatShortDate(iso, fmt)` from `lib/utils/format-date.ts` — user-facing date display. `todayInTimezone(tz)` for the current day boundary. `isoDate(d)` for the scheduling-internal `"YYYY-MM-DD"` form.
+- `isMastered(state, masteryRepetitions)` from `lib/stats/derive.ts` — single mastery check.
+- `filterMastered(cards, …)` from `lib/pasture/arrivals.ts` — mastery filter that honours the superuser `forceAllMastered` axis.
+- `computeStats(…)` from `lib/stats/derive.ts` — aggregate stats with the same superuser axis.
+- `masteredSpeciesIds(…)` from `lib/badges/derive.ts` — mastered species set.
+- `useCardClass(…)` from `lib/review/useCardClass.ts` — card-class derivation.
+- Class-name constants in `lib/utils/class-names.ts` — `cardPanel`, `cardPanelPadded`, `colStack`, `colStackLg`, `sectionLabel`, `dialogPanel`, `statValue`, `chartTickText`, `mutedText`. Never inline the underlying Tailwind literal — import the named constant so a visual convention change lives in one file.
+
+**Trade-off.** A premature abstraction is worse than three similar lines. The rule is *don't fragment what's already shared*, not *abstract every duplication*. Three sites with the same pattern that aren't going to grow are fine; three sites that ARE going to need a cross-cutting change next month must share a helper now. Where the failure mode is easy to encode at PR time, prefer a lint rule (see #1327 for the Pokémon-name case) over a convention-only enforcement.
+
 ### Caching
 
 - **Cache Components is enabled** (`cacheComponents: true` in `next.config.ts`). All cache APIs assume this model.
