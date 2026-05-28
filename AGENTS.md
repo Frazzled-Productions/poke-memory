@@ -77,6 +77,7 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 - `masteredSpeciesIds(…)` from `lib/badges/derive.ts` — mastered species set.
 - `useCardClass(…)` from `lib/review/useCardClass.ts` — card-class derivation.
 - Class-name constants in `lib/utils/class-names.ts` — `cardPanel`, `cardPanelPadded`, `colStack`, `colStackLg`, `sectionLabel`, `dialogPanel`, `statValue`, `chartTickText`, `mutedText`. Never inline the underlying Tailwind literal — import the named constant so a visual convention change lives in one file.
+- `spriteVariantUrl(id, width)` and `rawSpriteUrl(id)` from `lib/sprites/url.ts` — sprite URL resolution. `spriteVariantUrl` for pre-generated WebP paths served via the custom image loader; `rawSpriteUrl` for the raw PNG path (Pokédex-grid plain-`<img>` exemption only).
 
 **Trade-off.** A premature abstraction is worse than three similar lines. The rule is *don't fragment what's already shared*, not *abstract every duplication*. Three sites with the same pattern that aren't going to grow are fine; three sites that ARE going to need a cross-cutting change next month must share a helper now. Where the failure mode is easy to encode at PR time, prefer a lint rule (see #1327 for the Pokémon-name case) over a convention-only enforcement.
 
