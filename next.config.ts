@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSerwist } from "@serwist/turbopack";
+import createNextIntlPlugin from "next-intl/plugin";
 import pkg from "./package.json";
 import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 
@@ -72,4 +73,9 @@ const nextConfig: NextConfig = {
 // regression) and marks the esbuild bundler used by the service-worker route
 // (`app/sw/[path]/route.ts`) as server-external so Turbopack does not try to
 // bundle it. Offline support for the installed PWA — see issue #703.
-export default withSerwist(nextConfig);
+//
+// `withNextIntl` wraps the config so next-intl can wire up its server-side
+// request config (i18n/request.ts) and message imports without the
+// "Couldn't find next-intl config" runtime error (#1260).
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
+export default withNextIntl(withSerwist(nextConfig));

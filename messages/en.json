@@ -1,0 +1,189 @@
+{
+  "nav": {
+    "brand": "poke-memory",
+    "practice": "Practice",
+    "pokedex": "Pokédex",
+    "pasture": "Pasture",
+    "stats": "Stats",
+    "journey": "Journey",
+    "settings": "Settings",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "ariaLabel": "Main navigation"
+  },
+  "settings": {
+    "heading": "Settings",
+    "saved": "Saved!",
+    "save": "Save",
+    "search": {
+      "placeholder": "Search settings...",
+      "noMatch": "No settings match \"{query}\".",
+      "ariaLabel": "Search settings"
+    },
+    "section": {
+      "appearance": "Appearance",
+      "practice": "Practice",
+      "audio": "Audio",
+      "offline": "Offline",
+      "accountData": "Account & Data",
+      "advanced": "Advanced",
+      "labs": "Labs"
+    },
+    "appearance": {
+      "mobileNav": {
+        "heading": "Mobile navigation",
+        "label": "Bottom tab bar",
+        "description": "Show a fixed tab bar at the bottom of the screen on mobile. Turn off to use the classic hamburger menu instead. Has no effect on wide screens."
+      },
+      "theme": {
+        "heading": "App Theme",
+        "description": "Master a Pokémon to unlock it as an app colour theme.",
+        "selected": "Selected",
+        "setAsTheme": "Set as theme",
+        "remove": "Remove"
+      }
+    },
+    "labs": {
+      "languages": {
+        "label": "Languages",
+        "description": "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese.",
+        "locale": {
+          "en": "English",
+          "ja": "Japanese",
+          "zh-Hans": "Simplified Chinese",
+          "zh-Hant": "Traditional Chinese"
+        },
+        "selectLocale": "Language"
+      }
+    },
+    "practice": {
+      "scheduler": {
+        "heading": "Scheduler"
+      },
+      "masteryThreshold": {
+        "label": "Mastery threshold",
+        "description": "Cards with this many consecutive correct reviews count as mastered."
+      },
+      "recallTarget": {
+        "label": "Recall target ({percent}%)",
+        "description": "Lower means fewer reviews but you will forget more cards. Higher means more reviews but better retention. Default 90%."
+      },
+      "nameCards": {
+        "heading": "Name cards"
+      },
+      "evolutionCards": {
+        "heading": "Evolution cards"
+      },
+      "reverseCards": {
+        "heading": "Reverse cards"
+      },
+      "cryCards": {
+        "heading": "Cry to name cards"
+      },
+      "newPerDay": "New cards per day",
+      "reviewsPerDay": "Reviews per day",
+      "save": "Save"
+    },
+    "audio": {
+      "playCryOnReveal": {
+        "label": "Play cry on reveal",
+        "description": "Plays the Pokémon's cry once when you reveal a name or evolution card."
+      },
+      "speakNameOnReveal": {
+        "label": "Speak name on reveal",
+        "description": "Reads the Pokémon's name aloud using your device's text-to-speech engine when you reveal a card."
+      }
+    },
+    "backup": {
+      "heading": "Backup",
+      "exportLabel": "Export progress",
+      "exportDescription": "Downloads a JSON backup of all your card progress and settings.",
+      "exportButton": "Export",
+      "importLabel": "Import progress",
+      "importDescription": "Restore from a previously exported backup. Replaces current progress after confirmation.",
+      "importButton": "Import"
+    },
+    "regional": {
+      "heading": "Regional",
+      "timezone": {
+        "label": "Timezone",
+        "description": "Used for daily review limits and streak roll-overs. Auto-detected on first load."
+      },
+      "dateFormat": {
+        "label": "Date format",
+        "description": "Controls how dates are shown throughout the app."
+      }
+    },
+    "about": {
+      "heading": "About",
+      "version": "Version",
+      "whatsNew": "What's new",
+      "viewChangelog": "View changelog"
+    },
+    "dangerZone": {
+      "heading": "Danger zone",
+      "resetAllProgress": "Reset all progress",
+      "resetDescription": "Permanently deletes your review history",
+      "resetDescriptionCloud": "Permanently deletes your review history and cloud data.",
+      "deleteAccount": "Delete account",
+      "deleteDescription": "Permanently erases your account, cloud data, and sign-in identity. This cannot be undone."
+    },
+    "developer": {
+      "heading": "Developer",
+      "description": "QA shortcuts. While any flag here is on, sync to the cloud is paused so QA state cannot leak into your real data.",
+      "pretendAllMastered": {
+        "label": "Pretend all Pokémon are mastered",
+        "description": "Renders every species as mastered across the Pokédex, detail pages, Pasture, Stats, and the theme picker."
+      }
+    }
+  },
+  "practice": {
+    "title": "Poké Memory - Learn every Pokémon",
+    "description": "Free spaced-repetition flashcards for learning all 1025 Pokémon names and evolutions. No sign-up required.",
+    "signInFailed": "Sign-in failed. Please try again.",
+    "allCaughtUp": "All caught up!",
+    "nothingDue": "Nothing due right now.",
+    "reveal": "Reveal",
+    "again": "Again",
+    "hard": "Hard",
+    "good": "Good",
+    "easy": "Easy",
+    "undo": "Undo",
+    "loadingCard": "Loading card..."
+  },
+  "pokedex": {
+    "title": "Pokédex",
+    "description": "Browse all 1025 Pokémon. Filter by generation, type, or mastery status.",
+    "searchPlaceholder": "Search by name or number...",
+    "filterByGeneration": "Generation",
+    "filterByType": "Type",
+    "filterMastered": "Mastered only",
+    "noResults": "No Pokémon match your filters.",
+    "loadMore": "Load more"
+  },
+  "pasture": {
+    "title": "Pasture",
+    "description": "Pokémon you have mastered live here.",
+    "empty": "Your pasture is empty. Master some Pokémon to see them here.",
+    "searchPlaceholder": "Search mastered Pokémon...",
+    "masteredCount": "{count} mastered"
+  },
+  "stats": {
+    "title": "Stats",
+    "description": "Track your Pokémon learning progress.",
+    "loading": "Loading stats...",
+    "totalMastered": "Mastered",
+    "totalSeen": "Seen",
+    "streak": "Streak",
+    "days": "{count} days"
+  },
+  "journey": {
+    "title": "Journey",
+    "description": "Your Pokémon learning journey."
+  },
+  "error": {
+    "heading": "Something went wrong",
+    "tryAgain": "Try again",
+    "goHome": "Go to Practice"
+  }
+}
