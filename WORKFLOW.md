@@ -730,6 +730,23 @@ Runs on every `pull_request` event. Fails the `coverage` job on either a global-
 
 Runs on PRs that touch rendered UI (`components/**`, `app/**/*.tsx`, `app/globals.css`) or carry the `visual-regression` label. Compares committed Playwright screenshot baselines (`e2e/__screenshots__/`) against a fresh render of the two deterministic README surfaces (Stats, Journey) at a mobile and a desktop viewport, across the Chromium and WebKit engines. Practice, Pasture and Pokédex are excluded because their renders are not pixel-stable across runs (see `e2e/visual.spec.ts`). The job runs inside the pinned `mcr.microsoft.com/playwright` Docker image so Linux font rendering is deterministic; baselines are generated AND compared in the same image. A mismatch fails the `visual` job and uploads an expected/actual/diff report. Not a required check, and a non-matching PR does not run it. When a UI change is an intended visual update, regenerate baselines inside the Docker image (see the `visual-regression.yml` catalog entry above) and commit the changed PNGs in the same PR. For an in-CI one-click regeneration, dispatch `visual-baseline-update.yml` against the feature branch — it runs the same pinned image, refuses to push to `main` or `qa`, and is owner-gated. See the `visual-regression.yml` catalog entry for the exact local `docker run` command and the `visual-baseline-update.yml` entry for the CI path.
 
+### Perf budget gate (`perf-budget.yml`)
+
+Runs `e2e/perf-budget.spec.ts` on every pull request and on pushes to `main` / `qa`. The spec measures fresh-visitor time-to-interactive on the practice page with empty `storageState` (no localStorage, no IndexedDB seed) — it pre-dismisses the onboarding modal via `addInitScript`, navigates to `/`, and waits for the above-fold interactive element (the Reveal button or a documented end-state heading) to become visible. The wall-clock figure is logged on every run (look for `[perf-budget] project=...` in the job output) so the baseline can be tracked over time, and the assertion fails the job if it exceeds the per-project budget.
+
+Current budgets, defined as the `BUDGETS` constant in `e2e/perf-budget.spec.ts`:
+
+| Project | Budget |
+|---|---|
+| `chromium` | 5000 ms |
+| `mobile-safari` | 8000 ms |
+
+**Ratchet down only.** When a perf-improving change lowers the measured time meaningfully, lower the budget in the same PR so future regressions are caught at the new baseline. **Never** raise a budget to make a red run pass — investigate the cause first. A deliberate, justified regression (e.g. a feature that materially expands the seed payload) is the only case for raising a budget, and the PR description must explain why.
+
+The spec body is gated on `PERF_BUDGET=1`. Without the env var, `test.skip(...)` short-circuits the test, so the spec is invisible to `ci.yml`'s `e2e-browser` matrix and to `e2e.yml`'s preview run. The dedicated `perf-budget.yml` workflow is the only place it executes in CI; it runs the same pinned `mcr.microsoft.com/playwright:v1.60.0-noble` image as the other Playwright jobs for parity, builds locally, serves via `npm start`, and runs the spec on chromium and mobile-safari in parallel matrix legs. A `changes` filter mirrors the `e2e-browser` pattern so docs-only PRs report a no-op skip rather than burning the full 10–15 min build per leg.
+
+**Status: non-required initially.** Per #1268, the check runs on every PR but does not gate merge. Promotion to required happens after one week of stable baseline — add the `perf-budget` aggregator job (the single stable check-name produced by this workflow; the matrix legs themselves render as `Perf budget (chromium)` and `Perf budget (mobile-safari)`) to the `qa-staging` and `main-protection` rulesets' required-checks list when the baseline has held without spurious failures. The aggregator mirrors `ci.yml`'s `e2e` pattern so the required-check name stays stable regardless of how the matrix evolves. No spec or workflow change is needed at promotion time.
+
 ### `paths-ignore` and label escape hatches don't compose (#1250)
 
 When a workflow uses `paths-ignore` on a `pull_request` trigger, GitHub still fires `labeled` events on the PR, but the workflow re-evaluates `paths-ignore` against the PR's changed files and skips the run. Applying the escape-hatch label has no effect. If you need a label-based override, drop `paths-ignore` and gate the work inside the job (e.g. `if: contains(github.event.pull_request.labels.*.name, 'X')`).
