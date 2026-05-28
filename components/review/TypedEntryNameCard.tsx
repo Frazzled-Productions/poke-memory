@@ -6,6 +6,7 @@ import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { gradeTypedAnswer } from "@/lib/srs/typedEntryGrade";
 import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import type { Grade } from "@/lib/review/session";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 
 // Feedback is held visible for this long before calling onGrade so the parent
 // can advance to the next card. 1.5 s gives enough time for Playwright and
@@ -39,6 +40,12 @@ type Props = {
  * The component calls `onGrade` once and then becomes "submitted" — further
  * input is ignored while the grade is in flight. The parent (ReviewSession)
  * is responsible for advancing to the next card.
+ *
+ * The revealed answer text uses the locale-resolved name from
+ * `useLocalePokemonName` so it updates when `pokemonNameLocale` changes
+ * (#1260 followup). The grading comparison still uses `canonicalName` (the
+ * English name) — locale-aware typed-entry validation is tracked separately
+ * in #1259 (typed-entry strictness / accept native script).
  */
 export function TypedEntryNameCard({
   spriteUrl,
@@ -55,6 +62,11 @@ export function TypedEntryNameCard({
   const [feedbackGrade, setFeedbackGrade] = useState<Grade | null>(null);
   // Tracks whether onGrade has already been called so we never double-fire.
   const gradedRef = useRef(false);
+
+  // Locale-resolved name for the revealed-answer display. The English
+  // `canonicalName` is used for grading (string comparison) until typed-entry
+  // locale support ships (#1259).
+  const { name: localeDisplayName } = useLocalePokemonName(id ?? undefined, canonicalName);
 
   function submit(skipAnswer: boolean) {
     if (submitted || grading || gradedRef.current) return;
@@ -133,7 +145,7 @@ export function TypedEntryNameCard({
             </p>
             {feedbackInfo.showAnswer && (
               <p className="text-lg font-semibold capitalize text-foreground">
-                {canonicalName}
+                {localeDisplayName}
               </p>
             )}
           </div>

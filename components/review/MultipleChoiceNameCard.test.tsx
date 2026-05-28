@@ -12,6 +12,15 @@ vi.mock("next/image", () => ({
   },
 }));
 
+// Return the English name synchronously so tests are deterministic and do not
+// depend on localStorage or the locale sidecar being loaded.
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (_id: number | undefined, englishName: string) => ({
+    name: englishName,
+    transliteration: null,
+  }),
+}));
+
 function makeOption(id: number, name: string, isCorrect: boolean) {
   return {
     isCorrect,
@@ -169,5 +178,72 @@ describe("MultipleChoiceNameCard", () => {
     expect(onGrade).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(1); });
     expect(onGrade).toHaveBeenCalledWith(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale-aware name display (#1260 followup)
+// ---------------------------------------------------------------------------
+
+describe("MultipleChoiceNameCard — locale-aware names", () => {
+  it("option buttons render the locale-resolved name instead of English", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({
+      useLocalePokemonName: (id: number | undefined, _english: string) => ({
+        name: id === 1 ? "フシギダネ" : id === 4 ? "ヒトカゲ" : id === 7 ? "ゼニガメ" : id === 25 ? "ピカチュウ" : _english,
+        transliteration: null,
+      }),
+    }));
+    const { MultipleChoiceNameCard: LocaleMCCard } = await import(
+      "@/components/review/MultipleChoiceNameCard"
+    );
+    render(
+      <LocaleMCCard
+        spriteUrl="/sprites/1.png"
+        canonicalName="Bulbasaur"
+        options={DEFAULT_OPTIONS}
+        id={1}
+        onGrade={vi.fn()}
+      />,
+    );
+    // All four locale names should be present.
+    expect(screen.getByText("フシギダネ")).toBeInTheDocument();
+    expect(screen.getByText("ヒトカゲ")).toBeInTheDocument();
+    expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
+    expect(screen.queryByText("Charmander")).not.toBeInTheDocument();
+  });
+
+  it("feedback reveal shows the locale-resolved canonical name on a wrong answer", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({
+      useLocalePokemonName: (id: number | undefined, _english: string) => ({
+        // id=1 is the canonicalName target; others are options
+        name: id === 1 ? "フシギダネ" : _english,
+        transliteration: null,
+      }),
+    }));
+    const { MultipleChoiceNameCard: LocaleMCCard, FEEDBACK_HOLD_MS: HOLD } = await import(
+      "@/components/review/MultipleChoiceNameCard"
+    );
+    vi.useFakeTimers();
+    render(
+      <LocaleMCCard
+        spriteUrl="/sprites/1.png"
+        canonicalName="Bulbasaur"
+        options={DEFAULT_OPTIONS}
+        id={1}
+        onGrade={vi.fn()}
+      />,
+    );
+    // Click a wrong answer (Charmander is option id=4, resolves to English).
+    fireEvent.click(screen.getByText("Charmander"));
+    // Feedback should show the locale name, not the English canonical.
+    const feedbackRegion = screen
+      .getAllByRole("status")
+      .find((el) => el.getAttribute("aria-atomic") === "true")!;
+    expect(feedbackRegion).toHaveTextContent("フシギダネ");
+    expect(feedbackRegion).not.toHaveTextContent("Bulbasaur");
+    act(() => { vi.advanceTimersByTime(HOLD); });
+    vi.useRealTimers();
   });
 });
