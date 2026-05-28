@@ -1695,7 +1695,7 @@ export function ReviewSession() {
           ? { kind: "new-locked" }
           : { kind: "complete" };
     return (
-      <div className="flex flex-col items-center w-full">
+      <div className="flex flex-col flex-1 min-h-0 w-full items-center overflow-y-auto">
         <EndOfSessionScreen
           variant={variant}
           perType={perType}
