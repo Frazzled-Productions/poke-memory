@@ -65,7 +65,7 @@ async function insertAsUser(
                1, 0, 'review',
                '2026-06-01', '2026-05-30', '2026-05-28',
                false, now())
-       ON CONFLICT (user_id, card_type, subject_key) WHERE subject_key IS NOT NULL DO NOTHING`,
+       ON CONFLICT (user_id, card_type, subject_key, locale) DO NOTHING`,
       [userId, subjectKey],
     );
     await client.query("COMMIT");

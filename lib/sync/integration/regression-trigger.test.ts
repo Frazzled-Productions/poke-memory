@@ -639,6 +639,9 @@ describe("regression trigger (integration)", () => {
     try {
       await withUser(client, USER_ID, async (c) => {
         // Insert the "en" row — locale defaults to "en".
+        // Use current_date for first_seen / last_review so the
+        // reject_pre_reset_card_reviews trigger does not fire when a prior
+        // migration-022 test has stamped last_reset_at = now().
         await c.query(
           `INSERT INTO card_reviews
              (user_id, card_type, subject_key,
@@ -649,7 +652,7 @@ describe("regression trigger (integration)", () => {
            VALUES ($1, 'name', '501',
                    2.0, 5.0, 1, 3,
                    2, 0, 'review',
-                   '2026-06-01', '2026-05-20', '2026-05-18',
+                   current_date + 10, current_date, current_date,
                    false, now())`,
           [USER_ID],
         );
@@ -666,7 +669,7 @@ describe("regression trigger (integration)", () => {
              VALUES ($1, 'name', '501', 'ja',
                      1.5, 5.0, 1, 2,
                      1, 0, 'review',
-                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     current_date + 10, current_date, current_date,
                      false, now())`,
             [USER_ID],
           ),
@@ -706,7 +709,7 @@ describe("regression trigger (integration)", () => {
              VALUES ($1, 'name', '502', 'fr',
                      2.0, 5.0, 1, 3,
                      2, 0, 'review',
-                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     current_date + 10, current_date, current_date,
                      false, now())`,
             [USER_ID],
           ),
