@@ -7,6 +7,10 @@
 // has loaded. Falls back to the English name if the sidecar is unavailable or
 // if the languages Labs flag is off.
 //
+// The Pokémon-name locale is independent of the app UI locale (#1260 follow-up).
+// It is read from `UserSettings.pokemonNameLocale` (localStorage) rather than
+// from the `poke-memory:locale` cookie, which drives only the app UI language.
+//
 // Transliteration (rōmaji for ja, pinyin for zh-Hans/zh-Hant) is always shown
 // when locale !== en. No extra toggle — it is a learning aid for non-Latin
 // scripts and its presence is the value proposition of enabling the flag.
@@ -14,9 +18,8 @@
 import { useEffect, useState } from "react";
 import { loadLocaleNames, getLocaleName, getTransliteration } from "@/lib/pokemon/localeNames";
 import { isLabsFlagEnabled } from "@/lib/labs/flags";
-import { loadSettings } from "@/lib/settings/persistence";
+import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
-import { useAppLocale } from "./useAppLocale";
 import type { TransliterationLocale } from "@/lib/pokemon/seed";
 
 export type LocalePokemonName = {
@@ -30,7 +33,25 @@ export type LocalePokemonName = {
 };
 
 /**
+ * Reads the Pokémon-name locale from settings and keeps it in sync with same-
+ * tab `saveSettings` calls (via `SETTINGS_SAVED_EVENT`) and other-tab writes
+ * (via the `storage` event).
+ */
+function readPokemonNameLocale(): AppLocale {
+  if (typeof window === "undefined") return DEFAULT_LOCALE;
+  const settings = loadSettings();
+  const flagOn = isLabsFlagEnabled(settings.labsFlags, "languages");
+  if (!flagOn) return DEFAULT_LOCALE;
+  return settings.pokemonNameLocale ?? DEFAULT_LOCALE;
+}
+
+/**
  * Resolves the locale-appropriate display name for a Pokémon species.
+ *
+ * The locale is read from `UserSettings.pokemonNameLocale`, which is
+ * independent of the app UI locale cookie. This means a user can keep the
+ * app UI in English while practising Pokémon names in Japanese (or vice
+ * versa).
  *
  * @param speciesId  PokéAPI species ID (matches SeedPokemon.speciesId).
  * @param englishName  The English name — used immediately and as a fallback.
@@ -42,17 +63,31 @@ export function useLocalePokemonName(
   speciesId: number | undefined,
   englishName: string,
 ): LocalePokemonName {
-  const locale = useAppLocale();
+  const [locale, setLocale] = useState<AppLocale>(readPokemonNameLocale);
+
+  // Keep locale in sync: same-tab saveSettings fires SETTINGS_SAVED_EVENT,
+  // other-tab writes fire the storage event.
+  useEffect(() => {
+    function handleChange() {
+      setLocale(readPokemonNameLocale());
+    }
+    window.addEventListener(SETTINGS_SAVED_EVENT, handleChange);
+    window.addEventListener("storage", handleChange);
+    // Re-read on mount in case settings changed between SSR and hydration.
+    setLocale(readPokemonNameLocale());
+    return () => {
+      window.removeEventListener(SETTINGS_SAVED_EVENT, handleChange);
+      window.removeEventListener("storage", handleChange);
+    };
+  }, []);
+
   const [localeName, setLocaleName] = useState<LocalePokemonName>({
     name: englishName,
     transliteration: null,
   });
 
   useEffect(() => {
-    // If no speciesId, or locale is English, or labs flag is off — use English.
-    const settings = loadSettings();
-    const flagOn = isLabsFlagEnabled(settings.labsFlags, "languages");
-    if (!speciesId || locale === DEFAULT_LOCALE || !flagOn) {
+    if (!speciesId || locale === DEFAULT_LOCALE) {
       setLocaleName({ name: englishName, transliteration: null });
       return;
     }

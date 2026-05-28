@@ -99,6 +99,7 @@ const VALID_SETTINGS: UserSettings = {
   typedEntryOnboardingShown: false,
   mcCardOnboardingShown: false,
   labsFlags: { ...DEFAULT_LABS_FLAGS },
+  pokemonNameLocale: "en" as const,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

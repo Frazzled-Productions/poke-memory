@@ -80,6 +80,7 @@ const SAMPLE: UserSettings = {
   typedEntryOnboardingShown: false,
   mcCardOnboardingShown: false,
   labsFlags: { ...DEFAULT_LABS_FLAGS },
+  pokemonNameLocale: "en" as const,
 };
 
 describe("pushSettings", () => {
