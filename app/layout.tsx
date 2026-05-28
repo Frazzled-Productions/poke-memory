@@ -153,7 +153,7 @@ export default async function RootLayout({
   // Resolve locale from cookie OUTSIDE any 'use cache' function so we can
   // safely read cookies(). setRequestLocale makes the locale available to all
   // Server Components in this render via React cache(). See i18n/request.ts.
-  const locale = resolveLocale();
+  const locale = await resolveLocale();
   setRequestLocale(locale);
   const messages = await getMessages();
 

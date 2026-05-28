@@ -3,11 +3,6 @@
 //
 // The `languages` Labs flag must be enabled and a locale set in the cookie for
 // locale-specific content to render. We seed both via init scripts.
-//
-// Note on ja.json: the catalogue has real Japanese translations for nav labels
-// and the settings heading. The heading assertion is currently skipped because
-// the message files use flat dot-separated keys which are incompatible with
-// next-intl's nested path resolution — see the skipped test for details.
 
 import { test, expect } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
@@ -133,18 +128,6 @@ test.describe("i18n — Languages Labs flag (#1260)", () => {
     page,
     context,
   }) => {
-    // SKIP: The message catalogue files (messages/en.json, messages/ja.json, etc.)
-    // use flat dot-separated keys ("settings.heading": "Settings") rather than
-    // next-intl's expected nested format ({ settings: { heading: "Settings" } }).
-    // useTranslations() with a root namespace resolves "settings.heading" via
-    // nested path traversal (messages["settings"]["heading"]), which fails on a
-    // flat object, so t("settings.heading") returns the literal key string instead
-    // of the translated value. This is a production-code issue: either the message
-    // files must be converted to nested format, or the useTranslations() calls must
-    // be updated to use a namespace (e.g. useTranslations("settings"), t("heading")).
-    // Once that is fixed, remove this skip and verify that the heading renders "設定".
-    test.skip(true, "flat message keys not compatible with next-intl nested path resolution — fix messages/ format first");
-
     // Set the locale cookie before loading the page.
     await enableLanguagesFlag(page);
     await context.addCookies([

@@ -31,13 +31,14 @@ export type { AppLocale };
 /**
  * Resolve the request locale from the cookie, falling back to `DEFAULT_LOCALE`.
  * Reads from the Next.js `cookies()` store — must be called outside
- * `'use cache'` functions.
+ * `'use cache'` functions. Returns a Promise because `cookies()` is async
+ * in Next.js 16.
  */
-export function resolveLocale(): AppLocale {
+export async function resolveLocale(): Promise<AppLocale> {
   // In some server-action contexts `cookies()` may throw; guard with try/catch.
   try {
-    const jar = cookies();
-    const value = (jar as unknown as { get(name: string): { value: string } | undefined }).get(LOCALE_COOKIE)?.value;
+    const jar = await cookies();
+    const value = jar.get(LOCALE_COOKIE)?.value;
     if (value && (SUPPORTED_LOCALES as readonly string[]).includes(value)) {
       return value as AppLocale;
     }
@@ -48,9 +49,9 @@ export function resolveLocale(): AppLocale {
 }
 
 export default getRequestConfig(async () => {
-  const locale = resolveLocale();
+  const locale = await resolveLocale();
   const messages = (await import(`../messages/${locale}.json`)) as {
-    default: Record<string, string>;
+    default: Record<string, unknown>;
   };
 
   return {
