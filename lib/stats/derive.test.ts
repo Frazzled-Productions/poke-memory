@@ -262,6 +262,38 @@ describe("computeStats mastery boundary", () => {
     expect(result.learning).toBe(1);
   });
 
+  it("locale scoping: only counts name+reverse cards matching the given locale (#1259)", () => {
+    // Species 1: mastered in "ja"; should count when locale="ja", not when locale="en"
+    const jaName = { ...card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }), locale: "ja" as const };
+    const jaReverse = { ...masteredReverse(1), locale: "ja" as const };
+    // Species 2: mastered in "en" (default)
+    const enName = card(2, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS });
+    const enReverse = masteredReverse(2);
+    const all: ReviewableCard[] = [jaName, jaReverse, enName, enReverse];
+
+    const jaResult = computeStats(all, TODAY, 10, MASTERY_REPETITIONS, false, "ja");
+    expect(jaResult.mastered).toBe(1); // only species 1 (ja)
+    expect(jaResult.totalCards).toBe(1); // only 1 name card with locale "ja"
+
+    const enResult = computeStats(all, TODAY, 10, MASTERY_REPETITIONS, false, "en");
+    expect(enResult.mastered).toBe(1); // only species 2 (en)
+    expect(enResult.totalCards).toBe(1); // only 1 name card with locale "en"
+  });
+
+  it("locale scoping: en is the default — cards without locale field count as en (#1259)", () => {
+    // Cards without a locale field (pre-#1259 state) should count under the "en" scope.
+    const enNameNoLocale = card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS });
+    const enReverseNoLocale = masteredReverse(1);
+    const cards: ReviewableCard[] = [enNameNoLocale, enReverseNoLocale];
+
+    const enResult = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, false, "en");
+    expect(enResult.mastered).toBe(1);
+
+    const jaResult = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, false, "ja");
+    expect(jaResult.mastered).toBe(0); // same cards, but scoped to "ja" — no matches
+    expect(jaResult.totalCards).toBe(0);
+  });
+
   it("counts card meeting both thresholds as mastered when paired reverse card is also mastered", () => {
     // Since #1234, species mastery requires BOTH name AND reverse cards to
     // pass the FSRS gate. Pass the full mixed array with a paired reverse card.

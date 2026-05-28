@@ -149,4 +149,21 @@ describe("gradeLogToOptimizerItems", () => {
     const items = gradeLogToOptimizerItems(entries);
     expect(items[0].reviews[1].deltaT).toBe(2);
   });
+
+  it("groups same subjectKey in different locales as separate items (#1259)", () => {
+    // Two entries for the same subject key but different locales — they must
+    // not be merged into a single FSRS card history.
+    const DAY = 86_400_000;
+    const t = Date.UTC(2026, 0, 1, 12, 0, 0);
+    const entries: GradeLogEntry[] = [
+      makeEntry(t, 4, "1"),             // locale absent → defaults to "en"
+      makeEntry(t + DAY, 5, "1"),       // locale absent → "en"
+      { ...makeEntry(t, 4, "1"), locale: "ja" as const },   // "ja" group
+    ];
+    const items = gradeLogToOptimizerItems(entries);
+    // "en" (2 reviews) and "ja" (1 review) → 2 separate items
+    expect(items).toHaveLength(2);
+    const lengths = items.map((i) => i.reviews.length).sort();
+    expect(lengths).toEqual([1, 2]);
+  });
 });

@@ -99,4 +99,29 @@ describe("masteredSpeciesIds", () => {
     // Requires reps >= 4 — only id 4 qualifies (name reps=4 and reverse reps=4).
     expect([...masteredSpeciesIds(cards, 4, false)]).toEqual([4]);
   });
+
+  it("locale scoping: only counts name+reverse pairs with matching locale (#1259)", () => {
+    // Species 1 is mastered in "ja" only; species 4 is mastered in "en" only.
+    const jaName = { id: 1, cardType: "name" as const, state: mkState(3, 21), locale: "ja" as const } as unknown as ReviewableCard;
+    const jaReverse = { id: 2_000_001, cardType: "reverse" as const, state: mkState(3, 21), locale: "ja" as const } as unknown as ReviewableCard;
+    const enName = { id: 4, cardType: "name" as const, state: mkState(3, 21), locale: "en" as const } as unknown as ReviewableCard;
+    const enReverse = { id: 2_000_004, cardType: "reverse" as const, state: mkState(3, 21), locale: "en" as const } as unknown as ReviewableCard;
+
+    const all: ReviewableCard[] = [jaName, jaReverse, enName, enReverse];
+
+    expect([...masteredSpeciesIds(all, 3, false, "ja")]).toEqual([1]);
+    expect([...masteredSpeciesIds(all, 3, false, "en")]).toEqual([4]);
+  });
+
+  it("locale scoping: cards without locale field default to en (#1259)", () => {
+    // Pre-#1259 cards have no locale field — they default to "en".
+    const cards: ReviewableCard[] = [
+      nameCard(1, mkState(3, 21)),       // no locale → "en"
+      reverseCard(2_000_001, mkState(3, 21)), // no locale → "en"
+    ];
+    // Scoped to "en" — should find species 1
+    expect([...masteredSpeciesIds(cards, 3, false, "en")]).toEqual([1]);
+    // Scoped to "ja" — should find nothing (both cards have no locale, default "en")
+    expect([...masteredSpeciesIds(cards, 3, false, "ja")]).toEqual([]);
+  });
 });

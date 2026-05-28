@@ -22,17 +22,18 @@ export function isSyncSafe(card: ReviewableCard): boolean {
 }
 
 /**
- * Cloud row shape after migration 012.
+ * Cloud row shape after migration 029 (locale column added).
  *
- * Primary identity: (card_type, subject_key).
+ * Primary identity: (card_type, subject_key, locale).
  *   card_type   — DB discriminator (e.g. "name", "evolution-edge"). Note: the
  *                 app internally uses "evolution" / "reverse-evolution"; these
  *                 are mapped by appTypeToDbType / dbTypeToAppType.
  *   subject_key — type-specific opaque key: species ID string for species cards,
  *                 "fromId>>>toId" for edge cards.
+ *   locale      — Pokémon-name locale for this FSRS row (#1259).
  *
  * The legacy `pokemon_id` integer column was dropped by migration 012. Push
- * paths upsert via `(user_id, card_type, subject_key)` and never write
+ * paths upsert via `(user_id, card_type, subject_key, locale)` and never write
  * `pokemon_id` — it does not exist on the table.
  */
 export type CloudRow = {
@@ -40,6 +41,13 @@ export type CloudRow = {
   card_type: string;
   /** Type-specific identity key. Null for unmigrated edge rows (skipped on pull). */
   subject_key: string | null;
+  /**
+   * Pokémon-name locale for this FSRS row (#1259). Each locale gets independent
+   * FSRS state. Defaults to "en" for rows written before migration 029.
+   * Optional so pre-migration cloud rows (which lack this column) are still
+   * type-safe — all pull paths default to "en" via `row.locale ?? "en"`.
+   */
+  locale?: string;
   stability: number;
   difficulty: number;
   elapsed_days: number;
@@ -86,6 +94,7 @@ function toCloudRow(card: ReviewableCard): CloudRow {
   return {
     card_type: appTypeToDbType(card.cardType),
     subject_key: card.subjectKey,
+    locale: card.locale ?? "en",
     stability: card.state.stability,
     difficulty: card.state.difficulty,
     elapsed_days: card.state.elapsedDays,
@@ -147,7 +156,7 @@ export async function pushSession(
     try {
       const { error } = await client
         .from("card_reviews")
-        .upsert(batch, { onConflict: "user_id,card_type,subject_key" });
+        .upsert(batch, { onConflict: "user_id,card_type,subject_key,locale" });
       if (error) allOk = false;
     } catch {
       allOk = false;
@@ -178,6 +187,7 @@ export async function pushSingleCard(
         user_id: userId,
         card_type: appTypeToDbType(card.cardType),
         subject_key: card.subjectKey,
+        locale: card.locale ?? "en",
         stability: card.state.stability,
         difficulty: card.state.difficulty,
         elapsed_days: card.state.elapsedDays,
@@ -192,7 +202,7 @@ export async function pushSingleCard(
         seen_in_pasture: card.state.seenInPasture,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id,card_type,subject_key" },
+      { onConflict: "user_id,card_type,subject_key,locale" },
     );
     return !error;
   } catch {
@@ -221,7 +231,7 @@ export async function pullSession(
       const { data, error } = await client
         .from("card_reviews")
         .select(
-          "card_type,subject_key,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,hidden_since,seen_in_pasture,updated_at"
+          "card_type,subject_key,locale,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,hidden_since,seen_in_pasture,updated_at"
         )
         .eq("user_id", userId)
         .range(offset, offset + PAGE - 1);
@@ -276,12 +286,17 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
   // Legacy cloud rows (pre-migration 008) won't have seen_in_pasture on the
   // wire — treat undefined as false.
   const seenInPasture = row.seen_in_pasture ?? false;
+  // Legacy cloud rows (pre-migration 029) won't have locale on the wire —
+  // treat undefined as "en" so normalised local state always has the field set.
+  const locale = (row.locale ?? "en") as ReviewableCard["locale"];
+
   if (row.first_seen !== null && row.last_review === null) {
     console.warn(
-      `[sync] normalizing card ${row.card_type}:${row.subject_key}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
+      `[sync] normalizing card ${row.card_type}:${row.subject_key}:${row.locale ?? "en"}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
     );
     return {
       ...card,
+      locale,
       state: {
         ...card.state,
         stability: 0,
@@ -302,6 +317,7 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
   }
   return {
     ...card,
+    locale,
     state: {
       ...card.state,
       stability: row.stability,
@@ -336,14 +352,20 @@ function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
  * the pull counts as "graded since pull," preventing incorrect reverts in
  * same-day scenarios.
  */
-/** Returns a composite key for a cloud row to match against local cards. */
+/**
+ * Returns a composite key for a cloud row to match against local cards.
+ * Includes locale so per-locale rows merge correctly (#1259).
+ */
 function cloudRowKey(r: CloudRow): string {
-  return `${r.card_type}:${r.subject_key ?? ""}`;
+  return `${r.card_type}:${r.subject_key ?? ""}:${r.locale ?? "en"}`;
 }
 
-/** Returns the same composite key for a local card. */
+/**
+ * Returns the same composite key for a local card.
+ * Symmetric with cloudRowKey.
+ */
 function cardKey(card: ReviewableCard): string {
-  return `${appTypeToDbType(card.cardType)}:${card.subjectKey}`;
+  return `${appTypeToDbType(card.cardType)}:${card.subjectKey}:${card.locale ?? "en"}`;
 }
 
 export function mergeCloudIntoLocalSilent(

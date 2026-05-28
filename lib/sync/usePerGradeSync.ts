@@ -85,11 +85,14 @@ export function usePerGradeSync(
 
     const toSend = [...pendingQueueRef.current];
     if (toSend.length === 0) return;
-    const sentIds = new Set(toSend.map((card) => card.id));
+    // Locale-aware sent/failed sets: key by "id:locale" so cards with the same
+    // pokemon id but different locales are tracked independently (#1259).
+    const cardLocaleKey = (card: (typeof toSend)[0]) => `${card.id}:${card.locale ?? "en"}`;
+    const sentKeys = new Set(toSend.map(cardLocaleKey));
 
     // No in-flight guard here — concurrent drains produce idempotent upserts,
     // so the only shared-state risk is the pendingQueueRef filter below writing
-    // on stale read. That outcome is benign: each drain removes its own sentIds
+    // on stale read. That outcome is benign: each drain removes its own sentKeys
     // independently, so no grade is permanently lost. A guard would add
     // complexity without a meaningful correctness benefit.
     const results = await Promise.all(
@@ -98,7 +101,7 @@ export function usePerGradeSync(
         return { card, ok };
       }),
     );
-    const failedIds = new Set(results.filter((r) => !r.ok).map((r) => r.card.id));
+    const failedKeys = new Set(results.filter((r) => !r.ok).map((r) => cardLocaleKey(r.card)));
 
     // Keep a card in the queue if it wasn't part of this drain (a newer grade
     // arrived during the await window) or if it was sent but failed. If two
@@ -106,7 +109,7 @@ export function usePerGradeSync(
     // filter-time reflects the latest enqueued state — the newest version
     // survives either way.
     pendingQueueRef.current = pendingQueueRef.current.filter(
-      (card) => !sentIds.has(card.id) || failedIds.has(card.id),
+      (card) => !sentKeys.has(cardLocaleKey(card)) || failedKeys.has(cardLocaleKey(card)),
     );
 
     // Update lastPushAt once per debounce flush if at least one card succeeded.
@@ -180,8 +183,11 @@ export function usePerGradeSync(
       if (!isSyncSafe(card)) return;
 
       // Replace existing entry for this card or append.
+      // Use a locale-aware key so cards with the same id but different locales
+      // are treated as distinct entries (#1259).
+      const cardLocale = card.locale ?? "en";
       const queue = pendingQueueRef.current;
-      const idx = queue.findIndex((c) => c.id === card.id);
+      const idx = queue.findIndex((c) => c.id === card.id && (c.locale ?? "en") === cardLocale);
       if (idx >= 0) {
         queue[idx] = card;
       } else {

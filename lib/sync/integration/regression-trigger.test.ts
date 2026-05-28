@@ -628,4 +628,92 @@ describe("regression trigger (integration)", () => {
       client.release();
     }
   });
+
+  // ── Migration 029: locale column + PK expansion (#1259) ─────────────────────
+
+  it("allows two rows differing only by locale (migration 029 PK includes locale)", async () => {
+    // After migration 029, the PK is (user_id, card_type, subject_key, locale).
+    // The same (user, card_type, subject_key) in "en" and "ja" must coexist as
+    // independent rows — this is the key correctness guarantee for per-locale FSRS.
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        // Insert the "en" row — locale defaults to "en".
+        await c.query(
+          `INSERT INTO card_reviews
+             (user_id, card_type, subject_key,
+              stability, difficulty, elapsed_days, scheduled_days,
+              reps, lapses, fsrs_state,
+              due_date, last_review, first_seen,
+              seen_in_pasture, updated_at)
+           VALUES ($1, 'name', '501',
+                   2.0, 5.0, 1, 3,
+                   2, 0, 'review',
+                   '2026-06-01', '2026-05-20', '2026-05-18',
+                   false, now())`,
+          [USER_ID],
+        );
+
+        // Insert the "ja" row — same identity except locale.
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key, locale,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '501', 'ja',
+                     1.5, 5.0, 1, 2,
+                     1, 0, 'review',
+                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     false, now())`,
+            [USER_ID],
+          ),
+        ).resolves.toBeDefined();
+      });
+    } finally {
+      client.release();
+    }
+
+    // Verify both rows exist with independent reps values.
+    const { rows } = await pool.query(
+      `SELECT locale, reps FROM card_reviews
+       WHERE user_id = $1 AND card_type = 'name' AND subject_key = '501'
+       ORDER BY locale`,
+      [USER_ID],
+    );
+    expect(rows).toHaveLength(2);
+    // "en" row (default)
+    expect(rows.find((r: { locale: string }) => r.locale === "en")).toBeDefined();
+    // "ja" row (explicitly inserted)
+    expect(rows.find((r: { locale: string }) => r.locale === "ja")).toBeDefined();
+  });
+
+  it("rejects locale values outside the CHECK constraint (migration 029)", async () => {
+    // The locale CHECK constraint only permits 'en', 'ja', 'zh-Hans', 'zh-Hant'.
+    const client = await pool.connect();
+    try {
+      await withUser(client, USER_ID, async (c) => {
+        await expect(
+          c.query(
+            `INSERT INTO card_reviews
+               (user_id, card_type, subject_key, locale,
+                stability, difficulty, elapsed_days, scheduled_days,
+                reps, lapses, fsrs_state,
+                due_date, last_review, first_seen,
+                seen_in_pasture, updated_at)
+             VALUES ($1, 'name', '502', 'fr',
+                     2.0, 5.0, 1, 3,
+                     2, 0, 'review',
+                     '2026-06-01', '2026-05-20', '2026-05-18',
+                     false, now())`,
+            [USER_ID],
+          ),
+        ).rejects.toThrow();
+      });
+    } finally {
+      client.release();
+    }
+  });
 });

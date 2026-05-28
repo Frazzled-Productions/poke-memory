@@ -5,8 +5,9 @@
  * but that unit tests (with mocked Supabase) cannot verify:
  *
  * 1. Upsert conflict resolution — INSERT … ON CONFLICT (user_id, card_type,
- *    subject_key) DO UPDATE correctly overwrites every FSRS field when a row
- *    already exists, and correctly INSERTs when no row exists.
+ *    subject_key, locale) DO UPDATE correctly overwrites every FSRS field when
+ *    a row already exists, and correctly INSERTs when no row exists.
+ *    After migration 029 the PK includes `locale`.
  *
  * 2. Forward-progress is preserved — upserting a row with an older last_review
  *    via a same-key INSERT does NOT trigger the regression trigger (the upsert
@@ -85,6 +86,7 @@ async function upsertAndCommit(
   opts: {
     subjectKey: string;
     cardType?: string;
+    locale?: string;
     stability?: number;
     difficulty?: number;
     elapsedDays?: number;
@@ -103,6 +105,7 @@ async function upsertAndCommit(
   const {
     subjectKey,
     cardType = "name",
+    locale = "en",
     stability = 1.0,
     difficulty = 5.0,
     elapsedDays = 1,
@@ -125,17 +128,17 @@ async function upsertAndCommit(
     await client.query(`SELECT set_config('request.jwt.claims', $1, true)`, [claims]);
     await client.query(
       `INSERT INTO card_reviews
-         (user_id, card_type, subject_key,
+         (user_id, card_type, subject_key, locale,
           stability, difficulty, elapsed_days, scheduled_days,
           reps, lapses, fsrs_state,
           due_date, last_review, first_seen,
           hidden_since, seen_in_pasture, updated_at)
-       VALUES ($1, $2, $3,
-               $4, $5, $6, $7,
-               $8, $9, $10,
-               $11, $12, $13,
-               $14, $15, $16)
-       ON CONFLICT (user_id, card_type, subject_key) DO UPDATE SET
+       VALUES ($1, $2, $3, $4,
+               $5, $6, $7, $8,
+               $9, $10, $11,
+               $12, $13, $14,
+               $15, $16, $17)
+       ON CONFLICT (user_id, card_type, subject_key, locale) DO UPDATE SET
          stability       = EXCLUDED.stability,
          difficulty      = EXCLUDED.difficulty,
          elapsed_days    = EXCLUDED.elapsed_days,
@@ -153,6 +156,7 @@ async function upsertAndCommit(
         userId,
         cardType,
         subjectKey,
+        locale,
         stability,
         difficulty,
         elapsedDays,
@@ -180,19 +184,23 @@ async function upsertAndCommit(
 /**
  * Reads a single card row from the pool (outside any transaction so it sees
  * committed state). Returns null if no matching row exists.
+ *
+ * After migration 029, the PK is (user_id, card_type, subject_key, locale).
+ * This overload defaults locale to "en" for backwards-compatible callers.
  */
 async function readCard(
   userId: string,
   cardType: string,
   subjectKey: string,
+  locale = "en",
 ): Promise<Record<string, unknown> | null> {
   const { rows } = await pool.query(
     `SELECT stability, difficulty, elapsed_days, scheduled_days,
             reps, lapses, fsrs_state, due_date,
-            last_review, first_seen, seen_in_pasture, updated_at
+            last_review, first_seen, seen_in_pasture, updated_at, locale
      FROM card_reviews
-     WHERE user_id = $1 AND card_type = $2 AND subject_key = $3`,
-    [userId, cardType, subjectKey],
+     WHERE user_id = $1 AND card_type = $2 AND subject_key = $3 AND locale = $4`,
+    [userId, cardType, subjectKey, locale],
   );
   return rows.length > 0 ? rows[0] : null;
 }
@@ -516,5 +524,49 @@ describe("card_type discriminator (integration)", () => {
     const reverseRow = await readCard(USER_A, "reverse", KEY);
     expect(reverseRow).not.toBeNull();
     expect(Number(reverseRow!.reps)).toBe(7);
+  });
+});
+
+// ── 6. locale discriminator (#1259) ─────────────────────────────────────────
+
+describe("locale discriminator (integration, #1259)", () => {
+  it("same (user, card_type, subject_key) in different locales are stored as separate rows", async () => {
+    // Migration 029 adds locale to the PK. An "en" row and a "ja" row for the
+    // same species must coexist as independent rows.
+    const KEY = "6001";
+
+    await upsertAndCommit(pool, USER_A, { subjectKey: KEY, cardType: "name", locale: "en", reps: 3, stability: 4.0 });
+    await upsertAndCommit(pool, USER_A, { subjectKey: KEY, cardType: "name", locale: "ja", reps: 1, stability: 1.2 });
+
+    const enRow = await readCard(USER_A, "name", KEY, "en");
+    const jaRow = await readCard(USER_A, "name", KEY, "ja");
+
+    expect(enRow).not.toBeNull();
+    expect(jaRow).not.toBeNull();
+    expect(Number(enRow!.reps)).toBe(3);
+    expect(Number(jaRow!.reps)).toBe(1);
+    expect(Number(enRow!.stability)).toBeCloseTo(4.0);
+    expect(Number(jaRow!.stability)).toBeCloseTo(1.2);
+  });
+
+  it("upsert for 'ja' locale does not affect 'en' row for the same key", async () => {
+    const KEY = "6002";
+
+    await upsertAndCommit(pool, USER_A, { subjectKey: KEY, locale: "en", reps: 5, stability: 6.5 });
+    await upsertAndCommit(pool, USER_A, { subjectKey: KEY, locale: "ja", reps: 1, stability: 1.0 });
+
+    // Re-upsert the "ja" row with different state — must not touch the "en" row.
+    await upsertAndCommit(pool, USER_A, {
+      subjectKey: KEY,
+      locale: "ja",
+      reps: 2,
+      scheduledDays: 10,
+      lastReview: "2026-05-25",
+    });
+
+    const enRow = await readCard(USER_A, "name", KEY, "en");
+    expect(enRow).not.toBeNull();
+    expect(Number(enRow!.reps)).toBe(5);
+    expect(Number(enRow!.stability)).toBeCloseTo(6.5);
   });
 });

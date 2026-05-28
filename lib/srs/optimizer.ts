@@ -53,7 +53,9 @@ export function gradeLogToOptimizerItems(entries: GradeLogEntry[]): OptimizerInp
   const byCard = new Map<string, GradeLogEntry[]>();
   for (const entry of entries) {
     if (!entry.subjectKey) continue;
-    const key = `${entry.cardType}:${entry.subjectKey}`;
+    // Include locale in the key so per-locale review histories are grouped
+    // separately — mixing locales would produce nonsensical FSRS weight estimates.
+    const key = `${entry.cardType}:${entry.subjectKey}:${entry.locale ?? "en"}`;
     const list = byCard.get(key);
     if (list === undefined) {
       byCard.set(key, [entry]);

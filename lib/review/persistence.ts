@@ -196,6 +196,11 @@ export function migrateReviewCard(card: unknown): void {
   if (c.cardType === undefined) {
     c.cardType = "name";
   }
+  // Backfill locale for cards saved before #1259 — all pre-existing cards are
+  // English-language cards, so "en" is the correct default.
+  if (c.locale === undefined) {
+    c.locale = "en";
+  }
   // Backfill subjectKey for cards saved before migration 010. This runs once
   // per device on the first loadSession after deploy; subsequent saves will
   // include the field.
