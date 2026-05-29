@@ -89,16 +89,13 @@ export async function clearSeedScenario(): Promise<void> {
     idbDelete(KEY_GRADE_LOG),
   ]);
 
-  // Clear the active-seed indicator.
+  // Clear the active-seed indicator and dispatch change events.
   if (typeof window !== "undefined") {
     try {
       window.localStorage.removeItem(KEY_QA_SEED_ACTIVE);
     } catch {
       // Non-fatal for a QA tool.
     }
-  }
-
-  if (typeof window !== "undefined") {
     try {
       window.dispatchEvent(
         new StorageEvent("storage", {

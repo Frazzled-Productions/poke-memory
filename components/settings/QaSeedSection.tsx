@@ -29,7 +29,7 @@ type ApplyStatus =
 export function QaSeedSection() {
   const [selectedSlug, setSelectedSlug] = useState<string>(SCENARIOS[0]?.slug ?? "");
   const [status, setStatus] = useState<ApplyStatus>({ kind: "idle" });
-  // Slug of the scenario currently written to IDB, restored from localStorage on mount.
+  // Slug of the currently active scenario, persisted in localStorage (not IDB) and restored on mount.
   const [activeSeedSlug, setActiveSeedSlug] = useState<string | null>(null);
 
   // Restore the active-seed indicator from localStorage on mount.
