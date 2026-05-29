@@ -3,7 +3,7 @@
 import { useState, useCallback, useId, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { filterPokemon, parseFilters } from "@/lib/pokemon/filter";
-import type { PokemonCellData, PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
+import type { PokemonCellData, PokedexFilters, MasteryStatus, PokedexSort } from "@/lib/pokemon/filter";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import PokedexFilterBar from "./PokedexFilterBar";
 import PokedexGrid from "./PokedexGrid";
@@ -19,6 +19,7 @@ function countActiveFilters(filters: PokedexFilters): number {
   if (filters.gen !== null) count += 1;
   if (filters.hasAlternateForms) count += 1;
   if (filters.masteryStatus !== "all") count += 1;
+  if (filters.sort !== "national") count += 1;
   return count;
 }
 
@@ -33,6 +34,7 @@ function buildUrl(filters: PokedexFilters): string {
   if (filters.gen !== null) params.set("gen", String(filters.gen));
   if (filters.hasAlternateForms) params.set("forms", "1");
   if (filters.masteryStatus !== "all") params.set("mastery", filters.masteryStatus);
+  if (filters.sort !== "national") params.set("sort", filters.sort);
   const qs = params.toString();
   return qs ? `/pokedex?${qs}` : "/pokedex";
 }
@@ -104,6 +106,13 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
   const handleMasteryChange = useCallback(
     (masteryStatus: MasteryStatus) => {
       router.replace(buildUrl({ ...filters, masteryStatus }), { scroll: false });
+    },
+    [router, filters],
+  );
+
+  const handleSortChange = useCallback(
+    (sort: PokedexSort) => {
+      router.replace(buildUrl({ ...filters, sort }), { scroll: false });
     },
     [router, filters],
   );
@@ -186,6 +195,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
             onGenChange={handleGenChange}
             onAlternateFormsToggle={handleAlternateFormsToggle}
             onMasteryChange={handleMasteryChange}
+            onSortChange={handleSortChange}
             superuserMasteryLocked={flags.pretendAllMastered}
           />
         </div>

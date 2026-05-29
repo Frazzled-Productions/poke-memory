@@ -59,14 +59,16 @@ vi.mock("@/components/pokedex/PokedexFilterBar", () => ({
     onGenChange,
     onAlternateFormsToggle,
     onMasteryChange,
+    onSortChange,
     superuserMasteryLocked,
   }: {
-    filters: { query: string; types: string[]; gen: number | null; hasAlternateForms: boolean; masteryStatus: string };
+    filters: { query: string; types: string[]; gen: number | null; hasAlternateForms: boolean; masteryStatus: string; sort: string };
     onQueryChange: (q: string) => void;
     onTypeToggle: (type: string) => void;
     onGenChange: (gen: number | null) => void;
     onAlternateFormsToggle: () => void;
     onMasteryChange: (status: string) => void;
+    onSortChange: (sort: string) => void;
     superuserMasteryLocked?: boolean;
   }) => (
     <div data-testid="filter-bar" data-mastery-locked={String(superuserMasteryLocked)}>
@@ -81,6 +83,8 @@ vi.mock("@/components/pokedex/PokedexFilterBar", () => ({
       <button onClick={onAlternateFormsToggle}>Has Forms</button>
       <button onClick={() => onMasteryChange("mastered")}>Mastered</button>
       <button onClick={() => onMasteryChange("all")}>All Mastery</button>
+      <button onClick={() => onSortChange("proximity")}>Sort Proximity</button>
+      <button onClick={() => onSortChange("alpha")}>Sort Alpha</button>
     </div>
   ),
 }));
@@ -276,7 +280,7 @@ describe("PokedexFiltered — active-filter count badge", () => {
     expect(screen.getByLabelText("2 active filters")).toBeInTheDocument();
   });
 
-  it("shows badge with count 5 when all five filter axes are active", () => {
+  it("shows badge with count 5 when five filter axes are active", () => {
     setSearchParams({
       q: "pika",
       type: "electric",
@@ -286,6 +290,12 @@ describe("PokedexFiltered — active-filter count badge", () => {
     });
     render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("5 active filters")).toBeInTheDocument();
+  });
+
+  it("shows badge with count 1 when sort filter is active", () => {
+    setSearchParams({ sort: "proximity" });
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    expect(screen.getByLabelText("1 active filter")).toBeInTheDocument();
   });
 
   it("badge is hidden when the panel is open (even with active filters)", async () => {
@@ -452,6 +462,36 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith(
         expect.stringContaining("forms=1"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("calls router.replace with sort=proximity when Sort Proximity is clicked", async () => {
+    const user = userEvent.setup();
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    await user.click(screen.getByRole("button", { name: "Sort Proximity" }));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.stringContaining("sort=proximity"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("calls router.replace with sort=alpha when Sort Alpha is clicked", async () => {
+    const user = userEvent.setup();
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    await user.click(screen.getByRole("button", { name: "Sort Alpha" }));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.stringContaining("sort=alpha"),
         expect.any(Object),
       );
     });

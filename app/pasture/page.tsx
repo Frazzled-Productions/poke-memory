@@ -13,6 +13,7 @@ import {
   PastureSearchBar,
   PASTURE_FILTERS_DEFAULT,
 } from "@/components/pasture/PastureSearchBar";
+import { NextArrivalsStrip } from "@/components/pasture/NextArrivalsStrip";
 import type { PastureFilters } from "@/components/pasture/PastureSearchBar";
 import { pushSingleCard } from "@/lib/sync/cloud";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -314,6 +315,17 @@ export default function PasturePage() {
             />
           ))}
         </div>
+      )}
+
+      {/* Next arrivals strip — shows reviewed-but-unmastered species closest to
+          mastery. Hidden when forceAllMastered is on or no qualifying species exist.
+          Only rendered when we have session data (not the pretendAllMastered synthetic path). */}
+      {session && !flags.pretendAllMastered && (
+        <NextArrivalsStrip
+          cards={session.cards}
+          masteryRepetitions={masteryRepetitions}
+          forceAllMastered={flags.pretendAllMastered}
+        />
       )}
     </main>
   );

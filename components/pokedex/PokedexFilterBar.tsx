@@ -1,6 +1,6 @@
 "use client";
 
-import type { PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
+import type { PokedexFilters, MasteryStatus, PokedexSort } from "@/lib/pokemon/filter";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 
 // ---------------------------------------------------------------------------
@@ -30,6 +30,7 @@ type FilterBarProps = {
   onGenChange: (gen: number | null) => void;
   onAlternateFormsToggle: () => void;
   onMasteryChange: (masteryStatus: MasteryStatus) => void;
+  onSortChange: (sort: PokedexSort) => void;
   /** When true (superuser pretendAllMastered on), the mastery filter is locked to "all" and disabled. */
   superuserMasteryLocked?: boolean;
 };
@@ -44,6 +45,12 @@ const MASTERY_OPTIONS: { value: MasteryStatus; label: string }[] = [
   { value: "not-yet-mastered", label: "Not yet mastered" },
 ];
 
+const SORT_OPTIONS: { value: PokedexSort; label: string }[] = [
+  { value: "national", label: "National Number" },
+  { value: "alpha", label: "Alphabetical (A-Z)" },
+  { value: "proximity", label: "Closest to mastery" },
+];
+
 export default function PokedexFilterBar({
   filters,
   onQueryChange,
@@ -51,6 +58,7 @@ export default function PokedexFilterBar({
   onGenChange,
   onAlternateFormsToggle,
   onMasteryChange,
+  onSortChange,
   superuserMasteryLocked = false,
 }: FilterBarProps) {
   return (
@@ -177,7 +185,7 @@ export default function PokedexFilterBar({
       <div
         role="group"
         aria-label="Filter by mastery"
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap gap-2 mb-3"
       >
         {MASTERY_OPTIONS.map(({ value, label }) => {
           const isSelected = filters.masteryStatus === value;
@@ -206,6 +214,29 @@ export default function PokedexFilterBar({
             </button>
           );
         })}
+      </div>
+
+      {/* Sort order */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label
+          htmlFor="pokedex-sort"
+          className="text-xs font-semibold text-zinc-500 dark:text-zinc-400"
+        >
+          Sort:
+        </label>
+        <select
+          id="pokedex-sort"
+          value={filters.sort}
+          onChange={(e) => onSortChange(e.target.value as PokedexSort)}
+          className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900"
+          aria-label="Sort Pokédex"
+        >
+          {SORT_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

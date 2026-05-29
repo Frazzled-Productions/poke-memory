@@ -67,6 +67,16 @@ export const PASTURE_SPRITE_SIZE = 56;
 export const STATS_SPRITE_SIZE = 48;
 
 // ---------------------------------------------------------------------------
+// Pasture "Next arrivals" strip
+// ---------------------------------------------------------------------------
+
+/**
+ * Sprite size for the Pasture "Next arrivals" strip tiles (48 px square).
+ * Compact to fit 5 species in a single-row strip.
+ */
+export const PASTURE_ARRIVALS_SPRITE_SIZE = 48;
+
+// ---------------------------------------------------------------------------
 // Theme / chrome surfaces
 // ---------------------------------------------------------------------------
 

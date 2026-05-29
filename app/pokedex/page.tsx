@@ -9,6 +9,7 @@ import { classifyCard } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
+import { rankByMasteryProximity } from "@/lib/mastery/proximity";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { LoadingSkeleton } from "@/components/pokedex/PokedexGrid";
 import PokedexFiltered from "@/components/pokedex/PokedexFiltered";
@@ -51,9 +52,21 @@ export default function PokedexPage() {
       ? cards.filter((c) => c.cardType === "name" && c.state.lastReview !== null).length
       : 0;
 
+  // Pre-compute proximity scores for the "Closest to mastery" sort.
+  // Only available once cards have loaded. Produces a map from pokemonId → score
+  // for reviewed-but-unmastered species; mastered and locked species are absent.
+  const proximityScoreById = new Map<number, number>();
+  if (cards !== null && masteryRepetitions !== null) {
+    const ranked = rankByMasteryProximity(cards, { masteryRepetitions });
+    for (const entry of ranked) {
+      proximityScoreById.set(entry.id, entry.score);
+    }
+  }
+
   const enrichedPokemon: PokemonCellData[] = defaultFormPokemon.map((p) => ({
     ...p,
     cardClass: cardClassById.get(p.id) ?? "locked",
+    proximityScore: proximityScoreById.get(p.id),
   }));
 
   return (

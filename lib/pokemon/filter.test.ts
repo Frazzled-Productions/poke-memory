@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterPokemon, parseFilters } from './filter';
+import { filterPokemon, parseFilters, sortPokemon } from './filter';
 import type { PokemonCellData, PokedexFilters } from './filter';
 import { generationOf } from '@/lib/stats/derive';
 
@@ -36,7 +36,7 @@ function basePokemon(overrides: Partial<PokemonCellData> = {}): PokemonCellData 
   };
 }
 
-const noFilters: PokedexFilters = { query: '', types: [], gen: null, hasAlternateForms: false, masteryStatus: 'all' };
+const noFilters: PokedexFilters = { query: '', types: [], gen: null, hasAlternateForms: false, masteryStatus: 'all', sort: 'national' };
 
 // A small fixture set covering two gens and multiple types.
 // Gen 1 IDs: 1–151; Gen 2 IDs: 152–251.
@@ -106,18 +106,18 @@ describe('filterPokemon', () => {
 
   it('combined query + gen: both axes must match (AND)', () => {
     // "charman" matches only charmander (gen 1), not anything in gen 2
-    const result = filterPokemon(FIXTURES, { query: 'charman', types: [], gen: 1, hasAlternateForms: false, masteryStatus: 'all' });
+    const result = filterPokemon(FIXTURES, { query: 'charman', types: [], gen: 1, hasAlternateForms: false, masteryStatus: 'all', sort: 'national' });
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('charmander');
   });
 
   it('combined query + gen: returns empty when gen matches but query does not', () => {
-    const result = filterPokemon(FIXTURES, { query: 'xyz', types: [], gen: 1, hasAlternateForms: false, masteryStatus: 'all' });
+    const result = filterPokemon(FIXTURES, { query: 'xyz', types: [], gen: 1, hasAlternateForms: false, masteryStatus: 'all', sort: 'national' });
     expect(result).toHaveLength(0);
   });
 
   it('zero-result case returns empty array', () => {
-    const result = filterPokemon(FIXTURES, { query: 'zzz', types: ['electric'], gen: 9, hasAlternateForms: false, masteryStatus: 'all' });
+    const result = filterPokemon(FIXTURES, { query: 'zzz', types: ['electric'], gen: 9, hasAlternateForms: false, masteryStatus: 'all', sort: 'national' });
     expect(result).toEqual([]);
   });
 });
@@ -298,7 +298,7 @@ describe('parseFilters', () => {
 
   it('returns defaults when no params are present', () => {
     const result = parseFilters(params({}));
-    expect(result).toEqual({ query: '', types: [], gen: null, hasAlternateForms: false, masteryStatus: 'all' });
+    expect(result).toEqual({ query: '', types: [], gen: null, hasAlternateForms: false, masteryStatus: 'all', sort: 'national' });
   });
 
   it('reads q into query', () => {
@@ -364,5 +364,90 @@ describe('parseFilters', () => {
   it('maps invalid mastery param to "all"', () => {
     const result = parseFilters(params({ mastery: 'unknown' }));
     expect(result.masteryStatus).toBe('all');
+  });
+
+  it('parses sort=alpha', () => {
+    const result = parseFilters(params({ sort: 'alpha' }));
+    expect(result.sort).toBe('alpha');
+  });
+
+  it('parses sort=proximity', () => {
+    const result = parseFilters(params({ sort: 'proximity' }));
+    expect(result.sort).toBe('proximity');
+  });
+
+  it('maps missing sort param to "national"', () => {
+    const result = parseFilters(params({}));
+    expect(result.sort).toBe('national');
+  });
+
+  it('maps invalid sort param to "national"', () => {
+    const result = parseFilters(params({ sort: 'unknown' }));
+    expect(result.sort).toBe('national');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sortPokemon
+// ---------------------------------------------------------------------------
+
+describe('sortPokemon', () => {
+  const p = (id: number, overrides: Partial<PokemonCellData> = {}): PokemonCellData =>
+    basePokemon({ id, speciesId: id, name: `pokemon-${id}`, ...overrides });
+
+  it('"national" sort preserves input order', () => {
+    const input = [p(3), p(1), p(2)];
+    expect(sortPokemon(input, 'national').map((x) => x.id)).toEqual([3, 1, 2]);
+  });
+
+  it('"alpha" sort orders A-Z by name', () => {
+    const input = [
+      p(1, { name: 'charizard' }),
+      p(2, { name: 'bulbasaur' }),
+      p(3, { name: 'abra' }),
+    ];
+    expect(sortPokemon(input, 'alpha').map((x) => x.name)).toEqual(['abra', 'bulbasaur', 'charizard']);
+  });
+
+  it('"alpha" sort is case-insensitive', () => {
+    const input = [
+      p(1, { name: 'Zubat' }),
+      p(2, { name: 'abra' }),
+    ];
+    expect(sortPokemon(input, 'alpha').map((x) => x.name)).toEqual(['abra', 'Zubat']);
+  });
+
+  it('"proximity" sort places tier-0 (learning+proximityscore) before mastered before locked', () => {
+    const input = [
+      p(1, { cardClass: 'locked' }),
+      p(2, { cardClass: 'mastered' }),
+      p(3, { cardClass: 'learning', proximityScore: 2000 }),
+    ];
+    expect(sortPokemon(input, 'proximity').map((x) => x.id)).toEqual([3, 2, 1]);
+  });
+
+  it('"proximity" sort orders tier-0 by proximityScore descending', () => {
+    const input = [
+      p(1, { cardClass: 'learning', proximityScore: 500 }),
+      p(2, { cardClass: 'learning', proximityScore: 2000 }),
+      p(3, { cardClass: 'learning', proximityScore: 1000 }),
+    ];
+    expect(sortPokemon(input, 'proximity').map((x) => x.id)).toEqual([2, 3, 1]);
+  });
+
+  it('"proximity" sort tie-breaks by id ascending within same tier+score', () => {
+    const input = [
+      p(3, { cardClass: 'learning', proximityScore: 1000 }),
+      p(1, { cardClass: 'learning', proximityScore: 1000 }),
+      p(2, { cardClass: 'learning', proximityScore: 1000 }),
+    ];
+    expect(sortPokemon(input, 'proximity').map((x) => x.id)).toEqual([1, 2, 3]);
+  });
+
+  it('"proximity" sort returns a new array (does not mutate input)', () => {
+    const input = [p(2), p(1)];
+    const result = sortPokemon(input, 'alpha');
+    expect(result).not.toBe(input);
+    expect(input.map((x) => x.id)).toEqual([2, 1]); // unchanged
   });
 });
