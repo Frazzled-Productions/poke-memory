@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useEffect, useState, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard, type DailyLimits } from "@/lib/review/session";
 import { EMPTY_SCOPE, type PracticeScope } from "@/lib/review/scope";
 import { type DateFormat } from "@/lib/utils/format-date";
@@ -113,12 +114,12 @@ function SkeletonBlock({ className }: { className: string }) {
   );
 }
 
-function LoadingSkeleton() {
+function LoadingSkeleton({ ariaLabel }: { ariaLabel: string }) {
   return (
     <div
       className="flex flex-col gap-8"
       aria-busy="true"
-      aria-label="Loading stats"
+      aria-label={ariaLabel}
     >
       <SkeletonBlock className="h-12 w-full" />
       <SkeletonBlock className="h-28 w-full" />
@@ -131,18 +132,20 @@ function LoadingSkeleton() {
 
 
 function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[] }) {
+  const t = useTranslations("stats");
+  const tCommon = useTranslations("common");
   return (
     <section aria-labelledby="struggling-heading">
       <h2
         id="struggling-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        Struggling cards
+        {t("strugglingCards.heading")}
       </h2>
 
       {struggling.length === 0 ? (
         <p className={mutedText}>
-          No struggling cards yet. Keep it up!
+          {t("strugglingCards.empty")}
         </p>
       ) : (
         <ul className={colStack} role="list">
@@ -150,7 +153,7 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
             <li key={card.id}>
               <Link
                 href={`/pokedex/${card.id}`}
-                aria-label={`View ${card.name} in Pokédex`}
+                aria-label={tCommon("viewInPokedex", { name: card.name })}
                 className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-background px-4 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-zinc-800 dark:hover:bg-zinc-900"
               >
                 <Image
@@ -192,12 +195,11 @@ function ForcePullSection({
   userId: string;
   onSuccess: (cards: ReviewableCard[]) => void;
 }) {
+  const t = useTranslations("stats");
   const [status, setStatus] = useState<ForcePullStatus>("idle");
 
   async function handleForcePull() {
-    const confirmed = window.confirm(
-      "This will replace your local progress, settings, and display preferences with what's currently in the cloud. Continue?",
-    );
+    const confirmed = window.confirm(t("forcePull.confirmMessage"));
     if (!confirmed) return;
 
     setStatus("pulling");
@@ -288,10 +290,10 @@ function ForcePullSection({
         id="force-pull-heading"
         className="mb-1 text-base font-semibold text-foreground"
       >
-        Data
+        {t("forcePull.heading")}
       </h2>
       <p className={cn("mb-3", mutedText)}>
-        Use this if your stats look wrong; it pulls authoritative data from the cloud.
+        {t("forcePull.description")}
       </p>
       <button
         type="button"
@@ -300,7 +302,7 @@ function ForcePullSection({
         aria-busy={status === "pulling"}
         className="rounded-lg border border-zinc-200 bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
       >
-        {status === "pulling" ? "Pulling from cloud…" : "Force pull from cloud"}
+        {status === "pulling" ? t("forcePull.pulling") : t("forcePull.button")}
       </button>
       {status === "success" && (
         <p
@@ -308,7 +310,7 @@ function ForcePullSection({
           aria-live="polite"
           className="mt-2 text-sm text-emerald-600 dark:text-emerald-400"
         >
-          Done. Stats updated from cloud.
+          {t("forcePull.success")}
         </p>
       )}
       {status === "error" && (
@@ -317,7 +319,7 @@ function ForcePullSection({
           aria-live="assertive"
           className="mt-2 text-sm text-rose-600 dark:text-rose-400"
         >
-          Pull failed. Check your connection and try again.
+          {t("forcePull.error")}
         </p>
       )}
     </section>
@@ -341,6 +343,8 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 // ---------------------------------------------------------------------------
 
 export default function StatsPage() {
+  const t = useTranslations("stats");
+  const tCommon = useTranslations("common");
   const { user, supabase } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
   const client = anyFlagOn ? null : supabase;
@@ -545,7 +549,7 @@ export default function StatsPage() {
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
       <div className="w-full max-w-3xl lg:max-w-6xl">
         <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
-          Stats
+          {t("title")}
         </h1>
         {user !== null && (
           <div className="mb-8">
@@ -558,7 +562,7 @@ export default function StatsPage() {
         )}
 
         {snapshot === null ? (
-          <LoadingSkeleton />
+          <LoadingSkeleton ariaLabel={t("loadingAriaLabel")} />
         ) : (
           <div className="flex flex-col gap-10">
 
@@ -571,14 +575,14 @@ export default function StatsPage() {
               {/* Accuracy section */}
               <section aria-labelledby="accuracy-section-heading" className="flex flex-col gap-6">
                 <SectionHeading>
-                  <span id="accuracy-section-heading">Accuracy</span>
+                  <span id="accuracy-section-heading">{t("accuracyHeading")}</span>
                 </SectionHeading>
                 <GradeBreakdownBar
                   again={gradeTotals[1]}
                   hard={gradeTotals[2]}
                   good={gradeTotals[4]}
                   easy={gradeTotals[5]}
-                  label="All-time grade breakdown"
+                  label={t("allTimeGradeBreakdown")}
                 />
                 <AccuracySparkline
                   points={accuracyPoints}
@@ -606,7 +610,7 @@ export default function StatsPage() {
               {/* Activity section */}
               <section aria-labelledby="activity-section-heading" className="flex flex-col gap-6">
                 <SectionHeading>
-                  <span id="activity-section-heading">Activity</span>
+                  <span id="activity-section-heading">{t("activityHeading")}</span>
                 </SectionHeading>
                 <ReviewHeatmap
                   columns={computeReviewHeatmap(gradeLog, todayString(new Date(), userTimezone))}
@@ -633,7 +637,7 @@ export default function StatsPage() {
             {perGame.length > 0 && (
               <section aria-labelledby="progress-section-heading" className="flex flex-col gap-6">
                 <SectionHeading>
-                  <span id="progress-section-heading">Progress</span>
+                  <span id="progress-section-heading">{t("progressHeading")}</span>
                 </SectionHeading>
                 <GameBreakdown perGame={perGame} />
               </section>
@@ -642,16 +646,11 @@ export default function StatsPage() {
             {/* Scheduling section — full width on all breakpoints */}
             <section aria-labelledby="scheduling-section-heading" className="flex flex-col gap-6">
               <SectionHeading>
-                <span id="scheduling-section-heading">Scheduling</span>
+                <span id="scheduling-section-heading">{t("schedulingHeading")}</span>
               </SectionHeading>
-              <OnboardingHint id="statsHintDismissed" title="What &quot;mastered&quot; means">
+              <OnboardingHint id="statsHintDismissed" title={t("masteryMeaning.title")}>
                 <p>
-                  A card is mastered once you&apos;ve recalled it correctly{" "}
-                  {masteryRepetitions} time{masteryRepetitions === 1 ? "" : "s"}{" "}
-                  in a row <em>and</em> the next review is scheduled at least 21
-                  days out: that&apos;s when the scheduler is confident
-                  you&apos;ve actually learnt it, not just memorised it short
-                  term.
+                  {t("masteryMeaning.body", { reps: masteryRepetitions ?? 3 })}
                 </p>
               </OnboardingHint>
               {snapshot.firstMasteryDays !== null && masteryRepetitions !== null && (

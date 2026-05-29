@@ -12,7 +12,7 @@
  *   8. Streak rendered when currentStreak > 0.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithIntl as render, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
