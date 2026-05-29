@@ -13,9 +13,10 @@
  *     change via the FilterBar callbacks.
  *   - Superuser pretendAllMastered: overrides mastery filter to "all".
  *   - Sort: URL-driven; onSortChange updates URL; sort state is passed to FilterBar.
+ *   - i18n (#1369): "Filters" button and active-filter badge render via t() keys.
  */
 
-import { render, screen, act, waitFor } from "@testing-library/react";
+import { renderWithIntl, renderJa, screen, act, waitFor } from "@/components/test-utils/renderWithIntl";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -174,25 +175,25 @@ describe("PokedexFiltered — filter disclosure", () => {
   });
 
   it("renders the 'Filters' toggle button", () => {
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByRole("button", { name: /Filters/i })).toBeInTheDocument();
   });
 
   it("filter panel is hidden by default (aria-expanded false)", () => {
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const button = screen.getByRole("button", { name: /Filters/i });
     expect(button).toHaveAttribute("aria-expanded", "false");
   });
 
   it("filter bar is not visible before the toggle is clicked", () => {
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     // The panel div has hidden attribute; the FilterBar is in the DOM but not visible.
     expect(screen.getByTestId("filter-bar").closest("[hidden]")).toBeTruthy();
   });
 
   it("clicking the toggle button expands the panel (aria-expanded true)", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     const button = screen.getByRole("button", { name: /Filters/i });
     await user.click(button);
@@ -202,7 +203,7 @@ describe("PokedexFiltered — filter disclosure", () => {
 
   it("clicking the toggle a second time collapses the panel", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     const button = screen.getByRole("button", { name: /Filters/i });
     await user.click(button);
@@ -212,7 +213,7 @@ describe("PokedexFiltered — filter disclosure", () => {
   });
 
   it("aria-controls references the panel element", () => {
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const button = screen.getByRole("button", { name: /Filters/i });
     const panelId = button.getAttribute("aria-controls");
     expect(panelId).toBeTruthy();
@@ -222,7 +223,7 @@ describe("PokedexFiltered — filter disclosure", () => {
 
   it("filter panel is visible after the toggle is clicked", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
 
@@ -243,44 +244,44 @@ describe("PokedexFiltered — active-filter count badge", () => {
 
   it("badge is not shown when no filters are active", () => {
     mockSearchParams.value = new URLSearchParams();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     // No badge element — aria-label pattern "N active filter"
     expect(screen.queryByLabelText(/active filter/i)).not.toBeInTheDocument();
   });
 
   it("shows badge with count 1 when query filter is active (panel collapsed)", () => {
     setSearchParams({ q: "bulba" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("1 active filter")).toBeInTheDocument();
   });
 
   it("shows badge with count 1 when type filter is active", () => {
     setSearchParams({ type: "fire" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("1 active filter")).toBeInTheDocument();
   });
 
   it("shows badge with count 1 when gen filter is active", () => {
     setSearchParams({ gen: "1" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("1 active filter")).toBeInTheDocument();
   });
 
   it("shows badge with count 1 when hasAlternateForms is active", () => {
     setSearchParams({ forms: "1" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("1 active filter")).toBeInTheDocument();
   });
 
   it("shows badge with count 1 when masteryStatus filter is active", () => {
     setSearchParams({ mastery: "mastered" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("1 active filter")).toBeInTheDocument();
   });
 
   it("shows badge with count 2 when two filters are active", () => {
     setSearchParams({ q: "char", type: "fire" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("2 active filters")).toBeInTheDocument();
   });
 
@@ -292,14 +293,14 @@ describe("PokedexFiltered — active-filter count badge", () => {
       forms: "1",
       mastery: "mastered",
     });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("5 active filters")).toBeInTheDocument();
   });
 
   it("badge is hidden when the panel is open (even with active filters)", async () => {
     setSearchParams({ q: "bulba" });
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     // Badge visible while closed.
     expect(screen.getByLabelText("1 active filter")).toBeInTheDocument();
@@ -313,7 +314,7 @@ describe("PokedexFiltered — active-filter count badge", () => {
 
   it("badge uses singular label for exactly 1 active filter", () => {
     setSearchParams({ gen: "2" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     expect(screen.getByLabelText("1 active filter")).toBeInTheDocument();
     expect(screen.queryByLabelText("1 active filters")).not.toBeInTheDocument();
   });
@@ -331,7 +332,7 @@ describe("PokedexFiltered — grid receives filtered pokemon", () => {
   });
 
   it("renders all pokemon when no filters are active", () => {
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const grid = screen.getByTestId("pokedex-grid");
     expect(grid).toHaveTextContent("Bulbasaur");
     expect(grid).toHaveTextContent("Charmander");
@@ -340,7 +341,7 @@ describe("PokedexFiltered — grid receives filtered pokemon", () => {
 
   it("filters grid by name query from URL", () => {
     setSearchParams({ q: "char" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const grid = screen.getByTestId("pokedex-grid");
     expect(grid).toHaveTextContent("Charmander");
     expect(grid).not.toHaveTextContent("Bulbasaur");
@@ -349,7 +350,7 @@ describe("PokedexFiltered — grid receives filtered pokemon", () => {
 
   it("filters grid by mastery status from URL", () => {
     setSearchParams({ mastery: "mastered" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const grid = screen.getByTestId("pokedex-grid");
     expect(grid).toHaveTextContent("Bulbasaur");
     expect(grid).not.toHaveTextContent("Charmander");
@@ -360,7 +361,7 @@ describe("PokedexFiltered — grid receives filtered pokemon", () => {
     // With pretendAllMastered=true, effectiveMasteryStatus is forced to "all".
     mockFlags.pretendAllMastered = true;
     setSearchParams({ mastery: "not-yet-mastered" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     // All three should still appear because mastery override kicks in.
     const grid = screen.getByTestId("pokedex-grid");
     expect(grid).toHaveTextContent("Bulbasaur");
@@ -371,7 +372,7 @@ describe("PokedexFiltered — grid receives filtered pokemon", () => {
   it("passes superuserMasteryLocked=true to FilterBar when pretendAllMastered is on", async () => {
     mockFlags.pretendAllMastered = true;
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     // Open the panel so FilterBar is visible.
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     expect(screen.getByTestId("filter-bar")).toHaveAttribute("data-mastery-locked", "true");
@@ -391,7 +392,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
 
   it("calls router.replace with the gen filter when Gen 1 is clicked", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     // Open the filter panel first.
     await user.click(screen.getByRole("button", { name: /Filters/i }));
@@ -409,7 +410,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
     // Start with gen=1 active.
     setSearchParams({ gen: "1" });
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.click(screen.getByRole("button", { name: "All Gens" }));
@@ -422,7 +423,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
 
   it("calls router.replace with mastery filter when Mastered is clicked", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.click(screen.getByRole("button", { name: "Mastered" }));
@@ -437,7 +438,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
 
   it("calls router.replace with the type filter when Fire is toggled", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.click(screen.getByRole("button", { name: "Toggle Fire" }));
@@ -452,7 +453,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
 
   it("calls router.replace with forms=1 when Has Forms is toggled", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.click(screen.getByRole("button", { name: "Has Forms" }));
@@ -467,7 +468,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
 
   it("debounces query input: router.replace is called after text changes", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.type(screen.getByLabelText("filter-query"), "bul");
@@ -486,7 +487,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
 
   it("calls router.replace with sort=alphabetical when Sort Alphabetical is clicked", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.click(screen.getByRole("button", { name: "Sort Alphabetical" }));
@@ -501,7 +502,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
 
   it("calls router.replace with sort=closest-to-mastery when Sort Mastery is clicked", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.click(screen.getByRole("button", { name: "Sort Mastery" }));
@@ -518,7 +519,7 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
     // Start with a non-national sort active in the URL.
     mockSearchParams.value = new URLSearchParams({ sort: "alphabetical" });
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.click(screen.getByRole("button", { name: "Sort National" }));
@@ -546,7 +547,7 @@ describe("PokedexFiltered — sort state", () => {
 
   it("passes sort=national to FilterBar when no sort param in URL", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     expect(screen.getByTestId("filter-bar")).toHaveAttribute("data-sort", "national");
@@ -555,7 +556,7 @@ describe("PokedexFiltered — sort state", () => {
   it("passes sort=alphabetical to FilterBar when sort=alphabetical in URL", async () => {
     mockSearchParams.value = new URLSearchParams({ sort: "alphabetical" });
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     expect(screen.getByTestId("filter-bar")).toHaveAttribute("data-sort", "alphabetical");
@@ -564,9 +565,27 @@ describe("PokedexFiltered — sort state", () => {
   it("passes sort=closest-to-mastery to FilterBar when sort=closest-to-mastery in URL", async () => {
     mockSearchParams.value = new URLSearchParams({ sort: "closest-to-mastery" });
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     expect(screen.getByTestId("filter-bar")).toHaveAttribute("data-sort", "closest-to-mastery");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — Japanese locale chrome (#1369)
+// ---------------------------------------------------------------------------
+
+describe("PokedexFiltered — Japanese locale", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearchParams.value = new URLSearchParams();
+    mockFlags.pretendAllMastered = false;
+  });
+
+  it("renders the Filters toggle button in Japanese", () => {
+    renderJa(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    // messages/ja.json pokedex.filters = "フィルター"
+    expect(screen.getByRole("button", { name: /フィルター/i })).toBeInTheDocument();
   });
 });

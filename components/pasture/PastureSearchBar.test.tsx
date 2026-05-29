@@ -1,6 +1,19 @@
-import { render, screen, within } from "@testing-library/react";
+/**
+ * Component tests for PastureSearchBar.
+ *
+ * All renders use renderWithIntl (i18n wiring from #1369) so t() calls resolve
+ * against the real en.json catalogue. A renderJa suite asserts that Japanese
+ * chrome strings render correctly on this surface.
+ */
+
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
+import {
+  renderWithIntl,
+  renderJa,
+  screen,
+  within,
+} from "@/components/test-utils/renderWithIntl";
 import {
   PastureSearchBar,
   PASTURE_FILTERS_DEFAULT,
@@ -27,7 +40,7 @@ function renderSearchBar(
   const onTypeToggle = handlers.onTypeToggle ?? vi.fn();
   const onGenChange = handlers.onGenChange ?? vi.fn();
 
-  render(
+  renderWithIntl(
     <PastureSearchBar
       filters={filters}
       onQueryChange={onQueryChange}
@@ -236,5 +249,37 @@ describe("PastureSearchBar — generation pills", () => {
     const g = within(screen.getByRole("group", { name: /Filter by generation/i }));
     await user.click(g.getByRole("button", { name: "Gen IX", }));
     expect(onGenChange).toHaveBeenCalledWith(9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Japanese locale — chrome strings render in Japanese (#1369)
+// ---------------------------------------------------------------------------
+
+describe("PastureSearchBar — Japanese locale", () => {
+  it("renders the search label in Japanese", () => {
+    renderJa(
+      <PastureSearchBar
+        filters={defaultFilters()}
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pasture.searchAriaLabel = "Pokémon を検索"
+    expect(screen.getByRole("textbox", { name: "Pokémon を検索" })).toBeInTheDocument();
+  });
+
+  it("renders the filter-by-type group label in Japanese", () => {
+    renderJa(
+      <PastureSearchBar
+        filters={defaultFilters()}
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pasture.filterByTypeAriaLabel = "タイプでフィルター"
+    expect(screen.getByRole("group", { name: "タイプでフィルター" })).toBeInTheDocument();
   });
 });

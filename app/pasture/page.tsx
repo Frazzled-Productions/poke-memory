@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import type { SavedSession } from "@/lib/review/persistence";
 import { filterMastered, markSeenInPasture } from "@/lib/pasture/arrivals";
@@ -127,6 +128,8 @@ function isFiltered(filters: PastureFilters): boolean {
 }
 
 export default function PasturePage() {
+  const t = useTranslations("pasture");
+  const tCommon = useTranslations("common");
   const { user, supabase } = useAuth();
   const { flags } = useSuperuser();
   const [session, setSession] = useState<SavedSession | null>(null);
@@ -275,11 +278,10 @@ export default function PasturePage() {
     return (
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Pasture
+          {t("title")}
         </h1>
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
-          Your pasture is empty. Master your first Pokémon in Practice to see
-          it here.
+          {t("emptyBody")}
         </p>
         <NextArrivalsStrip arrivals={arrivals} />
       </main>
@@ -299,9 +301,9 @@ export default function PasturePage() {
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
       <h1 className="mb-6 text-2xl font-bold tracking-tight text-foreground">
-        Pasture
+        {t("title")}
         <span className="ml-2 text-base font-normal text-zinc-500 dark:text-zinc-400">
-          {masteredCards.length} Pokémon
+          {t("pokemonCount", { count: masteredCards.length })}
         </span>
       </h1>
 
@@ -314,7 +316,7 @@ export default function PasturePage() {
 
       {zones.length === 0 && filtered ? (
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
-          No Pokémon match your filters.
+          {tCommon("noResults")}
         </p>
       ) : (
         <div className="flex flex-col gap-8">

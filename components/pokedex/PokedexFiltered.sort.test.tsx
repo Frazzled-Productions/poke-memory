@@ -8,7 +8,7 @@
  *     back-navigation / page reload.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithIntl, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { KEY_POKEDEX_SORT } from "@/lib/storage/keys";
@@ -177,28 +177,28 @@ describe("PokedexFiltered — sort persistence", () => {
   });
 
   it("defaults to national sort when no localStorage key is present", () => {
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const filterBar = screen.getByTestId("filter-bar");
     expect(filterBar).toHaveAttribute("data-sort", "national");
   });
 
   it("reads stored sort preference from localStorage on mount", () => {
     storage.setItem(KEY_POKEDEX_SORT, "alphabetical");
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const filterBar = screen.getByTestId("filter-bar");
     expect(filterBar).toHaveAttribute("data-sort", "alphabetical");
   });
 
   it("reads closest-to-mastery from localStorage on mount", () => {
     storage.setItem(KEY_POKEDEX_SORT, "closest-to-mastery");
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const filterBar = screen.getByTestId("filter-bar");
     expect(filterBar).toHaveAttribute("data-sort", "closest-to-mastery");
   });
 
   it("writes to localStorage when sort changes via FilterBar callback", async () => {
     const user = userEvent.setup();
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
 
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await user.click(screen.getByRole("button", { name: "Sort Alphabetical" }));
@@ -211,7 +211,7 @@ describe("PokedexFiltered — sort persistence", () => {
   it("URL sort param takes priority over localStorage when present", () => {
     storage.setItem(KEY_POKEDEX_SORT, "alphabetical");
     mockSearchParams.value = new URLSearchParams({ sort: "closest-to-mastery" });
-    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const filterBar = screen.getByTestId("filter-bar");
     expect(filterBar).toHaveAttribute("data-sort", "closest-to-mastery");
   });

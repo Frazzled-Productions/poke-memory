@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+import { useTranslations } from "next-intl";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
@@ -15,6 +16,7 @@ import { LoadingSkeleton } from "@/components/pokedex/PokedexGrid";
 import PokedexFiltered from "@/components/pokedex/PokedexFiltered";
 
 export default function PokedexPage() {
+  const t = useTranslations("pokedex");
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
@@ -74,16 +76,16 @@ export default function PokedexPage() {
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
       <div className="w-full max-w-5xl">
         <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
-          Pokédex
+          {t("title")}
         </h1>
         <p className="mb-8 text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
           {cards === null ? (
             <span className="inline-block h-4 w-36 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
           ) : (
-            <>
-              {introduced.toLocaleString()} / {defaultFormPokemon.length.toLocaleString()}{" "}
-              introduced
-            </>
+            t("introduced", {
+              introduced: introduced.toLocaleString(),
+              total: defaultFormPokemon.length.toLocaleString(),
+            })
           )}
         </p>
 

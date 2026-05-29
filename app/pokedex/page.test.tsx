@@ -5,8 +5,8 @@
  * was previously uninstrumented and was failing the diff-coverage gate.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderWithIntl, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
 // Mocks — all declared before the component import.
@@ -146,7 +146,7 @@ beforeEach(() => {
 
 describe("PokedexPage", () => {
   it("renders the Pokédex heading and calls useLocalStorageKey", async () => {
-    render(<PokedexPage />);
+    renderWithIntl(<PokedexPage />);
 
     expect(useLocalStorageKey).toHaveBeenCalledWith("poke-memory:review-session:v1");
 
@@ -158,7 +158,7 @@ describe("PokedexPage", () => {
   it("shows the filtered grid once session data has loaded", async () => {
     mockLoadSession.mockResolvedValue(null);
 
-    render(<PokedexPage />);
+    renderWithIntl(<PokedexPage />);
 
     await waitFor(() => {
       expect(screen.getByTestId("pokedex-filtered")).toBeInTheDocument();

@@ -7,11 +7,20 @@
  *
  * Existing filter controls (type chips, gen pills, mastery buttons) are also
  * exercised to ensure the refactor that added the sort prop did not break them.
+ *
+ * All renders use renderWithIntl (i18n wiring from #1369) so t() calls resolve
+ * against the real en.json catalogue. A renderJa test asserts that Japanese
+ * chrome strings render correctly on this surface.
  */
 
-import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
+import {
+  renderWithIntl,
+  renderJa,
+  screen,
+  fireEvent,
+} from "@/components/test-utils/renderWithIntl";
 import PokedexFilterBar from "@/components/pokedex/PokedexFilterBar";
 import type { PokedexFilters } from "@/lib/pokemon/filter";
 import type { PokedexSortOrder } from "@/lib/pokedex/sort";
@@ -54,7 +63,7 @@ function renderBar(
     superuserMasteryLocked = false,
   } = handlers;
 
-  const result = render(
+  const result = renderWithIntl(
     <PokedexFilterBar
       filters={filters}
       sort={sort}
@@ -218,3 +227,47 @@ describe("PokedexFilterBar — existing filter controls", () => {
     expect(allMasteryBtn).toHaveTextContent("All");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Japanese locale — chrome strings render in Japanese (#1369)
+// ---------------------------------------------------------------------------
+
+describe("PokedexFilterBar — Japanese locale", () => {
+  it("renders the sort label in Japanese", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.sortBy = "並び替え"
+    expect(screen.getByLabelText("並び替え")).toBeInTheDocument();
+  });
+
+  it("renders the search label in Japanese", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.searchAriaLabel = "Pokémon を検索"
+    expect(screen.getByRole("textbox", { name: "Pokémon を検索" })).toBeInTheDocument();
+  });
+});
+
+// Suppress unused import warning — fireEvent is re-exported from renderWithIntl
+// and available for tests that need it; the import is intentional.
+void fireEvent;
