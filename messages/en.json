@@ -178,6 +178,9 @@
         "default": "Default"
       }
     },
+    "offline": {
+      "downloadHeading": "Download"
+    },
     "backup": {
       "heading": "Backup",
       "exportLabel": "Export progress",

@@ -178,6 +178,9 @@
         "default": "默认"
       }
     },
+    "offline": {
+      "downloadHeading": "下载"
+    },
     "backup": {
       "heading": "备份",
       "exportLabel": "导出进度",
