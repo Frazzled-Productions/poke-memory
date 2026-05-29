@@ -129,10 +129,25 @@ describe("PokemonLocaleProvider — reactive updates", () => {
       expect(result.current).toEqual({ locale: "en", languagesEnabled: false });
     });
   });
+
+  it("reads pokemonNameLocale from settings, NOT from the locale cookie", async () => {
+    // The cookie (app UI locale) is independent of pokemonNameLocale — they
+    // can disagree (UI in English while practising names in Japanese, or vice
+    // versa). The Provider must read from settings only.
+    document.cookie = "poke-memory:locale=ja";
+    mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "en" };
+
+    const { result } = renderHook(() => usePokemonLocaleContext(), { wrapper });
+    await waitFor(() => {
+      expect(result.current).toEqual({ locale: "en", languagesEnabled: true });
+    });
+
+    document.cookie = "poke-memory:locale=; max-age=0";
+  });
 });
 
 describe("PokemonLocaleProvider — single subscription regardless of consumer count", () => {
-  it("registers exactly one SETTINGS_SAVED_EVENT and one storage listener for N consumers", () => {
+  it("registers exactly one SETTINGS_SAVED_EVENT and one storage listener for N consumers", async () => {
     mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "en" };
     const addSpy = vi.spyOn(window, "addEventListener");
 
@@ -151,16 +166,19 @@ describe("PokemonLocaleProvider — single subscription regardless of consumer c
       </PokemonLocaleProvider>,
     );
 
-    const settingsListenerCount = addSpy.mock.calls.filter(
-      ([type]) => type === SETTINGS_SAVED_EVENT,
-    ).length;
-    const storageListenerCount = addSpy.mock.calls.filter(
-      ([type]) => type === "storage",
-    ).length;
-
-    // Exactly one listener registered by the Provider, not N (one per consumer)
-    // — this is the structural fix #1329 was held for.
-    expect(settingsListenerCount).toBe(1);
-    expect(storageListenerCount).toBe(1);
+    // Wait explicitly for the effect-scheduled listeners. Without waitFor the
+    // assertion would race React's effect flush — false-passing if effects
+    // ever moved to a later phase. With waitFor it false-fails (preferable)
+    // if a future regression makes listener registration consumer-driven.
+    await waitFor(() => {
+      const settingsListenerCount = addSpy.mock.calls.filter(
+        ([type]) => type === SETTINGS_SAVED_EVENT,
+      ).length;
+      const storageListenerCount = addSpy.mock.calls.filter(
+        ([type]) => type === "storage",
+      ).length;
+      expect(settingsListenerCount).toBe(1);
+      expect(storageListenerCount).toBe(1);
+    });
   });
 });

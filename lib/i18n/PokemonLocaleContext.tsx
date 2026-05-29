@@ -76,8 +76,10 @@ export function PokemonLocaleProvider({ children }: { children: React.ReactNode 
     function handleChange() {
       setState(readLocaleState());
     }
-    // Re-read on mount in case settings changed between SSR and hydration.
-    handleChange();
+    // `useState(readLocaleState)` already produced the correct initial value
+    // on mount — only the listeners are needed here. (An extra `handleChange()`
+    // call would force a second render with a fresh object reference, defeating
+    // the per-tree overhead reduction this Provider exists to deliver.)
     window.addEventListener(SETTINGS_SAVED_EVENT, handleChange);
     window.addEventListener("storage", handleChange);
     return () => {
