@@ -118,7 +118,12 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
       setLocaleNames(new Map());
       return;
     }
+    // Cancellation guard: if the locale changes while the async fetch is in
+    // flight, discard the stale result and do not apply it to state. This
+    // mirrors the pattern in lib/i18n/useLocalePokemonName.ts.
+    let cancelled = false;
     void loadLocaleNames().then((nameMap) => {
+      if (cancelled) return;
       const overrides = new Map<number, LocaleNameOverride>();
       for (const entry of nameMap.values()) {
         const name = entry.nameByLocale[locale];
@@ -128,6 +133,9 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
       }
       setLocaleNames(overrides);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [locale]);
 
   const handleQueryChange = useCallback(

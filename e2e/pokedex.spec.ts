@@ -1057,6 +1057,55 @@ test.describe("Pokédex grid — locale names (#1327)", () => {
     // locale-name span, not alongside it).
     await expect(page.getByText("Bulbasaur")).not.toBeVisible();
   });
+
+  test("grid renders a Simplified Chinese name when pokemonNameLocale=zh-Hans (happy path)", async ({
+    page,
+  }) => {
+    // Seed Bulbasaur as a learning card so it is not locked.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-05-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    // Enable languages flag and set locale to Simplified Chinese before page load.
+    await setLocale(page, "zh-Hans");
+
+    await page.goto("/pokedex");
+    await awaitSeedIdb(page);
+
+    // Wait for the locale-names sidecar to load and the grid to re-render.
+    // Bulbasaur's zh-Hans name is 妙蛙种子 (from generated-locale-names.json).
+    await expect(page.getByText("妙蛙种子")).toBeVisible({ timeout: 10000 });
+
+    // The English name should not be visible on the tile.
+    await expect(page.getByText("Bulbasaur")).not.toBeVisible();
+  });
 });
 
 // ---------------------------------------------------------------------------

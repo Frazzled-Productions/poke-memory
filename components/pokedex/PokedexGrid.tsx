@@ -50,7 +50,7 @@ function PokemonCell({
 
   // Resolved display name: locale override when available, English name as fallback.
   const displayName = localeOverride?.name ?? name;
-  const displayLang = localeOverride?.lang ?? undefined;
+  const displayLang = localeOverride?.lang;
 
   return (
     <li className="flex flex-col items-center gap-1">

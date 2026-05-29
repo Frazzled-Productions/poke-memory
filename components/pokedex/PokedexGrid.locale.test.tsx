@@ -124,4 +124,65 @@ describe("PokedexGrid — locale name rendering", () => {
     render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
   });
+
+  // ─── Simplified Chinese (zh-Hans) ──────────────────────────────────────────
+
+  it("renders the Simplified Chinese name when zh-Hans locale override is present", () => {
+    // Bulbasaur in zh-Hans: 妙蛙种子
+    const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "妙蛙种子", lang: "zh-Hans" }],
+    ]);
+    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    expect(screen.getByText("妙蛙种子")).toBeInTheDocument();
+    expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
+  });
+
+  it("applies lang=zh-Hans to the name span when a zh-Hans override is present", () => {
+    const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "妙蛙种子", lang: "zh-Hans" }],
+    ]);
+    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    const nameSpan = screen.getByText("妙蛙种子");
+    expect(nameSpan).toHaveAttribute("lang", "zh-Hans");
+  });
+
+  // ─── Traditional Chinese (zh-Hant) ─────────────────────────────────────────
+
+  it("renders the Traditional Chinese name when zh-Hant locale override is present", () => {
+    // Bulbasaur in zh-Hant: 妙蛙種子 (different final character from zh-Hans 种子 vs 種子)
+    const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "妙蛙種子", lang: "zh-Hant" }],
+    ]);
+    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    expect(screen.getByText("妙蛙種子")).toBeInTheDocument();
+    expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
+  });
+
+  it("applies lang=zh-Hant to the name span when a zh-Hant override is present", () => {
+    const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "妙蛙種子", lang: "zh-Hant" }],
+    ]);
+    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    const nameSpan = screen.getByText("妙蛙種子");
+    expect(nameSpan).toHaveAttribute("lang", "zh-Hant");
+  });
+
+  it("distinguishes zh-Hans from zh-Hant by final character (种子 vs 種子)", () => {
+    // This test exists to ensure the two locales are genuinely distinct — a
+    // renderer that collapses them would fail here.
+    const hansMap: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "妙蛙种子", lang: "zh-Hans" }],
+    ]);
+    const hantMap: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "妙蛙種子", lang: "zh-Hant" }],
+    ]);
+    const { unmount } = render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={hansMap} />);
+    expect(screen.getByText("妙蛙种子")).toHaveAttribute("lang", "zh-Hans");
+    expect(screen.queryByText("妙蛙種子")).not.toBeInTheDocument();
+    unmount();
+
+    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={hantMap} />);
+    expect(screen.getByText("妙蛙種子")).toHaveAttribute("lang", "zh-Hant");
+    expect(screen.queryByText("妙蛙种子")).not.toBeInTheDocument();
+  });
 });
