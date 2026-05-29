@@ -778,3 +778,100 @@ test.describe("Pasture page — generation filter", () => {
     await expect(page.getByRole("button", { name: /Chikorita/ })).toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pasture page — "Next arrivals" strip (#1316)
+// ---------------------------------------------------------------------------
+
+/**
+ * A seen (reviewed) but not-yet-mastered name card in the FSRS session shape.
+ * reps=2, scheduledDays=10 — below the mastery gate (reps >= 3, scheduledDays >= 21).
+ */
+function reviewedCard(id: number, name: string, habitat: string) {
+  return {
+    id,
+    cardType: "name",
+    name,
+    spriteUrl: `/sprites/pokemon/${id}.png`,
+    habitat,
+    state: {
+      stability: 3,
+      difficulty: 5,
+      elapsedDays: 0,
+      scheduledDays: 10,
+      reps: 2,
+      lapses: 0,
+      fsrsState: "review",
+      dueDate: "2026-06-10",
+      lastReview: "2026-05-31",
+      firstSeen: "2026-04-01",
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    },
+  };
+}
+
+test.describe("Pasture page — Next arrivals strip (#1316)", () => {
+  test("strip renders with species that are reviewed but not yet mastered", async ({
+    page,
+  }) => {
+    // Seed one mastered species (so the page shows the populated state, not the
+    // empty-pasture state) and two reviewed-but-not-mastered species so the
+    // strip has content.
+    await seedSessionIdb(
+      page,
+      buildSession([
+        // Mastered pair — needed so the page is not in the empty state
+        masteredCard(10, "Caterpie", "forest"),
+        masteredReverseCard(10),
+        // Reviewed but not mastered — should appear in the strip
+        reviewedCard(1, "Bulbasaur", "grassland"),
+        reviewedCard(4, "Charmander", "mountain"),
+      ]),
+    );
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    // The "Next arrivals" section heading must be visible.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Next arrivals" }),
+    ).toBeVisible();
+
+    // The arrivals list must be present.
+    await expect(
+      page.getByRole("list", { name: "Upcoming Pasture species" }),
+    ).toBeVisible();
+
+    // At least one of the reviewed species must appear in the list.
+    const strip = page.getByRole("region", { name: "Next arrivals" });
+    const items = strip.getByRole("listitem");
+    await expect(items.first()).toBeVisible();
+  });
+
+  test("strip shows all-caught-up message when all reviewed species are mastered", async ({
+    page,
+  }) => {
+    // Seed only fully mastered species — no arrivals remain.
+    await seedSessionIdb(
+      page,
+      buildSession([
+        masteredCard(10, "Caterpie", "forest"),
+        masteredReverseCard(10),
+      ]),
+    );
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Next arrivals" }),
+    ).toBeVisible();
+
+    await expect(
+      page.getByText(/All reviewed Pokémon are already in your Pasture/i),
+    ).toBeVisible();
+  });
+});
