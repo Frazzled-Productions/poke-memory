@@ -129,7 +129,37 @@ async function persistWeights(
   }
 }
 
+/**
+ * Extracts a safe, non-PII detail string from an unknown thrown value.
+ *
+ * Used for the `detail` field of `{ error: "unknown" }` and `{ error:
+ * "degenerate_data" }` responses. The binding's panic messages are short
+ * C-string literals with no user data; we truncate to 200 chars anyway as a
+ * safety cap. Returns "internal_error" when no usable message is available.
+ */
+function extractSafeDetail(err: unknown): string {
+  const raw =
+    err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  return raw.slice(0, 200) || "internal_error";
+}
+
 export async function POST(): Promise<NextResponse> {
+  try {
+    return await postHandler();
+  } catch (err) {
+    // Unhandled exceptions (e.g. an unexpected binding panic that bypasses the
+    // inner try/catch, or a Vercel infrastructure error surfaced as a thrown
+    // value). Return a structured { error: "unknown" } instead of an
+    // unstructured 500 so the UI can surface a meaningful message.
+    console.error("[/api/srs/optimize] unhandled error", err);
+    return NextResponse.json(
+      { error: "unknown", detail: extractSafeDetail(err) },
+      { status: 500 },
+    );
+  }
+}
+
+async function postHandler(): Promise<NextResponse> {
   const supabase = (await createClient()) as unknown as SupabaseClient;
   const {
     data: { user },
@@ -203,8 +233,10 @@ export async function POST(): Promise<NextResponse> {
     console.error("[/api/srs/optimize] computeParameters failed", err);
     // The native binding throws on degenerate or insufficient data distributions.
     // Return 422 (client-fixable: keep studying) rather than a generic 500.
+    // Surface a truncated, non-PII detail string so the UI can show the class
+    // of failure in addition to the status code.
     return NextResponse.json(
-      { error: "degenerate_data", reviewCount },
+      { error: "degenerate_data", reviewCount, detail: extractSafeDetail(err) },
       { status: 422 },
     );
   }

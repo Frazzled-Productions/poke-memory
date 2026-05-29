@@ -147,7 +147,7 @@ describe("POST /api/srs/optimize — persistWeights via RPC", () => {
     expect(body.error).toBe("save_failed");
   });
 
-  it("returns 422 with degenerate_data and reviewCount when computeParameters throws", async () => {
+  it("returns 422 with degenerate_data, reviewCount, and detail when computeParameters throws", async () => {
     makeSupabaseMock();
     (computeParameters as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("not enough data for optimization"),
@@ -159,6 +159,47 @@ describe("POST /api/srs/optimize — persistWeights via RPC", () => {
     expect(response.status).toBe(422);
     expect(body.error).toBe("degenerate_data");
     expect(typeof body.reviewCount).toBe("number");
+    expect(body.detail).toBe("not enough data for optimization");
+  });
+
+  it("returns 422 with detail='internal_error' when computeParameters throws a non-Error value", async () => {
+    makeSupabaseMock();
+    (computeParameters as ReturnType<typeof vi.fn>).mockRejectedValue(42);
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error).toBe("degenerate_data");
+    expect(body.detail).toBe("internal_error");
+  });
+
+  it("returns 500 with error='unknown' and a detail string when postHandler throws unexpectedly", async () => {
+    // Simulate an unhandled throw from createClient itself (bypasses all inner
+    // try/catches), which should be caught by the outer POST wrapper.
+    const { createClient: mockCreateClient } = await import("@/lib/supabase/server");
+    (mockCreateClient as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("unexpected panic"),
+    );
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe("unknown");
+    expect(body.detail).toBe("unexpected panic");
+  });
+
+  it("returns 500 with detail='internal_error' when unhandled throw has no message", async () => {
+    const { createClient: mockCreateClient } = await import("@/lib/supabase/server");
+    (mockCreateClient as ReturnType<typeof vi.fn>).mockRejectedValueOnce(null);
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe("unknown");
+    expect(body.detail).toBe("internal_error");
   });
 
   it("returns 503 with reviews_unavailable when grade log fetch returns null", async () => {
