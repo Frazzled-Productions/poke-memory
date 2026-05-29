@@ -269,5 +269,22 @@ describe("FirstVisitOnboardingModal", () => {
       // The dialog is the container — confirm the note is inside the DOM.
       expect(await screen.findByRole("note")).toBeInTheDocument();
     });
+
+    it("banner is absent when locale is Japanese and the dismissed flag is set", async () => {
+      // Pre-seed the per-locale dismissed flag in localStorage.
+      window.localStorage.setItem("poke-memory:mt-banner-dismissed:ja", "1");
+
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+
+      // Give the banner's useEffect time to read localStorage and update state.
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      // Banner must be absent — dismissed flag is set.
+      expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    });
   });
 });

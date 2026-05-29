@@ -445,10 +445,10 @@
     "intro": "Learn every Pokémon name and evolution with spaced repetition. New cards arrive daily; the app surfaces each card right before you would likely forget it, so gaps grow as your memory strengthens.",
     "howToGrade": {
       "heading": "How to grade",
-      "again": "Again - you forgot completely.",
-      "hard": "Hard - you recalled it, but struggled.",
-      "good": "Good - you recalled it with some effort.",
-      "easy": "Easy - instant recall, no hesitation.",
+      "again": "<term>Again</term> - you forgot completely.",
+      "hard": "<term>Hard</term> - you recalled it, but struggled.",
+      "good": "<term>Good</term> - you recalled it with some effort.",
+      "easy": "<term>Easy</term> - instant recall, no hesitation.",
       "honestGradeNote": "Grade honestly. Hitting Again sometimes is normal and part of the system working; the scheduler only improves if you tell it the truth."
     },
     "addingSound": {

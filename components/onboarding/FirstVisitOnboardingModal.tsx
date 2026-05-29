@@ -223,16 +223,16 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
             </h3>
             <ul className="flex flex-col gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
               <li>
-                {t("howToGrade.again")}
+                {t.rich("howToGrade.again", { term: (c) => <strong>{c}</strong> })}
               </li>
               <li>
-                {t("howToGrade.hard")}
+                {t.rich("howToGrade.hard", { term: (c) => <strong>{c}</strong> })}
               </li>
               <li>
-                {t("howToGrade.good")}
+                {t.rich("howToGrade.good", { term: (c) => <strong>{c}</strong> })}
               </li>
               <li>
-                {t("howToGrade.easy")}
+                {t.rich("howToGrade.easy", { term: (c) => <strong>{c}</strong> })}
               </li>
             </ul>
             <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
