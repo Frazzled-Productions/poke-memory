@@ -20,6 +20,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   DEFAULT_ONBOARDING,
   SETTINGS_SAVED_EVENT,
@@ -29,6 +30,7 @@ import {
 import { useAuth } from "@/lib/auth/AuthContext";
 import { cn } from "@/lib/utils/cn";
 import { sectionLabel } from "@/lib/utils/class-names";
+import { MachineTranslationBanner } from "@/components/i18n/MachineTranslationBanner";
 
 type Props = {
   /** Called when the modal closes so the parent can update its state. */
@@ -36,6 +38,7 @@ type Props = {
 };
 
 export function FirstVisitOnboardingModal({ onDismiss }: Props) {
+  const t = useTranslations("onboarding");
   // null = not yet read from localStorage (SSR / first paint).
   const [open, setOpen] = useState<boolean | null>(null);
   // Whether we have a DOM available (guards createPortal from SSR).
@@ -186,13 +189,13 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
             id="onboarding-modal-title"
             className="text-base font-semibold text-foreground"
           >
-            Welcome to Poké Memory
+            {t("welcomeHeading")}
           </h2>
           <button
             ref={closeButtonRef}
             type="button"
             onClick={dismiss}
-            aria-label="Close welcome guide"
+            aria-label={t("closeAriaLabel")}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
           >
             <span aria-hidden="true">&#x2715;</span>
@@ -202,11 +205,12 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
         {/* Body */}
         <div className="flex flex-col gap-5 overflow-y-auto px-6 py-5 max-h-[70vh]">
 
+          {/* Machine-translation notice — self-hides for en and when dismissed */}
+          <MachineTranslationBanner />
+
           {/* Intro */}
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Learn every Pokémon name and evolution with spaced repetition.
-            New cards arrive daily; the app surfaces each card right before
-            you would likely forget it, so gaps grow as your memory strengthens.
+            {t("intro")}
           </p>
 
           {/* Grading section */}
@@ -215,26 +219,24 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
               id="modal-grading-heading"
               className={cn("mb-2", sectionLabel)}
             >
-              How to grade
+              {t("howToGrade.heading")}
             </h3>
             <ul className="flex flex-col gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
               <li>
-                <strong className="text-foreground">Again</strong> - you forgot completely.
+                {t("howToGrade.again")}
               </li>
               <li>
-                <strong className="text-foreground">Hard</strong> - you recalled it, but struggled.
+                {t("howToGrade.hard")}
               </li>
               <li>
-                <strong className="text-foreground">Good</strong> - you recalled it with some effort.
+                {t("howToGrade.good")}
               </li>
               <li>
-                <strong className="text-foreground">Easy</strong> - instant recall, no hesitation.
+                {t("howToGrade.easy")}
               </li>
             </ul>
             <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              Grade honestly. Hitting Again sometimes is normal and part of the
-              system working; the scheduler only improves if you tell it the
-              truth.
+              {t("howToGrade.honestGradeNote")}
             </p>
           </section>
 
@@ -244,19 +246,17 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
               id="modal-audio-heading"
               className={cn("mb-2", sectionLabel)}
             >
-              Adding sound (optional)
+              {t("addingSound.heading")}
             </h3>
             <p className="text-sm text-zinc-600 dark:text-zinc-300">
-              You can enable Pokémon cries on card reveal and spoken names via
-              text-to-speech. You can also unlock cry cards, where the audio is
-              the prompt.
+              {t("addingSound.body")}
             </p>
             <Link
               href="/settings#audio-heading"
               onClick={dismiss}
               className="mt-2 inline-flex min-h-[36px] items-center rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:hover:bg-zinc-800"
             >
-              Open audio settings
+              {t("addingSound.openAudioSettings")}
             </Link>
           </section>
 
@@ -270,13 +270,10 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
                 id="modal-storage-heading"
                 className={cn("mb-1", sectionLabel)}
               >
-                Your progress is saved on this device
+                {t("guestStorage.heading")}
               </h3>
               <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                Progress is stored in your browser and is not backed up
-                automatically. On iOS Safari, the browser may clear it after
-                7 days without a visit. To keep it safe: add this page to
-                your Home Screen, or sign in to back it up to the cloud.
+                {t("guestStorage.body")}
               </p>
             </section>
           )}
@@ -289,7 +286,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
             onClick={dismiss}
             className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
           >
-            Get started
+            {t("getStarted")}
           </button>
         </div>
       </dialog>
