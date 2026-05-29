@@ -10,6 +10,7 @@ import {
 import { fnv1a, fnv1aUint32 } from "@/lib/utils/fnv1a";
 import { Subject, appTypeToDbType } from "@/lib/cards/subjectKey";
 import { todayInTimezone } from "@/lib/utils/format-date";
+import type { AppLocale } from "@/i18n/locales";
 
 // Re-export so callers that need the DB card_type value can get it without
 // importing subjectKey.ts separately.
@@ -21,12 +22,20 @@ export type NameReviewCard = SeedPokemon & {
   cardType: "name";
   /** DB subject key — equals String(pokemonId). */
   subjectKey: string;
+  /**
+   * Locale for which this card's FSRS state is tracked (#1259). Drives the
+   * `locale` column on `card_reviews`. Optional for backward-compatibility with
+   * pre-#1259 persisted cards; all callers default to "en" via `card.locale ?? "en"`.
+   */
+  locale?: AppLocale;
   state: ReviewState;
 };
 
 export type EvolutionReviewCard = EvolutionCard & {
   /** DB subject key — equals Subject.forEdge(preEvoId, postEvoId). */
   subjectKey: string;
+  /** Locale for which this card's FSRS state is tracked (#1259). Optional; defaults to "en". */
+  locale?: AppLocale;
   state: ReviewState;
 };
 
@@ -36,6 +45,8 @@ export type EvolutionReviewCard = EvolutionCard & {
 export type ReverseEvolutionReviewCard = ReverseEvolutionCard & {
   /** DB subject key — equals Subject.forEdge(preEvoId, postEvoId). Same key as the forward direction. */
   subjectKey: string;
+  /** Locale for which this card's FSRS state is tracked (#1259). Optional; defaults to "en". */
+  locale?: AppLocale;
   state: ReviewState;
 };
 
@@ -49,6 +60,8 @@ export type ReverseReviewCard = Omit<SeedPokemon, "id"> & {
   /** DB subject key — equals String(pokemonId). Same as the name card for this species. */
   subjectKey: string;
   pokemonId: number; // original species ID (same as SeedPokemon.id)
+  /** Locale for which this card's FSRS state is tracked (#1259). Optional; defaults to "en". */
+  locale?: AppLocale;
   state: ReviewState;
 };
 
@@ -62,6 +75,8 @@ export type CryReviewCard = Omit<SeedPokemon, "id"> & {
   /** DB subject key — equals String(pokemonId). */
   subjectKey: string;
   pokemonId: number;
+  /** Locale for which this card's FSRS state is tracked (#1259). Optional; defaults to "en". */
+  locale?: AppLocale;
   state: ReviewState;
 };
 
@@ -113,7 +128,13 @@ export type CardTypeOpts = {
   cryEnabled?: boolean;
 };
 
-export type BuildSessionOpts = CardTypeOpts;
+export type BuildSessionOpts = CardTypeOpts & {
+  /**
+   * Locale to stamp onto every card (#1259). Each (user, card_type, subject_key, locale)
+   * is an independent FSRS row. Defaults to `"en"` for backward compatibility.
+   */
+  locale?: AppLocale;
+};
 
 /**
  * Returns true when the card's type is enabled by the given opts.
@@ -151,12 +172,13 @@ export function buildSession(
   now: Date = new Date(),
   opts: BuildSessionOpts = {},
 ): ReviewableCard[] {
-  const { nameEnabled = true, evolutionEnabled = true } = opts;
+  const { nameEnabled = true, evolutionEnabled = true, locale = "en" } = opts;
   const nameCards: NameReviewCard[] = nameEnabled
     ? seed.map((pokemon) => ({
         ...pokemon,
         cardType: "name",
         subjectKey: Subject.forSpecies(pokemon.id),
+        locale,
         state: initialReviewState(now),
       }))
     : [];
@@ -164,6 +186,7 @@ export function buildSession(
     ? evoSeed.map((evo) => ({
         ...evo,
         subjectKey: Subject.forEdge(evo.preEvoId, evo.postEvoId),
+        locale,
         state: initialReviewState(now),
       }))
     : [];
@@ -176,6 +199,7 @@ export function buildSession(
         cardType: "reverse-evolution" as const,
         id: reverseEdgeIdFor(fwd.id),
         subjectKey: Subject.forEdge(fwd.preEvoId, fwd.postEvoId),
+        locale,
         state: initialReviewState(now),
       }))
     : [];
@@ -186,6 +210,7 @@ export function buildSession(
         pokemonId: p.id,
         cardType: "reverse" as const,
         subjectKey: Subject.forSpecies(p.id),
+        locale,
         state: initialReviewState(now),
       }))
     : [];
@@ -200,6 +225,7 @@ export function buildSession(
           pokemonId: p.id,
           cardType: "cry" as const,
           subjectKey: Subject.forSpecies(p.id),
+          locale,
           state: initialReviewState(now),
         }))
     : [];
@@ -224,7 +250,7 @@ export function hydrateSession(
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
-  opts: CardTypeOpts = {},
+  opts: BuildSessionOpts = {},
 ): ReviewableCard[] {
   const {
     reverseEnabled = false,
@@ -232,6 +258,7 @@ export function hydrateSession(
     evolutionEnabled = true,
     reverseEvolutionEnabled = false,
     cryEnabled = false,
+    locale = "en",
   } = opts;
   const seedById = new Map(seed.map((p) => [p.id, p]));
   const evoSeedById = new Map(evoSeed.map((e) => [e.id, e]));
@@ -249,12 +276,16 @@ export function hydrateSession(
   const allSaved = saved;
 
   const refreshed: ReviewableCard[] = allSaved.map((card) => {
+    // Preserve the saved card's locale; a locale change creates NEW cards rather
+    // than mutating existing ones (different PK on card_reviews).
+    const cardLocale = card.locale ?? "en";
     if (card.cardType === "evolution") {
       const fresh = evoSeedById.get(card.id);
       if (!fresh) return card;
       return {
         ...fresh,
         subjectKey: Subject.forEdge(fresh.preEvoId, fresh.postEvoId),
+        locale: cardLocale,
         state: card.state,
       };
     } else if (card.cardType === "reverse-evolution") {
@@ -263,6 +294,7 @@ export function hydrateSession(
       return {
         ...fresh,
         subjectKey: Subject.forEdge(fresh.preEvoId, fresh.postEvoId),
+        locale: cardLocale,
         state: card.state,
       };
     } else if (card.cardType === "reverse") {
@@ -274,6 +306,7 @@ export function hydrateSession(
         pokemonId: fresh.id,
         cardType: "reverse" as const,
         subjectKey: Subject.forSpecies(fresh.id),
+        locale: cardLocale,
         state: card.state,
       };
     } else if (card.cardType === "cry") {
@@ -285,6 +318,7 @@ export function hydrateSession(
         pokemonId: fresh.id,
         cardType: "cry" as const,
         subjectKey: Subject.forSpecies(fresh.id),
+        locale: cardLocale,
         state: card.state,
       };
     } else {
@@ -294,6 +328,7 @@ export function hydrateSession(
         ...fresh,
         cardType: "name",
         subjectKey: Subject.forSpecies(fresh.id),
+        locale: cardLocale,
         state: card.state,
       };
     }
@@ -308,6 +343,7 @@ export function hydrateSession(
           ...p,
           cardType: "name",
           subjectKey: Subject.forSpecies(p.id),
+          locale,
           state: initialReviewState(now),
         }))
     : [];
@@ -318,6 +354,7 @@ export function hydrateSession(
         .map((e) => ({
           ...e,
           subjectKey: Subject.forEdge(e.preEvoId, e.postEvoId),
+          locale,
           state: initialReviewState(now),
         }))
     : [];
@@ -329,6 +366,7 @@ export function hydrateSession(
           cardType: "reverse-evolution" as const,
           id: reverseEdgeIdFor(fwd.id),
           subjectKey: Subject.forEdge(fwd.preEvoId, fwd.postEvoId),
+          locale,
         }))
         .filter((c) => !savedIds.has(c.id))
         .map((c) => ({ ...c, state: initialReviewState(now) }))
@@ -343,6 +381,7 @@ export function hydrateSession(
           pokemonId: p.id,
           cardType: "reverse" as const,
           subjectKey: Subject.forSpecies(p.id),
+          locale,
           state: initialReviewState(now),
         }))
     : [];
@@ -356,6 +395,7 @@ export function hydrateSession(
           pokemonId: p.id,
           cardType: "cry" as const,
           subjectKey: Subject.forSpecies(p.id),
+          locale,
           state: initialReviewState(now),
         }))
     : [];

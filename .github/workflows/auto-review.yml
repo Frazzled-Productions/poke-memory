@@ -111,7 +111,13 @@ jobs:
       - uses: actions/setup-node@v6
         if: steps.idem.outputs.skip == 'false'
         with:
-          node-version: '20'
+          # Must match the Node version used by the other `npm ci` workflows
+          # (ci.yml, coverage.yml, integration-tests.yml all use Node 24, per
+          # .nvmrc). Drifting to Node 20 here fails `npm ci` with a missing
+          # @swc/helpers transitive — the lock file was resolved under Node 24's
+          # newer npm and Node 20's older npm resolves peer deps differently.
+          # See #1274.
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -131,6 +137,46 @@ jobs:
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "next=$((COUNT + 1))" >> "$GITHUB_OUTPUT"
           echo "Found $COUNT existing auto-review comment(s); next would be #$((COUNT + 1))."
+
+      - name: Resolve linked issues and fetch their bodies
+        id: linked-issues
+        if: steps.idem.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          # Collect commit messages between the PR base and HEAD so the
+          # extractor can mine `closes/fixes/resolves #N` references from
+          # commit subjects/bodies in addition to the PR description and
+          # branch name.
+          GIT_LOG=$(git log "origin/${BASE_REF}..HEAD" --format=%B || true)
+          export GIT_LOG
+          ISSUES=$(bash .github/scripts/extract-linked-issues.sh)
+          : > /tmp/linked-issues.md
+          if [[ -z "$ISSUES" ]]; then
+            echo "No linked issue could be resolved from PR body, branch, or commits."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Linked issue(s):"
+          printf '%s\n' "$ISSUES"
+          while IFS= read -r N; do
+            [[ -z "$N" ]] && continue
+            {
+              echo "## Issue #$N"
+              echo
+              gh issue view "$N" --json title,body,labels \
+                --jq '.title + "\n\nLabels: " + ([.labels[].name] | join(", ")) + "\n\n" + .body' \
+                || echo "(failed to fetch issue #$N)"
+              echo
+              echo "---"
+              echo
+            } >> /tmp/linked-issues.md
+          done <<< "$ISSUES"
+          echo "found=true" >> "$GITHUB_OUTPUT"
 
       - uses: anthropics/claude-code-action@v1
         if: steps.idem.outputs.skip == 'false'
@@ -155,8 +201,30 @@ jobs:
             Workflow:
             1. Read the PR diff:
                `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`
+
+               Also read the linked-issue bodies that the pre-step resolved:
+               `cat /tmp/linked-issues.md` (the file exists; it is empty when
+               no linked issue could be resolved from the PR body, branch
+               name, or commit messages).
             2. Invoke the `code-reviewer` sub-agent (Agent tool, subagent_type
                "code-reviewer") against that diff.
+
+               **Acceptance-criteria coverage.** Pass the contents of
+               `/tmp/linked-issues.md` to the sub-agent in its prompt and brief
+               it that — in addition to its standard correctness/security/
+               convention/perf checks — it must enumerate every acceptance
+               criterion in each linked issue body and locate the diff hunk
+               that implements it. Any criterion with no corresponding hunk
+               is a **Blocker** ("acceptance criterion uncovered"), anchored
+               on `issue #N:criterion text` rather than a file:line. A
+               deferral the PR body explicitly documents (with a follow-up
+               issue link) is acceptable; an undocumented deferral is still
+               a Blocker. If `/tmp/linked-issues.md` is empty, brief the
+               sub-agent that no linked issue was found — the acceptance-
+               criteria check is skipped, the diff-quality checks still
+               apply. The full rule lives in `.claude/agents/code-reviewer.md`
+               (step 1a and the "Acceptance-criteria coverage" checklist
+               bullet); the failure mode this closes is #1259 / #1260.
 
                **Cycle-aware briefing.** This is review
                ${{ steps.cycles.outputs.next }}; there are

@@ -13,6 +13,7 @@
     "lint:em-dash": "node scripts/check-no-em-dash.mjs",
     "seed": "node scripts/seed-pokemon.mjs",
     "seed:split": "node scripts/split-seed.mjs",
+    "seed:locale-names": "node scripts/seed-locale-names.mjs",
     "seed:sprites": "node scripts/optimise-sprites.mjs",
     "generate:scope-lookup": "node scripts/generate-scope-lookup.mjs",
     "audit:forms": "node scripts/audit-form-categories.mjs",
@@ -36,6 +37,7 @@
     "esbuild-wasm": "^0.28.0",
     "idb": "^8.0.3",
     "next": "16.2.6",
+    "next-intl": "^4.12.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "recharts": "^3.8.1",
@@ -63,9 +65,11 @@
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
     "pg": "^8.21.0",
+    "pinyin-pro": "3.28",
     "tailwindcss": "^4",
     "typescript": "^6",
     "vitest": "^4.1.6",
-    "wait-on": "^9.0.10"
+    "wait-on": "^9.0.10",
+    "wanakana": "^5.3.1"
   }
 }

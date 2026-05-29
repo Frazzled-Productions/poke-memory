@@ -11,6 +11,7 @@ export { isMastered } from "@/lib/stats/derive";
 import { isMastered, MASTERY_REPETITIONS } from "@/lib/stats/derive";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
+import type { AppLocale } from "@/i18n/locales";
 
 /** The numeric offset added to a pokémon ID to produce its reverse-card ID. */
 const REVERSE_ID_OFFSET = 2_000_000;
@@ -52,25 +53,32 @@ export function justBecameMastered(
  * reverse card have cleared the FSRS mastery gate. A name card alone is not
  * sufficient.
  *
+ * Since #1259, mastery is scoped to the user's current `pokemonNameLocale`.
+ * Only cards whose `locale` matches the given `locale` parameter are counted.
  * When `forceAllMastered` is true (superuser `pretendAllMastered` flag), the
- * mastery predicate is bypassed and every name-type card flows through. The
- * cardType filter still applies so the pasture stays one entry per species.
+ * mastery predicate is bypassed and every name-type card whose locale matches
+ * flows through. The cardType filter still applies so the pasture stays one
+ * entry per species.
  *
  * `masteryRepetitions` is the user's configured mastery threshold (from
  * `loadSettings().masteryRepetitions`). It defaults to `MASTERY_REPETITIONS`
  * for backward-compatibility, but callers that have the user's settings to
  * hand must pass it through so the pasture honours a custom threshold.
+ *
+ * `locale` defaults to `"en"` for backward-compatibility.
  */
 export function filterMastered(
   cards: ReviewableCard[],
   forceAllMastered = false,
   masteryRepetitions: number = MASTERY_REPETITIONS,
+  locale: AppLocale = "en",
 ): ReviewableCard[] {
-  // Build a quick set of species IDs whose reverse card is mastered.
+  // Build a quick set of species IDs whose reverse card is mastered in this locale.
   // Reverse card ID = REVERSE_ID_OFFSET + pokemonId.
   const masteredReverseSpecies = new Set<number>();
   for (const card of cards) {
     if (card.cardType !== "reverse") continue;
+    if ((card.locale ?? "en") !== locale) continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
     if (speciesId > 0 && (forceAllMastered || isMastered(card.state, masteryRepetitions))) {
       masteredReverseSpecies.add(speciesId);
@@ -79,6 +87,7 @@ export function filterMastered(
 
   return cards.filter((card) => {
     if (card.cardType !== "name") return false;
+    if ((card.locale ?? "en") !== locale) return false;
     if (forceAllMastered) return true;
     // Both name and reverse must be mastered for species-level mastery (#1234).
     return (

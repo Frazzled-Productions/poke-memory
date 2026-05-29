@@ -18,6 +18,15 @@ vi.mock("@/lib/audio/tts", () => ({
   speakName: vi.fn(),
 }));
 
+// Return the English name synchronously so tests are deterministic and do not
+// depend on localStorage or the locale sidecar being loaded.
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (_id: number | undefined, englishName: string) => ({
+    name: englishName,
+    transliteration: null,
+  }),
+}));
+
 const { mockPlayCry } = vi.hoisted(() => ({ mockPlayCry: vi.fn() }));
 
 vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
@@ -381,5 +390,58 @@ describe("resolveReverseFeedbackDelayMs", () => {
 
   it("returns the default mapping for undefined (in-flight settings blobs without the field)", () => {
     expect(resolveReverseFeedbackDelayMs(undefined)).toEqual({ correctMs: 600, incorrectMs: 1200 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SpritePicker — locale-aware name display (#1260 followup)
+// ---------------------------------------------------------------------------
+
+describe("SpritePicker — locale-aware names", () => {
+  it("shows the locale-resolved target name in the prompt heading", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({
+      useLocalePokemonName: (id: number | undefined, _english: string) => ({
+        name: id === 1 ? "フシギダネ" : "MISS",
+        transliteration: null,
+      }),
+    }));
+    const { SpritePicker: LocaleSpritePicker } = await import(
+      "@/components/review/SpritePicker"
+    );
+    render(
+      <LocaleSpritePicker
+        targetPokemon={TARGET}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+      />,
+    );
+    // The locale-resolved name should appear in the prompt (it may also appear
+    // in screen-reader-only text, so use getAllByText and assert at least one).
+    expect(screen.getAllByText("フシギダネ").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
+  });
+
+  it("shows the locale-resolved name in the grid tile aria-label", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({
+      useLocalePokemonName: (id: number | undefined, _english: string) => ({
+        name: id === 2 ? "フシギソウ" : _english,
+        transliteration: null,
+      }),
+    }));
+    const { SpritePicker: LocaleSpritePicker } = await import(
+      "@/components/review/SpritePicker"
+    );
+    render(
+      <LocaleSpritePicker
+        targetPokemon={TARGET}
+        distractors={DISTRACTORS}
+        onGrade={vi.fn()}
+      />,
+    );
+    // Distractor tile for id=2 should use the locale name.
+    expect(screen.getByRole("button", { name: "フシギソウ" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ivysaur" })).not.toBeInTheDocument();
   });
 });

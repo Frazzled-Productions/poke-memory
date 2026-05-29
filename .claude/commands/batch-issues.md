@@ -59,7 +59,33 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
    - **`qa` ahead** (`ahead > 0`): a previous batch was drained into `qa` but never promoted. Stop and ask the maintainer whether to **promote** (open the `qa -> main` PR for the existing work first) or **discard** (`git push origin +origin/main:qa`) before starting a new batch — do not silently stack a new batch on top.
    - If `qa` does not exist at all, stop and surface it — the qa staging-branch setup (#806) has not been applied.
 
-5. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
+5. **Per-issue staleness check (#1322).** For every non-trivial issue surfaced in step 1, run:
+
+   ```bash
+   .github/scripts/check-issue-staleness.sh <N>
+   ```
+
+   The script prints a structured verdict (`STALE: yes|no` plus reasons). For any issue that reports `STALE: yes` (default 3-day age threshold, or git activity on backtick-quoted file paths in the body since `createdAt`), include it in the **Decisions first** AskUserQuestion round below — the maintainer either confirms the ACs still hold (proceed) or marks the issue for an amend (skip this batch). Per-issue threshold overrides live on the issue itself as a `stale-check:N` label (or `stale-check:off` to disable the age branch); see the script header for the precedence rules.
+
+   Skip the staleness check for trivial issues (typo fixes, doc tweaks, one-liner workflow changes) — they are exempt under the same rule that lets them skip the planner.
+
+6. **Pre-existing CI noise + stale-preview pre-flight.** Two advisory checks so this session is not blamed for unrelated red signals or a stale preview:
+
+   ```bash
+   # 6a. Workflows that have been red on qa for multiple runs — known noise,
+   #     not introduced by this batch. Treat as out-of-scope unless the user
+   #     explicitly asks for an investigation in this session.
+   gh run list --branch=qa --status=failure --limit 20 --json conclusion,headSha,createdAt,name \
+     --jq 'group_by(.name) | map({workflow:.[0].name, recent_failures:length}) | map(select(.recent_failures >= 3))'
+
+   # 6b. Preview-deploy freshness — is the last QA Preview Deploy behind origin/qa?
+   gh run list --workflow="QA Preview Deploy" --limit 1 --json headSha --jq '.[0].headSha'
+   git rev-parse origin/qa
+   ```
+
+   For each workflow surfaced by 6a, check that a tracking issue already exists; if not, file one (`priority:later` by default) so the noise is captured and the session does not silently inherit blame. Carry the list into the Wrap-up handoff so the maintainer sees "known noise" annotated separately from "introduced by this batch". The freshness check (6b) is a hint for the Wrap-up `Fire qa preview deploy` step — if the SHAs already diverge before this session even starts, the maintainer needs to know this batch is not the first to land work since the last preview.
+
+7. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
 
    - **Code** — a concrete, implementable change. Goes into the implementation batches.
    - **Analysis** — a read-only audit or umbrella issue whose deliverable is a report plus scoped follow-up issues, not a PR.
@@ -103,8 +129,21 @@ For each batch, in order:
 
 1. **Spawn one Agent per issue in the batch, in parallel** (single message, multiple `Agent` tool calls). Use the appropriate specialist subagent type per AGENTS.md "File ownership". Each agent works in an isolated worktree (`EnterWorktree`) so parallel branches don't collide.
 
+   **Immediately after dispatch, health-check each agent's worktree** before considering the agent productive:
+
+   ```bash
+   # For each agent's reported worktree path:
+   git -C <worktree-path> rev-parse --abbrev-ref HEAD          # must match the assigned branch
+   git -C <worktree-path> log -1 --format='%h %s'              # must be on origin/qa's tip or a branch off it
+   ```
+
+   If the worktree is on the wrong branch (e.g. a stale `chore/...` left over from a prior run) or the HEAD is on a release-tag commit instead of `origin/qa`, stop that agent immediately with `TaskStop` and re-dispatch into a fresh worktree. A stalled or wrong-branched agent can spend ~1h producing edits that never reach the assigned branch — the canonical failure mode is the #1329 Context-refactor agent that edited files in a sibling worktree on `chore/1328-dry-single-source-of-truth-rule` instead of its own assignment. (memory: `feedback_verify_agent_reports`.)
+
 2. **Each agent's prompt must include:**
-   - The issue number and full body.
+   - The issue number and **the full body, verbatim** — not paraphrased, not summarised. Include all subsections; the implementer cross-checks against them in the PR body. The orchestrator-side scope drop that landed #1259/#1260 without per-locale FSRS rows happened because the brief paraphrased the issue's "Data model" section instead of pasting it.
+   - **"Echo back any `## Data model` / `## Schema` / `## Acceptance criteria` / `## Acceptance` sections from the issue body verbatim in the PR description before opening the PR."** The implementer's own copy is the cross-check anchor for both the auto-review job (`feedback_consult_specialist_on_brief`) and the in-session reviewer.
+   - **Specialist pre-consult (when applicable).** If the work falls in an i18n / SRS / Supabase / PokéAPI / privacy domain (per AGENTS.md "File ownership"), the orchestrator must consult the relevant specialist sub-agent (`i18n-expert`, `srs-expert`, `supabase-expert`, `pokeapi-expert`, `privacy-expert`) on the **brief** before dispatching the implementer — not just on the implemented diff afterwards. The specialist's read on the brief catches scope drops the implementer would miss (the canonical example: i18n-expert would have flagged the missing per-locale FSRS PK in the #1259 brief). Carry the specialist's notes into the implementer's prompt under a `## Specialist notes` heading.
+   - **Multi-site domain-concept audit (when applicable).** If the work touches a domain concept that is rendered or computed at multiple sites — Pokémon names, dates, mastery counts, sprite URLs, locale-aware text, ARIA labels, anything per the `dry-single-source` memory — the prompt must include: "Before implementing, grep the whole repo for every existing call site of this concept and list them as either in-scope or explicitly out-of-scope-with-rationale in the PR body. A fix that only patches the site QA flagged is the failure mode #1259/#1311/#1318/#1329 went through four rounds to escape." (memory: `feedback_agent_fix_full_audit`.)
    - "Branch off the latest `origin/qa` and open the PR against `qa` — batch work lands on the `qa` staging branch, never `main` directly. (memory: `feedback_rebase_before_pr`.)"
    - "Reference the issue in commit messages (`closes #N`). Note this does not auto-close the issue on merge into `qa` — the `qa -> main` promotion PR does that — but it keeps the linkage visible."
    - "If your change adds a Supabase migration, call `mcp__supabase__apply_migration` with the stripped name (no `0NN_` prefix) **before** opening the PR — the `migration-check.yml` check fails until file-vs-applied parity holds." (See AGENTS.md "Adding a feature that needs to persist data".)
@@ -133,6 +172,8 @@ Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
 2. **Real conflicts only.** Disjoint batches almost never conflict. If `gh pr merge` reports a genuine merge conflict (two PRs touched the same lines), rebase *that one PR* onto `origin/qa` with `--force-with-lease`, resolve, push, and retry the merge. This is the rare exception, not the per-PR norm.
 
+   **After one fix-round fails to converge, use `/investigate-ci-failure` rather than dispatching a second sweep.** If a batch PR's CI is still red after the first fix agent runs, do not dispatch another agent of the same shape — the second sweep will not converge either (memory: `feedback_investigate_after_sweep_fail`; worked examples in `#1234` and `#1263`). Hand off to `.claude/skills/investigate-ci-failure.md`, which forces a logic-vs-perf triage and mandates Playwright traces for perf-shape failures before any code change.
+
 3. **Detached-HEAD noise.** When the session runs from a detached HEAD (the parallel-jobs case), `gh pr merge` prints a harmless `could not determine current branch` notice *after* a successful merge. Confirm the merge landed with `gh pr view <PR> --json state` rather than trusting the command's exit code.
 
 ## Wrap-up
@@ -151,9 +192,16 @@ After every batch is merged into `qa` and the queue is drained:
    gh workflow run "QA Preview Deploy"
    ```
 
-   This creates a Vercel preview deployment of the bundled `qa` branch for the maintainer to test. Confirm it dispatched with `gh run list --workflow="QA Preview Deploy" --limit 1`.
+   This creates a Vercel preview deployment of the bundled `qa` branch for the maintainer to test. Confirm it dispatched with `gh run list --workflow="QA Preview Deploy" --limit 1`. Then poll the deploy to `READY` via `mcp__claude_ai_Vercel__get_deployment` (or the GitHub deployments API) so the URL handed off in step 7 is live, not still building.
 
-3. **Open the `qa -> main` promotion PR as a draft.** A PR merged into `qa` does **not** auto-close its `closes #N` issue — GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved:
+3. **Mini-batch follow-up loop.** Preview QA reliably surfaces 1-3 follow-up issues per session (worked examples: #1270/#1271 after #1234; #1331/#1332 after the multi-locale batch; memory: `feedback_mini_batch_after_qa`). Bake this in:
+
+   - When the maintainer surfaces a preview-QA gap, file it as a new issue (`priority:later` by default, `priority:next` if clearly higher; never `priority:now` without explicit direction) so it is tracked even if it is not implemented this session.
+   - For follow-ups the maintainer wants implemented inline, run them through the per-batch Implementation playbook (one Agent per issue, brief template from step 2, in-session `code-reviewer` pass, merge into `qa`).
+   - **After any mini-batch work lands on `qa`, return to step 2 and re-fire the preview deploy** so the next QA round is against the new `qa` tip, not the pre-mini-batch one. This is the rule the canonical session missed: #1329 + Context refactor landed on `qa` and no fresh preview was dispatched until the maintainer asked.
+   - Loop steps 2-3 zero or more times until the maintainer reports preview QA is clean.
+
+4. **Open the `qa -> main` promotion PR as a draft.** Only after step 3 reports a clean QA round. A PR merged into `qa` does **not** auto-close its `closes #N` issue — GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved (including any from mini-batch rounds):
 
    ```bash
    gh pr create --base main --head qa --draft \
@@ -165,9 +213,45 @@ After every batch is merged into `qa` and the queue is drained:
 
    Leave it as a **draft** — the maintainer marks it ready after QA. Do not merge it yourself.
 
-4. **Hand off to the maintainer.** One summary block:
-   - Issues drained into `qa` (numbers) and the PRs merged (numbers).
+5. **End-of-session retro (#1333).** Produce a structured retro covering:
+
+   - **What went well** — patterns worth keeping; honest, not performative.
+   - **What went poorly** — named incidents with one-line cost and root-cause attribution. Distinguish "we caught this in the session" from "the user caught it for us". Surface dropped scope, partial-fix loops, symptom-chasing, fire-and-forget async work, silent agent stalls, missed memory consultations, and any moment the orchestrator paraphrased an issue body instead of reading it verbatim.
+   - **Concrete improvements** — proposed edits to this skill, agent definitions (`.claude/agents/**`), AGENTS.md, or `.github/workflows/**`. Bias toward writing the edits in the same PR that closes out the session, not filing a follow-up issue ("file an issue" for a process gap defers the fix to the next session and the failure mode usually recurs first).
+   - **Memories** — new feedback / reference memories to file, or stale ones to update / remove. Verify each `Write` succeeds and the file exists before claiming it was saved (memory: `feedback_dont_claim_memory_without_verify`).
+
+   Hand the retro back to the user as a punch list. If the user picks improvements to implement, fold them into the same PR (or a separate retro PR if they touch many files); never let a retro lapse silently.
+
+6. **Coverage ratchet.** Run `npm run test:coverage` against the post-merge `qa` state. Read the printed `Statements / Branches / Functions / Lines` summary, then update **the single source of truth**:
+
+   ```bash
+   # Edit the file directly — every consumer (vitest.config.ts,
+   # .github/workflows/coverage.yml's PR comment, AGENTS.md / WORKFLOW.md
+   # references) reads from it, so this one edit propagates everywhere.
+   vim coverage-floor.json
+   ```
+
+   Set each metric to the nearest whole percentage **at or below** the measured value. Coverage floor never goes down — if the new measurement is below the existing JSON values, do **not** ratchet; file an issue about the regression instead and surface it in the handoff. Re-run `npm run test:coverage` after editing to confirm the new floor still passes (the vitest config imports the JSON, so a too-aggressive ratchet fails the gate immediately).
+
+   **Drift verification.** Before opening the wrap-up PR, confirm there is no orphan copy of the floor anywhere:
+
+   ```bash
+   # If anything matches outside coverage-floor.json itself and the
+   # coverage/ output dir, a copy has crept back in — fix it before
+   # opening the wrap-up PR.
+   git grep -nE 'Statements [0-9]+ / Branches [0-9]+ / Functions [0-9]+ / Lines [0-9]+' \
+     -- ':!coverage' ':!node_modules'
+   ```
+
+   The expected output is empty (or only the PR-comment template's templating string, which substitutes from the JSON at run time). Any hit with literal hardcoded numbers is a drift bug — extract it to `coverage-floor.json` or delete the duplicate. (User ask, this session — #1333 surfaced four divergent copies, two of which were already stale by multiple ratchets. The single-JSON design exists to make a recurrence impossible.)
+
+7. **Hand off to the maintainer.** One summary block:
+   - Issues drained into `qa` (numbers, including any added in mini-batch rounds) and the PRs merged (numbers).
    - The draft `qa -> main` promotion PR number.
+   - Mini-batch follow-ups filed but **not** implemented this session, with their numbers and priority labels.
+   - Coverage ratchet applied (old → new floor per metric); link to the commit.
+   - Retro punch list — at minimum, list the proposed improvements and whether each landed in this session or was deferred (with the deferral issue number).
+   - Pre-existing red CI inherited from step 6 of Pre-flight, with the tracking issue link for each.
    - Next steps for the maintainer: "Test the `qa` preview deploy. When satisfied, mark draft PR #N ready and merge it — that cuts the release, deploys production, and resets `qa`. If the batch carries a `minor-bump` fragment, apply `version-bump:approved` to the promotion PR first."
    - **Analysis/Exploration** issues run — which umbrella issues got a report comment, and how many follow-up issues each filed (the umbrellas stay open for the user to review and close).
    - Any `[USER-DECISION]` items still awaiting a choice.

@@ -9,6 +9,7 @@ import { addDaysToIsoDate as sharedAddDaysToIsoDate } from "@/lib/utils/dates";
 import { GEN_RANGES, generationOf } from "@/lib/stats/generationOf";
 export { GEN_RANGES, generationOf } from "@/lib/stats/generationOf";
 export type { GenerationRange } from "@/lib/stats/generationOf";
+import type { AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
 // Mastery classification
@@ -210,22 +211,26 @@ export function computeStats(
   strugglingLimit = 10,
   masteryRepetitions = MASTERY_REPETITIONS,
   forceAllMastered = false,
+  locale: AppLocale = "en",
 ): StatsResult {
   // Build the set of species IDs whose reverse card has cleared the mastery
-  // gate. Reverse card ID = REVERSE_ID_OFFSET + pokemonId; subtracting the
-  // offset recovers the species/pokemon ID that pairs with the name card.
-  // In forceAllMastered mode every reverse is considered mastered.
+  // gate in the given locale. Reverse card ID = REVERSE_ID_OFFSET + pokemonId;
+  // subtracting the offset recovers the species/pokemon ID that pairs with the
+  // name card. In forceAllMastered mode every reverse is considered mastered.
   const masteredReverseSpecies = new Set<number>();
   for (const card of cards) {
     if (card.cardType !== "reverse") continue;
+    if ((card.locale ?? "en") !== locale) continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
     if (speciesId > 0 && (forceAllMastered || isMastered(card.state, masteryRepetitions))) {
       masteredReverseSpecies.add(speciesId);
     }
   }
 
-  // Extract name cards for the per-species stats loop below.
-  const nameCards = cards.filter((c): c is NameReviewCard => c.cardType === "name");
+  // Extract name cards for this locale for the per-species stats loop below.
+  const nameCards = cards.filter(
+    (c): c is NameReviewCard => c.cardType === "name" && (c.locale ?? "en") === locale,
+  );
 
   // Pre-compute the 14 forecast date strings so the inner loop can do a
   // single Map lookup per card instead of a 14-way comparison chain.

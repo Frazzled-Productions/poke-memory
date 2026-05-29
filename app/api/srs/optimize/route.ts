@@ -32,7 +32,6 @@ import {
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import {
   gradeLogToOptimizerItems,
-  countOptimizableReviews,
   MIN_REVIEWS_FOR_OPTIMIZATION,
   OPTIMIZER_COOLDOWN_MS,
 } from "@/lib/srs/optimizer";
@@ -173,22 +172,24 @@ export async function POST(): Promise<NextResponse> {
     );
   }
 
-  // Gate on minimum review count.
+  // Build optimizer input first so the review count reflects only fittable
+  // cards (those with >= 2 reviews on distinct days). `countOptimizableReviews`
+  // mirrors the same filter, but computing items here gives us the definitive
+  // fittable count and avoids processing the entries twice.
+  //
   // NOTE: the eligibility button on the Settings page counts the *local*
   // grade log (IDB-backed), whereas this route counts the *cloud* grade_log
   // table. A user mid-sync can therefore pass the client-side gate but fail
   // here with not_enough_reviews. The component maps that 422 to "sync first,
   // then try again", which is the correct recovery action.
-  const reviewCount = countOptimizableReviews(entries);
+  const optimizerItems = gradeLogToOptimizerItems(entries);
+  const reviewCount = optimizerItems.reduce((sum, item) => sum + item.reviews.length, 0);
   if (reviewCount < MIN_REVIEWS_FOR_OPTIMIZATION) {
     return NextResponse.json(
       { error: "not_enough_reviews", reviewCount },
       { status: 422 },
     );
   }
-
-  // Build optimizer input and construct binding objects.
-  const optimizerItems = gradeLogToOptimizerItems(entries);
   let weights: number[];
   try {
     const bindingItems = optimizerItems.map(

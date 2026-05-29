@@ -23,8 +23,9 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling | No |
 | [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations | No |
 | [playwright](.claude/agents/playwright.md) | E2E smoke tests after user-facing changes; owns `e2e/**` | No |
-| [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change | Yes |
+| [code-reviewer](.claude/agents/code-reviewer.md) | Independent diff review at the end of a change, including synchronous-scale perf-budget impact (count of items processed synchronously, module-load JSON parses) — see #1234 / #1263 — acceptance-criteria coverage cross-checked against the linked issue's body (resolved via `closes/fixes/resolves #N` in PR body, branch name, or commit messages, with an uncovered criterion raised as a Blocker, closing the partial-scope gap surfaced by #1259 / #1260), and a fragmentation check that raises any new direct field access on a domain concept (`p.displayName`, inline date formatting, ad-hoc mastery check, inline class-name literal) as a Blocker tagged "fragmentation" — see #1328 and AGENTS.md "Single source of truth for shared concepts" | Yes |
 | [privacy-expert](.claude/agents/privacy-expert.md) | Data-protection / compliance advice — GDPR/UK-GDPR controller obligations, Children's Code, PECR/cookies, privacy notice + Terms drafting, DPIA upkeep, sub-processor classification | Yes |
+| [i18n-expert](.claude/agents/i18n-expert.md) | Multi-locale design — `pokemonNameLocale` vs. `appLocale`, transliteration sources (rōmaji, pinyin), message catalogs, `next-intl` routing, locale-aware sync, `<lang>` placement, adding a new locale | Yes |
 | [workflow-expert](.claude/agents/workflow-expert.md) | Reviews GitHub Actions / orchestration changes — idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
 
 ---
@@ -272,7 +273,7 @@ in-memory fixture.
 | **Trigger** | `pull_request` (any), `workflow_dispatch` |
 | **Job** | `coverage` |
 | **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), enforces two coverage gates, then posts the coverage summary (statements / branches / functions / lines) plus the diff-coverage result as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). The comment posts on both pass and fail. |
-| **Gates (#824)** | **Global floor** — `coverage.thresholds` in `vitest.config.ts` (Statements 74 / Branches 69 / Functions 66 / Lines 76, just below the measured baseline). `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** — `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit a 90% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. |
+| **Gates (#824)** | **Global floor** — values in `coverage-floor.json` at the repo root, imported by `vitest.config.ts`'s `coverage.thresholds`. `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** — `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit a 90% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. The numbers deliberately do not appear in this row, AGENTS.md, or the PR-comment template — they come from `coverage-floor.json` to prevent the drift #1333 cleaned up. The `/batch-issues` end-of-session ratchet updates the JSON file only. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork PRs run with a read-only token and cannot post comments). |
 | **Required check** | Not yet — the gates fail the job, but `coverage` must still be added as a required check on the `qa` and `main` rulesets (owner action) before a breach blocks merge. Until then the job goes red without blocking. (Originally non-blocking by design under #762; gated under #824.) |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
@@ -401,6 +402,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Gate** | Skip-list (inverted from the earlier allow-list — see #469): drafts, fork PRs (`head.repo.fork == false`), base branches other than `main` or `qa`, the `qa -> main` promotion PR (`head.ref == 'qa'`), Dependabot PRs, `chore(release):` titles, and `[skip ci]` in the title or body are all skipped. So it reviews PRs into `qa` (one-off and `auto`-pipeline PRs) and into `main` (hotfixes). `/batch-issues` disables the workflow during its drain, since batch PRs get the in-session `code-reviewer` instead (#814). |
 | **Single review producer** | `auto-review.yml` posts every `auto-review:N` comment — the first review on PR open and every follow-up review after a `/fix` push (which arrives as a `synchronize` event). `auto-pr.yml` only fixes and pushes; it never posts a review. This is the design that removes the duplicate-post race. |
 | **Cycle-aware review** | First review (no prior `auto-review:N` comments) reviews the full diff. A follow-up review of a `/fix` push verifies the prior Blocker/Concern findings are resolved and flags only genuine **new** regressions the fix introduced — it does not re-scan untouched code for fresh nitpicks or escalate severities, so the bar does not drift between cycles. |
+| **Linked-issue resolution** | A pre-action step parses `closes/fixes/resolves #N` (case-insensitive) from the PR body, branch name, and commit messages via `.github/scripts/extract-linked-issues.sh`, deduplicates the issue numbers, runs `gh issue view` for each, and writes the bodies to `/tmp/linked-issues.md`. The `claude-code-action@v1` prompt then `cat`s that file and briefs the `code-reviewer` sub-agent to cross-check the diff against every acceptance criterion in the linked issue(s). An uncovered criterion is raised as a **Blocker** (anchored on `issue #N:criterion text`, not a file:line). If no issue can be resolved, the file is empty and the prompt notes "no linked issue — coverage check skipped"; the diff-quality checks still run. This is the reviewer-side counterpart of the implementer cross-check in the coder sub-agents; together they close the partial-scope gap surfaced by #1259 / #1260. |
 | **Severity calibration** | `Blocker` / `Concern` / `Nit` / `Praise`, calibrated strictly: `Concern` is reserved for real correctness/security/convention problems in the changed code; hypothetical, pre-existing, or stylistic items are `Nit`. A `Needs fixes` verdict needs at least one Blocker or Concern, so over-tagging Nits as Concerns is what burns extra fix cycles. |
 | **Idempotency** | Each review comment includes `<!-- auto-review-sha:<head-sha> -->` on row 2; re-triggers at the same SHA are skipped. |
 | **Auto-fix trigger** | When verdict is `Needs fixes` and the cycle count is below 2 (i.e. there is at most one existing auto-review), automatically posts a `<!-- auto-review-autofix:N -->` `/fix` comment (N = the new review number) — which triggers `auto-pr.yml` without manual intervention. The marker is cycle-specific, so idempotent re-runs skip a duplicate post. The existing cycle cap (3) and no-progress guard still hold. |
@@ -660,6 +662,21 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `stale-preview-check.yml` — Stale qa preview check
+
+| | |
+|---|---|
+| **Trigger** | `schedule` (daily `30 8 * * *` cron, 08:30 UTC, after the auto-release window) and `workflow_dispatch`. |
+| **Job** | `check` |
+| **What it does** | Compares `origin/qa`'s tip SHA with the head SHA of the most recent `QA Preview Deploy` run. When they diverge and an open `qa -> main` promotion PR exists, upserts a marker comment on that PR (HTML marker `<!-- stale-preview-check -->`) linking to the `QA Preview Deploy` dispatch URL. When the preview catches up, removes the marker comment. |
+| **Why a dedicated workflow** | The `/batch-issues` skill's wrap-up rule "re-fire the preview after any qa-landing mini-batch work" only fires inside an active session. When mini-batch work lands on `qa` outside a session (a manual PR, an `/auto` run, a follow-up direct push), nobody re-fires the deploy and the maintainer QAs against a stale preview. This cron catches that gap. (#1333.) |
+| **Permissions** | `contents: read`, `pull-requests: write`, `actions: read` — the third is required so `gh run list --workflow="QA Preview Deploy"` can read past run metadata under `GITHUB_TOKEN`. |
+| **Idempotency** | The marker comment is upserted (patched in place) rather than appended, so a missed cron tick does not produce a stack of duplicate comments. |
+| **Required secrets** | None (uses `GITHUB_TOKEN`). |
+| **Concurrency** | Default; no concurrency group. The work is cheap (a few API calls) and runs once per day. |
+
+---
+
 ### `auto-release.yml` — Auto Release
 
 | | |
@@ -728,6 +745,23 @@ Runs on every `pull_request` event. Fails the `coverage` job on either a global-
 ### Visual-regression gate (`visual-regression.yml`)
 
 Runs on PRs that touch rendered UI (`components/**`, `app/**/*.tsx`, `app/globals.css`) or carry the `visual-regression` label. Compares committed Playwright screenshot baselines (`e2e/__screenshots__/`) against a fresh render of the two deterministic README surfaces (Stats, Journey) at a mobile and a desktop viewport, across the Chromium and WebKit engines. Practice, Pasture and Pokédex are excluded because their renders are not pixel-stable across runs (see `e2e/visual.spec.ts`). The job runs inside the pinned `mcr.microsoft.com/playwright` Docker image so Linux font rendering is deterministic; baselines are generated AND compared in the same image. A mismatch fails the `visual` job and uploads an expected/actual/diff report. Not a required check, and a non-matching PR does not run it. When a UI change is an intended visual update, regenerate baselines inside the Docker image (see the `visual-regression.yml` catalog entry above) and commit the changed PNGs in the same PR. For an in-CI one-click regeneration, dispatch `visual-baseline-update.yml` against the feature branch — it runs the same pinned image, refuses to push to `main` or `qa`, and is owner-gated. See the `visual-regression.yml` catalog entry for the exact local `docker run` command and the `visual-baseline-update.yml` entry for the CI path.
+
+### Perf budget gate (`perf-budget.yml`)
+
+Runs `e2e/perf-budget.spec.ts` on every pull request and on pushes to `main` / `qa`. The spec measures fresh-visitor time-to-interactive on the practice page with empty `storageState` (no localStorage, no IndexedDB seed) — it pre-dismisses the onboarding modal via `addInitScript`, navigates to `/`, and waits for the above-fold interactive element (the Reveal button or a documented end-state heading) to become visible. The wall-clock figure is logged on every run (look for `[perf-budget] project=...` in the job output) so the baseline can be tracked over time, and the assertion fails the job if it exceeds the per-project budget.
+
+Current budgets, defined as the `BUDGETS` constant in `e2e/perf-budget.spec.ts`:
+
+| Project | Budget |
+|---|---|
+| `chromium` | 5000 ms |
+| `mobile-safari` | 8000 ms |
+
+**Ratchet down only.** When a perf-improving change lowers the measured time meaningfully, lower the budget in the same PR so future regressions are caught at the new baseline. **Never** raise a budget to make a red run pass — investigate the cause first. A deliberate, justified regression (e.g. a feature that materially expands the seed payload) is the only case for raising a budget, and the PR description must explain why.
+
+The spec body is gated on `PERF_BUDGET=1`. Without the env var, `test.skip(...)` short-circuits the test, so the spec is invisible to `ci.yml`'s `e2e-browser` matrix and to `e2e.yml`'s preview run. The dedicated `perf-budget.yml` workflow is the only place it executes in CI; it runs the same pinned `mcr.microsoft.com/playwright:v1.60.0-noble` image as the other Playwright jobs for parity, builds locally, serves via `npm start`, and runs the spec on chromium and mobile-safari in parallel matrix legs. A `changes` filter mirrors the `e2e-browser` pattern so docs-only PRs report a no-op skip rather than burning the full 10–15 min build per leg.
+
+**Status: non-required initially.** Per #1268, the check runs on every PR but does not gate merge. Promotion to required happens after one week of stable baseline — add the `perf-budget` aggregator job (the single stable check-name produced by this workflow; the matrix legs themselves render as `Perf budget (chromium)` and `Perf budget (mobile-safari)`) to the `qa-staging` and `main-protection` rulesets' required-checks list when the baseline has held without spurious failures. The aggregator mirrors `ci.yml`'s `e2e` pattern so the required-check name stays stable regardless of how the matrix evolves. No spec or workflow change is needed at promotion time.
 
 ### `paths-ignore` and label escape hatches don't compose (#1250)
 

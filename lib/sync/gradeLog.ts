@@ -21,6 +21,8 @@ export async function pushGradeLog(
       card_type: e.cardType,
       grade: e.grade,
       subject_key: e.subjectKey ?? null,
+      // Migration 029 field — coalesce to "en" for pre-migration entries.
+      locale: e.locale ?? "en",
     }));
     const { error } = await client
       .from("grade_log")
@@ -34,12 +36,14 @@ export async function pushGradeLog(
   }
 }
 
-type CloudRow = {
+type GradeLogCloudRow = {
   occurred_at: number;
   entry_date: string;
   card_type: GradeLogEntry["cardType"];
   grade: GradeLogEntry["grade"];
   subject_key: string | null;
+  /** Migration 029 field — absent on pre-migration rows, defaults to "en". */
+  locale?: string | null;
 };
 
 export async function pullGradeLog(
@@ -49,16 +53,17 @@ export async function pullGradeLog(
   try {
     const { data, error } = await client
       .from("grade_log")
-      .select("occurred_at,entry_date,card_type,grade,subject_key")
+      .select("occurred_at,entry_date,card_type,grade,subject_key,locale")
       .eq("user_id", userId)
       .order("occurred_at", { ascending: true });
     if (error || !data) return null;
-    return (data as CloudRow[]).map((r) => {
+    return (data as GradeLogCloudRow[]).map((r) => {
       const entry: GradeLogEntry = {
         occurredAt: Number(r.occurred_at),
         date: r.entry_date,
         cardType: r.card_type,
         grade: r.grade,
+        locale: (r.locale ?? "en") as GradeLogEntry["locale"],
       };
       if (r.subject_key !== null && r.subject_key !== undefined) {
         entry.subjectKey = r.subject_key;

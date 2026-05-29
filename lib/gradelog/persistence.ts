@@ -1,6 +1,7 @@
 import type { Grade } from "@/lib/srs/scheduler";
 import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
 import { KEY_GRADE_LOG } from "@/lib/storage/keys";
+import type { AppLocale } from "@/i18n/locales";
 
 export type GradeLogEntry = {
   date: string;
@@ -21,6 +22,12 @@ export type GradeLogEntry = {
    * #462) lack this field.
    */
   subjectKey?: string;
+  /**
+   * Pokémon-name locale for this grade log entry (#1259). Drives the `locale`
+   * column on `grade_log` so the FSRS optimizer can group per-(card, locale).
+   * Absent in pre-#1259 entries; back-fills to `"en"` on read.
+   */
+  locale?: AppLocale;
 };
 
 export type GradeLog = GradeLogEntry[];

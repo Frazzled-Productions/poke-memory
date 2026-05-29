@@ -15,7 +15,7 @@ import { useState } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { AuthProvider } from "@/lib/auth/types";
 import { cn } from "@/lib/utils/cn";
-import { cardPanelPadded, colStack, mutedText } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, mutedText, sectionLabel } from "@/lib/utils/class-names";
 
 /** Human-readable display names for each provider. */
 const PROVIDER_LABELS: Record<AuthProvider, string> = {
@@ -157,7 +157,7 @@ export function LinkIdentitiesSection({ user, supabase }: Props) {
       id="linked-accounts-heading"
       className={cardPanelPadded}
     >
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+      <p className={sectionLabel}>
         Sign-in methods
       </p>
 

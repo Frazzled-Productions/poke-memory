@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import coverageFloor from "./coverage-floor.json";
 
 const alias = { "@": path.resolve(__dirname, ".") };
 
@@ -23,16 +24,22 @@ export default defineConfig({
       //         consumed by coverage.yml's diff-coverage gate
       // html  → drillable local report under coverage/
       reporter: ["text", "json-summary", "json", "html"],
-      // Global floor (regression guard, #824). Set ~1.5 pts below today's
-      // measured baseline (S 78.69 / B 71.93 / F 74.28 / L 80.87) rounded
-      // down, so an unrelated coverage drop fails CI. Ratchet upward as
-      // coverage improves — never downward to make a red build pass.
-      thresholds: {
-        statements: 77,
-        branches: 70,
-        functions: 72,
-        lines: 79,
-      },
+      // Global floor (regression guard, #824). Values live in
+      // ./coverage-floor.json — the single source of truth read by this
+      // config, by .github/workflows/coverage.yml's PR-comment template, and
+      // referenced (no hardcoded numbers) from AGENTS.md and WORKFLOW.md
+      // prose. Ratchet upward as coverage improves — never downward to make
+      // a red build pass. The /batch-issues skill ratchets the JSON file at
+      // the end of every session that touches product code; manual ratchets
+      // are also fine.
+      //
+      // Important: the JSON file must contain only the four threshold keys
+      // (statements / branches / functions / lines). Vitest iterates every
+      // key on this object and treats unknown ones as per-file glob
+      // patterns, so a `_comment` or `description` field would be evaluated
+      // as a picomatch glob on every coverage run. Keep ratchet rationale in
+      // this comment block, not in the JSON.
+      thresholds: coverageFloor,
       // Measure the application/library source we actually ship and test.
       include: ["app/**", "components/**", "lib/**"],
       exclude: [

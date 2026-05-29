@@ -22,6 +22,10 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 
 **Issue-first rule.** Every non-trivial change must have a GitHub issue before implementation begins. Create one if it doesn't exist. PRs reference the issue (`closes #N`) so work is tracked on the project board.
 
+**Issue-body cross-check (implementer-side).** Every coder sub-agent (`ui-coder`, `data-coder`, `playwright`) runs its own `gh issue view` against the linked issue before writing code, enumerates the issue's acceptance criteria, and compares them against the orchestrator's brief. If the brief omits one or more criteria, the coder stops and reports the gap rather than implementing only what the brief covered. The orchestrator either confirms the omission as a deliberate deferral (recorded in the PR body under `## Acceptance criteria covered`) or extends the brief. This is the implementer side of the partial-scope guard introduced after #1259 / #1260, where the orchestrator dropped acceptance criteria from the brief and the gap shipped because no later step re-read the issue. See `.claude/agents/data-coder.md`, `.claude/agents/ui-coder.md`, and `.claude/agents/playwright.md` for the step-1 wording each agent runs.
+
+**Briefs may extend, not contract.** The cross-check is one-directional: a brief that adds detail beyond the issue body is fine — proceed against the brief. A brief that drops scope present in the issue body is the failure mode the check exists to surface. Coders propagate dropped scope to the orchestrator as a question, never silently.
+
 **Skip sub-agents** for small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value. Seeing when to skip is part of the practice.
 
 ## File ownership
@@ -38,6 +42,7 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
 | Supabase schema / RLS | supabase-expert designs; data-coder implements |
 | Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
+| Multi-locale work (`pokemonNameLocale`, `appLocale`, transliteration, message catalogs, locale routing, locale-aware sync, adding a new locale) | i18n-expert advises (read-only); data-coder implements settings/sync/seed changes, ui-coder implements rendering, catalogs, and `<lang>` placement |
 | `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
 | `e2e/**` | playwright |
 | `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
@@ -48,6 +53,32 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 ## Conventions
 
 These are decisions made through deliberate research/discussion, not guesses. Add to this section only when a real decision is locked in.
+
+### Single source of truth for shared concepts
+
+When the same domain concept appears at multiple call sites — Pokémon names rendered in UI, dates formatted for display, sprite URLs resolved, mastery counted, locale-aware text, accessibility attributes attached, class-name literals reused — **every site routes through ONE shared helper, hook, or component**. Never duplicate the logic site-by-site, even if "it's just a one-liner here". The fragmentation pattern is the failure mode this rule prevents.
+
+**Why this is load-bearing.** The #1259 / #1260 multi-locale rollout shipped repeated rounds of partial fixes (#1311 → #1318 → audit-fix) because Pokémon names were rendered directly via `.displayName` in many separate components (`PokemonCard`, `EvolutionCardLayout`, `EvolutionCard`, `SpritePicker`, `MultipleChoiceNameCard`, …). Each render became a separate locale gap and each fix only exposed the next site that hadn't been audited. With a single `useLocalePokemonName(id, fallback)` hook used everywhere, the locale switch (or any future re-styling, accessibility attribute, or A/B test) would live in ONE place and adding locale support would have been one helper edit plus a mechanical import across the call sites.
+
+**How to apply.**
+
+- **Before writing a new render or computation**, ask: "is this concept already produced somewhere? If yes, can I import from there?" If no but the concept is rendered elsewhere, **centralise the existing call sites in the same PR**, rather than adding another fragmented call site.
+- **When adding a cross-cutting concern** (locale, theme, accessibility attribute, analytics tag) to the codebase, the first step is to centralise the existing call sites, then add the new concern in the helper. Adding the concern alongside the existing fragments is the failure pattern.
+- **When reviewing a PR**, flag any new direct field access on a domain object (`p.displayName`, `card.name`, `pokemon.sprite`) that should go through a helper — `code-reviewer` raises this as a **Blocker** tagged "fragmentation".
+- **When orchestrating**, if a brief mentions a domain concept (Pokémon name, date display, mastery count), include a "centralisation check" in the brief: identify the existing helper, or propose a new one with the existing call sites to centralise.
+
+**Existing helpers — use these, do not re-derive.**
+
+- `useLocalePokemonName(id, fallback)` from `lib/i18n/useLocalePokemonName.ts` — Pokémon name rendering (locale-aware).
+- `formatDate(iso, fmt, tz)` and `formatShortDate(iso, fmt)` from `lib/utils/format-date.ts` — user-facing date display. `todayInTimezone(tz)` for the current day boundary. `isoDate(d)` for the scheduling-internal `"YYYY-MM-DD"` form.
+- `isMastered(state, masteryRepetitions)` from `lib/stats/derive.ts` — single mastery check.
+- `filterMastered(cards, …)` from `lib/pasture/arrivals.ts` — mastery filter that honours the superuser `forceAllMastered` axis.
+- `computeStats(…)` from `lib/stats/derive.ts` — aggregate stats with the same superuser axis.
+- `masteredSpeciesIds(…)` from `lib/badges/derive.ts` — mastered species set.
+- `useCardClass(…)` from `lib/review/useCardClass.ts` — card-class derivation.
+- Class-name constants in `lib/utils/class-names.ts` — `cardPanel`, `cardPanelPadded`, `colStack`, `colStackLg`, `sectionLabel`, `dialogPanel`, `statValue`, `chartTickText`, `mutedText`. Never inline the underlying Tailwind literal — import the named constant so a visual convention change lives in one file.
+
+**Trade-off.** A premature abstraction is worse than three similar lines. The rule is *don't fragment what's already shared*, not *abstract every duplication*. Three sites with the same pattern that aren't going to grow are fine; three sites that ARE going to need a cross-cutting change next month must share a helper now. Where the failure mode is easy to encode at PR time, prefer a lint rule (see #1327 for the Pokémon-name case) over a convention-only enforcement.
 
 ### Caching
 
@@ -162,7 +193,7 @@ Three tests are in scope: `apply-migrations.test.ts` (all `db/migrations/*.sql` 
 
 `npm run test:coverage` runs the fast suite under the v8 coverage provider. Two gates apply:
 
-- **Global floor.** `coverage.thresholds` in `vitest.config.ts` (Statements 77 / Branches 70 / Functions 72 / Lines 79) is a regression guard set just below the measured baseline. `vitest run --coverage` exits non-zero if overall coverage drops below the floor. Ratchet the floor *upward* as coverage improves — never lower it to make a red build pass.
+- **Global floor.** Floor values live in `coverage-floor.json` at the repo root — the single source of truth, imported by `vitest.config.ts` and templated into every PR's coverage comment by `.github/workflows/coverage.yml`. `vitest run --coverage` exits non-zero if overall coverage drops below the floor. Ratchet the floor *upward* as coverage improves — never lower it to make a red build pass. The `/batch-issues` skill ratchets `coverage-floor.json` at the end of every session that touches product code (see its "End-of-session" steps); manual ratchets are also fine. **Do not hardcode the numbers in this paragraph** — point readers at the JSON file instead. The drift that motivated #1333 was four separate copies of the floor (config, two docs files, a workflow comment) that fell out of sync; a single JSON source prevents the recurrence.
 - **Diff coverage.** `scripts/diff-coverage.mjs` cross-references the lines a PR adds/changes against the v8 per-statement hit counts in `coverage/coverage-final.json` (the `json` reporter) and requires changed product lines to hit a 90% patch-coverage bar. Lines in test files, the generated seed payload, and non-product directories are excluded; a PR that changes no instrumented product lines skips the gate.
 
 Both gates run in the `coverage` workflow on every PR (see WORKFLOW.md "Build gates"). The coverage step no longer carries `continue-on-error`, so a breach fails the job. The PR comment posts on both pass and fail.
@@ -321,7 +352,17 @@ The smoke subset is intentionally smaller than CI's full e2e matrix — the goal
 
 **Graceful exit on halt.** If the implement run halts, the post-step commits any uncommitted edits as `WIP: halted run on #N` and pushes to origin, so `/continue` always has a branch to resume from. On resume, check `git log -1 --format=%s` — if the subject starts with `WIP:`, inspect `git diff HEAD~1` and amend or revert before continuing.
 
-**Auto-review on PR open.** `auto-review.yml` fires when a PR opens and posts `<!-- auto-review:1 -->`. Do not run `code-reviewer` yourself in the implement stage — it runs automatically after the PR is open.
+**Auto-review on PR open.** `auto-review.yml` fires when a PR opens and posts `<!-- auto-review:1 -->`. Do not run `code-reviewer` yourself in the implement stage — it runs automatically after the PR is open. The workflow resolves the linked issue (`closes/fixes/resolves #N` parsed from PR body, branch name, and commit messages via `.github/scripts/extract-linked-issues.sh`) and passes the issue bodies to the `code-reviewer` sub-agent, which **cross-checks the diff against the issue's acceptance criteria** and raises any uncovered criterion as a Blocker — the reviewer-side counterpart of the implementer cross-check above. This closes the gap surfaced by #1259 / #1260, where partial-scope changes shipped because no later step re-read the issue. When no linked issue can be resolved, the workflow continues and the coverage check is skipped (the diff-quality checks still run).
+
+**CI failure that does not converge — `/investigate-ci-failure`.** If a fix-round fails to converge (the next CI run is still red on the same shape), do not dispatch a second sweep agent. The second sweep will not converge either — sweep agents pattern-match on test names and tweak fixtures or bump timeouts, which is the wrong tool when the real cause is a production-code regression, a perf-budget breach, or a bundle-size cliff. Use the `/investigate-ci-failure` skill (`.claude/skills/investigate-ci-failure.md`) instead: it forces a logic-vs-perf triage, mandates Playwright traces for perf-shape failures, and requires reading the production code path (not just the test) for logic-shape failures before any code change. Memory: `feedback_investigate_after_sweep_fail`; worked examples in `#1234` and `#1263`.
+
+**Planner pre-flight: AC-quality check (#1321).** For non-trivial issues, the `planner` sub-agent reads the issue body and assesses whether the `## Acceptance criteria` section exists and is concrete enough to test against (an implementer or reviewer can produce a yes/no verdict from a build, test run, screenshot, or diff inspection). If the section is missing entirely, or any criterion is vague (subjective wording like "works well", "is intuitive", "looks nice"), the planner returns a **Proposed acceptance criteria** block instead of a full plan. The orchestrator surfaces those proposals to the user via `AskUserQuestion`; on approval it posts the agreed checklist as a comment on the issue, then re-dispatches the planner. Downstream implementer and reviewer cross-checks anchor on the comment-formalised ACs. Trivial issues (typo fixes, doc tweaks, one-liner workflow changes — the same set that may skip the planner entirely) are exempt.
+
+**Planner / `/batch-issues` pre-flight: staleness check (#1322).** Before dispatching an implementer, the planner (and the `/batch-issues` skill during its triage step) runs `.github/scripts/check-issue-staleness.sh <N>` against every non-trivial issue. The script reports `STALE: yes` when the issue is older than the threshold (default 3 days; this project moves fast enough that 3 days is the safe default) **or** when `git log --since=<createdAt>` shows commits touching any backtick-quoted file path in the body. A stale verdict pauses dispatch and surfaces a "confirm ACs still hold" prompt to the user; the user can confirm and proceed, or amend the issue. Per-issue overrides live on the issue itself as a `stale-check:N` label (set the age threshold to N days, e.g. `stale-check:14`) or `stale-check:off` (disable the age branch entirely; the file-activity branch still runs). Run-wide override via the `STALE_THRESHOLD_DAYS` env var. Trivial issues are exempt.
+
+**Expect a mini-batch after preview QA.** The `/batch-issues` drain is not finished when the promotion PR opens — the maintainer's QA on the `qa` preview reliably surfaces 1-3 small follow-ups per session (the worked examples: #1270 / #1271 after the #1234 batch; #1331 / #1332 after the multi-locale batch). The skill's playbook bakes in an explicit "mini-batch follow-up" stage between the initial preview QA and the final handoff — file the follow-ups as new issues (`priority:later` by default; `priority:next` if clearly higher), implement the in-scope ones inline, and re-fire the preview deploy after they land. The `feedback_mini_batch_after_qa` memory has the longer rationale.
+
+**End-of-session retro (#1333).** Every `/batch-issues` session ends with a structured retro before the final handoff: what went well, what went poorly with named incidents, concrete improvements written back into the skill / agent defs / AGENTS.md / workflows, and memories to file or update. The retro then ratchets the coverage floor (see "Coverage gate" above) and the documented values in this file before the run closes. The retro step is run regardless of session size — a clean run produces a short retro, a noisy one produces the corrective edits the next session needs. See the `/batch-issues` skill "End-of-session retro" and "Coverage ratchet" steps for the runbook.
 
 ### Privacy
 

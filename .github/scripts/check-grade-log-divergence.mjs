@@ -54,6 +54,34 @@
 // delay does not hide them — it just removes the noise from the leading
 // edge.
 //
+// Stuck-in-steps false positives on Option A (#1253)
+// --------------------------------------------------
+// The 2-day persistence window above assumes "a normal learning-step
+// run graduates within a session or two". The happy path obeys that
+// assumption, but a user who repeatedly grades the same card Again or
+// Hard without ever hitting Good-on-last-step or Easy can sit in
+// learning steps indefinitely. The scheduler design allows this on
+// purpose: `lib/srs/scheduler.ts` cases A1 (Again) and B (Hard) keep
+// `lastReview = null` for as long as the user keeps failing, which
+// keeps `isSyncSafe()` returning false and suppresses the per-grade
+// upsert. Meanwhile `grade_log` writes every tap (no in-step gate), so
+// the subject accumulates grade_log entries with no card_reviews row
+// across multiple days, which the 2-day-grace query would then flag.
+// Alert #1243 was a confirmed instance of this shape for a user who
+// had previously been flagged twice under the pre-grace monitor
+// (#1213, #1224).
+//
+// We extend Option A's CTE with a grade-distribution check: only count
+// a subject as missing if at least one of its grade_log entries inside
+// the window is Good (4) or Easy (5). If every entry is Again (1) or
+// Hard (2), the card is plausibly still in learning steps no matter
+// how old the latest tap is, so we exclude it. The moment the user
+// grades Good or Easy the card graduates locally, `isSyncSafe()`
+// returns true, and a real #584 break would then become visible on
+// the next qualifying tick. Future maintainers: do not re-tighten
+// this query by dropping the `MAX(grade) >= 4` clause; the
+// false-positive class it suppresses is structural, not transient.
+//
 // Re-learning false positives on Option B (#1229)
 // -----------------------------------------------
 // Option B also needs a 2-day grace, for a subtler reason than Option A.
@@ -188,6 +216,16 @@ const OPTION_B_MIN_GRADES = 3;
 // freshness: we want subjects whose LATEST grade falls inside the
 // window. A subject graded today and again 3 days ago should not flag,
 // because the recent grade means the card is still in-step.
+//
+// The `MAX(grade) >= 4` clause is the stuck-in-steps grace from #1253.
+// A subject whose every grade_log entry is Again (1) or Hard (2) has
+// not yet hit a graduation-eligible rating, so the scheduler keeps
+// `lastReview = null` and `isSyncSafe()` keeps blocking the per-grade
+// upsert by design. Cards in that state legitimately accumulate
+// grade_log entries with no card_reviews row over many days. We
+// exclude them here so they do not show up as #584 false positives.
+// Grade ratings: 1=Again, 2=Hard, 4=Good, 5=Easy (per
+// `lib/srs/scheduler.ts`).
 const OPTION_A_QUERY = `
 WITH gl_distinct AS (
   SELECT
@@ -198,11 +236,13 @@ WITH gl_distinct AS (
       ELSE card_type
     END AS card_type,
     subject_key,
-    MAX(entry_date) AS last_entry_date
+    MAX(entry_date) AS last_entry_date,
+    MAX(grade) AS max_grade
   FROM grade_log
   WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_A_LOWER_BOUND_DAYS_AGO} days')::date
   GROUP BY user_id, card_type, subject_key
   HAVING MAX(entry_date) <= (CURRENT_DATE - INTERVAL '${OPTION_A_UPPER_BOUND_DAYS_AGO} days')::date
+     AND MAX(grade) >= 4
 )
 SELECT
   g.user_id::text AS user_id,

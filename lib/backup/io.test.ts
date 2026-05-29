@@ -5,6 +5,7 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import type { BackupFile } from "./schema";
 import type { DailyLimits } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { DEFAULT_LABS_FLAGS } from "@/lib/labs/flags";
 
 vi.mock("@/lib/review/persistence", () => ({
   loadSession: vi.fn(),
@@ -97,6 +98,8 @@ const VALID_SETTINGS: UserSettings = {
   verifiedTypedEntryMode: false,
   typedEntryOnboardingShown: false,
   mcCardOnboardingShown: false,
+  labsFlags: { ...DEFAULT_LABS_FLAGS },
+  pokemonNameLocale: "en" as const,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

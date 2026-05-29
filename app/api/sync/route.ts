@@ -66,6 +66,9 @@ export async function POST(request: Request) {
       user_id: user.id,
       card_type: r.card_type,
       subject_key: r.subject_key,
+      // Migration 029 field — coalesce absent key to "en" for pre-migration clients
+      // and in-flight beacon queue entries that lack the field.
+      locale: r.locale ?? "en",
       stability: r.stability,
       difficulty: r.difficulty,
       elapsed_days: r.elapsed_days,
@@ -89,7 +92,7 @@ export async function POST(request: Request) {
       try {
         const { error } = await supabase
           .from("card_reviews")
-          .upsert(batch, { onConflict: "user_id,card_type,subject_key" });
+          .upsert(batch, { onConflict: "user_id,card_type,subject_key,locale" });
         if (!error) {
           batchOk = true;
           break;

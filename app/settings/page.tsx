@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   loadSettings,
   saveSettings,
@@ -56,7 +57,10 @@ import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
-import { cardPanelPadded, colStackLg } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStackLg, sectionLabel } from "@/lib/utils/class-names";
+import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
+import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
+import { setLocaleCookie } from "@/lib/i18n/actions";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -369,6 +373,7 @@ const TOP_LEVEL_SECTION_IDS = [
   "audio-heading",
   "offline-heading",
   "account-data-heading",
+  "labs-heading",
   "advanced-heading",
 ] as const;
 
@@ -390,6 +395,7 @@ const ALL_ANCHOR_IDS = [
   "backup-heading",
   "regional-heading",
   "about-heading",
+  "labs-heading",
   "developer-heading",
   "danger-zone-heading",
 ] as const;
@@ -422,12 +428,33 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "danger-zone-heading": "advanced-heading",
 };
 
+/** Human-readable labels for each supported locale. */
+const LOCALE_LABELS: Record<AppLocale, string> = {
+  en: "English",
+  ja: "Japanese",
+  "zh-Hans": "Simplified Chinese",
+  "zh-Hant": "Traditional Chinese",
+};
+
+/** Read the active locale from document.cookie without importing the hook. */
+function readActiveLocale(): AppLocale {
+  if (typeof document === "undefined") return DEFAULT_LOCALE;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${LOCALE_COOKIE}=`));
+  const v = match?.split("=")[1];
+  if (v && (SUPPORTED_LOCALES as readonly string[]).includes(v)) return v as AppLocale;
+  return DEFAULT_LOCALE;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
+  const t = useTranslations();
   const { user, supabase } = useAuth();
   const { updateFavourite } = useFavourite();
   const { unlocked, flags, setFlag, anyFlagOn } = useSuperuser();
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [activeLocale, setActiveLocale] = useState<AppLocale>(DEFAULT_LOCALE);
   const [draftValues, setDraftValues] = useState<Partial<Record<keyof UserSettings, string>>>({});
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -477,6 +504,7 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
+    setActiveLocale(readActiveLocale());
     const loaded = loadSettings();
 
     // Auto-detect regional prefs on first load when not yet set.
@@ -750,7 +778,7 @@ export default function SettingsPage() {
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
       <div className="w-full max-w-3xl">
         <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
-          Settings
+          {t("settings.heading")}
         </h1>
 
         {settings === null ? (
@@ -813,7 +841,7 @@ export default function SettingsPage() {
 
                 {/* Mobile navigation style (#661) — bottom tab bar vs hamburger */}
                 <div id="mobile-nav-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Mobile navigation
                   </p>
                   <div className={cardPanelPadded}>
@@ -865,7 +893,7 @@ export default function SettingsPage() {
               >
                 {/* Scheduler knobs */}
                 <div id="scheduler-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Scheduler
                   </p>
                   <OnboardingHint id="settingsHintDismissed" title="What recall target does">
@@ -962,7 +990,7 @@ export default function SettingsPage() {
                     the brand-new card through the simulated-Easy FSRS path —
                     real graduated state, not synthesised mastery. */}
                 <div id="known-quiz-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Quickstart
                   </p>
                   <div className={cardPanelPadded}>
@@ -1002,7 +1030,7 @@ export default function SettingsPage() {
 
                 {/* Name cards — always on since #1234 */}
                 <div id="name-cards-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Name cards
                   </p>
                   <div className={colStackLg}>
@@ -1093,7 +1121,7 @@ export default function SettingsPage() {
 
                 {/* Evolution cards */}
                 <div id="evolution-cards-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Evolution cards
                   </p>
                   <div className={cardPanelPadded}>
@@ -1166,7 +1194,7 @@ export default function SettingsPage() {
 
                 {/* Reverse-evolution cards */}
                 <div id="reverse-evolution-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Reverse-evolution cards
                   </p>
                   <div className={cardPanelPadded}>
@@ -1204,7 +1232,7 @@ export default function SettingsPage() {
 
                 {/* Alternate forms (#658) */}
                 <div id="alternate-forms-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Alternate forms
                   </p>
                   <div className={cardPanelPadded}>
@@ -1241,7 +1269,7 @@ export default function SettingsPage() {
 
                 {/* Reverse cards — always on since #1234 */}
                 <div id="reverse-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Reverse cards
                   </p>
                   {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
@@ -1304,7 +1332,7 @@ export default function SettingsPage() {
               >
                 {/* Cry cards */}
                 <div id="cry-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Cry → name cards
                   </p>
                   <div className={cardPanelPadded}>
@@ -1498,7 +1526,7 @@ export default function SettingsPage() {
                 transientOpen={isFiltering}
               >
                 <div id="offline-download-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Download
                   </p>
                   <OfflineSection />
@@ -1529,7 +1557,7 @@ export default function SettingsPage() {
 
                 {/* Onboarding explainer */}
                 <div id="onboarding-heading" className={cn("flex flex-col gap-3", cardPanelPadded)}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     How this works
                   </p>
                   <p className="text-sm text-foreground">
@@ -1589,7 +1617,7 @@ export default function SettingsPage() {
 
                 {/* Backup */}
                 <div id="backup-heading" className={cn(cardPanelPadded, "flex flex-col gap-3")}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Backup
                   </p>
                   <div>
@@ -1661,7 +1689,7 @@ export default function SettingsPage() {
 
                 {/* Regional */}
                 <div id="regional-heading" className={colStackLg}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     Regional
                   </p>
 
@@ -1755,7 +1783,7 @@ export default function SettingsPage() {
 
                 {/* About */}
                 <div id="about-heading" className={cn(cardPanelPadded, "flex flex-col gap-3")}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <p className={sectionLabel}>
                     About
                   </p>
                   <div>
@@ -1814,6 +1842,139 @@ export default function SettingsPage() {
                     </a>
                     .
                   </p>
+                </div>
+              </CollapsibleSection>
+              )}
+
+              {/* ── Labs ───────────────────────────────────────────────────── */}
+              {/* The Labs section only renders when there is at least one registered flag. */}
+              {visibleSectionIds.has("labs-heading") && Object.keys(LABS_FLAGS).length > 0 && (
+              <CollapsibleSection
+                sectionId="labs-heading"
+                heading="Labs"
+                forceOpen={targetCategoryId === "labs-heading"}
+                transientOpen={isFiltering}
+              >
+                <div id="labs-heading" className={colStackLg}>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Preview features that are in active development. These may
+                    change or be removed. Your feedback helps shape what ships.
+                  </p>
+                  {(Object.entries(LABS_FLAGS) as [LabsFlagKey, { label: string; description: string; default: boolean }][]).map(
+                    ([key, meta]) => (
+                      <div key={key} className={cardPanelPadded}>
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {meta.label}
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              {meta.description}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-label={meta.label}
+                            aria-checked={settings.labsFlags[key] ?? false}
+                            onClick={() => {
+                              const updated = {
+                                ...settings,
+                                labsFlags: {
+                                  ...settings.labsFlags,
+                                  [key]: !(settings.labsFlags[key] ?? false),
+                                },
+                              };
+                              setSettings(updated);
+                              saveSettings(updated);
+                            }}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                              settings.labsFlags[key] ?? false
+                                ? "bg-foreground"
+                                : "bg-zinc-300 dark:bg-zinc-600"
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                                settings.labsFlags[key] ?? false
+                                  ? "translate-x-5"
+                                  : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {/* Locale pickers — only shown when languages flag is on.
+                            Two independent selectors: one for the app UI, one
+                            for Pokémon names (#1260). */}
+                        {key === "languages" && (settings.labsFlags[key] ?? false) && (
+                          <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 flex flex-col gap-4">
+                            {/* App language — writes the locale cookie */}
+                            <div>
+                              <label
+                                htmlFor="labs-app-locale-select"
+                                className="block text-sm font-medium text-foreground"
+                              >
+                                App language
+                              </label>
+                              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                Controls the app UI language. App UI translation is in progress.
+                              </p>
+                              <select
+                                id="labs-app-locale-select"
+                                value={activeLocale}
+                                onChange={(e) => {
+                                  const next = e.target.value as AppLocale;
+                                  setActiveLocale(next);
+                                  void setLocaleCookie(next).then(() => {
+                                    router.refresh();
+                                  });
+                                }}
+                                className="mt-2 rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                              >
+                                {SUPPORTED_LOCALES.map((loc) => (
+                                  <option key={loc} value={loc}>
+                                    {LOCALE_LABELS[loc]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Pokémon name language — writes pokemonNameLocale in settings */}
+                            <div>
+                              <label
+                                htmlFor="labs-pokemon-name-locale-select"
+                                className="block text-sm font-medium text-foreground"
+                              >
+                                Pokémon name language
+                              </label>
+                              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                Pokémon names on cards will be shown in this language.
+                                Independent of the app language above.
+                              </p>
+                              <select
+                                id="labs-pokemon-name-locale-select"
+                                value={settings.pokemonNameLocale}
+                                onChange={(e) => {
+                                  const next = e.target.value as AppLocale;
+                                  const updated = { ...settings, pokemonNameLocale: next };
+                                  setSettings(updated);
+                                  saveSettings(updated);
+                                }}
+                                className="mt-2 rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                              >
+                                {SUPPORTED_LOCALES.map((loc) => (
+                                  <option key={loc} value={loc}>
+                                    {LOCALE_LABELS[loc]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ),
+                  )}
                 </div>
               </CollapsibleSection>
               )}

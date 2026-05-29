@@ -11,6 +11,15 @@ vi.mock("next/image", () => ({
 
 vi.mock("@/lib/audio/tts", () => ({ speakName: vi.fn() }));
 
+// Return the English name synchronously so tests are deterministic and do not
+// depend on localStorage or the locale sidecar being loaded.
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (_id: number | undefined, englishName: string) => ({
+    name: englishName,
+    transliteration: null,
+  }),
+}));
+
 const PRE_SPRITE = "https://example.com/charmander.png";
 const POST_SPRITE = "https://example.com/charmeleon.png";
 
@@ -336,5 +345,68 @@ describe('EvolutionCard direction="reverse-evolution"', () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Hear eevee" })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale-aware question prompt (#1260 followup)
+// ---------------------------------------------------------------------------
+
+describe("EvolutionCard — question-side name uses useLocalePokemonName", () => {
+  it("forward direction: prompt renders the locale-resolved pre-evo name", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({
+      useLocalePokemonName: (id: number | undefined, _english: string) => ({
+        name: id === 4 ? "ヒトカゲ" : "MISS",
+        transliteration: null,
+      }),
+    }));
+    const { EvolutionCard: LocaleEvolutionCard } = await import(
+      "@/components/review/EvolutionCard"
+    );
+    render(
+      <LocaleEvolutionCard
+        direction="evolution"
+        preEvoName="charmander"
+        preEvoSpriteUrl={PRE_SPRITE}
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase={null}
+        revealed={false}
+        preEvoId={4}
+        postEvoId={5}
+      />,
+    );
+    // Question prompt should use the locale-resolved name, not "charmander".
+    expect(screen.getByText("ヒトカゲ")).toBeInTheDocument();
+    expect(screen.queryByText("charmander")).not.toBeInTheDocument();
+  });
+
+  it("reverse direction: prompt renders the locale-resolved post-evo name", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({
+      useLocalePokemonName: (id: number | undefined, _english: string) => ({
+        name: id === 5 ? "リザード" : "MISS",
+        transliteration: null,
+      }),
+    }));
+    const { EvolutionCard: LocaleEvolutionCard } = await import(
+      "@/components/review/EvolutionCard"
+    );
+    render(
+      <LocaleEvolutionCard
+        direction="reverse-evolution"
+        preEvoName="charmander"
+        preEvoSpriteUrl={PRE_SPRITE}
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase={null}
+        revealed={false}
+        preEvoId={4}
+        postEvoId={5}
+      />,
+    );
+    expect(screen.getByText("リザード")).toBeInTheDocument();
+    expect(screen.queryByText("charmeleon")).not.toBeInTheDocument();
   });
 });
