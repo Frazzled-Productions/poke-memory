@@ -12,6 +12,7 @@ No consent banner is required. Every item of client-side storage used by Poké M
 | Storage item | Path | Purpose | Classification |
 |---|---|---|---|
 | `poke-memory:*` keys in `localStorage` | Guest + signed-in | SRS card state, settings, superuser QA flags, theme pre-paint | Strictly necessary — without this the app cannot function |
+| `poke-memory:locale` cookie | Guest + signed-in | Persists the chosen app UI language (`en` / `ja` / `zh-Hans` / `zh-Hant`); set only on an explicit user selection; ~1 year expiry | Strictly necessary — functional preference like theme/timezone; no tracking payload, does not identify the individual |
 | Supabase Auth session cookie (HTTP-only JWT) | Signed-in only | Keeps the user authenticated across requests | Strictly necessary — set by `@supabase/ssr`; not present in guest mode |
 | Vercel Analytics / Speed Insights | All users | Aggregate, anonymous page-view metrics and Core Web Vitals | **No cookie set, no `localStorage` write** — client-side scripts that write nothing to terminal-equipment storage; PECR Regulation 6 not engaged |
 
@@ -24,6 +25,8 @@ PECR Regulation 6 requires prior consent before storing or accessing information
 **Local storage (SRS state, settings):** The user explicitly requests the spaced-repetition service. Persisting review state in `localStorage` is strictly necessary to deliver that service in guest mode — without it, all progress is lost on navigation. This is the canonical strictly-necessary exemption.
 
 **Supabase Auth cookie:** The cookie is set only when a user explicitly signs in. An authentication session cookie is the textbook example of a strictly-necessary cookie; it does not persist after sign-out and carries no tracking payload.
+
+**Locale cookie (`poke-memory:locale`):** Introduced in #1260, this cookie was a pre-existing gap in this inventory and is recorded here for completeness. It persists the user's chosen app UI language and is written only when the user explicitly selects a locale. It is a functional-preference cookie in the same class as theme and timezone: it carries no tracking payload and does not identify the individual. The strictly-necessary exemption applies because the user explicitly requested the localised experience, and remembering that choice is necessary to deliver the service the user asked for.
 
 **Vercel Analytics / Speed Insights:** `@vercel/analytics` v2 and `@vercel/speed-insights` inject a client-side `<script>` tag that runs in the browser. They set no cookie and write nothing to `localStorage` or any other terminal-equipment storage. PECR Regulation 6 is not engaged because no information is stored on or retrieved from the user's terminal equipment.
 
