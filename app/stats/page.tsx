@@ -50,6 +50,8 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
+import { computePerGameStats, type GameStats } from "@/lib/stats/per-game";
+import { GameBreakdown } from "@/components/stats/GameBreakdown";
 
 // ---------------------------------------------------------------------------
 // Lazily-loaded Recharts chart components.
@@ -465,6 +467,19 @@ export default function StatsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageVersion, anyFlagOn, supabase, user]);
 
+  // Per-game mastery breakdown (#1313). Recomputed whenever cards change or
+  // the superuser flag toggles. SEED_POKEMON is a stable module-level const so
+  // it does not need to be in the deps array.
+  const perGame = useMemo<GameStats[]>(() => {
+    if (cards === null || masteryRepetitions === null) return [];
+    return computePerGameStats(
+      cards,
+      SEED_POKEMON,
+      masteryRepetitions,
+      flags.pretendAllMastered,
+    );
+  }, [cards, masteryRepetitions, flags.pretendAllMastered]);
+
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Stats reads all axes from the returned snapshot (#1139, simplified in #1151).
   const snapshotSettings = useMemo(() => ({
@@ -613,6 +628,16 @@ export default function StatsPage() {
               </section>
 
             </div>
+
+            {/* Progress section — per-game mastery breakdown, full width on all breakpoints */}
+            {perGame.length > 0 && (
+              <section aria-labelledby="progress-section-heading" className="flex flex-col gap-6">
+                <SectionHeading>
+                  <span id="progress-section-heading">Progress</span>
+                </SectionHeading>
+                <GameBreakdown perGame={perGame} />
+              </section>
+            )}
 
             {/* Scheduling section — full width on all breakpoints */}
             <section aria-labelledby="scheduling-section-heading" className="flex flex-col gap-6">

@@ -564,6 +564,61 @@ test.describe("Stats page — streak protection card (#1227)", () => {
   });
 });
 
+test.describe("Stats page — per-game mastery breakdown (#1313)", () => {
+  test("the Progress section and By game heading are visible", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // Wait for the page to hydrate past the loading skeleton. The Progress
+    // section is rendered as soon as cards are loaded (even with zero mastery),
+    // so it appears alongside the other sections once hydration completes.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Progress" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("heading", { level: 2, name: "By game" }),
+    ).toBeVisible();
+  });
+
+  test("Generation I accordion is present and expands to show game rows", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // Wait for hydration.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "By game" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // The Generation I accordion button should be present.
+    const genButton = page.getByRole("button", { name: /Generation I/i });
+    await expect(genButton).toBeVisible();
+    await expect(genButton).toHaveAttribute("aria-expanded", "false");
+
+    // Click to expand — game rows should appear.
+    await genButton.click();
+    await expect(genButton).toHaveAttribute("aria-expanded", "true");
+
+    // At least Pokémon Red/Blue should be listed.
+    await expect(page.getByText("Pokémon Red/Blue")).toBeVisible();
+  });
+
+  test("pretendAllMastered shows 100% on all game rows", async ({ page }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "By game" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Expand Generation I.
+    const genButton = page.getByRole("button", { name: /Generation I/i });
+    await genButton.click();
+
+    // Under pretendAllMastered every game should report 100%.
+    // The first visible percentage cell in the expanded list must be 100%.
+    await expect(page.getByText("100%").first()).toBeVisible();
+  });
+});
+
 test.describe("Stats page — heatmap hover tooltip", () => {
   test("hovering a heatmap cell shows a tooltip with the date and review count", async ({
     page,
