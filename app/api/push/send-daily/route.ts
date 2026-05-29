@@ -8,16 +8,38 @@ import { scopeMatchesEntry, resolveAnchorId } from "@/lib/eligibility/scopePredi
 import { SCOPE_LOOKUP } from "@/lib/pokemon/scopeLookup";
 import type { PracticeScope } from "@/lib/review/scope";
 import { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter } from "@/lib/eligibility/scopeConstants";
+import { shouldSendToUser, PUSH_DEFAULT_HOUR_UTC } from "@/lib/push/notificationHour";
 
 /**
- * Daily Web Push reminder route (#1056).
+ * Daily Web Push reminder route (#1056, per-user hour gate: #1315).
  *
  * Triggered by the `web-push-daily-reminders` pg_cron job (migration 028)
  * via `net.http_post` with a Bearer header carrying the
- * `cron_shared_secret` Vault value. The job fires once per day at 08:00
- * UTC; this handler then fans out per-user Web Push notifications for
- * every `push_subscriptions` row whose owning user has at least one card
- * due today in their own timezone.
+ * `cron_shared_secret` Vault value.
+ *
+ * CURRENT CRON SCHEDULE: once per day at 08:00 UTC (0 8 * * *).
+ * This route now supports per-user notification hours (#1315) but the cron
+ * has NOT yet been changed to hourly — that is a deliberate split to avoid
+ * a deploy-ordering hazard (the phase-2 migration must only be applied
+ * AFTER this PR is promoted to production). See the follow-up issue filed
+ * alongside #1315 for the phase-2 cron change.
+ *
+ * INTERIM BEHAVIOUR:
+ *   - Users with no preferred hour (NULL → effective UTC 8) continue to
+ *     receive their notification at 08:00 UTC exactly as before.
+ *   - Users who set a non-8-UTC-equivalent preferred hour are DORMANT
+ *     until the phase-2 cron flip activates hourly delivery.
+ *   - No user receives a duplicate notification in the interim.
+ *
+ * AFTER PHASE-2 (hourly cron):
+ *   The cron fires at `0 * * * *`. At each UTC hour H, only users whose
+ *   effective UTC send-hour equals H are notified. Each user receives at
+ *   most one notification per day, at their chosen local hour.
+ *
+ * This handler fans out per-user Web Push notifications for every
+ * `push_subscriptions` row whose owning user:
+ *   1. Matches the current UTC hour gate (see shouldSendToUser / #1315), AND
+ *   2. Has at least one card due today in their own timezone.
  *
  * Why a route handler instead of a Supabase Edge Function: VAPID JWTs are
  * ECDSA P-256 (ES256) and pgcrypto / pgsodium can't produce that shape, so
@@ -126,11 +148,15 @@ type SubscriptionRow = {
  * Subset of the `user_settings` row shape. `settings` is the JSONB blob
  * carrying per-user card-type enabled flags and daily new-card caps.
  * `timezone` is a scalar column (migration 019).
+ * `push_notification_hour` is a scalar column (migration 030, #1315) storing
+ * the user's preferred LOCAL hour (0-23) for the daily reminder. NULL means
+ * "no preference" — falls back to PUSH_DEFAULT_HOUR_UTC (8).
  */
 type SettingsRow = {
   user_id: string;
   timezone: string | null;
   settings: Record<string, unknown> | null;
+  push_notification_hour: number | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -457,15 +483,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
 
-  // Step 2: resolve timezones and per-user eligibility settings. We widen
-  // the SELECT to include the `settings` JSONB so we can filter by card-type
-  // enabled flags and the alt-forms toggle client-side. Users without a
-  // stored settings record fall back to DEFAULT_ELIGIBILITY (mirrors
-  // DEFAULT_SETTINGS in lib/settings/persistence.ts).
+  // Step 2: resolve timezones, notification-hour preference, and per-user
+  // eligibility settings. We widen the SELECT to include:
+  //   - `settings` JSONB: card-type enabled flags and alt-forms toggle.
+  //   - `timezone`: scalar column (migration 019) — used for "today" bucketing
+  //     and for converting the local preferred hour to UTC (#1315).
+  //   - `push_notification_hour`: scalar column (migration 030, #1315) — the
+  //     user's preferred local hour for the daily reminder (0-23 or NULL).
+  // Users without a stored settings record fall back to DEFAULT_ELIGIBILITY.
   const uniqueUserIds = Array.from(new Set(subscriptions.map((s) => s.user_id)));
   const { data: settingsData, error: settingsError } = await admin
     .from("user_settings")
-    .select("user_id, timezone, settings")
+    .select("user_id, timezone, settings, push_notification_hour")
     .in("user_id", uniqueUserIds);
   if (settingsError) {
     return NextResponse.json(
@@ -475,16 +504,45 @@ export async function POST(request: Request) {
   }
   const timezoneByUser = new Map<string, string>();
   const eligibilityByUser = new Map<string, UserEligibility>();
+  const pushHourByUser = new Map<string, number | null>();
   for (const row of (settingsData ?? []) as SettingsRow[]) {
     if (row.timezone) timezoneByUser.set(row.user_id, row.timezone);
     eligibilityByUser.set(row.user_id, parseEligibility(row.settings));
+    // Store the raw column value (null = no preference).
+    pushHourByUser.set(row.user_id, row.push_notification_hour ?? null);
   }
 
-  // Step 3: bucket users by "today in their timezone" so each distinct
+  // Per-user UTC-hour gate (#1315). Evaluated against the current moment so
+  // DST transitions are handled correctly via Intl.DateTimeFormat.
+  //
+  // INTERIM BEHAVIOUR: the cron is still daily (0 8 * * *), so this runs
+  // once at 08:00 UTC. NULL users (no preference) use PUSH_DEFAULT_HOUR_UTC
+  // (8) and match; users with a non-8-UTC-equivalent hour are dormant until
+  // the phase-2 cron change flips delivery to hourly (migration 031).
+  const now = new Date();
+  const filteredSubscriptions = subscriptions.filter((sub) => {
+    const tz = timezoneByUser.get(sub.user_id) ?? null;
+    const preferredHour = pushHourByUser.get(sub.user_id) ?? null;
+    return shouldSendToUser(preferredHour, tz, now);
+  });
+
+  if (filteredSubscriptions.length === 0) {
+    // No subscriptions match the current UTC hour. This is expected while the
+    // cron is still daily (only NULL/default-8 users arrive here at 08:00 UTC
+    // and they all pass) — in phase-2 it means no user scheduled this hour.
+    return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
+  }
+
+  // Re-derive the unique user ids for the now-filtered subscription set so
+  // Steps 3-4 only query for users who will actually receive a notification
+  // this hour.
+  const activeUserIds = Array.from(new Set(filteredSubscriptions.map((s) => s.user_id)));
+
+  // Step 3: bucket active users by "today in their timezone" so each distinct
   // calendar date is queried at most once. At our scale this is at most
   // ~30 buckets covering every inhabited UTC offset.
   const usersByDueDate = new Map<string, string[]>();
-  for (const userId of uniqueUserIds) {
+  for (const userId of activeUserIds) {
     const tz = timezoneByUser.get(userId) ?? "UTC";
     const today = todayInTimezone(tz);
     const bucket = usersByDueDate.get(today);
@@ -552,7 +610,7 @@ export async function POST(request: Request) {
   // whole batch.
   const toDelete: string[] = [];
   let sent = 0;
-  for (const sub of subscriptions) {
+  for (const sub of filteredSubscriptions) {
     const dueCount = dueCountByUser.get(sub.user_id) ?? 0;
     const eligibility = eligibilityByUser.get(sub.user_id) ?? DEFAULT_ELIGIBILITY;
     const startedTodayCounts = startedTodayByUser.get(sub.user_id) ?? {};

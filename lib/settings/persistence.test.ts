@@ -175,6 +175,7 @@ describe('loadSettings migration', () => {
       mcCardOnboardingShown: false,
       labsFlags: { ...DEFAULT_LABS_FLAGS },
       pokemonNameLocale: 'ja' as const,
+      pushNotificationHour: 20,
     };
     saveSettings(custom);
     const loaded = loadSettings();
