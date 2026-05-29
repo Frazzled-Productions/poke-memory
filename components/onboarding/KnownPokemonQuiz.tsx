@@ -47,12 +47,61 @@ import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { appendGradeEntry } from "@/lib/gradelog/persistence";
 import { generationOf, GEN_RANGES } from "@/lib/stats/derive";
 import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import {
   applyKnownGrades,
   eligibleCardsForKnownQuiz,
 } from "@/lib/onboarding/applyKnownGrades";
 import { dialogPanel, sectionLabel } from "@/lib/utils/class-names";
+
+// ---------------------------------------------------------------------------
+// KnownPokemonCard — single sprite tile in the "mark as known" grid.
+//
+// Extracted as its own component so `useLocalePokemonName` can be called
+// unconditionally — hooks may not be called inside array maps (#1327).
+// ---------------------------------------------------------------------------
+
+type KnownPokemonCardProps = {
+  card: NameReviewCard;
+  selected: boolean;
+  onToggle: (id: number) => void;
+};
+
+function KnownPokemonCard({ card, selected, onToggle }: KnownPokemonCardProps) {
+  // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
+  const { name: localeName } = useLocalePokemonName(card.speciesId, card.displayName);
+  return (
+    <li>
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={selected}
+        aria-label={`I already know ${localeName}`}
+        onClick={() => onToggle(card.id)}
+        className={`flex w-full flex-col items-center gap-1 rounded-lg border p-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+          selected
+            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950"
+            : "border-zinc-200 bg-background hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900"
+        }`}
+      >
+        <Image
+          src={card.spriteUrl}
+          alt=""
+          width={POKEDEX_GRID_SPRITE_SIZE}
+          height={POKEDEX_GRID_SPRITE_SIZE}
+          className="h-16 w-16 object-contain"
+          loading="lazy"
+          priority={false}
+        />
+        <span className="text-xs font-medium text-foreground">{localeName}</span>
+        {selected && (
+          <span className="sr-only">selected</span>
+        )}
+      </button>
+    </li>
+  );
+}
 
 type Props = {
   /**
@@ -360,40 +409,14 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         aria-label={`${GEN_RANGES.find((r) => r.gen === activeGen)?.name ?? ""} sprites`}
         className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6"
       >
-        {activeCards.map((card) => {
-          const selected = selectedIds.has(card.id);
-          const label = card.displayName ?? card.name;
-          return (
-            <li key={card.id}>
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={selected}
-                aria-label={`I already know ${label}`}
-                onClick={() => toggleCard(card.id)}
-                className={`flex w-full flex-col items-center gap-1 rounded-lg border p-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
-                  selected
-                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950"
-                    : "border-zinc-200 bg-background hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900"
-                }`}
-              >
-                <Image
-                  src={card.spriteUrl}
-                  alt=""
-                  width={POKEDEX_GRID_SPRITE_SIZE}
-                  height={POKEDEX_GRID_SPRITE_SIZE}
-                  className="h-16 w-16 object-contain"
-                  loading="lazy"
-                  priority={false}
-                />
-                <span className="text-xs font-medium text-foreground">{label}</span>
-                {selected && (
-                  <span className="sr-only">selected</span>
-                )}
-              </button>
-            </li>
-          );
-        })}
+        {activeCards.map((card) => (
+          <KnownPokemonCard
+            key={card.id}
+            card={card}
+            selected={selectedIds.has(card.id)}
+            onToggle={toggleCard}
+          />
+        ))}
       </ul>
 
       {/* Apply / status row */}

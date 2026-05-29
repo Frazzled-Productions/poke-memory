@@ -46,6 +46,37 @@ const eslintConfig = defineConfig([
       "react-hooks/preserve-manual-memoization": "warn",
     },
   },
+  // Multi-locale guard (#1327): forbid direct `.displayName` reads in UI code.
+  // Every Pokémon name shown to a user must flow through
+  // `useLocalePokemonName(speciesId, displayName)` so the active
+  // `pokemonNameLocale` setting is respected.
+  //
+  // Allowlist rationale:
+  //   app/api/**   — server-side API routes; locale is irrelevant, English baseline is correct.
+  //   lib/**       — pure data layer; English baseline is correct (excluded by the files glob).
+  //   scripts/**   — build-time seeders; English baseline is correct (excluded by the files glob).
+  //   e2e/**       — test code (excluded by the files glob).
+  //
+  // False positives: `.displayName` passed as the English-fallback argument to
+  // `useLocalePokemonName(speciesId, displayName)` is the intended pattern (the
+  // hook receives it as a fallback, not a final render value). Those sites are
+  // annotated with `// eslint-disable-next-line no-restricted-syntax` plus a
+  // one-line explanation rather than narrowing the AST selector, which would be
+  // more fragile.
+  {
+    files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    ignores: ["app/api/**"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "MemberExpression[property.name='displayName']",
+          message:
+            "Do not read .displayName directly in components/pages. Use useLocalePokemonName(speciesId, displayName) so the active pokemonNameLocale is respected.",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

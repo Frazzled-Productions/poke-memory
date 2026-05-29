@@ -861,3 +861,94 @@ test.describe("Pokédex sort options (#1314)", () => {
     expect(page.url()).not.toContain("sort=");
   });
 });
+
+test.describe("Pokédex detail — locale-aware Pokémon name (#1327)", () => {
+  // PokemonDetailDisclosure now uses useLocalePokemonName, so switching the
+  // pokemonNameLocale setting to 'ja' must cause the Japanese name to appear.
+  // This verifies the migration of direct .displayName reads to the hook.
+
+  test("Pokédex detail page renders Japanese name when pokemonNameLocale=ja", async ({
+    page,
+  }) => {
+    // Seed Bulbasaur (id=1, speciesId=1) as learning so the page is not locked.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-13",
+            firstSeen: "2026-05-13",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    // Enable the languages Labs flag and set pokemonNameLocale to Japanese.
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (typeof parsed === "object" && parsed !== null) {
+              existing = parsed as Record<string, unknown>;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({
+            mobileNav: "bottom",
+            ...existing,
+            pokemonNameLocale: "ja",
+            labsFlags: {
+              ...(typeof existing.labsFlags === "object" && existing.labsFlags !== null
+                ? (existing.labsFlags as Record<string, unknown>)
+                : {}),
+              languages: true,
+            },
+            onboarding: {
+              ...(typeof existing.onboarding === "object" && existing.onboarding !== null
+                ? (existing.onboarding as Record<string, unknown>)
+                : {}),
+              firstVisitOnboardingDismissed: true,
+            },
+          }),
+        );
+      } catch {
+        /* localStorage unavailable */
+      }
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+
+    // Bulbasaur's Japanese name is フシギダネ (from generated-locale-names.json).
+    // The useLocalePokemonName hook fetches the sidecar asynchronously, so we
+    // wait for the text to appear rather than checking it synchronously.
+    await expect(page.getByText("フシギダネ")).toBeVisible({ timeout: 10_000 });
+  });
+});

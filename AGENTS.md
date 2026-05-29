@@ -80,6 +80,25 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 
 **Trade-off.** A premature abstraction is worse than three similar lines. The rule is *don't fragment what's already shared*, not *abstract every duplication*. Three sites with the same pattern that aren't going to grow are fine; three sites that ARE going to need a cross-cutting change next month must share a helper now. Where the failure mode is easy to encode at PR time, prefer a lint rule (see #1327 for the Pokémon-name case) over a convention-only enforcement.
 
+### Multi-locale rendering
+
+All Pokémon names shown to users must flow through `useLocalePokemonName(speciesId, fallbackName)` from `lib/i18n/useLocalePokemonName.ts`. A lint rule (`no-restricted-syntax` in `eslint.config.mjs`, covering `components/**` and `app/**` minus `app/api/**`) enforces this at PR time — direct `.displayName` reads in those trees are a CI error (#1327).
+
+**The canonical pattern:**
+
+```tsx
+const { name: localeName } = useLocalePokemonName(pokemon.speciesId, pokemon.displayName);
+// Then render `localeName`, not `pokemon.displayName`.
+```
+
+**When `.displayName` reads are legitimate** (and must be annotated with `// eslint-disable-next-line no-restricted-syntax`):
+
+- Passing `displayName` as the English-fallback *argument* to `useLocalePokemonName` itself — the hook uses it as a synchronous fallback, not as the final render value.
+- Inside `app/api/**` — server-side API routes where locale is irrelevant and the English baseline is correct.
+- Inside `lib/**`, `scripts/**`, `e2e/**` — these are excluded from the rule's file glob.
+
+When extracting a sub-component to use the hook (required when the call site is inside an array `.map()` — hooks may not be called inside map callbacks), follow the pattern in `SpritePicker.tsx` (`SpritePickerTile`) and `KnownPokemonQuiz.tsx` (`KnownPokemonCard`): one hook call per rendered tile, inside a named component.
+
 ### Caching
 
 - **Cache Components is enabled** (`cacheComponents: true` in `next.config.ts`). All cache APIs assume this model.
