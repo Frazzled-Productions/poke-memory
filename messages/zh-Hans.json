@@ -394,7 +394,6 @@
       "heading": "薄弱卡片",
       "empty": "还没有薄弱卡片。继续保持！"
     },
-    "viewInPokedex": "在图鉴中查看{name}",
     "forcePull": {
       "heading": "数据",
       "description": "如果您的统计数据看起来有误，请使用此功能从云端拉取权威数据。",
@@ -411,8 +410,7 @@
     "description": "您的 Pokémon 学习之旅。",
     "loadingAriaLabel": "加载旅程中",
     "currentStreak": "当前连续天数",
-    "dayInARow": "天连续",
-    "daysInARow": "连续 {count} 天",
+    "daysInARow": "{count, plural, other {连续 {count} 天}}",
     "noStreak": "暂无连续记录。复习一些卡片来开始吧！",
     "masteryDistribution": "掌握度分布",
     "masteryLocked": "未开始",
@@ -422,7 +420,6 @@
     "speciesSeenAtLeastOnce": "至少见过一次的种族",
     "byGeneration": "按世代",
     "byGenerationMasteredTotal": "已掌握 / 总数",
-    "viewInPokedex": "在图鉴中查看{name}",
     "collectionTimeline": "收集时间线",
     "evolutionWall": "进化墙",
     "closeToMastery": "即将掌握"
@@ -435,8 +432,7 @@
       "body": "没有网络连接时，某些页面无法使用。您之前查看过的卡片应该仍然可以正常使用。"
     },
     "tryAgain": "重试",
-    "goHome": "前往练习",
-    "goPractice": "前往练习"
+    "goHome": "前往练习"
   },
   "onboarding": {
     "welcomeHeading": "欢迎使用 Poké Memory",

@@ -394,7 +394,6 @@
       "heading": "苦手なカード",
       "empty": "まだ苦手なカードはありません。この調子で頑張りましょう！"
     },
-    "viewInPokedex": "Pokédex で{name}を見る",
     "forcePull": {
       "heading": "データ",
       "description": "記録がおかしい場合はこれを使用してください。クラウドから正確なデータを取得します。",
@@ -411,8 +410,7 @@
     "description": "あなたの Pokémon 学習の旅。",
     "loadingAriaLabel": "旅を読み込み中",
     "currentStreak": "現在の連続日数",
-    "dayInARow": "日連続",
-    "daysInARow": "{count}日連続",
+    "daysInARow": "{count, plural, other {{count}日連続}}",
     "noStreak": "連続記録なし。カードをレビューして始めましょう！",
     "masteryDistribution": "習得状況の分布",
     "masteryLocked": "未開始",
@@ -422,7 +420,6 @@
     "speciesSeenAtLeastOnce": "1回以上表示された種族",
     "byGeneration": "世代別",
     "byGenerationMasteredTotal": "習得済み / 合計",
-    "viewInPokedex": "Pokédex で{name}を見る",
     "collectionTimeline": "コレクションタイムライン",
     "evolutionWall": "進化ウォール",
     "closeToMastery": "習得間近"
@@ -435,8 +432,7 @@
       "body": "接続がないと一部のページは利用できません。以前に見たカードは引き続き機能するはずです。"
     },
     "tryAgain": "もう一度試す",
-    "goHome": "練習に戻る",
-    "goPractice": "練習に行く"
+    "goHome": "練習に戻る"
   },
   "onboarding": {
     "welcomeHeading": "Poké Memory へようこそ",
