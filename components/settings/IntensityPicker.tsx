@@ -1,7 +1,7 @@
 "use client";
 
 import type { ThemeIntensity } from "@/lib/settings/persistence";
-import { colStack, colStackLg } from "@/lib/utils/class-names";
+import { colStack, colStackLg, sectionLabelSm } from "@/lib/utils/class-names";
 
 type Option = {
   value: ThemeIntensity;
@@ -37,7 +37,7 @@ export function IntensityPicker({ value, onChange }: Props) {
     <section className={colStackLg} aria-labelledby="intensity-heading">
       <h2
         id="intensity-heading"
-        className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+        className={sectionLabelSm}
       >
         Theme intensity
       </h2>

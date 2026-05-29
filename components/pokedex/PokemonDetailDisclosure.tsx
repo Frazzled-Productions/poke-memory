@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCardClass } from "@/lib/review/useCardClass";
 import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
-import { colStack } from "@/lib/utils/class-names";
+import { colStack, sectionLabelSmSubtle } from "@/lib/utils/class-names";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { getPokemonFacts, loadFlavorTexts } from "@/lib/pokemon/facts";
@@ -328,7 +328,7 @@ export function PokemonDetailDisclosure({
         <section aria-labelledby="stats-heading" className="mt-8">
           <h2
             id="stats-heading"
-            className="mb-3 text-sm font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500"
+            className={`mb-3 ${sectionLabelSmSubtle}`}
           >
             Base Stats
           </h2>
@@ -365,7 +365,7 @@ export function PokemonDetailDisclosure({
         <section aria-labelledby="facts-heading" className="mt-10">
           <h2
             id="facts-heading"
-            className="mb-3 text-sm font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500"
+            className={`mb-3 ${sectionLabelSmSubtle}`}
           >
             Facts
           </h2>
@@ -386,7 +386,7 @@ export function PokemonDetailDisclosure({
         <section aria-labelledby="evo-heading" className="mt-10">
           <h2
             id="evo-heading"
-            className="mb-4 text-sm font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500"
+            className={`mb-4 ${sectionLabelSmSubtle}`}
           >
             Evolution Chain
           </h2>
@@ -416,7 +416,7 @@ export function PokemonDetailDisclosure({
         <section aria-labelledby="forms-heading" className="mt-10">
           <h2
             id="forms-heading"
-            className="mb-4 text-sm font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500"
+            className={`mb-4 ${sectionLabelSmSubtle}`}
           >
             Forms
           </h2>

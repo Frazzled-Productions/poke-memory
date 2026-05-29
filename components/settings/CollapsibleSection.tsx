@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { sectionLabelSm } from "@/lib/utils/class-names";
 
 const STORAGE_PREFIX = "poke-memory:settings-section:";
 
@@ -113,7 +114,7 @@ export function CollapsibleSection({
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded",
           ].join(" ")}
         >
-          <span className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          <span className={sectionLabelSm}>
             {heading}
           </span>
           <ChevronIcon open={effectiveOpen} />

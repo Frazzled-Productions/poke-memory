@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
-import { cardPanelPadded, colStack, colStackLg, mutedText } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, mutedText, sectionLabelSm } from "@/lib/utils/class-names";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -143,7 +143,7 @@ export function FsrsOptimizerSection({
     <section className={colStackLg} aria-labelledby="optimizer-heading">
       <h2
         id="optimizer-heading"
-        className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+        className={sectionLabelSm}
       >
         Personalize my schedule
       </h2>

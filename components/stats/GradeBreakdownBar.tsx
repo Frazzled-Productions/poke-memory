@@ -1,4 +1,4 @@
-import { mutedText } from "@/lib/utils/class-names";
+import { mutedText, sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
   again: number;
@@ -72,7 +72,7 @@ export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegm
               >
                 <div className="mb-1 flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <span className={sectionLabel}>
                     {segLabel}
                   </span>
                 </div>

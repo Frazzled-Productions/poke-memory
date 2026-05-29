@@ -7,6 +7,7 @@ import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import type { CardDirection } from "@/components/review/DirectionBadge";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { sectionLabelSubtle } from "@/lib/utils/class-names";
 
 export const SPRITE_CLASS = "h-24 w-24 object-contain sm:h-48 sm:w-48";
 export const ARROW_CLASS =
@@ -160,7 +161,7 @@ export function EvolutionCardLayout({
             </div>
             {fact && (
               <div className="w-full mt-1 text-center sm:mt-2">
-                <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                <span className={sectionLabelSubtle}>
                   {fact.label}
                 </span>
                 <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-300 max-w-xs mx-auto">

@@ -49,6 +49,32 @@ export const sectionLabel =
   "text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400";
 
 /**
+ * `text-sm` variant of `sectionLabel`. Used for Settings section headings
+ * (`CollapsibleSection`, `IntensityPicker`, `FsrsOptimizerSection`) and the
+ * What's New changelog kind labels, where a slightly larger size gives the
+ * heading a clearer hierarchy above its body content.
+ */
+export const sectionLabelSm =
+  "text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400";
+
+/**
+ * Subtle section label with `tracking-widest` and inverted zinc tones
+ * (`text-zinc-400 dark:text-zinc-500`). Used for in-card fact labels on the
+ * practice card reveal surfaces (`PokemonCard`, `EvolutionCardLayout`) where
+ * the label sits against a brighter value and intentionally recedes.
+ */
+export const sectionLabelSubtle =
+  "text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500";
+
+/**
+ * `text-sm` variant of `sectionLabelSubtle`. Used for Pokédex detail section
+ * headings (`PokemonDetailDisclosure`) where the heading must stand slightly
+ * taller while still using the inverted zinc tone of the detail surface.
+ */
+export const sectionLabelSmSubtle =
+  "text-sm font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500";
+
+/**
  * Modal `<dialog>` panel with the standard rounded border, shadow, and
  * semi-transparent backdrop. Completes the `cardPanel` / `cardPanelPadded`
  * panel family for the dialog surface.
