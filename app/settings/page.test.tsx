@@ -216,6 +216,12 @@ vi.mock("@/i18n/locales", () => ({
   SUPPORTED_LOCALES: ["en", "ja", "zh-Hans", "zh-Hant"],
   LOCALE_COOKIE: "poke-memory:locale",
   DEFAULT_LOCALE: "en",
+  LOCALE_ENDONYMS: {
+    en: "English",
+    ja: "日本語",
+    "zh-Hans": "简体中文",
+    "zh-Hant": "繁體中文",
+  },
 }));
 
 vi.mock("@/lib/i18n/actions", () => ({
