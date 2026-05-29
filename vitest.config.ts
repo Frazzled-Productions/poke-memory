@@ -23,15 +23,17 @@ export default defineConfig({
       //         consumed by coverage.yml's diff-coverage gate
       // html  → drillable local report under coverage/
       reporter: ["text", "json-summary", "json", "html"],
-      // Global floor (regression guard, #824). Set ~1.5 pts below today's
-      // measured baseline (S 78.69 / B 71.93 / F 74.28 / L 80.87) rounded
-      // down, so an unrelated coverage drop fails CI. Ratchet upward as
-      // coverage improves — never downward to make a red build pass.
+      // Global floor (regression guard, #824). Set to the nearest whole
+      // percentage at or below today's measured baseline (S 81.05 / B 75.13 /
+      // F 77.84 / L 83.29), so an unrelated coverage drop fails CI. Ratchet
+      // upward as coverage improves — never downward to make a red build
+      // pass. The /batch-issues skill ratchets these at the end of every
+      // session that touches product code; manual ratchets are also fine.
       thresholds: {
-        statements: 77,
-        branches: 70,
-        functions: 72,
-        lines: 79,
+        statements: 81,
+        branches: 75,
+        functions: 77,
+        lines: 83,
       },
       // Measure the application/library source we actually ship and test.
       include: ["app/**", "components/**", "lib/**"],
