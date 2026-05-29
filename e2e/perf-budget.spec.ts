@@ -27,6 +27,7 @@ const BUDGETS = {
 const DEFAULT_BUDGET_MS = 8_000;
 
 import { test, expect } from "@playwright/test";
+import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 test.describe("Fresh-visitor performance budget (#1268)", () => {
   /**
@@ -49,18 +50,17 @@ test.describe("Fresh-visitor performance budget (#1268)", () => {
       "PERF_BUDGET=1 required to run perf budget tests",
     );
 
-    // Pre-dismiss the onboarding modal via localStorage so it does not block
-    // the interactive element we are waiting for. addInitScript runs before
-    // page.goto, so it is set before the app bootstraps.
-    await page.addInitScript(() => {
-      const settings = JSON.parse(
-        localStorage.getItem("poke-memory:settings:v1") ?? "{}",
-      );
-      localStorage.setItem(
-        "poke-memory:settings:v1",
-        JSON.stringify({ ...settings, firstVisitOnboardingDismissed: true }),
-      );
-    });
+    // Pre-dismiss the onboarding modal using the shared helper (#1298).
+    //
+    // The previous inline addInitScript set `firstVisitOnboardingDismissed`
+    // at the top level of the settings blob, but
+    // FirstVisitOnboardingModal.tsx reads it from
+    // `settings.onboarding?.firstVisitOnboardingDismissed` (a nested path).
+    // When the flag was at the wrong level the modal opened, applied `inert`
+    // to #app-root, and Playwright could not find the Reveal button — causing
+    // "perf budget exceeded" to measure "time to give up", not actual load
+    // time. The helper nests the flag correctly under `onboarding`.
+    await addOnboardingPreDismiss(page);
 
     // Start the navigation timer from just before goto so we capture the
     // full round-trip including network. The `navigation` PerformanceTiming
@@ -69,6 +69,14 @@ test.describe("Fresh-visitor performance budget (#1268)", () => {
     const gotoStart = Date.now();
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    // Defensive guard: confirm the onboarding modal is absent before
+    // measuring. If it is present, `inert` on #app-root will block the
+    // Reveal button and the timeout will measure "time to give up" rather
+    // than the actual load time (#1298).
+    await expect(
+      page.getByRole("dialog", { name: /welcome to pok[eé] memory/i }),
+    ).toHaveCount(0, { timeout: 5_000 });
 
     // Wait for the above-fold interactive element. This is the key
     // time-to-interactive signal: the seed JSON has been parsed, IDB seeded,
