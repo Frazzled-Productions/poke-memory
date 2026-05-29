@@ -128,6 +128,18 @@ export const KEY_OFFLINE_DOWNLOADED_AT = "poke-memory:offline-downloaded-at";
  */
 export const KEY_HAS_MASTERED = "poke-memory:has-mastered:v2";
 
+// ─── QA seed active scenario ──────────────────────────────────────────────────
+
+/**
+ * Stores the slug of the currently active QA seed scenario.
+ * Written by applySeedScenario, cleared by clearSeedScenario.
+ * Read by QaSeedSection on mount to restore the active-seed indicator.
+ *
+ * Absence means no seed is active. Value is a raw slug string, e.g.
+ * "mastery-gaps" or "pasture-progression".
+ */
+export const KEY_QA_SEED_ACTIVE = "poke-memory:qa-seed-active";
+
 // ─── Per-device shuffle salt ──────────────────────────────────────────────────
 
 /**

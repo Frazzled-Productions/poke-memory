@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cardPanelPadded } from "@/lib/utils/class-names";
 import { cn } from "@/lib/utils/cn";
-import { SCENARIOS } from "@/lib/qa-seed/scenarios";
+import { SCENARIOS, SCENARIO_BY_SLUG } from "@/lib/qa-seed/scenarios";
 import { applySeedScenario, clearSeedScenario } from "@/lib/qa-seed/apply";
+import { KEY_QA_SEED_ACTIVE } from "@/lib/storage/keys";
 
 type ApplyStatus =
   | { kind: "idle" }
@@ -28,6 +29,18 @@ type ApplyStatus =
 export function QaSeedSection() {
   const [selectedSlug, setSelectedSlug] = useState<string>(SCENARIOS[0]?.slug ?? "");
   const [status, setStatus] = useState<ApplyStatus>({ kind: "idle" });
+  // Slug of the scenario currently written to IDB, restored from localStorage on mount.
+  const [activeSeedSlug, setActiveSeedSlug] = useState<string | null>(null);
+
+  // Restore the active-seed indicator from localStorage on mount.
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(KEY_QA_SEED_ACTIVE);
+      setActiveSeedSlug(stored ?? null);
+    } catch {
+      // Private browsing / storage quota — non-fatal.
+    }
+  }, []);
 
   const selectedScenario = SCENARIOS.find((s) => s.slug === selectedSlug);
 
@@ -44,7 +57,8 @@ export function QaSeedSection() {
     setStatus({ kind: "applying" });
     try {
       const payload = selectedScenario.build();
-      await applySeedScenario(payload);
+      await applySeedScenario(payload, selectedScenario.slug);
+      setActiveSeedSlug(selectedScenario.slug);
       setStatus({ kind: "done", scenarioLabel: selectedScenario.label });
     } catch (err) {
       const message =
@@ -65,6 +79,7 @@ export function QaSeedSection() {
     setStatus({ kind: "applying" });
     try {
       await clearSeedScenario();
+      setActiveSeedSlug(null);
       setStatus({ kind: "cleared" });
     } catch (err) {
       const message =
@@ -91,6 +106,19 @@ export function QaSeedSection() {
         after applying. Sync is paused (superuser mode) so no cloud data is
         affected.
       </p>
+
+      {/* Active seed indicator */}
+      {activeSeedSlug !== null && (
+        <p
+          data-testid="qa-seed-active-indicator"
+          className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400"
+        >
+          Active seed:{" "}
+          <span className="font-semibold">
+            {SCENARIO_BY_SLUG.get(activeSeedSlug)?.label ?? activeSeedSlug}
+          </span>
+        </p>
+      )}
 
       {/* Scenario picker */}
       <div className="mt-3 flex flex-col gap-2">

@@ -121,6 +121,74 @@ test.describe("QA seed mode", () => {
     await expect(page.getByText(/Your pasture is empty/i)).toHaveCount(0);
   });
 
+  test("Applying mastery-gaps scenario and reloading shows Next arrivals content", async ({ page }) => {
+    await seedSuperuserWithQaSeed(page);
+    await page.goto("/settings");
+
+    page.on("dialog", (dialog) => { void dialog.accept(); });
+
+    await page.getByRole("button", { name: "Advanced", exact: true }).click();
+    const developerSection = page.getByRole("region", { name: /developer/i });
+    await expect(developerSection).toBeVisible({ timeout: 10_000 });
+
+    const seedPanel = page.getByTestId("qa-seed-section");
+    await expect(seedPanel).toBeVisible();
+
+    // Select the mastery-gaps scenario.
+    await seedPanel.getByRole("combobox", { name: /scenario/i }).selectOption("mastery-gaps");
+
+    // Apply.
+    await seedPanel.getByRole("button", { name: /apply.*seed/i }).click();
+    await expect(seedPanel.getByRole("status")).toContainText(/seed applied/i, { timeout: 10_000 });
+
+    // Active-seed indicator must reflect the chosen scenario immediately after apply.
+    await expect(page.getByTestId("qa-seed-active-indicator")).toBeVisible();
+    await expect(page.getByTestId("qa-seed-active-indicator")).toContainText("Mastery gaps");
+
+    // Reload and navigate to the Pasture.
+    await page.reload();
+    await page.goto("/pasture");
+
+    // "Next arrivals" section must be visible with actual content, not the empty state.
+    const nextArrivalsSection = page.getByRole("region", { name: /next arrivals/i });
+    await expect(nextArrivalsSection).toBeVisible({ timeout: 15_000 });
+    await expect(
+      nextArrivalsSection.getByText(/all reviewed.*already in your pasture/i),
+    ).toHaveCount(0);
+    // The arrivals list must exist.
+    await expect(
+      nextArrivalsSection.getByRole("list", { name: /upcoming pasture species/i }),
+    ).toBeVisible();
+  });
+
+  test("Active-seed indicator is shown on mount and cleared after Clear seed", async ({ page }) => {
+    // Pre-set the active-seed key in localStorage before mount.
+    await seedSuperuserWithQaSeed(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem("poke-memory:qa-seed-active", "mastery-gaps");
+    });
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Advanced", exact: true }).click();
+
+    const developerSection = page.getByRole("region", { name: /developer/i });
+    await expect(developerSection).toBeVisible({ timeout: 10_000 });
+
+    const seedPanel = page.getByTestId("qa-seed-section");
+    await expect(seedPanel).toBeVisible();
+
+    // Active indicator must show on mount (restored from localStorage).
+    await expect(page.getByTestId("qa-seed-active-indicator")).toBeVisible();
+    await expect(page.getByTestId("qa-seed-active-indicator")).toContainText("Mastery gaps");
+
+    // Clear the seed.
+    page.on("dialog", (dialog) => { void dialog.accept(); });
+    await seedPanel.getByRole("button", { name: /clear.*seed/i }).click();
+    await expect(seedPanel.getByRole("status")).toContainText(/seed cleared/i, { timeout: 10_000 });
+
+    // Indicator must be gone after clearing.
+    await expect(page.getByTestId("qa-seed-active-indicator")).toHaveCount(0);
+  });
+
   test("QA seed mode toggle appears in the Developer panel", async ({ page }) => {
     // Start with qaSeedMode off so we can toggle it on.
     await page.addInitScript(() => {

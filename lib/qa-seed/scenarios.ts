@@ -449,6 +449,126 @@ function buildPastureProgression(): SeedPayload {
   };
 }
 
+/**
+ * `mastery-gaps`
+ *
+ * Exercises two features that need specific in-between states:
+ *
+ * (a) "Next arrivals" strip on the Pasture (#1316): requires reviewed-but-unmastered
+ *     name cards — i.e. name cards that have been seen at least once but have not
+ *     yet reached reps >= 3 AND scheduledDays >= 21. The strip ranks them by
+ *     closest to mastery so QA can confirm real species appear rather than the
+ *     "all reviewed Pokémon already in your Pasture" empty state.
+ *
+ * (b) "Close to mastery" on Journey (#1312): requires species where the NAME card
+ *     IS mastered (reps >= 3, scheduledDays >= 21) but the matched REVERSE card
+ *     has NOT yet reached that bar. Without this shape the list is empty.
+ *
+ * Mix:
+ * - 15 fully mastered pairs (name + reverse both mastered) → Pasture is populated
+ * - 10 "name mastered, reverse near-miss" pairs → Close to mastery list
+ *   - 5 with a partially-reviewed reverse (scheduledDays 5–15)
+ *   - 5 with an unseen reverse (no reps yet)
+ * - 10 reviewed-but-unmastered name-only cards (reps 1–2, scheduledDays 5–10) → Next arrivals
+ * - 5 in-learning name-only cards → new queue
+ */
+function buildMasteryGaps(): SeedPayload {
+  const cards: SeededCard[] = [];
+
+  // ── (1) 15 fully mastered pairs (Pasture is visibly populated) ──────────────
+  const fullMasteredIds = [
+    1, 4, 7, 10, 13, 16, 19, 23, 25, 27,
+    29, 32, 35, 37, 39,
+  ];
+  for (const id of fullMasteredIds) {
+    const offsetDays = ((id % 7) + 1);
+    const state = masteredState({
+      dueDate: relativeDate(offsetDays),
+      lastReview: relativeDate(-offsetDays),
+      firstSeen: PAST_30,
+    });
+    cards.push(nameCard(id, state));
+    cards.push(reverseCard(id, state));
+  }
+
+  // ── (2) 10 "name mastered, reverse not" pairs → Close to mastery ────────────
+  //
+  // Five with a partially-reviewed reverse card (shows progress bar > 0):
+  const nearMissPartialIds = [41, 43, 46, 48, 50];
+  for (const id of nearMissPartialIds) {
+    // Name card: fully mastered.
+    cards.push(nameCard(id, masteredState({ firstSeen: PAST_30 })));
+    // Reverse card: graduated but not mastered (scheduledDays 5–15 depending on id).
+    const scheduledDays = 5 + (id % 11); // 5..15
+    cards.push(reverseCard(id, {
+      stability: 8,
+      difficulty: 5,
+      elapsedDays: scheduledDays,
+      scheduledDays,
+      reps: 2,
+      lapses: 0,
+      fsrsState: "review",
+      dueDate: relativeDate(scheduledDays),
+      lastReview: relativeDate(-scheduledDays),
+      firstSeen: PAST_15,
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    }));
+  }
+
+  // Five with an unseen reverse card (no reverse seeded at all — it is "new"):
+  const nearMissUnseenIds = [52, 54, 56, 58, 60];
+  for (const id of nearMissUnseenIds) {
+    // Name card: fully mastered.
+    cards.push(nameCard(id, masteredState({ firstSeen: PAST_30 })));
+    // No reverse card seeded — hydrateSession treats it as new, and
+    // deriveCloseToMastery reports reverseIntroduced: false for the row.
+  }
+
+  // ── (3) 10 reviewed-but-unmastered name cards → Next arrivals strip ─────────
+  //
+  // These are name-only cards (no reverse seeded), so they satisfy nextArrivals:
+  // • firstSeen is set (seen at least once)
+  // • NOT mastered (reps < 3)
+  // • reverse is NOT mastered (no reverse card at all)
+  const nextArrivalsIds = [63, 66, 69, 72, 74, 77, 79, 81, 83, 84];
+  for (let i = 0; i < nextArrivalsIds.length; i++) {
+    const id = nextArrivalsIds[i];
+    // Vary reps and scheduledDays so the strip shows a ranked list, not all ties.
+    const reps = (i % 2) + 1; // 1 or 2
+    const scheduledDays = 3 + (i % 8); // 3..10
+    cards.push(nameCard(id, {
+      stability: 5 + i,
+      difficulty: 5,
+      elapsedDays: scheduledDays,
+      scheduledDays,
+      reps,
+      lapses: 0,
+      fsrsState: "review",
+      dueDate: relativeDate(scheduledDays),
+      lastReview: relativeDate(-scheduledDays),
+      firstSeen: PAST_15,
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    }));
+  }
+
+  // ── (4) 5 in-learning name cards ─────────────────────────────────────────────
+  const learningIds = [86, 88, 90, 92, 95];
+  for (const id of learningIds) {
+    cards.push(nameCard(id, learningState()));
+  }
+
+  return {
+    session: { cards, limits: DEFAULT_LIMITS },
+    pokemonNameLocale: null,
+  };
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
 export const SCENARIOS: Scenario[] = [
@@ -475,6 +595,15 @@ export const SCENARIOS: Scenario[] = [
       "40 mastered + 20 in-progress + 15 in-learning species. " +
       "Visit the Pasture to see a realistically populated view without the pretend-all-mastered flag.",
     build: buildPastureProgression,
+  },
+  {
+    slug: "mastery-gaps",
+    label: "Mastery gaps",
+    description:
+      "15 fully mastered pairs, 10 name-mastered/reverse-pending pairs, " +
+      "10 reviewed-but-unmastered names, and 5 in-learning. " +
+      "Visit Pasture to verify the Next arrivals strip, and Journey to verify Close to mastery.",
+    build: buildMasteryGaps,
   },
 ];
 
