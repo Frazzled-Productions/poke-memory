@@ -45,7 +45,7 @@ function assertValidPayload(payload: SeedPayload, slug: string) {
     ).toBe(true);
 
     for (const card of payload.session.cards) {
-      expect(["name", "evolution"].includes(card.cardType), `${slug}: cardType must be name or evolution`).toBe(true);
+      expect(["name", "evolution", "reverse"].includes(card.cardType), `${slug}: cardType must be name, evolution, or reverse`).toBe(true);
       expect(typeof card.id).toBe("number");
       expect(typeof card.state).toBe("object");
 

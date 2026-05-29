@@ -45,7 +45,25 @@ type SeededEvolutionCard = {
   state: SeededState;
 };
 
-type SeededCard = SeededNameCard | SeededEvolutionCard;
+/**
+ * Minimal reverse-card shape accepted by lib/review/persistence.ts parseSession.
+ *
+ * The validator requires `name` and `spriteUrl` (same as name cards). `pokemonId`
+ * must be the original species ID; `id` must be REVERSE_ID_OFFSET (2_000_000) +
+ * pokemonId. hydrateSession then backfills all SeedPokemon fields on load.
+ */
+type SeededReverseCard = {
+  cardType: "reverse";
+  id: number;        // REVERSE_ID_OFFSET + pokemonId
+  pokemonId: number; // original species ID
+  locale: string;
+  name: string;
+  spriteUrl: string;
+  subjectKey: string;
+  state: SeededState;
+};
+
+type SeededCard = SeededNameCard | SeededEvolutionCard | SeededReverseCard;
 
 type DailyLimits = {
   name: { maxNewPerDay: number; maxReviewsPerDay: number };
@@ -196,6 +214,30 @@ function evolutionCard(preEvoId: number, postEvoId: number, edgeId: number, stat
   };
 }
 
+/**
+ * Since #1234, the Pasture requires BOTH the name card AND the paired reverse
+ * card to be mastered before a species appears. Seed reverse cards alongside
+ * mastered name cards so pasture-facing scenarios actually populate the Pasture.
+ *
+ * id = REVERSE_ID_OFFSET (2_000_000) + pokemonId — matching the offset used
+ * by hydrateSession. name/spriteUrl are placeholders; hydrateSession backfills
+ * all SeedPokemon fields from the seed on load.
+ */
+const REVERSE_ID_OFFSET = 2_000_000;
+
+function reverseCard(id: number, state: SeededState, locale = "en"): SeededReverseCard {
+  return {
+    cardType: "reverse",
+    id: REVERSE_ID_OFFSET + id,
+    pokemonId: id,
+    locale,
+    name: `pokemon-${id}`,
+    spriteUrl: `/sprites/pokemon/${id}.png`,
+    subjectKey: `species:${id}`,
+    state,
+  };
+}
+
 // ─── Scenario builders ────────────────────────────────────────────────────────
 
 /**
@@ -212,20 +254,21 @@ function evolutionCard(preEvoId: number, postEvoId: number, edgeId: number, stat
 function buildFsrsLocaleMastery(): SeedPayload {
   const cards: SeededCard[] = [];
 
-  // 30 mastered Gen-I species (en locale)
+  // 30 mastered Gen-I species (en locale).
+  // Since #1234, the Pasture requires both name AND reverse mastered — seed both.
   const masteredIds = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
     13, 16, 19, 25, 35, 39, 52, 54, 58, 63,
     66, 74, 79, 81, 84, 86, 90, 92, 95, 98,
   ];
   for (const id of masteredIds) {
-    cards.push(
-      nameCard(id, masteredState({
-        dueDate: FUTURE_7,
-        lastReview: PAST_7,
-        firstSeen: PAST_30,
-      }), "en"),
-    );
+    const state = masteredState({
+      dueDate: FUTURE_7,
+      lastReview: PAST_7,
+      firstSeen: PAST_30,
+    });
+    cards.push(nameCard(id, state, "en"));
+    cards.push(reverseCard(id, state, "en"));
   }
 
   // 10 due-soon (en locale)
@@ -347,7 +390,8 @@ function buildOptimiserStress(): SeedPayload {
 function buildPastureProgression(): SeedPayload {
   const cards: SeededCard[] = [];
 
-  // 40 mastered Gen-I species — the Pasture should be nicely populated
+  // 40 mastered Gen-I species — the Pasture should be nicely populated.
+  // Since #1234, the Pasture requires both name AND reverse mastered — seed both.
   const masteredIds = [
     1, 4, 7, 10, 13, 16, 19, 21, 23, 25,
     27, 29, 32, 35, 37, 39, 41, 43, 46, 48,
@@ -356,11 +400,13 @@ function buildPastureProgression(): SeedPayload {
   ];
   for (const id of masteredIds) {
     const offsetDays = ((id % 14) + 1); // vary the due-dates
-    cards.push(nameCard(id, masteredState({
+    const state = masteredState({
       dueDate: relativeDate(offsetDays),
       lastReview: relativeDate(-offsetDays),
       firstSeen: PAST_30,
-    })));
+    });
+    cards.push(nameCard(id, state));
+    cards.push(reverseCard(id, state));
   }
 
   // 20 graduated / due-soon (in progress, not yet mastered)
