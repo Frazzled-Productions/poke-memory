@@ -13,177 +13,177 @@
   },
   "settings": {
     "heading": "設定",
-    "saved": "Saved!",
-    "save": "Save",
+    "saved": "保存しました！",
+    "save": "保存",
     "search": {
-      "placeholder": "Search settings...",
-      "noMatch": "No settings match \"{query}\".",
-      "ariaLabel": "Search settings"
+      "placeholder": "設定を検索...",
+      "noMatch": "\"{query}\" に一致する設定はありません。",
+      "ariaLabel": "設定を検索"
     },
     "section": {
-      "appearance": "Appearance",
-      "practice": "Practice",
-      "audio": "Audio",
-      "offline": "Offline",
-      "accountData": "Account & Data",
-      "advanced": "Advanced",
-      "labs": "Labs"
+      "appearance": "外観",
+      "practice": "練習",
+      "audio": "オーディオ",
+      "offline": "オフライン",
+      "accountData": "アカウントとデータ",
+      "advanced": "詳細設定",
+      "labs": "ラボ"
     },
     "appearance": {
       "mobileNav": {
-        "heading": "Mobile navigation",
-        "label": "Bottom tab bar",
-        "description": "Show a fixed tab bar at the bottom of the screen on mobile. Turn off to use the classic hamburger menu instead. Has no effect on wide screens."
+        "heading": "モバイルナビゲーション",
+        "label": "下部タブバー",
+        "description": "モバイルで画面下部に固定タブバーを表示します。オフにすると、代わりにクラシックなハンバーガーメニューを使用します。広い画面には影響しません。"
       },
       "theme": {
-        "heading": "App Theme",
-        "description": "Master a Pokémon to unlock it as an app colour theme.",
-        "selected": "Selected",
-        "setAsTheme": "Set as theme",
-        "remove": "Remove"
+        "heading": "アプリテーマ",
+        "description": "Pokémon を習得済みにするとアプリのカラーテーマとして使用できるようになります。",
+        "selected": "選択中",
+        "setAsTheme": "テーマに設定",
+        "remove": "削除"
       }
     },
     "labs": {
       "languages": {
-        "label": "Languages",
-        "description": "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese.",
+        "label": "言語",
+        "description": "Pokémon の名前を日本語、簡体字中国語、繁体字中国語で表示します。",
         "locale": {
           "en": "English",
-          "ja": "Japanese",
-          "zh-Hans": "Simplified Chinese",
-          "zh-Hant": "Traditional Chinese"
+          "ja": "日本語",
+          "zh-Hans": "简体中文",
+          "zh-Hant": "繁體中文"
         },
-        "selectLocale": "Language"
+        "selectLocale": "言語"
       }
     },
     "practice": {
       "scheduler": {
-        "heading": "Scheduler"
+        "heading": "スケジューラー"
       },
       "masteryThreshold": {
-        "label": "Mastery threshold",
-        "description": "Cards with this many consecutive correct reviews count as mastered."
+        "label": "習得基準",
+        "description": "この回数だけ連続して正解したカードが習得済みとしてカウントされます。"
       },
       "recallTarget": {
-        "label": "Recall target ({percent}%)",
-        "description": "Lower means fewer reviews but you will forget more cards. Higher means more reviews but better retention. Default 90%."
+        "label": "記憶目標 ({percent}%)",
+        "description": "低くするとレビュー回数が減りますが、より多くのカードを忘れます。高くするとレビュー回数が増えますが、記憶の定着率が向上します。デフォルトは90%です。"
       },
       "nameCards": {
-        "heading": "Name cards"
+        "heading": "名前カード"
       },
       "evolutionCards": {
-        "heading": "Evolution cards"
+        "heading": "進化カード"
       },
       "reverseCards": {
-        "heading": "Reverse cards"
+        "heading": "逆引きカード"
       },
       "cryCards": {
-        "heading": "Cry to name cards"
+        "heading": "鳴き声から名前カード"
       },
-      "newPerDay": "New cards per day",
-      "reviewsPerDay": "Reviews per day",
-      "save": "Save"
+      "newPerDay": "1日の新規カード数",
+      "reviewsPerDay": "1日のレビュー数",
+      "save": "保存"
     },
     "audio": {
       "playCryOnReveal": {
-        "label": "Play cry on reveal",
-        "description": "Plays the Pokémon's cry once when you reveal a name or evolution card."
+        "label": "めくった時に鳴き声を再生",
+        "description": "名前カードまたは進化カードをめくった時に、Pokémon の鳴き声を一度再生します。"
       },
       "speakNameOnReveal": {
-        "label": "Speak name on reveal",
-        "description": "Reads the Pokémon's name aloud using your device's text-to-speech engine when you reveal a card."
+        "label": "めくった時に名前を読み上げ",
+        "description": "カードをめくった時に、デバイスの音声合成エンジンを使って Pokémon の名前を読み上げます。"
       }
     },
     "backup": {
-      "heading": "Backup",
-      "exportLabel": "Export progress",
-      "exportDescription": "Downloads a JSON backup of all your card progress and settings.",
-      "exportButton": "Export",
-      "importLabel": "Import progress",
-      "importDescription": "Restore from a previously exported backup. Replaces current progress after confirmation.",
-      "importButton": "Import"
+      "heading": "バックアップ",
+      "exportLabel": "進捗をエクスポート",
+      "exportDescription": "すべてのカードの進捗と設定を JSON バックアップとしてダウンロードします。",
+      "exportButton": "エクスポート",
+      "importLabel": "進捗をインポート",
+      "importDescription": "以前にエクスポートしたバックアップから復元します。確認後、現在の進捗を置き換えます。",
+      "importButton": "インポート"
     },
     "regional": {
-      "heading": "Regional",
+      "heading": "地域設定",
       "timezone": {
-        "label": "Timezone",
-        "description": "Used for daily review limits and streak roll-overs. Auto-detected on first load."
+        "label": "タイムゾーン",
+        "description": "1日のレビュー上限と連続日数のリセットに使用します。初回ロード時に自動検出されます。"
       },
       "dateFormat": {
-        "label": "Date format",
-        "description": "Controls how dates are shown throughout the app."
+        "label": "日付形式",
+        "description": "アプリ全体での日付の表示方法を設定します。"
       }
     },
     "about": {
-      "heading": "About",
-      "version": "Version",
-      "whatsNew": "What's new",
-      "viewChangelog": "View changelog"
+      "heading": "このアプリについて",
+      "version": "バージョン",
+      "whatsNew": "新機能",
+      "viewChangelog": "変更履歴を見る"
     },
     "dangerZone": {
-      "heading": "Danger zone",
-      "resetAllProgress": "Reset all progress",
-      "resetDescription": "Permanently deletes your review history",
-      "resetDescriptionCloud": "Permanently deletes your review history and cloud data.",
-      "deleteAccount": "Delete account",
-      "deleteDescription": "Permanently erases your account, cloud data, and sign-in identity. This cannot be undone."
+      "heading": "危険な操作",
+      "resetAllProgress": "すべての進捗を削除",
+      "resetDescription": "レビュー履歴を完全に削除します",
+      "resetDescriptionCloud": "レビュー履歴とクラウドデータを完全に削除します。",
+      "deleteAccount": "アカウントを削除",
+      "deleteDescription": "アカウント、クラウドデータ、サインイン情報を完全に消去します。この操作は復元不可です。"
     },
     "developer": {
-      "heading": "Developer",
-      "description": "QA shortcuts. While any flag here is on, sync to the cloud is paused so QA state cannot leak into your real data.",
+      "heading": "開発者",
+      "description": "QA ショートカット。いずれかのフラグがオンの間、クラウドへの同期は一時停止されるため、QA の状態が実データに漏れることはありません。",
       "pretendAllMastered": {
-        "label": "Pretend all Pokémon are mastered",
-        "description": "Renders every species as mastered across the Pokédex, detail pages, Pasture, Stats, and the theme picker."
+        "label": "すべての Pokémon を習得済みとして表示",
+        "description": "Pokédex、詳細ページ、牧場、記録、テーマピッカー全体で、すべての種族を習得済みとして表示します。"
       }
     }
   },
   "practice": {
     "title": "Poké Memory - Learn every Pokémon",
     "description": "Free spaced-repetition flashcards for learning all 1025 Pokémon names and evolutions. No sign-up required.",
-    "signInFailed": "Sign-in failed. Please try again.",
-    "allCaughtUp": "All caught up!",
-    "nothingDue": "Nothing due right now.",
-    "reveal": "Reveal",
-    "again": "Again",
-    "hard": "Hard",
-    "good": "Good",
-    "easy": "Easy",
-    "undo": "Undo",
-    "loadingCard": "Loading card..."
+    "signInFailed": "サインインに失敗しました。もう一度お試しください。",
+    "allCaughtUp": "すべて完了！",
+    "nothingDue": "今はレビューがありません。",
+    "reveal": "めくる",
+    "again": "もう一度",
+    "hard": "難しい",
+    "good": "普通",
+    "easy": "簡単",
+    "undo": "元に戻す",
+    "loadingCard": "カードを読み込み中..."
   },
   "pokedex": {
     "title": "Pokédex",
-    "description": "Browse all 1025 Pokémon. Filter by generation, type, or mastery status.",
-    "searchPlaceholder": "Search by name or number...",
-    "filterByGeneration": "Generation",
-    "filterByType": "Type",
-    "filterMastered": "Mastered only",
-    "noResults": "No Pokémon match your filters.",
-    "loadMore": "Load more"
+    "description": "1025匹の Pokémon をブラウズできます。世代、タイプ、習得状況でフィルタリングできます。",
+    "searchPlaceholder": "名前または番号で検索...",
+    "filterByGeneration": "世代",
+    "filterByType": "タイプ",
+    "filterMastered": "習得済みのみ",
+    "noResults": "フィルターに一致する Pokémon がいません。",
+    "loadMore": "もっと読み込む"
   },
   "pasture": {
-    "title": "Pasture",
-    "description": "Pokémon you have mastered live here.",
-    "empty": "Your pasture is empty. Master some Pokémon to see them here.",
-    "searchPlaceholder": "Search mastered Pokémon...",
-    "masteredCount": "{count} mastered"
+    "title": "牧場",
+    "description": "習得済みの Pokémon がここに住んでいます。",
+    "empty": "牧場は空です。Pokémon を習得するとここに表示されます。",
+    "searchPlaceholder": "習得済みの Pokémon を検索...",
+    "masteredCount": "{count}匹習得済み"
   },
   "stats": {
-    "title": "Stats",
-    "description": "Track your Pokémon learning progress.",
-    "loading": "Loading stats...",
-    "totalMastered": "Mastered",
-    "totalSeen": "Seen",
-    "streak": "Streak",
-    "days": "{count} days"
+    "title": "記録",
+    "description": "Pokémon の学習進捗を確認できます。",
+    "loading": "記録を読み込み中...",
+    "totalMastered": "習得済み",
+    "totalSeen": "確認済み",
+    "streak": "連続日数",
+    "days": "{count}日"
   },
   "journey": {
-    "title": "Journey",
-    "description": "Your Pokémon learning journey."
+    "title": "旅",
+    "description": "あなたの Pokémon 学習の旅。"
   },
   "error": {
-    "heading": "Something went wrong",
-    "tryAgain": "Try again",
-    "goHome": "Go to Practice"
+    "heading": "エラーが発生しました",
+    "tryAgain": "もう一度試す",
+    "goHome": "練習に戻る"
   }
 }
