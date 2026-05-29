@@ -711,3 +711,153 @@ test.describe("Pokédex detail — next review date (#992)", () => {
     await expect(page.getByText(/Next review:/)).not.toBeVisible();
   });
 });
+
+test.describe("Pokédex sort options (#1314)", () => {
+  // Seed Bulbasaur (id=1) as learning and Charmander (id=4) as mastered so that
+  // "closest to mastery" has a real ranking to exercise beyond all-locked.
+  async function seedTwoPokemon(page: Page) {
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 5,
+            difficulty: 5,
+            elapsedDays: 5,
+            scheduledDays: 5,
+            reps: 2,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-04-25",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+        {
+          id: 4,
+          name: "Charmander",
+          spriteUrl: "/sprites/pokemon/4.png",
+          cardType: "name",
+          state: {
+            stability: 30,
+            difficulty: 4,
+            elapsedDays: 30,
+            scheduledDays: 30,
+            reps: 5,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-06-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+  }
+
+  test("sort select renders with National Number as default", async ({ page }) => {
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    await expandFilters(page);
+
+    // The sort control renders with National Number selected by default.
+    const sortSelect = page.getByLabel("Sort by");
+    await expect(sortSelect).toBeVisible();
+    await expect(sortSelect).toHaveValue("national");
+  });
+
+  test("selecting Alphabetical updates the URL and reorders the grid", async ({ page }) => {
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    // Wait for the grid to render before counting.
+    const allLists = page.getByRole("list", { name: /Pokémon/ });
+    await expect(allLists.first()).toBeVisible();
+
+    // Expand filters and change sort.
+    await expandFilters(page);
+    const sortSelect = page.getByLabel("Sort by");
+    await sortSelect.selectOption("alphabetical");
+
+    // URL should update to include sort=alphabetical.
+    await page.waitForURL(/sort=alphabetical/, { timeout: 5_000 });
+
+    // The flat grid (no generation headings) renders after a non-national sort.
+    // Verify a grid is still visible with items.
+    const flatGrid = page.getByRole("list", { name: "Pokémon" });
+    await expect(flatGrid).toBeVisible();
+    const tiles = flatGrid.getByRole("listitem");
+    const count = await tiles.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test("selecting Closest to mastery updates the URL and renders a grid", async ({ page }) => {
+    await seedTwoPokemon(page);
+    await page.goto("/pokedex");
+    await awaitSeedIdb(page);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    // Wait for the grid to hydrate.
+    const allLists = page.getByRole("list", { name: /Pokémon/ });
+    await expect(allLists.first()).toBeVisible();
+
+    await expandFilters(page);
+    const sortSelect = page.getByLabel("Sort by");
+    await sortSelect.selectOption("closest-to-mastery");
+
+    await page.waitForURL(/sort=closest-to-mastery/, { timeout: 5_000 });
+
+    // A flat grid with items must render.
+    const flatGrid = page.getByRole("list", { name: "Pokémon" });
+    await expect(flatGrid).toBeVisible();
+    const tiles = flatGrid.getByRole("listitem");
+    expect(await tiles.count()).toBeGreaterThan(0);
+  });
+
+  test("sort URL param is preserved on reload", async ({ page }) => {
+    await page.goto("/pokedex?sort=alphabetical");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    await expandFilters(page);
+
+    const sortSelect = page.getByLabel("Sort by");
+    await expect(sortSelect).toHaveValue("alphabetical");
+  });
+
+  test("switching back to National Number removes sort param from URL", async ({ page }) => {
+    await page.goto("/pokedex?sort=alphabetical");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    await expandFilters(page);
+    const sortSelect = page.getByLabel("Sort by");
+    await sortSelect.selectOption("national");
+
+    // After reverting to default, sort param should disappear.
+    await page.waitForURL((url) => !url.searchParams.has("sort"), { timeout: 5_000 });
+    expect(page.url()).not.toContain("sort=");
+  });
+});

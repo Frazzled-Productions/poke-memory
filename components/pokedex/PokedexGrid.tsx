@@ -209,13 +209,20 @@ export function LoadingSkeleton() {
 type PokedexGridProps = {
   pokemon: PokemonCellData[];
   activeGen?: number;
+  /**
+   * When true, renders all Pokémon in a single flat grid without generation
+   * headings. Used when a non-national sort is active — generation sections
+   * assume national-number order within each group, so they would be misleading
+   * under alphabetical or closest-to-mastery sorts.
+   */
+  flatList?: boolean;
 };
 
 // ---------------------------------------------------------------------------
 // PokedexGrid
 // ---------------------------------------------------------------------------
 
-export default function PokedexGrid({ pokemon, activeGen }: PokedexGridProps) {
+export default function PokedexGrid({ pokemon, activeGen, flatList = false }: PokedexGridProps) {
   if (pokemon.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -229,6 +236,21 @@ export default function PokedexGrid({ pokemon, activeGen }: PokedexGridProps) {
           Clear filters
         </Link>
       </div>
+    );
+  }
+
+  // Flat list — no generation headings. Used for non-national sort orders.
+  if (flatList) {
+    return (
+      <ul
+        className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10"
+        role="list"
+        aria-label="Pokémon"
+      >
+        {pokemon.map((p) => (
+          <PokemonCell key={p.id} pokemon={p} />
+        ))}
+      </ul>
     );
   }
 

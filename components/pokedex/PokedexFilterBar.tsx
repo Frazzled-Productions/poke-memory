@@ -1,6 +1,7 @@
 "use client";
 
 import type { PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
+import type { PokedexSortOrder } from "@/lib/pokedex/sort";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 
 // ---------------------------------------------------------------------------
@@ -25,11 +26,13 @@ const ROMAN: Record<number, string> = {
 
 type FilterBarProps = {
   filters: PokedexFilters;
+  sort: PokedexSortOrder;
   onQueryChange: (q: string) => void;
   onTypeToggle: (type: string) => void;
   onGenChange: (gen: number | null) => void;
   onAlternateFormsToggle: () => void;
   onMasteryChange: (masteryStatus: MasteryStatus) => void;
+  onSortChange: (sort: PokedexSortOrder) => void;
   /** When true (superuser pretendAllMastered on), the mastery filter is locked to "all" and disabled. */
   superuserMasteryLocked?: boolean;
 };
@@ -44,13 +47,21 @@ const MASTERY_OPTIONS: { value: MasteryStatus; label: string }[] = [
   { value: "not-yet-mastered", label: "Not yet mastered" },
 ];
 
+const SORT_OPTIONS: { value: PokedexSortOrder; label: string }[] = [
+  { value: "national", label: "National Number" },
+  { value: "alphabetical", label: "Alphabetical" },
+  { value: "closest-to-mastery", label: "Closest to mastery" },
+];
+
 export default function PokedexFilterBar({
   filters,
+  sort,
   onQueryChange,
   onTypeToggle,
   onGenChange,
   onAlternateFormsToggle,
   onMasteryChange,
+  onSortChange,
   superuserMasteryLocked = false,
 }: FilterBarProps) {
   return (
@@ -85,6 +96,28 @@ export default function PokedexFilterBar({
             </svg>
           </button>
         )}
+      </div>
+
+      {/* Sort control */}
+      <div className="mb-3">
+        <label
+          htmlFor="pokedex-sort"
+          className="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400"
+        >
+          Sort by
+        </label>
+        <select
+          id="pokedex-sort"
+          value={sort}
+          onChange={(e) => onSortChange(e.target.value as PokedexSortOrder)}
+          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 sm:w-auto"
+        >
+          {SORT_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Type chips */}
