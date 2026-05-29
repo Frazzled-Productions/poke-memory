@@ -32,7 +32,10 @@
     "search": {
       "placeholder": "設定を検索...",
       "noMatch": "\"{query}\" に一致する設定はありません。",
-      "ariaLabel": "設定を検索"
+      "ariaLabel": "設定を検索",
+      "clearAriaLabel": "検索をクリア",
+      "noMatchAnnouncement": "検索に一致する設定はありません。",
+      "matchAnnouncement": "{count, plural, other {{count} 件のセクションが一致しました。}}"
     },
     "section": {
       "appearance": "外観",
@@ -72,7 +75,8 @@
         "appLanguageLabel": "アプリ言語",
         "appLanguageDescription": "アプリのUI言語を設定します。UI翻訳は進行中です。",
         "pokemonNameLanguageLabel": "Pokémon 名前の言語",
-        "pokemonNameLanguageDescription": "カードに表示される Pokémon の名前の言語です。アプリ言語とは独立しています。"
+        "pokemonNameLanguageDescription": "カードに表示される Pokémon の名前の言語です。アプリ言語とは独立しています。",
+        "previewSuffix": "（プレビュー）"
       }
     },
     "practice": {
@@ -195,7 +199,7 @@
     },
     "howThisWorks": {
       "heading": "仕組み",
-      "body1": "Poké Memory は FSRS という間隔反復スケジューラーを使用しており、記憶の強さに基づいて最適なタイミングで各カードを表示します。",
+      "body1": "Poké Memory は<link>FSRS</link>という間隔反復スケジューラーを使用しており、記憶の強さに基づいて最適なタイミングで各カードを表示します。",
       "body2": "採点のたびにスケジューラーがそのカードへの記憶の強さを更新し、忘れそうなタイミングで次のレビューを設定します。忘れて思い出すことが長期記憶への近道なので、「もう一度」になることは正常で、システムが機能している証拠です。",
       "body3": "正直に採点することが大切です。ほぼ忘れていたら「難しい」を、完全に忘れていたら「もう一度」を押してください。スケジューラーは正直な入力がなければ機能しません。",
       "showOnboardingAgainLabel": "チュートリアルをもう一度表示",

@@ -57,7 +57,7 @@ export function SettingsSearch({ value, onChange, matchCount }: Props) {
         {isFiltering && (
           <button
             type="button"
-            aria-label="Clear search"
+            aria-label={t("settings.search.clearAriaLabel")}
             onClick={() => onChange("")}
             className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-400 hover:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:text-zinc-500 dark:hover:text-zinc-300"
           >
@@ -83,8 +83,8 @@ export function SettingsSearch({ value, onChange, matchCount }: Props) {
       >
         {isFiltering
           ? matchCount === 0
-            ? "No settings match your search."
-            : `${matchCount} section${matchCount === 1 ? "" : "s"} ${matchCount === 1 ? "matches" : "match"} your search.`
+            ? t("settings.search.noMatchAnnouncement")
+            : t("settings.search.matchAnnouncement", { count: matchCount })
           : ""}
       </p>
     </div>

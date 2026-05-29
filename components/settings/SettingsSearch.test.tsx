@@ -1,6 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa, screen } from "@/components/test-utils/renderWithIntl";
 import { SettingsSearch } from "@/components/settings/SettingsSearch";
 import {
   SETTINGS_SEARCH_INDEX,
@@ -232,5 +232,47 @@ describe("Settings page filter logic", () => {
     const visible = getVisibleSectionIds("voice");
     expect(visible.has("audio-heading")).toBe(true);
     expect(visible.size).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SettingsSearch — Japanese locale (#1392)
+//
+// Verifies that the aria strings (clear button, aria-live announcements)
+// are localised in the Japanese catalogue and not hardcoded English.
+// ---------------------------------------------------------------------------
+
+describe("SettingsSearch — Japanese locale aria strings", () => {
+  it("renders the clear button with a Japanese aria-label", () => {
+    renderJa(<SettingsSearch value="test" onChange={vi.fn()} matchCount={1} />);
+    // The Japanese catalog key clearAriaLabel must produce a non-English label.
+    const clearBtn = screen.getByRole("button");
+    expect(clearBtn).toBeInTheDocument();
+    const label = clearBtn.getAttribute("aria-label") ?? "";
+    // Must not be the English string.
+    expect(label).not.toBe("Clear search");
+    // Must be a non-empty string (the Japanese translation).
+    expect(label.length).toBeGreaterThan(0);
+  });
+
+  it("announces zero matches in Japanese", () => {
+    renderJa(
+      <SettingsSearch value="zzznomatch" onChange={vi.fn()} matchCount={0} />,
+    );
+    const status = screen.getByRole("status");
+    // Must not be the English hardcoded string.
+    expect(status.textContent).not.toBe("No settings match your search.");
+    // Must be non-empty (the Japanese translation).
+    expect((status.textContent ?? "").trim().length).toBeGreaterThan(0);
+  });
+
+  it("announces plural match count in Japanese", () => {
+    renderJa(
+      <SettingsSearch value="audio" onChange={vi.fn()} matchCount={2} />,
+    );
+    const status = screen.getByRole("status");
+    expect((status.textContent ?? "").trim().length).toBeGreaterThan(0);
+    // Must not contain English words.
+    expect(status.textContent).not.toMatch(/section/);
   });
 });

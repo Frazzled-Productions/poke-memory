@@ -1554,7 +1554,18 @@ export default function SettingsPage() {
                     {t("settings.howThisWorks.heading")}
                   </p>
                   <p className="text-sm text-foreground">
-                    {t("settings.howThisWorks.body1")}
+                    {t.rich("settings.howThisWorks.body1", {
+                      link: (chunks) => (
+                        <a
+                          href="https://github.com/open-spaced-repetition/ts-fsrs"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+                        >
+                          {chunks}
+                        </a>
+                      ),
+                    })}
                   </p>
                   <p className="text-sm text-foreground">
                     {t("settings.howThisWorks.body2")}
@@ -1954,7 +1965,7 @@ export default function SettingsPage() {
                                   <option key={loc} value={loc}>
                                     {loc === "en"
                                       ? LOCALE_ENDONYMS[loc]
-                                      : `${LOCALE_ENDONYMS[loc]} (preview)`}
+                                      : `${LOCALE_ENDONYMS[loc]} ${t("settings.labs.languages.previewSuffix")}`}
                                   </option>
                                 ))}
                               </select>
@@ -1986,7 +1997,7 @@ export default function SettingsPage() {
                                   <option key={loc} value={loc}>
                                     {loc === "en"
                                       ? LOCALE_ENDONYMS[loc]
-                                      : `${LOCALE_ENDONYMS[loc]} (preview)`}
+                                      : `${LOCALE_ENDONYMS[loc]} ${t("settings.labs.languages.previewSuffix")}`}
                                   </option>
                                 ))}
                               </select>

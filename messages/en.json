@@ -32,7 +32,10 @@
     "search": {
       "placeholder": "Search settings...",
       "noMatch": "No settings match \"{query}\".",
-      "ariaLabel": "Search settings"
+      "ariaLabel": "Search settings",
+      "clearAriaLabel": "Clear search",
+      "noMatchAnnouncement": "No settings match your search.",
+      "matchAnnouncement": "{count, plural, one {1 section matches your search.} other {{count} sections match your search.}}"
     },
     "section": {
       "appearance": "Appearance",
@@ -72,7 +75,8 @@
         "appLanguageLabel": "App language",
         "appLanguageDescription": "Controls the app UI language. App UI translation is in progress.",
         "pokemonNameLanguageLabel": "Pokémon name language",
-        "pokemonNameLanguageDescription": "Pokémon names on cards will be shown in this language. Independent of the app language above."
+        "pokemonNameLanguageDescription": "Pokémon names on cards will be shown in this language. Independent of the app language above.",
+        "previewSuffix": "(preview)"
       }
     },
     "practice": {
@@ -195,7 +199,7 @@
     },
     "howThisWorks": {
       "heading": "How this works",
-      "body1": "Poké Memory uses FSRS, a spaced-repetition scheduler that picks the best time to show each card based on how well you remember it.",
+      "body1": "Poké Memory uses <link>FSRS</link>, a spaced-repetition scheduler that picks the best time to show each card based on how well you remember it.",
       "body2": "After every grade the scheduler updates its model of how strong your memory of that card is, and sets the next review for when you're most likely to be about to forget it. Forgetting and then re-remembering is what actually moves a card into long-term memory, so getting a few Agains is normal and part of the system working.",
       "body3": "Honest grading matters more than getting every card right. If you almost forgot, press Hard. If you truly forgot, press Again. The scheduler can't help you if you mark cards Easy when you only just scraped it.",
       "showOnboardingAgainLabel": "Show onboarding again",

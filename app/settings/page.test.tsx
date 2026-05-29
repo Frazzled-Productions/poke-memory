@@ -228,6 +228,27 @@ const { mockT } = vi.hoisted(() => {
     return val;
   };
 
+  // t.rich: resolve the message, apply <tag>...</tag> renderers, return array.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (t as unknown as Record<string, unknown>).rich = (key: string, tags: Record<string, (chunks: any) => any>): any => {
+    const raw = resolveDotPath(enMessages, key);
+    const parts: unknown[] = [];
+    // Match <tagName>...</tagName> with backreference \1.
+    const tagRe = new RegExp("<(\\w+)>(.*?)<\\/\\1>", "g");
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = tagRe.exec(raw)) !== null) {
+      if (m.index > last) parts.push(raw.slice(last, m.index));
+      const tagName = m[1];
+      const inner = m[2];
+      const renderer = tags[tagName];
+      parts.push(renderer ? renderer(inner) : inner);
+      last = m.index + m[0].length;
+    }
+    if (last < raw.length) parts.push(raw.slice(last));
+    return parts.length === 1 ? parts[0] : parts;
+  };
+
   return { mockT: t };
 });
 
@@ -888,5 +909,82 @@ describe("SettingsPage — locale picker endonyms", () => {
       // English option must have no preview marker.
       expect(texts).toContain("English");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FSRS hyperlink in "How this works" body1
+//
+// Asserts that t.rich is used to render the FSRS word as an anchor element
+// pointing to the ts-fsrs GitHub repository.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — FSRS link in How this works", () => {
+  it("renders an anchor linking to the FSRS GitHub repo inside the How this works body", async () => {
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+
+    // Wait for the page to load (settings fetch is async).
+    await waitFor(() => {
+      expect(screen.getByText(/how this works/i)).toBeInTheDocument();
+    });
+
+    const fsrsLink = screen.getByRole("link", { name: "FSRS" });
+    expect(fsrsLink).toBeInTheDocument();
+    expect(fsrsLink).toHaveAttribute(
+      "href",
+      "https://github.com/open-spaced-repetition/ts-fsrs",
+    );
+    expect(fsrsLink).toHaveAttribute("target", "_blank");
+    expect(fsrsLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Preview suffix localisation (#1392)
+//
+// Asserts that the "(preview)" suffix on non-en locale options comes from the
+// catalog key settings.labs.languages.previewSuffix, not a hardcoded string.
+// The en mock returns "(preview)"; a ja-keyed check verifies the key exists
+// in the Japanese catalog.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — preview suffix from catalog", () => {
+  it("preview suffix on locale picker options is sourced from the catalog (en)", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/app language/i)).toBeInTheDocument();
+    });
+
+    const select = screen.getByLabelText(/app language/i);
+    const options = Array.from(select.querySelectorAll("option"));
+    const nonEnglishTexts = options
+      .filter((o) => o.getAttribute("value") !== "en")
+      .map((o) => o.textContent ?? "");
+
+    // Every non-English option must carry the catalog suffix "(preview)".
+    for (const text of nonEnglishTexts) {
+      expect(text).toMatch(/\(preview\)$/);
+    }
+  });
+
+  it("Japanese catalog has a non-empty previewSuffix key", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const jaMessages = require("../../messages/ja.json") as Record<
+      string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any
+    >;
+    const suffix = jaMessages?.settings?.labs?.languages?.previewSuffix;
+    expect(typeof suffix).toBe("string");
+    expect(suffix.length).toBeGreaterThan(0);
+    // The Japanese suffix should use fullwidth brackets.
+    expect(suffix).toContain("プレビュー");
   });
 });
