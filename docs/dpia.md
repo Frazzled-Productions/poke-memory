@@ -80,7 +80,7 @@ All of the following apply to **authenticated users only** unless stated otherwi
 
 No special-category data (Article 9) is collected. No name or email address is written into our own tables — our four tables are keyed only by the opaque UUID issued by Supabase Auth.
 
-As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-Hans` / `zh-Hant`), selected via the `poke-memory:locale` cookie. The chosen locale is a display preference only — it is **not personal data**: it carries no tracking payload, does not identify the individual, and is set only on an explicit user selection. It is recorded in the PECR storage inventory (`docs/cookies-pecr.md`) as a strictly-necessary functional-preference cookie, on the same footing as theme and timezone.
+As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-Hans` / `zh-Hant`), selected via the `poke-memory:locale` cookie. **This applies to all users — guest and authenticated** — since the locale cookie is set on explicit locale selection regardless of sign-in state. The chosen locale is a display preference only — it is **not personal data**: it carries no tracking payload, does not identify the individual, and is set only on an explicit user selection. It is recorded in the PECR storage inventory (`docs/cookies-pecr.md`) as a strictly-necessary functional-preference cookie, on the same footing as theme and timezone.
 
 ### Processors
 

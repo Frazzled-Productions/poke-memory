@@ -153,10 +153,10 @@ No follow-up is required for COPPA. No data-flow or architecture changes are req
 
 As of #1369, the app UI **and** the first-visit onboarding modal are machine-translated into Japanese (`ja`), Simplified Chinese (`zh-Hans`), and Traditional Chinese (`zh-Hant`) in addition to English. Because the onboarding modal is the first child-facing surface a new user meets, the quality of its translated copy is directly relevant to the transparency standard.
 
-**Interim mitigations (shipped with #1369):**
+**No in-product mitigations shipped with #1369.** The following are planned but not yet implemented:
 
-- The #1349 "machine-translated, feedback welcome" banner is shown both in-app and inside the onboarding modal, so a user reading translated copy is told it is machine-generated and is invited to flag errors.
-- A "preview" label on the locale picker signals that the non-English locales are not yet human-reviewed.
+- **#1349** — a "machine-translated, feedback welcome" banner in-app and inside the onboarding modal (`priority:later`; not yet shipped). Until this lands, there is no in-product signal telling users that non-English copy is machine-generated.
+- A "preview" label on the locale picker to signal that non-English locales are not yet human-reviewed (not yet implemented).
 
 Until the onboarding copy is human-reviewed, the non-English locales are treated as **"preview" quality on the onboarding surface**.
 
