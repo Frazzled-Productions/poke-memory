@@ -277,3 +277,39 @@ test.describe("Guest storage section in onboarding modal (#1057)", () => {
     ).toHaveCount(0);
   });
 });
+
+const LOCALE_COOKIE = "poke-memory:locale";
+
+test.describe("Non-English locale in onboarding modal (#1369, #1390)", () => {
+  // This suite intentionally uses a fresh storageState (inherited from the
+  // test.use({ storageState: ... }) at the top of this file) so the modal
+  // appears on every visit.
+
+  test("modal renders Japanese copy and shows MachineTranslationBanner with locale=ja", async ({
+    page,
+    context,
+  }) => {
+    // Seed the locale cookie so the server serves the Japanese catalogue.
+    await context.addCookies([
+      {
+        name: LOCALE_COOKIE,
+        value: "ja",
+        domain: "localhost",
+        path: "/",
+      },
+    ]);
+
+    await page.goto("/");
+
+    // The modal must appear (fresh visit, no firstVisitOnboardingDismissed flag).
+    const modal = page.getByRole("dialog", { name: /poké memory へようこそ/i });
+    await expect(modal).toBeVisible();
+
+    // The MachineTranslationBanner must be visible inside the modal for ja locale.
+    // It renders with role="note" and contains the Japanese caution message.
+    const banner = modal.getByRole("note");
+    await expect(banner).toBeVisible();
+    // Verify the banner text is the Japanese translation (contains 自動的に作成).
+    await expect(banner.getByText(/自動的に作成/)).toBeVisible();
+  });
+});

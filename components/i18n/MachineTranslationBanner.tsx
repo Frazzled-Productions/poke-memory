@@ -13,9 +13,8 @@
  * localStorage key format: `poke-memory:mt-banner-dismissed:<locale>`
  * (e.g. `poke-memory:mt-banner-dismissed:ja`)
  *
- * A separate onboarding wave (#1369) may import this component for use inside
- * the onboarding modal. The banner itself must not be rendered inside the modal
- * — that is handled at the call site.
+ * Rendered at the page level (app/layout.tsx) AND inside FirstVisitOnboardingModal
+ * so the notice stays visible when the modal occludes the page.
  */
 
 import { useState, useEffect } from "react";
