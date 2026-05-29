@@ -7,6 +7,7 @@ import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/pe
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { classifyCard } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
+import type { MasteryProgress } from "@/lib/pokedex/sort";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
@@ -33,9 +34,18 @@ export default function PokedexPage() {
   }, [storageVersion]);
 
   const cardClassById = new Map<number, CardClass>();
+  const masteryProgressById = new Map<number, MasteryProgress>();
   if (cards !== null && masteryRepetitions !== null) {
     for (const card of cards) {
+      if (card.cardType !== "name") continue;
       cardClassById.set(card.id, classifyCard(card, masteryRepetitions));
+      // Populate the mastery-progress snapshot used by "closest to mastery" sort.
+      if (card.state.lastReview !== null) {
+        masteryProgressById.set(card.id, {
+          reps: card.state.reps,
+          scheduledDays: card.state.scheduledDays,
+        });
+      }
     }
   }
 
@@ -51,10 +61,14 @@ export default function PokedexPage() {
       ? cards.filter((c) => c.cardType === "name" && c.state.lastReview !== null).length
       : 0;
 
-  const enrichedPokemon: PokemonCellData[] = defaultFormPokemon.map((p) => ({
-    ...p,
-    cardClass: cardClassById.get(p.id) ?? "locked",
-  }));
+  const enrichedPokemon: PokemonCellData[] = defaultFormPokemon.map((p) => {
+    const progress = masteryProgressById.get(p.id);
+    return {
+      ...p,
+      cardClass: cardClassById.get(p.id) ?? "locked",
+      ...(progress !== undefined ? { masteryProgress: progress } : {}),
+    };
+  });
 
   return (
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">

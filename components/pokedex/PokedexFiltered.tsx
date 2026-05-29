@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useCallback, useId, useRef } from "react";
+import { useMemo, useState, useCallback, useId, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { filterPokemon, parseFilters } from "@/lib/pokemon/filter";
 import type { PokemonCellData, PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { sortPokemon, parseSort } from "@/lib/pokedex/sort";
+import type { PokedexSortOrder } from "@/lib/pokedex/sort";
 import PokedexFilterBar from "./PokedexFilterBar";
 import PokedexGrid from "./PokedexGrid";
 
@@ -26,13 +28,14 @@ function countActiveFilters(filters: PokedexFilters): number {
 // URL builder
 // ---------------------------------------------------------------------------
 
-function buildUrl(filters: PokedexFilters): string {
+function buildUrl(filters: PokedexFilters, sort: PokedexSortOrder): string {
   const params = new URLSearchParams();
   if (filters.query) params.set("q", filters.query);
   if (filters.types.length > 0) params.set("type", filters.types.join(","));
   if (filters.gen !== null) params.set("gen", String(filters.gen));
   if (filters.hasAlternateForms) params.set("forms", "1");
   if (filters.masteryStatus !== "all") params.set("mastery", filters.masteryStatus);
+  if (sort !== "national") params.set("sort", sort);
   const qs = params.toString();
   return qs ? `/pokedex?${qs}` : "/pokedex";
 }
@@ -53,6 +56,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
   const { flags } = useSuperuser();
 
   const filters = parseFilters(searchParams);
+  const sort = parseSort(searchParams.get("sort"));
 
   // Disclosure state — collapsed by default so the grid is visible first.
   const [isOpen, setIsOpen] = useState(false);
@@ -68,11 +72,11 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
       setLocalQuery(q);
       if (debounceRef.current !== null) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        router.replace(buildUrl({ ...filters, query: q }), { scroll: false });
+        router.replace(buildUrl({ ...filters, query: q }, sort), { scroll: false });
       }, 150);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [router, filters.types, filters.gen],
+    [router, filters.types, filters.gen, sort],
   );
 
   const handleTypeToggle = useCallback(
@@ -80,30 +84,37 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
       const newTypes = filters.types.includes(type)
         ? filters.types.filter((t) => t !== type)
         : [...filters.types, type];
-      router.replace(buildUrl({ ...filters, types: newTypes }), {
+      router.replace(buildUrl({ ...filters, types: newTypes }, sort), {
         scroll: false,
       });
     },
-    [router, filters],
+    [router, filters, sort],
   );
 
   const handleGenChange = useCallback(
     (gen: number | null) => {
-      router.replace(buildUrl({ ...filters, gen }), { scroll: false });
+      router.replace(buildUrl({ ...filters, gen }, sort), { scroll: false });
     },
-    [router, filters],
+    [router, filters, sort],
   );
 
   const handleAlternateFormsToggle = useCallback(() => {
     router.replace(
-      buildUrl({ ...filters, hasAlternateForms: !filters.hasAlternateForms }),
+      buildUrl({ ...filters, hasAlternateForms: !filters.hasAlternateForms }, sort),
       { scroll: false },
     );
-  }, [router, filters]);
+  }, [router, filters, sort]);
 
   const handleMasteryChange = useCallback(
     (masteryStatus: MasteryStatus) => {
-      router.replace(buildUrl({ ...filters, masteryStatus }), { scroll: false });
+      router.replace(buildUrl({ ...filters, masteryStatus }, sort), { scroll: false });
+    },
+    [router, filters, sort],
+  );
+
+  const handleSortChange = useCallback(
+    (newSort: PokedexSortOrder) => {
+      router.replace(buildUrl(filters, newSort), { scroll: false });
     },
     [router, filters],
   );
@@ -123,7 +134,23 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
 
   const filtered = filterPokemon(enrichedPokemon, effectiveFilters);
 
+  // Apply sort. Memoised to avoid re-sorting 1025 items on every render when
+  // only unrelated state changes. WebKit note: sort of 1025 items is O(n log n)
+  // and runs in <1 ms on modern devices — no measurable per-render cost.
+  const sorted = useMemo(
+    () => sortPokemon(filtered, sort, flags.pretendAllMastered),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, sort, flags.pretendAllMastered],
+  );
+
   const activeCount = countActiveFilters(effectiveFilters);
+
+  // When a custom sort is active, collapse into a flat list so the generation
+  // headings (which assume national-number order within each section) do not
+  // produce misleading groupings. National-number sort preserves the original
+  // gen-sectioned layout.
+  const isCustomSort = sort !== "national";
+  const activeGen = !isCustomSort ? (filters.gen ?? undefined) : undefined;
 
   return (
     <>
@@ -181,19 +208,22 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
         <div id={panelId} hidden={!isOpen}>
           <PokedexFilterBar
             filters={effectiveFilters}
+            sort={sort}
             onQueryChange={handleQueryChange}
             onTypeToggle={handleTypeToggle}
             onGenChange={handleGenChange}
             onAlternateFormsToggle={handleAlternateFormsToggle}
             onMasteryChange={handleMasteryChange}
+            onSortChange={handleSortChange}
             superuserMasteryLocked={flags.pretendAllMastered}
           />
         </div>
       </div>
 
       <PokedexGrid
-        pokemon={filtered}
-        activeGen={filters.gen ?? undefined}
+        pokemon={sorted}
+        activeGen={activeGen}
+        flatList={isCustomSort}
       />
     </>
   );

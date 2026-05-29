@@ -12,6 +12,7 @@
  *   - URL updates: router.replace is called with the correct path when filters
  *     change via the FilterBar callbacks.
  *   - Superuser pretendAllMastered: overrides mastery filter to "all".
+ *   - Sort: URL-driven; onSortChange updates URL; sort state is passed to FilterBar.
  */
 
 import { render, screen, act, waitFor } from "@testing-library/react";
@@ -54,22 +55,26 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
 vi.mock("@/components/pokedex/PokedexFilterBar", () => ({
   default: ({
     filters,
+    sort,
     onQueryChange,
     onTypeToggle,
     onGenChange,
     onAlternateFormsToggle,
     onMasteryChange,
+    onSortChange,
     superuserMasteryLocked,
   }: {
     filters: { query: string; types: string[]; gen: number | null; hasAlternateForms: boolean; masteryStatus: string };
+    sort: string;
     onQueryChange: (q: string) => void;
     onTypeToggle: (type: string) => void;
     onGenChange: (gen: number | null) => void;
     onAlternateFormsToggle: () => void;
     onMasteryChange: (status: string) => void;
+    onSortChange: (sort: string) => void;
     superuserMasteryLocked?: boolean;
   }) => (
-    <div data-testid="filter-bar" data-mastery-locked={String(superuserMasteryLocked)}>
+    <div data-testid="filter-bar" data-mastery-locked={String(superuserMasteryLocked)} data-sort={sort}>
       <input
         aria-label="filter-query"
         value={filters.query}
@@ -81,6 +86,9 @@ vi.mock("@/components/pokedex/PokedexFilterBar", () => ({
       <button onClick={onAlternateFormsToggle}>Has Forms</button>
       <button onClick={() => onMasteryChange("mastered")}>Mastered</button>
       <button onClick={() => onMasteryChange("all")}>All Mastery</button>
+      <button onClick={() => onSortChange("alphabetical")}>Sort Alphabetical</button>
+      <button onClick={() => onSortChange("closest-to-mastery")}>Sort Mastery</button>
+      <button onClick={() => onSortChange("national")}>Sort National</button>
     </div>
   ),
 }));
@@ -474,5 +482,91 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
       },
       { timeout: 1000 },
     );
+  });
+
+  it("calls router.replace with sort=alphabetical when Sort Alphabetical is clicked", async () => {
+    const user = userEvent.setup();
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    await user.click(screen.getByRole("button", { name: "Sort Alphabetical" }));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.stringContaining("sort=alphabetical"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("calls router.replace with sort=closest-to-mastery when Sort Mastery is clicked", async () => {
+    const user = userEvent.setup();
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    await user.click(screen.getByRole("button", { name: "Sort Mastery" }));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.stringContaining("sort=closest-to-mastery"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("omits sort param from URL when national sort is selected (default)", async () => {
+    // Start with a non-national sort active in the URL.
+    mockSearchParams.value = new URLSearchParams({ sort: "alphabetical" });
+    const user = userEvent.setup();
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    await user.click(screen.getByRole("button", { name: "Sort National" }));
+
+    await waitFor(() => {
+      // When national is selected, sort param is dropped from the URL.
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.not.stringContaining("sort="),
+        expect.any(Object),
+      );
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — sort state passed to FilterBar
+// ---------------------------------------------------------------------------
+
+describe("PokedexFiltered — sort state", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearchParams.value = new URLSearchParams();
+    mockFlags.pretendAllMastered = false;
+  });
+
+  it("passes sort=national to FilterBar when no sort param in URL", async () => {
+    const user = userEvent.setup();
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    expect(screen.getByTestId("filter-bar")).toHaveAttribute("data-sort", "national");
+  });
+
+  it("passes sort=alphabetical to FilterBar when sort=alphabetical in URL", async () => {
+    mockSearchParams.value = new URLSearchParams({ sort: "alphabetical" });
+    const user = userEvent.setup();
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    expect(screen.getByTestId("filter-bar")).toHaveAttribute("data-sort", "alphabetical");
+  });
+
+  it("passes sort=closest-to-mastery to FilterBar when sort=closest-to-mastery in URL", async () => {
+    mockSearchParams.value = new URLSearchParams({ sort: "closest-to-mastery" });
+    const user = userEvent.setup();
+    render(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    expect(screen.getByTestId("filter-bar")).toHaveAttribute("data-sort", "closest-to-mastery");
   });
 });
