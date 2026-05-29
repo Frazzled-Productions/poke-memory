@@ -21,6 +21,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
+import { MachineTranslationBanner } from "@/components/i18n/MachineTranslationBanner";
 import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
 import { StoragePersistenceRequester } from "@/components/pwa/StoragePersistenceRequester";
 import { PwaBadge } from "@/components/pwa/PwaBadge";
@@ -212,6 +213,13 @@ export default function RootLayout({
                     <FavouriteThemeProvider>
                       <ThemeWatermark />
                       <Nav />
+                      {/*
+                        MachineTranslationBanner is a client component that reads
+                        the active locale from a cookie and shows a dismissible
+                        caution when the locale is non-English (#1349).
+                        Rendered below the nav so it appears above all page content.
+                      */}
+                      <MachineTranslationBanner />
                       <Suspense fallback={null}>
                         <SyncOnVisible />
                       </Suspense>

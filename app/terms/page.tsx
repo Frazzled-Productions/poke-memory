@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { resolveLocale } from "@/i18n/request";
 
 export const metadata: Metadata = {
   title: "Terms of Use - Poké Memory",
@@ -6,9 +7,28 @@ export const metadata: Metadata = {
     "The terms under which Poké Memory is provided at pokememory.com.",
 };
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  const locale = await resolveLocale();
+  const showEnglishOnlyNotice = locale !== "en";
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+      {showEnglishOnlyNotice && (
+        <p
+          lang="en"
+          className="mb-6 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100"
+        >
+          These Terms are written in English only. They are the authoritative
+          version. If you need help understanding them, please contact{" "}
+          <a
+            href="mailto:fbrookhouse@gmail.com"
+            className="underline underline-offset-2 hover:text-blue-700 dark:hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
+          >
+            fbrookhouse@gmail.com
+          </a>
+          .
+        </p>
+      )}
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Terms of Use</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">

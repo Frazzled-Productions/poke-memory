@@ -60,7 +60,7 @@ import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg, sectionLabel } from "@/lib/utils/class-names";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
-import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
+import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
 
 /**
@@ -429,17 +429,9 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "danger-zone-heading": "advanced-heading",
 };
 
-/**
- * Locale endonyms — each language written in its own script.
- * These are locale-invariant: do NOT route through t(), which would translate
- * them into the active UI locale instead of showing the native name.
- */
-const LOCALE_ENDONYMS: Record<AppLocale, string> = {
-  en: "English",
-  ja: "日本語",
-  "zh-Hans": "简体中文",
-  "zh-Hant": "繁體中文",
-};
+// LOCALE_ENDONYMS is imported from @/i18n/locales — the single source of truth
+// for locale endonyms used across the settings locale picker and the machine-
+// translation banner (#1349).
 
 /** Read the active locale from document.cookie without importing the hook. */
 function readActiveLocale(): AppLocale {

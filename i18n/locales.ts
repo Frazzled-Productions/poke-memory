@@ -13,3 +13,15 @@ export const LOCALE_COOKIE = "poke-memory:locale";
 
 /** Fallback when the cookie is absent or holds an unsupported value. */
 export const DEFAULT_LOCALE: AppLocale = "en";
+
+/**
+ * Each locale's name written in its own script (endonym).
+ * Used in the machine-translation banner and the locale picker in Settings.
+ * Centralised here so both surfaces stay in sync automatically.
+ */
+export const LOCALE_ENDONYMS: Record<AppLocale, string> = {
+  en: "English",
+  ja: "日本語",
+  "zh-Hans": "简体中文",
+  "zh-Hant": "繁體中文",
+};
