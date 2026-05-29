@@ -8,9 +8,20 @@
  *  - The Japanese catalogue is used when `locale: "ja"` is passed.
  *  - `renderJa` is a true convenience alias for the Japanese locale.
  *  - Simplified Chinese and Traditional Chinese catalogues also resolve.
+ *  - Each locale produces a DISTINCT value, so a mis-wired MESSAGES map
+ *    (e.g. zh-Hant pointing at jaMessages) fails the test.
  *
  * The component under test is a minimal stub defined inline — this file
  * tests the helper infrastructure, not any production component.
+ *
+ * Key choice — `nav.brand` as the assertion key:
+ *   en       → "poke-memory"
+ *   ja       → "ポケメモリー"
+ *   zh-Hans  → "宝可记忆"
+ *   zh-Hant  → "寶可記憶"
+ * All four values are unique, so any two-locale swap is immediately detected.
+ * (`nav.practice` was the previous key; Traditional Chinese shares "練習"
+ * with Japanese, making zh-Hant→ja misconfigurations invisible.)
  */
 
 import { describe, it, expect } from "vitest";
@@ -21,9 +32,9 @@ import { renderWithIntl, renderJa, screen } from "./renderWithIntl";
 // Minimal test component — calls useTranslations and renders the value.
 // ---------------------------------------------------------------------------
 
-function NavPracticeLabel() {
+function NavBrandLabel() {
   const t = useTranslations("nav");
-  return <span>{t("practice")}</span>;
+  return <span>{t("brand")}</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,51 +44,71 @@ function NavPracticeLabel() {
 describe("renderWithIntl helper", () => {
   it("renders without throwing when a component calls useTranslations()", () => {
     // No NextIntlClientProvider mock needed — the helper provides the real one.
-    expect(() => renderWithIntl(<NavPracticeLabel />)).not.toThrow();
+    expect(() => renderWithIntl(<NavBrandLabel />)).not.toThrow();
   });
 
   it("shows the English value by default (locale defaults to 'en')", () => {
-    renderWithIntl(<NavPracticeLabel />);
-    // messages/en.json nav.practice = "Practice"
-    expect(screen.getByText("Practice")).toBeInTheDocument();
+    renderWithIntl(<NavBrandLabel />);
+    // messages/en.json nav.brand = "poke-memory"
+    expect(screen.getByText("poke-memory")).toBeInTheDocument();
   });
 
   it("shows the Japanese value when locale is 'ja'", () => {
-    renderWithIntl(<NavPracticeLabel />, { locale: "ja" });
-    // messages/ja.json nav.practice = "練習"
-    expect(screen.getByText("練習")).toBeInTheDocument();
+    renderWithIntl(<NavBrandLabel />, { locale: "ja" });
+    // messages/ja.json nav.brand = "ポケメモリー"
+    expect(screen.getByText("ポケメモリー")).toBeInTheDocument();
   });
 
   it("renderJa() is an alias for renderWithIntl(_, { locale: 'ja' })", () => {
-    renderJa(<NavPracticeLabel />);
-    expect(screen.getByText("練習")).toBeInTheDocument();
+    renderJa(<NavBrandLabel />);
+    // messages/ja.json nav.brand = "ポケメモリー"
+    expect(screen.getByText("ポケメモリー")).toBeInTheDocument();
   });
 
   it("shows the Simplified Chinese value when locale is 'zh-Hans'", () => {
-    renderWithIntl(<NavPracticeLabel />, { locale: "zh-Hans" });
-    // messages/zh-Hans.json nav.practice = "练习"
-    expect(screen.getByText("练习")).toBeInTheDocument();
+    renderWithIntl(<NavBrandLabel />, { locale: "zh-Hans" });
+    // messages/zh-Hans.json nav.brand = "宝可记忆"
+    expect(screen.getByText("宝可记忆")).toBeInTheDocument();
   });
 
   it("shows the Traditional Chinese value when locale is 'zh-Hant'", () => {
-    renderWithIntl(<NavPracticeLabel />, { locale: "zh-Hant" });
-    // messages/zh-Hant.json nav.practice = "練習"
-    expect(screen.getByText("練習")).toBeInTheDocument();
+    renderWithIntl(<NavBrandLabel />, { locale: "zh-Hant" });
+    // messages/zh-Hant.json nav.brand = "寶可記憶"
+    // This is DISTINCT from the Japanese value ("ポケメモリー"), so a
+    // zh-Hant→jaMessages misconfiguration causes this assertion to fail.
+    expect(screen.getByText("寶可記憶")).toBeInTheDocument();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Verify distinct en vs ja values (guards against catalogue being identical).
+// Verify distinct values guard — every locale produces a unique string.
+// A mis-wired MESSAGES map (e.g. two locales pointing at the same catalogue)
+// is caught because only one value can appear in the document at a time.
 // ---------------------------------------------------------------------------
 
 describe("renderWithIntl — locale switching produces distinct output", () => {
-  it("English and Japanese produce different text for nav.practice", () => {
-    const { unmount } = renderWithIntl(<NavPracticeLabel />);
-    expect(screen.getByText("Practice")).toBeInTheDocument();
-    unmount();
+  it("all four locales render different brand text", () => {
+    const locales: Array<{
+      locale: "en" | "ja" | "zh-Hans" | "zh-Hant";
+      expected: string;
+    }> = [
+      { locale: "en", expected: "poke-memory" },
+      { locale: "ja", expected: "ポケメモリー" },
+      { locale: "zh-Hans", expected: "宝可记忆" },
+      { locale: "zh-Hant", expected: "寶可記憶" },
+    ];
 
-    renderJa(<NavPracticeLabel />);
-    expect(screen.getByText("練習")).toBeInTheDocument();
-    expect(screen.queryByText("Practice")).toBeNull();
+    for (const { locale, expected } of locales) {
+      const { unmount } = renderWithIntl(<NavBrandLabel />, { locale });
+      expect(screen.getByText(expected)).toBeInTheDocument();
+      // Verify no other locale's brand text leaked into the document.
+      const others = locales
+        .filter((l) => l.locale !== locale)
+        .map((l) => l.expected);
+      for (const other of others) {
+        expect(screen.queryByText(other)).toBeNull();
+      }
+      unmount();
+    }
   });
 });

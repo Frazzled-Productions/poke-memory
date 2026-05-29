@@ -86,6 +86,79 @@ export function renderJa(ui: React.ReactElement): RenderResult {
 
 // ---------------------------------------------------------------------------
 // Re-export @testing-library/react so callers only need one import line.
+//
+// We explicitly list every name we re-export and deliberately EXCLUDE
+// `render`. Blanket `export *` would let a consumer write:
+//
+//   import { render } from "@/components/test-utils/renderWithIntl";
+//
+// and silently get the unwrapped, provider-free render — the footgun this
+// helper exists to prevent. Use `renderWithIntl` or `renderJa` instead.
 // ---------------------------------------------------------------------------
 
-export * from "@testing-library/react";
+export {
+  screen,
+  fireEvent,
+  waitFor,
+  waitForElementToBeRemoved,
+  within,
+  act,
+  cleanup,
+  renderHook,
+  // Query helpers — exposed so callers can destructure from their own
+  // `renderWithIntl(...)` result and also use the bound queries off `screen`.
+  getByRole,
+  getByText,
+  getByLabelText,
+  getByPlaceholderText,
+  getByAltText,
+  getByTestId,
+  getByTitle,
+  getByDisplayValue,
+  getAllByRole,
+  getAllByText,
+  getAllByLabelText,
+  getAllByPlaceholderText,
+  getAllByAltText,
+  getAllByTestId,
+  getAllByTitle,
+  getAllByDisplayValue,
+  queryByRole,
+  queryByText,
+  queryByLabelText,
+  queryByPlaceholderText,
+  queryByAltText,
+  queryByTestId,
+  queryByTitle,
+  queryByDisplayValue,
+  queryAllByRole,
+  queryAllByText,
+  queryAllByLabelText,
+  queryAllByPlaceholderText,
+  queryAllByAltText,
+  queryAllByTestId,
+  queryAllByTitle,
+  queryAllByDisplayValue,
+  findByRole,
+  findByText,
+  findByLabelText,
+  findByPlaceholderText,
+  findByAltText,
+  findByTestId,
+  findByTitle,
+  findByDisplayValue,
+  findAllByRole,
+  findAllByText,
+  findAllByLabelText,
+  findAllByPlaceholderText,
+  findAllByAltText,
+  findAllByTestId,
+  findAllByTitle,
+  findAllByDisplayValue,
+  // Utilities
+  prettyDOM,
+  logDOM,
+  getDefaultNormalizer,
+  configure,
+  getConfig,
+} from "@testing-library/react";
