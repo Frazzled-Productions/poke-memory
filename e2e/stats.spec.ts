@@ -602,7 +602,10 @@ test.describe("Stats page — per-game mastery breakdown (#1313)", () => {
     await expect(genButton).toHaveAttribute("aria-expanded", "true");
 
     // At least Pokémon Red/Blue should be listed.
-    await expect(page.getByText("Pokémon Red/Blue")).toBeVisible();
+    // Use exact: true to avoid a strict-mode violation — the GameRow also
+    // renders a sr-only span containing the full string "Pokémon Red/Blue:
+    // 0 of 151 mastered (0%)", so a substring match resolves to two elements.
+    await expect(page.getByText("Pokémon Red/Blue", { exact: true })).toBeVisible();
   });
 
   test("pretendAllMastered shows 100% on all game rows", async ({ page }) => {
