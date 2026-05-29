@@ -159,6 +159,14 @@ test.describe("QA seed mode", () => {
     await expect(
       nextArrivalsSection.getByRole("list", { name: /upcoming pasture species/i }),
     ).toBeVisible();
+
+    // Navigate to Journey and verify "Close to mastery" is populated — the
+    // scenario description explicitly lists this as the second exercised behaviour.
+    await page.goto("/journey");
+    const closeToMasterySection = page.getByRole("region", { name: /close to mastery/i });
+    await expect(closeToMasterySection).toBeVisible({ timeout: 15_000 });
+    // Empty-state copy must NOT be present (the list must have at least one entry).
+    await expect(page.getByText(/no gap to close/i)).toHaveCount(0);
   });
 
   test("Active-seed indicator is shown on mount and cleared after Clear seed", async ({ page }) => {

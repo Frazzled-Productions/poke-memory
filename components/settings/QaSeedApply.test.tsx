@@ -5,7 +5,7 @@
  * dispatch browser events and use IDB — both require the jsdom environment.
  * See AGENTS.md "Testing" section on test-file placement.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { applySeedScenario, clearSeedScenario } from "@/lib/qa-seed/apply";
 
 // ---------------------------------------------------------------------------

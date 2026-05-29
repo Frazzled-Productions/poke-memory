@@ -118,6 +118,9 @@ describe("scenario payload builders", () => {
       const payload = SCENARIO_BY_SLUG.get("mastery-gaps")!.build();
       // Cast to ReviewableCard[] as expected by the derivation helpers.
       // The seed shape is structurally compatible: cardType / id / state are present.
+      // SeededNameCard has no `displayName`, so `englishName` on any
+      // deriveCloseToMastery result will be undefined — assertions below only
+      // check reverseScheduledDays, so this is an intentional stub gap.
       return (payload.session?.cards ?? []) as unknown as ReviewableCard[];
     }
 
