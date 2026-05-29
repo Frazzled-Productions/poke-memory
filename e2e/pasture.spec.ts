@@ -739,6 +739,79 @@ test.describe("Pasture page — type filter", () => {
   });
 });
 
+test.describe("Pasture page — Almost there strip (#1316)", () => {
+  test("renders 'Almost there' heading and a sprite tile when reviewed-but-unmastered species are present", async ({
+    page,
+  }) => {
+    // Seed one mastered species (both legs) to get past the early-return empty
+    // state, plus one reviewed-but-unmastered name card (reps=2, scheduledDays=10
+    // — below the mastery gate of reps≥3 + scheduledDays≥21) to trigger the strip.
+    await seedSessionIdb(
+      page,
+      buildSession([
+        masteredCard(10, "Caterpie", "forest"),
+        masteredReverseCard(10),
+        {
+          id: 1,
+          cardType: "name",
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          habitat: "grassland",
+          state: {
+            stability: 2,
+            difficulty: 5,
+            elapsedDays: 10,
+            scheduledDays: 10,
+            reps: 2,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+            hiddenSince: null,
+            seenInPasture: false,
+          },
+        },
+      ]),
+    );
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    // The "Almost there" section heading must be visible.
+    await expect(
+      page.getByRole("heading", { name: "Almost there", level: 2 }),
+    ).toBeVisible();
+
+    // The strip's accessible list must be present with at least one tile.
+    const stripList = page.getByRole("list", { name: /closest to mastery/i });
+    await expect(stripList).toBeVisible();
+    await expect(stripList.getByRole("listitem").first()).toBeVisible();
+  });
+
+  test("'Almost there' strip is absent when no reviewed-but-unmastered species exist", async ({
+    page,
+  }) => {
+    // Only mastered species — strip requires at least one reviewed-but-unmastered card.
+    await seedSessionIdb(
+      page,
+      buildSession([
+        masteredCard(10, "Caterpie", "forest"),
+        masteredReverseCard(10),
+      ]),
+    );
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    await expect(
+      page.getByRole("heading", { name: "Almost there", level: 2 }),
+    ).not.toBeVisible();
+  });
+});
+
 test.describe("Pasture page — generation filter", () => {
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(

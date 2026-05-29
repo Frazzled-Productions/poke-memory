@@ -11,6 +11,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
@@ -142,7 +143,6 @@ describe("NextArrivalsStrip — hidden when empty", () => {
   });
 
   it("renders nothing when all reviewed cards are mastered", () => {
-    const REVERSE_OFFSET = 2_000_000;
     const masteredState: Partial<ReviewState> = {
       reps: MASTERY_REPS,
       scheduledDays: MASTERY_DAYS,
@@ -151,7 +151,7 @@ describe("NextArrivalsStrip — hidden when empty", () => {
     const nameCardMastered = makeCard(1, masteredState);
     const reverseCardMastered = {
       ...nameCardMastered,
-      id: REVERSE_OFFSET + 1,
+      id: REVERSE_ID_OFFSET + 1,
       cardType: "reverse",
     } as unknown as ReviewableCard;
     const cards: ReviewableCard[] = [nameCardMastered, reverseCardMastered];

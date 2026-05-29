@@ -56,7 +56,7 @@ const SPECIES_WITH_ALTERNATE_FORMS: ReadonlySet<number> = new Set(
  * Sort a filtered pokemon array according to `sort`.
  *
  * "national"  — original input order (ascending ID, matches SEED_POKEMON order)
- * "alpha"     — A-Z by `name` (lowercase comparison)
+ * "alpha"     — A-Z by `displayName` (matches what the user sees in the grid)
  * "proximity" — reviewed-but-unmastered species ranked by proximityScore desc,
  *               mastered species next, then unreviewed (locked) species last.
  *               Within each tier, ties break by id ascending for determinism.
@@ -70,7 +70,7 @@ export function sortPokemon(
   const sorted = [...pokemon];
 
   if (sort === "alpha") {
-    sorted.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+    sorted.sort((a, b) => a.displayName.localeCompare(b.displayName, "en", { sensitivity: "base" }));
     return sorted;
   }
 

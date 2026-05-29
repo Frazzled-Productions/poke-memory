@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { rankByMasteryProximity } from "./proximity";
 import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
@@ -84,7 +85,6 @@ function nameCard(
 
 /** Build a reverse card for a species. */
 function reverseCard(speciesId: number, overrides: Partial<ReviewState> = {}, locale = "en"): ReviewableCard {
-  const REVERSE_ID_OFFSET = 2_000_000;
   return {
     cardType: "reverse",
     id: REVERSE_ID_OFFSET + speciesId,

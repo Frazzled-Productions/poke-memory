@@ -711,3 +711,57 @@ test.describe("Pokédex detail — next review date (#992)", () => {
     await expect(page.getByText(/Next review:/)).not.toBeVisible();
   });
 });
+
+test.describe("Pokédex sort control (#1314)", () => {
+  test("selecting 'Alphabetical (A-Z)' updates the URL and the select reflects the choice", async ({ page }) => {
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    // Expand the filter panel before interacting with filter controls.
+    await expandFilters(page);
+
+    const sortSelect = page.getByLabel("Sort Pokédex");
+    await expect(sortSelect).toBeVisible();
+
+    await sortSelect.selectOption("alpha");
+    await page.waitForURL(/sort=alpha/);
+
+    // The select must reflect the chosen value.
+    await expect(sortSelect).toHaveValue("alpha");
+
+    // The grid should still render results.
+    await expect(
+      page.getByText("No Pokémon match your filters."),
+    ).not.toBeVisible();
+    await expect(page.getByRole("list", { name: /Pokémon/ }).first()).toBeVisible();
+  });
+
+  test("selecting 'Closest to mastery' updates the URL", async ({ page }) => {
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    await expandFilters(page);
+
+    const sortSelect = page.getByLabel("Sort Pokédex");
+    await sortSelect.selectOption("proximity");
+    await page.waitForURL(/sort=proximity/);
+
+    await expect(sortSelect).toHaveValue("proximity");
+  });
+
+  test("sort param is preserved on page load", async ({ page }) => {
+    await page.goto("/pokedex?sort=alpha");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    await expandFilters(page);
+
+    // The select must reflect the URL-initialised sort value.
+    await expect(page.getByLabel("Sort Pokédex")).toHaveValue("alpha");
+  });
+});

@@ -324,7 +324,7 @@ export default function PasturePage() {
         <NextArrivalsStrip
           cards={session.cards}
           masteryRepetitions={masteryRepetitions}
-          forceAllMastered={flags.pretendAllMastered}
+          forceAllMastered={false}
         />
       )}
     </main>

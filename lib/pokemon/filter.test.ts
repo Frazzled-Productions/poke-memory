@@ -400,21 +400,31 @@ describe('sortPokemon', () => {
     expect(sortPokemon(input, 'national').map((x) => x.id)).toEqual([3, 1, 2]);
   });
 
-  it('"alpha" sort orders A-Z by name', () => {
+  it('"alpha" sort orders A-Z by displayName', () => {
     const input = [
-      p(1, { name: 'charizard' }),
-      p(2, { name: 'bulbasaur' }),
-      p(3, { name: 'abra' }),
+      p(1, { name: 'charizard', displayName: 'Charizard' }),
+      p(2, { name: 'bulbasaur', displayName: 'Bulbasaur' }),
+      p(3, { name: 'abra', displayName: 'Abra' }),
     ];
-    expect(sortPokemon(input, 'alpha').map((x) => x.name)).toEqual(['abra', 'bulbasaur', 'charizard']);
+    expect(sortPokemon(input, 'alpha').map((x) => x.displayName)).toEqual(['Abra', 'Bulbasaur', 'Charizard']);
   });
 
   it('"alpha" sort is case-insensitive', () => {
     const input = [
-      p(1, { name: 'Zubat' }),
-      p(2, { name: 'abra' }),
+      p(1, { name: 'zubat', displayName: 'Zubat' }),
+      p(2, { name: 'abra', displayName: 'abra' }),
     ];
-    expect(sortPokemon(input, 'alpha').map((x) => x.name)).toEqual(['abra', 'Zubat']);
+    expect(sortPokemon(input, 'alpha').map((x) => x.displayName)).toEqual(['abra', 'Zubat']);
+  });
+
+  it('"alpha" sort uses displayName not name (e.g. Nidoran♀ before Nidoran♂)', () => {
+    // name slugs are 'nidoran-f' / 'nidoran-m' which would sort f < m,
+    // but displayName 'Nidoran♀' / 'Nidoran♂' should still compare correctly.
+    const input = [
+      p(29, { name: 'nidoran-f', displayName: 'Nidoran♀' }),
+      p(32, { name: 'nidoran-m', displayName: 'Nidoran♂' }),
+    ];
+    expect(sortPokemon(input, 'alpha').map((x) => x.displayName)).toEqual(['Nidoran♀', 'Nidoran♂']);
   });
 
   it('"proximity" sort places tier-0 (learning+proximityscore) before mastered before locked', () => {

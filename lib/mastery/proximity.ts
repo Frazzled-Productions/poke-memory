@@ -17,11 +17,9 @@
  */
 
 import { isMastered, MASTERY_REPETITIONS } from "@/lib/stats/derive";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { AppLocale } from "@/i18n/locales";
-
-/** The numeric offset added to a species ID to produce its reverse-card ID. */
-const REVERSE_ID_OFFSET = 2_000_000;
 
 export type ProximityEntry = {
   /** Pokemon / species ID (matches NameReviewCard.id). */

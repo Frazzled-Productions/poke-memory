@@ -23,6 +23,7 @@ import { PASTURE_ARRIVALS_SPRITE_SIZE } from "@/lib/sprites/sizes";
 // Strip limit
 // ---------------------------------------------------------------------------
 
+// Upper end of the "4–5 species" range specified in the issue (#1316).
 const STRIP_LIMIT = 5;
 
 // ---------------------------------------------------------------------------

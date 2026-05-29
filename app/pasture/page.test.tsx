@@ -152,12 +152,17 @@ vi.mock("@/components/pasture/PastureSearchBar", () => ({
   PASTURE_FILTERS_DEFAULT: { query: "", types: [], gen: null },
 }));
 
+vi.mock("@/components/pasture/NextArrivalsStrip", () => ({
+  NextArrivalsStrip: () => <div data-testid="next-arrivals-strip" />,
+}));
+
 // ---------------------------------------------------------------------------
 // Subject under test
 // ---------------------------------------------------------------------------
 
 import PasturePage from "@/app/pasture/page";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
+import { filterMastered } from "@/lib/pasture/arrivals";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -186,6 +191,70 @@ describe("PasturePage", () => {
       expect(
         screen.getByText(/master your first pokémon/i),
       ).toBeInTheDocument();
+    });
+  });
+
+  it("renders the NextArrivalsStrip when session is loaded and mastered cards exist", async () => {
+    // Provide a non-null session so the `session && !pretendAllMastered` block
+    // renders, and make filterMastered return one mastered card so the early
+    // empty-state return is bypassed.
+    const fakeCard = {
+      id: 10,
+      cardType: "name" as const,
+      name: "Caterpie",
+      habitat: "forest",
+      spriteUrl: "/sprites/pokemon/10.png",
+      types: ["bug"],
+      speciesId: 10,
+      displayName: "Caterpie",
+      isDefaultForm: true,
+      formCategory: "default",
+      formSlug: null,
+      stats: { hp: 45, attack: 30, defense: 35, specialAttack: 20, specialDefense: 20, speed: 45 },
+      flavorText: "",
+      flavorTexts: [],
+      evolutionChain: [],
+      height: 3,
+      weight: 29,
+      baseExperience: 39,
+      genus: "Worm Pokémon",
+      generation: "generation-i" as const,
+      captureRate: null,
+      baseHappiness: null,
+      growthRate: null,
+      genderRate: null,
+      isLegendary: false,
+      isMythical: false,
+      cryUrl: null,
+      subjectKey: "10",
+      locale: "en" as const,
+      state: {
+        stability: 30,
+        difficulty: 5,
+        elapsedDays: 0,
+        scheduledDays: 28,
+        reps: 4,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2099-01-01",
+        lastReview: "2026-05-01",
+        firstSeen: "2026-03-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(filterMastered).mockReturnValue([fakeCard as any]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockLoadSession.mockResolvedValue({ cards: [fakeCard as any] });
+
+    render(<PasturePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("next-arrivals-strip")).toBeInTheDocument();
     });
   });
 });

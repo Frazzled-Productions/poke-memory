@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useMemo } from "react";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
@@ -55,13 +55,16 @@ export default function PokedexPage() {
   // Pre-compute proximity scores for the "Closest to mastery" sort.
   // Only available once cards have loaded. Produces a map from pokemonId → score
   // for reviewed-but-unmastered species; mastered and locked species are absent.
-  const proximityScoreById = new Map<number, number>();
-  if (cards !== null && masteryRepetitions !== null) {
-    const ranked = rankByMasteryProximity(cards, { masteryRepetitions });
-    for (const entry of ranked) {
-      proximityScoreById.set(entry.id, entry.score);
+  const proximityScoreById = useMemo<Map<number, number>>(() => {
+    const map = new Map<number, number>();
+    if (cards !== null && masteryRepetitions !== null) {
+      const ranked = rankByMasteryProximity(cards, { masteryRepetitions });
+      for (const entry of ranked) {
+        map.set(entry.id, entry.score);
+      }
     }
-  }
+    return map;
+  }, [cards, masteryRepetitions]);
 
   const enrichedPokemon: PokemonCellData[] = defaultFormPokemon.map((p) => ({
     ...p,
