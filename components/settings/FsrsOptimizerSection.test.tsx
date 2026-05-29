@@ -233,7 +233,7 @@ describe("FsrsOptimizerSection", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/srs/optimize", { method: "POST" });
     });
 
-    it("shows generic error text for an unrecognised 500", async () => {
+    it("shows error text with HTTP status for an unrecognised 500 (no error code)", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
@@ -251,7 +251,61 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimise. Try again later.",
+          "Couldn't optimise (HTTP 500). Try again later.",
+        );
+      });
+    });
+
+    it("shows 'file an issue' message for the structured unknown error code", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          json: async () => ({ error: "unknown", detail: "some panic string" }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Couldn't optimise (HTTP 500). Please file an issue.",
+        );
+      });
+    });
+
+    it("shows 'file an issue' message for unknown error on a non-500 status", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 504,
+          json: async () => ({ error: "unknown" }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Couldn't optimise (HTTP 504). Please file an issue.",
         );
       });
     });
@@ -445,7 +499,7 @@ describe("FsrsOptimizerSection", () => {
       });
     });
 
-    it("shows error text when fetch throws", async () => {
+    it("shows connection-error text when fetch throws (network failure)", async () => {
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
 
       render(
@@ -460,7 +514,7 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimise. Try again later.",
+          "Couldn't reach the server. Check your connection and try again.",
         );
       });
     });
