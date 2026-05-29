@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   renderWithIntl,
+  renderJa,
   screen,
   waitFor,
   act,
@@ -3721,6 +3722,78 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
     // Assert: saveSettings was called with mcCardOnboardingShown: true.
     expect(vi.mocked(saveSettings)).toHaveBeenCalledWith(
       expect.objectContaining({ mcCardOnboardingShown: true }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale smoke tests — Japanese (mandatory locale coverage per AGENTS.md)
+// ---------------------------------------------------------------------------
+
+describe("ReviewSession locale smoke — Japanese", () => {
+  it("renders the loading skeleton aria-label in Japanese", () => {
+    renderJa(<ReviewSession />);
+    // cards starts as null — the loading skeleton is present synchronously
+    // before loadSession resolves.
+    expect(
+      screen.getByLabelText("レビューセッションを読み込み中"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Reveal button in Japanese", async () => {
+    renderJa(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /めくる/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders grade buttons in Japanese after reveal", async () => {
+    const user = userEvent.setup();
+    renderJa(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /めくる/i });
+    await user.click(revealBtn);
+
+    expect(screen.getByRole("button", { name: /もう一度/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /簡単/i })).toBeInTheDocument();
+  });
+
+  it("renders the all-caught-up screen in Japanese", async () => {
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    const user = userEvent.setup();
+    renderJa(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /めくる/i });
+    await user.click(revealBtn);
+
+    const easyBtn = screen.getByRole("button", { name: /簡単/i });
+    await user.click(easyBtn);
+
+    await waitFor(() =>
+      expect(screen.getByText(/すべて完了/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("renders the grade error message in Japanese", async () => {
+    const user = userEvent.setup();
+    renderJa(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /めくる/i });
+    await user.click(revealBtn);
+
+    vi.mocked(nextReview).mockImplementationOnce(() => {
+      throw new RangeError("nextReview: invalid grade");
+    });
+    await user.click(screen.getByRole("button", { name: /簡単/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/予期しないエラーにより採点を保存できませんでした/i)).toBeInTheDocument(),
     );
   });
 });

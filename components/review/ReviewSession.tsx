@@ -257,11 +257,11 @@ const TodayPill = React.memo(function TodayPill({
         <p>
           <span className="text-zinc-600 dark:text-zinc-300">{t("cardTypeName")}:</span>{" "}
           <span className="font-medium text-foreground">
-            {perType.name.newIntroducedToday} new
+            {perType.name.newIntroducedToday} {t("todayNew")}
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.name.reviewsDoneToday} reviewed
+            {perType.name.reviewsDoneToday} {t("todayReviewed")}
           </span>
         </p>
       )}
@@ -269,11 +269,11 @@ const TodayPill = React.memo(function TodayPill({
         <p>
           <span className="text-zinc-600 dark:text-zinc-300">{t("cardTypeEvolution")}:</span>{" "}
           <span className="font-medium text-foreground">
-            {perType.evolution.newIntroducedToday} new
+            {perType.evolution.newIntroducedToday} {t("todayNew")}
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.evolution.reviewsDoneToday} reviewed
+            {perType.evolution.reviewsDoneToday} {t("todayReviewed")}
           </span>
         </p>
       )}
@@ -281,11 +281,11 @@ const TodayPill = React.memo(function TodayPill({
         <p>
           <span className="text-zinc-600 dark:text-zinc-300">{t("cardTypeReverse")}:</span>{" "}
           <span className="font-medium text-foreground">
-            {perType.reverse.newIntroducedToday} new
+            {perType.reverse.newIntroducedToday} {t("todayNew")}
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.reverse.reviewsDoneToday} reviewed
+            {perType.reverse.reviewsDoneToday} {t("todayReviewed")}
           </span>
         </p>
       )}
@@ -293,11 +293,11 @@ const TodayPill = React.memo(function TodayPill({
         <p>
           <span className="text-zinc-600 dark:text-zinc-300">{t("cardTypeCry")}:</span>{" "}
           <span className="font-medium text-foreground">
-            {perType.cry.newIntroducedToday} new
+            {perType.cry.newIntroducedToday} {t("todayNew")}
           </span>
           {" · "}
           <span className="font-medium text-foreground">
-            {perType.cry.reviewsDoneToday} reviewed
+            {perType.cry.reviewsDoneToday} {t("todayReviewed")}
           </span>
         </p>
       )}
@@ -1336,7 +1336,11 @@ export function ReviewSession() {
       <div className="flex flex-col items-center gap-4 text-center">
         <p className="text-2xl font-semibold text-foreground">{t("noCardTypesEnabled")}</p>
         <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-          {t("noCardTypesEnabledBody")}
+          {t.rich("noCardTypesEnabledBody", {
+            link: (chunks) => (
+              <a href="/settings" className="underline text-foreground">{chunks}</a>
+            ),
+          })}
         </p>
       </div>
     );

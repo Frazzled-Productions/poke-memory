@@ -1,5 +1,3 @@
-"use client";
-
 import { describe, it, expect, vi } from "vitest";
 import { UndoButton, ReviewCardLayout } from "@/components/review/ReviewCardLayout";
 import {
