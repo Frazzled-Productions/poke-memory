@@ -233,7 +233,9 @@ describe("FsrsOptimizerSection", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/srs/optimize", { method: "POST" });
     });
 
-    it("shows generic error text for an unrecognised 500", async () => {
+    it("shows HTTP status in error text for an unrecognised 500 (#1305)", async () => {
+      // A 500 with no recognised errorCode (e.g. empty JSON body) must surface
+      // the HTTP status so the failure class is visible from a screenshot.
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
@@ -251,7 +253,36 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimise. Try again later.",
+          "Couldn't optimise (HTTP 500). Try again later.",
+        );
+      });
+    });
+
+    it("shows server-error message for the structured unknown error code (#1305)", async () => {
+      // The route returns { error: "unknown" } for any top-level unhandled
+      // exception. The UI must show the HTTP status to aid diagnosis.
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          json: async () => ({ error: "unknown", detail: "something exploded" }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Couldn't optimise (server error 500). Please file an issue.",
         );
       });
     });

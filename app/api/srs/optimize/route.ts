@@ -130,6 +130,21 @@ async function persistWeights(
 }
 
 export async function POST(): Promise<NextResponse> {
+  try {
+    return await runOptimize();
+  } catch (err) {
+    // Catch-all for any unexpected error not handled by the inner flow —
+    // e.g. a Supabase client initialisation failure or a transient network
+    // error. Returns a structured response so the UI can surface the HTTP
+    // status rather than the generic catch-all string (#1305).
+    console.error("[/api/srs/optimize] unhandled error", err);
+    const detail =
+      err instanceof Error ? err.message.slice(0, 200) : "internal error";
+    return NextResponse.json({ error: "unknown", detail }, { status: 500 });
+  }
+}
+
+async function runOptimize(): Promise<NextResponse> {
   const supabase = (await createClient()) as unknown as SupabaseClient;
   const {
     data: { user },
@@ -203,8 +218,18 @@ export async function POST(): Promise<NextResponse> {
     console.error("[/api/srs/optimize] computeParameters failed", err);
     // The native binding throws on degenerate or insufficient data distributions.
     // Return 422 (client-fixable: keep studying) rather than a generic 500.
+    //
+    // Note: the input filter in `gradeLogToOptimizerItems` drops single-review
+    // cards before we reach this point (#1304), so this branch handles genuine
+    // distributional issues (too little variance, too few distinct intervals).
+    //
+    // Include a truncated detail string so an opaque failure can be diagnosed
+    // from a screenshot alone (#1305). The binding's error strings contain no
+    // PII — they are binding-internal messages already written to our logs.
+    const detail =
+      err instanceof Error ? err.message.slice(0, 200) : "unknown binding error";
     return NextResponse.json(
-      { error: "degenerate_data", reviewCount },
+      { error: "degenerate_data", reviewCount, detail },
       { status: 422 },
     );
   }

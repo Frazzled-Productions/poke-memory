@@ -69,7 +69,7 @@ export function FsrsOptimizerSection({
       if (!res.ok) {
         setOptimizerState("error");
         const body = (await res.json().catch(() => null)) as
-          | { error?: string; reviewCount?: number; retryAfterMs?: number }
+          | { error?: string; detail?: string; reviewCount?: number; retryAfterMs?: number }
           | null;
         const errorCode = body?.error;
 
@@ -103,8 +103,19 @@ export function FsrsOptimizerSection({
           setErrorMsg("Couldn't load your settings. Check your connection and try again.");
         } else if (errorCode === "save_failed") {
           setErrorMsg("Optimisation succeeded but couldn't be saved. Try again.");
+        } else if (errorCode === "unknown") {
+          // A structured but unmapped server error — includes HTTP status so the
+          // next opaque failure can be diagnosed from a screenshot (#1305).
+          setErrorMsg(
+            `Couldn't optimise (server error ${res.status}). Please file an issue.`,
+          );
         } else {
-          setErrorMsg("Couldn't optimise. Try again later.");
+          // Truly unstructured response (e.g. a Vercel 504 with no JSON body, or
+          // an auth error without a matching errorCode). Include the HTTP status
+          // so the user can distinguish a timeout from an auth expiry.
+          setErrorMsg(
+            `Couldn't optimise (HTTP ${res.status}). Try again later.`,
+          );
         }
         return;
       }
