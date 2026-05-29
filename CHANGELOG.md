@@ -6,6 +6,20 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.23] - 2026-05-29
+
+### Added
+
+- Per-locale FSRS rows: switching Pokémon name language now gives each locale an independent progress slate (review history is preserved and restored when switching back). Mastery, Pasture, Stats, and badges all scope to the active locale.
+- Added a "Languages" Labs flag that reveals a locale selector in Settings, letting you view Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese (machine-translated stubs; full translations coming in a follow-up).
+
+### Fixed
+
+- Fixed app language and Pokémon name language being controlled by a single selector: they are now independent settings (#1260). A user can keep the app UI in English while practising Japanese Pokémon names, or vice versa.
+- Fixed evolution cards showing stale English names after switching Pokémon name locale: names are now resolved at render time so in-flight cards update immediately without a session rebuild (#1260).
+- Bottom nav bar is no longer unresponsive on the all-caught-up screen when the Higher or Lower mini-game is visible.
+- Fixed a rare sync gap where grades made near the end of a short mobile session could fail to reach cloud storage. The pending-grade queue is now written to localStorage before the unload beacon fires, ensuring the recovery path has the correct cards even if the beacon fails and the OS kills the page before the debounce timer runs.
+
 ## [0.10.22] - 2026-05-27
 
 ### Added
@@ -1421,7 +1435,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.22...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.23...HEAD
+[0.10.23]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.23
 [0.10.22]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.22
 [0.10.21]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.21
 [0.10.20]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.20
