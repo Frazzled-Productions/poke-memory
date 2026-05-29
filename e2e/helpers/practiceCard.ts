@@ -15,10 +15,10 @@ import type { Locator, Page } from "@playwright/test";
  * This locator therefore matches every legitimate first-card surface:
  *
  *  - Reveal button: flip name / evolution / reverse-evolution cards.
- *  - "Which Pokemon is X?" group: the SpritePicker (reverse name card).
- *  - "Choose the Pokemon name" group: the MultipleChoiceNameCard (verified
+ *  - "Which Pokémon is X?" group: the SpritePicker (reverse name card).
+ *  - "Choose the Pokémon name" group: the MultipleChoiceNameCard (verified
  *    typed-entry learning phase).
- *  - An end-state heading: All caught up / Daily review limit reached / etc.
+ *  - An end-state message: All caught up / Daily review limit reached / etc.
  *
  * Use this everywhere a test means "the Practice surface is ready and
  * interactable" so a calendar roll cannot reintroduce the flake.
@@ -27,8 +27,8 @@ export function practiceReadyLocator(page: Page): Locator {
   const reveal = page.getByRole("button", { name: /^reveal$/i });
   const spritePicker = page.getByRole("group", { name: /Which Pok[eé]mon is .+\?/ });
   const multipleChoice = page.getByRole("group", { name: "Choose the Pokémon name" });
-  const endState = page.getByRole("heading", {
-    name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
-  });
+  const endState = page.getByText(
+    /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
+  );
   return reveal.or(spritePicker).or(multipleChoice).or(endState);
 }
