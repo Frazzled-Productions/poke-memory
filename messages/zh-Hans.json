@@ -410,7 +410,7 @@
     "description": "您的 Pokémon 学习之旅。",
     "loadingAriaLabel": "加载旅程中",
     "currentStreak": "当前连续天数",
-    "daysInARow": "{count, plural, other {连续 {count} 天}}",
+    "daysInARow": "{count, plural, other {连续天}}",
     "noStreak": "暂无连续记录。复习一些卡片来开始吧！",
     "masteryDistribution": "掌握度分布",
     "masteryLocked": "未开始",

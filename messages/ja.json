@@ -410,7 +410,7 @@
     "description": "あなたの Pokémon 学習の旅。",
     "loadingAriaLabel": "旅を読み込み中",
     "currentStreak": "現在の連続日数",
-    "daysInARow": "{count, plural, other {{count}日連続}}",
+    "daysInARow": "{count, plural, other {日連続}}",
     "noStreak": "連続記録なし。カードをレビューして始めましょう！",
     "masteryDistribution": "習得状況の分布",
     "masteryLocked": "未開始",

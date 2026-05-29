@@ -333,6 +333,7 @@ function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
 function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
   const t = useTranslations("journey");
   const tCommon = useTranslations("common");
+  const tPokedex = useTranslations("pokedex");
   return (
     <section aria-labelledby="gen-heading">
       <h2
@@ -343,7 +344,7 @@ function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
       </h2>
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
         <div className="grid grid-cols-[1fr_auto] items-center border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-          <span>Generation</span>
+          <span>{tPokedex("filterByGeneration")}</span>
           <span className="text-right">{t("byGenerationMasteredTotal")}</span>
         </div>
         <ul role="list" className="text-sm">

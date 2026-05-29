@@ -264,10 +264,12 @@ describe("JourneyPage — English locale", () => {
     });
   });
 
-  it("renders the by-generation mastered/total column header", async () => {
+  it("renders the by-generation column headers", async () => {
     renderWithIntl(<JourneyPage />);
 
     await waitFor(() => {
+      // pokedex.filterByGeneration = "Generation" (reused for the left column header)
+      expect(screen.getByText("Generation")).toBeInTheDocument();
       expect(screen.getByText("Mastered / Total")).toBeInTheDocument();
     });
   });
@@ -284,9 +286,10 @@ describe("JourneyPage — with active streak", () => {
   it("renders the daysInARow ICU plural for count=5", async () => {
     renderWithIntl(<JourneyPage />);
 
-    // English: "{count, plural, one {{count} day in a row} other {{count} days in a row}}"
+    // English: "{count, plural, one {day in a row} other {days in a row}}"
+    // Count renders separately as the large animated number; label has no duplication.
     await waitFor(() => {
-      expect(screen.getByText("5 days in a row")).toBeInTheDocument();
+      expect(screen.getByText("days in a row")).toBeInTheDocument();
     });
   });
 });
@@ -321,26 +324,31 @@ describe("JourneyPage — Japanese locale", () => {
     });
   });
 
-  it("renders the by-generation mastered/total column header in Japanese", async () => {
+  it("renders the by-generation column headers in Japanese", async () => {
     renderJa(<JourneyPage />);
 
-    // ja: journey.byGenerationMasteredTotal = "習得済み / 合計"
     await waitFor(() => {
+      // ja: pokedex.filterByGeneration = "世代" (reused for the left column header)
+      expect(screen.getByText("世代")).toBeInTheDocument();
+      // ja: journey.byGenerationMasteredTotal = "習得済み / 合計"
       expect(screen.getByText("習得済み / 合計")).toBeInTheDocument();
     });
   });
 
-  it("renders the daysInARow ICU plural in Japanese for count=7", async () => {
-    const { computeStreak } = vi.mocked(
-      await import("@/lib/streak"),
-    );
-    computeStreak.mockReturnValueOnce(7);
+  describe("with active streak", () => {
+    beforeEach(async () => {
+      const { computeStreak } = vi.mocked(await import("@/lib/streak"));
+      computeStreak.mockReturnValue(7);
+    });
 
-    renderJa(<JourneyPage />);
+    it("renders the daysInARow ICU plural in Japanese for count=7", async () => {
+      renderJa(<JourneyPage />);
 
-    // ja: journey.daysInARow = "{count, plural, other {{count}日連続}}"
-    await waitFor(() => {
-      expect(screen.getByText("7日連続")).toBeInTheDocument();
+      // ja: journey.daysInARow = "{count, plural, other {日連続}}"
+      // Count renders separately as the large animated number; label has no duplication.
+      await waitFor(() => {
+        expect(screen.getByText("日連続")).toBeInTheDocument();
+      });
     });
   });
 });

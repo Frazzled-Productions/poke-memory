@@ -410,7 +410,7 @@
     "description": "您的寶可夢學習之旅。",
     "loadingAriaLabel": "載入旅程中",
     "currentStreak": "目前連續天數",
-    "daysInARow": "{count, plural, other {連續 {count} 天}}",
+    "daysInARow": "{count, plural, other {連續天}}",
     "noStreak": "暫無連續記錄。複習一些卡片來開始吧！",
     "masteryDistribution": "掌握度分佈",
     "masteryLocked": "未開始",

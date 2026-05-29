@@ -650,7 +650,7 @@ export default function StatsPage() {
               </SectionHeading>
               <OnboardingHint id="statsHintDismissed" title={t("masteryMeaning.title")}>
                 <p>
-                  {t("masteryMeaning.body", { reps: masteryRepetitions ?? 3 })}
+                  {t.rich("masteryMeaning.body", { reps: masteryRepetitions ?? 3, em: (chunks) => <em>{chunks}</em> })}
                 </p>
               </OnboardingHint>
               {snapshot.firstMasteryDays !== null && masteryRepetitions !== null && (
