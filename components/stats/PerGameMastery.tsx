@@ -8,11 +8,11 @@
  * sorted in release order, matching the Games scope picker.
  *
  * Styling follows the TypeBreakdown and TrainerCard conventions — `cardPanel`,
- * `sectionLabel`, `statValue`, `mutedText` from `lib/utils/class-names`.
+ * `sectionLabel`, `statValue` from `lib/utils/class-names`.
  */
 
 import type { GameStats } from "@/lib/stats/perGame";
-import { cardPanel, sectionLabel, statValue, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, sectionLabel, statValue } from "@/lib/utils/class-names";
 
 type Props = {
   games: readonly GameStats[];
@@ -68,7 +68,7 @@ function GameRow({ game }: { game: GameStats }) {
           aria-label={`${masteredPct}% of ${game.label} mastered`}
         >
           <div
-            className={`h-full rounded-full transition-all ${complete ? "bg-emerald-500 dark:bg-emerald-400" : "bg-rose-500 dark:bg-rose-400"}`}
+            className={`h-full rounded-full transition-all ${complete ? "bg-emerald-500 dark:bg-emerald-400" : "bg-blue-500 dark:bg-blue-400"}`}
             style={{ width: `${masteredPct}%` }}
           />
         </div>

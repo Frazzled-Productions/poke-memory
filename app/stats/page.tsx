@@ -663,12 +663,7 @@ export default function StatsPage() {
 
             {/* Per-game mastery breakdown (#1313) */}
             {perGameStats.length > 0 && (
-              <section aria-labelledby="per-game-section-heading" className="flex flex-col gap-6">
-                <SectionHeading>
-                  <span id="per-game-section-heading">Progress by game</span>
-                </SectionHeading>
-                <PerGameMastery games={perGameStats} />
-              </section>
+              <PerGameMastery games={perGameStats} />
             )}
 
             {user !== null && supabase !== null && !anyFlagOn && (

@@ -564,6 +564,36 @@ test.describe("Stats page — streak protection card (#1227)", () => {
   });
 });
 
+test.describe("Stats page — per-game mastery breakdown (#1313)", () => {
+  test("the By game section renders and shows generation headings", async ({
+    page,
+  }) => {
+    await page.goto("/stats");
+    // The section always renders when the seed contains version groups (which it
+    // does for the full seed). A fresh guest with no review history will see all
+    // games at 0% mastered.
+    await expect(
+      page.getByRole("heading", { name: "By game" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // At least one generation label should be present (Generation I at minimum).
+    await expect(page.getByText("Generation I")).toBeVisible();
+  });
+
+  test("pretendAllMastered shows full progress on every game", async ({
+    page,
+  }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { name: "By game" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // With pretendAllMastered on, every game bar should show 100%. The first
+    // progress bar in the list should have aria-valuenow="100".
+    const firstBar = page.getByRole("progressbar").first();
+    await expect(firstBar).toHaveAttribute("aria-valuenow", "100");
+  });
+});
+
 test.describe("Stats page — heatmap hover tooltip", () => {
   test("hovering a heatmap cell shows a tooltip with the date and review count", async ({
     page,

@@ -338,11 +338,6 @@ describe("computePerGameStats — custom masteryRepetitions", () => {
 });
 
 describe("computePerGameStats — ordering", () => {
-  beforeEach(() => {
-    // Reset the module-level memoisation between tests so slug list is fresh.
-    // (The seed mock is stable, so this is just a guard.)
-  });
-
   it("returns games in generation + release order", () => {
     const result = computePerGameStats([]);
     const slugs = result.map((g) => g.slug);
