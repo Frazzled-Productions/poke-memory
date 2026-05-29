@@ -87,7 +87,7 @@ import { ScopeControl } from "@/components/review/ScopeControl";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
-import { mutedText } from "@/lib/utils/class-names";
+import { mutedText, sectionLabel } from "@/lib/utils/class-names";
 import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 
 
@@ -248,7 +248,7 @@ const TodayPill = React.memo(function TodayPill({
   const showGraduatedHint = enabledDirections > 1;
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
-      <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-1 ${sectionLabel}`}>
         Done today
       </p>
       {nameEnabled && (

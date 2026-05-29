@@ -7,6 +7,7 @@ import {
   compareVersionGroupSlugs,
 } from "@/lib/pokemon/versionGroupLabels";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
   /** Currently-selected version-group slugs. */
@@ -155,7 +156,7 @@ export function GameScopePicker({ selected, onChange }: Props) {
         return (
           <div key={gen}>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <span className={sectionLabel}>
                 {genName}
               </span>
               <button

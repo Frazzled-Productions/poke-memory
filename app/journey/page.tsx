@@ -35,7 +35,7 @@ import { deriveCloseToMastery, type CloseToMasteryEntry } from "@/lib/journey/cl
 import { CloseToMastery } from "@/components/journey/CloseToMastery";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel, cardPanelPadded, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, cardPanelPadded, mutedText, sectionLabel } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -262,7 +262,7 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
             <div className="text-center">
               <div className="mb-0.5 flex items-center justify-center gap-1.5">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-                <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                <span className={sectionLabel}>
                   {label}
                 </span>
               </div>

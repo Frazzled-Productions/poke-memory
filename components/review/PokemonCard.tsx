@@ -5,6 +5,7 @@ import type { PokemonFact } from "@/lib/pokemon/facts";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { sectionLabelSubtle } from "@/lib/utils/class-names";
 
 type Props = {
   spriteUrl: string;
@@ -57,7 +58,7 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
             </div>
             {fact && (
               <div className="mt-1 text-center sm:mt-2">
-                <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                <span className={sectionLabelSubtle}>
                   {fact.label}
                 </span>
                 <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-300 max-w-xs">{fact.value}</p>

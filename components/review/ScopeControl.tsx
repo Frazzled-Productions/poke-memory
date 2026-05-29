@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
+import { sectionLabel } from "@/lib/utils/class-names";
 import {
   EMPTY_SCOPE,
   countMatchingSpecies,
@@ -119,7 +120,7 @@ function ScopeSection({
           id={legendId}
           className="flex cursor-pointer list-none items-center justify-between gap-2 py-0.5 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
         >
-          <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <span className={sectionLabel}>
             {legend}
           </span>
           {/* Chevron rotates when the <details> is open via the group-open variant. */}
@@ -186,7 +187,7 @@ export function ScopeControl({
           aria-expanded={open}
           aria-controls="scope-panel"
         >
-          <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <span className={sectionLabel}>
             Scope
           </span>
           <span

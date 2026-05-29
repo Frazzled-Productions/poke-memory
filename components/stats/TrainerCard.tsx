@@ -3,6 +3,7 @@
 import type { GenerationStats } from "@/lib/stats/derive";
 import type { BadgeDefinition } from "@/lib/badges/catalog";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
   handle: string | null;
@@ -80,7 +81,7 @@ export function TrainerCard({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col">
-          <span className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <span className={sectionLabel}>
             Trainer
           </span>
           <span className="text-lg font-semibold text-foreground">
@@ -88,7 +89,7 @@ export function TrainerCard({
           </span>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <span className={sectionLabel}>
             Lv
           </span>
           <span
