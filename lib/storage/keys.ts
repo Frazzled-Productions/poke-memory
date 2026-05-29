@@ -140,6 +140,15 @@ export const KEY_HAS_MASTERED = "poke-memory:has-mastered:v2";
  */
 export const KEY_QA_SEED_ACTIVE = "poke-memory:qa-seed-active";
 
+// ─── Pokédex sort preference ──────────────────────────────────────────────────
+
+/**
+ * The user's last-chosen Pokédex sort option
+ * ("national" | "alphabetical" | "closest-to-mastery").
+ * Persisted so the sort survives back-navigation and page reloads.
+ */
+export const KEY_POKEDEX_SORT = "poke-memory:pokedex-sort:v1";
+
 // ─── Per-device shuffle salt ──────────────────────────────────────────────────
 
 /**
