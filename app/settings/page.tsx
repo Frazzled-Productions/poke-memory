@@ -559,9 +559,12 @@ export default function SettingsPage() {
     if (!user || !supabase || !autoDetectedPrefsRef.current) return;
     const prefs = autoDetectedPrefsRef.current;
     autoDetectedPrefsRef.current = null;
+    // pushNotificationHour is not auto-detected; current settings value is passed
+    // through so the UPDATE does not null the column on other devices (#1315).
     void pushRegionalPrefs(supabase, user.id, {
       timezone: prefs.timezone,
       dateFormat: prefs.dateFormat,
+      pushNotificationHour: loadSettings().pushNotificationHour,
     }).catch(() => {});
   }, [user, supabase]);
 
@@ -1716,6 +1719,7 @@ export default function SettingsPage() {
                           void pushRegionalPrefs(supabase, user.id, {
                             timezone: e.target.value,
                             dateFormat: next.dateFormat,
+                            pushNotificationHour: next.pushNotificationHour,
                           }).catch(() => {});
                         }
                       }}
@@ -1766,6 +1770,7 @@ export default function SettingsPage() {
                                   void pushRegionalPrefs(supabase, user.id, {
                                     timezone: next.timezone,
                                     dateFormat: value,
+                                    pushNotificationHour: next.pushNotificationHour,
                                   }).catch(() => {});
                                 }
                               }}
@@ -1779,6 +1784,52 @@ export default function SettingsPage() {
                         ));
                       })()}
                     </fieldset>
+                  </div>
+
+                  {/* Push notification hour (#1315) */}
+                  <div className={cardPanelPadded}>
+                    <label
+                      htmlFor="push-notification-hour"
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      Daily reminder time
+                    </label>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Preferred local hour for your daily practice reminder. Uses your timezone
+                      above. Full per-hour delivery activates after a scheduled update.
+                    </p>
+                    <select
+                      id="push-notification-hour"
+                      value={settings.pushNotificationHour ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const parsed = raw === "" ? null : parseInt(raw, 10);
+                        const hour = parsed !== null && !isNaN(parsed) && parsed >= 0 && parsed <= 23
+                          ? parsed
+                          : null;
+                        const next = { ...settings, pushNotificationHour: hour };
+                        setSettings(next);
+                        saveSettings(next);
+                        if (user && supabase) {
+                          void pushRegionalPrefs(supabase, user.id, {
+                            timezone: next.timezone,
+                            dateFormat: next.dateFormat,
+                            pushNotificationHour: hour,
+                          }).catch(() => {});
+                        }
+                      }}
+                      className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      <option value="">Default (08:00)</option>
+                      {Array.from({ length: 24 }, (_, h) => {
+                        const label = `${String(h).padStart(2, "0")}:00`;
+                        return (
+                          <option key={h} value={String(h)}>
+                            {label}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
                 </div>
 

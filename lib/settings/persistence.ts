@@ -242,6 +242,15 @@ export type UserSettings = {
    */
   dateFormat: DateFormat | null;
   /**
+   * User's preferred local hour (0-23) for the daily push notification
+   * (#1315). Null means "no preference" — the send-daily route falls back to
+   * PUSH_DEFAULT_HOUR_UTC (8 = 08:00 UTC). Stored as a scalar column on
+   * user_settings (migration 030), NOT inside the JSONB blob, for the same
+   * reason as timezone/dateFormat: a dedicated write path via pushRegionalPrefs
+   * prevents last-write-wins races with the JSONB merge path.
+   */
+  pushNotificationHour: number | null;
+  /**
    * Streak protection state (#1227, revised #1245). Tokens auto-preserve a
    * streak across a missed day. Earned 1 per 30 consecutive review days,
    * capped at 3; scarcity is the only gate (consecutive spends are
@@ -337,6 +346,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   reverseFeedbackDelay: "default" as const,
   timezone: null,
   dateFormat: null,
+  // Null = no preference; route falls back to PUSH_DEFAULT_HOUR_UTC (8).
+  pushNotificationHour: null,
   streakProtection: { ...DEFAULT_STREAK_PROTECTION },
   // Default off: existing users keep the honour-system flow unchanged.
   verifiedTypedEntryMode: false,
@@ -557,6 +568,14 @@ function parseStoredSettings(raw: string | null): UserSettings {
       obj.dateFormat === "iso" || obj.dateFormat === "dmy" || obj.dateFormat === "mdy"
         ? obj.dateFormat
         : DEFAULT_SETTINGS.dateFormat,
+    // Null = no preference. Absent in pre-#1315 records; back-fills to null.
+    pushNotificationHour:
+      typeof obj.pushNotificationHour === "number" &&
+      Number.isInteger(obj.pushNotificationHour) &&
+      obj.pushNotificationHour >= 0 &&
+      obj.pushNotificationHour <= 23
+        ? obj.pushNotificationHour
+        : null,
     // Existing-user migration (#661): a record that pre-dates this field will
     // have no `mobileNav` key. To preserve their experience, default to
     // 'hamburger' (what they had before). A brand-new user (raw === null) never

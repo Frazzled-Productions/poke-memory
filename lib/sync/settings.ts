@@ -38,7 +38,7 @@ export async function pushSettings(
 }
 
 // ---------------------------------------------------------------------------
-// Regional preferences (timezone + date_format)
+// Regional preferences (timezone + date_format + push_notification_hour)
 // ---------------------------------------------------------------------------
 //
 // These live in dedicated scalar columns on user_settings, NOT inside the
@@ -52,13 +52,21 @@ export async function pushSettings(
 export type RegionalPrefs = {
   timezone: string | null;
   dateFormat: DateFormat | null;
+  /**
+   * User's preferred local hour (0-23) for the daily push reminder (#1315).
+   * Stored as a scalar column on user_settings (migration 030) for the same
+   * reason as timezone/dateFormat: a dedicated write path prevents
+   * last-write-wins collisions with the JSONB settings blob.
+   * NULL means "no preference" — the route falls back to PUSH_DEFAULT_HOUR_UTC.
+   */
+  pushNotificationHour: number | null;
 };
 
 /**
- * Write timezone + date_format scalar columns to user_settings.
- * Kept separate from pushSettings() so the two write paths target disjoint
- * columns and never compete for the same row. The two are safe to execute
- * concurrently.
+ * Write timezone + date_format + push_notification_hour scalar columns to
+ * user_settings. Kept separate from pushSettings() so the two write paths
+ * target disjoint columns and never compete for the same row. The two are
+ * safe to execute concurrently.
  */
 export async function pushRegionalPrefs(
   client: SupabaseClient,
@@ -69,12 +77,13 @@ export async function pushRegionalPrefs(
     // UPDATE rather than upsert — avoids creating a sparse row (settings=NULL)
     // for a user whose pushSettings hasn't run yet. A no-op update (row doesn't
     // exist) is safe: the row will be created by pushSettings and the next
-    // explicit timezone/date_format change will update the scalar columns.
+    // explicit timezone/date_format/hour change will update the scalar columns.
     const { error } = await client
       .from("user_settings")
       .update({
         timezone: prefs.timezone,
         date_format: prefs.dateFormat,
+        push_notification_hour: prefs.pushNotificationHour,
       })
       .eq("user_id", userId);
     return !error;
@@ -84,8 +93,9 @@ export async function pushRegionalPrefs(
 }
 
 /**
- * Pull timezone + date_format scalar columns from user_settings.
- * Returns null if the user has no row, or if both columns are null.
+ * Pull timezone + date_format + push_notification_hour scalar columns from
+ * user_settings. Returns null if the user has no row, or if all three columns
+ * are null.
  */
 export async function pullRegionalPrefs(
   client: SupabaseClient,
@@ -94,14 +104,19 @@ export async function pullRegionalPrefs(
   try {
     const { data, error } = await client
       .from("user_settings")
-      .select("timezone, date_format")
+      .select("timezone, date_format, push_notification_hour")
       .eq("user_id", userId)
       .maybeSingle();
     if (error || !data) return null;
-    const row = data as { timezone: string | null; date_format: string | null };
+    const row = data as {
+      timezone: string | null;
+      date_format: string | null;
+      push_notification_hour: number | null;
+    };
     const dateFormat = validateDateFormat(row.date_format);
-    if (row.timezone === null && dateFormat === null) return null;
-    return { timezone: row.timezone, dateFormat };
+    const pushNotificationHour = validatePushNotificationHour(row.push_notification_hour);
+    if (row.timezone === null && dateFormat === null && pushNotificationHour === null) return null;
+    return { timezone: row.timezone, dateFormat, pushNotificationHour };
   } catch {
     return null;
   }
@@ -110,6 +125,12 @@ export async function pullRegionalPrefs(
 function validateDateFormat(value: string | null): DateFormat | null {
   if (value === "iso" || value === "dmy" || value === "mdy") return value;
   return null;
+}
+
+function validatePushNotificationHour(value: number | null | undefined): number | null {
+  if (typeof value !== "number") return null;
+  if (!Number.isInteger(value) || value < 0 || value > 23) return null;
+  return value;
 }
 
 // ---------------------------------------------------------------------------

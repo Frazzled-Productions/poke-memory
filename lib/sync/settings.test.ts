@@ -81,6 +81,7 @@ const SAMPLE: UserSettings = {
   mcCardOnboardingShown: false,
   labsFlags: { ...DEFAULT_LABS_FLAGS },
   pokemonNameLocale: "en" as const,
+  pushNotificationHour: null,
 };
 
 describe("pushSettings", () => {
@@ -239,16 +240,18 @@ describe("pullSettingsWithTimestamp", () => {
 });
 
 describe("pushRegionalPrefs", () => {
-  it("calls update with timezone and date_format only — no updated_at — filtered by user_id", async () => {
+  it("calls update with timezone, date_format, and push_notification_hour — no updated_at — filtered by user_id", async () => {
     const { client, update, eq } = makeClientWithUpdate();
     const ok = await pushRegionalPrefs(client, "user-1", {
       timezone: "America/New_York",
       dateFormat: "mdy",
+      pushNotificationHour: 20,
     });
     expect(ok).toBe(true);
     const [row] = update.mock.calls[0] as [Record<string, unknown>];
     expect(row.timezone).toBe("America/New_York");
     expect(row.date_format).toBe("mdy");
+    expect(row.push_notification_hour).toBe(20);
     // Must NOT include updated_at — bumping it would cause other devices to
     // think the settings JSONB blob changed, triggering a spurious overwrite.
     expect(row).not.toHaveProperty("updated_at");
@@ -260,32 +263,43 @@ describe("pushRegionalPrefs", () => {
 
   it("returns false on supabase error", async () => {
     const { client } = makeClientWithUpdate({ message: "boom" });
-    expect(await pushRegionalPrefs(client, "user-1", { timezone: null, dateFormat: null })).toBe(false);
+    expect(await pushRegionalPrefs(client, "user-1", { timezone: null, dateFormat: null, pushNotificationHour: null })).toBe(false);
   });
 });
 
 describe("pullRegionalPrefs", () => {
-  it("returns timezone and dateFormat when both columns are set", async () => {
+  it("returns timezone, dateFormat, and pushNotificationHour when all columns are set", async () => {
     const { client } = makeClientWithMaybeSingle({
       timezone: "Australia/Sydney",
       date_format: "dmy",
+      push_notification_hour: 20,
     });
     expect(await pullRegionalPrefs(client, "user-1")).toEqual({
       timezone: "Australia/Sydney",
       dateFormat: "dmy",
+      pushNotificationHour: 20,
     });
   });
 
-  it("returns timezone-only when date_format is null", async () => {
-    const { client } = makeClientWithMaybeSingle({ timezone: "Europe/London", date_format: null });
+  it("returns timezone-only when date_format is null and push_notification_hour is null", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      timezone: "Europe/London",
+      date_format: null,
+      push_notification_hour: null,
+    });
     expect(await pullRegionalPrefs(client, "user-1")).toEqual({
       timezone: "Europe/London",
       dateFormat: null,
+      pushNotificationHour: null,
     });
   });
 
-  it("returns null when both columns are null (nothing to overlay)", async () => {
-    const { client } = makeClientWithMaybeSingle({ timezone: null, date_format: null });
+  it("returns null when all three columns are null (nothing to overlay)", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      timezone: null,
+      date_format: null,
+      push_notification_hour: null,
+    });
     expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
   });
 
@@ -298,17 +312,20 @@ describe("pullRegionalPrefs", () => {
     const { client } = makeClientWithMaybeSingle({
       timezone: "UTC",
       date_format: "invalid",
+      push_notification_hour: null,
     });
     expect(await pullRegionalPrefs(client, "user-1")).toEqual({
       timezone: "UTC",
       dateFormat: null,
+      pushNotificationHour: null,
     });
   });
 
-  it("returns null when timezone is also null and date_format is invalid", async () => {
+  it("returns null when timezone is also null, date_format is invalid, and push_notification_hour is null", async () => {
     const { client } = makeClientWithMaybeSingle({
       timezone: null,
       date_format: "bad-value",
+      push_notification_hour: null,
     });
     expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
   });
@@ -316,5 +333,31 @@ describe("pullRegionalPrefs", () => {
   it("returns null on supabase error", async () => {
     const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
     expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
+  });
+
+  it("returns pushNotificationHour when only hour is set and timezone/dateFormat are null", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      timezone: null,
+      date_format: null,
+      push_notification_hour: 9,
+    });
+    expect(await pullRegionalPrefs(client, "user-1")).toEqual({
+      timezone: null,
+      dateFormat: null,
+      pushNotificationHour: 9,
+    });
+  });
+
+  it("rejects out-of-range push_notification_hour values (e.g. 24)", async () => {
+    const { client } = makeClientWithMaybeSingle({
+      timezone: "UTC",
+      date_format: null,
+      push_notification_hour: 24,
+    });
+    expect(await pullRegionalPrefs(client, "user-1")).toEqual({
+      timezone: "UTC",
+      dateFormat: null,
+      pushNotificationHour: null,
+    });
   });
 });

@@ -716,3 +716,40 @@ test.describe("Settings — Labs section (#1258)", () => {
     );
   });
 });
+
+// ─── #1315: push notification hour picker ────────────────────────────────────
+
+test.describe("Settings — push notification hour picker (#1315)", () => {
+  test("hour picker renders in Account & Data > Regional section and can be set", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    // Expand "Account & Data".
+    await page.getByRole("button", { name: /account & data/i }).click();
+
+    // The 'Daily reminder time' picker must be visible in the Regional sub-section.
+    const select = page.getByLabel(/daily reminder time/i);
+    await expect(select).toBeVisible();
+
+    // The default option must read "Default (08:00)" — no preference set.
+    await expect(select).toHaveValue("");
+
+    // Select a specific hour and verify the value updates.
+    await select.selectOption("20");
+    await expect(select).toHaveValue("20");
+  });
+
+  test("hour picker has 25 options (default + hours 00:00 to 23:00)", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /account & data/i }).click();
+
+    const select = page.getByLabel(/daily reminder time/i);
+    await expect(select).toBeVisible();
+
+    const optionCount = await select.locator("option").count();
+    expect(optionCount).toBe(25);
+  });
+});

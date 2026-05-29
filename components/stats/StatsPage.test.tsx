@@ -607,6 +607,7 @@ describe("StatsPage — Force pull from cloud button", () => {
     vi.mocked(pullRegionalPrefs).mockResolvedValueOnce({
       timezone: "Europe/London",
       dateFormat: "dmy",
+      pushNotificationHour: null,
     });
     vi.mocked(pullStreak).mockResolvedValueOnce(["2026-05-13", "2026-05-14"]);
     vi.mocked(pullGradeLog).mockResolvedValueOnce([

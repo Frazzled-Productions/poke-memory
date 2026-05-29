@@ -11,7 +11,7 @@
  * level so the test never touches the network and never sends a real push.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("web-push", () => ({
   default: {
@@ -64,6 +64,8 @@ type SettingsMockRow = {
   user_id: string;
   timezone: string | null;
   settings?: Record<string, unknown> | null;
+  /** push_notification_hour (migration 030, #1315). null = no preference. */
+  push_notification_hour?: number | null;
 };
 
 /**
@@ -183,6 +185,15 @@ beforeEach(() => {
   process.env.VAPID_SUBJECT = "mailto:test@example.com";
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+  // Pin the system clock to 08:00 UTC so the per-user hour gate
+  // (shouldSendToUser) passes for NULL-preference users (default = 8).
+  // Tests that need a different UTC hour override via vi.setSystemTime locally.
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-05-20T08:00:00Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("buildDailyMessage", () => {
@@ -1111,5 +1122,125 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
     // dueCount=0, newEstimate=10 → new-only copy.
     expect(parsed.body).toContain("new");
     expect(parsed.body).toContain("10");
+  });
+});
+
+// ─── #1315: per-user notification-hour gating ────────────────────────────────
+
+describe("POST /api/push/send-daily — per-user notification-hour gate (#1315)", () => {
+  const SUB = {
+    id: "sub-1",
+    user_id: "user-a",
+    endpoint: "https://push.example/a",
+    p256dh: "p256-a",
+    auth_secret: "auth-a",
+  };
+
+  it("NULL preference: notifies user when current UTC hour is 8 (default)", async () => {
+    // Clock is pinned to 08:00 UTC by beforeEach. NULL preference → default UTC 8 → match.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: ALL_ENABLED_SETTINGS,
+        push_notification_hour: null,
+      }],
+      due: dueRowsFor({ "user-a": 1 }),
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    const body = (await res.json()) as { sent: number };
+    expect(body.sent).toBe(1);
+  });
+
+  it("NULL preference: does NOT notify user when current UTC hour is not 8", async () => {
+    // Override clock to 09:00 UTC — mismatches the default hour (8).
+    vi.setSystemTime(new Date("2026-05-20T09:00:00Z"));
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: ALL_ENABLED_SETTINGS,
+        push_notification_hour: null,
+      }],
+      due: dueRowsFor({ "user-a": 1 }),
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+
+    const res = await POST(makeRequest());
+    const body = (await res.json()) as { sent: number };
+    // Route should return 200 with sent=0 (no subscriptions matched the hour gate).
+    expect(body.sent).toBe(0);
+  });
+
+  it("interim dormancy: user with non-default hour is NOT notified at 08:00 UTC", async () => {
+    // Clock pinned to 08:00 UTC (beforeEach). User wants 20:00 UTC (hour=20).
+    // 20 ≠ 8 → dormant during the interim daily cron.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: ALL_ENABLED_SETTINGS,
+        push_notification_hour: 20,
+      }],
+      due: dueRowsFor({ "user-a": 3 }),
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+
+    const res = await POST(makeRequest());
+    const body = (await res.json()) as { sent: number };
+    expect(body.sent).toBe(0);
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it("set hour: notifies user when their local hour converts to the current UTC hour", async () => {
+    // Clock at 08:00 UTC. User in Europe/London (BST = UTC+1) wants 09:00 local.
+    // 09:00 BST = 08:00 UTC → match → should notify.
+    vi.setSystemTime(new Date("2026-05-20T08:00:00Z")); // BST day
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "Europe/London",
+        settings: ALL_ENABLED_SETTINGS,
+        push_notification_hour: 9, // 09:00 local in BST = 08:00 UTC
+      }],
+      due: dueRowsFor({ "user-a": 2 }),
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    const body = (await res.json()) as { sent: number };
+    expect(body.sent).toBe(1);
+  });
+
+  it("returns ok:true with sent=0 when no subscriptions match the UTC hour", async () => {
+    // Clock at 08:00 UTC. Both users have non-matching hours.
+    const admin = buildAdminMock({
+      subscriptions: [
+        SUB,
+        { id: "sub-2", user_id: "user-b", endpoint: "https://push.example/b", p256dh: "p256-b", auth_secret: "auth-b" },
+      ],
+      settings: [
+        { user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS, push_notification_hour: 20 },
+        { user_id: "user-b", timezone: "UTC", settings: ALL_ENABLED_SETTINGS, push_notification_hour: 18 },
+      ],
+      due: dueRowsFor({ "user-a": 5, "user-b": 3 }),
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; sent: number; deleted: number };
+    expect(body.ok).toBe(true);
+    expect(body.sent).toBe(0);
+    expect(body.deleted).toBe(0);
+    expect(mockSendNotification).not.toHaveBeenCalled();
   });
 });

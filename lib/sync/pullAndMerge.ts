@@ -238,9 +238,10 @@ export async function pullAndMerge(
       window.dispatchEvent(new CustomEvent(SYNC_PULL_APPLIED_EVENT));
     }
 
-    // Pull regional prefs (timezone + date_format scalar columns) — best-effort,
-    // runs on every pull so device B picks up choices made on device A.
-    // Cloud non-null values win; null cloud values leave local values untouched.
+    // Pull regional prefs (timezone + date_format + push_notification_hour
+    // scalar columns) — best-effort, runs on every pull so device B picks up
+    // choices made on device A. Cloud non-null values win; null cloud values
+    // leave local values untouched.
     try {
       const cloudPrefs = await pullRegionalPrefs(client, userId);
       if (cloudPrefs !== null) {
@@ -249,8 +250,15 @@ export async function pullAndMerge(
           ...local,
           ...(cloudPrefs.timezone !== null ? { timezone: cloudPrefs.timezone } : {}),
           ...(cloudPrefs.dateFormat !== null ? { dateFormat: cloudPrefs.dateFormat } : {}),
+          ...(cloudPrefs.pushNotificationHour !== null
+            ? { pushNotificationHour: cloudPrefs.pushNotificationHour }
+            : {}),
         };
-        if (next.timezone !== local.timezone || next.dateFormat !== local.dateFormat) {
+        if (
+          next.timezone !== local.timezone ||
+          next.dateFormat !== local.dateFormat ||
+          next.pushNotificationHour !== local.pushNotificationHour
+        ) {
           saveSettings(next);
         }
       }
