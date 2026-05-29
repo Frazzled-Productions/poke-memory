@@ -2272,6 +2272,17 @@ export function ReviewSession() {
 
   // --- Active review UI ---
 
+  // Extract the English display name once for all render branches below.
+  // Each child component (PokemonCard, MultipleChoiceNameCard, TypedEntryNameCard)
+  // calls useLocalePokemonName internally, so `cardEnglishName` is the
+  // fallback argument, not a final render value — the lint rule is intentionally
+  // suppressed here (#1327).
+  // EvolutionReviewCard and ReverseEvolutionReviewCard do not carry displayName
+  // (they render via EvolutionCard, not PokemonCard), so we fall back to ""
+  // for TypeScript's sake. Those branches never read cardEnglishName.
+  // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg forwarded to child components that call useLocalePokemonName internally
+  const cardEnglishName = "displayName" in effectiveCard ? effectiveCard.displayName : "";
+
   // Cry cards: cry plays as the prompt; sprite + name + grade buttons
   // appear after the user taps Reveal (or the visually-merged Play tile).
   if (effectiveCard.cardType === "cry") {
@@ -2308,7 +2319,7 @@ export function ReviewSession() {
               <>
                 <PokemonCard
                   spriteUrl={effectiveCard.spriteUrl}
-                  name={effectiveCard.displayName}
+                  name={cardEnglishName}
                   revealed
                   fact={currentFact}
                   direction="cry"
@@ -2549,7 +2560,7 @@ export function ReviewSession() {
             <MultipleChoiceNameCard
               key={`${effectiveCard.id}-${cardPresentationCount}`}
               spriteUrl={effectiveCard.spriteUrl}
-              canonicalName={effectiveCard.displayName}
+              canonicalName={cardEnglishName}
               options={mcOptions}
               id={effectiveCard.id}
               onGrade={handleGrade}
@@ -2563,7 +2574,7 @@ export function ReviewSession() {
           <TypedEntryNameCard
             key={effectiveCard.id}
             spriteUrl={effectiveCard.spriteUrl}
-            canonicalName={effectiveCard.displayName}
+            canonicalName={cardEnglishName}
             id={effectiveCard.id}
             onGrade={handleGrade}
             grading={grading}
@@ -2592,7 +2603,7 @@ export function ReviewSession() {
             ) : (
               <PokemonCard
                 spriteUrl={effectiveCard.spriteUrl}
-                name={effectiveCard.displayName}
+                name={cardEnglishName}
                 revealed={revealed}
                 fact={currentFact}
                 id={effectiveCard.id}

@@ -12,6 +12,7 @@ import { getPokemonFacts, loadFlavorTexts } from "@/lib/pokemon/facts";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import type { CardClassOrPending } from "@/lib/review/useCardClass";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import { CryButton } from "@/components/pokedex/CryButton";
 import { SpritePreloader } from "@/components/sprites/SpritePreloader";
@@ -120,19 +121,23 @@ function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
 // ---------------------------------------------------------------------------
 
 function FormBlock({ form }: { form: SeedPokemon }) {
+  // Resolve locale-aware name so alternate-form headings honour the active
+  // pokemonNameLocale setting (#1327).
+  // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
+  const { name: formLocaleName } = useLocalePokemonName(form.speciesId, form.displayName);
   return (
     <details className="group rounded-lg border border-zinc-200 dark:border-zinc-800">
       <summary className="flex cursor-pointer select-none list-none items-center gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded-lg">
         {/* Sprite thumbnail */}
         <Image
           src={`/sprites/pokemon/${form.id}.png`}
-          alt={form.displayName}
+          alt={formLocaleName}
           width={POKEDEX_NODE_SPRITE_SIZE}
           height={POKEDEX_NODE_SPRITE_SIZE}
           className="h-10 w-10 object-contain"
         />
         <span className="flex-1 text-sm font-medium text-foreground">
-          {form.displayName}
+          {formLocaleName}
         </span>
         {/* Chevron */}
         <svg
@@ -156,7 +161,7 @@ function FormBlock({ form }: { form: SeedPokemon }) {
         <div className="mb-3 flex justify-center">
           <Image
             src={`/sprites/pokemon/${form.id}.png`}
-            alt={form.displayName}
+            alt={formLocaleName}
             width={POKEDEX_FORM_SPRITE_SIZE}
             height={POKEDEX_FORM_SPRITE_SIZE}
             className="h-28 w-28 object-contain"
@@ -184,8 +189,8 @@ function FormBlock({ form }: { form: SeedPokemon }) {
 
         {/* Audio buttons */}
         <div className="flex justify-center gap-2">
-          <NameTtsButton name={form.displayName} id={form.id} />
-          <CryButton cryUrl={form.cryUrl} label={form.displayName} />
+          <NameTtsButton name={formLocaleName} id={form.id} />
+          <CryButton cryUrl={form.cryUrl} label={formLocaleName} />
         </div>
       </div>
     </details>
@@ -213,6 +218,10 @@ export function PokemonDetailDisclosure({
   // the SRS schedule, so showing schedule info alongside faked-mastery UI
   // would be misleading.
   const nextReview = useNextReviewDate(id);
+  // Resolve locale-aware name for audio buttons on the main species heading.
+  // Falls back to `name` synchronously until the locale sidecar loads (#1327).
+  // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
+  const { name: pokemonLocaleName } = useLocalePokemonName(pokemon.speciesId, pokemon.displayName);
 
   // Kick off flavor-text fetch the first time any disclosure opens. The cache
   // is shared across all instances so concurrent disclosures only fetch once.
@@ -277,9 +286,9 @@ export function PokemonDetailDisclosure({
           <h1 className="text-3xl font-bold tracking-tight text-zinc-300 dark:text-zinc-700">???</h1>
         ) : (
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{name}</h1>
-            <NameTtsButton name={pokemon.displayName ?? name} id={pokemon.id} />
-            <CryButton cryUrl={pokemon.cryUrl} label={pokemon.displayName ?? name} />
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{pokemonLocaleName}</h1>
+            <NameTtsButton name={pokemonLocaleName} id={pokemon.id} />
+            <CryButton cryUrl={pokemon.cryUrl} label={pokemonLocaleName} />
           </div>
         )}
         {!isLocked && (
