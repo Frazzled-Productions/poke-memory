@@ -749,3 +749,63 @@ describe("JourneyPage — timeline and evolution wall layout placeholders (#961)
     ).toBeInTheDocument();
   });
 });
+
+describe("JourneyPage — daysInARow label (no doubled number)", () => {
+  it("does not double the streak number in the StatCard aria-label", async () => {
+    const { computeStreak } = await import("@/lib/streak");
+    vi.mocked(computeStreak).mockReturnValue(5);
+
+    render(<JourneyPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /current streak/i }),
+      ).toBeInTheDocument();
+    });
+
+    // The StatCard label must be "days in a row" (no embedded count).
+    // visual text: "{animated}" + label "days in a row" → no duplication.
+    expect(screen.getByText(/^days in a row$/i)).toBeInTheDocument();
+
+    // The aria-label on the <p> must be "5 days in a row", not "5 5 days in a row".
+    const countEl = document.querySelector('[aria-label="5 days in a row"]');
+    expect(countEl).not.toBeNull();
+    // Confirm the doubled form is absent
+    expect(document.querySelector('[aria-label="5 5 days in a row"]')).toBeNull();
+  });
+
+  it("renders 'day in a row' (singular, no embedded count) when streak is 1", async () => {
+    const { computeStreak } = await import("@/lib/streak");
+    vi.mocked(computeStreak).mockReturnValue(1);
+
+    render(<JourneyPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/^day in a row$/i)).toBeInTheDocument();
+    });
+
+    const countEl = document.querySelector('[aria-label="1 day in a row"]');
+    expect(countEl).not.toBeNull();
+    expect(document.querySelector('[aria-label="1 1 day in a row"]')).toBeNull();
+  });
+});
+
+describe("JourneyPage — byGenerationColumn column header", () => {
+  it("renders the generation column header in English", async () => {
+    render(<JourneyPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Generation")).toBeInTheDocument();
+    });
+  });
+
+  it("renders the generation column header in Japanese", async () => {
+    // renderWithIntl is imported at top as `render`; call with locale option.
+    render(<JourneyPage />, { locale: "ja" });
+
+    // ja: journey.byGenerationColumn = "ジェネレーション"
+    await waitFor(() => {
+      expect(screen.getByText("ジェネレーション")).toBeInTheDocument();
+    });
+  });
+});

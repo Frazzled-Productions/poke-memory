@@ -388,7 +388,7 @@
     "schedulingHeading": "スケジューリング",
     "masteryMeaning": {
       "title": "「習得済み」とは",
-      "body": "{reps}回連続して正しく思い出し、次のレビューが21日以上先に設定されたカードが習得済みとなります。これはスケジューラーが短期記憶ではなく本当に覚えたと判断した時点です。"
+      "body": "{reps}回連続して正しく思い出し<em>、かつ</em>次のレビューが21日以上先に設定されたカードが習得済みとなります。これはスケジューラーが短期記憶ではなく本当に覚えたと判断した時点です。"
     },
     "strugglingCards": {
       "heading": "苦手なカード",
@@ -420,6 +420,7 @@
     "speciesSeenAtLeastOnce": "1回以上表示された種族",
     "byGeneration": "世代別",
     "byGenerationMasteredTotal": "習得済み / 合計",
+    "byGenerationColumn": "ジェネレーション",
     "collectionTimeline": "コレクションタイムライン",
     "evolutionWall": "進化ウォール",
     "closeToMastery": "習得間近"

@@ -420,6 +420,7 @@
     "speciesSeenAtLeastOnce": "species seen at least once",
     "byGeneration": "By generation",
     "byGenerationMasteredTotal": "Mastered / Total",
+    "byGenerationColumn": "Generation",
     "collectionTimeline": "Collection timeline",
     "evolutionWall": "Evolution wall",
     "closeToMastery": "Close to mastery"

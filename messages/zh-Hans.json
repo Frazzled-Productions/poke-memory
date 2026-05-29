@@ -388,7 +388,7 @@
     "schedulingHeading": "调度",
     "masteryMeaning": {
       "title": "「已掌握」是什么意思",
-      "body": "卡片在连续答对 {reps} 次且下次复习间隔至少 21 天后视为已掌握：这是调度器确认您真正学会而非短期记忆的时间点。"
+      "body": "卡片在连续答对 {reps} 次<em>且</em>下次复习间隔至少 21 天后视为已掌握：这是调度器确认您真正学会而非短期记忆的时间点。"
     },
     "strugglingCards": {
       "heading": "薄弱卡片",
@@ -420,6 +420,7 @@
     "speciesSeenAtLeastOnce": "至少见过一次的种族",
     "byGeneration": "按世代",
     "byGenerationMasteredTotal": "已掌握 / 总数",
+    "byGenerationColumn": "世代",
     "collectionTimeline": "收集时间线",
     "evolutionWall": "进化墙",
     "closeToMastery": "即将掌握"

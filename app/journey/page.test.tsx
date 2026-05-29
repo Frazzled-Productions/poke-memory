@@ -268,7 +268,7 @@ describe("JourneyPage — English locale", () => {
     renderWithIntl(<JourneyPage />);
 
     await waitFor(() => {
-      // pokedex.filterByGeneration = "Generation" (reused for the left column header)
+      // journey.byGenerationColumn = "Generation"
       expect(screen.getByText("Generation")).toBeInTheDocument();
       expect(screen.getByText("Mastered / Total")).toBeInTheDocument();
     });
@@ -328,8 +328,8 @@ describe("JourneyPage — Japanese locale", () => {
     renderJa(<JourneyPage />);
 
     await waitFor(() => {
-      // ja: pokedex.filterByGeneration = "世代" (reused for the left column header)
-      expect(screen.getByText("世代")).toBeInTheDocument();
+      // ja: journey.byGenerationColumn = "ジェネレーション"
+      expect(screen.getByText("ジェネレーション")).toBeInTheDocument();
       // ja: journey.byGenerationMasteredTotal = "習得済み / 合計"
       expect(screen.getByText("習得済み / 合計")).toBeInTheDocument();
     });

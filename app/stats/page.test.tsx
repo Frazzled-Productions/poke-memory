@@ -406,3 +406,30 @@ describe("StatsPage — Japanese locale", () => {
     });
   });
 });
+
+describe("StatsPage — masteryMeaning.body em emphasis", () => {
+  it("renders the mastery meaning body with <em> emphasis around 'and'", async () => {
+    renderWithIntl(<StatsPage />);
+
+    // stats.masteryMeaning.body contains <em>and</em> in EN.
+    // t.rich renders the em tag as a real <em> element.
+    await waitFor(() => {
+      const emEl = document.querySelector("em");
+      expect(emEl).not.toBeNull();
+      // The emphasised text should be "and" in English
+      expect(emEl?.textContent).toBe("and");
+    });
+  });
+
+  it("renders the mastery meaning body with <em> emphasis in Japanese", async () => {
+    renderJa(<StatsPage />);
+
+    // ja: stats.masteryMeaning.body contains <em>、かつ</em>
+    await waitFor(() => {
+      const emEl = document.querySelector("em");
+      expect(emEl).not.toBeNull();
+      // The emphasised text should be the Japanese conjunction
+      expect(emEl?.textContent).toBe("、かつ");
+    });
+  });
+});
