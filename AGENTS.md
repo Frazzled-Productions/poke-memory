@@ -241,7 +241,7 @@ Playwright smoke tests live in `e2e/` and run against Vercel preview deployments
 - **When to add E2E tests**: any change that adds a new page, a new interactive flow, or modifies an existing user-facing flow should include or update an E2E test in `e2e/`. The bar is smoke-level coverage — verify the happy path loads and key interactions work, not exhaustive edge cases. Absence-only test suites do not satisfy this requirement: a suite that only asserts the feature is hidden, disabled, or absent under various conditions leaves a rendering regression undetected. At least one test must assert the feature actually renders and its core interaction succeeds in the happy path.
 - **File naming**: one spec file per feature area (e.g. `e2e/smoke.spec.ts` for cross-cutting smoke tests, `e2e/pokedex.spec.ts` for Pokédex-specific flows).
 
-#### Mandatory coverage rules (state and locale)
+### Mandatory coverage rules (state and locale)
 
 Two non-negotiable rules for every user-facing change, enforced in the implementer's own tests (unit/component **and** e2e) and re-checked by the orchestrator at close-out by actually running the app. These exist because the #1302 / #1327 batch shipped three broken headline behaviours (English names on the Pokédex grid, an untranslated UI after switching locale, English picker labels) that all passed unit tests, CI, and code-review — because nothing exercised the feature in the broken state / locale.
 

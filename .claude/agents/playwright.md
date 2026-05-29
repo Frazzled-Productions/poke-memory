@@ -46,10 +46,10 @@ The orchestrator should tell you:
 - Never use fragile CSS selectors (`.class-name`, `div > span:nth-child(2)`).
 
 ## Test structure
-- Use `test.describe` to group related tests.
-- **Mandatory coverage rules (AGENTS.md "Mandatory coverage rules") — not optional:**
+- **Mandatory coverage rules (AGENTS.md `Mandatory coverage rules`) — not optional:**
   - **State IN and OUT.** If the change introduces or gates on a state (a flag, mode, setting, signed-in vs guest, or **empty vs populated** data), assert BOTH sides — e.g. a list/section both when it has entries and when it is empty/all-caught-up. Drive the state via `addInitScript` (localStorage/cookies) or the #1326 QA-seed scenarios; never test only the happy path.
-  - **Names/labels in every locale, on every surface.** If the change renders a Pokémon name or a user-facing label, add assertions in the non-English locales (`ja` at minimum, plus `zh-Hans`/`zh-Hant` where the value differs) for BOTH axes (`appLocale` cookie, `pokemonNameLocale` setting), on EVERY surface that renders it — **including perf-exempted surfaces like the Pokédex grid**. The grid showing English names while the detail page localised (#1327) is exactly the gap this rule closes. Set the locale via `addInitScript` before navigation, as `e2e/pokedex.spec.ts` already does.
+  - **Names/labels in every locale, on every surface.** If the change renders a Pokémon name or a user-facing label, add assertions in the non-English locales (`ja` at minimum, plus `zh-Hans`/`zh-Hant` where the value differs) for BOTH axes (`appLocale` (UI chrome) and `pokemonNameLocale` (Pokémon names)), on EVERY surface that renders it — **including perf-exempted surfaces like the Pokédex grid**. The grid showing English names while the detail page localised (#1327) is exactly the gap this rule closes. Set the locale via `addInitScript` before navigation, as `e2e/pokedex.spec.ts` already does.
+- Use `test.describe` to group related tests.
 - Tests must work against a fresh preview deployment with empty `localStorage` (no prior review state).
 - If a test depends on state from a prior action (e.g. grading a card to see stats), build that state within the test — don't rely on test ordering.
 - Use `test.skip()` gracefully when a precondition isn't met (e.g. no active card available on a fresh deploy).
