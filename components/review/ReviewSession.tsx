@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
 import { MultipleChoiceNameCard } from "@/components/review/MultipleChoiceNameCard";
@@ -229,6 +230,7 @@ const TodayPill = React.memo(function TodayPill({
   reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
 }) {
+  const t = useTranslations("practice");
   // Passive hint (#880): when more than one card direction is enabled, a user
   // will often see the review queue dominated by a single direction (typically
   // reverse / sprite-picker). This is correct behaviour - the review queue
@@ -249,11 +251,11 @@ const TodayPill = React.memo(function TodayPill({
   return (
     <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
       <p className={`mb-1 ${sectionLabel}`}>
-        Done today
+        {t("todayDoneHeading")}
       </p>
       {nameEnabled && (
         <p>
-          <span className="text-zinc-600 dark:text-zinc-300">Name:</span>{" "}
+          <span className="text-zinc-600 dark:text-zinc-300">{t("cardTypeName")}:</span>{" "}
           <span className="font-medium text-foreground">
             {perType.name.newIntroducedToday} new
           </span>
@@ -265,7 +267,7 @@ const TodayPill = React.memo(function TodayPill({
       )}
       {evolutionEnabled && (
         <p>
-          <span className="text-zinc-600 dark:text-zinc-300">Evolution:</span>{" "}
+          <span className="text-zinc-600 dark:text-zinc-300">{t("cardTypeEvolution")}:</span>{" "}
           <span className="font-medium text-foreground">
             {perType.evolution.newIntroducedToday} new
           </span>
@@ -277,7 +279,7 @@ const TodayPill = React.memo(function TodayPill({
       )}
       {reverseEnabled && (
         <p>
-          <span className="text-zinc-600 dark:text-zinc-300">Reverse:</span>{" "}
+          <span className="text-zinc-600 dark:text-zinc-300">{t("cardTypeReverse")}:</span>{" "}
           <span className="font-medium text-foreground">
             {perType.reverse.newIntroducedToday} new
           </span>
@@ -289,7 +291,7 @@ const TodayPill = React.memo(function TodayPill({
       )}
       {cryEnabled && (
         <p>
-          <span className="text-zinc-600 dark:text-zinc-300">Cry:</span>{" "}
+          <span className="text-zinc-600 dark:text-zinc-300">{t("cardTypeCry")}:</span>{" "}
           <span className="font-medium text-foreground">
             {perType.cry.newIntroducedToday} new
           </span>
@@ -301,8 +303,7 @@ const TodayPill = React.memo(function TodayPill({
       )}
       {showGraduatedHint && (
         <p className="mt-2 max-w-xs text-[11px] leading-snug text-zinc-400 dark:text-zinc-500">
-          Reviews surface only graduated cards, so one direction can dominate.
-          Cards still in learning steps wait in a separate queue.
+          {t("graduatedHint")}
         </p>
       )}
     </div>
@@ -403,36 +404,36 @@ function EndOfSessionScreen({
   /** Per-direction grade tally from the current session, for the accuracy row. */
   directionGrades: SessionDirectionTally;
 }) {
+  const t = useTranslations("practice");
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       {variant.kind === "complete" && (
         <>
-          <p className="text-2xl font-semibold text-foreground">All caught up!</p>
+          <p className="text-2xl font-semibold text-foreground">{t("allCaughtUp")}</p>
           <p className="text-zinc-500 dark:text-zinc-400">
-            No more cards due today. Come back tomorrow to keep going.
+            {t("nothingDueBody")}
           </p>
         </>
       )}
       {variant.kind === "new-locked" && (
         <>
-          <p className="text-2xl font-semibold text-foreground">New cards locked for today</p>
+          <p className="text-2xl font-semibold text-foreground">{t("newCardsLocked")}</p>
           <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-            You have hit a daily new-card cap. Come back tomorrow for more; keeping
-            this limit prevents tomorrow&apos;s review pile from growing too large.
+            {t("newCardsLockedBody")}
           </p>
         </>
       )}
       {variant.kind === "review-wall" && (
         <>
-          <p className="text-2xl font-semibold text-foreground">Daily review limit reached</p>
+          <p className="text-2xl font-semibold text-foreground">{t("reviewWall")}</p>
           <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-            You have hit a daily review cap. More cards are due. Keep going?
+            {t("reviewWallBody")}
           </p>
         </>
       )}
       {dueTomorrow > 0 && (
         <p className={mutedText}>
-          {dueTomorrow === 1 ? "1 card" : `${dueTomorrow} cards`} due tomorrow
+          {t("dueTomorrow", { count: dueTomorrow })}
         </p>
       )}
       <TodayPill
@@ -457,14 +458,14 @@ function EndOfSessionScreen({
               window.location.reload();
             }}
           >
-            Done for today
+            {t("doneForToday")}
           </button>
           <button
             type="button"
             className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
             onClick={variant.onKeepReviewing}
           >
-            Keep reviewing
+            {t("keepReviewing")}
           </button>
         </div>
       )}
@@ -472,14 +473,11 @@ function EndOfSessionScreen({
         <div className="w-full max-w-xs text-left">
           <OnboardingHint
             id="cardTypesHintDismissed"
-            title="Ready for more variety?"
+            title={t("readyForMoreVariety")}
             ctaHref="/settings#practice-heading"
-            ctaLabel="Open practice settings"
+            ctaLabel={t("openPracticeSettings")}
           >
-            <p>
-              Try reverse-evolution cards or alternate-form cards for a fresh
-              challenge.
-            </p>
+            <p>{t("readyForMoreVarietyBody")}</p>
           </OnboardingHint>
         </div>
       )}
@@ -504,6 +502,7 @@ function CountdownScreen({
   reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
 }) {
+  const t = useTranslations("practice");
   const [remaining, setRemaining] = useState(() => dueAt - Date.now());
 
   useEffect(() => {
@@ -516,7 +515,7 @@ function CountdownScreen({
 
   return (
     <div className="flex flex-col items-center gap-4 text-center">
-      <p className="text-2xl font-semibold text-foreground">Next card in</p>
+      <p className="text-2xl font-semibold text-foreground">{t("nextCardIn")}</p>
       <p
         className="text-4xl font-bold tabular-nums text-foreground"
         aria-live="polite"
@@ -525,7 +524,7 @@ function CountdownScreen({
         {formatCountdown(remaining)}
       </p>
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-        Hang tight, a learning card will be ready shortly.
+        {t("nextCardHangTight")}
       </p>
       <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
     </div>
@@ -537,6 +536,7 @@ function CountdownScreen({
 // ---------------------------------------------------------------------------
 
 export function ReviewSession() {
+  const t = useTranslations("practice");
   // null = SSR / not-yet-hydrated. Same pattern as before.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
@@ -1308,7 +1308,7 @@ export function ReviewSession() {
       <div
         className="flex flex-col items-center gap-6 animate-pulse"
         aria-busy="true"
-        aria-label="Loading review session"
+        aria-label={t("loadingAriaLabel")}
       >
         <div className="w-[320px] h-[320px] rounded-xl bg-zinc-200 dark:bg-zinc-800" />
         <div className="h-10 w-40 rounded-md bg-zinc-200 dark:bg-zinc-800" />
@@ -1334,11 +1334,9 @@ export function ReviewSession() {
     // always true. Kept as a safety net.
     return (
       <div className="flex flex-col items-center gap-4 text-center">
-        <p className="text-2xl font-semibold text-foreground">No card types enabled</p>
+        <p className="text-2xl font-semibold text-foreground">{t("noCardTypesEnabled")}</p>
         <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-          Enable at least one card type in{" "}
-          <a href="/settings" className="underline text-foreground">Settings</a>{" "}
-          to start reviewing.
+          {t("noCardTypesEnabledBody")}
         </p>
       </div>
     );
@@ -1351,16 +1349,16 @@ export function ReviewSession() {
   if (!isScopeEmpty(scope) && eligibleCardIds.size === 0) {
     return (
       <div className="flex flex-col items-center gap-4 text-center">
-        <p className="text-2xl font-semibold text-foreground">No Pokémon match your scope</p>
+        <p className="text-2xl font-semibold text-foreground">{t("noScopeMatch")}</p>
         <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
-          Adjust the filter above, or clear it to keep practising.
+          {t("noScopeMatchBody")}
         </p>
         <button
           type="button"
           onClick={() => handleScopeChange(EMPTY_SCOPE)}
           className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
         >
-          Clear scope
+          {t("clearScope")}
         </button>
       </div>
     );
@@ -1879,9 +1877,7 @@ export function ReviewSession() {
       // and unlock the session so the user can continue.
       console.error("[handleGrade] nextReview threw — skipping corrupt grade:", err);
       setGrading(false);
-      setGradeError(
-        "This grade could not be saved due to an unexpected error. Your session is still active, please try again.",
-      );
+      setGradeError(t("gradeErrorMessage"));
       return;
     }
     const newCards = cards.map((card) =>
@@ -2334,12 +2330,12 @@ export function ReviewSession() {
                   type="button"
                   onClick={() => playCry(effectiveCard.cryUrl ?? null)}
                   className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-zinc-300 bg-zinc-50 text-4xl transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:border-zinc-700 dark:bg-zinc-900 sm:h-40 sm:w-40 sm:text-5xl"
-                  aria-label="Play cry"
+                  aria-label={t("playCry")}
                 >
                   🔊
                 </button>
                 <p className="text-base font-semibold text-foreground">
-                  Name this Pokémon from its cry
+                  {t("cryPrompt")}
                 </p>
               </div>
             )}
@@ -2362,7 +2358,7 @@ export function ReviewSession() {
               disabled={revealing}
               className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
             >
-              Reveal
+              {t("reveal")}
             </button>
           )
         }
@@ -2383,7 +2379,7 @@ export function ReviewSession() {
               hard={sessionGrades[2]}
               good={sessionGrades[4]}
               easy={sessionGrades[5]}
-              label="This session"
+              label={t("thisSession")}
               hideZeroSegments
             />
           </div>
@@ -2465,7 +2461,7 @@ export function ReviewSession() {
               hard={sessionGrades[2]}
               good={sessionGrades[4]}
               easy={sessionGrades[5]}
-              label="This session"
+              label={t("thisSession")}
               hideZeroSegments
             />
           </div>
@@ -2638,7 +2634,7 @@ export function ReviewSession() {
             disabled={revealing}
             className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
           >
-            Reveal
+            {t("reveal")}
           </button>
         )
       }
@@ -2667,7 +2663,7 @@ export function ReviewSession() {
             hard={sessionGrades[2]}
             good={sessionGrades[4]}
             easy={sessionGrades[5]}
-            label="This session"
+            label={t("thisSession")}
           />
         </div>
       }

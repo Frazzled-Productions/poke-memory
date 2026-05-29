@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { Grade } from "@/lib/review/session";
 import { triggerHaptic } from "@/lib/review/haptic";
 import { useHapticSwitch } from "@/components/review/useHapticSwitch";
@@ -25,52 +26,22 @@ type GradeOption = {
   className: string;
 };
 
-// Strong saturated fills + a neutral outline ring + drop-shadow so the
-// buttons always read clearly against any mascot-tinted backdrop. Without
-// the ring + shadow, e.g. a pale-blue Snorlax card desaturates the Sky-Easy
-// button and a cream Pikachu card hides the Amber-Hard button.
-const GRADE_OPTIONS: GradeOption[] = [
-  {
-    grade: 1,
-    label: "Again",
-    className:
-      "bg-red-500 text-white [@media(hover:hover)]:hover:bg-red-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-red-400",
-  },
-  {
-    grade: 2,
-    label: "Hard",
-    className:
-      "bg-amber-500 text-white [@media(hover:hover)]:hover:bg-amber-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-amber-400",
-  },
-  {
-    grade: 4,
-    label: "Good",
-    className:
-      "bg-emerald-600 text-white [@media(hover:hover)]:hover:bg-emerald-700 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-emerald-400",
-  },
-  {
-    grade: 5,
-    label: "Easy",
-    className:
-      "bg-sky-500 text-white [@media(hover:hover)]:hover:bg-sky-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-sky-400",
-  },
-];
-
-// Keyboard shortcut rows shown in the help overlay. Key `3` is listed alongside
-// `4` as an alias for Good, matching the common 1/2/3/4 muscle memory from other
-// SRS apps — the keydown handler in ReviewSession accepts both.
-const SHORTCUT_ROWS: { keys: string; action: string }[] = [
-  { keys: "Space / Enter", action: "Reveal card" },
-  { keys: "1", action: "Grade: Again" },
-  { keys: "2", action: "Grade: Hard" },
-  { keys: "3 / 4", action: "Grade: Good" },
-  { keys: "5", action: "Grade: Easy" },
-  { keys: "?", action: "Show this overlay" },
-  { keys: "Esc", action: "Close this overlay" },
-];
-
 export function KeyboardShortcutsOverlay({ onClose }: { onClose: () => void }) {
+  const t = useTranslations("practice");
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard shortcut rows shown in the help overlay. Key `3` is listed alongside
+  // `4` as an alias for Good, matching the common 1/2/3/4 muscle memory from other
+  // SRS apps — the keydown handler in ReviewSession accepts both.
+  const SHORTCUT_ROWS: { keys: string; action: string }[] = [
+    { keys: "Space / Enter", action: t("keyboardShortcuts.revealCard") },
+    { keys: "1", action: t("keyboardShortcuts.gradeAgain") },
+    { keys: "2", action: t("keyboardShortcuts.gradeHard") },
+    { keys: "3 / 4", action: t("keyboardShortcuts.gradeGood") },
+    { keys: "5", action: t("keyboardShortcuts.gradeEasy") },
+    { keys: "?", action: t("keyboardShortcuts.showOverlay") },
+    { keys: "Esc", action: t("keyboardShortcuts.closeOverlay") },
+  ];
 
   // Focus the first focusable element inside the dialog when it opens, and
   // restore focus to the trigger when it closes.
@@ -123,14 +94,14 @@ export function KeyboardShortcutsOverlay({ onClose }: { onClose: () => void }) {
       <div
         ref={dialogRef}
         role="dialog"
-        aria-label="Keyboard shortcuts"
+        aria-label={t("keyboardShortcuts.title")}
         // Stop click bubbling so clicking inside the panel does not close it.
         onClick={(e) => e.stopPropagation()}
         className="relative mx-4 w-full max-w-sm rounded-2xl bg-surface-raised p-6 shadow-xl border border-[var(--theme-secondary)]"
       >
         <button
           type="button"
-          aria-label="Close keyboard shortcuts overlay"
+          aria-label={t("keyboardShortcuts.closeAriaLabel")}
           onClick={onClose}
           className="absolute right-4 top-4 rounded-md p-1 text-zinc-400 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:hover:text-zinc-200"
         >
@@ -140,7 +111,7 @@ export function KeyboardShortcutsOverlay({ onClose }: { onClose: () => void }) {
         </button>
 
         <h2 className="mb-4 text-base font-semibold text-foreground">
-          Keyboard shortcuts
+          {t("keyboardShortcuts.title")}
         </h2>
 
         <table className="w-full text-sm">
@@ -164,7 +135,7 @@ export function KeyboardShortcutsOverlay({ onClose }: { onClose: () => void }) {
         </table>
 
         <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-500">
-          Shortcuts are inactive while a text field is focused.
+          {t("keyboardShortcuts.inactiveNote")}
         </p>
       </div>
     </div>
@@ -179,6 +150,39 @@ export function GradeButtons({
   onOpenShortcuts,
   onCloseShortcuts,
 }: Props) {
+  const t = useTranslations("practice");
+
+  // Strong saturated fills + a neutral outline ring + drop-shadow so the
+  // buttons always read clearly against any mascot-tinted backdrop. Without
+  // the ring + shadow, e.g. a pale-blue Snorlax card desaturates the Sky-Easy
+  // button and a cream Pikachu card hides the Amber-Hard button.
+  const GRADE_OPTIONS: GradeOption[] = [
+    {
+      grade: 1,
+      label: t("again"),
+      className:
+        "bg-red-500 text-white [@media(hover:hover)]:hover:bg-red-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-red-400",
+    },
+    {
+      grade: 2,
+      label: t("hard"),
+      className:
+        "bg-amber-500 text-white [@media(hover:hover)]:hover:bg-amber-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-amber-400",
+    },
+    {
+      grade: 4,
+      label: t("good"),
+      className:
+        "bg-emerald-600 text-white [@media(hover:hover)]:hover:bg-emerald-700 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-emerald-400",
+    },
+    {
+      grade: 5,
+      label: t("easy"),
+      className:
+        "bg-sky-500 text-white [@media(hover:hover)]:hover:bg-sky-600 [@media(hover:hover)]:hover:shadow-lg focus-visible:ring-sky-400",
+    },
+  ];
+
   // Local open/close state, used when the parent does not provide controlled props.
   const [showShortcutsLocal, setShowShortcutsLocal] = useState(false);
 
@@ -222,7 +226,7 @@ export function GradeButtons({
           // layout untouched.
           className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3 rounded-xl bg-surface-raised p-2 sm:p-3 shadow-sm border border-[var(--theme-secondary)]"
           role="group"
-          aria-label="Grade your answer"
+          aria-label={t("gradeYourAnswer")}
         >
           {GRADE_OPTIONS.map(({ grade, label, className }) => (
             <button
@@ -266,7 +270,7 @@ export function GradeButtons({
             absolutely relative to the outer wrapper. Hidden on small viewports. */}
         <button
           type="button"
-          aria-label="Show keyboard shortcuts"
+          aria-label={t("showKeyboardShortcuts")}
           onClick={handleOpen}
           className="absolute -top-3 -right-3 hidden sm:flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-500 shadow-sm [@media(hover:hover)]:hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:bg-zinc-800 dark:text-zinc-400 [@media(hover:hover)]:dark:hover:bg-zinc-700"
         >
