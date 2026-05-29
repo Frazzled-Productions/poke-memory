@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { signIn, signOut } from "@/lib/auth/actions";
 import type { AuthProvider } from "@/lib/auth/types";
@@ -9,6 +10,7 @@ const TRIGGER_CLASS =
   "rounded px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-foreground";
 
 function SignInPicker({ isPending, onChoose }: { isPending: boolean; onChoose: (p: AuthProvider) => void }) {
+  const t = useTranslations("auth");
   const [open, setOpen] = useState(false);
   const [triggerBottom, setTriggerBottom] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,13 +60,13 @@ function SignInPicker({ isPending, onChoose }: { isPending: boolean; onChoose: (
         aria-controls="sign-in-picker-panel"
         className={TRIGGER_CLASS}
       >
-        {isPending ? "Signing in…" : "Sign in"}
+        {isPending ? t("signingIn") : t("signIn")}
       </button>
       {open && (
         <div
           id="sign-in-picker-panel"
           role="menu"
-          aria-label="Choose a sign-in provider"
+          aria-label={t("chooseProvider")}
           // Mobile: `position: fixed` pinned to the right edge of the viewport,
           // top computed from the trigger's bbox. Header wrap puts the trigger
           // on the left edge on narrow viewports and the right edge on wider
@@ -84,7 +86,7 @@ function SignInPicker({ isPending, onChoose }: { isPending: boolean; onChoose: (
             role="presentation"
             className="mb-2 text-xs text-zinc-600 dark:text-zinc-400"
           >
-            Use the same provider you signed up with to keep your progress.
+            {t("providerHint")}
           </p>
           <div className="flex flex-col gap-1">
             <button
@@ -98,7 +100,7 @@ function SignInPicker({ isPending, onChoose }: { isPending: boolean; onChoose: (
               disabled={isPending}
               className="rounded px-3 py-1.5 text-left text-sm font-medium text-foreground hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50 dark:hover:bg-zinc-800"
             >
-              Continue with GitHub
+              {t("continueWithGitHub")}
             </button>
             <button
               type="button"
@@ -111,7 +113,7 @@ function SignInPicker({ isPending, onChoose }: { isPending: boolean; onChoose: (
               disabled={isPending}
               className="rounded px-3 py-1.5 text-left text-sm font-medium text-foreground hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50 dark:hover:bg-zinc-800"
             >
-              Continue with Google
+              {t("continueWithGoogle")}
             </button>
           </div>
         </div>
@@ -121,6 +123,7 @@ function SignInPicker({ isPending, onChoose }: { isPending: boolean; onChoose: (
 }
 
 export function AuthButton() {
+  const t = useTranslations("auth");
   const { user, loading } = useAuth();
   const [isPending, startTransition] = useTransition();
 
@@ -162,7 +165,7 @@ export function AuthButton() {
         disabled={isPending}
         className={TRIGGER_CLASS}
       >
-        {isPending ? "Signing out…" : "Sign out"}
+        {isPending ? t("signingOut") : t("signOut")}
       </button>
     </div>
   );

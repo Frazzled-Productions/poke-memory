@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 
 export function Footer() {
+  const t = useTranslations("nav");
   const [year, setYear] = useState<number | null>(null);
   // Initialise to null so the first client render matches the server render
   // (both produce the footer), avoiding a React hydration mismatch for users
@@ -38,21 +40,21 @@ export function Footer() {
           href="/whats-new"
           className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
         >
-          What&apos;s new
+          {t("whatsNew")}
         </Link>
         <span aria-hidden="true">·</span>
         <Link
           href="/privacy"
           className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
         >
-          Privacy
+          {t("privacy")}
         </Link>
         <span aria-hidden="true">·</span>
         <Link
           href="/terms"
           className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
         >
-          Terms
+          {t("terms")}
         </Link>
         <span aria-hidden="true">·</span>
         <span className="font-mono">v{APP_VERSION}</span>

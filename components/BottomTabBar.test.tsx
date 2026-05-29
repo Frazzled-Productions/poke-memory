@@ -1,5 +1,5 @@
 /**
- * Component tests for BottomTabBar (issue #852).
+ * Component tests for BottomTabBar (issue #852, #1369 i18n wiring).
  *
  * Covers:
  *   - Static tab list includes the Journey entry.
@@ -8,10 +8,12 @@
  *   - Pasture tab hidden when hasMastered=false and flag is off.
  *   - Pasture tab re-derives on a SETTINGS_SAVED_EVENT (#868 follow-up).
  *   - The bar is hidden in hamburger mode.
+ *   - Japanese locale renders the correct translated label (練習 for Practice).
  */
 
-import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, screen, waitFor } from "@testing-library/react";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -112,7 +114,7 @@ beforeEach(() => {
 
 describe("BottomTabBar", () => {
   it("renders the Journey tab link", async () => {
-    render(<BottomTabBar />);
+    renderWithIntl(<BottomTabBar />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Journey" })).toBeInTheDocument();
@@ -120,7 +122,7 @@ describe("BottomTabBar", () => {
   });
 
   it("includes all core tabs: Practice, Stats, Journey, Pokédex, Settings", async () => {
-    render(<BottomTabBar />);
+    renderWithIntl(<BottomTabBar />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
@@ -134,7 +136,7 @@ describe("BottomTabBar", () => {
   it("marks the active tab with aria-current='page'", async () => {
     mockPathname.value = "/journey";
 
-    render(<BottomTabBar />);
+    renderWithIntl(<BottomTabBar />);
 
     await waitFor(() => {
       const journeyLink = screen.getByRole("link", { name: "Journey" });
@@ -148,7 +150,7 @@ describe("BottomTabBar", () => {
   it("marks /stats as current when pathname is /stats", async () => {
     mockPathname.value = "/stats";
 
-    render(<BottomTabBar />);
+    renderWithIntl(<BottomTabBar />);
 
     await waitFor(() => {
       expect(
@@ -158,7 +160,7 @@ describe("BottomTabBar", () => {
   });
 
   it("hides Pasture tab when hasMastered=false and pretendAllMastered=false", async () => {
-    render(<BottomTabBar />);
+    renderWithIntl(<BottomTabBar />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
@@ -170,7 +172,7 @@ describe("BottomTabBar", () => {
   it("shows Pasture tab when pretendAllMastered flag is on", async () => {
     mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: true } });
 
-    render(<BottomTabBar />);
+    renderWithIntl(<BottomTabBar />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Pasture" })).toBeInTheDocument();
@@ -182,7 +184,7 @@ describe("BottomTabBar", () => {
     mockLoadSession.mockResolvedValue({ cards: [] });
     mockFilterMastered.mockReturnValue([]);
 
-    render(<BottomTabBar />);
+    renderWithIntl(<BottomTabBar />);
 
     await waitFor(() => {
       expect(
@@ -214,7 +216,7 @@ describe("BottomTabBar", () => {
     mockLoadSession.mockResolvedValue(null);
     mockFilterMastered.mockReturnValue([]);
 
-    render(<BottomTabBar />);
+    renderWithIntl(<BottomTabBar />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
@@ -241,14 +243,22 @@ describe("BottomTabBar", () => {
       masteryRepetitions: 3,
     });
 
-    const { container } = render(<BottomTabBar />);
+    const { container } = renderWithIntl(<BottomTabBar />);
 
     // Allow time for the effect to read the setting
     await waitFor(() => {
-      // The nav landmark should not exist
-      expect(
-        container.querySelector('[aria-label="Mobile tab navigation"]'),
-      ).toBeNull();
+      // The nav landmark should not exist (mobileNav is hamburger so inner renders null)
+      expect(container.querySelector("nav")).toBeNull();
+    });
+  });
+});
+
+describe("BottomTabBar — Japanese locale", () => {
+  it("renders the Practice tab label in Japanese (練習)", async () => {
+    renderJa(<BottomTabBar />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "練習" })).toBeInTheDocument();
     });
   });
 });

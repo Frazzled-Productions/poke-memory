@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
@@ -12,18 +13,21 @@ import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
 
-const NAV_LINKS = [
-  { href: "/", label: "Practice" },
-  { href: "/stats", label: "Stats" },
-  { href: "/journey", label: "Journey" },
-  { href: "/pokedex", label: "Pokédex" },
-  { href: "/settings", label: "Settings" },
+// NAV_LINKS_HREFS is kept module-level (href is not locale-dependent).
+// Labels are derived inside the component so `t()` is available.
+const NAV_LINKS_HREFS = [
+  { href: "/", key: "practice" },
+  { href: "/stats", key: "stats" },
+  { href: "/journey", key: "journey" },
+  { href: "/pokedex", key: "pokedex" },
+  { href: "/settings", key: "settings" },
 ] as const;
 
 const LINK_BASE =
   "rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 [@media(hover:hover)]:hover:bg-white/20";
 
 export function NavLinks() {
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const { flags } = useSuperuser();
   const [hasMastered, setHasMastered] = useState(false);
@@ -89,7 +93,7 @@ export function NavLinks() {
   return (
     <>
       <ul className="flex items-center gap-1" role="list">
-        {NAV_LINKS.map(({ href, label }) => {
+        {NAV_LINKS_HREFS.map(({ href, key }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
           return (
             <li key={href}>
@@ -103,7 +107,7 @@ export function NavLinks() {
                     : "text-theme-fg-on-primary opacity-75 [@media(hover:hover)]:hover:opacity-100",
                 ].join(" ")}
               >
-                {label}
+                {t(key)}
               </Link>
             </li>
           );
@@ -120,7 +124,7 @@ export function NavLinks() {
                   : "text-theme-fg-on-primary opacity-75 [@media(hover:hover)]:hover:opacity-100",
               ].join(" ")}
             >
-              Pasture
+              {t("pasture")}
             </Link>
           </li>
         )}
@@ -132,15 +136,16 @@ export function NavLinks() {
 }
 
 export function NavLinksFallback() {
+  const t = useTranslations("nav");
   return (
     <ul className="flex items-center gap-1" role="list">
-      {NAV_LINKS.map(({ href, label }) => (
+      {NAV_LINKS_HREFS.map(({ href, key }) => (
         <li key={href}>
           <Link
             href={href}
             className={`${LINK_BASE} text-theme-fg-on-primary opacity-75 [@media(hover:hover)]:hover:opacity-100`}
           >
-            {label}
+            {t(key)}
           </Link>
         </li>
       ))}
