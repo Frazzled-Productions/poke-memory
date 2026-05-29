@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { useTranslations } from "next-intl";
 import { colStack } from "@/lib/utils/class-names";
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
  * Announces the result count to screen-readers via aria-live.
  */
 export function SettingsSearch({ value, onChange, matchCount }: Props) {
+  const t = useTranslations();
   const inputId = useId();
   const statusId = useId();
   const isFiltering = value.trim().length > 0;
@@ -22,7 +24,7 @@ export function SettingsSearch({ value, onChange, matchCount }: Props) {
   return (
     <div className={colStack}>
       <label htmlFor={inputId} className="sr-only">
-        Search settings
+        {t("settings.search.ariaLabel")}
       </label>
       <div className="relative">
         <svg
@@ -41,8 +43,8 @@ export function SettingsSearch({ value, onChange, matchCount }: Props) {
         <input
           id={inputId}
           type="search"
-          aria-label="Search settings"
-          placeholder="Search settings…"
+          aria-label={t("settings.search.ariaLabel")}
+          placeholder={t("settings.search.placeholder")}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={[

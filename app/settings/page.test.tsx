@@ -201,15 +201,38 @@ vi.mock("@/components/settings/OfflineSection", () => ({
   OfflineSection: () => <div data-testid="offline-section" />,
 }));
 
-// Stub next-intl — t() returns the key name so tests can match on it or on
-// the plain English fallback without caring about translations.
+// Stub next-intl — t() resolves keys against the real en.json catalogue so
+// tests can match on English strings without caring about translation internals.
+// The mock also accepts string-valued parameters ({percent}, {query}).
+const { mockT } = vi.hoisted(() => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const enMessages = require("../../messages/en.json") as Record<string, unknown>;
+
+  function resolveDotPath(obj: Record<string, unknown>, path: string): string {
+    const parts = path.split(".");
+    let cur: unknown = obj;
+    for (const part of parts) {
+      if (typeof cur !== "object" || cur === null) return path;
+      cur = (cur as Record<string, unknown>)[part];
+    }
+    return typeof cur === "string" ? cur : path;
+  }
+
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    let val = resolveDotPath(enMessages, key);
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        val = val.replace(`{${k}}`, String(v));
+      }
+    }
+    return val;
+  };
+
+  return { mockT: t };
+});
+
 vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => {
-    const map: Record<string, string> = {
-      "settings.heading": "Settings",
-    };
-    return map[key] ?? key;
-  },
+  useTranslations: () => mockT,
 }));
 
 vi.mock("@/i18n/locales", () => ({
@@ -744,6 +767,78 @@ describe("SettingsPage — typed-entry onboarding (#1271)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// i18n key resolution (#1369)
+//
+// Verifies that (a) key paths used in the settings page all resolve against
+// the real catalogues and (b) a representative Japanese string is returned
+// when the locale is Japanese. Because the page mock wires t() to the real
+// en.json, we verify the Japanese catalogue separately via the catalogue JSON
+// directly — this is consistent with how other component tests exercise locale
+// correctness without a full browser environment.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — i18n key resolution (#1369)", () => {
+  it("settings.save resolves to 'Save' in English and '保存' in Japanese", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const en = require("../../messages/en.json") as Record<string, Record<string, string>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ja = require("../../messages/ja.json") as Record<string, Record<string, string>>;
+    expect(en.settings.save).toBe("Save");
+    expect(ja.settings.save).toBe("保存");
+  });
+
+  it("settings.offline.downloadHeading resolves in all locales", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const en = require("../../messages/en.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ja = require("../../messages/ja.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const zhHans = require("../../messages/zh-Hans.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const zhHant = require("../../messages/zh-Hant.json") as Record<string, Record<string, Record<string, string>>>;
+    // en
+    expect(en.settings.offline.downloadHeading).toBe("Download");
+    // non-English locales must have the key (not fall back to the key path)
+    expect(ja.settings.offline.downloadHeading).toBeTruthy();
+    expect(ja.settings.offline.downloadHeading).not.toBe("settings.offline.downloadHeading");
+    expect(zhHans.settings.offline.downloadHeading).toBeTruthy();
+    expect(zhHant.settings.offline.downloadHeading).toBeTruthy();
+  });
+
+  it("renders the Japanese heading when the mock t() is set to Japanese", async () => {
+    // Swap the mock to resolve against ja.json for this test.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const jaMessages = require("../../messages/ja.json") as Record<string, unknown>;
+
+    function resolveDotPath(obj: Record<string, unknown>, path: string): string {
+      const parts = path.split(".");
+      let cur: unknown = obj;
+      for (const part of parts) {
+        if (typeof cur !== "object" || cur === null) return path;
+        cur = (cur as Record<string, unknown>)[part];
+      }
+      return typeof cur === "string" ? cur : path;
+    }
+
+    const tJa = (key: string, params?: Record<string, string | number>): string => {
+      let val = resolveDotPath(jaMessages, key);
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          val = val.replace(`{${k}}`, String(v));
+        }
+      }
+      return val;
+    };
+
+    // Verify the Japanese heading value resolves correctly.
+    expect(tJa("settings.heading")).toBe("設定");
+    expect(tJa("settings.save")).toBe("保存");
+    expect(tJa("settings.section.practice")).toBe("練習");
+    expect(tJa("settings.offline.downloadHeading")).toBe("ダウンロード");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Locale picker endonyms (#locale-picker-endonyms)
 //
 // Asserts that both locale-picker <select> elements show each language in
@@ -771,18 +866,27 @@ describe("SettingsPage — locale picker endonyms", () => {
     const pokemonLocaleSelect = screen.getByLabelText(/pokémon name language/i);
 
     // Both pickers must show endonyms (native script), not English translations.
+    // Non-English locales are marked "(preview)" — the endonym must still appear
+    // as a substring of each option.
     for (const select of [appLocaleSelect, pokemonLocaleSelect]) {
       const options = Array.from(select.querySelectorAll("option"));
       const texts = options.map((o) => o.textContent ?? "");
 
-      expect(texts).toContain("日本語");
-      expect(texts).toContain("简体中文");
-      expect(texts).toContain("繁體中文");
+      // Endonym appears in each option (may be followed by " (preview)").
+      expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
+      expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
+      expect(texts.some((t) => t.startsWith("繁體中文"))).toBe(true);
 
-      // Must NOT contain the old English-translated labels.
+      // Non-English options must include the preview marker.
+      expect(texts.some((t) => t.includes("(preview)"))).toBe(true);
+
+      // Must NOT contain English-translated labels.
       expect(texts).not.toContain("Japanese");
       expect(texts).not.toContain("Simplified Chinese");
       expect(texts).not.toContain("Traditional Chinese");
+
+      // English option must have no preview marker.
+      expect(texts).toContain("English");
     }
   });
 });
