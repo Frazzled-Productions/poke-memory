@@ -56,9 +56,8 @@ export function MachineTranslationBanner() {
   const language = LOCALE_ENDONYMS[locale];
 
   return (
-    <aside
+    <div
       role="note"
-      aria-label={t("machineTranslated", { language })}
       className="w-full bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800"
     >
       <div className="mx-auto flex max-w-3xl items-start gap-3 px-4 py-3 sm:items-center">
@@ -80,6 +79,6 @@ export function MachineTranslationBanner() {
           {t("dismiss")}
         </button>
       </div>
-    </aside>
+    </div>
   );
 }

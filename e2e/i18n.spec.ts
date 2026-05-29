@@ -50,6 +50,79 @@ async function enableLanguagesFlag(page: import("@playwright/test").Page): Promi
   });
 }
 
+const MT_BANNER_KEY_JA = "poke-memory:mt-banner-dismissed:ja";
+
+test.describe("i18n — MachineTranslationBanner (#1381)", () => {
+  test.beforeEach(async ({ page }) => {
+    await addOnboardingPreDismiss(page);
+  });
+
+  test("banner is absent when locale is English (default)", async ({ page }) => {
+    // No locale cookie set — falls back to English. Banner must not render.
+    await page.goto("/");
+
+    // The banner's visible text is the machine-translated caution message.
+    // We assert it is not visible rather than not in the DOM, since the
+    // component renders null for English — either way the text is absent.
+    await expect(page.getByRole("note")).not.toBeVisible();
+  });
+
+  test("banner text is visible when locale=ja is set via cookie", async ({ page, context }) => {
+    await context.addCookies([
+      {
+        name: LOCALE_COOKIE,
+        value: "ja",
+        domain: "localhost",
+        path: "/",
+      },
+    ]);
+
+    await page.goto("/");
+
+    // The banner renders with role="note" and the localised caution message.
+    const banner = page.getByRole("note");
+    await expect(banner).toBeVisible();
+
+    // The visible paragraph contains the Japanese translation text.
+    await expect(page.getByText(/自動的に作成/)).toBeVisible();
+  });
+
+  test("dismissing the banner hides it and persists dismissal across reload", async ({
+    page,
+    context,
+  }) => {
+    await context.addCookies([
+      {
+        name: LOCALE_COOKIE,
+        value: "ja",
+        domain: "localhost",
+        path: "/",
+      },
+    ]);
+
+    await page.goto("/");
+
+    // Confirm the banner is visible before dismissal.
+    const banner = page.getByRole("note");
+    await expect(banner).toBeVisible();
+
+    // Click the dismiss button (its accessible label is the catalogue "dismiss" key).
+    // The Japanese translation for dismiss is "閉じる".
+    await page.getByRole("button", { name: "閉じる" }).click();
+
+    // Banner should disappear immediately.
+    await expect(banner).not.toBeVisible();
+
+    // The dismissal flag must be written to localStorage.
+    const flag = await page.evaluate((key) => localStorage.getItem(key), MT_BANNER_KEY_JA);
+    expect(flag).toBe("1");
+
+    // Reload — banner must stay gone (localStorage persists the flag).
+    await page.reload();
+    await expect(page.getByRole("note")).not.toBeVisible();
+  });
+});
+
 test.describe("i18n — Languages Labs flag (#1260)", () => {
   test.beforeEach(async ({ page }) => {
     await addOnboardingPreDismiss(page);
