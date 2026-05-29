@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
 import { FirstVisitOnboardingModal } from "@/components/onboarding/FirstVisitOnboardingModal";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import { PracticeSidebar } from "@/components/review/PracticeSidebar";
@@ -18,12 +19,13 @@ async function AuthErrorBanner({
 }) {
   const { error } = await searchParams;
   if (error !== "auth") return null;
+  const t = await getTranslations("practice");
   return (
     <div
       role="alert"
       className="mb-6 w-full max-w-md rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
     >
-      Sign-in failed. Please try again.
+      {t("signInFailed")}
     </div>
   );
 }

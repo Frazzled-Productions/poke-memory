@@ -1,6 +1,13 @@
-import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  renderWithIntl,
+  renderJa,
+  screen,
+  waitFor,
+  act,
+  fireEvent,
+} from "@/components/test-utils/renderWithIntl";
 import { ReviewSession } from "@/components/review/ReviewSession";
 import type { NameReviewCard, CryReviewCard, ReverseReviewCard } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
@@ -303,7 +310,7 @@ beforeEach(() => {
 
 describe("ReviewSession reveal flow", () => {
   it("shows Reveal button and hides the Pokémon name before reveal", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
@@ -313,7 +320,7 @@ describe("ReviewSession reveal flow", () => {
 
   it("shows name and grade buttons after clicking Reveal", async () => {
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -341,7 +348,7 @@ describe("ReviewSession reveal flow", () => {
       practiceScope: { gens: [], types: [], presets: [] },
       earnedBadges: [],
     });
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -360,7 +367,7 @@ describe("ReviewSession reveal flow", () => {
       limits: DEFAULT_LIMITS,
     });
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -445,7 +452,7 @@ describe("handleReveal decode-ahead (#930)", () => {
     });
     mockLoadSettings.mockReturnValue(settingsForEvoOnly());
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -468,7 +475,7 @@ describe("handleReveal decode-ahead (#930)", () => {
       reverseEvolutionCardsEnabled: true,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -479,7 +486,7 @@ describe("handleReveal decode-ahead (#930)", () => {
 
   it("does not call decodeSpriteUrls on reveal for a name card", async () => {
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -498,7 +505,7 @@ describe("handleReveal decode-ahead (#930)", () => {
     });
     mockLoadSettings.mockReturnValue(settingsForEvoOnly());
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -527,7 +534,7 @@ describe("handleReveal decode-ahead (#930)", () => {
     });
     mockLoadSettings.mockReturnValue(settingsForEvoOnly());
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     // Fire the click without awaiting — the decode promise is still pending.
@@ -564,7 +571,7 @@ describe("ReviewSession onboarding nudges (#702)", () => {
       limits: DEFAULT_LIMITS,
     });
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -600,7 +607,7 @@ describe("ReviewSession onboarding nudges (#702)", () => {
       practiceScope: { gens: [], types: [], presets: [] },
       earnedBadges: [],
     });
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() =>
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
@@ -646,7 +653,7 @@ describe("ReviewSession reverse card flow", () => {
   }
 
   it("shows the Pokémon name as a prompt and sprite tiles but no Reveal button", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // 4 sprite tile buttons are rendered — no Reveal button.
     await waitFor(() => {
@@ -660,7 +667,7 @@ describe("ReviewSession reverse card flow", () => {
   });
 
   it("correct tile tap grades Good and advances to the next card", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
     // Wait for initial render with real timers (waitFor uses setTimeout internally).
     await waitFor(() => expect(getTileButtons()).toHaveLength(4));
 
@@ -680,7 +687,7 @@ describe("ReviewSession reverse card flow", () => {
   });
 
   it("incorrect tile tap shows feedback then grades Again and advances", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
     await waitFor(() => expect(getTileButtons()).toHaveLength(4));
 
     const targetName = getTargetName();
@@ -751,7 +758,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
       limits: DEFAULT_LIMITS,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // stepStartedAt is backfilled to Date.now(), so dueAt = now + 60 s.
     // Since 60 s < 20 min learn-ahead window and the queue is otherwise
@@ -771,7 +778,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
       limits: DEFAULT_LIMITS,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // saveSession must be called with a concrete (numeric) stepStartedAt so
     // that a subsequent reload reads the fixed anchor instead of stamping a
@@ -821,7 +828,7 @@ describe("Baseline: due review card reveal → grade cycle", () => {
     vi.mocked(loadSession).mockResolvedValueOnce({ cards: [reviewCard, GRADUATED_REVERSE_CARD], limits: DEFAULT_LIMITS });
 
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Un-revealed state: Reveal button visible, name hidden.
     await waitFor(() => {
@@ -911,7 +918,7 @@ describe("Regression: learning-card displaces current card before Reveal (#839)"
       limits: DEFAULT_LIMITS,
     });
 
-    await act(async () => { render(<ReviewSession />); });
+    await act(async () => { renderWithIntl(<ReviewSession />); });
 
     // Review card is on screen — Reveal button visible, name hidden.
     const revealBtn = screen.getByRole("button", { name: /reveal/i });
@@ -1028,7 +1035,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
     });
 
     // Flush async effects (loadSession is now async) while still in fake-timer mode.
-    await act(async () => { render(<ReviewSession />); });
+    await act(async () => { renderWithIntl(<ReviewSession />); });
 
     // loadSession resolved — component is out of the loading skeleton.
     const revealBtn = screen.getByRole("button", { name: /reveal/i });
@@ -1112,7 +1119,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
       limits: DEFAULT_LIMITS,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // The card should be pulled forward and presented for review — Reveal button visible,
     // no countdown screen.
@@ -1155,7 +1162,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
       limits: DEFAULT_LIMITS,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Too far in the future — should show countdown, not the card.
     await waitFor(() =>
@@ -1221,7 +1228,7 @@ describe("QueueCounterRow: live queue counters", () => {
       limits: DEFAULT_LIMITS,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Wait for session to load and render the queue counter row.
     await waitFor(() =>
@@ -1245,7 +1252,7 @@ describe("Practice scope (#333)", () => {
     // The default settings mock returns practiceScope { gens: [], types: [], presets: [] }.
     // The existing reveal-flow expectations should still hold: Reveal button is
     // visible and the empty-state branch is NOT rendered.
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
@@ -1273,7 +1280,7 @@ describe("Practice scope (#333)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(
@@ -1330,7 +1337,7 @@ describe("Practice scope (#333)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // saveSession must have been called with the reconciled card whose
     // hiddenSince is now a non-null ISO string.
@@ -1372,7 +1379,7 @@ describe("Practice scope: Clear scope button (#835)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Wait for the empty-state screen with the Clear scope button.
     await waitFor(() => {
@@ -1452,7 +1459,7 @@ describe("Practice scope: stale display lock clears on scope change (#1088)", ()
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Find the answer-hidden sprite. The preloader uses alt="", so this alt
     // is unique to the on-screen card.
@@ -1510,7 +1517,7 @@ describe("Practice scope: stale display lock clears on scope change (#1088)", ()
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
     await screen.findByAltText("A Pokémon sprite, answer hidden");
 
     const scopeToggle = screen
@@ -1534,7 +1541,7 @@ describe("Practice scope: stale display lock clears on scope change (#1088)", ()
 describe("ReviewSession TTS warm-up (#479)", () => {
   it("calls warmupTts on the reveal button click and again on the grade button click", async () => {
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -1555,7 +1562,7 @@ describe("ReviewSession TTS warm-up (#479)", () => {
   it("warmupTts is called before the grade's saveSession call (synchronous in click handler)", async () => {
     const user = userEvent.setup();
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Wait for mount-time saveSession calls to settle, then start tracking.
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
@@ -1582,7 +1589,7 @@ describe("ReviewSession TTS warm-up (#479)", () => {
 describe("Robustness: corrupt grade in handleGrade (#811)", () => {
   it("surfaces an error banner and leaves the session recoverable when nextReview throws", async () => {
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -1640,7 +1647,7 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
     });
 
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Cry branch shows a Reveal button (after the cry play tile).
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
@@ -1686,7 +1693,7 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
     });
 
     vi.useFakeTimers();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Reverse branch shows sprite tile buttons — no Reveal step.
     await act(async () => { vi.advanceTimersByTime(0); });
@@ -1748,7 +1755,7 @@ describe("Card-type disable guards (#835)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // The cry branch shows a Reveal button — the all-disabled guard must not fire.
     await waitFor(() => {
@@ -1785,7 +1792,7 @@ describe("Card-type disable guards (#835)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Reverse cards are queued — the guard never fires.
     await waitFor(() => {
@@ -1878,7 +1885,7 @@ describe("Card-type disable guards (#835)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Cry card is excluded from hasMoreNewCardsOf because cryCardsEnabled=false.
     // All other queues are empty → SESSION_COMPLETE, not NEW_CARDS_LOCKED.
@@ -1934,7 +1941,7 @@ describe("Card-type disable guards (#835)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // With "cry" in the resolveEndState tuple, hasMoreNewCardsOf("cry") returns
     // true and the new-card cap fires correctly — showing the locked screen.
@@ -2014,7 +2021,7 @@ describe("Card-type disable guards (#835)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // With "cry" in the reviewWall tuple, hasMoreDueReviewsOf("cry") returns
     // true and the review cap fires — showing the soft-wall screen.
@@ -2127,7 +2134,7 @@ describe("Share today button persistence (#896)", () => {
       }),
     );
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
@@ -2153,7 +2160,7 @@ describe("Share today button persistence (#896)", () => {
       { date: today, grade: 5, cardType: "reverse", occurredAt: 100 },
     ]);
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
@@ -2175,7 +2182,7 @@ describe("Share today button persistence (#896)", () => {
       { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: 1 },
     ]);
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
@@ -2232,7 +2239,7 @@ describe("Graduated-cards review queue hint (#880)", () => {
     const reverseCard = buildCompletedReverseCard();
     mockSeedPokemon.mockReturnValue([nameCard]);
     vi.mocked(loadSession).mockResolvedValue({ cards: [nameCard, reverseCard], limits: DEFAULT_LIMITS });
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
@@ -2267,7 +2274,7 @@ describe("Graduated-cards review queue hint (#880)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
@@ -2303,7 +2310,7 @@ describe("Graduated-cards review queue hint (#880)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
@@ -2421,7 +2428,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
       }),
     );
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
@@ -2500,7 +2507,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
@@ -2578,7 +2585,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
       }),
     );
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/daily review limit reached/i)).toBeInTheDocument();
@@ -2669,7 +2676,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByText(/daily review limit reached/i)).toBeInTheDocument();
@@ -2693,7 +2700,7 @@ describe("Keyboard shortcuts (#1060)", () => {
   }
 
   it("Space reveals the card when no text input is focused", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -2705,7 +2712,7 @@ describe("Keyboard shortcuts (#1060)", () => {
   });
 
   it("Enter reveals the card when no text input is focused", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -2717,7 +2724,7 @@ describe("Keyboard shortcuts (#1060)", () => {
   });
 
   it("grade key 1 (Again) is ignored before reveal", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -2730,7 +2737,7 @@ describe("Keyboard shortcuts (#1060)", () => {
   });
 
   it("grade key 1 (Again) fires after reveal", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -2757,7 +2764,7 @@ describe("Keyboard shortcuts (#1060)", () => {
       cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
       limits: DEFAULT_LIMITS,
     });
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -2776,7 +2783,7 @@ describe("Keyboard shortcuts (#1060)", () => {
   });
 
   it("Space is ignored while an <input> element is focused", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -2794,7 +2801,7 @@ describe("Keyboard shortcuts (#1060)", () => {
   });
 
   it("? key opens the keyboard shortcuts overlay", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -2808,7 +2815,7 @@ describe("Keyboard shortcuts (#1060)", () => {
   it("? key opens overlay before card is revealed", async () => {
     // The overlay must be accessible at any point in the review cycle, not only
     // after the card has been flipped (regression guard for the fix in #1069).
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
     // Card is NOT yet revealed.
@@ -2822,7 +2829,7 @@ describe("Keyboard shortcuts (#1060)", () => {
   });
 
   it("Escape closes the keyboard shortcuts overlay", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -2896,7 +2903,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
   });
 
   it("flip branch (name card): QueueCounterRow is present", async () => {
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() =>
       expect(screen.getByRole("status", { name: /queue counts/i })).toBeInTheDocument(),
@@ -2906,7 +2913,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
   it("flip branch (name card): undo button appears after grading", async () => {
     const user = userEvent.setup();
     mockLoadSettings.mockReturnValue(flipSettings);
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const reveal = await screen.findByRole("button", { name: /reveal/i });
     await user.click(reveal);
@@ -2926,7 +2933,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
   it("flip branch (name card): undo button disappears after clicking Undo (#1191 ref-based snapshot)", async () => {
     const user = userEvent.setup();
     mockLoadSettings.mockReturnValue(flipSettings);
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const reveal = await screen.findByRole("button", { name: /reveal/i });
     await user.click(reveal);
@@ -2967,7 +2974,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() =>
       expect(screen.getByRole("status", { name: /queue counts/i })).toBeInTheDocument(),
@@ -3000,7 +3007,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       earnedBadges: [],
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Cry branch shows a Reveal button alongside the play button.
     await screen.findByRole("button", { name: /reveal/i });
@@ -3016,7 +3023,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     // invert introduced in PR 2 of #1191.
     const user = userEvent.setup();
     mockLoadSettings.mockReturnValue(flipSettings);
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Wait for the first card to appear and reveal it.
     const reveal = await screen.findByRole("button", { name: /reveal/i });
@@ -3062,7 +3069,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     const user = userEvent.setup();
     mockLoadSettings.mockReturnValue({ ...flipSettings, masteryRepetitions: 3 });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Flag should not be set before the grade.
     expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
@@ -3142,7 +3149,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     // Flag must be absent before any grade.
     expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Wait for the SpritePicker tiles to appear.
     await waitFor(() =>
@@ -3222,7 +3229,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       limits: DEFAULT_LIMITS,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() =>
       expect(screen.getByText(/next card in/i)).toBeInTheDocument(),
@@ -3263,7 +3270,7 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Clear the mount-time saveSession call counter so we can reliably detect
     // the grade-triggered call below.
@@ -3288,7 +3295,7 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     vi.mocked(saveSession).mockClear();
@@ -3325,7 +3332,7 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Wait for mount to settle — both Once calls consumed, quotaExceeded still false.
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
@@ -3362,7 +3369,7 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
@@ -3434,7 +3441,7 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Wait for mount to settle — the Once call is consumed.
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
@@ -3469,7 +3476,7 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
     const user = userEvent.setup();
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
 
@@ -3552,7 +3559,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
     mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
     mockLoadSettings.mockReturnValue(typedModeSettings);
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // MC card should render with option buttons (no Reveal button, no text input).
     await waitFor(() => {
@@ -3585,7 +3592,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
     });
     mockLoadSettings.mockReturnValue(typedModeSettings);
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
@@ -3615,7 +3622,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
     });
     mockLoadSettings.mockReturnValue(typedModeSettings);
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // TypedEntryNameCard renders a text input, not multiple-choice buttons.
     await waitFor(() => {
@@ -3631,7 +3638,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
       verifiedTypedEntryMode: false,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
@@ -3646,7 +3653,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
       mcCardOnboardingShown: false,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     await waitFor(() => {
       expect(
@@ -3662,7 +3669,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
       mcCardOnboardingShown: true,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Wait for the MC card to render (option buttons appear).
     await waitFor(() => {
@@ -3683,7 +3690,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
       mcCardOnboardingShown: false,
     });
 
-    render(<ReviewSession />);
+    renderWithIntl(<ReviewSession />);
 
     // Act step 1: wait for MC card and assert banner is visible.
     await waitFor(() => {
@@ -3716,5 +3723,146 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
     expect(vi.mocked(saveSettings)).toHaveBeenCalledWith(
       expect.objectContaining({ mcCardOnboardingShown: true }),
     );
+  });
+});
+
+// Locale smoke tests — Japanese (mandatory locale coverage per AGENTS.md)
+// ---------------------------------------------------------------------------
+
+describe("ReviewSession locale smoke — Japanese", () => {
+  it("renders the loading skeleton aria-label in Japanese", () => {
+    renderJa(<ReviewSession />);
+    // cards starts as null — the loading skeleton is present synchronously
+    // before loadSession resolves.
+    expect(
+      screen.getByLabelText("レビューセッションを読み込み中"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Reveal button in Japanese", async () => {
+    renderJa(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /めくる/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders grade buttons in Japanese after reveal", async () => {
+    const user = userEvent.setup();
+    renderJa(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /めくる/i });
+    await user.click(revealBtn);
+
+    expect(screen.getByRole("button", { name: /もう一度/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /簡単/i })).toBeInTheDocument();
+  });
+
+  it("renders the all-caught-up screen in Japanese", async () => {
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    const user = userEvent.setup();
+    renderJa(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /めくる/i });
+    await user.click(revealBtn);
+
+    const easyBtn = screen.getByRole("button", { name: /簡単/i });
+    await user.click(easyBtn);
+
+    await waitFor(() =>
+      expect(screen.getByText("すべて完了！")).toBeInTheDocument(),
+    );
+  });
+
+  it("renders the grade error message in Japanese", async () => {
+    const user = userEvent.setup();
+    renderJa(<ReviewSession />);
+
+    const revealBtn = await screen.findByRole("button", { name: /めくる/i });
+    await user.click(revealBtn);
+
+    vi.mocked(nextReview).mockImplementationOnce(() => {
+      throw new RangeError("nextReview: invalid grade");
+    });
+    await user.click(screen.getByRole("button", { name: /簡単/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/予期しないエラーにより採点を保存できませんでした/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("renders the review-wall heading in Japanese (1日のレビュー上限に達しました)", async () => {
+    // Put a due cry card in the session with a maxReviewsCryPerDay of 0 — this
+    // triggers REVIEW_SOFT_WALL, showing the reviewWall / doneForToday screen.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seedWithCry: NameReviewCard = {
+      ...FIXTURE_CARD,
+      cryUrl: "https://example.com/bulbasaur.ogg",
+    };
+    const dueCryCard: CryReviewCard = {
+      ...seedWithCry,
+      id: CRY_ID_OFFSET + 1,
+      pokemonId: 1,
+      cardType: "cry",
+      subjectKey: "1",
+      state: {
+        stability: 5,
+        difficulty: 1,
+        elapsedDays: 0,
+        scheduledDays: 5,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-17",
+        lastReview: "2026-05-01",
+        firstSeen: "2026-04-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([seedWithCry]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [dueCryCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    renderJa(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("1日のレビュー上限に達しました"),
+      ).toBeInTheDocument();
+    });
+    // The "Done for today" button text should also be in Japanese.
+    expect(screen.getByText("今日はここまで")).toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 
 // ---------------------------------------------------------------------------
@@ -14,14 +15,15 @@ interface UndoButtonProps {
 }
 
 export function UndoButton({ onClick, className = "" }: UndoButtonProps) {
+  const t = useTranslations("practice");
   return (
     <button
       type="button"
       onClick={onClick}
       className={`${className} min-h-[36px] mb-3 sm:mb-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900`}
-      aria-label="Undo last grade"
+      aria-label={t("undoLastGradeAriaLabel")}
     >
-      Undo last grade (⌘Z)
+      {t("undoLastGrade")}
     </button>
   );
 }
@@ -113,9 +115,10 @@ export interface ReviewCardLayoutProps {
 // the active practice scope. Scheduling continues so FSRS state is not
 // corrupted; this hint explains the visible-but-out-of-scope card.
 function OutOfScopeHint() {
+  const t = useTranslations("practice");
   return (
     <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center italic">
-      Finishing an in-progress card
+      {t("outOfScopeHint")}
     </p>
   );
 }
