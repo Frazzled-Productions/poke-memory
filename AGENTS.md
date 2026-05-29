@@ -92,7 +92,18 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 
 Superuser mode is a QA cheat unlocked by typing `super` (desktop) or 7-tapping the nav title (mobile). It does **not** itself change behaviour — it reveals a **Developer** section on the Settings page that houses per-behaviour flags.
 
-**Flags are per axis of cheating, not per page.** Today there is one flag (`pretendAllMastered`) that renders every species as mastered. Future axes (e.g. "skip daily limits", "force-reveal cards") get their own flag. Do **not** add a per-page toggle that re-derives mastery — wire the page into `flags.pretendAllMastered` instead.
+**Flags are per axis of cheating, not per page.** Flags currently in use:
+
+| Flag | Purpose |
+|---|---|
+| `pretendAllMastered` | Renders every species as mastered across Pokédex, Pasture, Stats, and the theme picker. |
+| `forceNextStreakMilestone` | Fires the smallest un-seen streak celebration on next Practice visit. Self-clears after one fire. |
+| `forceCardsGraduated` | Treats all cards as graduated; skips the learning phase. Use to QA typed-entry without grinding. |
+| `qaSeedMode` | Reveals a scenario picker in the Developer section (#1326). Select a scenario and click "Apply seed" to inject deterministic test data into IndexedDB. Local-only — sync write-guard applies. See below for the scenario list. |
+
+Do **not** add a per-page toggle that re-derives mastery — wire the page into `flags.pretendAllMastered` instead.
+
+**QA seed scenarios** (available when `qaSeedMode` is on): `fsrs-locale-mastery` — 30 mastered en-locale name cards + due-soon + in-learning; switch Pokémon name language to Japanese to verify locale-aware mastery reset. `optimiser-stress` — 20 heavily-reviewed cards + 2 single-review cards; run the FSRS optimiser from Settings to verify it returns weights. `pasture-progression` — 40 mastered + 20 in-progress + 15 in-learning species; visit Pasture for a realistic populated view. To clear seeded state: click "Clear seed" and reload, or lock superuser mode (which offers to restore cloud state for signed-in users, or reset local state for guests).
 
 **Every new user-facing feature must honour the relevant superuser flag.** Specifically: if a feature displays mastery state, completion counts, per-Pokémon collection state, or anything gated on having mastered things, it must read `useSuperuser().flags.pretendAllMastered` (or a future appropriate flag) and treat it as "fully mastered" when on. The canonical pattern is `forceAllMastered || isMastered(...)`; pure functions take an optional `forceAllMastered` parameter (see `computeStats`, `computeRecords`, `filterMastered`).
 

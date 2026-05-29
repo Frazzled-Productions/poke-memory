@@ -40,6 +40,7 @@ import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
 import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
 import { TtsControls } from "@/components/settings/TtsControls";
+import { QaSeedSection } from "@/components/settings/QaSeedSection";
 import { CollapsibleSection } from "@/components/settings/CollapsibleSection";
 import { SettingsSearch } from "@/components/settings/SettingsSearch";
 import {
@@ -2139,6 +2140,47 @@ export default function SettingsPage() {
                     <div className="mt-4">
                       <ResetEarnedBadgesRow />
                     </div>
+
+                    {/* QA seed mode toggle (#1326) */}
+                    <div className={cn("mt-4", cardPanelPadded)}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            QA seed mode
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            Reveals a scenario picker to inject test data into
+                            local storage. Local-only: sync is paused so
+                            seeded data cannot reach the cloud.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label="QA seed mode"
+                          aria-checked={flags.qaSeedMode}
+                          onClick={() =>
+                            void setFlag("qaSeedMode", !flags.qaSeedMode)
+                          }
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            flags.qaSeedMode
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              flags.qaSeedMode
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* QA seed panel — only shown when qaSeedMode is on */}
+                    {flags.qaSeedMode && <QaSeedSection />}
                   </div>
                 )}
 
