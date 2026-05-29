@@ -233,7 +233,7 @@ describe("FsrsOptimizerSection", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/srs/optimize", { method: "POST" });
     });
 
-    it("shows generic error text for an unrecognised 500", async () => {
+    it("includes the HTTP status for an unrecognised 500 with no error code (#1305)", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
@@ -251,7 +251,57 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimise. Try again later.",
+          "Couldn't optimise (server error 500). Try again later.",
+        );
+      });
+    });
+
+    it("shows the file-an-issue message with status for the 'unknown' error code (#1305)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          json: async () => ({ error: "unknown", detail: "boom" }),
+        }),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Couldn't optimise (server error 500). Please file an issue.",
+        );
+      });
+    });
+
+    it("shows a connection message when the request never reaches the server (#1305)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockRejectedValue(new Error("network down")),
+      );
+
+      render(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId("fsrs-optimize-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
+          "Couldn't reach the server. Check your connection and try again.",
         );
       });
     });
@@ -460,7 +510,7 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't optimise. Try again later.",
+          "Couldn't reach the server. Check your connection and try again.",
         );
       });
     });

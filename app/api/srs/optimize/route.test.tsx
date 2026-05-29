@@ -221,4 +221,20 @@ describe("POST /api/srs/optimize — persistWeights via RPC", () => {
     // The write is exclusively via rpc.
     expect(rpcMock).toHaveBeenCalledOnce();
   });
+
+  it("returns 500 { error: 'unknown', detail } when an unmapped error is thrown (#1305)", async () => {
+    // An unexpected throw before any specific handler maps it — here the
+    // Supabase client itself fails to construct. The POST wrapper should catch
+    // it and return a structured 500 the UI can surface with its status.
+    (createClient as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("boom"),
+    );
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe("unknown");
+    expect(body.detail).toBe("boom");
+  });
 });

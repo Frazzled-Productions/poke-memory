@@ -103,8 +103,19 @@ export function FsrsOptimizerSection({
           setErrorMsg("Couldn't load your settings. Check your connection and try again.");
         } else if (errorCode === "save_failed") {
           setErrorMsg("Optimisation succeeded but couldn't be saved. Try again.");
+        } else if (errorCode === "unknown") {
+          // The route hit an unmapped failure and returned a structured 500
+          // (#1305). Surface the HTTP status so the next opaque failure can be
+          // diagnosed from a screenshot alone, rather than the old catch-all.
+          setErrorMsg(
+            `Couldn't optimise (server error ${res.status}). Please file an issue.`,
+          );
         } else {
-          setErrorMsg("Couldn't optimise. Try again later.");
+          // No recognised error code on a non-ok response: include the status
+          // so the failure class is at least visible (#1305).
+          setErrorMsg(
+            `Couldn't optimise (server error ${res.status}). Try again later.`,
+          );
         }
         return;
       }
@@ -124,8 +135,10 @@ export function FsrsOptimizerSection({
       setOptimizerState("idle");
       onOptimized(data.optimizedAt, data.weights);
     } catch {
+      // No HTTP response at all — a network failure or the request never
+      // reaching the server. Distinct from a server error with a status (#1305).
       setOptimizerState("error");
-      setErrorMsg("Couldn't optimise. Try again later.");
+      setErrorMsg("Couldn't reach the server. Check your connection and try again.");
     }
   }
 

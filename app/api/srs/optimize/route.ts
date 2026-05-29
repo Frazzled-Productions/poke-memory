@@ -129,7 +129,7 @@ async function persistWeights(
   }
 }
 
-export async function POST(): Promise<NextResponse> {
+async function runOptimize(): Promise<NextResponse> {
   const supabase = (await createClient()) as unknown as SupabaseClient;
   const {
     data: { user },
@@ -223,4 +223,25 @@ export async function POST(): Promise<NextResponse> {
   }
 
   return NextResponse.json({ weights, optimizedAt, reviewCount });
+}
+
+/**
+ * Public entry point. Wraps {@link runOptimize} so any *unmapped* failure (an
+ * unexpected throw, a transport error, a Vercel function timeout) returns a
+ * structured `{ error: "unknown", detail }` 500 the UI can surface with its
+ * HTTP status, instead of an opaque body the component maps to a catch-all
+ * string (#1305). This cannot catch a process-level abort from the native
+ * binding — that is guarded at the input layer by dropping unfittable items
+ * (#1304); this wrapper covers the catchable unmapped paths. `detail` is a
+ * truncated error message (already present in our logs), not user data.
+ */
+export async function POST(): Promise<NextResponse> {
+  try {
+    return await runOptimize();
+  } catch (err) {
+    console.error("[/api/srs/optimize] unhandled error", err);
+    const detail =
+      err instanceof Error ? err.message.slice(0, 200) : "internal_error";
+    return NextResponse.json({ error: "unknown", detail }, { status: 500 });
+  }
 }
