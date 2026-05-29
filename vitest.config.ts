@@ -32,6 +32,13 @@ export default defineConfig({
       // a red build pass. The /batch-issues skill ratchets the JSON file at
       // the end of every session that touches product code; manual ratchets
       // are also fine.
+      //
+      // Important: the JSON file must contain only the four threshold keys
+      // (statements / branches / functions / lines). Vitest iterates every
+      // key on this object and treats unknown ones as per-file glob
+      // patterns, so a `_comment` or `description` field would be evaluated
+      // as a picomatch glob on every coverage run. Keep ratchet rationale in
+      // this comment block, not in the JSON.
       thresholds: coverageFloor,
       // Measure the application/library source we actually ship and test.
       include: ["app/**", "components/**", "lib/**"],

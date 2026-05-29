@@ -55,7 +55,10 @@ jobs:
           fi
 
       - name: Find open qa -> main promotion PR
-        if: steps.shas.outputs.stale == 'true'
+        # Runs on both stale and not-stale paths — the dismiss step needs
+        # this lookup to know which PR to clean a marker comment off of.
+        # (Bug fix: the original `if: stale == true` left the dismiss step
+        # permanently false, so the comment was never removed when caught up.)
         id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,7 +72,7 @@ jobs:
             --json number \
             --jq '.[0].number // ""')
           if [ -z "$PR_NUMBER" ]; then
-            echo "No open qa -> main promotion PR; nothing to annotate."
+            echo "No open qa -> main promotion PR; nothing to annotate or dismiss."
             echo "pr_number=" >> "$GITHUB_OUTPUT"
           else
             echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
@@ -105,19 +108,21 @@ jobs:
           MARKER="<!-- stale-preview-check -->"
           DISPATCH_URL="https://github.com/${{ github.repository }}/actions/workflows/qa-preview-deploy.yml"
 
-          BODY=$(cat <<EOF
-          $MARKER
-          ## 🟡 Preview deploy is behind \`qa\`
-
-          The last \`QA Preview Deploy\` ran against \`${PREV_SHA:-(none)}\`, but \`origin/qa\` is now at \`${QA_SHA}\` (${AHEAD} commits ahead).
-
-          QA against the existing preview will not exercise the latest \`qa\` state. Re-fire the deploy before testing:
-
-          - **[Dispatch \`QA Preview Deploy\`](${DISPATCH_URL})** (Run workflow → branch \`qa\`)
-
-          This comment is updated daily by \`.github/workflows/stale-preview-check.yml\` and goes away once the preview catches up.
-          EOF
-          )
+          # printf, not a heredoc: the YAML run block strips leading
+          # whitespace, so an indented EOF delimiter is never matched and the
+          # heredoc fails. coverage.yml uses the same pattern for the same
+          # reason; copy it here verbatim.
+          BODY=$(printf '%s\n' \
+            "$MARKER" \
+            "## 🟡 Preview deploy is behind \`qa\`" \
+            "" \
+            "The last \`QA Preview Deploy\` ran against \`${PREV_SHA:-(none)}\`, but \`origin/qa\` is now at \`${QA_SHA}\` (${AHEAD} commits ahead)." \
+            "" \
+            "QA against the existing preview will not exercise the latest \`qa\` state. Re-fire the deploy before testing:" \
+            "" \
+            "- **[Dispatch \`QA Preview Deploy\`](${DISPATCH_URL})** (Run workflow → branch \`qa\`)" \
+            "" \
+            "This comment is updated daily by \`.github/workflows/stale-preview-check.yml\` and goes away once the preview catches up.")
 
           EXISTING_COMMENT_ID=$(gh api "/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -n1)
