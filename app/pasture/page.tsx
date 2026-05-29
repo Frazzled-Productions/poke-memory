@@ -129,7 +129,6 @@ function isFiltered(filters: PastureFilters): boolean {
 
 export default function PasturePage() {
   const t = useTranslations("pasture");
-  const tCommon = useTranslations("common");
   const { user, supabase } = useAuth();
   const { flags } = useSuperuser();
   const [session, setSession] = useState<SavedSession | null>(null);
@@ -316,7 +315,7 @@ export default function PasturePage() {
 
       {zones.length === 0 && filtered ? (
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
-          {tCommon("noResults")}
+          {t("noFilterMatch")}
         </p>
       ) : (
         <div className="flex flex-col gap-8">

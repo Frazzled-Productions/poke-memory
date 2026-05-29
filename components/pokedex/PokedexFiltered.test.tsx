@@ -588,4 +588,20 @@ describe("PokedexFiltered — Japanese locale", () => {
     // messages/ja.json pokedex.filters = "フィルター"
     expect(screen.getByRole("button", { name: /フィルター/i })).toBeInTheDocument();
   });
+
+  it("renders the activeFilters badge using simple {count} substitution in Japanese (count=1)", () => {
+    // ja.json uses simple substitution: "{count}件のフィルター適用中" — no plural form.
+    // This verifies the Japanese ICU format produces the correct label for count=1,
+    // where English would use the singular plural branch ("1 active filter").
+    setSearchParams({ gen: "1" });
+    renderJa(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    expect(screen.getByLabelText("1件のフィルター適用中")).toBeInTheDocument();
+  });
+
+  it("renders the activeFilters badge using simple {count} substitution in Japanese (count=2)", () => {
+    // Verifies count=2 also substitutes correctly with no plural distinction in Japanese.
+    setSearchParams({ gen: "1", type: "fire" });
+    renderJa(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    expect(screen.getByLabelText("2件のフィルター適用中")).toBeInTheDocument();
+  });
 });

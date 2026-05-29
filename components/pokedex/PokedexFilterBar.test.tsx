@@ -19,7 +19,6 @@ import {
   renderWithIntl,
   renderJa,
   screen,
-  fireEvent,
 } from "@/components/test-utils/renderWithIntl";
 import PokedexFilterBar from "@/components/pokedex/PokedexFilterBar";
 import type { PokedexFilters } from "@/lib/pokemon/filter";
@@ -302,7 +301,3 @@ describe("PokedexFilterBar — Japanese locale", () => {
     expect(screen.getByRole("button", { name: "第I世代" })).toBeInTheDocument();
   });
 });
-
-// Suppress unused import warning — fireEvent is re-exported from renderWithIntl
-// and available for tests that need it; the import is intentional.
-void fireEvent;
