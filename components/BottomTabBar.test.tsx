@@ -9,6 +9,7 @@
  *   - Pasture tab re-derives on a SETTINGS_SAVED_EVENT (#868 follow-up).
  *   - The bar is hidden in hamburger mode.
  *   - Japanese locale renders the correct translated label (練習 for Practice).
+ *   - BottomTabBarFallback renders translated tab labels (en + ja).
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -80,7 +81,7 @@ vi.mock("@/lib/settings/persistence", () => ({
 
 // ---------------------------------------------------------------------------
 
-import { BottomTabBar } from "@/components/BottomTabBar";
+import { BottomTabBar, BottomTabBarFallback } from "@/components/BottomTabBar";
 
 // ---------------------------------------------------------------------------
 
@@ -259,6 +260,31 @@ describe("BottomTabBar — Japanese locale", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "練習" })).toBeInTheDocument();
+    });
+  });
+});
+
+describe("BottomTabBarFallback", () => {
+  it("renders translated tab labels for all static tabs (English)", async () => {
+    renderWithIntl(<BottomTabBarFallback />);
+
+    // The fallback renders all STATIC_TAB_DEFS labels via t(key).
+    // It is aria-hidden so we query by text content directly.
+    await waitFor(() => {
+      expect(screen.getByText("Practice")).toBeInTheDocument();
+      expect(screen.getByText("Stats")).toBeInTheDocument();
+      expect(screen.getByText("Journey")).toBeInTheDocument();
+      expect(screen.getByText("Pokédex")).toBeInTheDocument();
+      expect(screen.getByText("Settings")).toBeInTheDocument();
+    });
+  });
+
+  it("renders translated tab labels in Japanese locale (練習, 図鑑)", async () => {
+    renderJa(<BottomTabBarFallback />);
+
+    await waitFor(() => {
+      expect(screen.getByText("練習")).toBeInTheDocument();
+      expect(screen.getByText("図鑑")).toBeInTheDocument();
     });
   });
 });

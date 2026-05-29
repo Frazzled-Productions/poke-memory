@@ -306,8 +306,10 @@ function BottomTabBarInner() {
  * Uses a plain `<div>` with `aria-hidden` rather than a `<nav>` because a
  * hidden landmark is semantically odd — assistive technology should not
  * discover a nav that provides no interactive content.
+ *
+ * Exported for direct unit testing (coverage of the fallback render path).
  */
-function BottomTabBarFallback() {
+export function BottomTabBarFallback() {
   const t = useTranslations("nav");
   return (
     <div
