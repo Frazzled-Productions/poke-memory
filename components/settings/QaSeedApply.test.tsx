@@ -9,6 +9,24 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { applySeedScenario, clearSeedScenario } from "@/lib/qa-seed/apply";
 
 // ---------------------------------------------------------------------------
+// localStorage stub
+// ---------------------------------------------------------------------------
+
+// jsdom on this Node version does not ship localStorage — install an in-memory
+// stub, matching the pattern in CollapsibleSection.test.tsx.
+function makeLocalStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() { return store.size; },
+    clear: () => store.clear(),
+    getItem: (k) => store.get(k) ?? null,
+    key: (i) => Array.from(store.keys())[i] ?? null,
+    removeItem: (k) => { store.delete(k); },
+    setItem: (k, v) => { store.set(k, String(v)); },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
@@ -32,6 +50,7 @@ vi.mock("@/lib/review/persistence", () => ({
 vi.mock("@/lib/storage/keys", () => ({
   KEY_REVIEW_SESSION: "poke-memory:review-session:v1",
   KEY_GRADE_LOG: "poke-memory:grade-log:v1",
+  KEY_QA_SEED_ACTIVE: "poke-memory:qa-seed-active",
 }));
 
 // ---------------------------------------------------------------------------
@@ -82,6 +101,35 @@ describe("applySeedScenario", () => {
     expect(saveSettings).not.toHaveBeenCalled();
   });
 
+  it("writes the active-seed slug to localStorage when slug is provided", async () => {
+    // Install a localStorage stub for this test only — jsdom does not ship one.
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+    const setItemSpy = vi.spyOn(window.localStorage, "setItem");
+    await applySeedScenario({ pokemonNameLocale: null }, "mastery-gaps");
+    expect(setItemSpy).toHaveBeenCalledWith("poke-memory:qa-seed-active", "mastery-gaps");
+    delete (window as unknown as { localStorage?: unknown }).localStorage;
+  });
+
+  it("does not write the active-seed slug when no slug is provided", async () => {
+    // Install a localStorage stub for this test only — jsdom does not ship one.
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+    const setItemSpy = vi.spyOn(window.localStorage, "setItem");
+    await applySeedScenario({ pokemonNameLocale: null });
+    const activeCalls = setItemSpy.mock.calls.filter(
+      ([key]) => key === "poke-memory:qa-seed-active",
+    );
+    expect(activeCalls.length).toBe(0);
+    delete (window as unknown as { localStorage?: unknown }).localStorage;
+  });
+
   it("dispatches a StorageEvent after writing session", async () => {
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     const payload = {
@@ -104,6 +152,19 @@ describe("applySeedScenario", () => {
 describe("clearSeedScenario", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("removes the active-seed slug from localStorage", async () => {
+    // Install a localStorage stub for this test only — jsdom does not ship one.
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+    window.localStorage.setItem("poke-memory:qa-seed-active", "mastery-gaps");
+    await clearSeedScenario();
+    expect(window.localStorage.getItem("poke-memory:qa-seed-active")).toBeNull();
+    delete (window as unknown as { localStorage?: unknown }).localStorage;
   });
 
   it("deletes the review session key from IDB", async () => {

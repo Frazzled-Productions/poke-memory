@@ -10,7 +10,7 @@
  */
 
 import { idbSet, idbDelete } from "@/lib/idb/db";
-import { KEY_REVIEW_SESSION, KEY_GRADE_LOG } from "@/lib/storage/keys";
+import { KEY_REVIEW_SESSION, KEY_GRADE_LOG, KEY_QA_SEED_ACTIVE } from "@/lib/storage/keys";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { SESSION_CHANGED_EVENT } from "@/lib/review/persistence";
 import type { SeedPayload } from "./scenarios";
@@ -19,10 +19,15 @@ import type { SeedPayload } from "./scenarios";
  * Writes a seed payload to IndexedDB (and settings where requested).
  * Dispatches a synthetic StorageEvent so same-tab subscribers re-read.
  *
+ * @param payload - The seed payload to write.
+ * @param slug    - The scenario slug to persist as the active seed indicator.
+ *                  When provided, written to localStorage under KEY_QA_SEED_ACTIVE
+ *                  so the QaSeedSection can restore the active indicator on remount.
+ *
  * This is intentionally NOT async-safe to call from multiple tabs at once —
  * it is a developer-only QA tool invoked by an explicit button click.
  */
-export async function applySeedScenario(payload: SeedPayload): Promise<void> {
+export async function applySeedScenario(payload: SeedPayload, slug?: string): Promise<void> {
   if (payload.session !== undefined) {
     const json = JSON.stringify(payload.session);
     await idbSet(KEY_REVIEW_SESSION, json);
@@ -58,6 +63,16 @@ export async function applySeedScenario(payload: SeedPayload): Promise<void> {
     const settings = loadSettings();
     saveSettings({ ...settings, pokemonNameLocale: payload.pokemonNameLocale });
   }
+
+  // Persist the active scenario slug so the QaSeedSection can restore the
+  // indicator on remount (e.g. navigating away and back to Settings).
+  if (typeof window !== "undefined" && slug) {
+    try {
+      window.localStorage.setItem(KEY_QA_SEED_ACTIVE, slug);
+    } catch {
+      // Private browsing / storage quota — non-fatal for a QA tool.
+    }
+  }
 }
 
 /**
@@ -74,7 +89,13 @@ export async function clearSeedScenario(): Promise<void> {
     idbDelete(KEY_GRADE_LOG),
   ]);
 
+  // Clear the active-seed indicator and dispatch change events.
   if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(KEY_QA_SEED_ACTIVE);
+    } catch {
+      // Non-fatal for a QA tool.
+    }
     try {
       window.dispatchEvent(
         new StorageEvent("storage", {

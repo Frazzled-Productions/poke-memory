@@ -33,6 +33,7 @@ import { saveStreakData } from "@/lib/streak/persistence";
 import { saveGradeLog } from "@/lib/gradelog/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
+import { KEY_QA_SEED_ACTIVE } from "@/lib/storage/keys";
 
 // Typing "super" anywhere (when not focused on an input) toggles unlocked state.
 const CHORD_SEQUENCE = ["s", "u", "p", "e", "r"];
@@ -93,6 +94,13 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
   // so a mastery check would spuriously return earned; `FavouriteThemeProvider`'s
   // mount-time belt-and-braces handles those cases on the next page load.
   const exitCleanup = useCallback(async () => {
+    // Remove the QA seed indicator so it never outlives the IDB data that
+    // exitCleanup is about to overwrite or wipe.
+    try {
+      window.localStorage.removeItem(KEY_QA_SEED_ACTIVE);
+    } catch {
+      // Non-fatal for a QA tool.
+    }
     const u = userRef.current;
     const sb = supabaseRef.current;
     let cardsTrusted = false;

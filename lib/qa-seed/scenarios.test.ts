@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { SCENARIOS, SCENARIO_BY_SLUG, type SeedPayload } from "./scenarios";
+import { nextArrivals } from "@/lib/pasture/nextArrivals";
+import { deriveCloseToMastery } from "@/lib/journey/closeToMastery";
+import type { ReviewableCard } from "@/lib/review/session";
 
 // ---------------------------------------------------------------------------
 // Scenario registry sanity checks
@@ -10,11 +13,12 @@ describe("SCENARIOS registry", () => {
     expect(SCENARIOS.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("includes fsrs-locale-mastery, optimiser-stress, and pasture-progression slugs", () => {
+  it("includes fsrs-locale-mastery, optimiser-stress, pasture-progression, and mastery-gaps slugs", () => {
     const slugs = SCENARIOS.map((s) => s.slug);
     expect(slugs).toContain("fsrs-locale-mastery");
     expect(slugs).toContain("optimiser-stress");
     expect(slugs).toContain("pasture-progression");
+    expect(slugs).toContain("mastery-gaps");
   });
 
   it("every scenario has a non-empty label and description", () => {
@@ -107,6 +111,68 @@ describe("scenario payload builders", () => {
     expect(mastered.length).toBeGreaterThanOrEqual(40);
     expect(inProgress.length).toBeGreaterThanOrEqual(15);
     expect(learning.length).toBeGreaterThanOrEqual(10);
+  });
+
+  describe("mastery-gaps scenario", () => {
+    function buildCards() {
+      const payload = SCENARIO_BY_SLUG.get("mastery-gaps")!.build();
+      // Cast to ReviewableCard[] as expected by the derivation helpers.
+      // The seed shape is structurally compatible: cardType / id / state are present.
+      // SeededNameCard has no `displayName`, so `englishName` on any
+      // deriveCloseToMastery result will be undefined — assertions below only
+      // check reverseScheduledDays, so this is an intentional stub gap.
+      return (payload.session?.cards ?? []) as unknown as ReviewableCard[];
+    }
+
+    it("produces reviewed-but-unmastered name cards that satisfy nextArrivals", () => {
+      const cards = buildCards();
+      const arrivals = nextArrivals(cards, false);
+      // Must have at least one arrival (not the all-caught-up empty state).
+      expect(arrivals.length).toBeGreaterThanOrEqual(1);
+      // Every arrival must be unmastered (reps < 3 or scheduledDays < 21).
+      for (const arrival of arrivals) {
+        const mastered =
+          arrival.state.reps >= 3 && arrival.state.scheduledDays >= 21;
+        expect(mastered).toBe(false);
+      }
+    });
+
+    it("produces name-mastered/reverse-pending pairs that satisfy deriveCloseToMastery", () => {
+      const cards = buildCards();
+      const closeToMastery = deriveCloseToMastery(cards);
+      // Must have at least one entry (not the "No gap to close" empty state).
+      expect(closeToMastery.length).toBeGreaterThanOrEqual(1);
+      // Every entry should have a reverseScheduledDays < 21 (reverse is not yet mastered).
+      for (const entry of closeToMastery) {
+        expect(entry.reverseScheduledDays).toBeLessThan(21);
+      }
+    });
+
+    it("mastery-gaps: has fully mastered pairs, partial reverse, and learning cards", () => {
+      const payload = SCENARIO_BY_SLUG.get("mastery-gaps")!.build();
+      const cards = payload.session?.cards ?? [];
+
+      // At least 15 fully mastered name cards (reps >= 3, scheduledDays >= 21).
+      const masteredNames = cards.filter(
+        (c) => c.cardType === "name" && c.state.reps >= 3 && c.state.scheduledDays >= 21,
+      );
+      expect(masteredNames.length).toBeGreaterThanOrEqual(15);
+
+      // At least 10 reviewed-but-unmastered name cards (for nextArrivals).
+      const unmastered = cards.filter(
+        (c) =>
+          c.cardType === "name" &&
+          c.state.firstSeen !== null &&
+          !(c.state.reps >= 3 && c.state.scheduledDays >= 21),
+      );
+      expect(unmastered.length).toBeGreaterThanOrEqual(10);
+
+      // At least some in-learning name cards.
+      const learning = cards.filter(
+        (c) => c.cardType === "name" && c.state.reps === 0 && c.state.learningStep !== null,
+      );
+      expect(learning.length).toBeGreaterThanOrEqual(5);
+    });
   });
 
   it("build() is deterministic: calling twice returns equal JSON", () => {
