@@ -149,9 +149,25 @@ Follow-up items (filed as separate issues, `priority:later`):
 
 No follow-up is required for COPPA. No data-flow or architecture changes are required by this assessment — the gaps are documentation and copy only.
 
+### Standard 4 (Transparency) — full-UI-translation rollout (#1369)
+
+As of #1369, the app UI **and** the first-visit onboarding modal are machine-translated into Japanese (`ja`), Simplified Chinese (`zh-Hans`), and Traditional Chinese (`zh-Hant`) in addition to English. Because the onboarding modal is the first child-facing surface a new user meets, the quality of its translated copy is directly relevant to the transparency standard.
+
+**No in-product mitigations shipped with #1369.** The following are planned but not yet implemented:
+
+- **#1349** — a "machine-translated, feedback welcome" banner in-app and inside the onboarding modal (`priority:later`; not yet shipped). Until this lands, there is no in-product signal telling users that non-English copy is machine-generated.
+- A "preview" label on the locale picker to signal that non-English locales are not yet human-reviewed (not yet implemented).
+
+Until the onboarding copy is human-reviewed, the non-English locales are treated as **"preview" quality on the onboarding surface**.
+
+**Required before GA on the child-facing onboarding surface:** human review of the onboarding copy (roughly 200 words per locale) by a fluent speaker of each locale, to confirm the plain-language transparency wording reads correctly and is age-appropriate. This is tracked as **#1376**. If `ChildFriendlySummary` (the child-facing summary on the privacy page) is machine-translated into any of these locales, it falls within the same human-review scope, since it is the dedicated Standard 4 / 15 child-facing surface.
+
+No data-flow change is involved — locale selection is a display preference only (see `docs/dpia.md` and `docs/cookies-pecr.md`). The follow-up is copy quality, not data practice.
+
 This assessment should be revisited if any of the following change:
 
 - The app adds its own account creation (removing the inherited 13+ age gate).
+- The app UI is translated into a new locale, or machine-translated copy is replaced by human-reviewed copy.
 - Social, community, or user-to-user features are added.
 - Advertising, marketing, affiliate, or behavioural-profiling integrations are added.
 - Engagement mechanics (push notifications, reminders, reward loops) are added — re-check Standard 13.
