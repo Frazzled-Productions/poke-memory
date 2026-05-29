@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import type { SavedSession } from "@/lib/review/persistence";
 import { filterMastered, markSeenInPasture } from "@/lib/pasture/arrivals";
+import { nextArrivals } from "@/lib/pasture/nextArrivals";
+import { NextArrivalsStrip } from "@/components/pasture/NextArrivalsStrip";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
 import { assignAnchors } from "@/lib/pasture/assign";
 import { biomeStats } from "@/lib/pasture/stats";
@@ -162,7 +164,7 @@ export default function PasturePage() {
   // `settingsVersion` here ties the value to the SETTINGS_SAVED_EVENT bump so
   // a threshold change re-derives the filtered pasture immediately.
   void settingsVersion;
-  const masteryRepetitions = loadSettings().masteryRepetitions;
+  const { masteryRepetitions, pokemonNameLocale } = loadSettings();
 
   // Derive mastered count so the reset-on-empty effect below can read it
   // without duplicating the full derivation logic.
@@ -257,6 +259,18 @@ export default function PasturePage() {
         ) as NameReviewCard[])
       : [];
 
+  // Compute next arrivals from the full raw session (all card types, all
+  // species — not just the mastered subset). Computed before the early-return
+  // so the strip can show upcoming arrivals even when the Pasture is empty.
+  // When pretendAllMastered is on, nextArrivals returns [] and the strip shows
+  // an all-caught-up message.
+  const arrivals = nextArrivals(
+    session?.cards ?? [],
+    flags.pretendAllMastered,
+    masteryRepetitions,
+    pokemonNameLocale,
+  );
+
   if (masteredCards.length === 0) {
     return (
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -267,6 +281,7 @@ export default function PasturePage() {
           Your pasture is empty. Master your first Pokémon in Practice to see
           it here.
         </p>
+        <NextArrivalsStrip arrivals={arrivals} />
       </main>
     );
   }
@@ -315,6 +330,8 @@ export default function PasturePage() {
           ))}
         </div>
       )}
+
+      <NextArrivalsStrip arrivals={arrivals} />
     </main>
   );
 }
