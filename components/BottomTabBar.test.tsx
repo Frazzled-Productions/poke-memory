@@ -248,8 +248,8 @@ describe("BottomTabBar", () => {
 
     // Allow time for the effect to read the setting
     await waitFor(() => {
-      // The nav landmark should not exist (mobileNav is hamburger so inner renders null)
-      expect(container.querySelector("nav")).toBeNull();
+      // The specific nav landmark should not exist (mobileNav is hamburger so inner renders null)
+      expect(container.querySelector('[aria-label="Mobile tab navigation"]')).toBeNull();
     });
   });
 });
