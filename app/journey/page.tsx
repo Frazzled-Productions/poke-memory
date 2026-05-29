@@ -17,6 +17,7 @@ import { loadGradeLog } from "@/lib/gradelog/persistence";
 import { buildCollectionTimeline, type CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { CollectionTimeline as CollectionTimelineWidget } from "@/components/journey/CollectionTimeline";
 import { EvolutionWall } from "@/components/journey/EvolutionWall";
+import { CloseToMastery } from "@/components/journey/CloseToMastery";
 import { MilestoneShareButton } from "@/components/journey/MilestoneShareButton";
 import { deriveEvolutionFamilies, type EvolutionFamily } from "@/lib/evolution/chains";
 import type { ReviewableCard } from "@/lib/review/session";
@@ -25,6 +26,7 @@ import { BadgeGallery } from "@/components/badges/BadgeGallery";
 import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
 import { RecordsCard } from "@/components/stats/RecordsCard";
 import { computeRecords, type Records } from "@/lib/stats/records";
+import { computeMasteryGap, type MasteryGapEntry } from "@/lib/mastery/masteryGap";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
@@ -405,6 +407,7 @@ export default function JourneyPage() {
   const [earnedBadgeIds, setEarnedBadgeIds] = useState<readonly string[]>([]);
   const [timeline, setTimeline] = useState<CollectionTimeline | null>(null);
   const [evolutionFamilies, setEvolutionFamilies] = useState<EvolutionFamily[] | null>(null);
+  const [masteryGap, setMasteryGap] = useState<MasteryGapEntry[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -510,6 +513,15 @@ export default function JourneyPage() {
         flags.pretendAllMastered,
       );
       setEvolutionFamilies(evoFamilies);
+
+      // Compute mastery gap: species where name card graduated (scheduledDays >= 21)
+      // but reverse card has not yet met the full mastery gate.
+      const gap = computeMasteryGap(
+        finalCards as readonly ReviewableCard[],
+        settings.masteryRepetitions,
+        flags.pretendAllMastered,
+      );
+      setMasteryGap(gap);
     }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -644,6 +656,12 @@ export default function JourneyPage() {
                 <SkeletonBlock className="h-10 w-full" />
               </section>
             )}
+
+            {/* Close to mastery — species where name card graduated but reverse
+                card has not yet met the full mastery gate. Hidden when the list
+                is empty (superuser pretendAllMastered, reverse cards disabled,
+                or no such gap exists). */}
+            <CloseToMastery entries={masteryGap} />
 
             {/* Badges */}
             <BadgeGallery

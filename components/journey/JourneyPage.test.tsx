@@ -308,6 +308,7 @@ vi.mock("@/lib/stats/derive", () => ({
       state.reps >= 3 && state.scheduledDays >= 21,
   ),
   MASTERY_REPETITIONS: 3,
+  MASTERY_INTERVAL_DAYS: 21,
 }));
 
 vi.mock("@/lib/stats/records", () => ({
