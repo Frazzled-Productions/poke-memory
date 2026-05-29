@@ -9,6 +9,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { practiceReadyLocator } from "./helpers/practiceCard";
 
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
@@ -47,17 +48,16 @@ test.describe("Practice page — session-progress sidebar (lg: layout)", () => {
 
     await page.goto("/");
 
-    // Wait for the page to hydrate.
-    const reveal = page.getByRole("button", { name: "Reveal" });
-    const endState = page.getByRole("heading", {
-      name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
-    });
+    // Wait for the page to hydrate. The first card may be a flip card, a
+    // sprite-picker, or a multiple-choice card depending on the deterministic
+    // per-day shuffle; `practiceReadyLocator` matches every variant so a
+    // calendar roll cannot reintroduce the #1370 date-dependent flake.
     // 30 s: this is the narrowest path (mobile-safari only — see the
     // test.skip above), which combines the post-#1234 doubled card-set
     // hydration cost AND the #1260 next-intl Suspense boundary AND the
     // narrow-viewport-specific layout work. Other mobile-safari practice
     // tests pass at 20 s; this one consistently needs more.
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 30_000 });
+    await expect(practiceReadyLocator(page)).toBeVisible({ timeout: 30_000 });
 
     // On mobile, the sidebar element exists in the DOM but is hidden via CSS.
     // Playwright's toBeVisible() checks CSS visibility (display:none / opacity 0).

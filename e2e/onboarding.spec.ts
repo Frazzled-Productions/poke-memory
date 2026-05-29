@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { practiceReadyLocator } from "./helpers/practiceCard";
 
 const SETTINGS_KEY = "poke-memory:settings:v1";
 
@@ -27,15 +28,14 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     await modal.getByRole("button", { name: /get started/i }).click();
     await expect(modal).toHaveCount(0);
 
-    // After dismissal the Practice card surface must be interactable.
-    // 20 s: fresh-visitor hydration builds ~2 050 cards from scratch. With the
-    // bundled seed chunk reduced from 2.9 MB to 1.2 MB (#1263) WebKit parses
-    // it well within this window, including on CI. The extra headroom over the
-    // previous 10 s accounts for the next-intl Suspense boundary introduced in
-    // #1260, which adds a hydration round-trip that pushes WebKit over 10 s.
-    await expect(
-      page.getByRole("button", { name: /reveal/i }).or(page.getByText(/all caught up/i)),
-    ).toBeVisible({ timeout: 20_000 });
+    // After dismissal the Practice card surface must be interactable. The
+    // first card may be a flip card (Reveal), a sprite-picker, or a
+    // multiple-choice card depending on the deterministic per-day shuffle, so
+    // match every variant (#1370 — the bare Reveal-or-"all caught up" locator
+    // timed out on days the shuffle led with a reverse card). 20 s budget
+    // covers fresh-visitor hydration of the ~2 050-card set (#1234) plus the
+    // #1260 next-intl Suspense round-trip.
+    await expect(practiceReadyLocator(page)).toBeVisible({ timeout: 20_000 });
   });
 
   test("modal does not reappear after dismissal", async ({ page }) => {
