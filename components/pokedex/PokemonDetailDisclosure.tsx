@@ -286,7 +286,7 @@ export function PokemonDetailDisclosure({
           <h1 className="text-3xl font-bold tracking-tight text-zinc-300 dark:text-zinc-700">???</h1>
         ) : (
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{name}</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{pokemonLocaleName}</h1>
             <NameTtsButton name={pokemonLocaleName} id={pokemon.id} />
             <CryButton cryUrl={pokemon.cryUrl} label={pokemonLocaleName} />
           </div>
