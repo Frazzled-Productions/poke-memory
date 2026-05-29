@@ -263,7 +263,7 @@
         "reset": "Reset",
         "cleared": "Cleared"
       },
-      "themeAudit": "Theme audit →",
+      "themeAudit": "Theme audit",
       "themeAuditDescription": "Side-by-side preview of every mascot × intensity × colour scheme. Use when tweaking globals.css to spot combos where the grade buttons blend into the surface."
     },
     "loadingAriaLabel": "Loading settings"
@@ -394,7 +394,6 @@
       "heading": "Struggling cards",
       "empty": "No struggling cards yet. Keep it up!"
     },
-    "viewInPokedex": "View {name} in Pokédex",
     "forcePull": {
       "heading": "Data",
       "description": "Use this if your stats look wrong; it pulls authoritative data from the cloud.",
@@ -411,8 +410,7 @@
     "description": "Your Pokémon learning journey.",
     "loadingAriaLabel": "Loading journey",
     "currentStreak": "Current streak",
-    "dayInARow": "day in a row",
-    "daysInARow": "{count, plural, one {day in a row} other {days in a row}}",
+    "daysInARow": "{count, plural, one {{count} day in a row} other {{count} days in a row}}",
     "noStreak": "No active streak. Review some cards to start one!",
     "masteryDistribution": "Mastery distribution",
     "masteryLocked": "Locked",
@@ -422,7 +420,6 @@
     "speciesSeenAtLeastOnce": "species seen at least once",
     "byGeneration": "By generation",
     "byGenerationMasteredTotal": "Mastered / Total",
-    "viewInPokedex": "View {name} in Pokédex",
     "collectionTimeline": "Collection timeline",
     "evolutionWall": "Evolution wall",
     "closeToMastery": "Close to mastery"
@@ -435,7 +432,6 @@
       "body": "Some pages aren't available without a connection. Cards you've seen before should still work."
     },
     "tryAgain": "Try again",
-    "goHome": "Go to Practice",
     "goPractice": "Go to practice"
   },
   "onboarding": {
