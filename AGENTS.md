@@ -92,7 +92,16 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 
 Superuser mode is a QA cheat unlocked by typing `super` (desktop) or 7-tapping the nav title (mobile). It does **not** itself change behaviour — it reveals a **Developer** section on the Settings page that houses per-behaviour flags.
 
-**Flags are per axis of cheating, not per page.** Today there is one flag (`pretendAllMastered`) that renders every species as mastered. Future axes (e.g. "skip daily limits", "force-reveal cards") get their own flag. Do **not** add a per-page toggle that re-derives mastery — wire the page into `flags.pretendAllMastered` instead.
+**Flags are per axis of cheating, not per page.** Flags today:
+
+| Flag | Purpose |
+|---|---|
+| `pretendAllMastered` | Renders every species as mastered across all surfaces. |
+| `forceNextStreakMilestone` | Forces the next streak milestone celebration on next Practice visit; self-clears after one fire. |
+| `forceCardsGraduated` | Treats all cards as graduated (learning phase bypassed). Use to QA typed-entry without grinding learning steps. |
+| `qaSeedMode` | Reveals the "QA seed" panel in the Developer section. See below. |
+
+Do **not** add a per-page toggle that re-derives mastery — wire the page into `flags.pretendAllMastered` instead.
 
 **Every new user-facing feature must honour the relevant superuser flag.** Specifically: if a feature displays mastery state, completion counts, per-Pokémon collection state, or anything gated on having mastered things, it must read `useSuperuser().flags.pretendAllMastered` (or a future appropriate flag) and treat it as "fully mastered" when on. The canonical pattern is `forceAllMastered || isMastered(...)`; pure functions take an optional `forceAllMastered` parameter (see `computeStats`, `computeRecords`, `filterMastered`).
 
@@ -111,6 +120,16 @@ Do not work around this guard. The whole point is that a QA session with cheats 
 - Guest: `window.confirm` offers a destructive local-state reset since there is no cloud to fall back to.
 
 Both branches assume the user understands they're exiting a QA mode. Do not silently skip the prompt or the pull.
+
+**QA seed mode (`qaSeedMode` flag, #1326).** When `qaSeedMode` is on, a "QA seed" section appears inside the Developer area on the Settings page. It lets QA inject curated, named scenario payloads into localStorage/IDB without needing real review history. Scenarios:
+
+| Scenario key | What it seeds | QA use-case |
+|---|---|---|
+| `fsrs-locale-mastery` | ~30 mastered name + reverse pairs (locale: `en`) + a few in-learning cards. | Switch `pokemonNameLocale` to `ja` → Pasture shows 0 mastered (locale-keyed FSRS state). |
+| `optimiser-stress` | ~220 grades across ~20 cards + 2 single-review cards. | Trigger the FSRS optimiser on Settings and verify it returns weights. |
+| `pasture-progression` | 16 mastered species across forest/grassland/mountain/waters-edge/urban habitats, plus 4 in-learning. | Verify the Pasture surface renders populated content without grinding. |
+
+Pure scenario builders live in `lib/qa-seed/scenarios.ts` (no DOM/IDB). The thin write wrapper lives in `lib/qa-seed/apply.ts`. Both are reusable by the screenshot script (#1296). Sync write-guard: `anyFlagOn` (which includes `qaSeedMode`) already suppresses all cloud writes — no additional guard needed.
 
 ### Sync (READ FIRST when touching `lib/sync/`, `app/api/sync/route.ts`, `db/migrations/`)
 

@@ -201,6 +201,10 @@ vi.mock("@/components/settings/OfflineSection", () => ({
   OfflineSection: () => <div data-testid="offline-section" />,
 }));
 
+vi.mock("@/components/settings/QaSeedSection", () => ({
+  QaSeedSection: () => <div data-testid="qa-seed-section" />,
+}));
+
 // Stub next-intl — t() returns the key name so tests can match on it or on
 // the plain English fallback without caring about translations.
 vi.mock("next-intl", () => ({

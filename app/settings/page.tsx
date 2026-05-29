@@ -56,6 +56,7 @@ import { pushRegionalPrefs } from "@/lib/sync/settings";
 import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
+import { QaSeedSection } from "@/components/settings/QaSeedSection";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg, sectionLabel } from "@/lib/utils/class-names";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
@@ -2136,8 +2137,50 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
+                    {/* QA seed section — only visible when qaSeedMode flag is on */}
+                    {flags.qaSeedMode && (
+                      <QaSeedSection />
+                    )}
+
                     <div className="mt-4">
                       <ResetEarnedBadgesRow />
+                    </div>
+
+                    {/* qaSeedMode flag toggle */}
+                    <div className={cn("mt-4", cardPanelPadded)}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            QA seed mode
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            Reveals the QA seed panel above. Inject named scenario
+                            payloads for manual preview QA. Sync is paused while on.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label="QA seed mode"
+                          aria-checked={flags.qaSeedMode}
+                          onClick={() =>
+                            void setFlag("qaSeedMode", !flags.qaSeedMode)
+                          }
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            flags.qaSeedMode
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              flags.qaSeedMode
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
