@@ -17,7 +17,8 @@ export const FLAGS_KEY = KEY_SUPERUSER_FLAGS;
 export type SuperuserFlagKey =
   | "pretendAllMastered"
   | "forceNextStreakMilestone"
-  | "forceCardsGraduated";
+  | "forceCardsGraduated"
+  | "qaSeedMode";
 
 export type SuperuserFlags = {
   pretendAllMastered: boolean;
@@ -31,12 +32,17 @@ export type SuperuserFlags = {
   // in immediately for name cards. Use to QA the typed-entry surface without
   // grinding through learning steps. See #1270.
   forceCardsGraduated: boolean;
+  // When true, a "QA seed" panel appears in the Developer section that lets
+  // you inject a named scenario payload into IndexedDB (local-only; sync
+  // write-guard still applies). See #1326.
+  qaSeedMode: boolean;
 };
 
 export const DEFAULT_FLAGS: SuperuserFlags = {
   pretendAllMastered: false,
   forceNextStreakMilestone: false,
   forceCardsGraduated: false,
+  qaSeedMode: false,
 };
 
 export function isUnlocked(): boolean {
@@ -59,6 +65,7 @@ export function loadFlags(): SuperuserFlags {
       pretendAllMastered: parsed?.pretendAllMastered === true,
       forceNextStreakMilestone: parsed?.forceNextStreakMilestone === true,
       forceCardsGraduated: parsed?.forceCardsGraduated === true,
+      qaSeedMode: parsed?.qaSeedMode === true,
     };
   } catch {
     return DEFAULT_FLAGS;
