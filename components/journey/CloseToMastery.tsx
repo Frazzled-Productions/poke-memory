@@ -1,0 +1,179 @@
+"use client";
+
+/**
+ * CloseToMastery — "Focus here next" section on the Journey page.
+ *
+ * Shows species where the name card has cleared the mastery gate
+ * (scheduledDays >= 21 AND reps >= masteryRepetitions) but the paired
+ * reverse card has not yet reached that bar.
+ *
+ * Derived via the pure `deriveCloseToMastery` helper in lib/journey/; this
+ * component handles rendering only.
+ *
+ * Superuser: when forceAllMastered is on the list is always empty (the
+ * helper returns [] and we show the empty state).
+ */
+
+import Image from "next/image";
+import type { CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
+import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
+import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { cn } from "@/lib/utils/cn";
+import { mutedText } from "@/lib/utils/class-names";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Maximum number of entries displayed. Remaining entries are noted in the footer. */
+const INITIAL_VISIBLE = 10;
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+/**
+ * A compact progress bar showing how close the reverse card is to the
+ * 21-day interval gate.
+ */
+function IntervalBar({ scheduledDays }: { scheduledDays: number }) {
+  const clamped = Math.min(MASTERY_INTERVAL_DAYS, Math.max(0, scheduledDays));
+  const pct = Math.round((clamped / MASTERY_INTERVAL_DAYS) * 100);
+  return (
+    <div
+      className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700"
+      aria-hidden="true"
+    >
+      <div
+        className="h-full rounded-full bg-amber-400 transition-[width] dark:bg-amber-500"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+/** A single row in the close-to-mastery list. */
+function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
+  const { name } = useLocalePokemonName(entry.speciesId, entry.englishName);
+
+  const daysRemaining = Math.max(
+    0,
+    MASTERY_INTERVAL_DAYS - entry.reverseScheduledDays,
+  );
+
+  const progressLabel = entry.reverseIntroduced
+    ? `${entry.reverseScheduledDays} / ${MASTERY_INTERVAL_DAYS} day interval`
+    : "Not yet started";
+
+  return (
+    <li className="flex items-center gap-3 py-2">
+      {/* Sprite */}
+      <div className="shrink-0" aria-hidden="true">
+        <Image
+          src={entry.spriteUrl}
+          alt=""
+          width={STATS_SPRITE_SIZE}
+          height={STATS_SPRITE_SIZE}
+          className="object-contain"
+          loading="lazy"
+        />
+      </div>
+
+      {/* Name + progress */}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{name}</p>
+        <div className="mt-1 flex items-center gap-2">
+          <IntervalBar scheduledDays={entry.reverseScheduledDays} />
+          <span
+            className={cn("text-xs tabular-nums", mutedText)}
+            aria-label={progressLabel}
+          >
+            {entry.reverseIntroduced
+              ? `${entry.reverseScheduledDays}d`
+              : "not started"}
+          </span>
+        </div>
+      </div>
+
+      {/* Days remaining badge */}
+      <div className="shrink-0 text-right">
+        {entry.reverseIntroduced ? (
+          <span
+            className={cn(
+              "text-xs font-medium tabular-nums",
+              daysRemaining === 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-amber-600 dark:text-amber-400",
+            )}
+            aria-label={
+              daysRemaining === 0
+                ? "Ready for mastery"
+                : `${daysRemaining} more days needed`
+            }
+          >
+            {daysRemaining === 0 ? "Ready" : `-${daysRemaining}d`}
+          </span>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CloseToMastery
+// ---------------------------------------------------------------------------
+
+export function CloseToMastery({
+  entries,
+}: {
+  entries: readonly CloseToMasteryEntry[];
+}) {
+  const visible = entries.slice(0, INITIAL_VISIBLE);
+  const hasMore = entries.length > INITIAL_VISIBLE;
+
+  return (
+    <section aria-labelledby="close-to-mastery-heading">
+      <h2
+        id="close-to-mastery-heading"
+        className="mb-1 text-base font-semibold text-foreground"
+      >
+        Close to mastery
+      </h2>
+
+      {entries.length > 0 && (
+        <p className={cn("mb-3 text-sm", mutedText)}>
+          Name known, reverse card still to learn:{" "}
+          <span className="font-semibold tabular-nums text-foreground">
+            {entries.length.toLocaleString("en-GB")}
+          </span>{" "}
+          species to go.
+        </p>
+      )}
+
+      {entries.length === 0 ? (
+        <p className={cn("py-4 text-center text-sm", mutedText)}>
+          No gap to close right now. Great work!
+        </p>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <ul
+            role="list"
+            aria-label="Species close to mastery"
+            className="divide-y divide-zinc-100 px-3 dark:divide-zinc-800"
+          >
+            {visible.map((entry) => (
+              <CloseToMasteryRow key={entry.speciesId} entry={entry} />
+            ))}
+          </ul>
+          {hasMore && (
+            <p className="border-t border-zinc-100 px-4 py-2.5 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
+              Showing {INITIAL_VISIBLE} of {entries.length} - practise reverse
+              cards to close the gap.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
