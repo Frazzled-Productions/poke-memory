@@ -7,6 +7,7 @@ import {
 } from "./helpers/completedSession";
 import { isMobileProject } from "./helpers/navHelpers";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { practiceReadyLocator } from "./helpers/practiceCard";
 
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
@@ -60,20 +61,15 @@ test.describe("Practice page", () => {
   test("loads and shows a card or end-state", async ({ page }) => {
     await page.goto("/");
 
-    // Either a Reveal button (active card) or an end-state heading
-    const reveal = page.getByRole("button", { name: "Reveal" });
-    const endState = page.getByRole("heading", {
-      name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
-    });
-
-    // Since #1234 the session is seeded with both name and reverse cards for
-    // every species (~2× the card set). With the bundled seed chunk reduced
-    // from 2.9 MB to 1.2 MB (#1263), WebKit parses it well within 10 s on its
-    // own. After #1260's next-intl Suspense boundary added a hydration round-
-    // trip, 20 s proved insufficient on mobile-safari (3/3 retries failed).
-    // Raised to 30 s to match wide-viewport.spec.ts's budget for the same
-    // root cause. Tracked in #1306.
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 30_000 });
+    // The first card is chosen by a deterministic per-(user, day) shuffle, so
+    // on some calendar days it is a flip name card (Reveal button) and on
+    // others a reverse / sprite-picker or multiple-choice card with no Reveal
+    // button. `practiceReadyLocator` matches every legitimate first-card
+    // surface so a calendar roll cannot reintroduce the date-dependent flake
+    // that masqueraded as a hydration timeout (#1370). 30 s budget retained as
+    // headroom for the #1234 doubled card-set hydration + #1260 next-intl
+    // Suspense boundary on the slowest CI project.
+    await expect(practiceReadyLocator(page)).toBeVisible({ timeout: 30_000 });
   });
 
   test("reveal shows grade buttons", async ({ page }) => {

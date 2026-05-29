@@ -28,6 +28,7 @@ const DEFAULT_BUDGET_MS = 8_000;
 
 import { test, expect } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { practiceReadyLocator } from "./helpers/practiceCard";
 
 test.describe("Fresh-visitor performance budget (#1268)", () => {
   /**
@@ -80,12 +81,11 @@ test.describe("Fresh-visitor performance budget (#1268)", () => {
 
     // Wait for the above-fold interactive element. This is the key
     // time-to-interactive signal: the seed JSON has been parsed, IDB seeded,
-    // and React has rendered a usable card or an end-state.
-    const reveal = page.getByRole("button", { name: "Reveal" });
-    const endState = page.getByRole("heading", {
-      name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
-    });
-    await expect(reveal.or(endState)).toBeVisible({
+    // and React has rendered a usable card or an end-state. The first card may
+    // be a flip card, sprite-picker, or multiple-choice card depending on the
+    // deterministic per-day shuffle (#1370) — all three are equally
+    // "interactive", so match every variant rather than only the Reveal flip.
+    await expect(practiceReadyLocator(page)).toBeVisible({
       timeout: DEFAULT_BUDGET_MS + 2_000, // grace above budget so we can log the overrun
     });
 
