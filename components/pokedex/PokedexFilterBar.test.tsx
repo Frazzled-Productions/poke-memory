@@ -202,13 +202,13 @@ describe("PokedexFilterBar — existing filter controls", () => {
   it("calls onMasteryChange with 'mastered' when Mastered button is clicked", async () => {
     const user = userEvent.setup();
     const { onMasteryChange } = renderBar();
-    await user.click(screen.getByRole("button", { name: "Mastered", exact: true }));
+    await user.click(screen.getByRole("button", { name: "Mastered" }));
     expect(onMasteryChange).toHaveBeenCalledWith("mastered");
   });
 
   it("disables non-all mastery buttons when superuserMasteryLocked is true", () => {
     renderBar(defaultFilters(), "national", { superuserMasteryLocked: true });
-    const masteredBtn = screen.getByRole("button", { name: "Mastered", exact: true });
+    const masteredBtn = screen.getByRole("button", { name: "Mastered" });
     expect(masteredBtn).toBeDisabled();
     // "All" in the mastery group must remain enabled. Scope to the mastery group
     // because the generation group also has an "All" button.
