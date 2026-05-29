@@ -590,7 +590,10 @@ test.describe("Stats page — per-game mastery breakdown (#1313)", () => {
     ).toBeVisible({ timeout: 15_000 });
 
     // The Generation I accordion button should be present.
-    const genButton = page.getByRole("button", { name: /Generation I/i });
+    // Use a word-boundary anchor so /Generation I\b/ does not accidentally
+    // match Generation II, III, etc. (which all contain "Generation I" as a
+    // substring prefix).
+    const genButton = page.getByRole("button", { name: /^Generation I\b/i });
     await expect(genButton).toBeVisible();
     await expect(genButton).toHaveAttribute("aria-expanded", "false");
 
@@ -609,8 +612,9 @@ test.describe("Stats page — per-game mastery breakdown (#1313)", () => {
       page.getByRole("heading", { level: 2, name: "By game" }),
     ).toBeVisible({ timeout: 15_000 });
 
-    // Expand Generation I.
-    const genButton = page.getByRole("button", { name: /Generation I/i });
+    // Expand Generation I. Use a word-boundary anchor so the regex does not
+    // match Generation II, III, etc. (all contain "Generation I" as a prefix).
+    const genButton = page.getByRole("button", { name: /^Generation I\b/i });
     await genButton.click();
 
     // Under pretendAllMastered every game should report 100%.
