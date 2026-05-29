@@ -138,8 +138,8 @@
     }
   },
   "practice": {
-    "title": "Poké Memory - Learn every Pokémon",
-    "description": "Free spaced-repetition flashcards for learning all 1025 Pokémon names and evolutions. No sign-up required.",
+    "title": "Poké Memory - すべての Pokémon を覚えよう",
+    "description": "1025匹の Pokémon の名前と進化を学ぶための無料フラッシュカード（間隔反復法）。登録不要。",
     "signInFailed": "サインインに失敗しました。もう一度お試しください。",
     "allCaughtUp": "すべて完了！",
     "nothingDue": "今はレビューがありません。",

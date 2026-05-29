@@ -138,8 +138,8 @@
     }
   },
   "practice": {
-    "title": "Poké Memory - Learn every Pokémon",
-    "description": "Free spaced-repetition flashcards for learning all 1025 Pokémon names and evolutions. No sign-up required.",
+    "title": "Poké Memory - 记住每一只 Pokémon",
+    "description": "免费间隔重复闪卡，帮助您学习全部 1025 只 Pokémon 的名称和进化。无需注册。",
     "signInFailed": "登录失败，请重试。",
     "allCaughtUp": "全部完成！",
     "nothingDue": "现在没有待复习的内容。",
