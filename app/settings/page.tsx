@@ -429,12 +429,16 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "danger-zone-heading": "advanced-heading",
 };
 
-/** Human-readable labels for each supported locale. */
-const LOCALE_LABELS: Record<AppLocale, string> = {
+/**
+ * Locale endonyms — each language written in its own script.
+ * These are locale-invariant: do NOT route through t(), which would translate
+ * them into the active UI locale instead of showing the native name.
+ */
+const LOCALE_ENDONYMS: Record<AppLocale, string> = {
   en: "English",
-  ja: "Japanese",
-  "zh-Hans": "Simplified Chinese",
-  "zh-Hant": "Traditional Chinese",
+  ja: "日本語",
+  "zh-Hans": "简体中文",
+  "zh-Hant": "繁體中文",
 };
 
 /** Read the active locale from document.cookie without importing the hook. */
@@ -1986,7 +1990,7 @@ export default function SettingsPage() {
                               >
                                 {SUPPORTED_LOCALES.map((loc) => (
                                   <option key={loc} value={loc}>
-                                    {LOCALE_LABELS[loc]}
+                                    {LOCALE_ENDONYMS[loc]}
                                   </option>
                                 ))}
                               </select>
@@ -2017,7 +2021,7 @@ export default function SettingsPage() {
                               >
                                 {SUPPORTED_LOCALES.map((loc) => (
                                   <option key={loc} value={loc}>
-                                    {LOCALE_LABELS[loc]}
+                                    {LOCALE_ENDONYMS[loc]}
                                   </option>
                                 ))}
                               </select>

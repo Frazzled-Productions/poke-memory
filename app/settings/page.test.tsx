@@ -736,3 +736,47 @@ describe("SettingsPage — typed-entry onboarding (#1271)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Locale picker endonyms (#locale-picker-endonyms)
+//
+// Asserts that both locale-picker <select> elements show each language in
+// its own script (endonym) rather than the English translation.
+// The LOCALE_ENDONYMS constant must NOT route through t() — these labels are
+// locale-invariant by design.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — locale picker endonyms", () => {
+  it("shows each language in its own script in both locale pickers", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      pokemonNameLocale: "en",
+      labsFlags: { languages: true }, // enable the Languages labs flag to show the pickers
+    });
+
+    render(<SettingsPage />);
+
+    // Wait for the language pickers to appear.
+    await waitFor(() => {
+      expect(screen.getByLabelText(/app language/i)).toBeInTheDocument();
+    });
+
+    const appLocaleSelect = screen.getByLabelText(/app language/i);
+    const pokemonLocaleSelect = screen.getByLabelText(/pokémon name language/i);
+
+    // Both pickers must show endonyms (native script), not English translations.
+    for (const select of [appLocaleSelect, pokemonLocaleSelect]) {
+      const options = Array.from(select.querySelectorAll("option"));
+      const texts = options.map((o) => o.textContent ?? "");
+
+      expect(texts).toContain("日本語");
+      expect(texts).toContain("简体中文");
+      expect(texts).toContain("繁體中文");
+
+      // Must NOT contain the old English-translated labels.
+      expect(texts).not.toContain("Japanese");
+      expect(texts).not.toContain("Simplified Chinese");
+      expect(texts).not.toContain("Traditional Chinese");
+    }
+  });
+});
