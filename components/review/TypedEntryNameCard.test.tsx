@@ -13,6 +13,15 @@ vi.mock("next/image", () => ({
   },
 }));
 
+// Return the English name synchronously so tests are deterministic and do not
+// depend on localStorage or the locale sidecar being loaded.
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (_id: number | undefined, englishName: string) => ({
+    name: englishName,
+    transliteration: null,
+  }),
+}));
+
 type TestProps = {
   spriteUrl?: string;
   canonicalName?: string;
@@ -147,5 +156,41 @@ describe("TypedEntryNameCard", () => {
     renderCard({ grading: true });
     expect(screen.getByRole("button", { name: /submit/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /i don.t know/i })).toBeDisabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale-aware answer reveal (#1260 followup)
+// ---------------------------------------------------------------------------
+
+describe("TypedEntryNameCard — locale-aware answer reveal", () => {
+  it("shows the locale-resolved name in the feedback reveal on a wrong answer", async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({
+      useLocalePokemonName: (_id: number | undefined, _english: string) => ({
+        name: "ピカチュウ",
+        transliteration: "Pikachu",
+      }),
+    }));
+    const { TypedEntryNameCard: LocaleCard } = await import(
+      "@/components/review/TypedEntryNameCard"
+    );
+    render(
+      <LocaleCard
+        spriteUrl="/sprites/pokemon/webp/320/25.webp"
+        canonicalName="Pikachu"
+        id={25}
+        onGrade={vi.fn()}
+      />,
+    );
+    // Submit a wrong answer to trigger the answer reveal.
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Squirtle" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    // Feedback should show the locale name, not the English canonical.
+    expect(screen.getByText("ピカチュウ")).toBeInTheDocument();
+    expect(screen.queryByText("Pikachu")).not.toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    vi.useRealTimers();
   });
 });

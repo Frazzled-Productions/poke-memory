@@ -8,18 +8,15 @@
 // if the languages Labs flag is off.
 //
 // The Pokémon-name locale is independent of the app UI locale (#1260 follow-up).
-// It is read from `UserSettings.pokemonNameLocale` (localStorage) rather than
-// from the `poke-memory:locale` cookie, which drives only the app UI language.
-//
-// Transliteration (rōmaji for ja, pinyin for zh-Hans/zh-Hant) is always shown
-// when locale !== en. No extra toggle — it is a learning aid for non-Latin
-// scripts and its presence is the value proposition of enabling the flag.
+// It is read from `UserSettings.pokemonNameLocale` (localStorage) via
+// `PokemonLocaleContext` rather than calling `loadSettings()` directly. This
+// means all N call sites on a page share one subscription instead of N — the
+// structural fix for the hydration timeout on WebKit CI (#1329).
 
 import { useEffect, useState } from "react";
 import { loadLocaleNames, getLocaleName, getTransliteration } from "@/lib/pokemon/localeNames";
-import { isLabsFlagEnabled } from "@/lib/labs/flags";
-import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
-import { DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
+import { DEFAULT_LOCALE } from "@/i18n/locales";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import type { TransliterationLocale } from "@/lib/pokemon/seed";
 
 export type LocalePokemonName = {
@@ -33,25 +30,15 @@ export type LocalePokemonName = {
 };
 
 /**
- * Reads the Pokémon-name locale from settings and keeps it in sync with same-
- * tab `saveSettings` calls (via `SETTINGS_SAVED_EVENT`) and other-tab writes
- * (via the `storage` event).
- */
-function readPokemonNameLocale(): AppLocale {
-  if (typeof window === "undefined") return DEFAULT_LOCALE;
-  const settings = loadSettings();
-  const flagOn = isLabsFlagEnabled(settings.labsFlags, "languages");
-  if (!flagOn) return DEFAULT_LOCALE;
-  return settings.pokemonNameLocale ?? DEFAULT_LOCALE;
-}
-
-/**
  * Resolves the locale-appropriate display name for a Pokémon species.
  *
- * The locale is read from `UserSettings.pokemonNameLocale`, which is
- * independent of the app UI locale cookie. This means a user can keep the
- * app UI in English while practising Pokémon names in Japanese (or vice
- * versa).
+ * The locale is read from `PokemonLocaleContext`, which consolidates the
+ * `pokemonNameLocale` setting subscription into a single provider for the
+ * whole tree.  Each call site costs one `useContext` read per render rather
+ * than one `loadSettings()` call + two event-listener registrations.
+ *
+ * The hook's external API is unchanged — existing call sites continue to work
+ * without modification.
  *
  * @param speciesId  PokéAPI species ID (matches SeedPokemon.speciesId).
  * @param englishName  The English name — used immediately and as a fallback.
@@ -63,23 +50,8 @@ export function useLocalePokemonName(
   speciesId: number | undefined,
   englishName: string,
 ): LocalePokemonName {
-  const [locale, setLocale] = useState<AppLocale>(readPokemonNameLocale);
-
-  // Keep locale in sync: same-tab saveSettings fires SETTINGS_SAVED_EVENT,
-  // other-tab writes fire the storage event.
-  useEffect(() => {
-    function handleChange() {
-      setLocale(readPokemonNameLocale());
-    }
-    window.addEventListener(SETTINGS_SAVED_EVENT, handleChange);
-    window.addEventListener("storage", handleChange);
-    // Re-read on mount in case settings changed between SSR and hydration.
-    setLocale(readPokemonNameLocale());
-    return () => {
-      window.removeEventListener(SETTINGS_SAVED_EVENT, handleChange);
-      window.removeEventListener("storage", handleChange);
-    };
-  }, []);
+  // O(1) context read — the subscription is owned by PokemonLocaleProvider.
+  const { locale } = usePokemonLocaleContext();
 
   const [localeName, setLocaleName] = useState<LocalePokemonName>({
     name: englishName,
@@ -95,7 +67,7 @@ export function useLocalePokemonName(
     let cancelled = false;
     void loadLocaleNames().then(() => {
       if (cancelled) return;
-      const name = getLocaleName(speciesId, locale as AppLocale) ?? englishName;
+      const name = getLocaleName(speciesId, locale) ?? englishName;
       const transliteration =
         locale !== "en"
           ? (getTransliteration(speciesId, locale as TransliterationLocale) ?? null)

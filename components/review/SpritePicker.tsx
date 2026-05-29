@@ -8,6 +8,7 @@ import { speakName } from "@/lib/audio/tts";
 import { playCry } from "@/lib/audio/cry";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 
 /**
  * Maps the tri-state delay setting to concrete millisecond values.
@@ -26,6 +27,54 @@ export function resolveReverseFeedbackDelayMs(
 }
 
 type Tile = SeedPokemon & { isCorrect: boolean };
+
+type TileProps = {
+  tile: Tile;
+  answered: boolean;
+  selectedId: number | null;
+  onTap: (tile: Tile) => void;
+  tileClassName: (tile: Tile) => string;
+};
+
+/**
+ * A single sprite tile in the 2×2 grid.
+ *
+ * Extracted as its own component so `useLocalePokemonName` can be called
+ * unconditionally — hooks may not be called inside array maps (#1260 followup).
+ */
+function SpritePickerTile({ tile, answered, selectedId, onTap, tileClassName }: TileProps) {
+  const { name: localeName } = useLocalePokemonName(tile.speciesId, tile.displayName);
+
+  const ariaLabel = !answered
+    ? localeName
+    : tile.isCorrect
+      ? `${localeName} (correct)`
+      : tile.id === selectedId
+        ? `${localeName} (incorrect)`
+        : localeName;
+
+  return (
+    <button
+      type="button"
+      disabled={answered}
+      aria-label={ariaLabel}
+      onClick={() => onTap(tile)}
+      className={tileClassName(tile)}
+    >
+      <Image
+        src={tile.spriteUrl}
+        alt=""
+        aria-hidden="true"
+        width={150}
+        height={150}
+        loading="eager"
+        className="object-contain w-[150px] h-[150px]"
+      />
+      {/* Visually hidden name for screen readers */}
+      <span className="sr-only">{localeName}</span>
+    </button>
+  );
+}
 
 /**
  * Fisher-Yates shuffle. Returns a new array; does not mutate the input.
@@ -73,6 +122,14 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Resolve the locale-aware target name for the prompt, TTS calls, and
+  // feedback label. Falls back to the English displayName synchronously
+  // until the locale sidecar loads (#1260 followup).
+  const { name: targetLocaleName } = useLocalePokemonName(
+    targetPokemon.speciesId,
+    targetPokemon.displayName,
+  );
+
   // Shuffle once at mount. The parent must remount this component (via a
   // changing `key`) on each card presentation so the order is fresh every time
   // the same card reappears as a learning-step replay or within-session review.
@@ -93,13 +150,16 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
     // the reverse-card equivalent of the reveal moment on flip cards (#707, #731).
     // When both are enabled, chain TTS to fire after the cry ends, consistent
     // with the cry → TTS ordering in handleReveal on flip cards.
+    // The locale-resolved name is passed to speakName so any text-based TTS
+    // pronounces the locale name. The cry audio is language-neutral (it is the
+    // in-game sound, not a pronunciation) so it plays regardless of locale.
     const speakAfterCry =
-      speakNameOnAnswer ? () => speakName(targetPokemon.displayName, targetPokemon.id) : undefined;
+      speakNameOnAnswer ? () => speakName(targetLocaleName, targetPokemon.id) : undefined;
 
     if (playCryOnAnswer) {
       playCry(targetPokemon.cryUrl, 0.6, speakAfterCry);
     } else if (speakNameOnAnswer) {
-      speakName(targetPokemon.displayName, targetPokemon.id);
+      speakName(targetLocaleName, targetPokemon.id);
     }
 
     // Resolve the feedback delay from settings at tap time so changes made
@@ -146,12 +206,12 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
       {/* Name prompt */}
       <div className="flex items-center gap-2">
         <p className="text-3xl font-semibold tracking-wide capitalize text-foreground">
-          {targetPokemon.displayName}
+          {targetLocaleName}
         </p>
         <button
           type="button"
-          aria-label={`Hear ${targetPokemon.displayName}`}
-          onClick={() => speakName(targetPokemon.displayName, targetPokemon.id)}
+          aria-label={`Hear ${targetLocaleName}`}
+          onClick={() => speakName(targetLocaleName, targetPokemon.id)}
           className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
         >
           🔊
@@ -162,37 +222,17 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
       <div
         className="grid grid-cols-2 gap-3"
         role="group"
-        aria-label={`Which Pokémon is ${targetPokemon.displayName}?`}
+        aria-label={`Which Pokémon is ${targetLocaleName}?`}
       >
         {tiles.map((tile) => (
-          <button
+          <SpritePickerTile
             key={tile.id}
-            type="button"
-            disabled={answered}
-            aria-label={
-              !answered
-                ? tile.displayName
-                : tile.isCorrect
-                  ? `${tile.displayName} (correct)`
-                  : tile.id === selectedId
-                    ? `${tile.displayName} (incorrect)`
-                    : tile.displayName
-            }
-            onClick={() => handleTap(tile)}
-            className={tileClassName(tile)}
-          >
-            <Image
-              src={tile.spriteUrl}
-              alt=""
-              aria-hidden="true"
-              width={150}
-              height={150}
-              loading="eager"
-              className="object-contain w-[150px] h-[150px]"
-            />
-            {/* Visually hidden name for screen readers */}
-            <span className="sr-only">{tile.displayName}</span>
-          </button>
+            tile={tile}
+            answered={answered}
+            selectedId={selectedId}
+            onTap={handleTap}
+            tileClassName={tileClassName}
+          />
         ))}
       </div>
 
@@ -202,7 +242,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
           <p className="text-sm font-medium text-center text-zinc-600 dark:text-zinc-300">
             {tiles.find((t) => t.id === selectedId)?.isCorrect
               ? "Correct!"
-              : `The correct answer was ${targetPokemon.displayName}`}
+              : `The correct answer was ${targetLocaleName}`}
           </p>
         )}
       </div>
