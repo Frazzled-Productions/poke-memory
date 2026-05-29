@@ -32,7 +32,10 @@
     "search": {
       "placeholder": "搜尋設定...",
       "noMatch": "沒有與「{query}」相符的設定。",
-      "ariaLabel": "搜尋設定"
+      "ariaLabel": "搜尋設定",
+      "clearAriaLabel": "清除搜尋",
+      "noMatchAnnouncement": "沒有與您的搜尋相符的設定。",
+      "matchAnnouncement": "{count, plural, other {{count} 個部分與您的搜尋相符。}}"
     },
     "section": {
       "appearance": "外觀",
@@ -72,7 +75,8 @@
         "appLanguageLabel": "應用程式語言",
         "appLanguageDescription": "控制應用程式介面語言。介面翻譯仍在進行中。",
         "pokemonNameLanguageLabel": "寶可夢名稱語言",
-        "pokemonNameLanguageDescription": "卡片上顯示的寶可夢名稱語言，與應用程式語言相互獨立。"
+        "pokemonNameLanguageDescription": "卡片上顯示的寶可夢名稱語言，與應用程式語言相互獨立。",
+        "previewSuffix": "（預覽）"
       }
     },
     "practice": {
@@ -195,7 +199,7 @@
     },
     "howThisWorks": {
       "heading": "運作原理",
-      "body1": "Poké Memory 使用 FSRS 間隔重複排程器，根據您的記憶強度選擇最佳時間顯示每張卡片。",
+      "body1": "Poké Memory 使用<link>FSRS</link>間隔重複排程器，根據您的記憶強度選擇最佳時間顯示每張卡片。",
       "body2": "每次評分後，排程器都會更新對該卡片記憶強度的模型，並在您最可能即將遺忘時設定下次複習時間。遺忘後再想起才能真正將卡片轉入長期記憶，所以偶爾「再來一次」是正常的，說明系統在正常運作。",
       "body3": "誠實評分比每次都答對更重要。如果幾乎忘了，就按「困難」；如果完全忘了，就按「再來一次」。如果明明勉強答對卻選「簡單」，排程器就無法幫助您。",
       "showOnboardingAgainLabel": "重新顯示新手引導",
