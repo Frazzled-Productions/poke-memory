@@ -99,6 +99,14 @@ const { name: localeName } = useLocalePokemonName(pokemon.speciesId, pokemon.dis
 
 When extracting a sub-component to use the hook (required when the call site is inside an array `.map()` — hooks may not be called inside map callbacks), follow the pattern in `SpritePicker.tsx` (`SpritePickerTile`) and `KnownPokemonQuiz.tsx` (`KnownPokemonCard`): one hook call per rendered tile, inside a named component.
 
+### Message-catalogue completeness gate
+
+`scripts/lint-i18n.mjs` (run via `npm run lint:i18n`) diffs every non-English catalogue (`messages/{ja,zh-Hans,zh-Hant}.json`) against `messages/en.json` as the structural baseline. The check fails (exit 1) when any locale is **missing** a key that `en` has, or has an **extra** key that `en` doesn't — both directions, because extra keys are dead code that signal drift.
+
+The gate is part of the `lint` chain (`eslint && lint:em-dash && lint:i18n`), so it runs automatically in the `test` CI job on every PR via `npm run lint`. No extra workflow step is needed.
+
+**When adding or renaming a message key:** add it to `messages/en.json` first, then propagate the same structural change to the three non-English files before committing. Running `node scripts/lint-i18n.mjs` locally verifies parity without waiting for CI.
+
 ### Caching
 
 - **Cache Components is enabled** (`cacheComponents: true` in `next.config.ts`). All cache APIs assume this model.
