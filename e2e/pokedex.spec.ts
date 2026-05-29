@@ -2,6 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
+const SETTINGS_KEY = "poke-memory:settings:v1";
+
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
 });
@@ -18,6 +20,54 @@ async function expandFilters(page: Page): Promise<void> {
     await toggle.click();
   }
 }
+// ---------------------------------------------------------------------------
+// Helper — enable the languages Labs flag and set pokemonNameLocale before load.
+// ---------------------------------------------------------------------------
+
+async function setLocale(
+  page: Page,
+  locale: string,
+): Promise<void> {
+  await page.addInitScript(
+    ({ key, loc }: { key: string; loc: string }) => {
+      try {
+        const raw = localStorage.getItem(key);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (typeof parsed === "object" && parsed !== null) {
+              existing = parsed as Record<string, unknown>;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        const merged = {
+          ...existing,
+          labsFlags: {
+            ...(typeof existing.labsFlags === "object" && existing.labsFlags !== null
+              ? (existing.labsFlags as Record<string, unknown>)
+              : {}),
+            languages: true,
+          },
+          pokemonNameLocale: loc,
+          onboarding: {
+            ...(typeof existing.onboarding === "object" && existing.onboarding !== null
+              ? (existing.onboarding as Record<string, unknown>)
+              : {}),
+            firstVisitOnboardingDismissed: true,
+          },
+        };
+        localStorage.setItem(key, JSON.stringify(merged));
+      } catch {
+        /* localStorage unavailable */
+      }
+    },
+    { key: SETTINGS_KEY, loc: locale },
+  );
+}
+
 
 test.describe("Pokédex filter disclosure (#865)", () => {
   test("filter controls are collapsed by default", async ({ page }) => {
@@ -950,5 +1000,148 @@ test.describe("Pokédex detail — locale-aware Pokémon name (#1327)", () => {
     // The useLocalePokemonName hook fetches the sidecar asynchronously, so we
     // wait for the text to appear rather than checking it synchronously.
     await expect(page.getByText("フシギダネ")).toBeVisible({ timeout: 10_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pokédex grid locale names (#1327 follow-up: grid names localised)
+// ---------------------------------------------------------------------------
+
+test.describe("Pokédex grid — locale names (#1327)", () => {
+  test("grid renders a Japanese name when pokemonNameLocale=ja (happy path)", async ({
+    page,
+  }) => {
+    // Seed Bulbasaur as a learning card so it is not locked.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-05-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    // Enable languages flag and set locale to Japanese before page load.
+    await setLocale(page, "ja");
+
+    await page.goto("/pokedex");
+    await awaitSeedIdb(page);
+
+    // Wait for the locale-names sidecar to load and the grid to re-render.
+    // Bulbasaur's Japanese name is フシギダネ (from generated-locale-names.json).
+    await expect(page.getByText("フシギダネ")).toBeVisible({ timeout: 10000 });
+
+    // The English name should not be visible on the tile (it appears in the
+    // locale-name span, not alongside it).
+    await expect(page.getByText("Bulbasaur")).not.toBeVisible();
+  });
+
+  test("grid renders a Simplified Chinese name when pokemonNameLocale=zh-Hans (happy path)", async ({
+    page,
+  }) => {
+    // Seed Bulbasaur as a learning card so it is not locked.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-05-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    // Enable languages flag and set locale to Simplified Chinese before page load.
+    await setLocale(page, "zh-Hans");
+
+    await page.goto("/pokedex");
+    await awaitSeedIdb(page);
+
+    // Wait for the locale-names sidecar to load and the grid to re-render.
+    // Bulbasaur's zh-Hans name is 妙蛙种子 (from generated-locale-names.json).
+    await expect(page.getByText("妙蛙种子")).toBeVisible({ timeout: 10000 });
+
+    // The English name should not be visible on the tile.
+    await expect(page.getByText("Bulbasaur")).not.toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pokédex sort stickiness (#1314)
+// ---------------------------------------------------------------------------
+
+test.describe("Pokédex sort — sticky across navigation (#1314)", () => {
+  test("sort defaults to National Number", async ({ page }) => {
+    await page.goto("/pokedex");
+    await expandFilters(page);
+    const sortSelect = page.getByLabel("Sort by");
+    await expect(sortSelect).toBeVisible();
+    await expect(sortSelect).toHaveValue("national");
+  });
+
+  test("sort persists across navigation to a detail page and back (happy path)", async ({
+    page,
+  }) => {
+    await page.goto("/pokedex");
+    await expect(page.getByRole("heading", { level: 1, name: "Pokédex" })).toBeVisible();
+
+    // Change sort to Alphabetical via the filter bar.
+    await expandFilters(page);
+    const sortSelect = page.getByLabel("Sort by");
+    await sortSelect.selectOption("alphabetical");
+    await page.waitForURL(/sort=alphabetical/, { timeout: 5_000 });
+
+    // Navigate to a detail page and back.
+    await page.goto("/pokedex/1");
+    await page.goto("/pokedex");
+
+    // Sort should still be Alphabetical after returning to the grid
+    // (restored from localStorage when the URL has no sort param).
+    await expandFilters(page);
+    const sortSelectAfter = page.getByLabel("Sort by");
+    await expect(sortSelectAfter).toBeVisible();
+    await expect(sortSelectAfter).toHaveValue("alphabetical");
   });
 });

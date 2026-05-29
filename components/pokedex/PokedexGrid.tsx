@@ -32,7 +32,13 @@ function zeroPad(id: number): string {
 // The size literal below is intentionally kept inline — this surface opts out
 // of next/image entirely, so it does not participate in the loader's WebP
 // variant routing that the shared size constants exist for.
-function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
+function PokemonCell({
+  pokemon,
+  localeOverride,
+}: {
+  pokemon: PokemonCellData;
+  localeOverride?: LocaleNameOverride;
+}) {
   const { flags } = useSuperuser();
   const { id, name, spriteUrl, cardClass: rawCardClass } = pokemon;
   // PokemonCellData.cardClass is CardClass (never "pending"), so no pending guard needed.
@@ -42,11 +48,15 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
   const isMastered = cardClass === "mastered";
   const isLearning = cardClass === "learning";
 
+  // Resolved display name: locale override when available, English name as fallback.
+  const displayName = localeOverride?.name ?? name;
+  const displayLang = localeOverride?.lang;
+
   return (
     <li className="flex flex-col items-center gap-1">
       <Link
         href={"/pokedex/" + id}
-        aria-label={isLocked ? "Pokémon #" + zeroPad(id) : name}
+        aria-label={isLocked ? "Pokémon #" + zeroPad(id) : displayName}
         className="block w-full"
       >
         <div
@@ -97,7 +107,7 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={spriteUrl}
-            alt={isLocked ? `#${zeroPad(id)} (locked)` : name}
+            alt={isLocked ? `#${zeroPad(id)} (locked)` : displayName}
             width={64}
             height={64}
             loading="lazy"
@@ -117,12 +127,17 @@ function PokemonCell({ pokemon }: { pokemon: PokemonCellData }) {
         </div>
       </Link>
 
-      {/* Name — visible for learning/mastered, sr-only for locked */}
+      {/* Name — visible for learning/mastered, sr-only for locked.
+          lang attribute applied when locale differs from the page language
+          (WCAG 3.1.2) so screen readers use correct pronunciation rules. */}
       {isLocked ? (
         <span className="sr-only">{name}</span>
       ) : (
-        <span className="text-center text-[11px] leading-tight text-zinc-700 dark:text-zinc-300 line-clamp-2">
-          {name}
+        <span
+          lang={displayLang}
+          className="text-center text-[11px] leading-tight text-zinc-700 dark:text-zinc-300 line-clamp-2"
+        >
+          {displayName}
         </span>
       )}
     </li>
@@ -137,10 +152,12 @@ function GenerationSection({
   gen,
   name,
   pokemon,
+  localeNames,
 }: {
   gen: number;
   name: string;
   pokemon: PokemonCellData[];
+  localeNames?: ReadonlyMap<number, LocaleNameOverride>;
 }) {
   const { flags } = useSuperuser();
   const total = pokemon.length;
@@ -165,7 +182,11 @@ function GenerationSection({
         aria-label={`${name} Pokémon`}
       >
         {pokemon.map((p) => (
-          <PokemonCell key={p.id} pokemon={p} />
+          <PokemonCell
+            key={p.id}
+            pokemon={p}
+            localeOverride={localeNames?.get(p.speciesId ?? p.id)}
+          />
         ))}
       </ul>
     </section>
@@ -206,6 +227,18 @@ export function LoadingSkeleton() {
 // Grid props
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-tile locale name override: the resolved name and the BCP 47 language
+ * tag to apply via the `lang` attribute (WCAG 3.1.2). Absent for locked tiles
+ * where no name is shown, or when the active locale is English.
+ */
+export type LocaleNameOverride = {
+  /** The resolved locale name to display in place of the English `pokemon.name`. */
+  name: string;
+  /** BCP 47 language tag — e.g. `"ja"`, `"zh-Hans"`. Set `lang` on the name element. */
+  lang: string;
+};
+
 type PokedexGridProps = {
   pokemon: PokemonCellData[];
   activeGen?: number;
@@ -216,13 +249,15 @@ type PokedexGridProps = {
    * under alphabetical or closest-to-mastery sorts.
    */
   flatList?: boolean;
+  /** Optional locale-name overrides keyed by speciesId. Computed in PokedexFiltered. */
+  localeNames?: ReadonlyMap<number, LocaleNameOverride>;
 };
 
 // ---------------------------------------------------------------------------
 // PokedexGrid
 // ---------------------------------------------------------------------------
 
-export default function PokedexGrid({ pokemon, activeGen, flatList = false }: PokedexGridProps) {
+export default function PokedexGrid({ pokemon, activeGen, flatList = false, localeNames }: PokedexGridProps) {
   if (pokemon.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -248,7 +283,11 @@ export default function PokedexGrid({ pokemon, activeGen, flatList = false }: Po
         aria-label="Pokémon"
       >
         {pokemon.map((p) => (
-          <PokemonCell key={p.id} pokemon={p} />
+          <PokemonCell
+            key={p.id}
+            pokemon={p}
+            localeOverride={localeNames?.get(p.speciesId ?? p.id)}
+          />
         ))}
       </ul>
     );
@@ -260,7 +299,12 @@ export default function PokedexGrid({ pokemon, activeGen, flatList = false }: Po
       `Generation ${activeGen}`;
     return (
       <div className="flex flex-col gap-12">
-        <GenerationSection gen={activeGen} name={genName} pokemon={pokemon} />
+        <GenerationSection
+          gen={activeGen}
+          name={genName}
+          pokemon={pokemon}
+          localeNames={localeNames}
+        />
       </div>
     );
   }
@@ -279,6 +323,7 @@ export default function PokedexGrid({ pokemon, activeGen, flatList = false }: Po
             gen={range.gen}
             name={range.name}
             pokemon={genPokemon}
+            localeNames={localeNames}
           />
         );
       })}

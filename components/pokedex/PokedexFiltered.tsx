@@ -1,14 +1,19 @@
 "use client";
 
-import { useMemo, useState, useCallback, useId, useRef } from "react";
+import { useMemo, useState, useCallback, useEffect, useId, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { filterPokemon, parseFilters } from "@/lib/pokemon/filter";
 import type { PokemonCellData, PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { sortPokemon, parseSort } from "@/lib/pokedex/sort";
 import type { PokedexSortOrder } from "@/lib/pokedex/sort";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
+import { loadLocaleNames } from "@/lib/pokemon/localeNames";
+import { DEFAULT_LOCALE } from "@/i18n/locales";
+import { KEY_POKEDEX_SORT } from "@/lib/storage/keys";
 import PokedexFilterBar from "./PokedexFilterBar";
 import PokedexGrid from "./PokedexGrid";
+import type { LocaleNameOverride } from "./PokedexGrid";
 
 // ---------------------------------------------------------------------------
 // Active filter count
@@ -41,6 +46,37 @@ function buildUrl(filters: PokedexFilters, sort: PokedexSortOrder): string {
 }
 
 // ---------------------------------------------------------------------------
+// Sort persistence helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the last-used sort order from localStorage so the grid remembers the
+ * user's preference across back-navigation. Falls back to "national" when
+ * localStorage is unavailable or the stored value is unrecognised.
+ */
+function readStoredSort(): PokedexSortOrder {
+  if (typeof localStorage === "undefined") return "national";
+  try {
+    const stored = localStorage.getItem(KEY_POKEDEX_SORT);
+    if (stored === "alphabetical" || stored === "closest-to-mastery") return stored;
+    return "national";
+  } catch {
+    return "national";
+  }
+}
+
+/**
+ * Persist the chosen sort order to localStorage so it survives navigation.
+ */
+function writeStoredSort(value: PokedexSortOrder): void {
+  try {
+    localStorage.setItem(KEY_POKEDEX_SORT, value);
+  } catch {
+    /* localStorage unavailable — gracefully ignore */
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
@@ -54,9 +90,14 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { flags } = useSuperuser();
+  const { locale } = usePokemonLocaleContext();
 
   const filters = parseFilters(searchParams);
-  const sort = parseSort(searchParams.get("sort"));
+  // If the URL has a sort param, use it. Otherwise fall back to the localStorage
+  // sticky preference so back-navigation restores the last chosen order.
+  const sort: PokedexSortOrder = searchParams.get("sort")
+    ? parseSort(searchParams.get("sort"))
+    : readStoredSort();
 
   // Disclosure state — collapsed by default so the grid is visible first.
   const [isOpen, setIsOpen] = useState(false);
@@ -66,6 +107,36 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
   // are debounced so we don't push a new history entry on every keystroke.
   const [localQuery, setLocalQuery] = useState(filters.query);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Locale names: loaded once per locale switch. Empty map until loaded.
+  const [localeNames, setLocaleNames] = useState<ReadonlyMap<number, LocaleNameOverride>>(
+    () => new Map(),
+  );
+
+  useEffect(() => {
+    if (locale === DEFAULT_LOCALE) {
+      setLocaleNames(new Map());
+      return;
+    }
+    // Cancellation guard: if the locale changes while the async fetch is in
+    // flight, discard the stale result and do not apply it to state. This
+    // mirrors the pattern in lib/i18n/useLocalePokemonName.ts.
+    let cancelled = false;
+    void loadLocaleNames().then((nameMap) => {
+      if (cancelled) return;
+      const overrides = new Map<number, LocaleNameOverride>();
+      for (const entry of nameMap.values()) {
+        const name = entry.nameByLocale[locale];
+        if (name) {
+          overrides.set(entry.speciesId, { name, lang: locale });
+        }
+      }
+      setLocaleNames(overrides);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
 
   const handleQueryChange = useCallback(
     (q: string) => {
@@ -114,6 +185,8 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
 
   const handleSortChange = useCallback(
     (newSort: PokedexSortOrder) => {
+      // Persist to localStorage for sticky behaviour across navigation.
+      writeStoredSort(newSort);
       router.replace(buildUrl(filters, newSort), { scroll: false });
     },
     [router, filters],
@@ -224,6 +297,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
         pokemon={sorted}
         activeGen={activeGen}
         flatList={isCustomSort}
+        localeNames={localeNames}
       />
     </>
   );
