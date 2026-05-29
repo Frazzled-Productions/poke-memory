@@ -17,8 +17,8 @@
  *     expect(screen.getByText("練習")).toBeInTheDocument();
  *   });
  *
- * Re-exports everything from @testing-library/react so importers only need
- * one import line.
+ * Re-exports testing utilities from @testing-library/react (excluding `render`)
+ * so importers only need one import line.
  */
 
 import React from "react";
@@ -39,12 +39,12 @@ import zhHantMessages from "@/messages/zh-Hant.json";
 // Internal catalogue map
 // ---------------------------------------------------------------------------
 
-const MESSAGES: Record<AppLocale, Record<string, unknown>> = {
-  en: enMessages as Record<string, unknown>,
-  ja: jaMessages as Record<string, unknown>,
-  "zh-Hans": zhHansMessages as Record<string, unknown>,
-  "zh-Hant": zhHantMessages as Record<string, unknown>,
-};
+const MESSAGES = {
+  en: enMessages,
+  ja: jaMessages,
+  "zh-Hans": zhHansMessages,
+  "zh-Hant": zhHantMessages,
+} satisfies Record<AppLocale, object>;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -65,6 +65,7 @@ export function renderWithIntl(
 ): RenderResult {
   const messages = MESSAGES[locale];
 
+  // Locale is fixed at render time; `rerender` inherits it and cannot change locale mid-test.
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <NextIntlClientProvider locale={locale} messages={messages}>
