@@ -26,7 +26,9 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 
    Trivial issues (typo fixes, doc tweaks, one-liner workflow changes — the same set that may skip the planner entirely per WORKFLOW.md) are exempt from the AC-quality check.
 
-   **Pre-flight: centralisation check.** If the plan adds a new render or computation of a domain concept (Pokémon name, date display, mastery count, sprite URL, class-name constant), call out which existing helper the implementer should use. If no helper exists but the concept is already rendered elsewhere, propose a new helper in the plan with the existing call sites enumerated as ones to centralise in the same PR — do not plan a fresh fragmented call site. The fragmentation pattern is the root cause of repeated partial-fix cycles (#1259 / #1260 / #1311 / #1318); see AGENTS.md "Single source of truth for shared concepts" for the canonical helper list (`useLocalePokemonName`, `formatDate`, `isMastered`, `filterMastered`, `computeStats`, `useCardClass`, `lib/utils/class-names.ts`).
+   **Pre-flight: centralisation + call-site audit.** If the plan adds a new render or computation of a domain concept (Pokémon name, date display, mastery count, sprite URL, class-name constant), call out which existing helper the implementer should use. If no helper exists but the concept is already rendered elsewhere, propose a new helper in the plan with the existing call sites enumerated as ones to centralise in the same PR — do not plan a fresh fragmented call site.
+
+   **Additionally**, when the work modifies the *behaviour* of an existing shared concept (e.g. adding locale-awareness to Pokémon-name rendering, adding superuser-flag gating to a mastery counter), grep the whole repo for every existing call site of that concept and include a top-level `## Affected call sites` subsection in the plan listing each one as either **in-scope** (must be updated in this change, with the file path and a one-line note on what changes) or **out-of-scope with rationale** (explicitly preserved for a future change, with the reason). Never leave the implementer to discover the call sites from the visibly-broken surface alone — that is the failure mode #1259/#1311/#1318/#1329 went through four QA rounds to escape. The implementer's audit then becomes verification, not discovery. See AGENTS.md "Single source of truth for shared concepts" for the canonical helper list (`useLocalePokemonName`, `formatDate`, `isMastered`, `filterMastered`, `computeStats`, `useCardClass`, `lib/utils/class-names.ts`). (memory: `feedback_agent_fix_full_audit`.)
 
 2. Identify unknowns. Tag each one for the orchestrator:
    - `[EXPERT-RESEARCH]` — has an objectively-correct answer a domain specialist can produce. Name the specialist (`next16-expert`, `pokeapi-expert`, `srs-expert`, or `supabase-expert`). Example: "what conflict resolution rule preserves FSRS scheduling integrity?" → srs-expert. Example: "should this feature use a new table or extend `user_settings.settings`?" → supabase-expert.
@@ -62,9 +64,10 @@ This line is consumed by the implement job's staleness gate. It must be the lite
 
 1. **Goal** — one sentence.
 2. **Open questions** — list, each prefixed with its tag. Always name the specialist for `[EXPERT-RESEARCH]`; always note `researcher` for `[USER-DECISION + RESEARCH]`; omit the agent for `[USER-DECISION]`. The orchestrator uses the tag to decide whether to dispatch a specialist, dispatch the researcher, or pass the question through to the maintainer as-is.
-3. **Plan** — numbered steps. Use ⚡ for parallelizable groups.
-4. **Risks** — bullet list.
-5. **Out of scope** — explicit list of what this plan does NOT do.
+3. **Affected call sites** (omit when not applicable) — required when the change modifies the behaviour of a shared domain concept per the centralisation + call-site audit in Process step 1. List every call site as `file_path` — in-scope or out-of-scope with a one-line rationale. Omit this section only when the work touches no shared concept.
+4. **Plan** — numbered steps. Use ⚡ for parallelizable groups.
+5. **Risks** — bullet list.
+6. **Out of scope** — explicit list of what this plan does NOT do.
 
 ## What you don't do
 - Don't write code. Plans only.

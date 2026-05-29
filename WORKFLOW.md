@@ -273,7 +273,7 @@ in-memory fixture.
 | **Trigger** | `pull_request` (any), `workflow_dispatch` |
 | **Job** | `coverage` |
 | **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), enforces two coverage gates, then posts the coverage summary (statements / branches / functions / lines) plus the diff-coverage result as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). The comment posts on both pass and fail. |
-| **Gates (#824)** | **Global floor** — `coverage.thresholds` in `vitest.config.ts` (Statements 74 / Branches 69 / Functions 66 / Lines 76, just below the measured baseline). `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** — `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit a 90% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. |
+| **Gates (#824)** | **Global floor** — values in `coverage-floor.json` at the repo root, imported by `vitest.config.ts`'s `coverage.thresholds`. `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** — `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit a 90% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. The numbers deliberately do not appear in this row, AGENTS.md, or the PR-comment template — they come from `coverage-floor.json` to prevent the drift #1333 cleaned up. The `/batch-issues` end-of-session ratchet updates the JSON file only. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard — fork PRs run with a read-only token and cannot post comments). |
 | **Required check** | Not yet — the gates fail the job, but `coverage` must still be added as a required check on the `qa` and `main` rulesets (owner action) before a breach blocks merge. Until then the job goes red without blocking. (Originally non-blocking by design under #762; gated under #824.) |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
@@ -659,6 +659,21 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Why a dedicated workflow** | The deploy-hook URL is a repo secret, so the deploy must be fired server-side, not from the local `/batch-issues` session. `?ref=qa` is hardcoded — dispatching from the default branch would otherwise resolve `github.ref` to `main`. |
 | **Required secrets** | `VERCEL_DEPLOY_HOOK_URL`. |
 | **Concurrency** | `group: qa-preview-deploy` with `cancel-in-progress: false`. |
+
+---
+
+### `stale-preview-check.yml` — Stale qa preview check
+
+| | |
+|---|---|
+| **Trigger** | `schedule` (daily `30 8 * * *` cron, 08:30 UTC, after the auto-release window) and `workflow_dispatch`. |
+| **Job** | `check` |
+| **What it does** | Compares `origin/qa`'s tip SHA with the head SHA of the most recent `QA Preview Deploy` run. When they diverge and an open `qa -> main` promotion PR exists, upserts a marker comment on that PR (HTML marker `<!-- stale-preview-check -->`) linking to the `QA Preview Deploy` dispatch URL. When the preview catches up, removes the marker comment. |
+| **Why a dedicated workflow** | The `/batch-issues` skill's wrap-up rule "re-fire the preview after any qa-landing mini-batch work" only fires inside an active session. When mini-batch work lands on `qa` outside a session (a manual PR, an `/auto` run, a follow-up direct push), nobody re-fires the deploy and the maintainer QAs against a stale preview. This cron catches that gap. (#1333.) |
+| **Permissions** | `contents: read`, `pull-requests: write`, `actions: read` — the third is required so `gh run list --workflow="QA Preview Deploy"` can read past run metadata under `GITHUB_TOKEN`. |
+| **Idempotency** | The marker comment is upserted (patched in place) rather than appended, so a missed cron tick does not produce a stack of duplicate comments. |
+| **Required secrets** | None (uses `GITHUB_TOKEN`). |
+| **Concurrency** | Default; no concurrency group. The work is cheap (a few API calls) and runs once per day. |
 
 ---
 

@@ -1,0 +1,159 @@
+name: Stale qa preview check
+
+# Daily reminder workflow: if origin/qa has advanced beyond the last QA Preview
+# Deploy's SHA AND a draft qa -> main promotion PR is open, comment on that PR
+# linking the QA Preview Deploy workflow_dispatch URL so the maintainer can
+# re-fire the preview before QAing.
+#
+# This is the automated counterpart to the /batch-issues wrap-up rule "after
+# any mini-batch work lands on qa, re-fire the preview". The cron exists for
+# the case where a mini-batch lands outside an active /batch-issues session
+# (a manual PR, an /auto run, a follow-up direct push by the maintainer) and
+# nobody re-fires the deploy.
+#
+# Idempotent: a single tracking comment per session is updated in place rather
+# than appended, via the `<!-- stale-preview-check -->` HTML marker.
+
+on:
+  schedule:
+    - cron: "30 8 * * *"   # 08:30 UTC daily (after the auto-release window)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  # actions: read so `gh run list --workflow="QA Preview Deploy"` can read
+  # past run metadata. Without this the GITHUB_TOKEN gets a 403 on the
+  # Actions API and LAST_PREVIEW_SHA is silently empty, making `stale`
+  # unconditionally true and the workflow post a spurious comment every
+  # day. (cron-health-monitor.yml uses the same pattern.)
+  actions: read
+
+jobs:
+  check:
+    name: Compare qa tip to last preview SHA
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compute qa SHA and last-preview SHA
+        id: shas
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          QA_SHA=$(gh api /repos/${{ github.repository }}/branches/qa --jq '.commit.sha')
+          LAST_PREVIEW_SHA=$(gh run list \
+            --workflow="QA Preview Deploy" \
+            --limit 1 \
+            --json headSha \
+            --jq '.[0].headSha // ""')
+
+          echo "qa_sha=$QA_SHA" >> "$GITHUB_OUTPUT"
+          echo "last_preview_sha=$LAST_PREVIEW_SHA" >> "$GITHUB_OUTPUT"
+
+          if [ "$QA_SHA" = "$LAST_PREVIEW_SHA" ]; then
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+            echo "qa tip ($QA_SHA) matches last preview SHA — no action needed."
+          else
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            echo "qa tip ($QA_SHA) ahead of last preview ($LAST_PREVIEW_SHA)."
+          fi
+
+      - name: Find open qa -> main promotion PR
+        # Runs on both stale and not-stale paths — the dismiss step needs
+        # this lookup to know which PR to clean a marker comment off of.
+        # (Bug fix: the original `if: stale == true` left the dismiss step
+        # permanently false, so the comment was never removed when caught up.)
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER=$(gh pr list \
+            --repo ${{ github.repository }} \
+            --base main \
+            --head qa \
+            --state open \
+            --json number \
+            --jq '.[0].number // ""')
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open qa -> main promotion PR; nothing to annotate or dismiss."
+            echo "pr_number=" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Count commits ahead
+        if: steps.shas.outputs.stale == 'true' && steps.pr.outputs.pr_number != ''
+        id: ahead
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          QA_SHA="${{ steps.shas.outputs.qa_sha }}"
+          PREV_SHA="${{ steps.shas.outputs.last_preview_sha }}"
+          # If PREV_SHA is empty (no prior preview at all), report just "tip".
+          if [ -z "$PREV_SHA" ]; then
+            echo "ahead=unknown (no prior preview deploy found)" >> "$GITHUB_OUTPUT"
+          else
+            AHEAD=$(gh api "/repos/${{ github.repository }}/compare/${PREV_SHA}...${QA_SHA}" --jq '.ahead_by')
+            echo "ahead=$AHEAD" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upsert stale-preview comment on promotion PR
+        if: steps.shas.outputs.stale == 'true' && steps.pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+          QA_SHA="${{ steps.shas.outputs.qa_sha }}"
+          PREV_SHA="${{ steps.shas.outputs.last_preview_sha }}"
+          AHEAD="${{ steps.ahead.outputs.ahead }}"
+          MARKER="<!-- stale-preview-check -->"
+          DISPATCH_URL="https://github.com/${{ github.repository }}/actions/workflows/qa-preview-deploy.yml"
+
+          # printf, not a heredoc: the YAML run block strips leading
+          # whitespace, so an indented EOF delimiter is never matched and the
+          # heredoc fails. coverage.yml uses the same pattern for the same
+          # reason; copy it here verbatim.
+          BODY=$(printf '%s\n' \
+            "$MARKER" \
+            "## 🟡 Preview deploy is behind \`qa\`" \
+            "" \
+            "The last \`QA Preview Deploy\` ran against \`${PREV_SHA:-(none)}\`, but \`origin/qa\` is now at \`${QA_SHA}\` (${AHEAD} commits ahead)." \
+            "" \
+            "QA against the existing preview will not exercise the latest \`qa\` state. Re-fire the deploy before testing:" \
+            "" \
+            "- **[Dispatch \`QA Preview Deploy\`](${DISPATCH_URL})** (Run workflow → branch \`qa\`)" \
+            "" \
+            "This comment is updated daily by \`.github/workflows/stale-preview-check.yml\` and goes away once the preview catches up.")
+
+          EXISTING_COMMENT_ID=$(gh api "/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -n1)
+
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            gh api --method PATCH "/repos/${{ github.repository }}/issues/comments/${EXISTING_COMMENT_ID}" \
+              -f body="$BODY"
+            echo "Updated existing stale-preview comment ${EXISTING_COMMENT_ID} on PR #${PR_NUMBER}."
+          else
+            gh api --method POST "/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+              -f body="$BODY"
+            echo "Posted stale-preview comment on PR #${PR_NUMBER}."
+          fi
+
+      - name: Dismiss stale-preview comment when caught up
+        if: steps.shas.outputs.stale == 'false' && steps.pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+          MARKER="<!-- stale-preview-check -->"
+          EXISTING_COMMENT_ID=$(gh api "/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -n1)
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            gh api --method DELETE "/repos/${{ github.repository }}/issues/comments/${EXISTING_COMMENT_ID}"
+            echo "Removed stale-preview comment ${EXISTING_COMMENT_ID} — preview now caught up."
+          fi
