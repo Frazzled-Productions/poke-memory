@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { LocaleProvider } from "@/components/i18n/LocaleProvider";
+import { PokemonLocaleProvider } from "@/lib/i18n/PokemonLocaleContext";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -191,6 +192,14 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <LocaleProvider>
             {/*
+              PokemonLocaleProvider consolidates the pokemonNameLocale subscription
+              into a single pair of event listeners for the whole tree (#1329).
+              Previously, each useLocalePokemonName call site registered its own
+              listeners, costing O(N) subscriptions for N cards on screen and
+              pushing practice-page hydration past the WebKit CI timeout.
+            */}
+            <PokemonLocaleProvider>
+            {/*
               #app-root wraps all persistent page chrome. FirstVisitOnboardingModal
               renders via createPortal directly onto <body> and toggles `inert` +
               `aria-hidden` on this element while open, preventing the screen-reader
@@ -241,6 +250,7 @@ export default function RootLayout({
             <DocumentTitleBadge />
             <Analytics />
             <SpeedInsights />
+            </PokemonLocaleProvider>
           </LocaleProvider>
         </Suspense>
       </body>
