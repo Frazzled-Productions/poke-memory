@@ -31,6 +31,8 @@ import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { detectTopMilestone } from "@/lib/journey/milestones";
+import { deriveCloseToMastery, type CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
+import { CloseToMastery } from "@/components/journey/CloseToMastery";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, cardPanelPadded, mutedText } from "@/lib/utils/class-names";
@@ -405,6 +407,7 @@ export default function JourneyPage() {
   const [earnedBadgeIds, setEarnedBadgeIds] = useState<readonly string[]>([]);
   const [timeline, setTimeline] = useState<CollectionTimeline | null>(null);
   const [evolutionFamilies, setEvolutionFamilies] = useState<EvolutionFamily[] | null>(null);
+  const [closeToMasteryEntries, setCloseToMasteryEntries] = useState<readonly CloseToMasteryEntry[] | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -510,6 +513,14 @@ export default function JourneyPage() {
         flags.pretendAllMastered,
       );
       setEvolutionFamilies(evoFamilies);
+
+      // Derive close-to-mastery entries from the final card set.
+      const ctm = deriveCloseToMastery(
+        finalCards as readonly ReviewableCard[],
+        settings.masteryRepetitions,
+        flags.pretendAllMastered,
+      );
+      setCloseToMasteryEntries(ctm);
     }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -640,6 +651,24 @@ export default function JourneyPage() {
                   className="mb-3 text-base font-semibold text-foreground"
                 >
                   Evolution wall
+                </h2>
+                <SkeletonBlock className="h-10 w-full" />
+              </section>
+            )}
+
+            {/* Close to mastery.
+                Shown whenever the entries are loaded (even if empty — the
+                empty state is informative). Same skeleton approach used for
+                other deferred sections to avoid layout shift. */}
+            {closeToMasteryEntries !== null ? (
+              <CloseToMastery entries={closeToMasteryEntries} />
+            ) : (
+              <section aria-labelledby="ctm-skeleton-heading" aria-busy="true">
+                <h2
+                  id="ctm-skeleton-heading"
+                  className="mb-3 text-base font-semibold text-foreground"
+                >
+                  Close to mastery
                 </h2>
                 <SkeletonBlock className="h-10 w-full" />
               </section>

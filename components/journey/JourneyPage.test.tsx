@@ -308,6 +308,17 @@ vi.mock("@/lib/stats/derive", () => ({
       state.reps >= 3 && state.scheduledDays >= 21,
   ),
   MASTERY_REPETITIONS: 3,
+  MASTERY_INTERVAL_DAYS: 21,
+}));
+
+vi.mock("@/lib/journey/closeToMastery", () => ({
+  deriveCloseToMastery: vi.fn(() => []),
+}));
+
+vi.mock("@/components/journey/CloseToMastery", () => ({
+  CloseToMastery: ({ entries }: { entries: unknown[] }) => (
+    <div data-testid="close-to-mastery" data-count={entries.length} />
+  ),
 }));
 
 vi.mock("@/lib/stats/records", () => ({
