@@ -14,12 +14,14 @@
  *  - Signed-in: avatar rendered when avatar_url is set
  *  - Signed-in: display-name fallback chain (user_name → full_name → name → email → "User avatar")
  *  - Both GitHub and Google provider branches invoke signIn with the right provider
+ *  - Japanese locale renders auth strings correctly (サインイン for Sign in)
  */
 
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { User } from "@supabase/supabase-js";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -74,13 +76,13 @@ describe("AuthButton — guest state (not signed in)", () => {
   });
 
   it("renders the Sign in trigger button when no user is present", () => {
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     expect(screen.getByRole("button", { name: /sign in/i })).toBeTruthy();
   });
 
   it("renders nothing while loading", () => {
     mockUseAuth.mockReturnValue({ user: null, loading: true });
-    const { container } = render(<AuthButton />);
+    const { container } = renderWithIntl(<AuthButton />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -88,7 +90,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("opens the provider picker when the trigger is clicked", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     const trigger = screen.getByRole("button", { name: /sign in/i });
     await user.click(trigger);
@@ -98,7 +100,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("closes the provider picker when the trigger is clicked again", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     const trigger = screen.getByRole("button", { name: /sign in/i });
     await user.click(trigger);
@@ -109,7 +111,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("closes the provider picker when Escape is pressed", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
     expect(screen.getByRole("menu")).toBeTruthy();
@@ -121,7 +123,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("returns focus to the trigger after closing with Escape", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     const trigger = screen.getByRole("button", { name: /sign in/i });
     await user.click(trigger);
@@ -132,7 +134,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("closes the picker on outside pointerdown", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithIntl(
       <div>
         <AuthButton />
         <div data-testid="outside">Outside</div>
@@ -153,7 +155,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("renders 'Continue with GitHub' inside the picker", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
@@ -162,7 +164,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("calls signIn with 'github' when the GitHub option is chosen", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
     await user.click(screen.getByRole("menuitem", { name: /continue with github/i }));
@@ -172,7 +174,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("closes the picker after choosing GitHub", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
     await user.click(screen.getByRole("menuitem", { name: /continue with github/i }));
@@ -184,7 +186,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("renders 'Continue with Google' inside the picker", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
@@ -193,7 +195,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("calls signIn with 'google' when the Google option is chosen", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
     await user.click(screen.getByRole("menuitem", { name: /continue with google/i }));
@@ -203,7 +205,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 
   it("closes the picker after choosing Google", async () => {
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
     await user.click(screen.getByRole("menuitem", { name: /continue with google/i }));
@@ -215,7 +217,7 @@ describe("AuthButton — guest state (not signed in)", () => {
   // useTransition's isPending is true during the async Server Action call.
 
   it("trigger button is not disabled before any action is triggered", () => {
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     const trigger = screen.getByRole("button", { name: /sign in/i });
     expect(trigger).not.toBeDisabled();
   });
@@ -226,7 +228,7 @@ describe("AuthButton — guest state (not signed in)", () => {
     mockSignIn.mockReturnValue(new Promise<void>((res) => { resolveSignIn = res; }));
 
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     // Open the picker and click a provider inside an act block so React
     // processes the transition start synchronously.
@@ -259,7 +261,7 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ user_name: "ash" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     expect(screen.getByRole("button", { name: /sign out/i })).toBeTruthy();
   });
 
@@ -268,7 +270,7 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ user_name: "ash" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
   });
 
@@ -278,7 +280,7 @@ describe("AuthButton — signed-in state", () => {
       loading: false,
     });
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign out/i }));
 
@@ -296,7 +298,7 @@ describe("AuthButton — signed-in state", () => {
     });
 
     const user = userEvent.setup();
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     await act(async () => {
       await user.click(screen.getByRole("button", { name: /sign out/i }));
@@ -315,7 +317,7 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ avatar_url: "https://example.com/ash.png", user_name: "ash" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     const img = screen.getByRole("img");
     expect(img.getAttribute("src")).toBe("https://example.com/ash.png");
@@ -326,7 +328,7 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ user_name: "ash" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
 
     expect(screen.queryByRole("img")).toBeNull();
   });
@@ -338,7 +340,7 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ avatar_url: "https://example.com/avatar.png", user_name: "ash" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     expect(screen.getByRole("img").getAttribute("alt")).toBe("ash");
   });
 
@@ -347,7 +349,7 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ avatar_url: "https://example.com/avatar.png", full_name: "Ash Ketchum" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     expect(screen.getByRole("img").getAttribute("alt")).toBe("Ash Ketchum");
   });
 
@@ -356,7 +358,7 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ avatar_url: "https://example.com/avatar.png", name: "Ash" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     expect(screen.getByRole("img").getAttribute("alt")).toBe("Ash");
   });
 
@@ -365,7 +367,7 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ avatar_url: "https://example.com/avatar.png", email: "ash@pallet.town" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     expect(screen.getByRole("img").getAttribute("alt")).toBe("ash@pallet.town");
   });
 
@@ -374,7 +376,23 @@ describe("AuthButton — signed-in state", () => {
       user: makeUser({ avatar_url: "https://example.com/avatar.png" }),
       loading: false,
     });
-    render(<AuthButton />);
+    renderWithIntl(<AuthButton />);
     expect(screen.getByRole("img").getAttribute("alt")).toBe("User avatar");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Japanese locale
+// ---------------------------------------------------------------------------
+
+describe("AuthButton — Japanese locale", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: null, loading: false });
+  });
+
+  it("renders the Sign in button label in Japanese (サインイン)", () => {
+    renderJa(<AuthButton />);
+    expect(screen.getByRole("button", { name: "サインイン" })).toBeInTheDocument();
   });
 });
