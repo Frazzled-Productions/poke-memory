@@ -282,4 +282,31 @@ describe("PastureSearchBar — Japanese locale", () => {
     // messages/ja.json pasture.filterByTypeAriaLabel = "タイプでフィルター"
     expect(screen.getByRole("group", { name: "タイプでフィルター" })).toBeInTheDocument();
   });
+
+  it("renders the generation All pill in Japanese", () => {
+    renderJa(
+      <PastureSearchBar
+        filters={defaultFilters()}
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.generationAll = "すべて"
+    const genGroup = screen.getByRole("group", { name: "世代でフィルター" });
+    expect(genGroup.querySelector("button[aria-pressed]")).toHaveTextContent("すべて");
+  });
+
+  it("renders a Gen I pill in Japanese as 第I世代", () => {
+    renderJa(
+      <PastureSearchBar
+        filters={defaultFilters()}
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.generationLabel = "第{gen}世代" → "第I世代"
+    expect(screen.getByRole("button", { name: "第I世代" })).toBeInTheDocument();
+  });
 });

@@ -266,6 +266,41 @@ describe("PokedexFilterBar — Japanese locale", () => {
     // messages/ja.json pokedex.searchAriaLabel = "Pokémon を検索"
     expect(screen.getByRole("textbox", { name: "Pokémon を検索" })).toBeInTheDocument();
   });
+
+  it("renders the generation All pill in Japanese", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.generationAll = "すべて"
+    const genGroup = screen.getByRole("group", { name: "世代でフィルター" });
+    expect(genGroup.querySelector("button[aria-pressed]")).toHaveTextContent("すべて");
+  });
+
+  it("renders a Gen I pill in Japanese as 第I世代", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.generationLabel = "第{gen}世代" → "第I世代"
+    expect(screen.getByRole("button", { name: "第I世代" })).toBeInTheDocument();
+  });
 });
 
 // Suppress unused import warning — fireEvent is re-exported from renderWithIntl

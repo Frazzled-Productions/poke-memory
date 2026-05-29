@@ -169,7 +169,7 @@ export default function PokedexFilterBar({
               : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
           ].join(" ")}
         >
-          All
+          {t("generationAll")}
         </button>
         {([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((gen) => (
           <button
@@ -184,7 +184,7 @@ export default function PokedexFilterBar({
                 : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
             ].join(" ")}
           >
-            Gen {ROMAN[gen]}
+            {t("generationLabel", { gen: ROMAN[gen] })}
           </button>
         ))}
       </div>

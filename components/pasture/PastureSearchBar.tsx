@@ -59,6 +59,7 @@ export function PastureSearchBar({
   onGenChange,
 }: Props) {
   const t = useTranslations("pasture");
+  const tPokedex = useTranslations("pokedex");
 
   return (
     <div className="mb-6 rounded-lg border border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -144,7 +145,7 @@ export function PastureSearchBar({
               : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
           ].join(" ")}
         >
-          All
+          {tPokedex("generationAll")}
         </button>
         {([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((gen) => (
           <button
@@ -159,7 +160,7 @@ export function PastureSearchBar({
                 : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
             ].join(" ")}
           >
-            Gen {ROMAN[gen]}
+            {tPokedex("generationLabel", { gen: ROMAN[gen] })}
           </button>
         ))}
       </div>
