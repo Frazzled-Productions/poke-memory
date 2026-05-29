@@ -394,7 +394,6 @@
       "heading": "薄弱卡片",
       "empty": "還沒有薄弱卡片。繼續保持！"
     },
-    "viewInPokedex": "在圖鑑中查看{name}",
     "forcePull": {
       "heading": "資料",
       "description": "如果您的記錄看起來有誤，請使用此功能從雲端取得權威資料。",
@@ -411,8 +410,7 @@
     "description": "您的寶可夢學習之旅。",
     "loadingAriaLabel": "載入旅程中",
     "currentStreak": "目前連續天數",
-    "dayInARow": "天連續",
-    "daysInARow": "連續 {count} 天",
+    "daysInARow": "{count, plural, other {連續 {count} 天}}",
     "noStreak": "暫無連續記錄。複習一些卡片來開始吧！",
     "masteryDistribution": "掌握度分佈",
     "masteryLocked": "未開始",
@@ -422,7 +420,6 @@
     "speciesSeenAtLeastOnce": "至少見過一次的種族",
     "byGeneration": "按世代",
     "byGenerationMasteredTotal": "已掌握 / 總數",
-    "viewInPokedex": "在圖鑑中查看{name}",
     "collectionTimeline": "收藏時間線",
     "evolutionWall": "進化牆",
     "closeToMastery": "即將掌握"
@@ -435,8 +432,7 @@
       "body": "沒有網路連線時，某些頁面無法使用。您之前查看過的卡片應該仍然可以正常使用。"
     },
     "tryAgain": "重試",
-    "goHome": "前往練習",
-    "goPractice": "前往練習"
+    "goHome": "前往練習"
   },
   "onboarding": {
     "welcomeHeading": "歡迎使用 Poké Memory",
