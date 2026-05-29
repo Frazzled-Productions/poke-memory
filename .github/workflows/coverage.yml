@@ -96,6 +96,10 @@ jobs:
           if [ -f "$SUMMARY" ]; then
             node -e '
               const t = require("./coverage/coverage-summary.json").total;
+              // Single source of truth for the floor — see coverage-floor.json.
+              // Avoid hardcoding numbers here: drift between this comment and
+              // vitest.config.ts is the failure mode #1333 exists to prevent.
+              const floor = require("./coverage-floor.json");
               const row = (label, m) =>
                 `| ${label} | ${m.pct.toFixed(2)}% | ${m.covered} / ${m.total} |`;
               console.log([
@@ -108,8 +112,9 @@ jobs:
                 row("Functions", t.functions),
                 row("Lines", t.lines),
                 "",
-                "_Global floor: Statements 74 / Branches 69 / Functions 66 / Lines 76. " +
+                `_Global floor: Statements ${floor.statements} / Branches ${floor.branches} / Functions ${floor.functions} / Lines ${floor.lines}. ` +
                   "Changed lines must hit a 90% patch-coverage bar. See the `coverage` workflow._",
+                "_Floor values come from `coverage-floor.json` at the repo root — the single source consumed by `vitest.config.ts` and this comment. AGENTS.md and WORKFLOW.md reference the file by name rather than copying the numbers, so a ratchet only needs to touch the JSON. (#1333.)_",
               ].join("\n"));
             ' > /tmp/coverage-table.md
           else

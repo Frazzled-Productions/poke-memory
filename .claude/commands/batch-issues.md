@@ -222,7 +222,28 @@ After every batch is merged into `qa` and the queue is drained:
 
    Hand the retro back to the user as a punch list. If the user picks improvements to implement, fold them into the same PR (or a separate retro PR if they touch many files); never let a retro lapse silently.
 
-6. **Coverage ratchet.** Run `npm run test:coverage` against the post-merge `qa` state. Read the printed `Statements / Branches / Functions / Lines` summary, then update **both** `vitest.config.ts` `coverage.thresholds` **and** the AGENTS.md "Coverage gate" paragraph to the nearest whole percentage at or below each metric. Coverage floor never goes down — if the new measurement is below the existing floor, do not ratchet, file an issue about the regression instead. Commit the ratchet as part of the retro / wrap-up PR so the documented values never drift from the enforced ones. (User ask, this session.)
+6. **Coverage ratchet.** Run `npm run test:coverage` against the post-merge `qa` state. Read the printed `Statements / Branches / Functions / Lines` summary, then update **the single source of truth**:
+
+   ```bash
+   # Edit the file directly — every consumer (vitest.config.ts,
+   # .github/workflows/coverage.yml's PR comment, AGENTS.md / WORKFLOW.md
+   # references) reads from it, so this one edit propagates everywhere.
+   vim coverage-floor.json
+   ```
+
+   Set each metric to the nearest whole percentage **at or below** the measured value. Coverage floor never goes down — if the new measurement is below the existing JSON values, do **not** ratchet; file an issue about the regression instead and surface it in the handoff. Re-run `npm run test:coverage` after editing to confirm the new floor still passes (the vitest config imports the JSON, so a too-aggressive ratchet fails the gate immediately).
+
+   **Drift verification.** Before opening the wrap-up PR, confirm there is no orphan copy of the floor anywhere:
+
+   ```bash
+   # If anything matches outside coverage-floor.json itself and the
+   # coverage/ output dir, a copy has crept back in — fix it before
+   # opening the wrap-up PR.
+   git grep -nE 'Statements [0-9]+ / Branches [0-9]+ / Functions [0-9]+ / Lines [0-9]+' \
+     -- ':!coverage' ':!node_modules'
+   ```
+
+   The expected output is empty (or only the PR-comment template's templating string, which substitutes from the JSON at run time). Any hit with literal hardcoded numbers is a drift bug — extract it to `coverage-floor.json` or delete the duplicate. (User ask, this session — #1333 surfaced four divergent copies, two of which were already stale by multiple ratchets. The single-JSON design exists to make a recurrence impossible.)
 
 7. **Hand off to the maintainer.** One summary block:
    - Issues drained into `qa` (numbers, including any added in mini-batch rounds) and the PRs merged (numbers).

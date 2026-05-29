@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import coverageFloor from "./coverage-floor.json";
 
 const alias = { "@": path.resolve(__dirname, ".") };
 
@@ -23,18 +24,15 @@ export default defineConfig({
       //         consumed by coverage.yml's diff-coverage gate
       // html  → drillable local report under coverage/
       reporter: ["text", "json-summary", "json", "html"],
-      // Global floor (regression guard, #824). Set to the nearest whole
-      // percentage at or below today's measured baseline (S 81.05 / B 75.13 /
-      // F 77.84 / L 83.29), so an unrelated coverage drop fails CI. Ratchet
-      // upward as coverage improves — never downward to make a red build
-      // pass. The /batch-issues skill ratchets these at the end of every
-      // session that touches product code; manual ratchets are also fine.
-      thresholds: {
-        statements: 81,
-        branches: 75,
-        functions: 77,
-        lines: 83,
-      },
+      // Global floor (regression guard, #824). Values live in
+      // ./coverage-floor.json — the single source of truth read by this
+      // config, by .github/workflows/coverage.yml's PR-comment template, and
+      // referenced (no hardcoded numbers) from AGENTS.md and WORKFLOW.md
+      // prose. Ratchet upward as coverage improves — never downward to make
+      // a red build pass. The /batch-issues skill ratchets the JSON file at
+      // the end of every session that touches product code; manual ratchets
+      // are also fine.
+      thresholds: coverageFloor,
       // Measure the application/library source we actually ship and test.
       include: ["app/**", "components/**", "lib/**"],
       exclude: [

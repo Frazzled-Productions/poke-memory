@@ -1,0 +1,7 @@
+{
+  "_comment": "Single source of truth for the global coverage floor (#824, #1333). Ratcheted upward at the end of every /batch-issues session (never downward — see AGENTS.md 'Coverage gate'). Imported by vitest.config.ts (enforced threshold); read by .github/workflows/coverage.yml at run time and templated into every PR's coverage comment. AGENTS.md and WORKFLOW.md prose deliberately do not hardcode these numbers — they point at this file instead, so there is no fifth copy to drift.",
+  "statements": 81,
+  "branches": 75,
+  "functions": 77,
+  "lines": 83
+}
