@@ -393,7 +393,7 @@
     "schedulingHeading": "调度",
     "masteryMeaning": {
       "title": "「已掌握」是什么意思",
-      "body": "卡片在连续答对 {reps} 次且下次复习间隔至少 21 天后视为已掌握：这是调度器确认您真正学会而非短期记忆的时间点。"
+      "body": "卡片在连续答对 {reps} 次<em>且</em>下次复习间隔至少 21 天后视为已掌握：这是调度器确认您真正学会而非短期记忆的时间点。"
     },
     "strugglingCards": {
       "heading": "薄弱卡片",
@@ -415,7 +415,7 @@
     "description": "您的 Pokémon 学习之旅。",
     "loadingAriaLabel": "加载旅程中",
     "currentStreak": "当前连续天数",
-    "daysInARow": "{count, plural, other {连续 {count} 天}}",
+    "daysInARow": "{count, plural, other {连续天}}",
     "noStreak": "暂无连续记录。复习一些卡片来开始吧！",
     "masteryDistribution": "掌握度分布",
     "masteryLocked": "未开始",
@@ -425,6 +425,7 @@
     "speciesSeenAtLeastOnce": "至少见过一次的种族",
     "byGeneration": "按世代",
     "byGenerationMasteredTotal": "已掌握 / 总数",
+    "byGenerationColumn": "世代",
     "collectionTimeline": "收集时间线",
     "evolutionWall": "进化墙",
     "closeToMastery": "即将掌握"

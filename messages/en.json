@@ -393,7 +393,7 @@
     "schedulingHeading": "Scheduling",
     "masteryMeaning": {
       "title": "What \"mastered\" means",
-      "body": "A card is mastered once you've recalled it correctly {reps} {reps, plural, one {time} other {times}} in a row and the next review is scheduled at least 21 days out: that's when the scheduler is confident you've actually learnt it, not just memorised it short term."
+      "body": "A card is mastered once you've recalled it correctly {reps} {reps, plural, one {time} other {times}} in a row <em>and</em> the next review is scheduled at least 21 days out: that's when the scheduler is confident you've actually learnt it, not just memorised it short term."
     },
     "strugglingCards": {
       "heading": "Struggling cards",
@@ -415,7 +415,7 @@
     "description": "Your Pokémon learning journey.",
     "loadingAriaLabel": "Loading journey",
     "currentStreak": "Current streak",
-    "daysInARow": "{count, plural, one {{count} day in a row} other {{count} days in a row}}",
+    "daysInARow": "{count, plural, one {day in a row} other {days in a row}}",
     "noStreak": "No active streak. Review some cards to start one!",
     "masteryDistribution": "Mastery distribution",
     "masteryLocked": "Locked",
@@ -425,6 +425,7 @@
     "speciesSeenAtLeastOnce": "species seen at least once",
     "byGeneration": "By generation",
     "byGenerationMasteredTotal": "Mastered / Total",
+    "byGenerationColumn": "Generation",
     "collectionTimeline": "Collection timeline",
     "evolutionWall": "Evolution wall",
     "closeToMastery": "Close to mastery"

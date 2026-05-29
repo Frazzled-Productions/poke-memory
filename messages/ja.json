@@ -393,7 +393,7 @@
     "schedulingHeading": "スケジューリング",
     "masteryMeaning": {
       "title": "「習得済み」とは",
-      "body": "{reps}回連続して正しく思い出し、次のレビューが21日以上先に設定されたカードが習得済みとなります。これはスケジューラーが短期記憶ではなく本当に覚えたと判断した時点です。"
+      "body": "{reps}回連続して正しく思い出し<em>、かつ</em>次のレビューが21日以上先に設定されたカードが習得済みとなります。これはスケジューラーが短期記憶ではなく本当に覚えたと判断した時点です。"
     },
     "strugglingCards": {
       "heading": "苦手なカード",
@@ -415,7 +415,7 @@
     "description": "あなたの Pokémon 学習の旅。",
     "loadingAriaLabel": "旅を読み込み中",
     "currentStreak": "現在の連続日数",
-    "daysInARow": "{count, plural, other {{count}日連続}}",
+    "daysInARow": "{count, plural, other {日連続}}",
     "noStreak": "連続記録なし。カードをレビューして始めましょう！",
     "masteryDistribution": "習得状況の分布",
     "masteryLocked": "未開始",
@@ -425,6 +425,7 @@
     "speciesSeenAtLeastOnce": "1回以上表示された種族",
     "byGeneration": "世代別",
     "byGenerationMasteredTotal": "習得済み / 合計",
+    "byGenerationColumn": "ジェネレーション",
     "collectionTimeline": "コレクションタイムライン",
     "evolutionWall": "進化ウォール",
     "closeToMastery": "習得間近"

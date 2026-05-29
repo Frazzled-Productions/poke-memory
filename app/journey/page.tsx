@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useCountUp } from "@/lib/stats/useCountUp";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS } from "@/lib/review/session";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
@@ -81,12 +82,12 @@ function SkeletonBlock({ className }: { className: string }) {
   );
 }
 
-function LoadingSkeleton() {
+function LoadingSkeleton({ ariaLabel }: { ariaLabel: string }) {
   return (
     <div
       className="flex flex-col gap-8"
       aria-busy="true"
-      aria-label="Loading journey"
+      aria-label={ariaLabel}
     >
       <SkeletonBlock className="h-20 w-full" />
       {/* Timeline skeleton */}
@@ -194,6 +195,7 @@ function RadialRing({
 // ---------------------------------------------------------------------------
 
 function MasteryRings({ stats }: { stats: MasterySnapshot }) {
+  const t = useTranslations("journey");
   const { totalCards, locked, learning, mastered } = stats;
   const masteredPct = pct(mastered, totalCards);
   const learningPct = pct(learning, totalCards);
@@ -206,7 +208,7 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
   const rings = [
     {
       key: "locked",
-      label: "Locked",
+      label: t("masteryLocked"),
       count: lockedAnimated,
       rawCount: locked,
       pct: lockedPct,
@@ -215,7 +217,7 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
     },
     {
       key: "learning",
-      label: "Learning",
+      label: t("masteryLearning"),
       count: learningAnimated,
       rawCount: learning,
       pct: learningPct,
@@ -224,7 +226,7 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
     },
     {
       key: "mastered",
-      label: "Mastered",
+      label: t("masteryMastered"),
       count: masteredAnimated,
       rawCount: mastered,
       pct: masteredPct,
@@ -239,13 +241,13 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
         id="mastery-heading"
         className="mb-4 text-lg font-semibold text-foreground"
       >
-        Mastery distribution
+        {t("masteryDistribution")}
       </h2>
 
       <div
         className="grid grid-cols-3 gap-3"
         role="img"
-        aria-label={`Mastery distribution: ${mastered} mastered, ${learning} learning, ${locked} locked`}
+        aria-label={`${t("masteryDistribution")}: ${mastered} ${t("masteryMastered")}, ${learning} ${t("masteryLearning")}, ${locked} ${t("masteryLocked")}`}
       >
         {rings.map(({ key, label, count, rawCount, pct: ringPct, colour, dotClass }) => (
           <div
@@ -283,6 +285,7 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
 // ---------------------------------------------------------------------------
 
 function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
+  const t = useTranslations("journey");
   const { introduced, totalCards } = stats;
   const introPct = pct(introduced, totalCards);
   const introducedAnimated = useCountUp(introduced);
@@ -293,7 +296,7 @@ function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
         id="introduced-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        Introduced
+        {t("introduced")}
       </h2>
       <div className={cn("flex items-center gap-5", cardPanel)}>
         <div className="shrink-0" aria-hidden="true">
@@ -315,7 +318,7 @@ function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
             </span>
           </p>
           <p className={cn("mt-0.5", mutedText)}>
-            species seen at least once
+            {t("speciesSeenAtLeastOnce")}
           </p>
         </div>
       </div>
@@ -328,18 +331,20 @@ function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
 // ---------------------------------------------------------------------------
 
 function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
+  const t = useTranslations("journey");
+  const tCommon = useTranslations("common");
   return (
     <section aria-labelledby="gen-heading">
       <h2
         id="gen-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        By generation
+        {t("byGeneration")}
       </h2>
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
         <div className="grid grid-cols-[1fr_auto] items-center border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-          <span>Generation</span>
-          <span className="text-right">Mastered / Total</span>
+          <span>{t("byGenerationColumn")}</span>
+          <span className="text-right">{t("byGenerationMasteredTotal")}</span>
         </div>
         <ul role="list" className="text-sm">
           {stats.perGeneration.map((gen, idx) => {
@@ -356,7 +361,7 @@ function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
               >
                 <Link
                   href={`/pokedex?gen=${gen.gen}`}
-                  aria-label={`View ${gen.name} in Pokédex`}
+                  aria-label={tCommon("viewInPokedex", { name: gen.name })}
                   className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:hover:bg-zinc-900 dark:focus:bg-zinc-900"
                 >
                   <span className="text-foreground">{gen.name}</span>
@@ -389,6 +394,7 @@ function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
 // ---------------------------------------------------------------------------
 
 export default function JourneyPage() {
+  const t = useTranslations("journey");
   const { user, supabase } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
@@ -592,11 +598,11 @@ export default function JourneyPage() {
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
       <div className="w-full max-w-3xl">
         <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
-          Journey
+          {t("title")}
         </h1>
 
         {masterySnapshot === null || currentStreak === null ? (
-          <LoadingSkeleton />
+          <LoadingSkeleton ariaLabel={t("loadingAriaLabel")} />
         ) : (
           <div className="flex flex-col gap-10">
             {/* Trainer card */}
@@ -633,7 +639,7 @@ export default function JourneyPage() {
                   id="timeline-skeleton-heading"
                   className="mb-4 text-lg font-semibold text-foreground"
                 >
-                  Collection timeline
+                  {t("collectionTimeline")}
                 </h2>
                 <SkeletonBlock className="h-[200px] w-full" />
               </section>
@@ -650,7 +656,7 @@ export default function JourneyPage() {
                   id="evo-wall-skeleton-heading"
                   className="mb-3 text-base font-semibold text-foreground"
                 >
-                  Evolution wall
+                  {t("evolutionWall")}
                 </h2>
                 <SkeletonBlock className="h-10 w-full" />
               </section>
@@ -668,7 +674,7 @@ export default function JourneyPage() {
                   id="ctm-skeleton-heading"
                   className="mb-3 text-base font-semibold text-foreground"
                 >
-                  Close to mastery
+                  {t("closeToMastery")}
                 </h2>
                 <SkeletonBlock className="h-10 w-full" />
               </section>
@@ -684,17 +690,17 @@ export default function JourneyPage() {
             {/* Streak */}
             <section aria-labelledby="streak-heading">
               <h2 id="streak-heading" className="mb-3 text-base font-semibold text-foreground">
-                Current streak
+                {t("currentStreak")}
               </h2>
               {currentStreak > 0 ? (
                 <StatCard
-                  label={currentStreak === 1 ? "day in a row" : "days in a row"}
+                  label={t("daysInARow", { count: currentStreak })}
                   value={currentStreak}
                   accent="text-amber-500 dark:text-amber-400"
                 />
               ) : (
                 <p className={mutedText}>
-                  No active streak. Review some cards to start one!
+                  {t("noStreak")}
                 </p>
               )}
             </section>
