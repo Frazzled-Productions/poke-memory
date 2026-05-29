@@ -178,6 +178,9 @@
         "default": "預設"
       }
     },
+    "offline": {
+      "downloadHeading": "下載"
+    },
     "backup": {
       "heading": "備份",
       "exportLabel": "匯出進度",

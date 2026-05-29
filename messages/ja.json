@@ -178,6 +178,9 @@
         "default": "デフォルト"
       }
     },
+    "offline": {
+      "downloadHeading": "ダウンロード"
+    },
     "backup": {
       "heading": "バックアップ",
       "exportLabel": "進捗をエクスポート",
