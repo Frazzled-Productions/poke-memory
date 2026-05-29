@@ -50,6 +50,8 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
+import { computePerGameStats, type GameStats } from "@/lib/stats/perGame";
+import { PerGameMastery } from "@/components/stats/PerGameMastery";
 
 // ---------------------------------------------------------------------------
 // Lazily-loaded Recharts chart components.
@@ -497,6 +499,14 @@ export default function StatsPage() {
   // Read the memoised snapshot from context — computed once per unique input set (#1139).
   const snapshot: DashboardSnapshot | null = useDashboardSnapshot();
 
+  // Per-game mastery breakdown (#1313). Computed from the full card array using
+  // the same mastery gate as computeStats (both name + reverse required).
+  // Re-memoised whenever cards, masteryRepetitions, or forceAllMastered change.
+  const perGameStats: GameStats[] = useMemo(() => {
+    if (cards === null || masteryRepetitions === null) return [];
+    return computePerGameStats(cards, masteryRepetitions, flags.pretendAllMastered);
+  }, [cards, masteryRepetitions, flags.pretendAllMastered]);
+
   const reviewCharts =
     cards !== null && snapshot !== null
       ? (() => {
@@ -650,6 +660,16 @@ export default function StatsPage() {
               />
               <StrugglingCards struggling={snapshot.struggling ?? []} />
             </section>
+
+            {/* Per-game mastery breakdown (#1313) */}
+            {perGameStats.length > 0 && (
+              <section aria-labelledby="per-game-section-heading" className="flex flex-col gap-6">
+                <SectionHeading>
+                  <span id="per-game-section-heading">Progress by game</span>
+                </SectionHeading>
+                <PerGameMastery games={perGameStats} />
+              </section>
+            )}
 
             {user !== null && supabase !== null && !anyFlagOn && (
               <ForcePullSection
