@@ -359,7 +359,9 @@
     "additionalFiltersAriaLabel": "其他篩選條件",
     "filterByMasteryAriaLabel": "按掌握度篩選",
     "hasAlternateForms": "有異形態",
-    "introduced": "{introduced} / {total} 已引入"
+    "introduced": "{introduced} / {total} 已引入",
+    "generationAll": "全部",
+    "generationLabel": "第 {gen} 代"
   },
   "pasture": {
     "title": "牧場",

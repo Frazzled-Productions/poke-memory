@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 
 // ---------------------------------------------------------------------------
@@ -57,26 +58,29 @@ export function PastureSearchBar({
   onTypeToggle,
   onGenChange,
 }: Props) {
+  const t = useTranslations("pasture");
+  const tPokedex = useTranslations("pokedex");
+
   return (
     <div className="mb-6 rounded-lg border border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900">
       {/* Search input */}
       <div className="relative mb-3">
         <label htmlFor="pasture-search" className="sr-only">
-          Search Pokémon
+          {t("searchAriaLabel")}
         </label>
         <input
           id="pasture-search"
           type="text"
           value={filters.query}
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Search Pokémon…"
+          placeholder={t("searchPasturePlaceholder")}
           className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-8 text-sm text-foreground placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 dark:placeholder:text-zinc-500"
         />
         {filters.query && (
           <button
             type="button"
             onClick={() => onQueryChange("")}
-            aria-label="Clear search"
+            aria-label={t("clearSearch")}
             className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
           >
             <svg
@@ -99,7 +103,7 @@ export function PastureSearchBar({
       {/* Type chips */}
       <div
         role="group"
-        aria-label="Filter by type"
+        aria-label={t("filterByTypeAriaLabel")}
         className="mb-3 flex flex-wrap gap-2"
       >
         {POKEMON_TYPES.map((type) => {
@@ -127,7 +131,7 @@ export function PastureSearchBar({
       {/* Generation pills */}
       <div
         role="group"
-        aria-label="Filter by generation"
+        aria-label={t("filterByGenerationAriaLabel")}
         className="flex flex-wrap gap-2"
       >
         <button
@@ -141,7 +145,7 @@ export function PastureSearchBar({
               : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
           ].join(" ")}
         >
-          All
+          {tPokedex("generationAll")}
         </button>
         {([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((gen) => (
           <button
@@ -156,7 +160,7 @@ export function PastureSearchBar({
                 : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
             ].join(" ")}
           >
-            Gen {ROMAN[gen]}
+            {tPokedex("generationLabel", { gen: ROMAN[gen] })}
           </button>
         ))}
       </div>

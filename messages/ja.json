@@ -359,7 +359,9 @@
     "additionalFiltersAriaLabel": "追加フィルター",
     "filterByMasteryAriaLabel": "習得状況でフィルター",
     "hasAlternateForms": "異なるフォルムあり",
-    "introduced": "{introduced} / {total} 表示済み"
+    "introduced": "{introduced} / {total} 表示済み",
+    "generationAll": "すべて",
+    "generationLabel": "第{gen}世代"
   },
   "pasture": {
     "title": "牧場",

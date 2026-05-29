@@ -359,7 +359,9 @@
     "additionalFiltersAriaLabel": "Additional filters",
     "filterByMasteryAriaLabel": "Filter by mastery",
     "hasAlternateForms": "Has alternate forms",
-    "introduced": "{introduced} / {total} introduced"
+    "introduced": "{introduced} / {total} introduced",
+    "generationAll": "All",
+    "generationLabel": "Gen {gen}"
   },
   "pasture": {
     "title": "Pasture",

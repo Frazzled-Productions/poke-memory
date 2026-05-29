@@ -7,11 +7,19 @@
  *
  * Existing filter controls (type chips, gen pills, mastery buttons) are also
  * exercised to ensure the refactor that added the sort prop did not break them.
+ *
+ * All renders use renderWithIntl (i18n wiring from #1369) so t() calls resolve
+ * against the real en.json catalogue. A renderJa test asserts that Japanese
+ * chrome strings render correctly on this surface.
  */
 
-import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
+import {
+  renderWithIntl,
+  renderJa,
+  screen,
+} from "@/components/test-utils/renderWithIntl";
 import PokedexFilterBar from "@/components/pokedex/PokedexFilterBar";
 import type { PokedexFilters } from "@/lib/pokemon/filter";
 import type { PokedexSortOrder } from "@/lib/pokedex/sort";
@@ -54,7 +62,7 @@ function renderBar(
     superuserMasteryLocked = false,
   } = handlers;
 
-  const result = render(
+  const result = renderWithIntl(
     <PokedexFilterBar
       filters={filters}
       sort={sort}
@@ -216,5 +224,80 @@ describe("PokedexFilterBar — existing filter controls", () => {
     const allMasteryBtn = masteryGroup.querySelector("button:not([disabled])");
     expect(allMasteryBtn).not.toBeNull();
     expect(allMasteryBtn).toHaveTextContent("All");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Japanese locale — chrome strings render in Japanese (#1369)
+// ---------------------------------------------------------------------------
+
+describe("PokedexFilterBar — Japanese locale", () => {
+  it("renders the sort label in Japanese", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.sortBy = "並び替え"
+    expect(screen.getByLabelText("並び替え")).toBeInTheDocument();
+  });
+
+  it("renders the search label in Japanese", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.searchAriaLabel = "Pokémon を検索"
+    expect(screen.getByRole("textbox", { name: "Pokémon を検索" })).toBeInTheDocument();
+  });
+
+  it("renders the generation All pill in Japanese", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.generationAll = "すべて"
+    const genGroup = screen.getByRole("group", { name: "世代でフィルター" });
+    expect(genGroup.querySelector("button[aria-pressed]")).toHaveTextContent("すべて");
+  });
+
+  it("renders a Gen I pill in Japanese as 第I世代", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json pokedex.generationLabel = "第{gen}世代" → "第I世代"
+    expect(screen.getByRole("button", { name: "第I世代" })).toBeInTheDocument();
   });
 });

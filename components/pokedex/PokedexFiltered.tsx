@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect, useId, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { useSearchParams, useRouter } from "next/navigation";
 import { filterPokemon, parseFilters } from "@/lib/pokemon/filter";
 import type { PokemonCellData, PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
@@ -91,6 +92,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
   const router = useRouter();
   const { flags } = useSuperuser();
   const { locale } = usePokemonLocaleContext();
+  const t = useTranslations("pokedex");
 
   const filters = parseFilters(searchParams);
   // If the URL has a sort param, use it. Otherwise fall back to the localStorage
@@ -249,10 +251,10 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
               strokeLinecap="round"
             />
           </svg>
-          <span>Filters</span>
+          <span>{t("filters")}</span>
           {!isOpen && activeCount > 0 && (
             <span
-              aria-label={`${activeCount} active filter${activeCount === 1 ? "" : "s"}`}
+              aria-label={t("activeFilters", { count: activeCount })}
               className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--theme-accent)] px-1.5 text-xs font-semibold text-white"
             >
               {activeCount}
