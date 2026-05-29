@@ -3726,7 +3726,6 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Locale smoke tests — Japanese (mandatory locale coverage per AGENTS.md)
 // ---------------------------------------------------------------------------
 
@@ -3776,7 +3775,7 @@ describe("ReviewSession locale smoke — Japanese", () => {
     await user.click(easyBtn);
 
     await waitFor(() =>
-      expect(screen.getByText(/すべて完了/i)).toBeInTheDocument(),
+      expect(screen.getByText("すべて完了！")).toBeInTheDocument(),
     );
   });
 
@@ -3795,5 +3794,75 @@ describe("ReviewSession locale smoke — Japanese", () => {
     await waitFor(() =>
       expect(screen.getByText(/予期しないエラーにより採点を保存できませんでした/i)).toBeInTheDocument(),
     );
+  });
+
+  it("renders the review-wall heading in Japanese (1日のレビュー上限に達しました)", async () => {
+    // Put a due cry card in the session with a maxReviewsCryPerDay of 0 — this
+    // triggers REVIEW_SOFT_WALL, showing the reviewWall / doneForToday screen.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seedWithCry: NameReviewCard = {
+      ...FIXTURE_CARD,
+      cryUrl: "https://example.com/bulbasaur.ogg",
+    };
+    const dueCryCard: CryReviewCard = {
+      ...seedWithCry,
+      id: CRY_ID_OFFSET + 1,
+      pokemonId: 1,
+      cardType: "cry",
+      subjectKey: "1",
+      state: {
+        stability: 5,
+        difficulty: 1,
+        elapsedDays: 0,
+        scheduledDays: 5,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-17",
+        lastReview: "2026-05-01",
+        firstSeen: "2026-04-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    mockSeedPokemon.mockReturnValue([seedWithCry]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [dueCryCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      evolutionCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+    });
+
+    renderJa(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("1日のレビュー上限に達しました"),
+      ).toBeInTheDocument();
+    });
+    // The "Done for today" button text should also be in Japanese.
+    expect(screen.getByText("今日はここまで")).toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 });

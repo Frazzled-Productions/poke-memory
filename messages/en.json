@@ -296,6 +296,8 @@
     "loadingAriaLabel": "Loading review session",
     "noCardTypesEnabled": "No card types enabled",
     "noCardTypesEnabledBody": "Enable at least one card type in <link>Settings</link> to start reviewing.",
+    "todayNew": "new",
+    "todayReviewed": "reviewed",
     "noScopeMatch": "No Pokémon match your scope",
     "noScopeMatchBody": "Adjust the filter above, or clear it to keep practising.",
     "clearScope": "Clear scope",

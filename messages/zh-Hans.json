@@ -296,6 +296,8 @@
     "loadingAriaLabel": "加载复习会话中",
     "noCardTypesEnabled": "未启用任何卡片类型",
     "noCardTypesEnabledBody": "请在<link>设置</link>中至少启用一种卡片类型以开始复习。",
+    "todayNew": "新卡",
+    "todayReviewed": "已复习",
     "noScopeMatch": "没有符合您范围的宝可梦",
     "noScopeMatchBody": "请调整上方的筛选条件，或清除后继续练习。",
     "clearScope": "清除范围",

@@ -296,6 +296,8 @@
     "loadingAriaLabel": "載入複習工作階段中",
     "noCardTypesEnabled": "未啟用任何卡片類型",
     "noCardTypesEnabledBody": "請在<link>設定</link>中至少啟用一種卡片類型以開始複習。",
+    "todayNew": "新卡",
+    "todayReviewed": "已複習",
     "noScopeMatch": "沒有符合您範圍的寶可夢",
     "noScopeMatchBody": "請調整上方的篩選條件，或清除後繼續練習。",
     "clearScope": "清除範圍",
