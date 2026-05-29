@@ -662,6 +662,21 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `stale-preview-check.yml` — Stale qa preview check
+
+| | |
+|---|---|
+| **Trigger** | `schedule` (daily `30 8 * * *` cron, 08:30 UTC, after the auto-release window) and `workflow_dispatch`. |
+| **Job** | `check` |
+| **What it does** | Compares `origin/qa`'s tip SHA with the head SHA of the most recent `QA Preview Deploy` run. When they diverge and an open `qa -> main` promotion PR exists, upserts a marker comment on that PR (HTML marker `<!-- stale-preview-check -->`) linking to the `QA Preview Deploy` dispatch URL. When the preview catches up, removes the marker comment. |
+| **Why a dedicated workflow** | The `/batch-issues` skill's wrap-up rule "re-fire the preview after any qa-landing mini-batch work" only fires inside an active session. When mini-batch work lands on `qa` outside a session (a manual PR, an `/auto` run, a follow-up direct push), nobody re-fires the deploy and the maintainer QAs against a stale preview. This cron catches that gap. (#1333.) |
+| **Permissions** | `contents: read`, `pull-requests: write`, `actions: read` — the third is required so `gh run list --workflow="QA Preview Deploy"` can read past run metadata under `GITHUB_TOKEN`. |
+| **Idempotency** | The marker comment is upserted (patched in place) rather than appended, so a missed cron tick does not produce a stack of duplicate comments. |
+| **Required secrets** | None (uses `GITHUB_TOKEN`). |
+| **Concurrency** | Default; no concurrency group. The work is cheap (a few API calls) and runs once per day. |
+
+---
+
 ### `auto-release.yml` — Auto Release
 
 | | |

@@ -218,7 +218,7 @@ After every batch is merged into `qa` and the queue is drained:
    - **What went well** — patterns worth keeping; honest, not performative.
    - **What went poorly** — named incidents with one-line cost and root-cause attribution. Distinguish "we caught this in the session" from "the user caught it for us". Surface dropped scope, partial-fix loops, symptom-chasing, fire-and-forget async work, silent agent stalls, missed memory consultations, and any moment the orchestrator paraphrased an issue body instead of reading it verbatim.
    - **Concrete improvements** — proposed edits to this skill, agent definitions (`.claude/agents/**`), AGENTS.md, or `.github/workflows/**`. Bias toward writing the edits in the same PR that closes out the session, not filing a follow-up issue ("file an issue" for a process gap defers the fix to the next session and the failure mode usually recurs first).
-   - **Memories** — new feedback / reference memories to file, or stale ones to update / remove. Verify each `Write` succeeds and the file exists before claiming it was saved (memory: `dont_claim_memory_without_verify`).
+   - **Memories** — new feedback / reference memories to file, or stale ones to update / remove. Verify each `Write` succeeds and the file exists before claiming it was saved (memory: `feedback_dont_claim_memory_without_verify`).
 
    Hand the retro back to the user as a punch list. If the user picks improvements to implement, fold them into the same PR (or a separate retro PR if they touch many files); never let a retro lapse silently.
 

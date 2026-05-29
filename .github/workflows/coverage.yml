@@ -114,7 +114,7 @@ jobs:
                 "",
                 `_Global floor: Statements ${floor.statements} / Branches ${floor.branches} / Functions ${floor.functions} / Lines ${floor.lines}. ` +
                   "Changed lines must hit a 90% patch-coverage bar. See the `coverage` workflow._",
-                "_Floor values come from `coverage-floor.json` at the repo root — the single source consumed by `vitest.config.ts` and this comment. AGENTS.md and WORKFLOW.md reference the file by name rather than copying the numbers, so a ratchet only needs to touch the JSON. (#1333.)_",
+                "_Floor values come from `coverage-floor.json` at the repo root, the single source consumed by `vitest.config.ts` and this comment. AGENTS.md and WORKFLOW.md reference the file by name rather than copying the numbers, so a ratchet only needs to touch the JSON. (#1333.)_",
               ].join("\n"));
             ' > /tmp/coverage-table.md
           else

@@ -22,6 +22,12 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  # actions: read so `gh run list --workflow="QA Preview Deploy"` can read
+  # past run metadata. Without this the GITHUB_TOKEN gets a 403 on the
+  # Actions API and LAST_PREVIEW_SHA is silently empty, making `stale`
+  # unconditionally true and the workflow post a spurious comment every
+  # day. (cron-health-monitor.yml uses the same pattern.)
+  actions: read
 
 jobs:
   check:
