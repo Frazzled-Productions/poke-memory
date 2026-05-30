@@ -161,3 +161,24 @@ export const KEY_POKEDEX_SORT = "poke-memory:pokedex-sort:v1";
  * read/written for the guest path.
  */
 export const KEY_CLIENT_SALT = "poke-memory:client-salt:v1";
+
+// ─── Machine-translation banner dismissal ────────────────────────────────────
+
+/**
+ * Key prefix for per-locale MT-banner dismissal flags.
+ * Each locale gets its own key so reads are fast and synchronous — the banner
+ * component reads the key for the active locale in a `useEffect` after hydration.
+ *
+ * Full key format: `poke-memory:mt-banner-dismissed:<locale>`
+ * (e.g. `poke-memory:mt-banner-dismissed:ja`)
+ *
+ * Dismissal is also persisted in `user_settings.dismissedMtBannerLocales` for
+ * cross-device sync; `pullAndMerge` writes these keys as a write-through on
+ * every pull so the banner's read path never needs to consult settings (#1387).
+ */
+const MT_BANNER_DISMISSED_PREFIX = "poke-memory:mt-banner-dismissed";
+
+/** Returns the localStorage key for the given locale's MT-banner dismissal flag. */
+export function mtBannerDismissedKey(locale: string): string {
+  return `${MT_BANNER_DISMISSED_PREFIX}:${locale}`;
+}
