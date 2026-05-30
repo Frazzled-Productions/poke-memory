@@ -113,26 +113,6 @@ export function masteredSpeciesEvents(
 }
 
 // ---------------------------------------------------------------------------
-// countMasteredSpecies
-// ---------------------------------------------------------------------------
-
-/**
- * Count the number of mastered species in the full card array.
- * Equivalent to `masteredSpeciesIds(...).size` but avoids building the Set
- * when only the count is needed.
- *
- * Uses the same species-level (both-legs) rule as `masteredSpeciesIds`.
- */
-export function countMasteredSpecies(
-  cards: readonly ReviewableCard[],
-  masteryRepetitions = MASTERY_REPETITIONS,
-  forceAllMastered = false,
-  locale: AppLocale = "en",
-): number {
-  return masteredSpeciesEvents(cards, masteryRepetitions, forceAllMastered, locale).length;
-}
-
-// ---------------------------------------------------------------------------
 // nameCardsForLocale — extract name cards scoped to a locale
 // ---------------------------------------------------------------------------
 
