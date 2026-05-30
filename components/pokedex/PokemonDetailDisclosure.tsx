@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCardClass } from "@/lib/review/useCardClass";
 import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
 import { colStack, sectionLabelSmSubtle } from "@/lib/utils/class-names";
@@ -204,6 +205,7 @@ export function PokemonDetailDisclosure({
   pokemon: SeedPokemon;
   forms?: SeedPokemon[];
 }) {
+  const t = useTranslations("pokedex");
   const { flags } = useSuperuser();
   const { id, name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
   const rawCardClass = useCardClass(id);
@@ -319,7 +321,7 @@ export function PokemonDetailDisclosure({
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
             {nextReview.status === "due-today"
               ? "Due today"
-              : `Next review: in ${nextReview.days} ${nextReview.days === 1 ? "day" : "days"}`}
+              : t("nextReviewInDays", { count: nextReview.days })}
           </p>
         )}
 

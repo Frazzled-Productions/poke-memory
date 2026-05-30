@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
 // Mock next/image — renders as a plain img so alt/src/width assertions work
@@ -130,7 +131,7 @@ describe("PokemonDetailDisclosure — audio buttons", () => {
 
   it("main pokemon row renders both TTS and cry buttons with disambiguated aria-labels", () => {
     const pokemon = makePokemon({ displayName: "Bulbasaur", cryUrl: "https://example.com/cries/1.ogg" });
-    render(<PokemonDetailDisclosure pokemon={pokemon} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
 
     expect(screen.getByRole("button", { name: "Hear Bulbasaur" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play Bulbasaur cry" })).toBeInTheDocument();
@@ -138,7 +139,7 @@ describe("PokemonDetailDisclosure — audio buttons", () => {
 
   it("main pokemon cry button is omitted when cryUrl is null", () => {
     const pokemon = makePokemon({ cryUrl: null });
-    render(<PokemonDetailDisclosure pokemon={pokemon} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
 
     expect(screen.getByRole("button", { name: "Hear Bulbasaur" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Play Bulbasaur cry" })).not.toBeInTheDocument();
@@ -156,7 +157,7 @@ describe("PokemonDetailDisclosure — audio buttons", () => {
       name: "raichu-alola",
       cryUrl: "https://example.com/cries/raichu-alola.ogg",
     });
-    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
 
     expect(screen.getByRole("button", { name: "Hear Alolan Raichu" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play Alolan Raichu cry" })).toBeInTheDocument();
@@ -165,7 +166,7 @@ describe("PokemonDetailDisclosure — audio buttons", () => {
   it("TTS button calls speakName with the pokemon display name", async () => {
     const user = userEvent.setup();
     const pokemon = makePokemon({ displayName: "Bulbasaur" });
-    render(<PokemonDetailDisclosure pokemon={pokemon} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
 
     await user.click(screen.getByRole("button", { name: "Hear Bulbasaur" }));
     expect(mockSpeakName).toHaveBeenCalledWith("Bulbasaur", 1);
@@ -175,7 +176,7 @@ describe("PokemonDetailDisclosure — audio buttons", () => {
     const user = userEvent.setup();
     const cryUrl = "https://example.com/cries/1.ogg";
     const pokemon = makePokemon({ cryUrl });
-    render(<PokemonDetailDisclosure pokemon={pokemon} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
 
     await user.click(screen.getByRole("button", { name: "Play Bulbasaur cry" }));
     expect(mockPlayCry).toHaveBeenCalledWith(cryUrl);
@@ -197,7 +198,7 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
     mockCardClass.value = "locked";
     const pokemon = makePokemon({ id: 37, speciesId: 37, displayName: "Vulpix", name: "Vulpix" });
     const form = makeAltForm();
-    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
 
     expect(screen.queryByRole("heading", { name: "Forms", level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText("Alolan Vulpix")).not.toBeInTheDocument();
@@ -209,7 +210,7 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
     mockPretendAllMastered.value = true;
     const pokemon = makePokemon({ id: 37, speciesId: 37, displayName: "Vulpix", name: "Vulpix" });
     const form = makeAltForm();
-    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
 
     expect(screen.getByRole("heading", { name: "Forms", level: 2 })).toBeInTheDocument();
     expect(screen.getByText("Alolan Vulpix")).toBeInTheDocument();
@@ -219,7 +220,7 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
     mockCardClass.value = "learning";
     const pokemon = makePokemon({ id: 37, speciesId: 37, displayName: "Vulpix", name: "Vulpix" });
     const form = makeAltForm();
-    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
 
     expect(screen.getByRole("heading", { name: "Forms", level: 2 })).toBeInTheDocument();
     expect(screen.getByText("Alolan Vulpix")).toBeInTheDocument();
@@ -229,7 +230,7 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
     mockCardClass.value = "mastered";
     const pokemon = makePokemon({ id: 37, speciesId: 37, displayName: "Vulpix", name: "Vulpix" });
     const form = makeAltForm();
-    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
 
     expect(screen.getByRole("heading", { name: "Forms", level: 2 })).toBeInTheDocument();
     expect(screen.getByText("Alolan Vulpix")).toBeInTheDocument();
@@ -248,7 +249,7 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
       displayName: "Some Other Form",
       formSlug: "other",
     });
-    render(<PokemonDetailDisclosure pokemon={alolanVulpix} forms={[siblingForm]} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={alolanVulpix} forms={[siblingForm]} />);
 
     expect(screen.getByText("Some Other Form")).toBeInTheDocument();
     // The current form (Alolan Vulpix as primary pokemon name) appears in heading
@@ -285,7 +286,7 @@ describe("PokemonDetailDisclosure — sprite sizes (#931)", () => {
 
   it("main sprite renders at POKEDEX_DETAIL_SPRITE_SIZE", () => {
     const pokemon = makePokemon({ spriteUrl: "/sprites/pokemon/1.png" });
-    render(<PokemonDetailDisclosure pokemon={pokemon} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
 
     const img = screen.getByRole("img", { name: "Bulbasaur" });
     expect(img).toHaveAttribute("width", String(POKEDEX_DETAIL_SPRITE_SIZE));
@@ -295,7 +296,7 @@ describe("PokemonDetailDisclosure — sprite sizes (#931)", () => {
   it("alt-form thumbnail in FormBlock renders at POKEDEX_NODE_SPRITE_SIZE", () => {
     const pokemon = makePokemon({ cryUrl: null });
     const form = makeAltForm({ displayName: "Alolan Raichu" });
-    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
 
     // The thumbnail img inside the FormBlock summary is the one that comes
     // before the span text; query by alt to target it specifically.
@@ -312,7 +313,7 @@ describe("PokemonDetailDisclosure — sprite sizes (#931)", () => {
   it("alt-form full sprite in FormBlock renders at POKEDEX_FORM_SPRITE_SIZE", () => {
     const pokemon = makePokemon({ cryUrl: null });
     const form = makeAltForm({ displayName: "Alolan Raichu" });
-    render(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} forms={[form]} />);
 
     const fullSprite = screen.getAllByRole("img", { name: "Alolan Raichu" }).find(
       (el) => el.getAttribute("width") === String(POKEDEX_FORM_SPRITE_SIZE),

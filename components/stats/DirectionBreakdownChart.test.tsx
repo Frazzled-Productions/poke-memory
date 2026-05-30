@@ -10,8 +10,9 @@
  * synthetic payload so TooltipBody (and its `statValue` line) executes.
  */
 
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { screen } from "@testing-library/react";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { DirectionBreakdownChart } from "@/components/stats/DirectionBreakdownChart";
 import type { DirectionBreakdownRow } from "@/lib/stats/direction-breakdown";
 
@@ -74,7 +75,7 @@ const ROWS: readonly DirectionBreakdownRow[] = [
 
 describe("DirectionBreakdownChart", () => {
   it("renders the Accuracy by card direction heading", () => {
-    render(<DirectionBreakdownChart rows={ROWS} />);
+    renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     expect(
       screen.getByRole("heading", { name: /accuracy by card direction/i }),
     ).toBeInTheDocument();
@@ -85,25 +86,25 @@ describe("DirectionBreakdownChart", () => {
       { direction: "name",    total: 0, passes: 0, accuracy: null, disabled: false },
       { direction: "reverse", total: 0, passes: 0, accuracy: null, disabled: false },
     ];
-    render(<DirectionBreakdownChart rows={emptyRows} />);
+    renderWithIntl(<DirectionBreakdownChart rows={emptyRows} />);
     expect(
       screen.getByText(/no reviews recorded yet/i),
     ).toBeInTheDocument();
   });
 
   it("renders the bar chart when rows have data", () => {
-    render(<DirectionBreakdownChart rows={ROWS} />);
+    renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     expect(screen.getByTestId("bar-chart")).toBeInTheDocument();
   });
 
   it("renders the TooltipBody content (statValue line) via the mocked Tooltip", () => {
-    render(<DirectionBreakdownChart rows={ROWS} />);
+    renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     // TooltipBody renders "Accuracy: 85%" using the statValue class when hasData is true.
     expect(screen.getByText(/accuracy: 85%/i)).toBeInTheDocument();
   });
 
   it("renders the per-direction review count list", () => {
-    render(<DirectionBreakdownChart rows={ROWS} />);
+    renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     expect(screen.getByRole("list")).toBeInTheDocument();
   });
 });

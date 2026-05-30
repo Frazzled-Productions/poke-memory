@@ -13,7 +13,7 @@
 
 import { useState, useMemo, useId } from "react";
 import Image from "next/image";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import type {
   EvolutionFamily,
   FamilyEdge,
@@ -368,6 +368,7 @@ export function EvolutionWall({
   families: readonly EvolutionFamily[];
 }) {
   const tWidget = useTranslations("journey.evolutionWallWidget");
+  const format = useFormatter();
   const [filter, setFilter] = useState<FilterMode>("all");
   const [isOpen, setIsOpen] = useState(false);
   const headingId = useId();
@@ -425,11 +426,11 @@ export function EvolutionWall({
       <p className="mb-3 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
         {tWidget("familiesCompleted")}{" "}
         <span className="font-semibold tabular-nums text-foreground">
-          {stats.completedFamilies.toLocaleString("en-GB")}
+          {format.number(stats.completedFamilies)}
         </span>
         {" / "}
         <span className="tabular-nums">
-          {stats.totalFamilies.toLocaleString("en-GB")}
+          {format.number(stats.totalFamilies)}
         </span>
       </p>
 

@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations, useFormatter } from "next-intl";
 import type { GradeDistribution, GradeTrendPoint } from "@/lib/stats/grade-distribution";
 import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
 
@@ -36,6 +37,7 @@ type TooltipPayload = {
 };
 
 function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonly unknown[] }) {
+  const format = useFormatter();
   if (!active || !payload || payload.length === 0) return null;
   const d = (payload[0] as { payload: TooltipPayload }).payload;
   const rows: { label: string; key: keyof typeof GRADE_COLOURS; count: number }[] = [
@@ -55,11 +57,11 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonl
             className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
             style={{ backgroundColor: GRADE_COLOURS[key] }}
           />
-          {label}: {count.toLocaleString("en-GB")}
+          {label}: {format.number(count)}
         </p>
       ))}
       <p className="mt-1 border-t border-zinc-100 pt-1 tabular-nums text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-        Total: {d.total.toLocaleString("en-GB")}
+        Total: {format.number(d.total)}
       </p>
     </div>
   );
@@ -85,6 +87,7 @@ type Props = {
 // ---------------------------------------------------------------------------
 
 function OverallBar({ distribution }: { distribution: GradeDistribution }) {
+  const format = useFormatter();
   const { again, hard, good, easy, total } = distribution;
   if (total === 0) return null;
 
@@ -120,7 +123,7 @@ function OverallBar({ distribution }: { distribution: GradeDistribution }) {
           <li key={key} className="flex items-center gap-1.5">
             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${color}`} />
             <span className="tabular-nums">
-              {label}: {count.toLocaleString("en-GB")} (
+              {label}: {format.number(count)} (
               {total > 0 ? Math.round((count / total) * 100) : 0}%)
             </span>
           </li>
@@ -143,6 +146,8 @@ function OverallBar({ distribution }: { distribution: GradeDistribution }) {
  * intentionally NOT affected by the `pretendAllMastered` superuser flag.
  */
 export function GradeDistributionChart({ distribution, trend }: Props) {
+  const t = useTranslations("stats");
+  const format = useFormatter();
   // With leading zeros trimmed by `computeGradeTrend`, a non-empty `trend`
   // array always contains at least one week with data.
   const hasTrendData = trend.length > 0;
@@ -200,7 +205,7 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
                   .filter((p) => p.total > 0)
                   .map(
                     (p) =>
-                      `week of ${p.weekStart}: ${p.total} grade${p.total === 1 ? "" : "s"}`,
+                      `week of ${p.weekStart}: ${t("weeklyGradeCount", { count: p.total })}`,
                   )
                   .join(", ")}`}
               >

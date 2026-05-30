@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useFormatter } from "next-intl";
 import type { ActivityPoint } from "@/lib/stats/activity-history";
 import { isActivityHistoryEmpty } from "@/lib/stats/activity-history";
 import type { DateFormat } from "@/lib/utils/format-date";
@@ -55,6 +56,7 @@ function ChartTooltip({
   payload?: readonly unknown[];
   dateFormat: DateFormat;
 }) {
+  const format = useFormatter();
   if (!active || !payload || payload.length === 0) return null;
   const d = (payload[0] as { payload: TooltipPayload }).payload;
   const label = formatXTick(d.date, dateFormat);
@@ -66,7 +68,7 @@ function ChartTooltip({
           className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
           style={{ backgroundColor: REVIEWS_COLOUR }}
         />
-        Reviews: {d.reviews.toLocaleString("en-GB")}
+        Reviews: {format.number(d.reviews)}
       </p>
       {d.introduced > 0 && (
         <p className={statValue}>
@@ -74,7 +76,7 @@ function ChartTooltip({
             className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
             style={{ backgroundColor: INTRODUCED_COLOUR }}
           />
-          New cards introduced: {d.introduced.toLocaleString("en-GB")}
+          New cards introduced: {format.number(d.introduced)}
         </p>
       )}
     </div>

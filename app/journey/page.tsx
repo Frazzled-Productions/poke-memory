@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, useMemo } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import { useCountUp } from "@/lib/stats/useCountUp";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS } from "@/lib/review/session";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
@@ -114,14 +114,15 @@ function StatCard({
   value: number;
   accent?: string;
 }) {
+  const format = useFormatter();
   const animated = useCountUp(value);
   return (
     <div className={cardPanelPadded}>
       <p
         className={`text-2xl font-bold tabular-nums ${accent ?? "text-foreground"}`}
-        aria-label={`${value.toLocaleString("en-GB")} ${label}`}
+        aria-label={`${format.number(value)} ${label}`}
       >
-        {animated.toLocaleString("en-GB")}
+        {format.number(animated)}
       </p>
       <p className={cn("mt-0.5", mutedText)}>{label}</p>
     </div>
@@ -196,6 +197,7 @@ function RadialRing({
 
 function MasteryRings({ stats }: { stats: MasterySnapshot }) {
   const t = useTranslations("journey");
+  const format = useFormatter();
   const { totalCards, locked, learning, mastered } = stats;
   const masteredPct = pct(mastered, totalCards);
   const learningPct = pct(learning, totalCards);
@@ -269,7 +271,7 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
                 </span>
               </div>
               <p className="text-xl font-bold tabular-nums text-foreground">
-                {count.toLocaleString("en-GB")}
+                {format.number(count)}
               </p>
               <p className="text-xs text-zinc-400 dark:text-zinc-500">{ringPct}%</p>
             </div>
@@ -286,6 +288,7 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
 
 function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
   const t = useTranslations("journey");
+  const format = useFormatter();
   const { introduced, totalCards } = stats;
   const introPct = pct(introduced, totalCards);
   const introducedAnimated = useCountUp(introduced);
@@ -312,9 +315,9 @@ function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
             className="text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
             aria-label={`${introduced} of ${totalCards} introduced`}
           >
-            <span>{introducedAnimated.toLocaleString("en-GB")}</span>
+            <span>{format.number(introducedAnimated)}</span>
             <span className="text-base font-normal text-zinc-400 dark:text-zinc-500">
-              {" / "}{totalCards.toLocaleString("en-GB")}
+              {" / "}{format.number(totalCards)}
             </span>
           </p>
           <p className={cn("mt-0.5", mutedText)}>

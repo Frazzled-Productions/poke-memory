@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   DIRECTION_LABELS,
   totalDirectionReviews,
@@ -72,6 +73,7 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
  * intentionally unaffected by the `pretendAllMastered` superuser flag.
  */
 export function DirectionBreakdownChart({ rows }: Props) {
+  const t = useTranslations("stats");
   // Only show directions that have at least one review. Directions with zero
   // reviews (never used, or disabled before any history was recorded) are pure
   // clutter and are hidden entirely.
@@ -190,7 +192,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
                     )}
                   </span>
                   <span>
-                    {row.total} review{row.total === 1 ? "" : "s"}
+                    {t("directionReviewCount", { count: row.total })}
                   </span>
                 </li>
               ))}

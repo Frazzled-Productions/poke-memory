@@ -14,7 +14,7 @@
  */
 
 import { useState, useId, useMemo, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import type { CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { snapshotAtPosition } from "@/lib/timeline/reconstruct";
 import { chartTickText } from "@/lib/utils/class-names";
@@ -73,10 +73,11 @@ function CountPill({
   label: string;
   colour: string;
 }) {
+  const format = useFormatter();
   return (
     <div className="flex flex-col items-center">
       <span className={`text-2xl font-bold tabular-nums ${colour}`}>
-        {count.toLocaleString("en-GB")}
+        {format.number(count)}
       </span>
       <span className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
     </div>

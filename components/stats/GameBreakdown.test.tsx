@@ -1,5 +1,6 @@
-import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
+import { screen, fireEvent } from "@testing-library/react";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { GameBreakdown } from "@/components/stats/GameBreakdown";
 import type { GameStats } from "@/lib/stats/per-game";
 
@@ -17,57 +18,57 @@ const X_Y: GameStats = { slug: "x-y", total: 72, introduced: 72, mastered: 72 };
 
 describe("GameBreakdown", () => {
   it("renders the section heading", () => {
-    render(<GameBreakdown perGame={[RED_BLUE]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE]} />);
     expect(screen.getByRole("heading", { level: 2, name: "By game" })).toBeInTheDocument();
   });
 
   it("shows an empty state when perGame is empty", () => {
-    render(<GameBreakdown perGame={[]} />);
+    renderWithIntl(<GameBreakdown perGame={[]} />);
     expect(screen.getByText(/No game data available/)).toBeInTheDocument();
   });
 
   it("renders one accordion button per generation group", () => {
     // red-blue is Gen I, gold-silver is Gen II, x-y is Gen VI.
-    render(<GameBreakdown perGame={[RED_BLUE, GOLD_SILVER, X_Y]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE, GOLD_SILVER, X_Y]} />);
     // Three separate generations → three accordion buttons.
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(3);
   });
 
   it("shows the generation label in each accordion header", () => {
-    render(<GameBreakdown perGame={[RED_BLUE]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE]} />);
     expect(screen.getByText("Generation I")).toBeInTheDocument();
   });
 
   it("shows game count and species mastered summary in the accordion header", () => {
-    render(<GameBreakdown perGame={[RED_BLUE]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE]} />);
     // "1 game · 10/151 species mastered"
     expect(screen.getByText(/1 game/)).toBeInTheDocument();
     expect(screen.getByText(/10\/151 species mastered/)).toBeInTheDocument();
   });
 
   it("game rows are hidden until the accordion is expanded", () => {
-    render(<GameBreakdown perGame={[RED_BLUE]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE]} />);
     // Game name should NOT be visible yet.
     expect(screen.queryByText("Pokémon Red/Blue")).not.toBeInTheDocument();
   });
 
   it("expands to show game rows when the accordion button is clicked", () => {
-    render(<GameBreakdown perGame={[RED_BLUE]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE]} />);
     const button = screen.getByRole("button", { name: /Generation I/i });
     fireEvent.click(button);
     expect(screen.getByText("Pokémon Red/Blue")).toBeInTheDocument();
   });
 
   it("shows mastered/total count in the expanded row", () => {
-    render(<GameBreakdown perGame={[RED_BLUE]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE]} />);
     const button = screen.getByRole("button", { name: /Generation I/i });
     fireEvent.click(button);
     expect(screen.getByText("10/151")).toBeInTheDocument();
   });
 
   it("collapses the accordion when clicked a second time", () => {
-    render(<GameBreakdown perGame={[RED_BLUE]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE]} />);
     const button = screen.getByRole("button", { name: /Generation I/i });
     fireEvent.click(button);
     expect(screen.getByText("Pokémon Red/Blue")).toBeInTheDocument();
@@ -76,7 +77,7 @@ describe("GameBreakdown", () => {
   });
 
   it("sets aria-expanded correctly on the accordion button", () => {
-    render(<GameBreakdown perGame={[RED_BLUE]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE]} />);
     const button = screen.getByRole("button", { name: /Generation I/i });
     expect(button).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(button);
@@ -85,7 +86,7 @@ describe("GameBreakdown", () => {
 
   it("multiple games in the same generation appear under one accordion", () => {
     const YELLOW: GameStats = { slug: "yellow", total: 151, introduced: 0, mastered: 0 };
-    render(<GameBreakdown perGame={[RED_BLUE, YELLOW]} />);
+    renderWithIntl(<GameBreakdown perGame={[RED_BLUE, YELLOW]} />);
     // Both are Gen I — only one accordion button.
     expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(screen.getByText(/2 games/)).toBeInTheDocument();
@@ -97,7 +98,7 @@ describe("GameBreakdown", () => {
   });
 
   it("100% mastered is displayed correctly as 100%", () => {
-    render(<GameBreakdown perGame={[X_Y]} />);
+    renderWithIntl(<GameBreakdown perGame={[X_Y]} />);
     const button = screen.getByRole("button", { name: /Generation VI/i });
     fireEvent.click(button);
     expect(screen.getByText("72/72")).toBeInTheDocument();
@@ -105,7 +106,7 @@ describe("GameBreakdown", () => {
   });
 
   it("0% mastered shows 0%", () => {
-    render(<GameBreakdown perGame={[GOLD_SILVER]} />);
+    renderWithIntl(<GameBreakdown perGame={[GOLD_SILVER]} />);
     const button = screen.getByRole("button", { name: /Generation II/i });
     fireEvent.click(button);
     expect(screen.getByText("0%")).toBeInTheDocument();

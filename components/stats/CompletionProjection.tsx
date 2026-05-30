@@ -1,5 +1,6 @@
 "use client";
 
+import { useFormatter } from "next-intl";
 import type { CompletionProjection } from "@/lib/stats/completion-projection";
 import type { DateFormat } from "@/lib/utils/format-date";
 import { formatDate } from "@/lib/utils/format-date";
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Props) {
+  const format = useFormatter();
   return (
     <section aria-labelledby="completion-projection-heading">
       <h2
@@ -59,7 +61,7 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
               <span>
                 <span className="font-medium text-foreground">
-                  {projection.remaining.toLocaleString("en-GB")}
+                  {format.number(projection.remaining)}
                 </span>{" "}
                 species remaining
               </span>

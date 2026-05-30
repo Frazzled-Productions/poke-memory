@@ -18,8 +18,13 @@
  * The page is responsible for evaluating those conditions; this component
  * just renders the message for a given day count. The wording is hedged on
  * purpose: "roughly", "if you keep reviewing daily" - no false precision.
+ *
+ * Note: spellOutSmall (English-only "one"/"two"/etc.) was removed in #1408.
+ * ICU plural formatting handles both count text and locale-aware number
+ * rendering via the `#` placeholder.
  */
 
+import { useTranslations } from "next-intl";
 import { mutedText } from "@/lib/utils/class-names";
 
 type Props = {
@@ -35,17 +40,8 @@ type Props = {
   masteryDays: number;
 };
 
-const SMALL_NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"] as const;
-
-function spellOutSmall(n: number): string {
-  if (n >= 0 && n < SMALL_NUMBER_WORDS.length && Number.isInteger(n)) {
-    return SMALL_NUMBER_WORDS[n];
-  }
-  return n.toLocaleString("en-GB");
-}
-
 export function FirstMasteryHint({ days, masteryReps, masteryDays }: Props) {
-  const repsWord = spellOutSmall(masteryReps);
+  const t = useTranslations("stats");
   return (
     <p
       className={mutedText}
@@ -54,10 +50,10 @@ export function FirstMasteryHint({ days, masteryReps, masteryDays }: Props) {
     >
       First mastery in roughly{" "}
       <span className="font-medium text-foreground tabular-nums">
-        {days.toLocaleString("en-GB")}
+        {t("firstMasteryDays", { count: days })}
       </span>{" "}
-      day{days === 1 ? "" : "s"} if you keep reviewing daily. Mastery needs{" "}
-      {repsWord} successful review{masteryReps === 1 ? "" : "s"} and a{" "}
+      if you keep reviewing daily. Mastery needs{" "}
+      {t("masterySuccessfulReviews", { count: masteryReps })} and a{" "}
       {masteryDays}-day interval.
     </p>
   );
