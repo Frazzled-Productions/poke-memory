@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
 import { OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 
@@ -43,7 +44,7 @@ describe("FsrsOptimizerSection", () => {
 
   describe("guest state (not signed in)", () => {
     it("shows sign-in prompt and no button", () => {
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={false}
@@ -58,7 +59,7 @@ describe("FsrsOptimizerSection", () => {
 
   describe("superuser paused", () => {
     it("shows disabled button with 'Sync paused (superuser)' label", () => {
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -77,7 +78,7 @@ describe("FsrsOptimizerSection", () => {
 
     it("disables button with 'Next optimization in N days' when optimized 2 days ago", () => {
       const optimizedAt = new Date(Date.now() - 2 * MS_PER_DAY).toISOString();
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -88,7 +89,7 @@ describe("FsrsOptimizerSection", () => {
       );
       const button = screen.getByTestId("fsrs-optimize-button");
       expect(button).toBeDisabled();
-      expect(button).toHaveTextContent(/Next optimization in \d+ days/);
+      expect(button).toHaveTextContent(/Next optimisation in \d+ days/);
       expect(screen.getByTestId("fsrs-optimize-last-run")).toBeInTheDocument();
     });
 
@@ -98,7 +99,7 @@ describe("FsrsOptimizerSection", () => {
       vi.setSystemTime(fixedNow);
       try {
         const optimizedAt = new Date(fixedNow - OPTIMIZER_COOLDOWN_MS).toISOString();
-        render(
+        renderWithIntl(
           <FsrsOptimizerSection
             {...defaultProps}
             isSignedIn={true}
@@ -117,7 +118,7 @@ describe("FsrsOptimizerSection", () => {
 
     it("enables button when optimized 8 days ago (cooldown elapsed)", () => {
       const optimizedAt = new Date(Date.now() - 8 * MS_PER_DAY).toISOString();
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -134,7 +135,7 @@ describe("FsrsOptimizerSection", () => {
 
   describe("signed in — not enough reviews", () => {
     it("shows disabled button and review-count help text", () => {
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -149,7 +150,7 @@ describe("FsrsOptimizerSection", () => {
     });
 
     it("does not render the last-optimized timestamp", () => {
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -162,7 +163,7 @@ describe("FsrsOptimizerSection", () => {
 
   describe("signed in — enough reviews", () => {
     it("renders an enabled Optimise now button", () => {
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -175,7 +176,7 @@ describe("FsrsOptimizerSection", () => {
     });
 
     it("shows last-optimized timestamp when fsrsWeightsOptimizedAt is set", () => {
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -193,7 +194,7 @@ describe("FsrsOptimizerSection", () => {
     });
 
     it("does not render the last-optimized timestamp when not set", () => {
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -216,7 +217,7 @@ describe("FsrsOptimizerSection", () => {
       });
       vi.stubGlobal("fetch", mockFetch);
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -239,7 +240,7 @@ describe("FsrsOptimizerSection", () => {
         vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -266,7 +267,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -293,7 +294,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -320,7 +321,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -347,7 +348,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -374,7 +375,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -401,7 +402,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -428,7 +429,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -455,7 +456,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -482,7 +483,7 @@ describe("FsrsOptimizerSection", () => {
         }),
       );
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}
@@ -502,7 +503,7 @@ describe("FsrsOptimizerSection", () => {
     it("shows connection-error text when fetch throws (network failure)", async () => {
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
 
-      render(
+      renderWithIntl(
         <FsrsOptimizerSection
           {...defaultProps}
           isSignedIn={true}

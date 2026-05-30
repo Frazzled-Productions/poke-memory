@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ChildFriendlySummary from "@/components/privacy/ChildFriendlySummary";
 import { resolveLocale } from "@/i18n/request";
+import { inlineLink } from "@/lib/utils/class-names";
 
 export const metadata: Metadata = {
   title: "Privacy Notice - Poké Memory",
@@ -54,7 +55,7 @@ export default async function PrivacyPage() {
             about this notice or your personal data, contact{" "}
             <a
               href="mailto:fbrookhouse@gmail.com"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               fbrookhouse@gmail.com
             </a>
@@ -464,7 +465,7 @@ export default async function PrivacyPage() {
               href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               GitHub Privacy Statement
             </a>
@@ -473,7 +474,7 @@ export default async function PrivacyPage() {
               href="https://policies.google.com/privacy"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               Google Privacy Policy
             </a>
@@ -515,7 +516,7 @@ export default async function PrivacyPage() {
             delete your account or request erasure (see{" "}
             <a
               href="#section-rights"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               Your rights
             </a>
@@ -566,7 +567,7 @@ export default async function PrivacyPage() {
               in Supabase, please contact us at{" "}
               <a
                 href="mailto:fbrookhouse@gmail.com"
-                className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+                className={inlineLink}
               >
                 fbrookhouse@gmail.com
               </a>{" "}
@@ -585,7 +586,7 @@ export default async function PrivacyPage() {
             To exercise any of these rights, email{" "}
             <a
               href="mailto:fbrookhouse@gmail.com"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               fbrookhouse@gmail.com
             </a>{" "}
@@ -611,7 +612,7 @@ export default async function PrivacyPage() {
               href="https://ico.org.uk/make-a-complaint"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               ico.org.uk/make-a-complaint
             </a>
@@ -638,7 +639,7 @@ export default async function PrivacyPage() {
             contact us at{" "}
             <a
               href="mailto:fbrookhouse@gmail.com"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               fbrookhouse@gmail.com
             </a>{" "}
@@ -660,7 +661,7 @@ export default async function PrivacyPage() {
             be announced via the{" "}
             <a
               href="/whats-new"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               What&rsquo;s new
             </a>{" "}
@@ -695,7 +696,7 @@ export default async function PrivacyPage() {
               href="https://pokeapi.co"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               PokéAPI
             </a>
@@ -719,7 +720,7 @@ export default async function PrivacyPage() {
             law), see the{" "}
             <a
               href="/terms"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               Terms of Use
             </a>

@@ -735,7 +735,10 @@ test.describe("Pokédex detail — next review date (#992)", () => {
     await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
 
     // The review-date line should appear with "Next review: in N days" for a future card.
-    await expect(page.getByText(/Next review: in \d+ days?/)).toBeVisible();
+    // The ICU `#` placeholder applies locale digit grouping, so a far-future date (e.g.
+    // 2099-01-01 → ~26,600 days) renders as "26,645 days" with a thousands separator.
+    // Allow commas, narrow no-break spaces (U+202F), and regular spaces in the number.
+    await expect(page.getByText(/Next review: in [\d,   ]+ days?/)).toBeVisible();
   });
 
   test("review date is absent for a locked (never-started) Pokémon", async ({ page }) => {

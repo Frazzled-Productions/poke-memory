@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 import { getTypeName, type TypeTranslations } from "@/lib/i18n/typeNames";
+import { FilterChip } from "@/components/ui/FilterChip";
 
 // ---------------------------------------------------------------------------
 // Roman numeral map for generation pills
@@ -113,20 +114,15 @@ export function PastureSearchBar({
           const colors = TYPE_COLORS[type];
           const label = getTypeName(type, tTypes);
           return (
-            <button
+            <FilterChip
               key={type}
-              type="button"
+              active={isSelected}
               onClick={() => onTypeToggle(type)}
-              aria-pressed={isSelected}
-              className={[
-                "rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
-                isSelected && colors
-                  ? `${colors.bg} ${colors.text}`
-                  : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-              ].join(" ")}
+              activeClassName={colors ? `${colors.bg} ${colors.text}` : undefined}
+              padding="px-2.5 py-0.5"
             >
               {label}
-            </button>
+            </FilterChip>
           );
         })}
       </div>
@@ -137,34 +133,20 @@ export function PastureSearchBar({
         aria-label={t("filterByGenerationAriaLabel")}
         className="flex flex-wrap gap-2"
       >
-        <button
-          type="button"
+        <FilterChip
+          active={filters.gen === null}
           onClick={() => onGenChange(null)}
-          aria-pressed={filters.gen === null}
-          className={[
-            "rounded-full px-3 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
-            filters.gen === null
-              ? "bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-          ].join(" ")}
         >
           {tPokedex("generationAll")}
-        </button>
+        </FilterChip>
         {([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((gen) => (
-          <button
+          <FilterChip
             key={gen}
-            type="button"
+            active={filters.gen === gen}
             onClick={() => onGenChange(gen)}
-            aria-pressed={filters.gen === gen}
-            className={[
-              "rounded-full px-3 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
-              filters.gen === gen
-                ? "bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-            ].join(" ")}
           >
             {tPokedex("generationLabel", { gen: ROMAN[gen] })}
-          </button>
+          </FilterChip>
         ))}
       </div>
     </div>

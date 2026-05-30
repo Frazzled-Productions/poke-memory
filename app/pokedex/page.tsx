@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
@@ -17,6 +17,7 @@ import PokedexFiltered from "@/components/pokedex/PokedexFiltered";
 
 export default function PokedexPage() {
   const t = useTranslations("pokedex");
+  const format = useFormatter();
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
@@ -83,8 +84,8 @@ export default function PokedexPage() {
             <span className="inline-block h-4 w-36 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
           ) : (
             t("introduced", {
-              introduced: introduced.toLocaleString(),
-              total: defaultFormPokemon.length.toLocaleString(),
+              introduced: format.number(introduced),
+              total: format.number(defaultFormPokemon.length),
             })
           )}
         </p>

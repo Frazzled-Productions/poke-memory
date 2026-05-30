@@ -9,11 +9,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   totalHistogramCards,
   type DifficultyBucket,
 } from "@/lib/stats/difficulty-histogram";
-import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 type Props = {
   /** The nine difficulty buckets, from `computeDifficultyHistogram`. */
@@ -41,13 +42,14 @@ type ChartDatum = {
 };
 
 function TooltipBody({ datum }: { datum: ChartDatum }) {
+  const t = useTranslations("stats");
   return (
-    <div className="rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700">
+    <div className={chartTooltipCard}>
       <p className="font-semibold text-foreground">
         Difficulty {datum.lower} to {datum.upper}
       </p>
       <p className={`mt-1 ${statValue}`}>
-        {datum.count} card{datum.count === 1 ? "" : "s"}
+        {t("cardCount", { count: datum.count })}
       </p>
     </div>
   );
@@ -61,6 +63,7 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
  * returns an empty population, which renders the empty state here.
  */
 export function DifficultyHistogram({ buckets, mean }: Props) {
+  const t = useTranslations("stats");
   const total = totalHistogramCards(buckets);
 
   const data: ChartDatum[] = buckets.map((b) => ({
@@ -78,7 +81,7 @@ export function DifficultyHistogram({ buckets, mean }: Props) {
       >
         Card difficulty spread
       </h2>
-      <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-3 ${mutedTextXs}`}>
         How the FSRS scheduler rates the cards you have started learning, from
         1 (easy) to 10 (hard).
       </p>
@@ -94,9 +97,8 @@ export function DifficultyHistogram({ buckets, mean }: Props) {
               <span className="text-2xl font-semibold tabular-nums text-foreground">
                 {mean === null ? "-" : mean.toFixed(1)}
               </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                average difficulty across {total.toLocaleString("en-GB")} card
-                {total === 1 ? "" : "s"}
+              <span className={mutedTextXs}>
+                {t("difficultyAcrossCards", { count: total })}
               </span>
             </div>
 
@@ -105,7 +107,7 @@ export function DifficultyHistogram({ buckets, mean }: Props) {
               aria-label={`Difficulty histogram: ${buckets
                 .map(
                   (b) =>
-                    `${b.label} ${b.count} card${b.count === 1 ? "" : "s"}`,
+                    `${b.label} ${t("cardCount", { count: b.count })}`,
                 )
                 .join(", ")}`}
             >

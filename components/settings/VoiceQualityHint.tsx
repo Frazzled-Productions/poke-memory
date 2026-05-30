@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPreferredVoice, voiceTier, type VoiceTier } from "@/lib/audio/tts";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 const DISMISS_KEY = "poke-memory:settings:voice-tip:v1";
 
@@ -35,7 +36,7 @@ export function VoiceQualityHint() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-foreground">Voice sounding robotic?</p>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className={`mt-1 ${mutedTextXs}`}>
             The default English voice on most devices is a low-quality &ldquo;compact&rdquo; version. Your device&apos;s accessibility or spoken-content settings let you download a higher-quality (Premium or Enhanced) British English voice. Once installed, the app picks it automatically.
           </p>
         </div>

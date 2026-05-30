@@ -4,6 +4,7 @@ import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
 import { KEY_LEGACY_PRACTICE_SCOPE } from "@/lib/storage/keys";
 import { versionGroupLabel } from "@/lib/pokemon/versionGroupLabels";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { isCardEligible, type CardEligibilitySettings } from "@/lib/eligibility";
 import { STARTER_IDS } from "@/lib/pokemon/starterIds";
 // Import and re-export lightweight scope constants so server-side routes can
@@ -542,19 +543,11 @@ function parseScopeShape(value: unknown): PracticeScope | null {
  * steps. `loadSettings` is the canonical caller (#333).
  */
 export function readLegacyScope(): PracticeScope | null {
-  if (typeof window === "undefined") return null;
-  let raw: string | null;
-  try {
-    raw = window.localStorage.getItem(LEGACY_SCOPE_KEY);
-  } catch {
-    return null;
-  }
-  if (raw === null) return null;
-  try {
-    return parseScopeShape(JSON.parse(raw) as unknown);
-  } catch {
-    return null;
-  }
+  return readLocalStorage(
+    LEGACY_SCOPE_KEY,
+    (raw) => parseScopeShape(JSON.parse(raw) as unknown),
+    null,
+  );
 }
 
 /**

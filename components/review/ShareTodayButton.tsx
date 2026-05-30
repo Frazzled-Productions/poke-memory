@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { DailySummaryParts } from "@/lib/review/share";
 import { generateDailyShareImage } from "@/lib/share/generateShareImage";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 type Props = {
   /** Summary parts used to render the image card and, via `text`, the plain-text fallback. */
@@ -124,7 +125,7 @@ export function ShareTodayButton({ parts, text }: Props) {
         Share today
       </button>
       {status === "copied" ? (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400" role="status">
+        <p className={mutedTextXs} role="status">
           Copied to clipboard
         </p>
       ) : null}

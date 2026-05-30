@@ -7,9 +7,10 @@
  * was the root cause of #1180.
  */
 
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import * as precacheModule from "@/lib/pwa/precache";
 import { _resetForTesting } from "@/lib/pwa/downloadController";
@@ -63,7 +64,7 @@ Object.defineProperty(navigator, "storage", {
 
 describe("OfflineSection", () => {
   it("renders the Download button in the idle state", () => {
-    render(<OfflineSection />);
+    renderWithIntl(<OfflineSection />);
     expect(
       screen.getByRole("button", { name: /download/i }),
     ).toBeInTheDocument();
@@ -74,7 +75,7 @@ describe("OfflineSection", () => {
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       new Date().toISOString(),
     );
-    render(<OfflineSection />);
+    renderWithIntl(<OfflineSection />);
     expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^download$/i }),
@@ -99,7 +100,7 @@ describe("OfflineSection", () => {
 
     // Act without awaiting any async events — we are asserting the
     // synchronously committed initial render, not a state transition.
-    const { container } = render(<OfflineSection />);
+    const { container } = renderWithIntl(<OfflineSection />);
 
     // "Update" must be present in the committed tree.
     expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
@@ -121,7 +122,7 @@ describe("OfflineSection", () => {
     );
 
     const user = userEvent.setup();
-    render(<OfflineSection />);
+    renderWithIntl(<OfflineSection />);
 
     await user.click(screen.getByRole("button", { name: /download/i }));
 
@@ -153,7 +154,7 @@ describe("OfflineSection", () => {
     });
 
     const user = userEvent.setup();
-    render(<OfflineSection />);
+    renderWithIntl(<OfflineSection />);
 
     await user.click(screen.getByRole("button", { name: /download/i }));
 
@@ -187,7 +188,7 @@ describe("OfflineSection", () => {
     );
 
     const user = userEvent.setup();
-    render(<OfflineSection />);
+    renderWithIntl(<OfflineSection />);
 
     await user.click(screen.getByRole("button", { name: /download/i }));
 
@@ -212,7 +213,7 @@ describe("OfflineSection", () => {
     );
 
     const user = userEvent.setup();
-    render(<OfflineSection />);
+    renderWithIntl(<OfflineSection />);
 
     await user.click(screen.getByRole("button", { name: /download/i }));
 
@@ -236,7 +237,7 @@ describe("OfflineSection", () => {
     });
 
     const user = userEvent.setup();
-    render(<OfflineSection />);
+    renderWithIntl(<OfflineSection />);
 
     await user.click(screen.getByRole("button", { name: /download/i }));
 
@@ -280,7 +281,7 @@ describe("OfflineSection", () => {
     );
 
     const user = userEvent.setup();
-    const { unmount } = render(<OfflineSection />);
+    const { unmount } = renderWithIntl(<OfflineSection />);
 
     // Start the download.
     await user.click(screen.getByRole("button", { name: /download/i }));
@@ -303,7 +304,7 @@ describe("OfflineSection", () => {
     });
 
     // Remount (navigation back).
-    render(<OfflineSection />);
+    renderWithIntl(<OfflineSection />);
 
     // The remounted component must immediately show the in-progress state.
     await waitFor(() =>

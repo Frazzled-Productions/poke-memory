@@ -9,12 +9,12 @@
  */
 
 import {
-  render,
   screen,
   fireEvent,
   waitFor,
 } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import DueForecast from "@/components/stats/DueForecast";
 import type { DueForecastDay } from "@/lib/stats/derive";
 
@@ -56,7 +56,7 @@ describe("DueForecast", () => {
   });
 
   it("renders 14 bars", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const list = screen.getByRole("list", { name: /14-day due forecast/i });
     const items = list.querySelectorAll('[role="listitem"]');
     expect(items).toHaveLength(14);
@@ -64,24 +64,24 @@ describe("DueForecast", () => {
 
   it("shows correct total card count", () => {
     // counts 0,2,4,...26 → sum = 182
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     expect(screen.getByText(/182 cards over the next 14 days/i)).toBeInTheDocument();
   });
 
   it("shows '1 card' (singular) when total is 1", () => {
     const forecast = makeForecast({ 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0 });
-    render(<DueForecast forecast={forecast} />);
+    renderWithIntl(<DueForecast forecast={forecast} />);
     expect(screen.getByText(/1 card over the next 14 days/i)).toBeInTheDocument();
   });
 
   it("shows no tooltip on initial render", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("clicking a bar opens the tooltip with date and count", () => {
     const forecast = makeForecast({ 3: 5 });
-    render(<DueForecast forecast={forecast} fmt="dmy" tz="UTC" />);
+    renderWithIntl(<DueForecast forecast={forecast} fmt="dmy" tz="UTC" />);
     const bar = getBar(3);
     fireEvent.click(bar);
     const tooltip = screen.getByRole("tooltip");
@@ -91,7 +91,7 @@ describe("DueForecast", () => {
   });
 
   it("clicking the same bar again dismisses the tooltip", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const bar = getBar(2);
     fireEvent.click(bar);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe("DueForecast", () => {
 
   it("clicking a different bar moves the tooltip to the new bar", () => {
     const forecast = makeForecast({ 1: 3, 2: 7 });
-    render(<DueForecast forecast={forecast} fmt="dmy" tz="UTC" />);
+    renderWithIntl(<DueForecast forecast={forecast} fmt="dmy" tz="UTC" />);
 
     fireEvent.click(getBar(1));
     expect(screen.getByRole("tooltip").textContent).toMatch(/3 cards/);
@@ -111,7 +111,7 @@ describe("DueForecast", () => {
   });
 
   it("clicking outside the container dismisses the tooltip", async () => {
-    render(
+    renderWithIntl(
       <div>
         <DueForecast forecast={makeForecast()} />
         <button data-testid="outside">Outside</button>
@@ -127,7 +127,7 @@ describe("DueForecast", () => {
   });
 
   it("Escape key dismisses the tooltip", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const bar = getBar(1);
     fireEvent.click(bar);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
@@ -137,28 +137,28 @@ describe("DueForecast", () => {
   });
 
   it("Enter key opens the tooltip on a focused bar", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const bar = getBar(4);
     fireEvent.keyDown(bar, { key: "Enter" });
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
 
   it("Space key opens the tooltip on a focused bar", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const bar = getBar(5);
     fireEvent.keyDown(bar, { key: " " });
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
 
   it("mouseenter opens the tooltip", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const bar = getBar(3);
     fireEvent.mouseEnter(bar);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
 
   it("mouseleave closes the tooltip when it was opened by hover", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const bar = getBar(3);
     fireEvent.mouseEnter(bar);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
@@ -167,7 +167,7 @@ describe("DueForecast", () => {
   });
 
   it("mouseleave does NOT close the tooltip when it was opened by click", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const bar = getBar(3);
     // Open via click (lastInteraction = "click")
     fireEvent.click(bar);
@@ -180,7 +180,7 @@ describe("DueForecast", () => {
   it("hoverOpenedIdx guard: mouseenter then click on the same bar does not close the tooltip", () => {
     // On mobile WebKit, a tap fires synthetic mouseenter before onClick.
     // The guard in handleBarClick detects this and skips the toggle.
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     const bar = getBar(6);
     // Simulate the WebKit synthetic-event sequence: mouseenter fires first
     fireEvent.mouseEnter(bar);
@@ -193,7 +193,7 @@ describe("DueForecast", () => {
 
   it("bars at index 0-2 use left-anchored tooltip position class", () => {
     const forecast = makeForecast({ 0: 10 });
-    render(<DueForecast forecast={forecast} />);
+    renderWithIntl(<DueForecast forecast={forecast} />);
     fireEvent.click(getBar(0));
     const tooltip = screen.getByRole("tooltip");
     // The left-anchor class applied by tooltipPositionClasses(0)
@@ -203,7 +203,7 @@ describe("DueForecast", () => {
 
   it("bars at index 11-13 use right-anchored tooltip position class", () => {
     const forecast = makeForecast({ 13: 8 });
-    render(<DueForecast forecast={forecast} />);
+    renderWithIntl(<DueForecast forecast={forecast} />);
     fireEvent.click(getBar(13));
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip.className).toContain("right-0");
@@ -212,7 +212,7 @@ describe("DueForecast", () => {
 
   it("bars at index 3-10 use centred tooltip position class", () => {
     const forecast = makeForecast({ 5: 6 });
-    render(<DueForecast forecast={forecast} />);
+    renderWithIntl(<DueForecast forecast={forecast} />);
     fireEvent.click(getBar(5));
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip.className).toContain("left-1/2");
@@ -220,12 +220,12 @@ describe("DueForecast", () => {
   });
 
   it("the first date label reads 'Today'", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     expect(screen.getByText("Today")).toBeInTheDocument();
   });
 
   it("shows the due-forecast section heading", () => {
-    render(<DueForecast forecast={makeForecast()} />);
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
     expect(
       screen.getByRole("heading", { name: /due forecast/i }),
     ).toBeInTheDocument();

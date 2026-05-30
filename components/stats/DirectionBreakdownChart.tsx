@@ -9,12 +9,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   DIRECTION_LABELS,
   totalDirectionReviews,
   type DirectionBreakdownRow,
 } from "@/lib/stats/direction-breakdown";
-import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 type Props = {
   /** One row per card direction, from `computeDirectionBreakdown`. */
@@ -43,7 +44,7 @@ type ChartDatum = {
 
 function TooltipBody({ datum }: { datum: ChartDatum }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700">
+    <div className={chartTooltipCard}>
       <p className="font-semibold text-foreground">{datum.label}</p>
       {datum.hasData ? (
         <>
@@ -72,6 +73,7 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
  * intentionally unaffected by the `pretendAllMastered` superuser flag.
  */
 export function DirectionBreakdownChart({ rows }: Props) {
+  const t = useTranslations("stats");
   // Only show directions that have at least one review. Directions with zero
   // reviews (never used, or disabled before any history was recorded) are pure
   // clutter and are hidden entirely.
@@ -99,7 +101,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
       >
         Accuracy by card direction
       </h2>
-      <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-3 ${mutedTextXs}`}>
         How your recall compares across name, reverse, cry and evolution cards.
       </p>
 
@@ -176,7 +178,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
             {/* Per-direction review counts, since the bars only encode accuracy. */}
             <ul
               role="list"
-              className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400 sm:grid-cols-3"
+              className={`mt-3 grid grid-cols-2 gap-x-4 gap-y-1 ${mutedTextXs} sm:grid-cols-3`}
             >
               {visibleRows.map((row) => (
                 <li
@@ -190,7 +192,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
                     )}
                   </span>
                   <span>
-                    {row.total} review{row.total === 1 ? "" : "s"}
+                    {t("directionReviewCount", { count: row.total })}
                   </span>
                 </li>
               ))}

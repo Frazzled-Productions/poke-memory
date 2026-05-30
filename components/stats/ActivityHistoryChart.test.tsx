@@ -10,8 +10,9 @@
  * synthetic payload so ChartTooltip (and its `statValue` lines) executes.
  */
 
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { screen } from "@testing-library/react";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { ActivityHistoryChart } from "@/components/stats/ActivityHistoryChart";
 import type { ActivityPoint } from "@/lib/stats/activity-history";
 
@@ -61,33 +62,33 @@ const SERIES: readonly ActivityPoint[] = [
 
 describe("ActivityHistoryChart", () => {
   it("renders the Daily activity heading", () => {
-    render(<ActivityHistoryChart series={[]} />);
+    renderWithIntl(<ActivityHistoryChart series={[]} />);
     expect(
       screen.getByRole("heading", { name: /daily activity/i }),
     ).toBeInTheDocument();
   });
 
   it("shows the empty-state message when there is no activity", () => {
-    render(<ActivityHistoryChart series={[]} />);
+    renderWithIntl(<ActivityHistoryChart series={[]} />);
     expect(
       screen.getByText(/no activity recorded yet/i),
     ).toBeInTheDocument();
   });
 
   it("renders the bar chart when series has data", () => {
-    render(<ActivityHistoryChart series={SERIES} />);
+    renderWithIntl(<ActivityHistoryChart series={SERIES} />);
     expect(screen.getByTestId("bar-chart")).toBeInTheDocument();
   });
 
   it("renders the ChartTooltip content (statValue lines) via the mocked Tooltip", () => {
-    render(<ActivityHistoryChart series={SERIES} />);
+    renderWithIntl(<ActivityHistoryChart series={SERIES} />);
     // The tooltip mock fires content with active=true; ChartTooltip renders
     // "Reviews: 12" using the statValue class — verify the text is present.
     expect(screen.getByText(/reviews: 12/i)).toBeInTheDocument();
   });
 
   it("renders the legend with Reviews and New cards introduced labels", () => {
-    render(<ActivityHistoryChart series={SERIES} />);
+    renderWithIntl(<ActivityHistoryChart series={SERIES} />);
     expect(screen.getByText("Reviews")).toBeInTheDocument();
     expect(screen.getByText("New cards introduced")).toBeInTheDocument();
   });

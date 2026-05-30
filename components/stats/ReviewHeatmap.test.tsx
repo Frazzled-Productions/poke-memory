@@ -4,10 +4,17 @@
  * Exercises the component's render path so the `cardPanel` class-name
  * refactor on the wrapper div is instrumented by the coverage gate.
  * Also covers the hover-tooltip interaction added in #1063.
+ *
+ * Updated in #1408 to use renderWithIntl (component now calls useTranslations /
+ * useFormatter) and to assert locale-correct number formatting.
  */
 
-import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
+import { fireEvent, screen } from "@testing-library/react";
+import {
+  renderWithIntl,
+  renderJa,
+} from "@/components/test-utils/renderWithIntl";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import type { HeatmapCell } from "@/lib/stats/heatmap";
 
@@ -29,34 +36,52 @@ function makeColumnsWithReviews(): readonly (readonly HeatmapCell[])[] {
   return cols;
 }
 
+/** Build columns with a fixed total review count spread across multiple cells. */
+function makeColumnsWithCount(total: number): readonly (readonly HeatmapCell[])[] {
+  const cols = makeEmptyColumns() as HeatmapCell[][];
+  // Put all reviews in cell [0][0] for simplicity.
+  (cols[0] as HeatmapCell[])[0] = { date: "2026-01-01", count: total };
+  return cols;
+}
+
 describe("ReviewHeatmap", () => {
   it("renders the Review activity heading", () => {
-    render(<ReviewHeatmap columns={makeEmptyColumns()} />);
+    renderWithIntl(<ReviewHeatmap columns={makeEmptyColumns()} />);
     expect(
       screen.getByRole("heading", { name: /review activity/i }),
     ).toBeInTheDocument();
   });
 
-  it("shows total review count in the summary line", () => {
-    render(<ReviewHeatmap columns={makeEmptyColumns()} />);
+  it("shows total review count in the summary line (en)", () => {
+    renderWithIntl(<ReviewHeatmap columns={makeEmptyColumns()} />);
     // Zero reviews → "0 reviews in the last year"
     expect(screen.getByText(/0 reviews in the last year/)).toBeInTheDocument();
   });
 
+  it("shows localised number in summary line (ja, 1000 reviews)", () => {
+    const cols = makeColumnsWithCount(1000);
+    renderJa(<ReviewHeatmap columns={cols} />);
+    // Japanese uses commas for grouping same as en: "1,000"
+    // Multiple elements may contain "1,000" (headline + SVG title); use
+    // getAllByText and assert at least one is present.
+    const matches = screen.getAllByText(/1,000/);
+    expect(matches.length).toBeGreaterThan(0);
+  });
+
   it("renders an SVG heatmap image", () => {
-    render(<ReviewHeatmap columns={makeEmptyColumns()} />);
+    renderWithIntl(<ReviewHeatmap columns={makeEmptyColumns()} />);
     expect(
       screen.getByRole("img", { name: /heatmap/i }),
     ).toBeInTheDocument();
   });
 
   it("does not show a tooltip before hovering", () => {
-    render(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
+    renderWithIntl(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("shows a tooltip with date and review count on mouseEnter", () => {
-    render(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
+    renderWithIntl(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
 
     // The SVG has 53×7 = 371 rect cells. The first rect corresponds to col 0 / row 0
     // which we set to 5 reviews on 2026-01-01.
@@ -75,7 +100,7 @@ describe("ReviewHeatmap", () => {
   });
 
   it("hides the tooltip after mouseleave on the SVG", () => {
-    render(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
+    renderWithIntl(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
 
     const svg = screen.getByRole("img", { name: /heatmap/i });
     const rects = svg.querySelectorAll("rect");

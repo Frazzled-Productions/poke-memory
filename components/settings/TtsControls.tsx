@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { speakName } from "@/lib/audio/tts";
-import { cardPanelPadded, colStackLg } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
 
 type TtsControlsProps = {
   ttsVoice: string | null;
@@ -57,7 +57,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
             </option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className={`mt-1 ${mutedTextXs}`}>
           English voices from your device. &ldquo;Auto&rdquo; picks the highest-quality British English voice available.
           This voice is used for the spoken-name fallback; pre-generated name audio uses a fixed British English voice.
         </p>

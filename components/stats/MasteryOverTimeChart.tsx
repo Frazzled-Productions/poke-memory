@@ -8,9 +8,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useFormatter } from "next-intl";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
 import type { DateFormat } from "@/lib/utils/format-date";
-import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette — consistent with other Stats components (zinc/emerald/rose)
@@ -35,17 +36,18 @@ function ChartTooltip({
   active?: boolean;
   payload?: readonly unknown[];
 }) {
+  const format = useFormatter();
   if (!active || !payload || payload.length === 0) return null;
   const d = (payload[0] as { payload: TooltipPayload }).payload;
   return (
-    <div className="rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700">
+    <div className={chartTooltipCard}>
       <p className="font-semibold text-foreground">{d.date}</p>
       <p className={`mt-0.5 ${statValue}`}>
         <span
           className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
           style={{ backgroundColor: AREA_COLOUR }}
         />
-        {d.count.toLocaleString("en-GB")} mastered
+        {format.number(d.count)} mastered
       </p>
     </div>
   );
@@ -101,6 +103,7 @@ type Props = {
  * as a headline number with no trend line (single-point series).
  */
 export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", forceAllMastered = false }: Props) {
+  const format = useFormatter();
   const hasData = series.length > 0;
   const latestCount = hasData ? series[series.length - 1].count : 0;
 
@@ -119,7 +122,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
       >
         Mastery over time
       </h2>
-      <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-3 ${mutedTextXs}`}>
         Cumulative species mastered, using the last review date as a proxy for
         when each card crossed the mastery threshold.
       </p>
@@ -135,18 +138,18 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
             {/* Headline count */}
             <div className="mb-4 flex items-baseline gap-2">
               <span className="text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                {latestCount.toLocaleString("en-GB")}
+                {format.number(latestCount)}
               </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              <span className={mutedTextXs}>
                 {totalCards > 0
-                  ? `of ${totalCards.toLocaleString("en-GB")} species mastered`
+                  ? `of ${format.number(totalCards)} species mastered`
                   : "species mastered"}
               </span>
             </div>
 
             {isSinglePoint ? (
               /* Single-point: no trend to draw — just show the headline. */
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className={mutedTextXs}>
                 {forceAllMastered
                   ? "Superuser mode: showing total as of today."
                   : "Review more cards to see your progress trend."}
@@ -154,7 +157,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
             ) : (
               <div
                 role="img"
-                aria-label={`Mastery over time: ${latestCount} of ${totalCards} species mastered as of ${series[series.length - 1].date}`}
+                aria-label={`Mastery over time: ${format.number(latestCount)} of ${format.number(totalCards)} species mastered as of ${series[series.length - 1].date}`}
               >
                 <ResponsiveContainer width="100%" height={160}>
                   <AreaChart

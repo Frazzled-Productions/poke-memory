@@ -8,10 +8,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useFormatter } from "next-intl";
 import type { ActivityPoint } from "@/lib/stats/activity-history";
 import { isActivityHistoryEmpty } from "@/lib/stats/activity-history";
 import type { DateFormat } from "@/lib/utils/format-date";
-import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette — consistent with other Stats components (zinc/emerald/rose)
@@ -55,18 +56,19 @@ function ChartTooltip({
   payload?: readonly unknown[];
   dateFormat: DateFormat;
 }) {
+  const format = useFormatter();
   if (!active || !payload || payload.length === 0) return null;
   const d = (payload[0] as { payload: TooltipPayload }).payload;
   const label = formatXTick(d.date, dateFormat);
   return (
-    <div className="rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700">
+    <div className={chartTooltipCard}>
       <p className="mb-1 font-semibold text-foreground">{label}</p>
       <p className={statValue}>
         <span
           className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
           style={{ backgroundColor: REVIEWS_COLOUR }}
         />
-        Reviews: {d.reviews.toLocaleString("en-GB")}
+        Reviews: {format.number(d.reviews)}
       </p>
       {d.introduced > 0 && (
         <p className={statValue}>
@@ -74,7 +76,7 @@ function ChartTooltip({
             className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
             style={{ backgroundColor: INTRODUCED_COLOUR }}
           />
-          New cards introduced: {d.introduced.toLocaleString("en-GB")}
+          New cards introduced: {format.number(d.introduced)}
         </p>
       )}
     </div>
@@ -91,7 +93,7 @@ function ChartLegend() {
   return (
     <div
       aria-hidden="true"
-      className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400"
+      className={`mt-2 flex flex-wrap gap-x-4 gap-y-1 ${mutedTextXs}`}
     >
       <span className="flex items-center gap-1.5">
         <span
@@ -178,7 +180,7 @@ export function ActivityHistoryChart({
       >
         Daily activity
       </h2>
-      <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-3 ${mutedTextXs}`}>
         Reviews completed and new cards introduced within the past year. Derived
         from review history, not mastery.
       </p>

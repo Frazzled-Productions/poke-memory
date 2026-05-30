@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
-import { cardPanel } from "@/lib/utils/class-names";
+import { cardPanel, mutedTextXs } from "@/lib/utils/class-names";
 import type { DueForecastDay } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
@@ -69,6 +70,7 @@ export default function DueForecast({
   fmt = "dmy",
   tz = "UTC",
 }: DueForecastProps) {
+  const t = useTranslations("stats");
   const max = forecast.reduce((m, d) => (d.count > m ? d.count : m), 0);
   const total = forecast.reduce((s, d) => s + d.count, 0);
 
@@ -143,9 +145,8 @@ export default function DueForecast({
         Due forecast
       </h2>
       <div className={cardPanel}>
-        <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-          {total.toLocaleString("en-GB")} card{total === 1 ? "" : "s"} over the
-          next 14 days
+        <p className={`mb-3 ${mutedTextXs} tabular-nums`}>
+          {t("cardsOverNextDays", { count: total })}
         </p>
         {/* ref on this container so outside-click detection has a boundary. */}
         <div ref={containerRef}>
@@ -159,7 +160,7 @@ export default function DueForecast({
               const isToday = idx === 0;
               const isOpen = openTooltip?.idx === idx;
               const tooltipId = `due-forecast-tooltip-${idx}`;
-              const label = `${formatForecastDate(day.date, fmt, tz)}: ${day.count} card${day.count === 1 ? "" : "s"}`;
+              const label = `${formatForecastDate(day.date, fmt, tz)}: ${t("cardCount", { count: day.count })}`;
               return (
                 <div
                   key={day.date}
@@ -184,7 +185,7 @@ export default function DueForecast({
                         {formatForecastDate(day.date, fmt, tz)}
                       </span>
                       <span className="block tabular-nums">
-                        {day.count} card{day.count === 1 ? "" : "s"}
+                        {t("cardCount", { count: day.count })}
                       </span>
                     </div>
                   )}

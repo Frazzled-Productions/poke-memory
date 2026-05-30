@@ -14,10 +14,11 @@
  */
 
 import { useState, useId, useMemo, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import type { CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { snapshotAtPosition } from "@/lib/timeline/reconstruct";
-import { chartTickText } from "@/lib/utils/class-names";
+import { chartTickText, mutedTextXs } from "@/lib/utils/class-names";
+import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,44 +74,20 @@ function CountPill({
   label: string;
   colour: string;
 }) {
+  const format = useFormatter();
   return (
     <div className="flex flex-col items-center">
       <span className={`text-2xl font-bold tabular-nums ${colour}`}>
-        {count.toLocaleString("en-GB")}
+        {format.number(count)}
       </span>
-      <span className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
+      <span className={`mt-0.5 ${mutedTextXs}`}>{label}</span>
     </div>
   );
 }
 
-function ProgressBar({
-  value,
-  max,
-  colourClass,
-  label,
-}: {
-  value: number;
-  max: number;
-  colourClass: string;
-  label: string;
-}) {
-  const p = pct(value, max);
-  return (
-    <div
-      role="meter"
-      aria-valuenow={value}
-      aria-valuemin={0}
-      aria-valuemax={max}
-      aria-label={label}
-      className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
-    >
-      <div
-        className={`h-full rounded-full transition-all duration-200 ${colourClass}`}
-        style={{ width: `${p}%` }}
-      />
-    </div>
-  );
-}
+// ProgressBar replaced by MeterBar from @/components/ui/MeterBar.
+// The local sub-component was removed; MeterBar provides the same role=meter
+// markup with the canonical a11y contract.
 
 // ---------------------------------------------------------------------------
 // EmptyState — shown when no grade log data exists yet
@@ -271,30 +248,37 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
           )}
         </div>
 
-        {/* Progress bars */}
+        {/* Progress bars — wrapped in aria-hidden; screen-reader content is
+            provided by the aria-live region lower in the tree. */}
         {!isFuture && (
           <div className="mb-5 flex flex-col gap-2" aria-hidden="true">
-            <ProgressBar
+            <MeterBar
               value={snapshot.introduced}
               max={totalSpecies}
-              colourClass="bg-blue-500"
+              fillClass="bg-blue-500"
               label={`Introduced: ${introducedPct}%`}
+              trackClass="dark:bg-zinc-800"
+              transitionClass="transition-all duration-200"
             />
-            <ProgressBar
+            <MeterBar
               value={snapshot.mastered}
               max={totalSpecies}
-              colourClass="bg-emerald-500"
+              fillClass="bg-emerald-500"
               label={`Mastered: ${masteredPct}%`}
+              trackClass="dark:bg-zinc-800"
+              transitionClass="transition-all duration-200"
             />
           </div>
         )}
         {isFuture && (
           <div className="mb-5" aria-hidden="true">
-            <ProgressBar
+            <MeterBar
               value={snapshot.mastered}
               max={totalSpecies}
-              colourClass="bg-amber-400"
+              fillClass="bg-amber-400"
               label={`Retained: ${masteredPct}%`}
+              trackClass="dark:bg-zinc-800"
+              transitionClass="transition-all duration-200"
             />
           </div>
         )}

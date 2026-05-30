@@ -68,7 +68,7 @@ import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
 import { triggerHaptic } from "@/lib/review/haptic";
 import { markSessionActive, markSessionInactive } from "@/lib/review/sessionActive";
-import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
+import { KEY_HAS_MASTERED, KEY_SETTINGS } from "@/lib/storage/keys";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
   loadDailySummary,
@@ -88,7 +88,7 @@ import { ScopeControl } from "@/components/review/ScopeControl";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
-import { mutedText, sectionLabel } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 
 
@@ -249,7 +249,7 @@ const TodayPill = React.memo(function TodayPill({
   ].filter(Boolean).length;
   const showGraduatedHint = enabledDirections > 1;
   return (
-    <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
+    <div className={`${mutedTextXs} tabular-nums text-center`}>
       <p className={`mb-1 ${sectionLabel}`}>
         {t("todayDoneHeading")}
       </p>
@@ -344,7 +344,7 @@ function DirectionAccuracyRow({ tally }: { tally: SessionDirectionTally }) {
 
   return (
     <p
-      className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums"
+      className={`${mutedTextXs} tabular-nums`}
       aria-label={`Session accuracy by direction: ${parts.join(", ")}`}
     >
       {parts.join(" · ")}
@@ -992,7 +992,7 @@ export function ReviewSession() {
   // Reload when settings change in another tab so reverseEnabled and limits stay current.
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key === "poke-memory:settings:v1") {
+      if (e.key === KEY_SETTINGS) {
         window.location.reload();
       }
     }
@@ -2159,11 +2159,16 @@ export function ReviewSession() {
           c.state.lastReview !== today,
       );
       recordReview(today, gradedToday, dueQueueEmpty);
+      // Pass POST-grade learningStep/stepStartedAt from nextState so the
+      // grade_log row captures the scheduler's exact in-learning position
+      // at the time of grading (#1416). These are in closure scope.
       const appended = await appendGradeEntry({
         date: today,
         grade,
         cardType: effectiveCard.cardType,
         subjectKey: effectiveCard.subjectKey,
+        learningStep: nextState.learningStep,
+        stepStartedAt: nextState.stepStartedAt,
       });
       snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
     });

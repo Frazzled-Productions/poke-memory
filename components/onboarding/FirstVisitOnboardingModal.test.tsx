@@ -236,9 +236,9 @@ describe("FirstVisitOnboardingModal", () => {
     it("renders the close button aria-label in Japanese", async () => {
       renderJa(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
-      // ja catalogue: onboarding.closeAriaLabel = "ウェルカムガイドを閉じる"
+      // ja catalogue: onboarding.closeAriaLabel = "このガイドを閉じる"
       expect(
-        screen.getByRole("button", { name: /ウェルカムガイドを閉じる/ }),
+        screen.getByRole("button", { name: /このガイドを閉じる/ }),
       ).toBeInTheDocument();
     });
 

@@ -10,8 +10,12 @@
  * synthetic payload so TooltipBody (and its `statValue` line) executes.
  */
 
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { screen } from "@testing-library/react";
+import {
+  renderWithIntl,
+  renderJa,
+} from "@/components/test-utils/renderWithIntl";
 import { DifficultyHistogram } from "@/components/stats/DifficultyHistogram";
 import type { DifficultyBucket } from "@/lib/stats/difficulty-histogram";
 
@@ -73,7 +77,7 @@ const BUCKETS: readonly DifficultyBucket[] = [
 
 describe("DifficultyHistogram", () => {
   it("renders the Card difficulty spread heading", () => {
-    render(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
+    renderWithIntl(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
     expect(
       screen.getByRole("heading", { name: /card difficulty spread/i }),
     ).toBeInTheDocument();
@@ -81,26 +85,49 @@ describe("DifficultyHistogram", () => {
 
   it("shows the empty-state message when all buckets are zero", () => {
     const zeroBuckets = BUCKETS.map((b) => ({ ...b, count: 0 }));
-    render(<DifficultyHistogram buckets={zeroBuckets} mean={null} />);
+    renderWithIntl(<DifficultyHistogram buckets={zeroBuckets} mean={null} />);
     expect(
       screen.getByText(/no cards introduced yet/i),
     ).toBeInTheDocument();
   });
 
   it("renders the bar chart when buckets have data", () => {
-    render(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
+    renderWithIntl(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
     expect(screen.getByTestId("bar-chart")).toBeInTheDocument();
   });
 
   it("renders the TooltipBody content (statValue line) via the mocked Tooltip", () => {
-    render(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
+    renderWithIntl(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
     // The tooltip mock fires content with the MOCK_DATUM (count=7); TooltipBody
     // renders "7 cards" using the statValue class.
     expect(screen.getByText("7 cards")).toBeInTheDocument();
   });
 
   it("renders the mean difficulty value", () => {
-    render(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
+    renderWithIntl(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
     expect(screen.getByText("4.2")).toBeInTheDocument();
+  });
+
+  // --- Locale coverage (#1408) ---
+
+  it("renders 'average difficulty across N cards' in en for count > 1", () => {
+    renderWithIntl(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
+    // Total = 2+7+5+3+1 = 18
+    expect(screen.getByText(/average difficulty across 18 cards/i)).toBeInTheDocument();
+  });
+
+  it("renders 'average difficulty across 1 card' in en for count = 1", () => {
+    const singleBucket: readonly DifficultyBucket[] = [
+      { lower: 3, upper: 4, label: "3-4", count: 1 },
+    ];
+    renderWithIntl(<DifficultyHistogram buckets={singleBucket} mean={3.5} />);
+    expect(screen.getByText(/average difficulty across 1 card/i)).toBeInTheDocument();
+  });
+
+  it("renders in Japanese (ja) without throwing", () => {
+    renderJa(<DifficultyHistogram buckets={BUCKETS} mean={4.2} />);
+    expect(
+      screen.getByRole("heading", { name: /card difficulty spread/i }),
+    ).toBeInTheDocument();
   });
 });

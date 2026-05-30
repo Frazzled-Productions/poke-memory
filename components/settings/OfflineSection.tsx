@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useFormatter } from "next-intl";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import {
   getState,
@@ -9,7 +10,7 @@ import {
   stopDownload,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
-import { cardPanelPadded } from "@/lib/utils/class-names";
+import { cardPanelPadded, mutedTextXs } from "@/lib/utils/class-names";
 
 /**
  * Species IDs eligible for offline caching — all default-form entries in the
@@ -48,6 +49,7 @@ function formatDate(isoString: string): string {
  * and shows live progress from the surviving run.
  */
 export function OfflineSection() {
+  const format = useFormatter();
   // Initialise from the singleton synchronously. The subscribe() effect (below)
   // fires after mount and immediately calls setDownloadState with the current
   // singleton state, which may already be "downloading" if a download survived
@@ -118,11 +120,11 @@ export function OfflineSection() {
           <p className="text-sm font-medium text-foreground">
             Download for offline use
           </p>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className={`mt-1 ${mutedTextXs}`}>
             Pre-fetches every sprite and cry so you can practise without a connection. Recommended on Wi-Fi. About 166 MB.
           </p>
           {storageInfo !== null && (
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className={`mt-1 ${mutedTextXs}`}>
               Using {storageInfo.usedMb} of {storageInfo.totalMb} available.
             </p>
           )}
@@ -156,12 +158,12 @@ export function OfflineSection() {
           <div className="flex flex-col gap-3">
             <div>
               <p
-                className="text-xs text-zinc-500 dark:text-zinc-400"
+                className={mutedTextXs}
                 aria-live="polite"
                 aria-atomic="true"
               >
-                Downloading {downloadState.progress.done.toLocaleString()} of{" "}
-                {downloadState.progress.total.toLocaleString()}
+                Downloading {format.number(downloadState.progress.done)} of{" "}
+                {format.number(downloadState.progress.total)}
                 {downloadState.progress.bytesSoFar > 0 && (
                   <> ({formatMb(downloadState.progress.bytesSoFar)})</>
                 )}

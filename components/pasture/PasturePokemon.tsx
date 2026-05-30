@@ -6,6 +6,7 @@ import type { NameReviewCard } from "@/lib/review/session";
 import { ArrivalSparkle } from "./ArrivalSparkle";
 import styles from "./Pasture.module.css";
 import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 type Props = {
   card: NameReviewCard;
@@ -201,7 +202,7 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
           <p className="text-center text-sm font-semibold text-foreground">
             {card.name}
           </p>
-          <dl className="mt-1.5 space-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+          <dl className={`mt-1.5 space-y-0.5 ${mutedTextXs}`}>
             <div className="flex justify-between">
               <dt>First seen</dt>
               <dd>{firstSeenLabel}</dd>

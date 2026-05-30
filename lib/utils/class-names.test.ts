@@ -12,6 +12,9 @@ import {
   colStackLg,
   chartTickText,
   mutedText,
+  mutedTextXs,
+  inlineLink,
+  chartTooltipCard,
 } from "./class-names";
 
 describe("class-names constants", () => {
@@ -120,5 +123,42 @@ describe("class-names constants", () => {
   it("mutedText is a non-empty string", () => {
     expect(typeof mutedText).toBe("string");
     expect(mutedText.length).toBeGreaterThan(0);
+  });
+
+  describe("mutedTextXs", () => {
+    it("is a non-empty string", () => {
+      expect(typeof mutedTextXs).toBe("string");
+      expect(mutedTextXs.length).toBeGreaterThan(0);
+    });
+
+    it("matches the expected literal", () => {
+      expect(mutedTextXs).toBe("text-xs text-zinc-500 dark:text-zinc-400");
+    });
+  });
+
+  describe("inlineLink", () => {
+    it("is a non-empty string", () => {
+      expect(typeof inlineLink).toBe("string");
+      expect(inlineLink.length).toBeGreaterThan(0);
+    });
+
+    it("matches the expected literal", () => {
+      expect(inlineLink).toBe(
+        "underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded",
+      );
+    });
+  });
+
+  describe("chartTooltipCard", () => {
+    it("is a non-empty string", () => {
+      expect(typeof chartTooltipCard).toBe("string");
+      expect(chartTooltipCard.length).toBeGreaterThan(0);
+    });
+
+    it("matches the expected literal", () => {
+      expect(chartTooltipCard).toBe(
+        "rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700",
+      );
+    });
   });
 });

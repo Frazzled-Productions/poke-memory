@@ -13,13 +13,14 @@
 
 import { useState, useMemo, useId } from "react";
 import Image from "next/image";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import type {
   EvolutionFamily,
   FamilyEdge,
   FamilyNode,
 } from "@/lib/evolution/chains";
 import { computeEvolutionWallStats } from "@/lib/evolution/chains";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -368,6 +369,7 @@ export function EvolutionWall({
   families: readonly EvolutionFamily[];
 }) {
   const tWidget = useTranslations("journey.evolutionWallWidget");
+  const format = useFormatter();
   const [filter, setFilter] = useState<FilterMode>("all");
   const [isOpen, setIsOpen] = useState(false);
   const headingId = useId();
@@ -425,11 +427,11 @@ export function EvolutionWall({
       <p className="mb-3 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
         {tWidget("familiesCompleted")}{" "}
         <span className="font-semibold tabular-nums text-foreground">
-          {stats.completedFamilies.toLocaleString("en-GB")}
+          {format.number(stats.completedFamilies)}
         </span>
         {" / "}
         <span className="tabular-nums">
-          {stats.totalFamilies.toLocaleString("en-GB")}
+          {format.number(stats.totalFamilies)}
         </span>
       </p>
 
@@ -469,7 +471,7 @@ export function EvolutionWall({
         )}
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className={`mt-4 flex flex-wrap items-center gap-4 ${mutedTextXs}`}>
           <span className="flex items-center gap-1.5">
             <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
               <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-emerald-500 dark:stroke-emerald-400" stroke="currentColor" />

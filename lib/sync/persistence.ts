@@ -1,6 +1,7 @@
 import type { ReviewableCard } from "@/lib/review/session";
 import { KEY_SYNC_STATUS, KEY_PENDING_GRADE_QUEUE } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
 import { idbSet, idbDelete } from "@/lib/idb/db";
 import { toCloudRows } from "@/lib/sync/cloud";
 
@@ -137,12 +138,11 @@ export function markPushFailed(failedCardCount: number, at = new Date().toISOStr
 
 export function saveSyncStatus(status: SyncStatus): void {
   if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(status));
-  } catch {
-    // storage full or unavailable — best effort
-    return;
-  }
+  // writeLocalStorage handles SSR guard + try/catch. The StorageEvent dispatch
+  // is kept explicit here because it re-reads the key after the write (so
+  // newValue is always the serialised-and-stored form, not the pre-serialisation
+  // value) — a deliberately defensive convention in the sync layer.
+  writeLocalStorage(STORAGE_KEY, status);
 
   // Same-tab subscribers (useLocalStorageKey) require a synthetic StorageEvent —
   // the browser only fires the native event in *other* tabs. Centralising the
@@ -221,11 +221,7 @@ function parsePendingQueue(raw: string): ReviewableCard[] {
  */
 export function savePendingQueue(queue: ReviewableCard[]): void {
   if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
-  } catch {
-    // Storage full or unavailable — best effort.
-  }
+  writeLocalStorage(PENDING_QUEUE_KEY, queue);
   // Mirror to IDB so the service worker can read the queue on Background Sync.
   // The IDB copy is stored as CloudRow[] (snake_case, with appTypeToDbType
   // applied) because the SW cannot import app modules and must be able to POST

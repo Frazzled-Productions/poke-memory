@@ -26,6 +26,8 @@
  */
 
 import { precacheAll, OFFLINE_DOWNLOADED_AT_KEY, type PrecacheProgress, type PrecacheSummary } from "./precache";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -72,19 +74,16 @@ function seedFromStorage(): void {
   storageSeedDone = true;
 
   if (currentState.phase !== "idle") return;
-  if (typeof window === "undefined") return;
 
-  try {
-    const at = window.localStorage.getItem(OFFLINE_DOWNLOADED_AT_KEY);
-    if (at !== null) {
-      currentState = {
-        phase: "done",
-        summary: { totalRequested: 0, downloaded: 0, skipped: 0, failed: 0 },
-        downloadedAt: at,
-      };
-    }
-  } catch {
-    // localStorage unavailable — stay idle.
+  // The stored value is a raw ISO timestamp string (not JSON-encoded), so we
+  // pass it through without JSON.parse. SSR returns null (window undefined).
+  const at = readLocalStorage(OFFLINE_DOWNLOADED_AT_KEY, (raw) => raw, null);
+  if (at !== null) {
+    currentState = {
+      phase: "done",
+      summary: { totalRequested: 0, downloaded: 0, skipped: 0, failed: 0 },
+      downloadedAt: at,
+    };
   }
 }
 
@@ -176,11 +175,9 @@ export async function startDownload(ids: number[]): Promise<void> {
     }
 
     const downloadedAt = new Date().toISOString();
-    try {
-      window.localStorage.setItem(OFFLINE_DOWNLOADED_AT_KEY, downloadedAt);
-    } catch {
-      // localStorage unavailable — continue anyway.
-    }
+    // writeLocalStorageRaw swallows errors — download result is recorded
+    // best-effort; the UI still transitions to "done" even if storage fails.
+    writeLocalStorageRaw(OFFLINE_DOWNLOADED_AT_KEY, downloadedAt);
 
     setState({ phase: "done", summary, downloadedAt });
     abortController = null;

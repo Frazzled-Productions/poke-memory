@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { Records } from "@/lib/stats/records";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel } from "@/lib/utils/class-names";
+import { cardPanel, mutedTextXs } from "@/lib/utils/class-names";
 
 type Props = { records: Records };
 
@@ -25,7 +25,7 @@ function Stat({
       <span className="text-2xl font-semibold tabular-nums text-foreground">
         {value}
       </span>
-      <span className="text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
+      <span className={mutedTextXs}>{label}</span>
       {description ? (
         <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
           {description}

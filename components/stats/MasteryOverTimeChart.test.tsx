@@ -10,8 +10,9 @@
  * component's own JSX paths.
  */
 
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { screen } from "@testing-library/react";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { MasteryOverTimeChart } from "@/components/stats/MasteryOverTimeChart";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
 
@@ -40,7 +41,7 @@ const POINT: MasteryPoint = { date: "2026-05-01", count: 10 };
 
 describe("MasteryOverTimeChart", () => {
   it("renders the section heading", () => {
-    render(
+    renderWithIntl(
       <MasteryOverTimeChart series={[]} totalCards={100} />,
     );
     expect(
@@ -49,7 +50,7 @@ describe("MasteryOverTimeChart", () => {
   });
 
   it("shows the empty-state paragraph when there is no data (lines 127, 129)", () => {
-    render(
+    renderWithIntl(
       <MasteryOverTimeChart series={[]} totalCards={100} />,
     );
     expect(
@@ -58,7 +59,7 @@ describe("MasteryOverTimeChart", () => {
   });
 
   it("renders the chart when series has data (lines 188, 197 — XAxis/YAxis className)", () => {
-    render(
+    renderWithIntl(
       <MasteryOverTimeChart series={[POINT, { date: "2026-05-10", count: 20 }]} totalCards={100} />,
     );
     // Recharts mock renders the axes with the className prop from the component.
@@ -71,7 +72,7 @@ describe("MasteryOverTimeChart", () => {
   });
 
   it("renders the AreaChart stub when series has multiple points", () => {
-    render(
+    renderWithIntl(
       <MasteryOverTimeChart series={[POINT, { date: "2026-05-10", count: 20 }]} totalCards={100} />,
     );
     expect(screen.getByTestId("area-chart")).toBeInTheDocument();

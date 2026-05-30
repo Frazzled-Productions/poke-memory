@@ -70,8 +70,8 @@ describe("pushGradeLog", () => {
     expect(from).toHaveBeenCalledWith("grade_log");
     expect(upsert).toHaveBeenCalledWith(
       [
-        { user_id: "user-1", occurred_at: 100, entry_date: "2026-05-12", card_type: "name", grade: 4, subject_key: null, locale: "en" },
-        { user_id: "user-1", occurred_at: 101, entry_date: "2026-05-12", card_type: "evolution", grade: 1, subject_key: null, locale: "en" },
+        { user_id: "user-1", occurred_at: 100, entry_date: "2026-05-12", card_type: "name", grade: 4, subject_key: null, locale: "en", learning_step: null, step_started_at: null },
+        { user_id: "user-1", occurred_at: 101, entry_date: "2026-05-12", card_type: "evolution", grade: 1, subject_key: null, locale: "en", learning_step: null, step_started_at: null },
       ],
       { onConflict: GRADE_LOG_CONFLICT_COLS, ignoreDuplicates: true },
     );
@@ -169,5 +169,63 @@ describe("pushGradeLog locale (#1259)", () => {
     await pushGradeLog(client, "u", entries);
     const row = (upsert.mock.calls[0][0] as { locale: string }[])[0];
     expect(row.locale).toBe("en");
+  });
+});
+
+describe("pushGradeLog learning_step / step_started_at (#1416)", () => {
+  it("sends learning_step and step_started_at for an in-learning card", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    const entries = [makeEntry(700, { learningStep: 0, stepStartedAt: 1_700_000 })];
+    await pushGradeLog(client, "u", entries);
+    const row = (upsert.mock.calls[0][0] as { learning_step: number | null; step_started_at: number | null }[])[0];
+    expect(row.learning_step).toBe(0);
+    expect(row.step_started_at).toBe(1_700_000);
+  });
+
+  it("sends learning_step: null and step_started_at: null for a graduated card (explicit null)", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    const entries = [makeEntry(800, { learningStep: null, stepStartedAt: null })];
+    await pushGradeLog(client, "u", entries);
+    const row = (upsert.mock.calls[0][0] as { learning_step: number | null; step_started_at: number | null }[])[0];
+    expect(row.learning_step).toBeNull();
+    expect(row.step_started_at).toBeNull();
+  });
+
+  it("sends null for both when neither field is set (legacy call site — pre-migration entries)", async () => {
+    const { client, upsert } = makeClientWithUpsert();
+    const entries = [makeEntry(900)]; // no learningStep / stepStartedAt
+    await pushGradeLog(client, "u", entries);
+    const row = (upsert.mock.calls[0][0] as { learning_step: number | null; step_started_at: number | null }[])[0];
+    expect(row.learning_step).toBeNull();
+    expect(row.step_started_at).toBeNull();
+  });
+});
+
+describe("pullGradeLog learning_step / step_started_at (#1416)", () => {
+  it("maps learning_step and step_started_at from a cloud row for an in-learning card", async () => {
+    const { client } = makeClientWithOrderedSelect([
+      { occurred_at: 700, entry_date: "2026-05-12", card_type: "name", grade: 1, subject_key: null, locale: "en", learning_step: 0, step_started_at: 1_700_000 },
+    ]);
+    const result = await pullGradeLog(client, "u");
+    expect(result?.[0].learningStep).toBe(0);
+    expect(result?.[0].stepStartedAt).toBe(1_700_000);
+  });
+
+  it("omits learningStep and stepStartedAt when the cloud row has null (pre-migration / graduated)", async () => {
+    const { client } = makeClientWithOrderedSelect([
+      { occurred_at: 800, entry_date: "2026-05-12", card_type: "name", grade: 4, subject_key: null, locale: "en", learning_step: null, step_started_at: null },
+    ]);
+    const result = await pullGradeLog(client, "u");
+    expect(result?.[0].learningStep).toBeUndefined();
+    expect(result?.[0].stepStartedAt).toBeUndefined();
+  });
+
+  it("omits learningStep and stepStartedAt when the fields are absent on the cloud row (pre-migration row)", async () => {
+    const { client } = makeClientWithOrderedSelect([
+      { occurred_at: 900, entry_date: "2026-05-12", card_type: "name", grade: 4, subject_key: null, locale: "en" },
+    ]);
+    const result = await pullGradeLog(client, "u");
+    expect(result?.[0].learningStep).toBeUndefined();
+    expect(result?.[0].stepStartedAt).toBeUndefined();
   });
 });

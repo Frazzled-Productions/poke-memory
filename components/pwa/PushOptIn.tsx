@@ -10,6 +10,7 @@ import {
   unsubscribeFromPush,
 } from "@/lib/push/subscribe";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 /**
  * Daily-reminder opt-in toggle (#1056).
@@ -132,7 +133,7 @@ export function PushOptIn({
           <p className="text-sm font-medium text-foreground">
             Daily review reminder
           </p>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className={`mt-1 ${mutedTextXs}`}>
             Send a Web Push notification once a day when you have Pokémon ready to review. You can turn this off any time.
           </p>
         </div>

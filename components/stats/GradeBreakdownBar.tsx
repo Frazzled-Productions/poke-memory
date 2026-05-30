@@ -1,3 +1,6 @@
+"use client";
+
+import { useFormatter } from "next-intl";
 import { mutedText, sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
@@ -17,6 +20,7 @@ type Segment = {
 };
 
 export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegments = false }: Props) {
+  const format = useFormatter();
   const heading = label ?? "Grade breakdown";
   const total = again + hard + good + easy;
 
@@ -77,7 +81,7 @@ export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegm
                   </span>
                 </div>
                 <p className="text-xl font-bold tabular-nums text-foreground">
-                  {count.toLocaleString('en-GB')}
+                  {format.number(count)}
                 </p>
               </div>
             ))}

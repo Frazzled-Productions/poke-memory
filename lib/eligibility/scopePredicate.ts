@@ -28,6 +28,7 @@ import type { PracticeScope, FormCategoryFilter } from "@/lib/review/scope";
 import type { ScopeLookupEntry } from "@/lib/pokemon/scopeLookup";
 import type { FormCategory } from "@/lib/pokemon/forms";
 import { generationOf } from "@/lib/stats/generationOf";
+import { Subject } from "@/lib/cards/subjectKey";
 import { STARTER_IDS } from "@/lib/pokemon/starterIds";
 
 // ---------------------------------------------------------------------------
@@ -135,11 +136,14 @@ export function resolveAnchorId(cardType: string, subjectKey: string): number | 
     cardType === "evolution-edge" ||
     cardType === "reverse-evolution-edge"
   ) {
-    const sep = subjectKey.indexOf(">>>");
-    if (sep === -1) return null;
-    // Pre-evo is the "from" id — the part before ">>>".
-    const fromId = parseInt(subjectKey.slice(0, sep), 10);
-    return isNaN(fromId) ? null : fromId;
+    // Route through Subject.parseEdge (the canonical codec for "<fromId>>><toId>" keys).
+    // The scope anchor is the pre-evo — the "from" id — matching cardMatchesScope in
+    // lib/review/scope.ts which uses card.preEvoId for evolution cards.
+    try {
+      return Subject.parseEdge(subjectKey).fromId;
+    } catch {
+      return null;
+    }
   }
 
   // Unknown card type — cannot resolve.

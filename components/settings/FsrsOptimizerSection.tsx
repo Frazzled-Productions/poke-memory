@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
-import { cardPanelPadded, colStack, colStackLg, mutedText, sectionLabelSm } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, sectionLabelSm } from "@/lib/utils/class-names";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -49,6 +50,7 @@ export function FsrsOptimizerSection({
   superuserPaused,
   onOptimized,
 }: Props) {
+  const t = useTranslations("settings");
   const [optimizerState, setOptimizerState] = useState<OptimizerState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Capture the current time once at mount. The lazy initialiser runs outside
@@ -96,7 +98,7 @@ export function FsrsOptimizerSection({
             typeof body?.retryAfterMs === "number"
               ? Math.max(1, Math.ceil(body.retryAfterMs / MS_PER_DAY))
               : 7;
-          setErrorMsg(`Try again in ${days} day${days === 1 ? "" : "s"}.`);
+          setErrorMsg(t("optimizerRetryAfter", { count: days }));
         } else if (errorCode === "reviews_unavailable") {
           setErrorMsg("Couldn't load your reviews. Check your connection and try again.");
         } else if (errorCode === "service_unavailable") {
@@ -188,7 +190,7 @@ export function FsrsOptimizerSection({
             </button>
             <p
               data-testid="fsrs-optimize-help"
-              className="text-xs text-zinc-500 dark:text-zinc-400"
+              className={mutedTextXs}
             >
               Available after ~200 reviews. You have {optimizableReviewCount}.
             </p>
@@ -205,11 +207,11 @@ export function FsrsOptimizerSection({
               data-testid="fsrs-optimize-button"
               className="mt-2 inline-flex items-center gap-2 min-h-[44px] rounded-lg bg-zinc-200 text-zinc-500 px-6 py-2 text-sm font-semibold dark:bg-zinc-800 dark:text-zinc-400"
             >
-              Next optimization in {cooldown.daysRemaining} day{cooldown.daysRemaining === 1 ? "" : "s"}
+              {t("optimizerCooldown", { count: cooldown.daysRemaining })}
             </button>
             <p
               data-testid="fsrs-optimize-last-run"
-              className="text-xs text-zinc-500 dark:text-zinc-400"
+              className={mutedTextXs}
             >
               Last optimized:{" "}
               {new Date(cooldown.optimizedAt).toLocaleDateString("en-GB", {
@@ -262,7 +264,7 @@ export function FsrsOptimizerSection({
               {fsrsWeightsOptimizedAt !== undefined && (
                 <p
                   data-testid="fsrs-optimize-last-run"
-                  className="text-xs text-zinc-500 dark:text-zinc-400"
+                  className={mutedTextXs}
                 >
                   Last optimized:{" "}
                   {new Date(fsrsWeightsOptimizedAt).toLocaleDateString("en-GB", {

@@ -128,7 +128,7 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
             {balance}
           </span>
           <span className={mutedText}>
-            {balance === 1 ? t("tokenSingular") : t("tokenPlural")}
+            {t("tokenCount", { count: balance })}
             {balance >= MAX_BALANCE ? t("tokenMax") : ""}
           </span>
         </div>

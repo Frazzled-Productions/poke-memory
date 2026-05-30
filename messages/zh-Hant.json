@@ -23,7 +23,10 @@
     "continueWithGitHub": "使用 GitHub 繼續",
     "continueWithGoogle": "使用 Google 繼續",
     "providerHint": "請使用註冊時所用的登入方式，以保留您的進度。",
-    "chooseProvider": "選擇登入方式"
+    "chooseProvider": "選擇登入方式",
+    "cardsReviewed": "{count, plural, other {已複習 # 張卡片}}",
+    "streakDaysCount": "{count, plural, other {# 天連續}}",
+    "gradesLogged": "{count, plural, other {已記錄 # 次評分}}"
   },
   "settings": {
     "heading": "設定",
@@ -185,6 +188,8 @@
     "offline": {
       "downloadHeading": "下載"
     },
+    "optimizerCooldown": "{count, plural, other {下次最佳化還需 # 天}}",
+    "optimizerRetryAfter": "{count, plural, other {請在 # 天後重試。}}",
     "backup": {
       "heading": "備份",
       "exportLabel": "匯出進度",
@@ -362,6 +367,9 @@
       "hiddenCardsPaused": "隱藏的卡片已暫停：它們的複習日期會向後推移，因此刪除範圍不會讓過期卡片湧入佇列。"
     }
   },
+  "review": {
+    "streakDays": "{count, plural, other {連續 # 天}}"
+  },
   "pokedex": {
     "title": "Pokédex",
     "description": "瀏覽全部 1025 隻寶可夢，可按世代、屬性或掌握狀態篩選。",
@@ -392,7 +400,8 @@
     "introduced": "{introduced} / {total} 已引入",
     "generationAll": "全部",
     "generationLabel": "第 {gen} 代",
-    "masteryCount": "{mastered} / {total} 已掌握"
+    "masteryCount": "{mastered} / {total} 已掌握",
+    "nextReviewInDays": "{count, plural, other {下次複習: # 天後}}"
   },
   "pasture": {
     "title": "牧場",
@@ -444,6 +453,17 @@
     "totalSeen": "已見過",
     "streak": "連續天數",
     "days": "{count} 天",
+    "cardCount": "{count, plural, other {# 張卡片}}",
+    "gameCount": "{count, plural, other {# 款遊戲}}",
+    "reviewsInLastYear": "{count, plural, other {過去一年 # 次複習}}",
+    "reviewsOverWindow": "{count, plural, other {基於過去365天 # 次複習。}}",
+    "reviewsOverWindowInline": "{count, plural, other {基於過去365天 # 次複習}}",
+    "cardsOverNextDays": "{count, plural, other {未來14天共 # 張卡片}}",
+    "difficultyAcrossCards": "{count, plural, other {# 張卡片的平均難度}}",
+    "firstMasteryDays": "{count, plural, other {# 天}}",
+    "masterySuccessfulReviews": "{count, plural, other {# 次成功複習}}",
+    "directionReviewCount": "{count, plural, other {# 次複習}}",
+    "weeklyGradeCount": "{count, plural, other {# 次評分}}",
     "accuracyHeading": "準確率",
     "activityHeading": "活動",
     "progressHeading": "進度",
@@ -494,8 +514,7 @@
       "heading": "連續記錄保護",
       "earnAndSpentBanner": "您獲得了一個連續記錄保護令牌，並在同一天使用它來彌補昨天的缺失。您的連續記錄是安全的。",
       "dismissAriaLabel": "關閉連續記錄保護通知",
-      "tokenSingular": "令牌",
-      "tokenPlural": "令牌",
+      "tokenCount": "{count, plural, other {個令牌}}",
       "tokenMax": "（最大）",
       "earnDescription": "令牌自動補償一次缺失。每連續複習{earnInterval}天獲得一個，最多{maxBalance}個。",
       "nextTokenStart": "今天複習以開始獲取下一個令牌。",
@@ -603,25 +622,38 @@
   "onboarding": {
     "welcomeHeading": "歡迎使用 Poké Memory",
     "closeAriaLabel": "關閉歡迎指南",
-    "intro": "透過間隔重複學習每隻寶可夢的名稱和進化。新卡片每天到來；應用程式會在您即將遺忘前顯示每張卡片，隨著記憶增強，間隔也會越來越長。",
+    "intro": "透過間隔重複學習每隻寶可夢的名稱和進化。新卡片每天到來；應用程式會在你即將遺忘前顯示每張卡片，隨著記憶增強，間隔也會越來越長。",
     "howToGrade": {
       "heading": "如何評分",
       "again": "<term>再來一次</term> - 完全忘記了。",
       "hard": "<term>困難</term> - 想起來了，但很費力。",
-      "good": "<term>普通</term> - 努力了一下想起來了。",
+      "good": "<term>還不錯</term> - 努力了一下想起來了。",
       "easy": "<term>簡單</term> - 立刻就想起來了。",
-      "honestGradeNote": "請誠實評分。有時按「再來一次」是正常的，這說明系統在正常運作；只有誠實的輸入才能讓排程器不斷改進。"
+      "honestGradeNote": "請誠實評分。有時按「再來一次」是正常的，這說明系統在正常運作；這樣應用程式才能越來越聰明。"
     },
     "addingSound": {
       "heading": "新增音效（選用）",
-      "body": "您可以開啟翻牌時播放寶可夢叫聲以及文字轉語音朗讀名稱。您也可以解鎖以叫聲為提示的叫聲卡片。",
+      "body": "你可以開啟翻牌時播放寶可夢叫聲以及文字轉語音朗讀名稱。你也可以解鎖以叫聲為提示的叫聲卡片。",
       "openAudioSettings": "開啟音訊設定"
     },
     "guestStorage": {
-      "heading": "您的進度儲存在此裝置上",
-      "body": "進度儲存在瀏覽器中，不會自動備份。在 iOS Safari 上，如果 7 天沒有訪問，瀏覽器可能會清除資料。為了安全儲存：將此頁面新增到主畫面，或登入以將其備份到雲端。"
+      "heading": "你的進度儲存在此裝置上",
+      "body": "進度儲存在瀏覽器中，不會自動備份。在 iOS Safari 上，如果超過 7 天沒有開啟，瀏覽器可能會清除資料。為了安全儲存：將此頁面新增到主畫面，或登入以將其備份到雲端。"
     },
     "getStarted": "開始"
+  },
+  "sync": {
+    "status": {
+      "lastSynced": "上次同步: {time}",
+      "atTime": "{time}",
+      "notSyncedYet": "尚未同步。",
+      "syncFailed": "同步失敗",
+      "cardsOutOfSync": "{count, plural, other {# 張卡片可能未同步}}",
+      "retrying": "重試中…",
+      "retryFailed": "重試失敗 · 再次嘗試",
+      "schemaError": "同步錯誤：偵測到結構不符。您的進度已安全儲存在本地。",
+      "retry": "重試"
+    }
   },
   "common": {
     "viewInPokedex": "在圖鑑中查看{name}",

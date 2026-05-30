@@ -276,6 +276,77 @@ describe("StreakProtectionCard", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Multi-day bridge rendering (#1399)
+// ---------------------------------------------------------------------------
+
+describe("StreakProtectionCard — multi-day bridge (#1399)", () => {
+  it("renders correctly after a 3-day bridge: balance, last-spend date, and spend event", () => {
+    // Simulate the state after applyProtectionStep bridged a 3-day absence.
+    // User had balance=3, missed days 05-02, 05-03, 05-04, opened on 05-05.
+    // Result: balance=0, spendDates=[05-02, 05-03, 05-04], one "spent" event.
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          balance: 0,
+          spendDates: ["2026-05-02", "2026-05-03", "2026-05-04"],
+          daysSinceLastEarn: 10,
+          lastEarnCheckDate: "2026-05-01",
+          protectionEvents: [{ date: "2026-05-05", kind: "spent" }],
+          lastAcknowledgedProtectionEventDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // Balance shows 0.
+    expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
+    // History line shows the most recent spend date (last entry in spendDates).
+    expect(
+      screen.getByTestId("streak-protection-last-spend"),
+    ).toHaveTextContent("Streak preserved on");
+    expect(
+      screen.getByTestId("streak-protection-last-spend"),
+    ).toHaveTextContent("2026-05-04");
+    // Recent events list contains the combined spend event.
+    const eventsSection = screen.getByTestId("streak-protection-recent-events");
+    expect(eventsSection).toBeInTheDocument();
+    expect(eventsSection).toHaveTextContent("Used");
+    expect(eventsSection).toHaveTextContent("2026-05-05");
+  });
+
+  it("renders correctly after a combined earn-and-spend: balance=1 with earned-and-spent event", () => {
+    // User had balance=3 (bridged 3 days) and earned a token in the same step.
+    // Net: balance=1, one "earned-and-spent" event.
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          balance: 1,
+          spendDates: ["2026-05-02", "2026-05-03", "2026-05-04"],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: "2026-05-05",
+          protectionEvents: [{ date: "2026-05-05", kind: "earned-and-spent" }],
+          lastAcknowledgedProtectionEventDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    expect(screen.getByLabelText("1 protection token")).toBeInTheDocument();
+    // The earn-and-spend banner should appear (unacknowledged).
+    expect(
+      screen.getByTestId("streak-protection-earn-spend-banner"),
+    ).toBeInTheDocument();
+    // Recent events list shows "Earned + used".
+    const eventsSection = screen.getByTestId("streak-protection-recent-events");
+    expect(eventsSection).toHaveTextContent("Earned + used");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Locale coverage (mandatory per AGENTS.md — #1393)
 // ---------------------------------------------------------------------------
 
@@ -298,5 +369,107 @@ describe("StreakProtectionCard — Japanese locale (#1393)", () => {
     // The token count region is present — check via the labelledby pattern.
     // The token label "0 トークン残り" is the aria-label on the count element.
     expect(screen.getByLabelText("0 トークン残り")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tokenCount ICU plural — count=1 and count>1 (Fix 2, #1408 review)
+// ---------------------------------------------------------------------------
+
+describe("StreakProtectionCard — tokenCount ICU plural (#1408)", () => {
+  it("en: count=1 renders the singular 'token' label", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          ...DEFAULT_STREAK_PROTECTION,
+          balance: 1,
+          spendDates: [],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // The muted label next to the large balance number uses tokenCount.
+    // count=1 → "token" (ICU 'one' branch).
+    const labelEl = screen.getByLabelText("1 protection token");
+    expect(labelEl).toBeInTheDocument();
+    // The muted sibling renders the ICU label text, not raw tokenSingular.
+    // We verify the muted span renders "token" (no "s").
+    expect(labelEl.nextElementSibling?.textContent).toMatch(/^token(\s|\()?/);
+  });
+
+  it("en: count=2 renders the plural 'tokens' label", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          ...DEFAULT_STREAK_PROTECTION,
+          balance: 2,
+          spendDates: [],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    const labelEl = screen.getByLabelText("2 protection tokens");
+    expect(labelEl).toBeInTheDocument();
+    // count=2 → "tokens" (ICU 'other' branch).
+    expect(labelEl.nextElementSibling?.textContent).toMatch(/^tokens(\s|\()?/);
+  });
+
+  it("ja: count=1 renders the Japanese token label (no English 's' suffix)", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          ...DEFAULT_STREAK_PROTECTION,
+          balance: 1,
+          spendDates: [],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: null,
+        },
+      }),
+    );
+
+    renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // ja tokensRemaining: "1 トークン残り"
+    const labelEl = screen.getByLabelText("1 トークン残り");
+    expect(labelEl).toBeInTheDocument();
+    // tokenCount in ja 'other' branch = "トークン" (no English plural suffix)
+    expect(labelEl.nextElementSibling?.textContent).toContain("トークン");
+    expect(labelEl.nextElementSibling?.textContent).not.toContain("token");
+  });
+
+  it("zh-Hans: count=2 renders the Chinese token label", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          ...DEFAULT_STREAK_PROTECTION,
+          balance: 2,
+          spendDates: [],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />, {
+      locale: "zh-Hans",
+    });
+    // zh-Hans tokensRemaining: "剩余 2 个令牌"
+    const labelEl = screen.getByLabelText("剩余 2 个令牌");
+    expect(labelEl).toBeInTheDocument();
+    // tokenCount in zh-Hans 'other' branch = "个令牌"
+    expect(labelEl.nextElementSibling?.textContent).toContain("令牌");
   });
 });

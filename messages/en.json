@@ -23,7 +23,10 @@
     "continueWithGitHub": "Continue with GitHub",
     "continueWithGoogle": "Continue with Google",
     "providerHint": "Use the same provider you signed up with to keep your progress.",
-    "chooseProvider": "Choose a sign-in provider"
+    "chooseProvider": "Choose a sign-in provider",
+    "cardsReviewed": "{count, plural, one {# card reviewed} other {# cards reviewed}}",
+    "streakDaysCount": "{count, plural, one {# streak day} other {# streak days}}",
+    "gradesLogged": "{count, plural, one {# grade logged} other {# grades logged}}"
   },
   "settings": {
     "heading": "Settings",
@@ -185,6 +188,8 @@
     "offline": {
       "downloadHeading": "Download"
     },
+    "optimizerCooldown": "{count, plural, one {Next optimisation in # day} other {Next optimisation in # days}}",
+    "optimizerRetryAfter": "{count, plural, one {Try again in # day.} other {Try again in # days.}}",
     "backup": {
       "heading": "Backup",
       "exportLabel": "Export progress",
@@ -362,6 +367,9 @@
       "hiddenCardsPaused": "Hidden cards are paused: their review dates shift forward by the time they're hidden, so removing the scope won't flood your queue with overdue reviews."
     }
   },
+  "review": {
+    "streakDays": "{count, plural, one {# day streak} other {# days streak}}"
+  },
   "pokedex": {
     "title": "Pokédex",
     "description": "Browse all 1025 Pokémon. Filter by generation, type, or mastery status.",
@@ -392,7 +400,8 @@
     "introduced": "{introduced} / {total} introduced",
     "generationAll": "All",
     "generationLabel": "Gen {gen}",
-    "masteryCount": "{mastered} / {total} mastered"
+    "masteryCount": "{mastered} / {total} mastered",
+    "nextReviewInDays": "{count, plural, one {Next review: in # day} other {Next review: in # days}}"
   },
   "pasture": {
     "title": "Pasture",
@@ -444,6 +453,17 @@
     "totalSeen": "Seen",
     "streak": "Streak",
     "days": "{count} days",
+    "cardCount": "{count, plural, one {# card} other {# cards}}",
+    "gameCount": "{count, plural, one {# game} other {# games}}",
+    "reviewsInLastYear": "{count, plural, one {# review in the last year} other {# reviews in the last year}}",
+    "reviewsOverWindow": "{count, plural, one {Based on # review over a rolling 365-day window.} other {Based on # reviews over a rolling 365-day window.}}",
+    "reviewsOverWindowInline": "{count, plural, one {based on # review over a rolling 365-day window} other {based on # reviews over a rolling 365-day window}}",
+    "cardsOverNextDays": "{count, plural, one {# card over the next 14 days} other {# cards over the next 14 days}}",
+    "difficultyAcrossCards": "{count, plural, one {average difficulty across # card} other {average difficulty across # cards}}",
+    "firstMasteryDays": "{count, plural, one {# day} other {# days}}",
+    "masterySuccessfulReviews": "{count, plural, one {# successful review} other {# successful reviews}}",
+    "directionReviewCount": "{count, plural, one {# review} other {# reviews}}",
+    "weeklyGradeCount": "{count, plural, one {# grade} other {# grades}}",
     "accuracyHeading": "Accuracy",
     "activityHeading": "Activity",
     "progressHeading": "Progress",
@@ -494,8 +514,7 @@
       "heading": "Streak protection",
       "earnAndSpentBanner": "You earned a streak protection token and used it the same day to cover yesterday. Your streak is safe.",
       "dismissAriaLabel": "Dismiss streak protection notice",
-      "tokenSingular": "token",
-      "tokenPlural": "tokens",
+      "tokenCount": "{count, plural, one {token} other {tokens}}",
       "tokenMax": " (max)",
       "earnDescription": "Tokens cover one missed day, automatically. Earn one for every {earnInterval} consecutive review days, up to {maxBalance}.",
       "nextTokenStart": "Review today to start earning your next token.",
@@ -622,6 +641,19 @@
       "body": "Progress is stored in your browser and is not backed up automatically. On iOS Safari, the browser may clear it after 7 days without a visit. To keep it safe: add this page to your Home Screen, or sign in to back it up to the cloud."
     },
     "getStarted": "Get started"
+  },
+  "sync": {
+    "status": {
+      "lastSynced": "Last synced: {time}",
+      "atTime": "at {time}",
+      "notSyncedYet": "Not synced yet.",
+      "syncFailed": "Sync failed",
+      "cardsOutOfSync": "{count, plural, one {# card may be out of sync} other {# cards may be out of sync}}",
+      "retrying": "Retrying…",
+      "retryFailed": "Retry failed · Try again",
+      "schemaError": "Sync error: a schema mismatch was detected. Your progress is safe locally.",
+      "retry": "Retry"
+    }
   },
   "common": {
     "viewInPokedex": "View {name} in Pokédex",

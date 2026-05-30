@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import type { GenerationStats } from "@/lib/stats/derive";
 import type { BadgeDefinition } from "@/lib/badges/catalog";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
-import { sectionLabel } from "@/lib/utils/class-names";
+import { mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
   handle: string | null;
@@ -105,7 +105,7 @@ export function TrainerCard({
           </span>
         </div>
       </div>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mt-1 ${mutedTextXs}`}>
         {totalMastered >= BASE_SPECIES_COUNT
           ? t("allMastered")
           : t("masteryProgress", { mastered: totalMastered, next, needed, levelNext: level + 1 })}

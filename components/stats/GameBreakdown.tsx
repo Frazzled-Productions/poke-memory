@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { GameStats } from "@/lib/stats/per-game";
 import {
   versionGroupLabel,
   versionGroupGeneration,
   VERSION_GROUP_ORDER,
 } from "@/lib/pokemon/versionGroupLabels";
+import { mutedTextXs } from "@/lib/utils/class-names";
+import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -46,22 +49,18 @@ function GameRow({ row }: { row: GameStats }) {
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <div
-          className="flex-1 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700"
-          aria-hidden="true"
-        >
-          <div
-            className="h-full bg-emerald-500 dark:bg-emerald-400 transition-all duration-300"
-            style={{ width: `${masteredPct}%` }}
-          />
-        </div>
+        <MeterBar
+          value={row.mastered}
+          max={row.total}
+          fillClass="bg-emerald-500 dark:bg-emerald-400"
+          label={`${label}: ${row.mastered} of ${row.total} mastered (${masteredPct}%)`}
+          transitionClass="transition-all duration-300"
+          className="flex-1"
+        />
         <span className="w-9 text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
           {masteredPct}%
         </span>
       </div>
-      <span className="sr-only">
-        {label}: {row.mastered} of {row.total} mastered ({masteredPct}%)
-      </span>
     </li>
   );
 }
@@ -76,6 +75,7 @@ type GenGroup = {
 };
 
 function GenAccordion({ group }: { group: GenGroup }) {
+  const t = useTranslations("stats");
   const [open, setOpen] = useState(false);
   const genName = GEN_NAMES[group.gen] ?? `Generation ${group.gen}`;
   const totalMastered = group.rows.reduce((s, r) => s + r.mastered, 0);
@@ -92,8 +92,8 @@ function GenAccordion({ group }: { group: GenGroup }) {
       >
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-sm font-semibold text-foreground">{genName}</span>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {uniqueGames} {uniqueGames === 1 ? "game" : "games"} · {totalMastered}/{totalSpecies} species mastered
+          <span className={mutedTextXs}>
+            {t("gameCount", { count: uniqueGames })} · {totalMastered}/{totalSpecies} species mastered
           </span>
         </div>
         <svg
