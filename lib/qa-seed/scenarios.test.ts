@@ -118,11 +118,11 @@ describe("scenario payload builders", () => {
     expect(payload.pokemonNameLocale).toBe("en");
   });
 
-  it("pasture-progression: has both en-locale and ja-locale mastered name cards (per-locale FSRS demo)", () => {
+  it("pasture-progression: has 40 en-locale mastered name cards and NO ja duplicates (per-locale FSRS demo)", () => {
     const payload = SCENARIO_BY_SLUG.get("pasture-progression")!.build();
     const cards = payload.session?.cards ?? [];
 
-    // Must have en-locale mastered name cards (the main 40).
+    // 40 en-locale mastered name cards (the main set).
     const enMasteredNames = cards.filter(
       (c) => c.cardType === "name" &&
         (c as { locale?: string }).locale === "en" &&
@@ -130,15 +130,29 @@ describe("scenario payload builders", () => {
     );
     expect(enMasteredNames.length).toBeGreaterThanOrEqual(40);
 
-    // Must also have ja-locale mastered name cards (the locale-demo subset).
-    const jaMasteredNames = cards.filter(
-      (c) => c.cardType === "name" &&
-        (c as { locale?: string }).locale === "ja" &&
-        c.state.reps >= 3 && c.state.scheduledDays >= 21,
-    );
-    expect(jaMasteredNames.length).toBeGreaterThanOrEqual(1);
-    // ja count must be strictly less than en count so switching locale shows a different number.
-    expect(jaMasteredNames.length).toBeLessThan(enMasteredNames.length);
+    // No ja-locale duplicates: the local session keys cards by numeric `id`, so
+    // seeding an en+ja pair for the same species collides and breaks Practice
+    // (#1394 mini-batch regression). pokemonNameLocale 'en' shows 40; switching
+    // to ja shows 0 — which already demonstrates per-locale storage.
+    const jaCards = cards.filter((c) => (c as { locale?: string }).locale === "ja");
+    expect(jaCards).toHaveLength(0);
+    expect(payload.pokemonNameLocale).toBe("en");
+  });
+
+  // Regression guard for the #1394 mini-batch crash: the local review session
+  // keys cards by numeric `id`, so a scenario must never emit two cards sharing
+  // an `id` (e.g. an en+ja pair for one species). Duplicate ids collide in
+  // buildSessionQueues and break the Practice page.
+  it("every scenario emits session cards with unique numeric ids", () => {
+    for (const scenario of SCENARIOS) {
+      const cards = scenario.build().session?.cards ?? [];
+      const ids = cards.map((c) => c.id);
+      const unique = new Set(ids);
+      expect(
+        unique.size,
+        `scenario '${scenario.slug}' has ${ids.length - unique.size} duplicate card id(s)`,
+      ).toBe(ids.length);
+    }
   });
 
   it("mastery-gaps: sets pokemonNameLocale to 'en'", () => {

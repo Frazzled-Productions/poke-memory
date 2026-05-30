@@ -383,14 +383,17 @@ function buildOptimiserStress(): SeedPayload {
  * the Pasture page a genuinely populated view without the `pretendAllMastered`
  * flag, and lets QA verify the Pasture visual layout with real data.
  *
- * Mix: 40 mastered (en), 5 mastered (ja), 20 due-soon, 15 in-learning,
- * rest locked (absent from the session — hydrateSession adds them as new
- * cards on next practice load).
+ * Mix: 40 mastered (en), 20 due-soon, 15 in-learning, rest locked (absent
+ * from the session — hydrateSession adds them as new cards on next practice
+ * load).
  *
  * Sets `pokemonNameLocale: "en"` so the 40 en-locale mastered cards show
- * correctly. Switching to Japanese in Settings should show only the 5
- * ja-locale mastered cards — demonstrating that mastery is stored per locale
- * (the per-locale FSRS rows introduced in #1259).
+ * correctly. Switching to Japanese in Settings shows 0 mastered (the en cards
+ * do not match the ja locale) — demonstrating that mastery is stored per
+ * locale (the per-locale FSRS rows introduced in #1259). We do NOT seed
+ * ja-locale duplicates of the same species: the local review session keys
+ * cards by numeric `id`, so an en+ja pair for one species collides and breaks
+ * Practice (#1394 mini-batch regression).
  *
  * The Gen-I species used (IDs 1–92) all have non-null PokéAPI habitats, so
  * the Pasture spreads across multiple biomes (grassland, forest, mountain,
@@ -418,20 +421,13 @@ function buildPastureProgression(): SeedPayload {
     cards.push(reverseCard(id, state, "en"));
   }
 
-  // 5 mastered (locale: ja) — a distinct subset so switching pokemonNameLocale
-  // to Japanese shows exactly 5 mastered cards. This demonstrates that mastery
-  // is tracked per locale: en and ja do not share state (#1259).
-  const jaMasteredIds = [1, 4, 7, 25, 39];
-  for (const id of jaMasteredIds) {
-    const offsetDays = ((id % 7) + 1);
-    const state = masteredState({
-      dueDate: relativeDate(offsetDays),
-      lastReview: relativeDate(-offsetDays),
-      firstSeen: PAST_30,
-    });
-    cards.push(nameCard(id, state, "ja"));
-    cards.push(reverseCard(id, state, "ja"));
-  }
+  // NOTE: we deliberately do NOT seed ja-locale duplicates of the same species.
+  // The local review session keys cards by numeric `id` (locale-agnostic), so an
+  // en and a ja card for the same species would share an `id` and collide in
+  // buildSessionQueues, breaking Practice. Per-locale mastery is still
+  // demonstrable: with pokemonNameLocale 'en' the Pasture shows 40 mastered;
+  // switching to Japanese shows 0 (the en cards don't match the ja locale),
+  // confirming mastery is tracked per locale (#1259). (Regression: #1394 mini-batch.)
 
   // 20 graduated / due-soon (in progress, not yet mastered)
   const dueSoonIds = [
@@ -470,8 +466,9 @@ function buildPastureProgression(): SeedPayload {
   return {
     session: { cards, limits: DEFAULT_LIMITS },
     // Set en so the 40 en-locale mastered cards show by default. Switch to
-    // Japanese in Settings > Pokémon name language to see only the 5 ja-locale
-    // mastered cards — confirming per-locale FSRS storage (#1259).
+    // Japanese in Settings > Pokémon name language to see 0 mastered (the en
+    // cards do not match the ja locale) — confirming per-locale FSRS storage
+    // (#1259).
     pokemonNameLocale: "en",
   };
 }
