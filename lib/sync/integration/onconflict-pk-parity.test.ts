@@ -41,8 +41,39 @@ let pool: pg.Pool;
 let dbName: string;
 
 /**
+ * Counts the number of constraints of a given type on a table.
+ *
+ * Used to assert that exactly one UNIQUE constraint exists before reading its
+ * columns — a second UNIQUE constraint added in a future migration would otherwise
+ * cause `queryConstraintCols` to return a merged, unpredictable column list.
+ *
+ * @param tableName - public-schema table name, e.g. "streak_days"
+ * @param contype   - 'p' for PRIMARY KEY, 'u' for UNIQUE
+ */
+async function countConstraints(
+  tableName: string,
+  contype: "p" | "u",
+): Promise<number> {
+  const { rows } = await pool.query<{ cnt: string }>(
+    `SELECT COUNT(*) AS cnt
+     FROM pg_constraint c
+     JOIN pg_class t ON t.oid = c.conrelid
+     JOIN pg_namespace n ON n.oid = t.relnamespace
+     WHERE n.nspname = 'public'
+       AND t.relname = $1
+       AND c.contype = $2`,
+    [tableName, contype],
+  );
+  return Number(rows[0]?.cnt ?? 0);
+}
+
+/**
  * Queries pg_constraint for the columns of a named constraint (or the PRIMARY KEY /
  * UNIQUE constraint of a given type) on a table, returned in declaration order.
+ *
+ * Callers must first assert via `countConstraints` that exactly one constraint of
+ * the queried type exists; if multiple exist the column list returned here is
+ * non-deterministic across schema changes.
  *
  * @param tableName   - public-schema table name, e.g. "card_reviews"
  * @param contype     - 'p' for PRIMARY KEY, 'u' for UNIQUE
@@ -100,6 +131,11 @@ describe("onConflict ↔ PK/UNIQUE parity (integration)", () => {
   });
 
   it("streak_days: client STREAK_DAYS_CONFLICT_COLS matches the live UNIQUE constraint (migration 001 — 2 columns)", async () => {
+    // Assert exactly one UNIQUE constraint: a second one added later would cause
+    // queryConstraintCols to return a merged, non-deterministic column list.
+    const constraintCount = await countConstraints("streak_days", "u");
+    expect(constraintCount).toBe(1);
+
     const dbCols = await queryConstraintCols("streak_days", "u");
     const clientCols = parseConflictCols(STREAK_DAYS_CONFLICT_COLS);
 
@@ -108,6 +144,11 @@ describe("onConflict ↔ PK/UNIQUE parity (integration)", () => {
   });
 
   it("grade_log: client GRADE_LOG_CONFLICT_COLS matches the live UNIQUE constraint (migration 006 — 2 columns)", async () => {
+    // Assert exactly one UNIQUE constraint: a second one added later would cause
+    // queryConstraintCols to return a merged, non-deterministic column list.
+    const constraintCount = await countConstraints("grade_log", "u");
+    expect(constraintCount).toBe(1);
+
     const dbCols = await queryConstraintCols("grade_log", "u");
     const clientCols = parseConflictCols(GRADE_LOG_CONFLICT_COLS);
 

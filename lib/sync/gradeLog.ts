@@ -4,6 +4,7 @@ import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 // Grade-log sync is best-effort. Failures are surfaced as `false` / `null`
 // and the caller is expected to keep going — analytics history is auxiliary
 // to card-review state.
+
 /**
  * The `onConflict` column list for `grade_log` upserts.
  *

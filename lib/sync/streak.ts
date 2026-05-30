@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // Streak sync is best-effort: failures are surfaced as `false` (push) or `null`
 // (pull) and the caller is expected to keep going. A streak miss is not a
 // data-loss event the way a card-review miss is.
+
 /**
  * The `onConflict` column list for `streak_days` upserts.
  *
