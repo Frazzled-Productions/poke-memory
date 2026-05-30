@@ -621,20 +621,20 @@
   },
   "onboarding": {
     "welcomeHeading": "Poké Memory へようこそ",
-    "closeAriaLabel": "ウェルカムガイドを閉じる",
+    "closeAriaLabel": "このガイドを閉じる",
     "intro": "間隔反復ですべての Pokémon の名前と進化を覚えましょう。新しいカードが毎日届き、アプリが忘れる直前にカードを表示するため、記憶が強化されるにつれて間隔が伸びていきます。",
     "howToGrade": {
-      "heading": "採点の方法",
-      "again": "<term>もう一度</term> - 完全に忘れた。",
-      "hard": "<term>難しい</term> - 思い出せたが苦労した。",
-      "good": "<term>普通</term> - 多少努力して思い出せた。",
-      "easy": "<term>簡単</term> - 即座に思い出せた。",
-      "honestGradeNote": "正直に採点してください。「もう一度」になることは正常で、システムが機能している証拠です。正直な入力があってこそスケジューラーが改善されます。"
+      "heading": "ボタンの使い方",
+      "again": "<term>もう一度</term> - 完全に忘れてしまった。",
+      "hard": "<term>難しい</term> - 苦労したけど思い出せた。",
+      "good": "<term>できた</term> - 少し考えて思い出せた。",
+      "easy": "<term>簡単</term> - すぐに思い出せた。",
+      "honestGradeNote": "正直に答えることが大切です。「もう一度」になることは正常で、アプリがちゃんと動いている証拠です。正直に答えることで、アプリがどんどん賢くなります。"
     },
     "addingSound": {
       "heading": "音を追加する（任意）",
       "body": "カードをめくったときに Pokémon の鳴き声を、また音声合成で名前の読み上げを有効にできます。音声をプロンプトとする鳴き声カードも使用できます。",
-      "openAudioSettings": "オーディオ設定を開く"
+      "openAudioSettings": "サウンドの設定を開く"
     },
     "guestStorage": {
       "heading": "進捗はこのデバイスに保存されます",
