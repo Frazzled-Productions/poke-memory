@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
@@ -16,6 +17,7 @@ import {
   type ScopeMatchContext,
 } from "@/lib/review/scope";
 import { GameScopePicker } from "@/components/review/GameScopePicker";
+import { getTypeName, type TypeTranslations } from "@/lib/i18n/typeNames";
 
 type Props = {
   scope: PracticeScope;
@@ -144,6 +146,10 @@ export function ScopeControl({
   incompleteChainSpeciesIds,
 }: Props) {
   const [open, setOpen] = useState(false);
+  // Note: the loop variable inside POKEMON_TYPES.map is named `type` (not `t`)
+  // to avoid shadowing the `tTypes` translation function. See LANDMINE note in
+  // issue #1389 specialist notes.
+  const tTypes = useTranslations("types") as TypeTranslations;
   const active = !isScopeEmpty(scope);
   // Context for the "Incomplete evolution chains" preset (#995): the live
   // count must consult the same incomplete-chain species set the session uses.
@@ -255,26 +261,27 @@ export function ScopeControl({
             defaultOpen={typesActive}
           >
             <div className="flex flex-wrap gap-1.5">
-              {POKEMON_TYPES.map((t) => {
-                const selected = scope.types.includes(t);
-                const colors = TYPE_COLORS[t];
+              {POKEMON_TYPES.map((type) => {
+                const selected = scope.types.includes(type);
+                const colors = TYPE_COLORS[type];
                 const selectedClasses = colors
                   ? `border-transparent ${colors.bg} ${colors.text}`
                   : SELECTED_ACCENT;
+                const typeName = getTypeName(type, tTypes);
                 return (
                   <button
-                    key={t}
+                    key={type}
                     type="button"
-                    onClick={() => onChange({ ...scope, types: toggleStr(scope.types, t) })}
-                    aria-label={`Type ${t}`}
+                    onClick={() => onChange({ ...scope, types: toggleStr(scope.types, type) })}
+                    aria-label={typeName}
                     aria-pressed={selected}
                     className={
                       PILL_BASE +
-                      " capitalize " +
+                      " " +
                       (selected ? selectedClasses : UNSELECTED_PILL)
                     }
                   >
-                    {t}
+                    {typeName}
                   </button>
                 );
               })}

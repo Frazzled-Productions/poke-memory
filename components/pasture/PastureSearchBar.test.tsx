@@ -310,3 +310,75 @@ describe("PastureSearchBar — Japanese locale", () => {
     expect(screen.getByRole("button", { name: "第I世代" })).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Type pill locale coverage (#1389) — type names must localise with appLocale
+// ---------------------------------------------------------------------------
+
+describe("PastureSearchBar — type pills in Japanese locale", () => {
+  it("renders the Fire pill in Japanese as ほのお", () => {
+    renderJa(
+      <PastureSearchBar
+        filters={defaultFilters()}
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json types.fire = "ほのお"
+    expect(screen.getByRole("button", { name: "ほのお" })).toBeInTheDocument();
+  });
+
+  it("renders the Grass pill in Japanese as くさ", () => {
+    renderJa(
+      <PastureSearchBar
+        filters={defaultFilters()}
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json types.grass = "くさ"
+    expect(screen.getByRole("button", { name: "くさ" })).toBeInTheDocument();
+  });
+});
+
+describe("PastureSearchBar — type pills in Simplified Chinese locale", () => {
+  it("renders the Dragon pill in Simplified Chinese as 龙", () => {
+    renderWithIntl(
+      <PastureSearchBar
+        filters={defaultFilters()}
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+      />,
+      { locale: "zh-Hans" },
+    );
+    // messages/zh-Hans.json types.dragon = "龙"
+    const typeGroup = screen.getByRole("group", { name: "按属性筛选" });
+    expect(typeGroup).toBeInTheDocument();
+    const buttons = Array.from(typeGroup.querySelectorAll("button"));
+    const dragonBtn = buttons.find((b) => b.textContent === "龙");
+    expect(dragonBtn).toBeTruthy();
+  });
+});
+
+describe("PastureSearchBar — type pills in Traditional Chinese locale", () => {
+  it("renders the Bug pill in Traditional Chinese as 蟲", () => {
+    renderWithIntl(
+      <PastureSearchBar
+        filters={defaultFilters()}
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+      />,
+      { locale: "zh-Hant" },
+    );
+    // messages/zh-Hant.json types.bug = "蟲"
+    const typeGroup = screen.getByRole("group", { name: "按屬性篩選" });
+    expect(typeGroup).toBeInTheDocument();
+    const buttons = Array.from(typeGroup.querySelectorAll("button"));
+    const bugBtn = buttons.find((b) => b.textContent === "蟲");
+    expect(bugBtn).toBeTruthy();
+  });
+});

@@ -476,5 +476,25 @@
   "banner": {
     "machineTranslated": "このアプリの{language}翻訳は自動的に作成されており、完全にはレビューされていません。表現が不自然な場合があります。誤りを見つけましたか？fbrookhouse@gmail.com までお知らせください。",
     "dismiss": "閉じる"
+  },
+  "types": {
+    "bug": "むし",
+    "dark": "あく",
+    "dragon": "ドラゴン",
+    "electric": "でんき",
+    "fairy": "フェアリー",
+    "fighting": "かくとう",
+    "fire": "ほのお",
+    "flying": "ひこう",
+    "ghost": "ゴースト",
+    "grass": "くさ",
+    "ground": "じめん",
+    "ice": "こおり",
+    "normal": "ノーマル",
+    "poison": "どく",
+    "psychic": "エスパー",
+    "rock": "いわ",
+    "steel": "はがね",
+    "water": "みず"
   }
 }
