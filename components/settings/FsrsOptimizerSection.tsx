@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
-import { cardPanelPadded, colStack, colStackLg, mutedText, sectionLabelSm } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, sectionLabelSm } from "@/lib/utils/class-names";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -190,7 +190,7 @@ export function FsrsOptimizerSection({
             </button>
             <p
               data-testid="fsrs-optimize-help"
-              className="text-xs text-zinc-500 dark:text-zinc-400"
+              className={mutedTextXs}
             >
               Available after ~200 reviews. You have {optimizableReviewCount}.
             </p>
@@ -211,7 +211,7 @@ export function FsrsOptimizerSection({
             </button>
             <p
               data-testid="fsrs-optimize-last-run"
-              className="text-xs text-zinc-500 dark:text-zinc-400"
+              className={mutedTextXs}
             >
               Last optimized:{" "}
               {new Date(cooldown.optimizedAt).toLocaleDateString("en-GB", {
@@ -264,7 +264,7 @@ export function FsrsOptimizerSection({
               {fsrsWeightsOptimizedAt !== undefined && (
                 <p
                   data-testid="fsrs-optimize-last-run"
-                  className="text-xs text-zinc-500 dark:text-zinc-400"
+                  className={mutedTextXs}
                 >
                   Last optimized:{" "}
                   {new Date(fsrsWeightsOptimizedAt).toLocaleDateString("en-GB", {

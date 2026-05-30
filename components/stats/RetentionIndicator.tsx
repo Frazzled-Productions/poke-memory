@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import { useTranslations, useFormatter } from "next-intl";
 import type { RetentionComparison } from "@/lib/stats/retention";
-import { cardPanel, mutedText, sectionLabel } from "@/lib/utils/class-names";
+import { cardPanel, mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
   /** Actual-vs-target comparison from `computeRetentionComparison`. */
@@ -54,7 +54,7 @@ export function RetentionIndicator({ comparison }: Props) {
       >
         Recall vs target
       </h2>
-      <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-3 ${mutedTextXs}`}>
         Your measured recall over the past year against the {formatPct(target)}{" "}
         retention target the scheduler aims for.
       </p>
@@ -141,7 +141,7 @@ export function RetentionIndicator({ comparison }: Props) {
                   </>
                 )}
               </p>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+              <p className={`mt-1 ${mutedTextXs} tabular-nums`}>
                 {t("reviewsOverWindow", { count: reviews })}
               </p>
             </div>

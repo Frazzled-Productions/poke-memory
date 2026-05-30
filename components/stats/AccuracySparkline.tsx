@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Window options
@@ -150,7 +150,7 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
           <span className="text-2xl font-semibold tabular-nums text-foreground">
             {rollingValue === null ? "—" : formatPct(rollingValue)}
           </span>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          <span className={mutedTextXs}>
             {windowLabel}
           </span>
         </div>

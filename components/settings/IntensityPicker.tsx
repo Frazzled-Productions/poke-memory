@@ -1,7 +1,7 @@
 "use client";
 
 import type { ThemeIntensity } from "@/lib/settings/persistence";
-import { colStack, colStackLg, sectionLabelSm } from "@/lib/utils/class-names";
+import { colStack, colStackLg, mutedTextXs, sectionLabelSm } from "@/lib/utils/class-names";
 
 type Option = {
   value: ThemeIntensity;
@@ -71,7 +71,7 @@ export function IntensityPicker({ value, onChange }: Props) {
               />
               <div>
                 <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                <p className={`mt-0.5 ${mutedTextXs}`}>
                   {opt.description}
                 </p>
               </div>

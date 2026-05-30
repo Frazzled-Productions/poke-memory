@@ -12,6 +12,7 @@ import {
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 type Phase = "picking" | "revealed";
 type LastResult = "correct" | "wrong" | "tie" | null;
@@ -191,7 +192,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
       aria-label="Higher or Lower mini-game"
       className="flex flex-col items-center gap-4 w-full max-w-sm mx-auto pt-6 border-t border-zinc-200 dark:border-zinc-800"
     >
-      <div className="flex justify-between w-full text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+      <div className={`flex justify-between w-full ${mutedTextXs} tabular-nums`}>
         <span>
           Streak: <span className="font-semibold text-foreground">{streak}</span>
         </span>

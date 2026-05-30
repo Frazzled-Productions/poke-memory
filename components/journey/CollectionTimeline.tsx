@@ -17,7 +17,7 @@ import { useState, useId, useMemo, useCallback } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import type { CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { snapshotAtPosition } from "@/lib/timeline/reconstruct";
-import { chartTickText } from "@/lib/utils/class-names";
+import { chartTickText, mutedTextXs } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,7 +79,7 @@ function CountPill({
       <span className={`text-2xl font-bold tabular-nums ${colour}`}>
         {format.number(count)}
       </span>
-      <span className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
+      <span className={`mt-0.5 ${mutedTextXs}`}>{label}</span>
     </div>
   );
 }

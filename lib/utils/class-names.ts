@@ -87,3 +87,31 @@ export const dialogPanel =
  * neutral muted tone, consistent across all six chart components.
  */
 export const statValue = "tabular-nums text-zinc-600 dark:text-zinc-300";
+
+/**
+ * Muted body text at `text-xs`. The `text-xs` companion to `mutedText`
+ * (`text-sm`). Used for helper paragraphs, field descriptions, and supporting
+ * metadata throughout Settings, Stats, and review surfaces.
+ *
+ * Compose spacing at call sites: `\`mt-1 \${mutedTextXs}\`` or
+ * `cn("mt-1", mutedTextXs)` — do not inline the colour classes directly.
+ */
+export const mutedTextXs = "text-xs text-zinc-500 dark:text-zinc-400";
+
+/**
+ * Standard in-prose hyperlink style. Underlined with a theme-accent focus ring
+ * and a subtle zinc hover tone. Used across the privacy and terms pages, and
+ * `ChildFriendlySummary`.
+ */
+export const inlineLink =
+  "underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded";
+
+/**
+ * Chart tooltip card container used by all five Stats custom tooltips
+ * (`DirectionBreakdownChart`, `MasteryOverTimeChart`, `DifficultyHistogram`,
+ * `GradeDistributionChart`, `ActivityHistoryChart`). Uses `border-zinc-700`
+ * in dark mode — distinct from the `cardPanel` / `cardPanelPadded` family
+ * which use `border-zinc-800`.
+ */
+export const chartTooltipCard =
+  "rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700";

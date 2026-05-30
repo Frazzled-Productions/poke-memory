@@ -18,6 +18,7 @@ import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 type Placement = {
   card: NameReviewCard;
@@ -253,7 +254,7 @@ export default function BiomeLandscapePage({
 
           {/* Richer stats panel — shown below the heading row */}
           <dl
-            className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-zinc-500 dark:text-zinc-400"
+            className={`mt-1 flex flex-wrap gap-x-4 gap-y-0.5 ${mutedTextXs}`}
             aria-label="Biome statistics"
           >
             <div>

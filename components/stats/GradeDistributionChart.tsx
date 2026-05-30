@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { useTranslations, useFormatter } from "next-intl";
 import type { GradeDistribution, GradeTrendPoint } from "@/lib/stats/grade-distribution";
-import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Colour palette — consistent with GradeBreakdownBar and the Stats accent vocabulary
@@ -47,7 +47,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonl
     { label: "Easy",  key: "easy",  count: d.easy  },
   ];
   return (
-    <div className="rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700">
+    <div className={chartTooltipCard}>
       <p className="mb-1 font-semibold text-foreground">
         w/c {d.weekStart}
       </p>
@@ -117,7 +117,7 @@ function OverallBar({ distribution }: { distribution: GradeDistribution }) {
       </div>
       <ul
         role="list"
-        className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400"
+        className={`mt-2 flex flex-wrap gap-x-4 gap-y-1 ${mutedTextXs}`}
       >
         {segments.map(({ key, label, count, color }) => (
           <li key={key} className="flex items-center gap-1.5">
@@ -179,7 +179,7 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
       >
         Grade distribution
       </h2>
-      <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-3 ${mutedTextXs}`}>
         How often you pressed Again, Hard, Good, or Easy over time. A higher
         Easy and Good share shows the cards are sticking.
       </p>
@@ -268,7 +268,7 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className={`mt-2 ${mutedTextXs}`}>
                 Weekly history builds up as you complete full weeks of reviews.
                 Keep going!
               </p>

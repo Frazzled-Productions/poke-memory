@@ -58,7 +58,7 @@ import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
-import { cardPanelPadded, colStackLg, sectionLabel } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStackLg, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
@@ -144,7 +144,7 @@ function ResetEarnedBadgesRow() {
           <p className="text-sm font-medium text-foreground">
             {t("settings.developer.resetEarnedBadges.label")}
           </p>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className={`mt-1 ${mutedTextXs}`}>
             {t("settings.developer.resetEarnedBadges.description")}
           </p>
         </div>
@@ -212,7 +212,7 @@ function FavouritePicker({
       >
         {t("settings.appearance.theme.heading")}
       </h3>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={mutedTextXs}>
         {t("settings.appearance.theme.description")}
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -854,7 +854,7 @@ export default function SettingsPage() {
                         <p className="text-sm font-medium text-foreground">
                           {t("settings.appearance.mobileNav.label")}
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t("settings.appearance.mobileNav.description")}
                         </p>
                       </div>
@@ -929,7 +929,7 @@ export default function SettingsPage() {
                           onBlur={() => handleBlur(key, min)}
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t(helperKey)}
                         </p>
                       </div>
@@ -961,7 +961,7 @@ export default function SettingsPage() {
                     />
                     <p
                       id="retentionTarget-helper"
-                      className="mt-2 text-xs text-zinc-500 dark:text-zinc-400"
+                      className={`mt-2 ${mutedTextXs}`}
                     >
                       {t("settings.practice.recallTarget.description")}
                     </p>
@@ -999,7 +999,7 @@ export default function SettingsPage() {
                         <p className="text-sm font-medium text-foreground">
                           {t("settings.practice.quickstart.label")}
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t("settings.practice.quickstart.description")}
                         </p>
                       </div>
@@ -1053,7 +1053,7 @@ export default function SettingsPage() {
                           onBlur={() => handleBlur(key, min)}
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t(helperKey)}
                         </p>
                       </div>
@@ -1065,7 +1065,7 @@ export default function SettingsPage() {
                           <p className="text-sm font-medium text-foreground">
                             {t("settings.practice.typedEntry.label")}
                           </p>
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className={`mt-1 ${mutedTextXs}`}>
                             {t("settings.practice.typedEntry.description")}
                           </p>
                         </div>
@@ -1089,7 +1089,7 @@ export default function SettingsPage() {
                         </button>
                       </div>
                       {/* Always-visible inline help explaining the MC ramp (#1271) */}
-                      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className={`mt-2 ${mutedTextXs}`}>
                         {t("settings.practice.typedEntry.mcRampNote")}
                       </p>
                       {/* One-time first-enable banner (#1271). Dismissed by the user; never re-fires. */}
@@ -1127,7 +1127,7 @@ export default function SettingsPage() {
                         <p className="text-sm font-medium text-foreground">
                           {t("settings.practice.evolutionCards.enableLabel")}
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t("settings.practice.evolutionCards.enableDescription")}
                         </p>
                       </div>
@@ -1180,7 +1180,7 @@ export default function SettingsPage() {
                             disabled={!settings.evolutionCardsEnabled}
                             className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                           />
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className={`mt-1 ${mutedTextXs}`}>
                             {t(helperKey)}
                           </p>
                         </div>
@@ -1200,7 +1200,7 @@ export default function SettingsPage() {
                         <p className="text-sm font-medium text-foreground">
                           {t("settings.practice.reverseEvolutionCards.enableLabel")}
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t("settings.practice.reverseEvolutionCards.enableDescription")}
                         </p>
                       </div>
@@ -1236,7 +1236,7 @@ export default function SettingsPage() {
                         <p className="text-sm font-medium text-foreground">
                           {t("settings.practice.alternateForms.enableLabel")}
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t("settings.practice.alternateForms.enableDescription")}
                         </p>
                       </div>
@@ -1289,7 +1289,7 @@ export default function SettingsPage() {
                         onBlur={() => handleBlur(key, min)}
                         className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                       />
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className={`mt-1 ${mutedTextXs}`}>
                         {t(helperKey)}
                       </p>
                     </div>
@@ -1336,7 +1336,7 @@ export default function SettingsPage() {
                         <p className="text-sm font-medium text-foreground">
                           {t("settings.audio.cryCards.enableLabel")}
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t("settings.audio.cryCards.enableDescription")}
                         </p>
                       </div>
@@ -1369,7 +1369,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium text-foreground">
                         {t("settings.audio.playCryOnReveal.label")}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className={`mt-1 ${mutedTextXs}`}>
                         {t("settings.audio.playCryOnReveal.description")}
                       </p>
                     </div>
@@ -1398,7 +1398,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium text-foreground">
                         {t("settings.audio.speakNameOnReveal.label")}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className={`mt-1 ${mutedTextXs}`}>
                         {t("settings.audio.speakNameOnReveal.description")}
                       </p>
                     </div>
@@ -1439,7 +1439,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium text-foreground">
                         {t("settings.audio.waitForAudio.label")}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className={`mt-1 ${mutedTextXs}`}>
                         {t("settings.audio.waitForAudio.description")}
                       </p>
                     </div>
@@ -1470,7 +1470,7 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium text-foreground">
                     {t("settings.audio.reverseFeedbackDelay.label")}
                   </p>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className={`mt-1 ${mutedTextXs}`}>
                     {t("settings.audio.reverseFeedbackDelay.description")}
                   </p>
                   <fieldset className="mt-3 flex gap-2">
@@ -1578,7 +1578,7 @@ export default function SettingsPage() {
                     <p className="text-sm font-medium text-foreground">
                       {t("settings.howThisWorks.showOnboardingAgainLabel")}
                     </p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-1 ${mutedTextXs}`}>
                       {t("settings.howThisWorks.showOnboardingAgainDescription")}
                     </p>
                     <button
@@ -1605,7 +1605,7 @@ export default function SettingsPage() {
                   </p>
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("settings.backup.exportLabel")}</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-1 ${mutedTextXs}`}>
                       {t("settings.backup.exportDescription")}
                     </p>
                     <button
@@ -1623,7 +1623,7 @@ export default function SettingsPage() {
                       <hr className="border-zinc-200 dark:border-zinc-800" />
                       <div>
                         <p className="text-sm font-medium text-foreground">{t("settings.backup.downloadReviewHistory")}</p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className={`mt-1 ${mutedTextXs}`}>
                           {t("settings.backup.downloadReviewHistoryDescription")}
                         </p>
                         <a
@@ -1641,7 +1641,7 @@ export default function SettingsPage() {
 
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("settings.backup.importLabel")}</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-1 ${mutedTextXs}`}>
                       {t("settings.backup.importDescription")}
                     </p>
                     <input
@@ -1684,7 +1684,7 @@ export default function SettingsPage() {
                     >
                       {t("settings.regional.timezone.label")}
                     </label>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-1 ${mutedTextXs}`}>
                       {t("settings.regional.timezone.description")}
                     </p>
                     <select
@@ -1717,7 +1717,7 @@ export default function SettingsPage() {
                     <p className="text-sm font-medium text-foreground">
                       {t("settings.regional.dateFormat.label")}
                     </p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-1 ${mutedTextXs}`}>
                       {t("settings.regional.dateFormat.description")}
                     </p>
                     <fieldset className="mt-3 flex flex-col gap-2">
@@ -1756,7 +1756,7 @@ export default function SettingsPage() {
                               className="shrink-0 accent-foreground"
                             />
                             <span className="flex-1 text-foreground">{t(dateLabelKey)}</span>
-                            <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+                            <span className={`font-mono ${mutedTextXs} tabular-nums`}>
                               {formatShortDate(todayIso, value)}
                             </span>
                           </label>
@@ -1773,7 +1773,7 @@ export default function SettingsPage() {
                     >
                       {t("settings.regional.dailyReminderTime.label")}
                     </label>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-1 ${mutedTextXs}`}>
                       {t("settings.regional.dailyReminderTime.description")}
                     </p>
                     <select
@@ -1818,7 +1818,7 @@ export default function SettingsPage() {
                   </p>
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("settings.about.version")}</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-1 ${mutedTextXs}`}>
                       {process.env.NEXT_PUBLIC_APP_VERSION
                         ? `v${process.env.NEXT_PUBLIC_APP_VERSION}`
                         : "dev"}
@@ -1829,7 +1829,7 @@ export default function SettingsPage() {
 
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("settings.about.whatsNew")}</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-1 ${mutedTextXs}`}>
                       {t("settings.about.whatsNewDescription")}
                     </p>
                     <Link
@@ -1886,7 +1886,7 @@ export default function SettingsPage() {
                 transientOpen={isFiltering}
               >
                 <div id="labs-heading" className={colStackLg}>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className={mutedTextXs}>
                     {t("settings.labs.description")}
                   </p>
                   {(Object.entries(LABS_FLAGS) as [LabsFlagKey, { label: string; description: string; default: boolean }][]).map(
@@ -1897,7 +1897,7 @@ export default function SettingsPage() {
                             <p className="text-sm font-medium text-foreground">
                               {meta.label}
                             </p>
-                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            <p className={`mt-1 ${mutedTextXs}`}>
                               {meta.description}
                             </p>
                           </div>
@@ -1946,7 +1946,7 @@ export default function SettingsPage() {
                               >
                                 {t("settings.labs.languages.appLanguageLabel")}
                               </label>
-                              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              <p className={`mt-1 ${mutedTextXs}`}>
                                 {t("settings.labs.languages.appLanguageDescription")}
                               </p>
                               <select
@@ -1979,7 +1979,7 @@ export default function SettingsPage() {
                               >
                                 {t("settings.labs.languages.pokemonNameLanguageLabel")}
                               </label>
-                              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              <p className={`mt-1 ${mutedTextXs}`}>
                                 {t("settings.labs.languages.pokemonNameLanguageDescription")}
                               </p>
                               <select
@@ -2033,7 +2033,7 @@ export default function SettingsPage() {
                     >
                       {t("settings.developer.heading")}
                     </p>
-                    <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className={`mt-2 ${mutedTextXs}`}>
                       {t("settings.developer.description")}
                     </p>
                     <div className={cn("mt-4", cardPanelPadded)}>
@@ -2043,7 +2043,7 @@ export default function SettingsPage() {
                       >
                         {t("settings.developer.themeAudit")}
                       </a>
-                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className={`mt-1 ${mutedTextXs}`}>
                         {t("settings.developer.themeAuditDescription")}
                       </p>
                     </div>
@@ -2054,7 +2054,7 @@ export default function SettingsPage() {
                           <p className="text-sm font-medium text-foreground">
                             {t("settings.developer.pretendAllMastered.label")}
                           </p>
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className={`mt-1 ${mutedTextXs}`}>
                             {t("settings.developer.pretendAllMastered.description")}
                           </p>
                         </div>
@@ -2087,7 +2087,7 @@ export default function SettingsPage() {
                           <p className="text-sm font-medium text-foreground">
                             {t("settings.developer.forceNextStreakMilestone.label")}
                           </p>
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className={`mt-1 ${mutedTextXs}`}>
                             {t("settings.developer.forceNextStreakMilestone.description")}
                           </p>
                         </div>
@@ -2125,7 +2125,7 @@ export default function SettingsPage() {
                           <p className="text-sm font-medium text-foreground">
                             {t("settings.developer.forceCardsGraduated.label")}
                           </p>
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className={`mt-1 ${mutedTextXs}`}>
                             {t("settings.developer.forceCardsGraduated.description")}
                           </p>
                         </div>
@@ -2168,7 +2168,7 @@ export default function SettingsPage() {
                           <p className="text-sm font-medium text-foreground">
                             {t("settings.developer.qaSeedMode.label")}
                           </p>
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className={`mt-1 ${mutedTextXs}`}>
                             {t("settings.developer.qaSeedMode.description")}
                           </p>
                         </div>
@@ -2213,7 +2213,7 @@ export default function SettingsPage() {
                   <div className="mt-4 flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">{t("settings.dangerZone.resetAllProgress")}</p>
-                      <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className={`mt-0.5 ${mutedTextXs}`}>
                         {user
                           ? t("settings.dangerZone.resetDescriptionCloud")
                           : t("settings.dangerZone.resetDescription")}
@@ -2245,7 +2245,7 @@ export default function SettingsPage() {
                           <p className="text-sm font-medium text-foreground">
                             {t("settings.dangerZone.deleteAccount")}
                           </p>
-                          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                          <p className={`mt-0.5 ${mutedTextXs}`}>
                             {t("settings.dangerZone.deleteDescription")}
                           </p>
                         </div>

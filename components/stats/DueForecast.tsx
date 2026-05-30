@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
-import { cardPanel } from "@/lib/utils/class-names";
+import { cardPanel, mutedTextXs } from "@/lib/utils/class-names";
 import type { DueForecastDay } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ export default function DueForecast({
         Due forecast
       </h2>
       <div className={cardPanel}>
-        <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+        <p className={`mb-3 ${mutedTextXs} tabular-nums`}>
           {t("cardsOverNextDays", { count: total })}
         </p>
         {/* ref on this container so outside-click detection has a boundary. */}
