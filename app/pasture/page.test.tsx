@@ -163,6 +163,111 @@ vi.mock("@/components/pasture/PastureSearchBar", () => ({
 
 import PasturePage from "@/app/pasture/page";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
+import { hydrateSession } from "@/lib/review/session";
+import type { ReviewableCard } from "@/lib/review/session";
+import { filterMastered } from "@/lib/pasture/arrivals";
+
+// ---------------------------------------------------------------------------
+// Fixtures for the hydrate→filter→count regression test
+// ---------------------------------------------------------------------------
+
+/**
+ * A minimal saved card as it exists in localStorage BEFORE hydration:
+ * no habitat, no isDefaultForm — exactly the gap that caused the #1394
+ * regression where all species fell into the "unknown"/Wildlands bucket and
+ * biomeStats reported 0 mastered per biome.
+ */
+const MASTERED_FSRS_STATE = {
+  stability: 30,
+  difficulty: 5,
+  elapsedDays: 30,
+  scheduledDays: 30,      // >= 21 → meets mastery interval requirement
+  reps: 3,                // >= masteryRepetitions (3) → meets reps requirement
+  lapses: 0,
+  fsrsState: "review" as const,
+  dueDate: "2099-01-01",
+  lastReview: "2026-04-30",
+  firstSeen: "2026-03-01",
+  learningStep: null,
+  stepStartedAt: null,
+  hiddenSince: null,
+  seenInPasture: false,
+};
+
+/**
+ * The card BEFORE hydration — minimal shape matching what QA-seed and
+ * localStorage store: no habitat, no isDefaultForm.
+ */
+const RAW_SAVED_NAME_CARD = {
+  id: 25,
+  cardType: "name" as const,
+  subjectKey: "25",
+  locale: "en" as const,
+  state: MASTERED_FSRS_STATE,
+  // Fields that ARE present on saved cards:
+  displayName: "Pikachu",
+  name: "pikachu",
+  speciesId: 25,
+  spriteUrl: "/sprites/pokemon/25.png",
+  types: ["electric"],
+  // The two fields that QA-seeded cards do NOT have — this is the gap:
+  // habitat and isDefaultForm are undefined here.
+};
+
+/**
+ * The reverse card for the same species — also mastered. filterMastered
+ * requires BOTH the name card and the reverse card to be mastered for a
+ * species to appear in the pasture (since #1234).
+ */
+const RAW_SAVED_REVERSE_CARD = {
+  id: 2_000_025, // REVERSE_ID_OFFSET (2_000_000) + speciesId (25)
+  cardType: "reverse" as const,
+  subjectKey: "25",
+  locale: "en" as const,
+  state: MASTERED_FSRS_STATE,
+  displayName: "Pikachu",
+  name: "pikachu",
+  speciesId: 25,
+  spriteUrl: "/sprites/pokemon/25.png",
+  types: ["electric"],
+};
+
+/**
+ * The card AFTER hydration — hydrateSession backfills habitat and
+ * isDefaultForm from SEED_POKEMON so biomeStats and buildZoneData can
+ * place the card in the correct biome bucket.
+ */
+const HYDRATED_NAME_CARD = {
+  ...RAW_SAVED_NAME_CARD,
+  habitat: "forest",
+  isDefaultForm: true,
+  formCategory: "default" as const,
+  formSlug: null,
+  stats: { hp: 35, attack: 55, defense: 40, specialAttack: 50, specialDefense: 50, speed: 90 },
+  flavorText: "Electric mouse.",
+  flavorTexts: undefined,
+  evolutionChain: [],
+  height: 4,
+  weight: 60,
+  baseExperience: 112,
+  genus: "Mouse Pokémon",
+  generation: "generation-i",
+  captureRate: 190,
+  baseHappiness: 70,
+  growthRate: "medium",
+  genderRate: 4,
+  isLegendary: false,
+  isMythical: false,
+  cryUrl: null,
+  versionGroups: [],
+  localNames: {},
+};
+
+const HYDRATED_REVERSE_CARD = {
+  ...RAW_SAVED_REVERSE_CARD,
+  habitat: "forest",
+  isDefaultForm: true,
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -192,5 +297,106 @@ describe("PasturePage", () => {
         screen.getByText(/master your first pokémon/i),
       ).toBeInTheDocument();
     });
+  });
+
+  /**
+   * Regression guard for #1394 — the hydrate→filter→count chain.
+   *
+   * Before the fix, the Pasture page called filterMastered on the raw saved
+   * session (no habitat, no isDefaultForm). biomeStats then fell back to the
+   * "unknown" bucket for every species and reported 0 mastered per biome.
+   *
+   * The fix adds a hydrateSession call that backfills those fields from
+   * SEED_POKEMON before filtering. This test guards that path:
+   *
+   * 1. loadSession returns raw cards (no habitat/isDefaultForm).
+   * 2. hydrateSession is called and returns enriched cards with those fields.
+   * 3. filterMastered is given the HYDRATED cards and returns the mastered set.
+   * 4. The mastered count in the page heading is non-zero.
+   *
+   * If someone removes the hydrateSession call, step 2 assertion fails and
+   * filterMastered receives the raw cards instead — the mock returns [] for
+   * non-hydrated input, making the heading disappear and step 4 fail too.
+   */
+  it("hydrates saved cards before filtering — mastered count is non-zero (#1394 regression)", async () => {
+    const rawCards = [RAW_SAVED_NAME_CARD, RAW_SAVED_REVERSE_CARD];
+    const hydratedCards = [HYDRATED_NAME_CARD, HYDRATED_REVERSE_CARD];
+
+    // Return a real session whose cards are in the un-hydrated shape
+    // (no habitat, no isDefaultForm) — exactly the QA-seed / localStorage shape.
+    mockLoadSession.mockResolvedValue({
+      cards: rawCards,
+      buildTimestamp: "2026-01-01T00:00:00.000Z",
+    });
+
+    // hydrateSession is called by the page with the raw cards; it returns the
+    // enriched set. The mock simulates the real hydration step.
+    vi.mocked(hydrateSession).mockReturnValueOnce(hydratedCards as unknown as ReviewableCard[]);
+
+    // filterMastered is called twice per render (once for masteredCount, once
+    // for masteredCards). Use mockImplementation (not Once) so both calls
+    // return the mastered subset. The implementation is conditional: it returns
+    // the mastered card only when the input has been hydrated (habitat === "forest"),
+    // so the test fails if hydrateSession is bypassed and the raw cards — which
+    // have no habitat — are passed to filterMastered instead.
+    vi.mocked(filterMastered).mockImplementation((cards) => {
+      // Only return mastered cards when the input has been hydrated (has habitat).
+      const firstCard = cards[0] as { habitat?: string; cardType: string };
+      if (firstCard?.habitat === "forest") {
+        return [HYDRATED_NAME_CARD] as ReturnType<typeof filterMastered>;
+      }
+      return [];
+    });
+
+    renderWithIntl(<PasturePage />);
+
+    // Assert hydrateSession was called — removing it breaks this step.
+    await waitFor(() => {
+      expect(hydrateSession).toHaveBeenCalled();
+    });
+
+    // Assert the mastered count heading appears with the correct count.
+    // This disappears when filterMastered returns [] (i.e. when the hydrated
+    // cards are not passed through), so it guards the full hydrate→filter→count chain.
+    await waitFor(() => {
+      expect(screen.getByText(/1 pokémon/i)).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Inverse of the regression guard: if hydrateSession returns the raw
+   * (un-enriched) cards — as though the call were absent — the filterMastered
+   * mock returns [] and the empty-state body is shown instead of the count.
+   *
+   * This makes the regression explicit: a reviewer can see exactly what breaks
+   * when the hydration step is removed.
+   */
+  it("shows empty state when hydrateSession returns un-hydrated cards (#1394 regression, inverse)", async () => {
+    const rawCards = [RAW_SAVED_NAME_CARD, RAW_SAVED_REVERSE_CARD];
+
+    mockLoadSession.mockResolvedValue({
+      cards: rawCards,
+      buildTimestamp: "2026-01-01T00:00:00.000Z",
+    });
+
+    // hydrateSession returns the raw cards unchanged — simulating its removal.
+    vi.mocked(hydrateSession).mockReturnValueOnce(rawCards as unknown as ReviewableCard[]);
+
+    // filterMastered returns [] for un-hydrated cards (no habitat).
+    vi.mocked(filterMastered).mockImplementation((cards) => {
+      const firstCard = cards[0] as { habitat?: string };
+      if (firstCard?.habitat === "forest") {
+        return [HYDRATED_NAME_CARD] as ReturnType<typeof filterMastered>;
+      }
+      return [];
+    });
+
+    renderWithIntl(<PasturePage />);
+
+    // Empty state is shown — the count heading is absent.
+    await waitFor(() => {
+      expect(screen.getByText(/master your first pokémon/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/1 pokémon/i)).not.toBeInTheDocument();
   });
 });

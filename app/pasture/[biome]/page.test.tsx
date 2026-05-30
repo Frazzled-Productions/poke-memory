@@ -5,7 +5,8 @@
  * call that was previously uninstrumented and failing the diff-coverage gate.
  */
 
-import { render, act } from "@testing-library/react";
+import { act } from "@testing-library/react";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -178,7 +179,7 @@ describe("BiomeLandscapePage", () => {
     const params = Promise.resolve({ biome: "grassland" });
 
     await act(async () => {
-      render(<BiomeLandscapePage params={params} />);
+      renderWithIntl(<BiomeLandscapePage params={params} />);
       // Flush the params Promise resolution so the component body runs past
       // the use(params) call and reaches useLocalStorageKey.
       await params;
@@ -193,7 +194,7 @@ describe("BiomeLandscapePage", () => {
     mockLoadSession.mockReturnValue(new Promise(() => {}));
     const params = Promise.resolve({ biome: "grassland" });
 
-    const { container } = render(<BiomeLandscapePage params={params} />);
+    const { container } = renderWithIntl(<BiomeLandscapePage params={params} />);
 
     // While loading the component renders null — the container has no children.
     expect(container.firstChild).toBeNull();

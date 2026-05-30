@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
@@ -73,6 +74,7 @@ export default function BiomeLandscapePage({
 }) {
   const { biome: biomeSlug } = use(params);
   const router = useRouter();
+  const t = useTranslations("pasture");
   const { flags } = useSuperuser();
   const isLandscape = useIsLandscape();
   const [masteredCards, setMasteredCards] = useState<NameReviewCard[] | null>(
@@ -121,6 +123,10 @@ export default function BiomeLandscapePage({
             evolutionEnabled: false,
             reverseEvolutionEnabled: false,
             cryEnabled: false,
+            // `locale` only affects newly-created cards; all *Enabled flags are
+            // false here so no new cards are added. Existing saved cards keep
+            // their own persisted `locale` tag unchanged. This opt is present
+            // for completeness but is effectively dead in this refresh pass.
             locale: pokemonNameLocale,
           });
           const cards = filterMastered(
@@ -218,7 +224,7 @@ export default function BiomeLandscapePage({
                   router.back();
                 }
               }}
-              aria-label="Back to Pasture"
+              aria-label={t("biome.backAriaLabel")}
               className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-zinc-500 transition-colors hover:text-foreground dark:text-zinc-400 dark:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             >
               <svg
@@ -235,7 +241,7 @@ export default function BiomeLandscapePage({
                   strokeLinejoin="round"
                 />
               </svg>
-              Pasture
+              {t("biome.backLabel")}
             </button>
             <h1 className="ml-1 text-sm font-semibold text-foreground">
               {zone.label}
@@ -285,7 +291,7 @@ export default function BiomeLandscapePage({
         <main className="px-4 pb-8 pt-2">
           {isEmpty ? (
             <p className="mt-6 text-zinc-500 dark:text-zinc-400">
-              No mastered Pokémon in this biome yet. Keep practising!
+              {t("biome.emptyState")}
             </p>
           ) : (
             <PastureZone

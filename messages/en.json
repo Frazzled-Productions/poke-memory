@@ -428,7 +428,12 @@
       "rare": "Sanctuary",
       "unknown": "Wildlands"
     },
-    "zoneAriaLabel": "{zone} zone"
+    "zoneAriaLabel": "{zone} zone",
+    "biome": {
+      "backLabel": "Pasture",
+      "backAriaLabel": "Back to Pasture",
+      "emptyState": "No mastered Pokémon in this biome yet. Keep practising!"
+    }
   },
   "stats": {
     "title": "Stats",

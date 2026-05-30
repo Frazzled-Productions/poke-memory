@@ -172,6 +172,10 @@ export default function PasturePage() {
           evolutionEnabled: false,
           reverseEvolutionEnabled: false,
           cryEnabled: false,
+          // `locale` only affects newly-created cards; all *Enabled flags are
+          // false here so no new cards are added. Existing saved cards keep
+          // their own persisted `locale` tag unchanged. This opt is present
+          // for completeness but is effectively dead in this refresh pass.
           locale: pokemonNameLocale,
         });
         setSession({ ...s, cards: hydrated });
