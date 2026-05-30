@@ -4,8 +4,19 @@
  * MachineTranslationBanner — dismissible caution banner for non-English locales.
  *
  * Shown once per locale until the user dismisses it. Dismissal is persisted
- * in a standalone localStorage key per locale so it does not pollute the
- * UserSettings object and requires no sync leg.
+ * in a standalone localStorage key per locale (for fast synchronous reads)
+ * AND in `user_settings.dismissedMtBannerLocales` (for cross-device sync).
+ *
+ * Cross-device sync: on dismiss, `saveSettings` is called with the updated
+ * `dismissedMtBannerLocales` array; `AutoSyncOnChange` picks this up and
+ * pushes the change to Supabase via the best-effort settings leg. On pull,
+ * `pullAndMerge` unions cloud locales into the standalone localStorage keys
+ * so this component's read path requires no changes (AC2 of #1387).
+ *
+ * LWW caveat: the `merge_user_settings` RPC `||` overlay OVERWRITES arrays
+ * rather than unioning them. In the rare case where two devices dismiss
+ * different locales before syncing, the last push wins and a banner may
+ * re-show once on the other device. Acceptable for a cosmetic banner.
  *
  * The banner is intentionally NOT rendered in the English locale — the English
  * UI is the authoritative version and needs no machine-translation caveat.
@@ -21,6 +32,7 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/lib/i18n/useAppLocale";
 import { LOCALE_ENDONYMS } from "@/i18n/locales";
+import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 
 /** Returns the localStorage key for the given locale's dismissal flag. */
 export function mtBannerDismissedKey(locale: string): string {
@@ -44,8 +56,23 @@ export function MachineTranslationBanner() {
   }, [locale]);
 
   function handleDismiss() {
+    // Write the standalone key (fast synchronous read path — component never
+    // changes its useEffect to read from settings directly).
     localStorage.setItem(mtBannerDismissedKey(locale), "1");
     setDismissed(true);
+
+    // Also persist in UserSettings so the dismissal syncs to other devices via
+    // the best-effort settings leg in AutoSyncOnChange. saveSettings dispatches
+    // SETTINGS_SAVED_EVENT, which AutoSyncOnChange handles; the superuser write-
+    // guard is enforced there (userId = null when anyFlagOn), so AC4 is
+    // satisfied without any extra guard here.
+    const current = loadSettings();
+    if (!current.dismissedMtBannerLocales.includes(locale)) {
+      saveSettings({
+        ...current,
+        dismissedMtBannerLocales: [...current.dismissedMtBannerLocales, locale],
+      });
+    }
   }
 
   // Do not render for English — the authoritative locale needs no disclaimer.

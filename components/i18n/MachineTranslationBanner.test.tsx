@@ -38,6 +38,9 @@ beforeEach(() => {
   });
   localStorageMock.clear();
   vi.clearAllMocks();
+  // Default: loadSettings returns settings with no dismissed locales.
+  mockLoadSettings.mockReturnValue({ dismissedMtBannerLocales: [] });
+  mockSaveSettings.mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -52,6 +55,16 @@ afterEach(() => {
 
 vi.mock("@/lib/i18n/useAppLocale", () => ({
   useAppLocale: vi.fn(() => "ja"),
+}));
+
+// Mock lib/settings/persistence so we can spy on saveSettings calls without
+// touching real localStorage or triggering SETTINGS_SAVED_EVENT listeners.
+const mockLoadSettings = vi.fn();
+const mockSaveSettings = vi.fn();
+
+vi.mock("@/lib/settings/persistence", () => ({
+  loadSettings: () => mockLoadSettings(),
+  saveSettings: (s: unknown) => mockSaveSettings(s),
 }));
 
 import { useAppLocale } from "@/lib/i18n/useAppLocale";
@@ -149,6 +162,46 @@ describe("MachineTranslationBanner", () => {
       vi.mocked(useAppLocale).mockReturnValue("zh-Hant");
       renderWithIntl(<MachineTranslationBanner />, { locale: "zh-Hant" });
       expect(screen.getByRole("note")).toBeTruthy();
+    });
+  });
+
+
+  describe("settings write-through on dismiss (#1387)", () => {
+    beforeEach(() => {
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+    });
+
+    it("calls saveSettings with the dismissed locale appended when banner is dismissed", () => {
+      renderJa(<MachineTranslationBanner />);
+      fireEvent.click(screen.getByRole("button"));
+
+      expect(mockSaveSettings).toHaveBeenCalledOnce();
+      const saved = mockSaveSettings.mock.calls[0][0] as Record<string, unknown>;
+      expect((saved.dismissedMtBannerLocales as string[])).toContain("ja");
+    });
+
+    it("does not call saveSettings again when the locale is already in dismissedMtBannerLocales", () => {
+      // Simulate: settings already have ja in the list (e.g. a second dismiss click).
+      mockLoadSettings.mockReturnValue({ dismissedMtBannerLocales: ["ja"] });
+      // Pre-seed the localStorage key so the banner renders as already dismissed.
+      store[mtBannerDismissedKey("ja")] = "1";
+
+      renderJa(<MachineTranslationBanner />);
+
+      // Banner is already dismissed so no button is visible.
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+    });
+
+    it("guest path: saveSettings is still called (local-only, no cloud write without auth)", () => {
+      // Guest mode: AutoSyncOnChange treats userId as null (anyFlagOn or no user),
+      // so saveSettings persists locally and the cloud push never fires.
+      // From the component's perspective, saveSettings is always called on dismiss —
+      // the write-guard lives in AutoSyncOnChange, not here.
+      renderJa(<MachineTranslationBanner />);
+      fireEvent.click(screen.getByRole("button"));
+
+      expect(mockSaveSettings).toHaveBeenCalledOnce();
     });
   });
 

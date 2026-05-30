@@ -305,6 +305,21 @@ export type UserSettings = {
    * on. Absent in pre-#1260 records; back-fills to `"en"` on read.
    */
   pokemonNameLocale: AppLocale;
+  /**
+   * Locales for which the machine-translation banner has been dismissed
+   * (#1387). Each entry is an `AppLocale` string (e.g. `"ja"`, `"zh-Hans"`).
+   * Absent in pre-#1387 records; back-fills to `[]` on read.
+   *
+   * Sync semantics: LWW via the `merge_user_settings` RPC `||` overlay, which
+   * OVERWRITES arrays rather than unioning them. In the rare case where two
+   * devices dismiss different locales before syncing, the last push wins and a
+   * banner may re-show once on the other device. This is acceptable for a
+   * cosmetic banner and matches the existing `seenStreakMilestones` behaviour.
+   * On pull, dismissed locales from the cloud are UNIONED into the local
+   * standalone `poke-memory:mt-banner-dismissed:<locale>` keys so a locally-
+   * dismissed locale not yet pushed is never lost (see `pullAndMerge`).
+   */
+  dismissedMtBannerLocales: string[];
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -359,6 +374,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   labsFlags: { ...DEFAULT_LABS_FLAGS },
   // Default "en": absent in pre-#1260 records; back-fills to English on read.
   pokemonNameLocale: DEFAULT_LOCALE,
+  // Default []: absent in pre-#1387 records; back-fills to empty array on read.
+  dismissedMtBannerLocales: [],
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -603,6 +620,9 @@ function parseStoredSettings(raw: string | null): UserSettings {
       obj.pokemonNameLocale === "zh-Hant"
         ? (obj.pokemonNameLocale as AppLocale)
         : DEFAULT_LOCALE,
+    // Default []: absent in pre-#1387 records. Non-array or entries that are
+    // not strings are silently dropped — same defensive posture as seenStreakMilestones.
+    dismissedMtBannerLocales: validateDismissedMtBannerLocales(obj.dismissedMtBannerLocales),
   };
 }
 
@@ -628,6 +648,18 @@ function validateSeenStreakMilestones(value: unknown): number[] {
   const seen = new Set<number>();
   for (const v of value) {
     if (typeof v !== "number" || !Number.isInteger(v) || v <= 0) continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+function validateDismissedMtBannerLocales(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of value) {
+    if (typeof v !== "string") continue;
     if (seen.has(v)) continue;
     seen.add(v);
     out.push(v);

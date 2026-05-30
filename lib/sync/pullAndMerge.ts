@@ -19,6 +19,7 @@ import {
 } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
 import { preserveDeviceLocalKeys } from "@/lib/settings/lastPushedSnapshot";
+import { mtBannerDismissedKey } from "@/components/i18n/MachineTranslationBanner";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
@@ -177,6 +178,28 @@ export async function pullAndMerge(
           ),
         );
       }
+
+      // Write-through for MT-banner dismissals (#1387, AC2). Union the cloud
+      // `dismissedMtBannerLocales` into the standalone localStorage keys so
+      // MachineTranslationBanner's read path (which reads the standalone key
+      // directly) reflects the cloud state without needing to read settings.
+      // We UNION rather than replace so a locally-dismissed locale not yet
+      // pushed is never evicted from localStorage by a stale cloud value.
+      // This runs on every cycle (not just when cloudIsNewer) because the
+      // write is idempotent and the banner may have been dismissed on another
+      // device after this device's lastSettingsPullAt cursor was stamped.
+      if (typeof window !== "undefined") {
+        const cloudLocales: unknown = (pulledRow.settings as Record<string, unknown> | null)
+          ?.dismissedMtBannerLocales;
+        if (Array.isArray(cloudLocales)) {
+          for (const locale of cloudLocales) {
+            if (typeof locale === "string") {
+              localStorage.setItem(mtBannerDismissedKey(locale), "1");
+            }
+          }
+        }
+      }
+
       if (pulledRow.updatedAt !== null) {
         nextLastSettingsPullAt = pulledRow.updatedAt;
       } else if (legacyNeverApplied) {

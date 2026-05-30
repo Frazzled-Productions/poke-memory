@@ -176,6 +176,7 @@ describe('loadSettings migration', () => {
       labsFlags: { ...DEFAULT_LABS_FLAGS },
       pokemonNameLocale: 'ja' as const,
       pushNotificationHour: 20,
+      dismissedMtBannerLocales: ['ja', 'zh-Hans'],
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -836,5 +837,52 @@ describe('loadSettings: pokemonNameLocale (#1260)', () => {
   it('saveSettings + loadSettings round-trips pokemonNameLocale: "ja"', () => {
     saveSettings({ ...DEFAULT_SETTINGS, pokemonNameLocale: 'ja' });
     expect(loadSettings().pokemonNameLocale).toBe('ja');
+  });
+});
+
+describe("dismissedMtBannerLocales (#1387)", () => {
+  it("defaults to [] when the field is absent from stored JSON", () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ masteryRepetitions: 3 }));
+    expect(loadSettings().dismissedMtBannerLocales).toEqual([]);
+  });
+
+  it("defaults to [] when the stored value is not an array (non-array fallback)", () => {
+    for (const bad of [null, 42, "ja", true, {}]) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, dismissedMtBannerLocales: bad }),
+      );
+      expect(loadSettings().dismissedMtBannerLocales).toEqual([]);
+    }
+  });
+
+  it("drops non-string entries but keeps valid ones", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, dismissedMtBannerLocales: ["ja", 42, null, "zh-Hans"] }),
+    );
+    expect(loadSettings().dismissedMtBannerLocales).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("deduplicates entries", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, dismissedMtBannerLocales: ["ja", "ja", "zh-Hans"] }),
+    );
+    expect(loadSettings().dismissedMtBannerLocales).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("round-trips a non-empty array via saveSettings + loadSettings", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, dismissedMtBannerLocales: ["ja", "zh-Hant"] });
+    expect(loadSettings().dismissedMtBannerLocales).toEqual(["ja", "zh-Hant"]);
+  });
+
+  it("round-trips an empty array", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, dismissedMtBannerLocales: [] });
+    expect(loadSettings().dismissedMtBannerLocales).toEqual([]);
+  });
+
+  it("DEFAULT_SETTINGS has dismissedMtBannerLocales: []", () => {
+    expect(DEFAULT_SETTINGS.dismissedMtBannerLocales).toEqual([]);
   });
 });
