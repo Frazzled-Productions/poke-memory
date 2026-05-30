@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { mergeStreak, pullStreak, pushStreak } from "./streak";
+import { mergeStreak, pullStreak, pushStreak, STREAK_DAYS_CONFLICT_COLS } from "./streak";
 
 function makeClientWithUpsert(error: null | object = null) {
   const upsert = vi.fn().mockResolvedValue({ error });
@@ -45,7 +45,7 @@ describe("pushStreak", () => {
         { user_id: "user-1", review_date: "2026-05-10" },
         { user_id: "user-1", review_date: "2026-05-11" },
       ],
-      { onConflict: "user_id,review_date", ignoreDuplicates: true },
+      { onConflict: STREAK_DAYS_CONFLICT_COLS, ignoreDuplicates: true },
     );
   });
 

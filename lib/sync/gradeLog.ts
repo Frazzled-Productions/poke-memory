@@ -5,6 +5,16 @@ import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 // and the caller is expected to keep going — analytics history is auxiliary
 // to card-review state.
 
+/**
+ * The `onConflict` column list for `grade_log` upserts.
+ *
+ * Matches the UNIQUE constraint on grade_log: (user_id, occurred_at) — migration 006.
+ * Exported so the onConflict-PK parity integration test can import the live
+ * client constant and compare it against the DB constraint.
+ */
+export const GRADE_LOG_CONFLICT_COLS = "user_id,occurred_at" as const;
+
+
 export async function pushGradeLog(
   client: SupabaseClient,
   userId: string,
@@ -27,7 +37,7 @@ export async function pushGradeLog(
     const { error } = await client
       .from("grade_log")
       .upsert(rows, {
-        onConflict: "user_id,occurred_at",
+        onConflict: GRADE_LOG_CONFLICT_COLS,
         ignoreDuplicates: true,
       });
     return !error;

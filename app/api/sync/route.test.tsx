@@ -27,6 +27,7 @@ vi.mock("next/cache", () => ({
 import { POST } from "./route";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateTag } from "next/cache";
+import { CARD_REVIEWS_CONFLICT_COLS } from "@/lib/sync/cloud";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -238,7 +239,7 @@ describe("POST /api/sync", () => {
     // The composite conflict key must match the DB unique constraint (migration 029 adds locale).
     expect(upsertMock).toHaveBeenCalledWith(
       expect.any(Array),
-      { onConflict: "user_id,card_type,subject_key,locale" },
+      { onConflict: CARD_REVIEWS_CONFLICT_COLS },
     );
   });
 

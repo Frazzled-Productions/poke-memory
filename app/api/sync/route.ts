@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { CloudRow } from "@/lib/sync/cloud";
+import { CARD_REVIEWS_CONFLICT_COLS } from "@/lib/sync/cloud";
 
 type BeaconPayload = {
   cards: CloudRow[];
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
       try {
         const { error } = await supabase
           .from("card_reviews")
-          .upsert(batch, { onConflict: "user_id,card_type,subject_key,locale" });
+          .upsert(batch, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
         if (!error) {
           batchOk = true;
           break;

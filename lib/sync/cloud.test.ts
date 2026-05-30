@@ -6,6 +6,7 @@ import {
   mergeCloudIntoLocal,
   mergeCloudIntoLocalSilent,
   applyCloudAuthoritative,
+  CARD_REVIEWS_CONFLICT_COLS,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { CloudRow, SeedOpts } from "./cloud";
@@ -160,7 +161,7 @@ describe("pushSession", () => {
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
     await pushSession(client, "user-1", [safeCard]);
     const [, conflictArg] = client._upsertSpy.mock.calls[0] as [unknown, { onConflict: string }];
-    expect(conflictArg.onConflict).toBe("user_id,card_type,subject_key,locale");
+    expect(conflictArg.onConflict).toBe(CARD_REVIEWS_CONFLICT_COLS);
   });
 
   it("warns when an unsafe card is skipped", async () => {
@@ -221,7 +222,7 @@ describe("pushSingleCard", () => {
     ];
     expect(rowArg.card_type).toBe("name");
     expect(rowArg.subject_key).toBe("1");
-    expect(conflictArg.onConflict).toBe("user_id,card_type,subject_key,locale");
+    expect(conflictArg.onConflict).toBe(CARD_REVIEWS_CONFLICT_COLS);
   });
 });
 
