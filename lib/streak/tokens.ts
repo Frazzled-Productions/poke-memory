@@ -11,11 +11,14 @@
  * 2. Cap. The balance is capped at `MAX_BALANCE`. Earning a token while the
  *    balance is already at the cap is a no-op (the counter still resets, so
  *    the next earn requires another `EARN_INTERVAL_DAYS` of reviews).
- * 3. Spend trigger. Automatic on a missed day, iff balance >= 1 AND the
- *    streak was alive before the gap. The spend bridges exactly one missed
- *    day. If the user does not have a token, the streak resets as before.
+ * 3. Spend trigger. Automatic on app open when a consecutive run of missed
+ *    days is found immediately before today, bounded by a still-alive day
+ *    (review day or prior spend) before it. The spend is all-or-nothing:
+ *    balance must be >= gapLength to bridge the whole run; if the gap is
+ *    unsavable no tokens are spent and the balance is preserved. The
+ *    walk-back is bounded by MAX_BALANCE so at most 3 days are scanned.
  *    Consecutive spends are permitted — scarcity (earn rate + balance cap)
- *    is the only gate (#1245).
+ *    is the only gate (#1245, extended #1399).
  *
  * The full design is documented in #1227. These constants are tunable; if a
  * value feels wrong mid-implementation, surface it in a follow-up issue
@@ -198,24 +201,37 @@ export type ProtectionStepResult = {
 };
 
 /**
- * Advance the protection state for a fresh day. Two side-channel events
- * happen here:
+ * Advance the protection state for a fresh day. Three phases run in order:
  *
- *   - Earn: if today is a qualifying review day (present in `streakDates`),
- *     `daysSinceLastEarn` increments by one (guarded by `lastEarnCheckDate`
- *     so multiple grade events in the same day count once). When the counter
- *     reaches `EARN_INTERVAL_DAYS`, balance is incremented (clamped to
- *     `MAX_BALANCE`) and the counter resets to 0. If any day strictly between
- *     `lastEarnCheckDate` and `today` is neither a review day nor a spend
- *     day, the consecutive-review chain was broken — the counter resets to 0
- *     before incrementing for today, so the 30-day clock only counts
- *     *sustained* practice (#1227 scarcity invariant).
+ * Phase 1 — Spend (pre-earn): if there is a consecutive run of missing days
+ *     immediately before today, bounded by a still-alive day (a review day or
+ *     a prior spend) before it, and the current balance >= gapLength, every
+ *     missing day is bridged in one app-open by spending one token per day.
+ *     This is all-or-nothing: if the gap is longer than the available balance
+ *     the streak is unsavable, so no tokens are spent and the balance is
+ *     preserved. The walk-back is bounded by MAX_BALANCE, so at most 3 days
+ *     are ever inspected. One combined protection event is recorded, not one
+ *     per day. (#1399). `spendSet` is updated immediately after so the earn
+ *     leg sees the bridged days.
  *
- *   - Spend: if today is NOT a review day (yet) but the streak would otherwise
- *     have broken because yesterday is missing, and the day before yesterday
- *     IS in `streakDates` or `spendDates`, and balance >= 1, a token is spent
- *     to bridge yesterday. `spendDates` gains `yesterday` and `balance`
- *     decrements. Consecutive spends are permitted (#1245).
+ * Phase 2 — Earn: if today is a qualifying review day (present in
+ *     `streakDates`), `daysSinceLastEarn` increments by one (guarded by
+ *     `lastEarnCheckDate` so multiple grade events in the same day count
+ *     once). When the counter reaches `EARN_INTERVAL_DAYS`, balance is
+ *     incremented (clamped to `MAX_BALANCE`) and the counter resets to 0. If
+ *     any day strictly between `lastEarnCheckDate` and `today` is neither a
+ *     review day nor a spend day, the consecutive-review chain was broken —
+ *     the counter resets to 0 before incrementing for today, so the 30-day
+ *     clock only counts *sustained* practice (#1227 scarcity invariant).
+ *     Because `spendSet` was updated in Phase 1, bridged days are correctly
+ *     seen here (#1399 ordering hazard).
+ *
+ * Phase 3 — Spend (post-earn): a second spend check runs only when the earn
+ *     leg actually awarded a new token in Phase 2 AND no spend fired in
+ *     Phase 1. This handles the combined earn-then-spend case: the user's
+ *     balance was 0 (so Phase 1 couldn't spend), earn raised it to 1, and the
+ *     newly-minted token can bridge a single-day gap in the same step. The
+ *     same walk-back and all-or-nothing rules apply.
  *
  * `today` and the `streakDates` set use ISO date strings ("YYYY-MM-DD"),
  * matching the existing streak storage. The function never mutates its
@@ -237,16 +253,79 @@ export function applyProtectionStep(
   let earned = false;
   let spent = false;
 
-  // Earn leg. Only counts when today is a qualifying review day and we have
-  // not already counted today. The check fires daily — at most one increment
-  // per calendar day, regardless of how many grade events fire.
+  // -------------------------------------------------------------------------
+  // Shared walk-back helper (inline) — finds the consecutive missing days
+  // immediately before today and the anchor that bounds the gap. Used by both
+  // the pre-earn spend leg (Phase 1) and the post-earn spend leg (Phase 3).
+  //
+  // Returns { missingDays, foundAnchor } where missingDays is ordered newest-
+  // first (yesterday, day-before, …). Walk limit: MAX_BALANCE missing-day
+  // steps, plus one anchor-search step. A gap of more than MAX_BALANCE days
+  // can never be bridged (balance cap), so the walk exits early.
+  function findGap(
+    liveSet: ReadonlySet<string>,
+  ): { missingDays: string[]; foundAnchor: boolean } {
+    const missing: string[] = [];
+    let anchor = false;
+    for (let i = 1; i <= MAX_BALANCE + 1; i++) {
+      const day = offsetDate(today, -i);
+      if (liveSet.has(day)) {
+        anchor = true;
+        break;
+      }
+      if (i <= MAX_BALANCE) {
+        missing.push(day);
+      }
+      // i === MAX_BALANCE + 1 and still missing → gap unsavable; anchor stays false.
+    }
+    return { missingDays: missing, foundAnchor: anchor };
+  }
+
+  // -------------------------------------------------------------------------
+  // Phase 1 — Spend (pre-earn).
+  //
+  // Walk backwards from yesterday collecting consecutive missing days until we
+  // find a still-alive day (review or prior spend) that anchors the gap. The
+  // check is all-or-nothing: balance must be >= gapLength to bridge; otherwise
+  // no tokens are spent and the balance is preserved intact.
+  {
+    // Build a combined live-set (dateSet ∪ spendSet) for the walk.
+    const liveSet = new Set<string>(dateSet);
+    for (const d of spendSet) liveSet.add(d);
+
+    const { missingDays, foundAnchor } = findGap(liveSet);
+    const gapLength = missingDays.length;
+
+    if (foundAnchor && gapLength >= 1 && next.balance >= gapLength) {
+      // Bridge every missing day: add to spendDates, decrement balance.
+      spent = true;
+      const newSpendSet = new Set(next.spendDates);
+      for (const day of missingDays) newSpendSet.add(day);
+      const mergedDates = Array.from(newSpendSet).sort();
+      next = {
+        ...next,
+        balance: next.balance - gapLength,
+        spendDates: mergedDates,
+      };
+      // Rebuild spendSet so the earn leg (Phase 2) can see the bridged days.
+      for (const day of missingDays) spendSet.add(day);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Phase 2 — Earn leg.
+  //
+  // Only counts when today is a qualifying review day and we have not already
+  // counted today. The check fires daily — at most one increment per calendar
+  // day, regardless of how many grade events fire.
   if (dateSet.has(today) && next.lastEarnCheckDate !== today) {
     // Reset the consecutive-review counter if the chain between
     // `lastEarnCheckDate` and `today` is broken — any interstitial day that
     // is neither a review day nor bridged by a spend means the user did not
     // sustain the streak, so the earn clock must start over. Token spends
     // legitimately bridge a missed day (the streak is preserved) so they
-    // also preserve the earn counter.
+    // also preserve the earn counter. `spendSet` was updated in Phase 1 so
+    // bridged days are correctly seen here (#1399 ordering hazard).
     if (
       next.lastEarnCheckDate !== null &&
       hasUnbridgedGap(next.lastEarnCheckDate, today, dateSet, spendSet)
@@ -273,28 +352,36 @@ export function applyProtectionStep(
     }
   }
 
-  // Spend leg. Triggered when yesterday is missing AND the day before was a
-  // review day (or itself a prior spend), and balance >= 1. Consecutive spends
-  // are permitted — scarcity (earn rate + balance cap) is the only gate (#1245).
-  const yesterday = offsetDate(today, -1);
-  const dayBefore = offsetDate(today, -2);
+  // -------------------------------------------------------------------------
+  // Phase 3 — Spend (post-earn).
+  //
+  // Only runs when earn fired in Phase 2 AND no spend fired in Phase 1. This
+  // handles the combined "earn-then-spend" case: balance was 0 (Phase 1
+  // couldn't spend), earning raised it to 1, and the newly-minted token can
+  // bridge a single-day gap in the same step. The same walk-back and
+  // all-or-nothing rules apply. At this point spendSet still reflects Phase 1
+  // results (no change since spend didn't fire), so re-use it.
+  if (earned && !spent) {
+    // Rebuild the live set to include the Phase 1 spendSet (unchanged) and
+    // the current spendDates from `next` (also unchanged since Phase 1 didn't
+    // spend). We build a fresh liveSet to be explicit about what's visible.
+    const liveSet = new Set<string>(dateSet);
+    for (const d of next.spendDates) liveSet.add(d);
 
-  const yesterdayMissing = !dateSet.has(yesterday) && !spendSet.has(yesterday);
-  const streakAliveBeforeYesterday =
-    dateSet.has(dayBefore) || spendSet.has(dayBefore);
+    const { missingDays, foundAnchor } = findGap(liveSet);
+    const gapLength = missingDays.length;
 
-  if (
-    yesterdayMissing &&
-    streakAliveBeforeYesterday &&
-    next.balance >= 1
-  ) {
-    spent = true;
-    const mergedDates = [...next.spendDates, yesterday].sort();
-    next = {
-      ...next,
-      balance: next.balance - 1,
-      spendDates: mergedDates,
-    };
+    if (foundAnchor && gapLength >= 1 && next.balance >= gapLength) {
+      spent = true;
+      const newSpendSet = new Set(next.spendDates);
+      for (const day of missingDays) newSpendSet.add(day);
+      const mergedDates = Array.from(newSpendSet).sort();
+      next = {
+        ...next,
+        balance: next.balance - gapLength,
+        spendDates: mergedDates,
+      };
+    }
   }
 
   // Append a protection event when at least one of earn/spend fired. Earn-
