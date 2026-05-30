@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   computeStreak,
   effectiveStreakDates,
@@ -19,6 +20,7 @@ import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { MilestoneCelebration } from "@/components/streak/MilestoneCelebration";
 
 export function StreakBadge() {
+  const t = useTranslations("review");
   const [streak, setStreak] = useState<number | null>(null);
   const [pendingMilestone, setPendingMilestone] = useState<number | null>(null);
   const { flags, setFlag } = useSuperuser();
@@ -95,7 +97,7 @@ export function StreakBadge() {
         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
           {streak === 0
             ? "Start your streak!"
-            : `${streak} day${streak === 1 ? "" : "s"} streak`}
+            : t("streakDays", { count: streak })}
         </span>
       </div>
       {pendingMilestone !== null && (

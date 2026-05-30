@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { GameStats } from "@/lib/stats/per-game";
 import {
   versionGroupLabel,
@@ -76,6 +77,7 @@ type GenGroup = {
 };
 
 function GenAccordion({ group }: { group: GenGroup }) {
+  const t = useTranslations("stats");
   const [open, setOpen] = useState(false);
   const genName = GEN_NAMES[group.gen] ?? `Generation ${group.gen}`;
   const totalMastered = group.rows.reduce((s, r) => s + r.mastered, 0);
@@ -93,7 +95,7 @@ function GenAccordion({ group }: { group: GenGroup }) {
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-sm font-semibold text-foreground">{genName}</span>
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {uniqueGames} {uniqueGames === 1 ? "game" : "games"} · {totalMastered}/{totalSpecies} species mastered
+            {t("gameCount", { count: uniqueGames })} · {totalMastered}/{totalSpecies} species mastered
           </span>
         </div>
         <svg

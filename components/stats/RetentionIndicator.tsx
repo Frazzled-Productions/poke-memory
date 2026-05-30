@@ -6,6 +6,7 @@ import {
   RadialBarChart,
   ResponsiveContainer,
 } from "recharts";
+import { useTranslations, useFormatter } from "next-intl";
 import type { RetentionComparison } from "@/lib/stats/retention";
 import { cardPanel, mutedText, sectionLabel } from "@/lib/utils/class-names";
 
@@ -24,10 +25,6 @@ function gaugeColour(delta: number): string {
   return "#f43f5e"; // rose-500
 }
 
-function formatPct(v: number): string {
-  return `${Math.round(v * 100)}%`;
-}
-
 /**
  * Radial gauge comparing measured recall accuracy against the user's
  * configured FSRS retention target.
@@ -40,7 +37,14 @@ function formatPct(v: number): string {
  * intentionally unaffected by the `pretendAllMastered` superuser flag.
  */
 export function RetentionIndicator({ comparison }: Props) {
+  const t = useTranslations("stats");
+  const format = useFormatter();
   const { actual, target, delta, reviews } = comparison;
+
+  /** Format a fraction as a percent with no decimal places, locale-aware. */
+  function formatPct(v: number): string {
+    return format.number(v, { style: "percent", maximumFractionDigits: 0 });
+  }
 
   return (
     <section aria-labelledby="retention-heading">
@@ -68,7 +72,7 @@ export function RetentionIndicator({ comparison }: Props) {
               role="img"
               aria-label={`Recall ${formatPct(actual)} against a ${formatPct(
                 target,
-              )} target, based on ${reviews} reviews in the past year`}
+              )} target, ${t("reviewsOverWindowInline", { count: reviews })}`}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <RadialBarChart
@@ -138,8 +142,7 @@ export function RetentionIndicator({ comparison }: Props) {
                 )}
               </p>
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                Based on {reviews.toLocaleString("en-GB")} review
-                {reviews === 1 ? "" : "s"} over a rolling 365-day window.
+                {t("reviewsOverWindow", { count: reviews })}
               </p>
             </div>
           </div>

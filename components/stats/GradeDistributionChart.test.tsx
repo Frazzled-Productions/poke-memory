@@ -10,8 +10,9 @@
  * synthetic payload so ChartTooltip (and its `statValue` line) executes.
  */
 
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { screen } from "@testing-library/react";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { GradeDistributionChart } from "@/components/stats/GradeDistributionChart";
 import type { GradeDistribution, GradeTrendPoint } from "@/lib/stats/grade-distribution";
 
@@ -81,7 +82,7 @@ const TREND: readonly GradeTrendPoint[] = [
 
 describe("GradeDistributionChart", () => {
   it("renders the Grade distribution heading", () => {
-    render(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
+    renderWithIntl(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
     expect(
       screen.getByRole("heading", { name: /grade distribution/i }),
     ).toBeInTheDocument();
@@ -89,25 +90,25 @@ describe("GradeDistributionChart", () => {
 
   it("shows the empty-state message when distribution total is zero", () => {
     const empty: GradeDistribution = { again: 0, hard: 0, good: 0, easy: 0, total: 0 };
-    render(<GradeDistributionChart distribution={empty} trend={[]} />);
+    renderWithIntl(<GradeDistributionChart distribution={empty} trend={[]} />);
     expect(
       screen.getByText(/no grades recorded yet/i),
     ).toBeInTheDocument();
   });
 
   it("renders the bar chart when trend has data", () => {
-    render(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
+    renderWithIntl(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
     expect(screen.getByTestId("bar-chart")).toBeInTheDocument();
   });
 
   it("renders the ChartTooltip content (statValue line) via the mocked Tooltip", () => {
-    render(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
+    renderWithIntl(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
     // ChartTooltip renders grade rows with statValue class — "Again: 2" should appear.
     expect(screen.getByText(/again: 2/i)).toBeInTheDocument();
   });
 
   it("renders the overall distribution bar when total is non-zero", () => {
-    render(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
+    renderWithIntl(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
     // The OverallBar renders an img role with the grade mix aria-label.
     expect(
       screen.getByRole("img", { name: /all-time grade mix/i }),

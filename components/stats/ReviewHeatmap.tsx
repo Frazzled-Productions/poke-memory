@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslations, useFormatter } from "next-intl";
 import type { HeatmapCell } from "@/lib/stats/heatmap";
 import { intensityBucket } from "@/lib/stats/heatmap";
 import { cardPanel } from "@/lib/utils/class-names";
@@ -32,17 +33,19 @@ const INTENSITY_HOVER_STROKES = [
   "stroke-emerald-700 dark:stroke-emerald-200", // 4
 ] as const;
 
-function formatTooltipLabel(cell: HeatmapCell): string {
+/** Build the tooltip date string. Uses en-GB for English month/weekday names
+ *  regardless of locale — the date format is fixed but the count is localised
+ *  separately by the caller via t(). */
+function formatTooltipDate(cell: HeatmapCell): string {
   // en-GB locale gives English month/weekday names on all browser locales.
   const d = new Date(cell.date + "T00:00:00Z");
-  const human = d.toLocaleDateString("en-GB", {
+  return d.toLocaleDateString("en-GB", {
     weekday: "short",
     month: "short",
     day: "numeric",
     year: "numeric",
     timeZone: "UTC",
   });
-  return `${human} - ${cell.count} review${cell.count === 1 ? "" : "s"}`;
 }
 
 type TooltipState = {
@@ -54,6 +57,9 @@ type TooltipState = {
 };
 
 export function ReviewHeatmap({ columns }: Props) {
+  const t = useTranslations("stats");
+  const format = useFormatter();
+
   const width = COLS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
   const height = ROWS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
   const total = columns.flat().reduce((s, c) => s + c.count, 0);
@@ -61,6 +67,10 @@ export function ReviewHeatmap({ columns }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  function buildTooltipLabel(cell: HeatmapCell): string {
+    return `${formatTooltipDate(cell)} - ${t("directionReviewCount", { count: cell.count })}`;
+  }
 
   function clampTooltipPos(
     rawX: number,
@@ -127,7 +137,7 @@ export function ReviewHeatmap({ columns }: Props) {
       </h2>
       <div className={cardPanel}>
         <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-          {total.toLocaleString('en-GB')} review{total === 1 ? "" : "s"} in the last year
+          {t("reviewsInLastYear", { count: total })}
         </p>
         {/* relative container so the tooltip can be absolutely positioned. */}
         <div ref={containerRef} className="relative">
@@ -137,7 +147,7 @@ export function ReviewHeatmap({ columns }: Props) {
             className="block h-auto w-full"
             style={{ maxWidth: width }}
             role="img"
-            aria-label={`Review activity heatmap for the last 365 days, ${total} total reviews`}
+            aria-label={`Review activity heatmap for the last 365 days, ${format.number(total)} total reviews`}
             onMouseLeave={handleCellLeave}
           >
             {columns.map((col, x) =>
@@ -166,7 +176,7 @@ export function ReviewHeatmap({ columns }: Props) {
                     onMouseEnter={(e) => handleCellEnter(e, cell, key)}
                     onMouseMove={(e) => handleCellMove(e, cell)}
                   >
-                    <title>{formatTooltipLabel(cell)}</title>
+                    <title>{buildTooltipLabel(cell)}</title>
                   </rect>
                 );
               }),
@@ -198,7 +208,7 @@ export function ReviewHeatmap({ columns }: Props) {
                 top: tooltip.y - 8,
               }}
             >
-              {formatTooltipLabel(tooltip.cell)}
+              {buildTooltipLabel(tooltip.cell)}
             </div>
           )}
         </div>

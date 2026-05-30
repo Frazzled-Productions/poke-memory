@@ -23,7 +23,10 @@
     "continueWithGitHub": "GitHub でつづける",
     "continueWithGoogle": "Google でつづける",
     "providerHint": "進捗を引き継ぐには、登録時と同じプロバイダーを使用してください。",
-    "chooseProvider": "サインインプロバイダーを選択"
+    "chooseProvider": "サインインプロバイダーを選択",
+    "cardsReviewed": "{count, plural, other {# 枚のカードをレビューしました}}",
+    "streakDaysCount": "{count, plural, other {# 日連続}}",
+    "gradesLogged": "{count, plural, other {# 件の採点を記録しました}}"
   },
   "settings": {
     "heading": "設定",
@@ -185,6 +188,8 @@
     "offline": {
       "downloadHeading": "ダウンロード"
     },
+    "optimizerCooldown": "{count, plural, other {次の最適化まであと # 日}}",
+    "optimizerRetryAfter": "{count, plural, other {# 日後に再試行してください。}}",
     "backup": {
       "heading": "バックアップ",
       "exportLabel": "進捗をエクスポート",
@@ -362,6 +367,9 @@
       "hiddenCardsPaused": "非表示のカードは一時停止されています。スコープを削除してもレビュー期限切れのカードが溢れることはありません。"
     }
   },
+  "review": {
+    "streakDays": "{count, plural, other {# 日連続中}}"
+  },
   "pokedex": {
     "title": "Pokédex",
     "description": "1025匹の Pokémon をブラウズできます。世代、タイプ、習得状況でフィルタリングできます。",
@@ -392,7 +400,8 @@
     "introduced": "{introduced} / {total} 表示済み",
     "generationAll": "すべて",
     "generationLabel": "第{gen}世代",
-    "masteryCount": "{mastered} / {total} 習得済み"
+    "masteryCount": "{mastered} / {total} 習得済み",
+    "nextReviewInDays": "{count, plural, other {次のレビュー: # 日後}}"
   },
   "pasture": {
     "title": "牧場",
@@ -444,6 +453,17 @@
     "totalSeen": "確認済み",
     "streak": "連続日数",
     "days": "{count}日",
+    "cardCount": "{count, plural, other {# 枚のカード}}",
+    "gameCount": "{count, plural, other {# 作品}}",
+    "reviewsInLastYear": "{count, plural, other {過去1年間に # 件のレビュー}}",
+    "reviewsOverWindow": "{count, plural, other {過去365日間の # 件のレビューに基づく。}}",
+    "reviewsOverWindowInline": "{count, plural, other {過去365日間の # 件のレビューに基づく}}",
+    "cardsOverNextDays": "{count, plural, other {今後14日間で # 枚のカード}}",
+    "difficultyAcrossCards": "{count, plural, other {# 枚のカードの平均難易度}}",
+    "firstMasteryDays": "{count, plural, other {# 日}}",
+    "masterySuccessfulReviews": "{count, plural, other {# 回の正解}}",
+    "directionReviewCount": "{count, plural, other {# 件のレビュー}}",
+    "weeklyGradeCount": "{count, plural, other {# 件の採点}}",
     "accuracyHeading": "正確さ",
     "activityHeading": "活動",
     "progressHeading": "進捗",
@@ -494,8 +514,7 @@
       "heading": "連続記録の保護",
       "earnAndSpentBanner": "連続記録保護トークンを獲得し、同日に使用して昨日の記録を守りました。連続記録は安全です。",
       "dismissAriaLabel": "連続記録保護の通知を閉じる",
-      "tokenSingular": "トークン",
-      "tokenPlural": "トークン",
+      "tokenCount": "{count, plural, other {トークン}}",
       "tokenMax": "（最大）",
       "earnDescription": "トークンは1回のミスをカバーします。{earnInterval}日連続レビューごとに1枚獲得、最大{maxBalance}枚。",
       "nextTokenStart": "今日レビューして次のトークンの獲得を始めましょう。",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useFormatter } from "next-intl";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import {
   getState,
@@ -48,6 +49,7 @@ function formatDate(isoString: string): string {
  * and shows live progress from the surviving run.
  */
 export function OfflineSection() {
+  const format = useFormatter();
   // Initialise from the singleton synchronously. The subscribe() effect (below)
   // fires after mount and immediately calls setDownloadState with the current
   // singleton state, which may already be "downloading" if a download survived
@@ -160,8 +162,8 @@ export function OfflineSection() {
                 aria-live="polite"
                 aria-atomic="true"
               >
-                Downloading {downloadState.progress.done.toLocaleString()} of{" "}
-                {downloadState.progress.total.toLocaleString()}
+                Downloading {format.number(downloadState.progress.done)} of{" "}
+                {format.number(downloadState.progress.total)}
                 {downloadState.progress.bytesSoFar > 0 && (
                   <> ({formatMb(downloadState.progress.bytesSoFar)})</>
                 )}

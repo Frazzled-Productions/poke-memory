@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
@@ -447,18 +448,19 @@ function SideCard({
   disabled: boolean;
   onClick: () => void;
 }) {
+  const t = useTranslations("auth");
   return (
     <div className="rounded-xl border border-zinc-200 bg-background p-6 dark:border-zinc-800">
       <h2 className="text-base font-semibold text-foreground">{heading}</h2>
       <ul className="mt-2 space-y-1 text-sm text-zinc-500 dark:text-zinc-400">
         <li>
-          {cardCount} card{cardCount !== 1 ? "s" : ""} reviewed
+          {t("cardsReviewed", { count: cardCount })}
         </li>
         <li>
-          {streakDays} streak day{streakDays !== 1 ? "s" : ""}
+          {t("streakDaysCount", { count: streakDays })}
         </li>
         <li>
-          {gradeEntries} grade{gradeEntries !== 1 ? "s" : ""} logged
+          {t("gradesLogged", { count: gradeEntries })}
         </li>
       </ul>
       {latestReviewed && (
