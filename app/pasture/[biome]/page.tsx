@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
@@ -11,9 +12,10 @@ import { biomeStats } from "@/lib/pasture/stats";
 import { PastureZone } from "@/components/pasture/PastureZone";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
+import { hydrateSession } from "@/lib/review/session";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
@@ -72,6 +74,7 @@ export default function BiomeLandscapePage({
 }) {
   const { biome: biomeSlug } = use(params);
   const router = useRouter();
+  const t = useTranslations("pasture");
   const { flags } = useSuperuser();
   const isLandscape = useIsLandscape();
   const [masteredCards, setMasteredCards] = useState<NameReviewCard[] | null>(
@@ -108,15 +111,34 @@ export default function BiomeLandscapePage({
         setMasteredCards(all);
       } else {
         const session = await loadSession();
-        const masteryRepetitions = loadSettings().masteryRepetitions;
-        const cards = session
-          ? (filterMastered(
-              session.cards,
-              false,
-              masteryRepetitions,
-            ) as NameReviewCard[])
-          : [];
-        setMasteredCards(cards);
+        const { masteryRepetitions, pokemonNameLocale } = loadSettings();
+        if (session) {
+          // Hydrate so each card carries the full SEED_POKEMON fields (habitat,
+          // isDefaultForm, etc.) that biomeStats and the biome filter depend on.
+          // All *Enabled flags are false — only refresh existing cards from seed
+          // (backfill habitat, isDefaultForm, etc.) without adding ~1 000 new unseen cards.
+          const hydrated = hydrateSession(session.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+            reverseEnabled: false,
+            nameEnabled: false,
+            evolutionEnabled: false,
+            reverseEvolutionEnabled: false,
+            cryEnabled: false,
+            // `locale` only affects newly-created cards; all *Enabled flags are
+            // false here so no new cards are added. Existing saved cards keep
+            // their own persisted `locale` tag unchanged. This opt is present
+            // for completeness but is effectively dead in this refresh pass.
+            locale: pokemonNameLocale,
+          });
+          const cards = filterMastered(
+            hydrated,
+            false,
+            masteryRepetitions,
+            pokemonNameLocale,
+          ) as NameReviewCard[];
+          setMasteredCards(cards);
+        } else {
+          setMasteredCards([]);
+        }
       }
     }
     void load();
@@ -202,7 +224,7 @@ export default function BiomeLandscapePage({
                   router.back();
                 }
               }}
-              aria-label="Back to Pasture"
+              aria-label={t("biome.backAriaLabel")}
               className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-zinc-500 transition-colors hover:text-foreground dark:text-zinc-400 dark:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             >
               <svg
@@ -219,7 +241,7 @@ export default function BiomeLandscapePage({
                   strokeLinejoin="round"
                 />
               </svg>
-              Pasture
+              {t("biome.backLabel")}
             </button>
             <h1 className="ml-1 text-sm font-semibold text-foreground">
               {zone.label}
@@ -269,7 +291,7 @@ export default function BiomeLandscapePage({
         <main className="px-4 pb-8 pt-2">
           {isEmpty ? (
             <p className="mt-6 text-zinc-500 dark:text-zinc-400">
-              No mastered Pokémon in this biome yet. Keep practising!
+              {t("biome.emptyState")}
             </p>
           ) : (
             <PastureZone

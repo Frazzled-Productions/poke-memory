@@ -428,7 +428,12 @@
       "rare": "聖域",
       "unknown": "荒野"
     },
-    "zoneAriaLabel": "{zone} ゾーン"
+    "zoneAriaLabel": "{zone} ゾーン",
+    "biome": {
+      "backLabel": "牧場",
+      "backAriaLabel": "牧場に戻る",
+      "emptyState": "このバイオームにはまだ習得済みの Pokémon がいません。練習を続けましょう！"
+    }
   },
   "stats": {
     "title": "記録",

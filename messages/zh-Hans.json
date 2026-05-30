@@ -428,7 +428,12 @@
       "rare": "圣所",
       "unknown": "荒野"
     },
-    "zoneAriaLabel": "{zone}区域"
+    "zoneAriaLabel": "{zone}区域",
+    "biome": {
+      "backLabel": "牧场",
+      "backAriaLabel": "返回牧场",
+      "emptyState": "此生物群系中还没有掌握的宝可梦。继续练习吧！"
+    }
   },
   "stats": {
     "title": "统计",

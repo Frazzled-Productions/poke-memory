@@ -383,14 +383,23 @@ function buildOptimiserStress(): SeedPayload {
  * the Pasture page a genuinely populated view without the `pretendAllMastered`
  * flag, and lets QA verify the Pasture visual layout with real data.
  *
- * Mix: 40 mastered, 20 due-soon (graduated but not yet mastered),
- * 15 in-learning, rest locked (absent from the session entirely — hydrateSession
- * adds them as new cards on next practice load).
+ * Mix: 40 mastered (en), 5 mastered (ja), 20 due-soon, 15 in-learning,
+ * rest locked (absent from the session — hydrateSession adds them as new
+ * cards on next practice load).
+ *
+ * Sets `pokemonNameLocale: "en"` so the 40 en-locale mastered cards show
+ * correctly. Switching to Japanese in Settings should show only the 5
+ * ja-locale mastered cards — demonstrating that mastery is stored per locale
+ * (the per-locale FSRS rows introduced in #1259).
+ *
+ * The Gen-I species used (IDs 1–92) all have non-null PokéAPI habitats, so
+ * the Pasture spreads across multiple biomes (grassland, forest, mountain,
+ * waters-edge, etc.) instead of everything landing in Wildlands.
  */
 function buildPastureProgression(): SeedPayload {
   const cards: SeededCard[] = [];
 
-  // 40 mastered Gen-I species — the Pasture should be nicely populated.
+  // 40 mastered Gen-I species (locale: en) — spreads across multiple biomes.
   // Since #1234, the Pasture requires both name AND reverse mastered — seed both.
   const masteredIds = [
     1, 4, 7, 10, 13, 16, 19, 21, 23, 25,
@@ -405,8 +414,23 @@ function buildPastureProgression(): SeedPayload {
       lastReview: relativeDate(-offsetDays),
       firstSeen: PAST_30,
     });
-    cards.push(nameCard(id, state));
-    cards.push(reverseCard(id, state));
+    cards.push(nameCard(id, state, "en"));
+    cards.push(reverseCard(id, state, "en"));
+  }
+
+  // 5 mastered (locale: ja) — a distinct subset so switching pokemonNameLocale
+  // to Japanese shows exactly 5 mastered cards. This demonstrates that mastery
+  // is tracked per locale: en and ja do not share state (#1259).
+  const jaMasteredIds = [1, 4, 7, 25, 39];
+  for (const id of jaMasteredIds) {
+    const offsetDays = ((id % 7) + 1);
+    const state = masteredState({
+      dueDate: relativeDate(offsetDays),
+      lastReview: relativeDate(-offsetDays),
+      firstSeen: PAST_30,
+    });
+    cards.push(nameCard(id, state, "ja"));
+    cards.push(reverseCard(id, state, "ja"));
   }
 
   // 20 graduated / due-soon (in progress, not yet mastered)
@@ -445,7 +469,10 @@ function buildPastureProgression(): SeedPayload {
 
   return {
     session: { cards, limits: DEFAULT_LIMITS },
-    pokemonNameLocale: null,
+    // Set en so the 40 en-locale mastered cards show by default. Switch to
+    // Japanese in Settings > Pokémon name language to see only the 5 ja-locale
+    // mastered cards — confirming per-locale FSRS storage (#1259).
+    pokemonNameLocale: "en",
   };
 }
 
@@ -565,7 +592,9 @@ function buildMasteryGaps(): SeedPayload {
 
   return {
     session: { cards, limits: DEFAULT_LIMITS },
-    pokemonNameLocale: null,
+    // Set en so the mastered cards match the default locale; switching to
+    // Japanese in Settings shows 0 mastered, confirming per-locale FSRS storage.
+    pokemonNameLocale: "en",
   };
 }
 
@@ -592,17 +621,19 @@ export const SCENARIOS: Scenario[] = [
     slug: "pasture-progression",
     label: "Pasture progression",
     description:
-      "40 mastered + 20 in-progress + 15 in-learning species. " +
-      "Visit the Pasture to see a realistically populated view without the pretend-all-mastered flag.",
+      "40 mastered (en) + 5 mastered (ja) + 20 in-progress + 15 in-learning species. " +
+      "Visit the Pasture to see multiple biomes populated. Switch Pokémon name language to Japanese " +
+      "to see only 5 mastered — confirming per-locale FSRS storage.",
     build: buildPastureProgression,
   },
   {
     slug: "mastery-gaps",
     label: "Mastery gaps",
     description:
-      "15 fully mastered pairs, 10 name-mastered/reverse-pending pairs, " +
+      "15 fully mastered pairs (en), 10 name-mastered/reverse-pending pairs, " +
       "10 reviewed-but-unmastered names, and 5 in-learning. " +
-      "Visit Pasture to verify the Next arrivals strip, and Journey to verify Close to mastery.",
+      "Visit Pasture to verify the Next arrivals strip, and Journey to verify Close to mastery. " +
+      "Switch to Japanese to see 0 mastered — confirming per-locale FSRS storage.",
     build: buildMasteryGaps,
   },
 ];
