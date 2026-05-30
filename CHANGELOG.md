@@ -6,6 +6,43 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.24] - 2026-05-30
+
+### Added
+
+- Machine-translated the app UI message catalogues for Japanese (ja), Simplified Chinese (zh-Hans), and Traditional Chinese (zh-Hant), replacing all English placeholder values with locale-appropriate translations.
+- Journey page now shows a "Close to mastery" section listing species where the name card is mastered but the reverse card still needs work, sorted by closest to the 21-day interval gate first.
+- Stats page now shows a "By game" progress breakdown in a new Progress section, listing mastery percentage and count for each game (Red/Blue through Legends: Z-A), grouped by generation in expandable accordions.
+- Pokédex grid now supports three sort orders: National Number (default), Alphabetical, and Closest to mastery (learning species ranked by review progress, mastered species first, locked species last). Sort is URL-driven and composes with all existing filters.
+- Settings (Regional section) now has a "Daily reminder time" picker to choose your preferred hour for the daily practice notification. Full per-hour delivery will activate after a scheduled server update.
+- Pasture: a "Next arrivals" strip below the biome grid shows up to 5 reviewed-but-not-yet-mastered species ranked by closest to mastery (highest reps, then nearest due date), giving a motivational forward-looking nudge.
+- QA seed mode: a superuser-only developer tool that injects named scenario payloads into local storage for manual QA on preview deployments. Enable the "QA seed mode" flag in Settings > Advanced > Developer, pick a scenario, and click "Apply seed". Available scenarios: `fsrs-locale-mastery` (verify locale-aware FSRS reset), `optimiser-stress` (verify the FSRS optimiser endpoint), and `pasture-progression` (verify Pasture with real data). Local-only; sync write-guard prevents seeded data from reaching Supabase.
+- Added `scripts/lint-i18n.mjs` message-catalogue completeness gate (`npm run lint:i18n`), wired into `npm run lint` and CI, to catch missing or extra keys across the `ja`, `zh-Hans`, and `zh-Hant` catalogues before they reach production.
+- Added a dismissible machine-translation banner for non-English app locales, noting that the translation was created automatically and inviting feedback. Dismissed per locale and stored locally.
+- Added an English-only notice at the top of the Privacy Notice and Terms of Use pages when viewing in a non-English locale, clarifying that the documents are authoritative in English only.
+- Added full i18n catalogue keys for all user-facing strings across nav, auth, practice, settings, Pokédex, Pasture, Stats, Journey, error, onboarding, and banner namespaces, enabling the app language switcher to actually translate the UI.
+- App navigation and sign-in now respect the chosen app language: tab labels, the brand name, nav aria-labels, and auth button text (Sign in / Sign out / Signing in / Continue with GitHub / Continue with Google) are all wired to the i18n catalogue.
+- The onboarding modal now displays in the active app locale (Japanese, Simplified Chinese, Traditional Chinese). A machine-translation notice appears inside the modal for non-English locales.
+- Wired all Pokédex and Pasture UI chrome strings to `useTranslations()` so switching the app language now translates filter labels, sort controls, search inputs, aria-labels, headings, and count phrases on both surfaces.
+- Wired all Practice screen strings (review session, grade buttons, keyboard shortcuts, undo, loading, end-of-session states, cry card) to `next-intl` translations so switching the app language translates the Practice surface.
+
+### Changed
+
+- README screenshots now show a realistic lived-in state: Pikachu is always the practice card, Stats shows a 30-day grade history with a populated accuracy chart, Pasture shows 30 mastered species, and the Pokédex grid shows a mix of mastered / in-progress / locked tiles.
+- FSRS optimiser now surfaces the HTTP status code when the server returns an unmapped error, making opaque failures diagnosable from a screenshot alone.
+- Settings page strings wired to next-intl catalogue keys so switching the app language now translates section headings, labels, descriptions, and button text across the entire Settings page.
+- QA seed: added "Mastery gaps" scenario that exercises the Pasture "Next arrivals" strip and Journey "Close to mastery" list with the specific in-between card states each feature requires.
+- QA seed: added an active-seed indicator to the Settings panel; the selected scenario label is shown after applying and restored on remount, cleared when "Clear seed" is clicked.
+
+### Fixed
+
+- Pokédex detail page and Known Pokémon quiz now respect the Pokémon name locale setting (Japanese / Chinese) introduced in the Languages Labs flag. Previously, these surfaces rendered the English name directly instead of routing through the locale-aware hook.
+- Stats, Journey, and error pages now use `useTranslations()` so switching the app language actually translates all headings, labels, and status messages on those surfaces.
+- Language picker options now display each language in its own script (English, 日本語, 简体中文, 繁體中文) rather than English translations.
+- Pokédex grid tiles now display localised Pokémon names when a non-English name locale is active (previously only the detail page applied the locale; the grid stayed English). Closes #1327.
+- Pokédex sort selection (National Number / Alphabetical) is now persisted to localStorage and survives back-navigation to the grid. Closes #1314.
+- Fixed an intermittent practice-page test failure that depended on the calendar day: the Practice smoke checks now recognise sprite-picker and multiple-choice cards as valid first cards, not just the flip card.
+
 ## [0.10.23] - 2026-05-29
 
 ### Added
@@ -1435,7 +1472,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.23...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.24...HEAD
+[0.10.24]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.24
 [0.10.23]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.23
 [0.10.22]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.22
 [0.10.21]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.21
