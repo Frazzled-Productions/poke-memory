@@ -116,6 +116,11 @@ async function writeSeedToPage(page, seed) {
       maxNewReversePerDay: 0,
       maxNewCryPerDay: 0,
       seenStreakMilestones: [3, 7, 14],
+      // Force the bottom tab bar. Without this key parseStoredSettings
+      // defaults an absent mobileNav to "hamburger" (the #661
+      // existing-user-preservation fallback), so the GIF shows the
+      // desktop hamburger instead of the mobile bottom tab bar.
+      mobileNav: "bottom",
       onboarding: {
         firstVisitOnboardingDismissed: true,
         welcomeDismissed: true,
