@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import {
   isSyncSafe,
   pushSession,
@@ -6,11 +7,14 @@ import {
   mergeCloudIntoLocal,
   mergeCloudIntoLocalSilent,
   applyCloudAuthoritative,
+  isStructuralError,
+  popStructuralErrorCode,
   CARD_REVIEWS_CONFLICT_COLS,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { CloudRow, SeedOpts } from "./cloud";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
+import type { PostgrestError } from "@supabase/supabase-js";
 
 // Minimal ReviewableCard factory for sync tests.
 // Only the fields relevant to isSyncSafe and sync are set.
@@ -765,5 +769,191 @@ describe("locale round-trip (#1259)", () => {
     // The "en" card should be unchanged — no matching cloud row.
     expect(merged.state.lastReview).toBeNull();
     expect(merged).toBe(enCard);
+  });
+});
+
+// ─── isStructuralError (#1358) ────────────────────────────────────────────────
+
+function makePostgrestError(code: string): PostgrestError {
+  const name = "PostgrestError";
+  return {
+    code,
+    message: `Error with code ${code}`,
+    details: "",
+    hint: "",
+    name,
+    toJSON: () => ({ code, message: `Error with code ${code}`, details: "", hint: "", name }),
+  };
+}
+
+describe("isStructuralError (#1358)", () => {
+  it("returns false for null error", () => {
+    expect(isStructuralError(null)).toBe(false);
+  });
+
+  it("returns true for 42P10 (ON CONFLICT mismatch — the #1344 incident code)", () => {
+    expect(isStructuralError(makePostgrestError("42P10"))).toBe(true);
+  });
+
+  it("returns true for 42P01 (relation does not exist)", () => {
+    expect(isStructuralError(makePostgrestError("42P01"))).toBe(true);
+  });
+
+  it("returns true for 42703 (column does not exist)", () => {
+    expect(isStructuralError(makePostgrestError("42703"))).toBe(true);
+  });
+
+  it("returns true for 42501 (insufficient privilege at PG layer)", () => {
+    expect(isStructuralError(makePostgrestError("42501"))).toBe(true);
+  });
+
+  it("returns true for 23505 (unique violation)", () => {
+    expect(isStructuralError(makePostgrestError("23505"))).toBe(true);
+  });
+
+  it("returns true for 23503 (foreign key violation)", () => {
+    expect(isStructuralError(makePostgrestError("23503"))).toBe(true);
+  });
+
+  it("returns false for 23514 (check_violation — deliberate regression trigger)", () => {
+    // 23514 is the DELIBERATE regression trigger (migrations 002/015/016/017).
+    // It must NOT fail loud — it is the expected rejection of bad state.
+    expect(isStructuralError(makePostgrestError("23514"))).toBe(false);
+  });
+
+  it("returns false for PGRST-prefixed codes (PostgREST transient schema-cache)", () => {
+    expect(isStructuralError(makePostgrestError("PGRST116"))).toBe(false);
+    expect(isStructuralError(makePostgrestError("PGRST301"))).toBe(false);
+  });
+
+  it("returns false for generic 5xx-style codes", () => {
+    // These are transient — not structural.
+    expect(isStructuralError(makePostgrestError("500"))).toBe(false);
+  });
+
+  it("returns false when code is not a string", () => {
+    const err = { code: undefined, message: "test", details: "", hint: "" } as unknown as PostgrestError;
+    expect(isStructuralError(err)).toBe(false);
+  });
+});
+
+// ─── structural-error side-effects in pushSingleCard / pushSession (#1358) ────
+//
+// pushSingleCard / pushSession record structural error codes in a module-level
+// slot. Callers drain the slot via popStructuralErrorCode() and forward to
+// markStructuralSyncError (in persistence.ts) themselves. This avoids the
+// circular dependency cloud.ts → persistence.ts → cloud.ts (toCloudRows).
+
+describe("pushSingleCard structural error handling (#1358)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    // Drain any stale code from previous tests before each run.
+    popStructuralErrorCode();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // Drain any remaining code so other tests are not affected.
+    popStructuralErrorCode();
+  });
+
+  it("popStructuralErrorCode returns '42P10' and console.error fires on a 42P10 error", async () => {
+    const client = makeSupabaseClient({ code: "42P10", message: "ON CONFLICT mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const card = makeCard(1, "2026-05-10", "2026-05-10");
+
+    const result = await pushSingleCard(client, "user-1", card);
+
+    expect(result).toBe(false);
+    expect(popStructuralErrorCode()).toBe("42P10");
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("42P10")
+    );
+  });
+
+  it("popStructuralErrorCode returns '23505' for a unique violation", async () => {
+    const client = makeSupabaseClient({ code: "23505", message: "unique violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const card = makeCard(2, "2026-05-10", "2026-05-10");
+
+    await pushSingleCard(client, "user-1", card);
+
+    expect(popStructuralErrorCode()).toBe("23505");
+  });
+
+  it("popStructuralErrorCode returns null on a 23514 (deliberate regression trigger)", async () => {
+    // 23514 is deliberate — the regression trigger rejecting bad state.
+    const client = makeSupabaseClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const card = makeCard(3, "2026-05-10", "2026-05-10");
+
+    await pushSingleCard(client, "user-1", card);
+
+    expect(popStructuralErrorCode()).toBeNull();
+  });
+
+  it("popStructuralErrorCode returns null on a network TypeError (catch path)", async () => {
+    const upsertSpy = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+    const client = {
+      from: vi.fn().mockReturnValue({ upsert: upsertSpy }),
+    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    const card = makeCard(4, "2026-05-10", "2026-05-10");
+
+    const result = await pushSingleCard(client, "user-1", card);
+
+    expect(result).toBe(false);
+    expect(popStructuralErrorCode()).toBeNull();
+  });
+
+  it("popStructuralErrorCode returns null on a transient PGRST error", async () => {
+    const client = makeSupabaseClient({ code: "PGRST116", message: "transient", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const card = makeCard(5, "2026-05-10", "2026-05-10");
+
+    await pushSingleCard(client, "user-1", card);
+
+    expect(popStructuralErrorCode()).toBeNull();
+  });
+});
+
+describe("pushSession structural error handling (#1358)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    popStructuralErrorCode();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    popStructuralErrorCode();
+  });
+
+  it("popStructuralErrorCode returns '42P10' and console.error fires when a batch returns 42P10", async () => {
+    const client = makeSupabaseClient({ code: "42P10", message: "ON CONFLICT mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const cards = [makeCard(1, "2026-05-10", "2026-05-10"), makeCard(2, "2026-05-10", "2026-05-10")];
+
+    const result = await pushSession(client, "user-1", cards);
+
+    expect(result).toBe(false);
+    expect(popStructuralErrorCode()).toBe("42P10");
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("42P10"));
+  });
+
+  it("breaks early and calls upsert only once on structural error (does not retry remaining batches)", async () => {
+    // With BATCH=200 and 2 cards, there is only 1 batch. Verify the early-break
+    // logic by checking upsert was called exactly once.
+    const client = makeSupabaseClient({ code: "42P10", message: "mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const cards = [makeCard(10, "2026-05-10", "2026-05-10")];
+
+    await pushSession(client, "user-1", cards);
+
+    expect(client._upsertSpy).toHaveBeenCalledTimes(1);
+    expect(popStructuralErrorCode()).toBe("42P10");
+  });
+
+  it("popStructuralErrorCode returns null on a 23514 (deliberate regression trigger)", async () => {
+    const client = makeSupabaseClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const cards = [makeCard(11, "2026-05-10", "2026-05-10")];
+
+    await pushSession(client, "user-1", cards);
+
+    expect(popStructuralErrorCode()).toBeNull();
   });
 });

@@ -7,11 +7,27 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 vi.mock("@/lib/sync/cloud", () => ({
   pushSingleCard: vi.fn(),
   isSyncSafe: vi.fn(() => true),
+  // popStructuralErrorCode returns null by default so drainQueue does not
+  // call markStructuralSyncError in tests not testing that path.
+  popStructuralErrorCode: vi.fn(() => null),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({
   markPushSucceeded: vi.fn(),
   markPushFailed: vi.fn(),
+  markStructuralSyncError: vi.fn(),
+  // loadSyncStatus returns no structural error by default so drainQueue does
+  // not short-circuit in most tests. Individual tests can override as needed.
+  loadSyncStatus: vi.fn(() => ({
+    lastPushAt: null,
+    lastPushFailed: false,
+    lastPushAttemptAt: null,
+    failedCardCount: null,
+    lastPullAt: null,
+    lastSettingsPullAt: null,
+    lastSeenResetAt: null,
+    structuralSyncError: null,
+  })),
   savePendingQueue: vi.fn(),
   clearPendingQueue: vi.fn(),
 }));

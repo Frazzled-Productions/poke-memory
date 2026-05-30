@@ -31,6 +31,16 @@ export type SyncStatus = {
   lastSettingsPullAt: string | null;
   /** ISO timestamp of the `user_settings.last_reset_at` this device has already reconciled. When cloud advances this past the local value, `pullAndMerge` calls `clearLocalProgress` before merging — that's how stale local stops resurrecting deleted rows (#576). Null = never seen a reset on this device. */
   lastSeenResetAt: string | null;
+  /**
+   * SQLSTATE code of a structural (non-transient) error on the card_reviews
+   * primary sync path (#1358). Set immediately on detection; never set by the
+   * auxiliary legs (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs).
+   * Non-null means retrying is pointless — the error signals a deploy/schema
+   * mismatch (e.g. 42P10: ON CONFLICT column list does not match any unique
+   * constraint). Only cleared when a push subsequently succeeds (structural
+   * fixes require a deploy, not a user action).
+   */
+  structuralSyncError: string | null;
 };
 
 const ZERO: SyncStatus = {
@@ -41,6 +51,7 @@ const ZERO: SyncStatus = {
   lastPullAt: null,
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 export function loadSyncStatus(): SyncStatus {
@@ -59,13 +70,14 @@ function parseSyncStatus(raw: string): SyncStatus {
     lastPullAt: typeof obj.lastPullAt === "string" ? obj.lastPullAt : null,
     lastSettingsPullAt: typeof obj.lastSettingsPullAt === "string" ? obj.lastSettingsPullAt : null,
     lastSeenResetAt: typeof obj.lastSeenResetAt === "string" ? obj.lastSeenResetAt : null,
+    structuralSyncError: typeof obj.structuralSyncError === "string" ? obj.structuralSyncError : null,
   };
 }
 
 /**
- * Record a successful push. Clears lastPushFailed and stamps lastPushAt.
- * Call this inside the success branch of any push path so the Stats page
- * "Last synced" indicator stays current after auto-sync runs.
+ * Record a successful push. Clears lastPushFailed, clears any structuralSyncError,
+ * and stamps lastPushAt. Call this inside the success branch of any push path so
+ * the Stats page "Last synced" indicator stays current after auto-sync runs.
  *
  * Semantics notes (#473):
  * - `failedCardCount` is intentionally left as-is on success. `useRetryPush`
@@ -78,10 +90,14 @@ function parseSyncStatus(raw: string): SyncStatus {
  *   progress" semantic is deliberate — a partial-success debounced push still
  *   moved the cloud forward — and differs from the unload path, which flags
  *   failure whenever `failedCardCount > 0`.
+ * - `structuralSyncError` is cleared on success because a successful push
+ *   proves the schema mismatch has been resolved (the schema fix will have been
+ *   deployed). Clearing here avoids a stale error banner after a deploy fix
+ *   without requiring a user action.
  */
 export function markPushSucceeded(at = new Date().toISOString()): void {
   const current = loadSyncStatus();
-  saveSyncStatus({ ...current, lastPushAt: at, lastPushFailed: false });
+  saveSyncStatus({ ...current, lastPushAt: at, lastPushFailed: false, structuralSyncError: null });
 }
 
 /**
@@ -100,6 +116,43 @@ export function markPushFailed(failedCardCount: number, at = new Date().toISOStr
     lastPushFailed: true,
     failedCardCount,
   });
+}
+
+/**
+ * Record a structural (non-transient) error on the card_reviews primary path
+ * (#1358). Call this IMMEDIATELY when a push returns a structural SQLSTATE
+ * (42xxx, 23505, 23503) — do not wait for FAILURE_THRESHOLD consecutive drains.
+ *
+ * Structural errors are never transient: 42P10 always means an ON CONFLICT
+ * mismatch (deploy/schema mismatch), 23505 unique violation, 23503 FK violation.
+ * Retrying will always fail until a schema fix is deployed.
+ *
+ * Does NOT flip lastPushFailed — the structural banner is a separate, more
+ * prominent signal that disables the Retry button entirely.
+ *
+ * IMPORTANT: Only call this from the card_reviews push path. Auxiliary legs
+ * (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs) must warn-and-
+ * continue regardless of error code.
+ */
+export function markStructuralSyncError(code: string, at = new Date().toISOString()): void {
+  const current = loadSyncStatus();
+  saveSyncStatus({
+    ...current,
+    lastPushAttemptAt: at,
+    lastPushFailed: true,
+    structuralSyncError: code,
+  });
+}
+
+/**
+ * Clear the structural sync error after a successful push proves the schema
+ * mismatch has been resolved. Callers should prefer `markPushSucceeded` which
+ * clears this automatically — this helper is exposed for targeted test use only.
+ */
+export function clearStructuralSyncError(): void {
+  const current = loadSyncStatus();
+  if (current.structuralSyncError === null) return;
+  saveSyncStatus({ ...current, structuralSyncError: null });
 }
 
 export function saveSyncStatus(status: SyncStatus): void {

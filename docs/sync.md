@@ -50,9 +50,27 @@ A `BEFORE UPDATE` trigger on `card_reviews` raises `23514 check_violation` when:
 
 **Do not work around the trigger.** A legitimate "reset progress" / "delete account" flow needs a `SECURITY DEFINER` RPC that explicitly bypasses it, plus user confirmation in the calling UI. `reset_all_progress` (migration 018) is that RPC — use it rather than creating a new bypass path.
 
+### Structural vs transient errors on the card_reviews path (#1358)
+
+Not all errors on the `card_reviews` write path are equal. Two categories exist:
+
+**Structural (fail loud, immediately):** SQLSTATE codes `42xxx` (schema errors — 42P10 ON CONFLICT mismatch, 42P01 relation not found, 42703 column not found, 42501 insufficient privilege at the PG layer), `23505` (unique violation), `23503` (FK violation). These are **never transient** — they always indicate a deploy/schema mismatch (for example, the #1344 incident where migration 029 widened the PK before the matching 4-column `onConflict` client was live, producing 42P10 on every upsert for ~19 hours). Retrying is pointless until a deploy fixes the mismatch.
+
+When a structural code is returned by `pushSingleCard` or `pushSession`, the client calls `markStructuralSyncError(code)` as a side-effect (`lib/sync/persistence.ts`). This records the code in `SyncStatus.structuralSyncError`, fires a `console.error` (reaching error monitoring), and causes `SyncStatusLine` to render a non-retryable banner: "Sync error: a schema mismatch was detected. Your progress is safe locally." The Retry button is hidden — retrying 42P10 always fails. `usePerGradeSync.drainQueue` short-circuits on subsequent drains when `structuralSyncError` is non-null; `useRetryPush.retryNow` similarly returns early. The `app/api/sync/route.ts` unload path also breaks early and returns HTTP 409 (not 502) so the fetch+keepalive caller can distinguish a structural failure from a transient one without retrying 3x first. The `structuralSyncError` field is cleared by `markPushSucceeded` — a successful push proves the schema mismatch has been resolved (the deploy fix is live).
+
+**Excluded from structural treatment:**
+- `23514` (check_violation) — this is the regression trigger (migrations 002 / 015 / 016 / 017), a **deliberate** DB guard. The trigger rejects bad state; the correct response is best-effort/skip (the client should not have generated the regressing row).
+- `PGRST`-prefixed codes — PostgREST HTTP-layer, transient during schema-cache reload.
+- Network `TypeError` — lands in the `catch` block, not `error.code`. Best-effort retry is appropriate.
+- Generic 5xx — transient.
+
+The predicate is `isStructuralError(error)` in `lib/sync/cloud.ts`. It is only wired to the `card_reviews` call sites — auxiliary legs (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs) must warn-and-continue regardless of error code.
+
+During a constraint-affecting migration window (see [Constraint-affecting migration ordering](#constraint-affecting-migration-ordering)), a 42P10 produced by the structural-error path is the **expected loud signal** — it surfaces the mismatch to the user immediately rather than hiding it for 19 hours. That prominence is desirable; it is not a regression of the structural-error feature itself.
+
 ### Auxiliary sync legs are best-effort
 
-Cards are the primary contract — they flow through `usePerGradeSync` (per-grade debounced upsert) and `useSyncOnUnload` (beacon on page hide). Everything else is best-effort: the regional-prefs leg inside `pullAndMerge`, the `pushSettings` / `pushStreak` / `pushGradeLog` calls inside `AutoSyncOnChange`, and the settings-page write-back of auto-detected regional prefs. Their failures `console.warn` and continue — they must not flip the user-visible sync status into the error state. Surfacing "Sync failed" because the streak push hiccuped is worse than silently degrading.
+Cards are the primary contract — they flow through `usePerGradeSync` (per-grade debounced upsert) and `useSyncOnUnload` (beacon on page hide). Everything else is best-effort: the regional-prefs leg inside `pullAndMerge`, the `pushSettings` / `pushStreak` / `pushGradeLog` calls inside `AutoSyncOnChange`, and the settings-page write-back of auto-detected regional prefs. Their failures `console.warn` and continue — they must not flip the user-visible sync status into the error state. Surfacing "Sync failed" because the streak push hiccuped is worse than silently degrading. Structural-error detection (42xxx / 23505 / 23503) is explicitly NOT applied to auxiliary legs — only the card_reviews primary path.
 
 ### Per-table conflict policy
 

@@ -124,7 +124,8 @@ const baseSyncStatus = {
   failedCardCount: null,
   lastPullAt: null,
   lastSettingsPullAt: null,
-    lastSeenResetAt: null,
+  lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 describe("pullAndMerge", () => {

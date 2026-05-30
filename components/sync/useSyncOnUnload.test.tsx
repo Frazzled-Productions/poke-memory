@@ -39,7 +39,8 @@ const ZERO_STATUS: SyncStatus = {
   failedCardCount: null,
   lastPullAt: null,
   lastSettingsPullAt: null,
-    lastSeenResetAt: null,
+  lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 function mockUnsynced(count: number) {

@@ -2,10 +2,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
-import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
+import { pushSingleCard, isSyncSafe, popStructuralErrorCode } from "@/lib/sync/cloud";
 import {
   markPushSucceeded,
   markPushFailed,
+  markStructuralSyncError,
+  loadSyncStatus,
   savePendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
@@ -83,6 +85,12 @@ export function usePerGradeSync(
     const uid = userIdRef.current;
     if (!c || !uid) return;
 
+    // Short-circuit if a structural error was already recorded (#1358). Retrying
+    // a schema-mismatch error is pointless until a deploy fixes the mismatch.
+    // pushSingleCard records the error as a side-effect on first encounter; this
+    // guard prevents subsequent drains from hammering the same broken endpoint.
+    if (loadSyncStatus().structuralSyncError !== null) return;
+
     const toSend = [...pendingQueueRef.current];
     if (toSend.length === 0) return;
     // Locale-aware sent/failed sets: key by "id:locale" so cards with the same
@@ -101,6 +109,19 @@ export function usePerGradeSync(
         return { card, ok };
       }),
     );
+
+    // Drain the structural-error slot set by pushSingleCard (#1358). If any
+    // push produced a structural error (42P10 ON CONFLICT mismatch, etc.),
+    // record it immediately — don't wait for FAILURE_THRESHOLD drains.
+    const structuralCode = popStructuralErrorCode();
+    if (structuralCode !== null) {
+      markStructuralSyncError(structuralCode);
+      // Persist the queue so grades survive; further drains will short-circuit
+      // on the structuralSyncError guard above until a deploy fix resolves it.
+      savePendingQueue(pendingQueueRef.current);
+      return;
+    }
+
     const failedKeys = new Set(results.filter((r) => !r.ok).map((r) => cardLocaleKey(r.card)));
 
     // Keep a card in the queue if it wasn't part of this drain (a newer grade

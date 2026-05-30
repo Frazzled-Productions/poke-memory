@@ -4,6 +4,8 @@ import {
   saveSyncStatus,
   markPushSucceeded,
   markPushFailed,
+  markStructuralSyncError,
+  clearStructuralSyncError,
   STORAGE_KEY,
   type SyncStatus,
 } from "./persistence";
@@ -31,6 +33,7 @@ const ZERO: SyncStatus = {
   lastPullAt: null,
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 let storage: ReturnType<typeof makeMockStorage>;
@@ -93,9 +96,27 @@ describe("loadSyncStatus", () => {
       lastPullAt: "2026-05-01T08:00:00.000Z",
       lastSettingsPullAt: "2026-05-01T07:00:00.000Z",
       lastSeenResetAt: "2026-04-30T00:00:00.000Z",
+      structuralSyncError: null,
     };
     saveSyncStatus(status);
     expect(loadSyncStatus()).toEqual(status);
+  });
+
+  it("reads back structuralSyncError when written", () => {
+    const status: SyncStatus = { ...ZERO, structuralSyncError: "42P10" };
+    saveSyncStatus(status);
+    expect(loadSyncStatus().structuralSyncError).toBe("42P10");
+  });
+
+  it("defaults structuralSyncError to null when field is absent (legacy record)", () => {
+    // Simulate a record stored before this field was added.
+    storage.setItem(STORAGE_KEY, JSON.stringify({ lastPushFailed: false }));
+    expect(loadSyncStatus().structuralSyncError).toBeNull();
+  });
+
+  it("defaults structuralSyncError to null when field is not a string", () => {
+    storage.setItem(STORAGE_KEY, JSON.stringify({ structuralSyncError: 42 }));
+    expect(loadSyncStatus().structuralSyncError).toBeNull();
   });
 
   it("defaults lastPushFailed to false when stored value is not boolean", () => {
@@ -218,6 +239,13 @@ describe("markPushSucceeded", () => {
     expect(loadSyncStatus().lastPushFailed).toBe(false);
   });
 
+  it("clears structuralSyncError — a successful push proves the schema mismatch is resolved", () => {
+    saveSyncStatus({ ...ZERO, structuralSyncError: "42P10", lastPushFailed: true });
+    markPushSucceeded("2026-05-10T12:00:00.000Z");
+    expect(loadSyncStatus().structuralSyncError).toBeNull();
+    expect(loadSyncStatus().lastPushFailed).toBe(false);
+  });
+
   it("preserves failedCardCount (intentional — callers gate on lastPushFailed)", () => {
     saveSyncStatus({ ...ZERO, lastPushFailed: true, failedCardCount: 7 });
     markPushSucceeded("2026-05-10T12:00:00.000Z");
@@ -274,5 +302,74 @@ describe("markPushFailed", () => {
     const parsed = new Date(ts!).getTime();
     expect(parsed).toBeGreaterThanOrEqual(before);
     expect(parsed).toBeLessThanOrEqual(after);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// markStructuralSyncError (#1358)
+// ---------------------------------------------------------------------------
+
+describe("markStructuralSyncError", () => {
+  it("sets structuralSyncError to the provided code", () => {
+    markStructuralSyncError("42P10", "2026-05-30T12:00:00.000Z");
+    expect(loadSyncStatus().structuralSyncError).toBe("42P10");
+  });
+
+  it("sets lastPushFailed to true", () => {
+    markStructuralSyncError("42P10", "2026-05-30T12:00:00.000Z");
+    expect(loadSyncStatus().lastPushFailed).toBe(true);
+  });
+
+  it("stamps lastPushAttemptAt", () => {
+    markStructuralSyncError("42P10", "2026-05-30T12:00:00.000Z");
+    expect(loadSyncStatus().lastPushAttemptAt).toBe("2026-05-30T12:00:00.000Z");
+  });
+
+  it("preserves lastPushAt — the last successful sync should remain visible", () => {
+    saveSyncStatus({ ...ZERO, lastPushAt: "2026-05-29T08:00:00.000Z" });
+    markStructuralSyncError("42P10", "2026-05-30T12:00:00.000Z");
+    expect(loadSyncStatus().lastPushAt).toBe("2026-05-29T08:00:00.000Z");
+  });
+
+  it("stores any SQLSTATE string, not just 42P10", () => {
+    markStructuralSyncError("23505", "2026-05-30T12:00:00.000Z");
+    expect(loadSyncStatus().structuralSyncError).toBe("23505");
+  });
+
+  it("is a no-op when window is undefined (SSR path)", () => {
+    vi.unstubAllGlobals();
+    expect(() => markStructuralSyncError("42P10")).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// clearStructuralSyncError (#1358)
+// ---------------------------------------------------------------------------
+
+describe("clearStructuralSyncError", () => {
+  it("clears structuralSyncError to null", () => {
+    saveSyncStatus({ ...ZERO, structuralSyncError: "42P10" });
+    clearStructuralSyncError();
+    expect(loadSyncStatus().structuralSyncError).toBeNull();
+  });
+
+  it("is a no-op when structuralSyncError is already null", () => {
+    saveSyncStatus(ZERO);
+    expect(() => clearStructuralSyncError()).not.toThrow();
+    expect(loadSyncStatus().structuralSyncError).toBeNull();
+  });
+
+  it("preserves other fields when clearing", () => {
+    saveSyncStatus({
+      ...ZERO,
+      lastPushAt: "2026-05-29T08:00:00.000Z",
+      lastPushFailed: true,
+      structuralSyncError: "42P10",
+    });
+    clearStructuralSyncError();
+    const status = loadSyncStatus();
+    expect(status.structuralSyncError).toBeNull();
+    expect(status.lastPushAt).toBe("2026-05-29T08:00:00.000Z");
+    expect(status.lastPushFailed).toBe(true);
   });
 });

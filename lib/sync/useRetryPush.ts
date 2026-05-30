@@ -74,6 +74,13 @@ export function useRetryPush(
       return;
     }
 
+    // Structural errors (deploy/schema mismatch) cannot be resolved by retrying
+    // (#1358). The SyncStatusLine banner disables the Retry button in this state
+    // but we guard here too in case retryNow is called programmatically.
+    if (status.structuralSyncError !== null) {
+      return;
+    }
+
     // Claim the in-progress slot before any branching so two rapid calls can't
     // both pass the guard. Cleared by the auto-reset timer in every branch.
     isRetryingRef.current = true;
