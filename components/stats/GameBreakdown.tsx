@@ -8,6 +8,7 @@ import {
   versionGroupGeneration,
   VERSION_GROUP_ORDER,
 } from "@/lib/pokemon/versionGroupLabels";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,7 +95,7 @@ function GenAccordion({ group }: { group: GenGroup }) {
       >
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-sm font-semibold text-foreground">{genName}</span>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          <span className={mutedTextXs}>
             {t("gameCount", { count: uniqueGames })} · {totalMastered}/{totalSpecies} species mastered
           </span>
         </div>

@@ -20,6 +20,7 @@ import type {
   FamilyNode,
 } from "@/lib/evolution/chains";
 import { computeEvolutionWallStats } from "@/lib/evolution/chains";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -470,7 +471,7 @@ export function EvolutionWall({
         )}
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className={`mt-4 flex flex-wrap items-center gap-4 ${mutedTextXs}`}>
           <span className="flex items-center gap-1.5">
             <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
               <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-emerald-500 dark:stroke-emerald-400" stroke="currentColor" />

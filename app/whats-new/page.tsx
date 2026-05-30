@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getChangelog } from "@/lib/changelog/parse";
 import { BulletText } from "@/components/whats-new/BulletText";
 import { MarkVisited } from "@/components/whats-new/MarkVisited";
-import { sectionLabelSm } from "@/lib/utils/class-names";
+import { mutedTextXs, sectionLabelSm } from "@/lib/utils/class-names";
 
 export const metadata: Metadata = {
   title: "What's New - Poké Memory",
@@ -42,7 +42,7 @@ export default function WhatsNewPage() {
                 <h2 className="text-lg font-semibold">v{release.version}</h2>
                 <time
                   dateTime={release.date}
-                  className="text-xs text-zinc-500 dark:text-zinc-400"
+                  className={mutedTextXs}
                 >
                   {release.date}
                 </time>

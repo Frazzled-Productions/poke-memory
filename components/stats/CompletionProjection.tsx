@@ -4,7 +4,7 @@ import { useFormatter } from "next-intl";
 import type { CompletionProjection } from "@/lib/stats/completion-projection";
 import type { DateFormat } from "@/lib/utils/format-date";
 import { formatDate } from "@/lib/utils/format-date";
-import { cardPanel, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
 
 type Props = {
   projection: CompletionProjection;
@@ -58,7 +58,7 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
                 estimated completion date
               </p>
             </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+            <div className={`flex flex-wrap gap-x-6 gap-y-1 ${mutedTextXs} tabular-nums`}>
               <span>
                 <span className="font-medium text-foreground">
                   {format.number(projection.remaining)}

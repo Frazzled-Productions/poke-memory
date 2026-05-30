@@ -88,7 +88,7 @@ import { ScopeControl } from "@/components/review/ScopeControl";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
-import { mutedText, sectionLabel } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 
 
@@ -249,7 +249,7 @@ const TodayPill = React.memo(function TodayPill({
   ].filter(Boolean).length;
   const showGraduatedHint = enabledDirections > 1;
   return (
-    <div className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums text-center">
+    <div className={`${mutedTextXs} tabular-nums text-center`}>
       <p className={`mb-1 ${sectionLabel}`}>
         {t("todayDoneHeading")}
       </p>
@@ -344,7 +344,7 @@ function DirectionAccuracyRow({ tally }: { tally: SessionDirectionTally }) {
 
   return (
     <p
-      className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums"
+      className={`${mutedTextXs} tabular-nums`}
       aria-label={`Session accuracy by direction: ${parts.join(", ")}`}
     >
       {parts.join(" · ")}

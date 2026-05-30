@@ -10,7 +10,7 @@ import {
   stopDownload,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
-import { cardPanelPadded } from "@/lib/utils/class-names";
+import { cardPanelPadded, mutedTextXs } from "@/lib/utils/class-names";
 
 /**
  * Species IDs eligible for offline caching — all default-form entries in the
@@ -120,11 +120,11 @@ export function OfflineSection() {
           <p className="text-sm font-medium text-foreground">
             Download for offline use
           </p>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className={`mt-1 ${mutedTextXs}`}>
             Pre-fetches every sprite and cry so you can practise without a connection. Recommended on Wi-Fi. About 166 MB.
           </p>
           {storageInfo !== null && (
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className={`mt-1 ${mutedTextXs}`}>
               Using {storageInfo.usedMb} of {storageInfo.totalMb} available.
             </p>
           )}
@@ -158,7 +158,7 @@ export function OfflineSection() {
           <div className="flex flex-col gap-3">
             <div>
               <p
-                className="text-xs text-zinc-500 dark:text-zinc-400"
+                className={mutedTextXs}
                 aria-live="polite"
                 aria-atomic="true"
               >

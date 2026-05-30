@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import type { HeatmapCell } from "@/lib/stats/heatmap";
 import { intensityBucket } from "@/lib/stats/heatmap";
-import { cardPanel } from "@/lib/utils/class-names";
+import { cardPanel, mutedTextXs } from "@/lib/utils/class-names";
 
 type Props = {
   /** 53 columns × 7 rows, oldest column first; today is in the rightmost column. */
@@ -136,7 +136,7 @@ export function ReviewHeatmap({ columns }: Props) {
         Review activity
       </h2>
       <div className={cardPanel}>
-        <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+        <p className={`mb-3 ${mutedTextXs} tabular-nums`}>
           {t("reviewsInLastYear", { count: total })}
         </p>
         {/* relative container so the tooltip can be absolutely positioned. */}

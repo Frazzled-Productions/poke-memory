@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { resolveLocale } from "@/i18n/request";
+import { inlineLink } from "@/lib/utils/class-names";
 
 export const metadata: Metadata = {
   title: "Terms of Use - Poké Memory",
@@ -51,7 +52,7 @@ export default async function TermsPage() {
             Poké Memory web application hosted at{" "}
             <a
               href="https://pokememory.com"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               pokememory.com
             </a>{" "}
@@ -66,7 +67,7 @@ export default async function TermsPage() {
               href="https://github.com/frasercl/poke-memory/blob/main/LICENSE"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               LICENSE
             </a>{" "}
@@ -173,7 +174,7 @@ export default async function TermsPage() {
                 href="https://pokeapi.co"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+                className={inlineLink}
               >
                 PokéAPI
               </a>
@@ -264,14 +265,14 @@ export default async function TermsPage() {
             For questions about these Terms, contact{" "}
             <a
               href="mailto:fbrookhouse@gmail.com"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               fbrookhouse@gmail.com
             </a>
             . For questions about how we handle your personal data, see our{" "}
             <a
               href="/privacy"
-              className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+              className={inlineLink}
             >
               Privacy Notice
             </a>

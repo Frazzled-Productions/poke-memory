@@ -11,7 +11,7 @@ import {
 import { useFormatter } from "next-intl";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
 import type { DateFormat } from "@/lib/utils/format-date";
-import { cardPanel, chartTickText, mutedText, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette — consistent with other Stats components (zinc/emerald/rose)
@@ -40,7 +40,7 @@ function ChartTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const d = (payload[0] as { payload: TooltipPayload }).payload;
   return (
-    <div className="rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700">
+    <div className={chartTooltipCard}>
       <p className="font-semibold text-foreground">{d.date}</p>
       <p className={`mt-0.5 ${statValue}`}>
         <span
@@ -122,7 +122,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
       >
         Mastery over time
       </h2>
-      <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-3 ${mutedTextXs}`}>
         Cumulative species mastered, using the last review date as a proxy for
         when each card crossed the mastery threshold.
       </p>
@@ -140,7 +140,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
               <span className="text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                 {format.number(latestCount)}
               </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              <span className={mutedTextXs}>
                 {totalCards > 0
                   ? `of ${format.number(totalCards)} species mastered`
                   : "species mastered"}
@@ -149,7 +149,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
 
             {isSinglePoint ? (
               /* Single-point: no trend to draw — just show the headline. */
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className={mutedTextXs}>
                 {forceAllMastered
                   ? "Superuser mode: showing total as of today."
                   : "Review more cards to see your progress trend."}

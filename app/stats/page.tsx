@@ -9,7 +9,7 @@ import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type Reviewa
 import { EMPTY_SCOPE, type PracticeScope } from "@/lib/review/scope";
 import { type DateFormat } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
-import { colStack, mutedText } from "@/lib/utils/class-names";
+import { colStack, mutedText, mutedTextXs } from "@/lib/utils/class-names";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
@@ -165,7 +165,7 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-foreground">{card.name}</p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+                  <p className={`${mutedTextXs} tabular-nums`}>
                     Ease factor: {card.easeFactor.toFixed(2)} · Reps:{" "}
                     {card.repetitions}
                   </p>

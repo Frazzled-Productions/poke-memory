@@ -29,7 +29,7 @@ import {
 } from "@/lib/settings/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { cn } from "@/lib/utils/cn";
-import { sectionLabel } from "@/lib/utils/class-names";
+import { mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import { MachineTranslationBanner } from "@/components/i18n/MachineTranslationBanner";
 
 type Props = {
@@ -235,7 +235,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
                 {t.rich("howToGrade.easy", { term: (c) => <strong>{c}</strong> })}
               </li>
             </ul>
-            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className={`mt-2 ${mutedTextXs}`}>
               {t("howToGrade.honestGradeNote")}
             </p>
           </section>

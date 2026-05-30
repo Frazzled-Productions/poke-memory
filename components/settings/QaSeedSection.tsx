@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { cardPanelPadded } from "@/lib/utils/class-names";
+import { cardPanelPadded, mutedTextXs } from "@/lib/utils/class-names";
 import { cn } from "@/lib/utils/cn";
 import { SCENARIOS, SCENARIO_BY_SLUG } from "@/lib/qa-seed/scenarios";
 import { applySeedScenario, clearSeedScenario } from "@/lib/qa-seed/apply";
@@ -101,7 +101,7 @@ export function QaSeedSection() {
       >
         QA seed
       </p>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className={`mt-1 ${mutedTextXs}`}>
         Inject a named test-data scenario into local storage. Reload the page
         after applying. Sync is paused (superuser mode) so no cloud data is
         affected.
@@ -146,7 +146,7 @@ export function QaSeedSection() {
 
         {/* Selected scenario description */}
         {selectedScenario && (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <p className={mutedTextXs}>
             {selectedScenario.description}
           </p>
         )}

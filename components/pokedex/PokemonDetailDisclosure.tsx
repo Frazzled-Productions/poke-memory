@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCardClass } from "@/lib/review/useCardClass";
 import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
-import { colStack, sectionLabelSmSubtle } from "@/lib/utils/class-names";
+import { colStack, mutedTextXs, sectionLabelSmSubtle } from "@/lib/utils/class-names";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { getPokemonFacts, loadFlavorTexts } from "@/lib/pokemon/facts";
@@ -318,7 +318,7 @@ export function PokemonDetailDisclosure({
         !flags.pretendAllMastered &&
         nextReview.status !== "pending" &&
         nextReview.status !== "not-started" && (
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className={`mt-2 ${mutedTextXs}`}>
             {nextReview.status === "due-today"
               ? "Due today"
               : t("nextReviewInDays", { count: nextReview.days })}

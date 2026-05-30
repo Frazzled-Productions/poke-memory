@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
-import { sectionLabel } from "@/lib/utils/class-names";
+import { mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import {
   EMPTY_SCOPE,
   countMatchingSpecies,
@@ -192,7 +192,7 @@ export function ScopeControl({
             className={
               active
                 ? "rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-                : "text-xs text-zinc-500 dark:text-zinc-400"
+                : mutedTextXs
             }
           >
             {scopeLabel(scope)}
@@ -323,7 +323,7 @@ export function ScopeControl({
             defaultOpen={gamesActive}
             hasDivider={alternateFormsEnabled}
           >
-            <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className={`mb-2 ${mutedTextXs}`}>
               {tScope("gamesDescription")}
             </p>
             <GameScopePicker
@@ -428,7 +428,7 @@ export function ScopeControl({
               {tScope("matchCount", { match: matchCount, total: totalCount })}
             </p>
             {active ? (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className={mutedTextXs}>
                 {tScope("hiddenCardsPaused")}
               </p>
             ) : null}

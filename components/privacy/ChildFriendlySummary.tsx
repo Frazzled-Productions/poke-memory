@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { inlineLink } from "@/lib/utils/class-names";
 
 export default function ChildFriendlySummary() {
   return (
@@ -39,14 +40,14 @@ export default function ChildFriendlySummary() {
           <strong>You&rsquo;re in control.</strong> You can{" "}
           <Link
             href="/settings#backup-heading"
-            className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+            className={inlineLink}
           >
             export your progress
           </Link>{" "}
           or{" "}
           <Link
             href="/settings#danger-zone-heading"
-            className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+            className={inlineLink}
           >
             reset all progress
           </Link>{" "}
