@@ -12,20 +12,21 @@
 // coverage-floor.json is ratcheted): bump it in the same commit that adds the
 // content, with a one-line justification in the commit message.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = process.cwd();
+const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FILE = "AGENTS.md";
 
 // Ceiling, with headroom above the current size so ordinary edits don't trip it
 // but a section-sized re-bloat does. Current size after the compression pass is
-// ~289 lines; 330 allows a section or two of genuine new runtime convention
+// 290 lines; 330 allows a section or two of genuine new runtime convention
 // before the gate asks you to relocate detail instead. The pre-compression file
-// was 449 lines, so this still fires long before the old level of bloat.
+// was 451 lines, so this still fires long before the old level of bloat.
 const MAX_LINES = 330;
 
-const text = readFileSync(join(ROOT, FILE), "utf8");
-const lines = text.split("\n").length;
+const text = readFileSync(resolve(ROOT, FILE), "utf8");
+const lines = text.trimEnd().split("\n").length;
 
 if (lines > MAX_LINES) {
   console.error(
