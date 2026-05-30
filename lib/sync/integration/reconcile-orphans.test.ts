@@ -343,6 +343,29 @@ describe("reconcile_grade_log_orphans (integration)", () => {
     expect(res.rows[0].card_type).toBe("evolution-edge");
   });
 
+  // ── Test 9: card-type normalisation (reverse-evolution → reverse-evolution-edge) ──
+  it("grade_log card_type='reverse-evolution' is normalised to 'reverse-evolution-edge' in card_reviews", async () => {
+    await insertGradeLogRow({
+      userId: USER_ID,
+      cardType: "reverse-evolution",
+      subjectKey: "101-102",
+      locale: "en",
+      grade: 4,
+      entryDate: daysAgo(1),
+    });
+
+    await callReconcile(false);
+
+    // card_reviews should have 'reverse-evolution-edge', not 'reverse-evolution'.
+    const res = await pool.query(
+      `SELECT card_type FROM card_reviews
+       WHERE user_id = $1 AND subject_key = $2 AND locale = $3`,
+      [USER_ID, "101-102", "en"],
+    );
+    expect(res.rows).toHaveLength(1);
+    expect(res.rows[0].card_type).toBe("reverse-evolution-edge");
+  });
+
   // ── Test 8: lapses counter derived correctly ──────────────────────────────
   it("lapses counts Again grades that occurred after the first graduation", async () => {
     // Sequence: Good (graduation) → Again (lapse) → Good.

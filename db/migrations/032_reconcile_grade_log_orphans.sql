@@ -103,6 +103,9 @@ BEGIN
   -- noise from very old grade_log entries that may have intentionally been
   -- superseded by a later reset.
 
+  -- NOTE: this orphan-selection CTE is duplicated in the dry-run COUNT branch
+  -- and the live INSERT branch below. They MUST stay identical, or the dry-run
+  -- count diverges from what the live run heals. Keep both in sync.
   WITH normalised AS (
     SELECT
       user_id,
@@ -184,6 +187,9 @@ BEGIN
   --   seen_in_pasture = false       do not pre-acknowledge pasture visit
   --   hidden_since    = NULL
 
+  -- NOTE: this orphan-selection CTE is duplicated in the dry-run COUNT branch
+  -- and the live INSERT branch below. They MUST stay identical, or the dry-run
+  -- count diverges from what the live run heals. Keep both in sync.
   WITH normalised AS (
     SELECT
       user_id,
