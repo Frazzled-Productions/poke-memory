@@ -33,6 +33,9 @@ export async function pushGradeLog(
       subject_key: e.subjectKey ?? null,
       // Migration 029 field — coalesce to "en" for pre-migration entries.
       locale: e.locale ?? "en",
+      // Migration 033 fields — NULL for graduated cards and pre-migration entries.
+      learning_step: e.learningStep ?? null,
+      step_started_at: e.stepStartedAt ?? null,
     }));
     const { error } = await client
       .from("grade_log")
@@ -54,6 +57,10 @@ type GradeLogCloudRow = {
   subject_key: string | null;
   /** Migration 029 field — absent on pre-migration rows, defaults to "en". */
   locale?: string | null;
+  /** Migration 033 field — NULL for graduated cards and pre-migration rows. */
+  learning_step?: number | null;
+  /** Migration 033 field — epoch ms; NULL for graduated cards and pre-migration rows. */
+  step_started_at?: number | null;
 };
 
 export async function pullGradeLog(
@@ -63,7 +70,7 @@ export async function pullGradeLog(
   try {
     const { data, error } = await client
       .from("grade_log")
-      .select("occurred_at,entry_date,card_type,grade,subject_key,locale")
+      .select("occurred_at,entry_date,card_type,grade,subject_key,locale,learning_step,step_started_at")
       .eq("user_id", userId)
       .order("occurred_at", { ascending: true });
     if (error || !data) return null;
@@ -77,6 +84,16 @@ export async function pullGradeLog(
       };
       if (r.subject_key !== null && r.subject_key !== undefined) {
         entry.subjectKey = r.subject_key;
+      }
+      // Migration 033 fields — NULL on pre-migration rows (column didn't exist
+      // when they were inserted); undefined/null both treated as "graduated" by
+      // the scheduler. Omit the key entirely when null so legacy-shaped entries
+      // are indistinguishable from new graduated entries.
+      if (r.learning_step !== null && r.learning_step !== undefined) {
+        entry.learningStep = r.learning_step;
+      }
+      if (r.step_started_at !== null && r.step_started_at !== undefined) {
+        entry.stepStartedAt = r.step_started_at;
       }
       return entry;
     });

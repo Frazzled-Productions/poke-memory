@@ -1,0 +1,33 @@
+-- Migration 033: add learning_step and step_started_at columns to grade_log
+--
+-- Rationale: the FSRS scheduler's learningStep / stepStartedAt are in-memory only
+-- and were never persisted, making a replay-correct orphan heal impossible (the
+-- conservative placeholder path in migration 032 fills in a row, but the FSRS
+-- state is only approximate). Persisting these two fields on grade_log enables a
+-- future job to replay the exact scheduler path and heal orphans with correct
+-- stability/difficulty/scheduledDays.
+--
+-- Column semantics:
+--   learning_step   smallint NULL  — 0-based step index when the entry was graded;
+--                                    NULL means the card was graduated at grade time
+--                                    (not in a learning/relearning step). Pre-existing
+--                                    rows backfill NULL (intentional — no DEFAULT).
+--   step_started_at bigint   NULL  — epoch ms matching the occurred_at type; marks
+--                                    when the current step started. NULL for
+--                                    pre-existing rows and for graduated cards.
+--
+-- RLS: grade_log uses row-level policies (select: auth.uid()=user_id,
+-- insert: auth.uid()=user_id). Column-level RLS does not exist in Postgres, so
+-- the existing policies cover these new columns automatically. No policy changes.
+--
+-- Trigger: grade_log has one trigger, grade_log_reject_pre_reset_trigger (migration
+-- 022), which fires BEFORE INSERT and checks entry_date. Additive nullable columns
+-- do not affect it. No trigger changes are needed.
+--
+-- No CHECK constraint on learning_step: valid value space is scheduler-governed;
+-- validation happens at the application boundary, consistent with card_type after
+-- migration 013. No NOT NULL, no DEFAULT clause — Postgres backfills NULL on
+-- existing rows without one.
+
+ALTER TABLE grade_log ADD COLUMN learning_step smallint;
+ALTER TABLE grade_log ADD COLUMN step_started_at bigint;

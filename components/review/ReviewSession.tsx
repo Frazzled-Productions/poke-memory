@@ -2159,11 +2159,16 @@ export function ReviewSession() {
           c.state.lastReview !== today,
       );
       recordReview(today, gradedToday, dueQueueEmpty);
+      // Pass POST-grade learningStep/stepStartedAt from nextState so the
+      // grade_log row captures the scheduler's exact in-learning position
+      // at the time of grading (#1416). These are in closure scope.
       const appended = await appendGradeEntry({
         date: today,
         grade,
         cardType: effectiveCard.cardType,
         subjectKey: effectiveCard.subjectKey,
+        learningStep: nextState.learningStep,
+        stepStartedAt: nextState.stepStartedAt,
       });
       snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
     });
