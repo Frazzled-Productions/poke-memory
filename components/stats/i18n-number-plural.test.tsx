@@ -9,7 +9,7 @@
  * Test project: jsdom (components/**).
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import {
   renderWithIntl,
@@ -68,6 +68,9 @@ vi.mock("@/lib/streak", () => ({
   loadStreakData: vi.fn(() => ({})),
   STREAK_UPDATED_EVENT: "streak-updated",
 }));
+
+// Import after mock so vi.mocked() resolves to the mock implementation.
+import { computeStreak } from "@/lib/streak";
 vi.mock("@/lib/streak/runProtection", () => ({
   runStreakProtection: vi.fn(),
 }));
@@ -230,9 +233,21 @@ describe("RetentionIndicator — locale coverage (#1408)", () => {
 // ---------------------------------------------------------------------------
 
 describe("StreakBadge — locale coverage (#1408)", () => {
+  afterEach(() => {
+    // Restore the default mock value (count=5) after each test in this block.
+    vi.mocked(computeStreak).mockReturnValue(5);
+  });
+
   it("en: renders '5 days streak' (count=5, 'other' branch)", () => {
     renderWithIntl(<StreakBadge />);
     expect(screen.getByText(/5 days streak/)).toBeInTheDocument();
+  });
+
+  it("en: count=1 renders '1 day streak' ('one' branch)", () => {
+    // Override computeStreak to return 1 for this test only.
+    vi.mocked(computeStreak).mockReturnValue(1);
+    renderWithIntl(<StreakBadge />);
+    expect(screen.getByText(/1 day streak/)).toBeInTheDocument();
   });
 
   it("ja: renders the streak badge without throwing", () => {

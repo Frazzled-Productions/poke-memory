@@ -371,3 +371,105 @@ describe("StreakProtectionCard — Japanese locale (#1393)", () => {
     expect(screen.getByLabelText("0 トークン残り")).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// tokenCount ICU plural — count=1 and count>1 (Fix 2, #1408 review)
+// ---------------------------------------------------------------------------
+
+describe("StreakProtectionCard — tokenCount ICU plural (#1408)", () => {
+  it("en: count=1 renders the singular 'token' label", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          ...DEFAULT_STREAK_PROTECTION,
+          balance: 1,
+          spendDates: [],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // The muted label next to the large balance number uses tokenCount.
+    // count=1 → "token" (ICU 'one' branch).
+    const labelEl = screen.getByLabelText("1 protection token");
+    expect(labelEl).toBeInTheDocument();
+    // The muted sibling renders the ICU label text, not raw tokenSingular.
+    // We verify the muted span renders "token" (no "s").
+    expect(labelEl.nextElementSibling?.textContent).toMatch(/^token(\s|\()?/);
+  });
+
+  it("en: count=2 renders the plural 'tokens' label", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          ...DEFAULT_STREAK_PROTECTION,
+          balance: 2,
+          spendDates: [],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    const labelEl = screen.getByLabelText("2 protection tokens");
+    expect(labelEl).toBeInTheDocument();
+    // count=2 → "tokens" (ICU 'other' branch).
+    expect(labelEl.nextElementSibling?.textContent).toMatch(/^tokens(\s|\()?/);
+  });
+
+  it("ja: count=1 renders the Japanese token label (no English 's' suffix)", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          ...DEFAULT_STREAK_PROTECTION,
+          balance: 1,
+          spendDates: [],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: null,
+        },
+      }),
+    );
+
+    renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // ja tokensRemaining: "1 トークン残り"
+    const labelEl = screen.getByLabelText("1 トークン残り");
+    expect(labelEl).toBeInTheDocument();
+    // tokenCount in ja 'other' branch = "トークン" (no English plural suffix)
+    expect(labelEl.nextElementSibling?.textContent).toContain("トークン");
+    expect(labelEl.nextElementSibling?.textContent).not.toContain("token");
+  });
+
+  it("zh-Hans: count=2 renders the Chinese token label", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          ...DEFAULT_STREAK_PROTECTION,
+          balance: 2,
+          spendDates: [],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />, {
+      locale: "zh-Hans",
+    });
+    // zh-Hans tokensRemaining: "剩余 2 个令牌"
+    const labelEl = screen.getByLabelText("剩余 2 个令牌");
+    expect(labelEl).toBeInTheDocument();
+    // tokenCount in zh-Hans 'other' branch = "个令牌"
+    expect(labelEl.nextElementSibling?.textContent).toContain("令牌");
+  });
+});

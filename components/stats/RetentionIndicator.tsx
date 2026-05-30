@@ -72,7 +72,7 @@ export function RetentionIndicator({ comparison }: Props) {
               role="img"
               aria-label={`Recall ${formatPct(actual)} against a ${formatPct(
                 target,
-              )} target, ${t("reviewsOverWindow", { count: reviews })}`}
+              )} target, ${t("reviewsOverWindowInline", { count: reviews })}`}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <RadialBarChart
