@@ -1,4 +1,5 @@
 import type { ReviewableCard } from "@/lib/review/session";
+import type { AppLocale } from "@/i18n/locales";
 import { MASTERY_REPETITIONS } from "./derive";
 import { masteredSpeciesEvents } from "./mastery-species-events";
 
@@ -48,6 +49,7 @@ export function computeMasteryOverTime(
   today: string,
   masteryRepetitions = MASTERY_REPETITIONS,
   forceAllMastered = false,
+  locale: AppLocale = "en",
 ): MasteryPoint[] {
   if (forceAllMastered) {
     // Superuser overlay: treat every species as mastered at today's date.
@@ -60,7 +62,7 @@ export function computeMasteryOverTime(
 
   // Collect the species-level mastery date for every fully-mastered species.
   // masteredSpeciesEvents returns only species where BOTH name+reverse are mastered.
-  const events = masteredSpeciesEvents(cards, masteryRepetitions, false);
+  const events = masteredSpeciesEvents(cards, masteryRepetitions, false, locale);
   const masteryDates: string[] = events.map((e) => e.masteredDate);
 
   if (masteryDates.length === 0) return [];

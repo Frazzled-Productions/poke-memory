@@ -223,11 +223,16 @@ function replayLog(
         if (nameMs !== undefined) {
           const speciesmasteredAtMs = Math.max(entry.occurredAt, nameMs);
           const ev = speciesEvents.get(speciesKey);
-          // The species event (firstSeenMs) may exist from name-card grading,
-          // or may not if only reverse has been graded — fall back to entry.occurredAt.
           if (ev !== undefined && ev.masteredAtMs === null) {
             speciesEvents.set(speciesKey, {
               firstSeenMs: ev.firstSeenMs,
+              masteredAtMs: speciesmasteredAtMs,
+            });
+          } else if (ev === undefined) {
+            // Defensive: species event absent (e.g. log begins with reverse
+            // entries after a local reset + cloud pull). Create it now.
+            speciesEvents.set(speciesKey, {
+              firstSeenMs: entry.occurredAt,
               masteredAtMs: speciesmasteredAtMs,
             });
           }

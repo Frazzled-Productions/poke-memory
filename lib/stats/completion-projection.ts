@@ -1,4 +1,5 @@
 import type { ReviewableCard } from "@/lib/review/session";
+import type { AppLocale } from "@/i18n/locales";
 import { addDaysToIsoDate } from "@/lib/utils/dates";
 import { isoMinusDays } from "@/lib/stats/date";
 import { MASTERY_REPETITIONS } from "@/lib/stats/derive";
@@ -91,6 +92,7 @@ export function computeCompletionProjection(
   today: string,
   masteryRepetitions: number = MASTERY_REPETITIONS,
   forceAllMastered = false,
+  locale: AppLocale = "en",
 ): CompletionProjection {
   // Superuser shortcut: the user pretends everything is mastered.
   if (forceAllMastered) {
@@ -98,11 +100,11 @@ export function computeCompletionProjection(
   }
 
   // Derive species-level mastery events (both name + reverse legs, #1448).
-  const events = masteredSpeciesEvents(cards, masteryRepetitions, false);
+  const events = masteredSpeciesEvents(cards, masteryRepetitions, false, locale);
   const masteredSpeciesIdSet = new Set(events.map((e) => e.speciesId));
 
   // Count name cards (species) that are NOT yet mastered.
-  const nameCards = nameCardsForLocale(cards);
+  const nameCards = nameCardsForLocale(cards, locale);
   let remaining = 0;
   for (const card of nameCards) {
     if (!masteredSpeciesIdSet.has(card.id)) {

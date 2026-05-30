@@ -1,5 +1,6 @@
 import type { ReviewableCard } from "@/lib/review/session";
 import type { GradeLog } from "@/lib/gradelog/persistence";
+import type { AppLocale } from "@/i18n/locales";
 import { isoDate } from "@/lib/utils/format-date";
 import { MASTERY_REPETITIONS } from "./derive";
 import { masteredSpeciesEvents, nameCardsForLocale } from "./mastery-species-events";
@@ -94,12 +95,13 @@ export function computeRecords(
   streakDates: readonly string[],
   masteryRepetitions: number = MASTERY_REPETITIONS,
   forceAllMastered = false,
+  locale: AppLocale = "en",
 ): Records {
   // Superuser pretendAllMastered: project the mastery-derived metrics onto
   // "you've mastered everything". longestStreak / bestReviewDay derive from
   // grade-log/streak data and stay honest — pretend-mastered doesn't change
   // your actual review history.
-  const nameCards = nameCardsForLocale(cards);
+  const nameCards = nameCardsForLocale(cards, locale);
   if (forceAllMastered && nameCards.length > 0) {
     return {
       longestStreak: computeLongestStreak(streakDates),
@@ -116,7 +118,7 @@ export function computeRecords(
   }
 
   // Derive species-level mastery events (both legs required, #1448).
-  const events = masteredSpeciesEvents(cards, masteryRepetitions, false);
+  const events = masteredSpeciesEvents(cards, masteryRepetitions, false, locale);
 
   let avgDaysToMastery: number | null = null;
   if (events.length > 0) {

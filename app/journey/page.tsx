@@ -38,6 +38,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, cardPanelPadded, mutedText, sectionLabel } from "@/lib/utils/class-names";
 import { MeterBar } from "@/components/ui/MeterBar";
+import type { AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -404,6 +405,7 @@ export default function JourneyPage() {
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<Awaited<ReturnType<typeof buildSession>> | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
+  const [pokemonNameLocale, setPokemonNameLocale] = useState<AppLocale>("en");
   const [eligibilitySettings, setEligibilitySettings] = useState<EligibilitySettings>({
     evolutionCardsEnabled: true,
     reverseEvolutionCardsEnabled: false,
@@ -429,6 +431,7 @@ export default function JourneyPage() {
         : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
+      setPokemonNameLocale(settings.pokemonNameLocale);
       setEligibilitySettings({
         evolutionCardsEnabled: settings.evolutionCardsEnabled,
         reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
@@ -591,6 +594,7 @@ export default function JourneyPage() {
           streakDates,
           masteryRepetitions,
           flags.pretendAllMastered,
+          pokemonNameLocale,
         )
       : null;
 

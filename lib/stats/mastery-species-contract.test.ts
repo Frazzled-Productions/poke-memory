@@ -1,7 +1,7 @@
 /**
  * Fitness / contract tests for species-level mastery consistency (#1448).
  *
- * These tests assert that ALL user-facing mastered-count surfaces agree with
+ * These tests assert that all pure-function mastered-count surfaces agree with
  * `masteredSpeciesIds(...).size` for a fixture session where:
  *   - Some species have ONLY the name card mastered (not species-mastered).
  *   - Some species have ONLY the reverse card mastered (not species-mastered).
@@ -13,6 +13,9 @@
  * If any count-deriving helper bypasses the species-level check, it will return
  * a non-zero count for the name-only or reverse-only species and this test
  * will fail — surfacing the fragmentation before it reaches production.
+ *
+ * Component surfaces (`useCardClass`, `ReviewSession.speciesBecameMastered`)
+ * require DOM/hook rendering and are covered in their own test files.
  */
 
 import { describe, it, expect } from "vitest";

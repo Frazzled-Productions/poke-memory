@@ -53,6 +53,7 @@ import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/s
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { computePerGameStats, type GameStats } from "@/lib/stats/per-game";
 import { GameBreakdown } from "@/components/stats/GameBreakdown";
+import type { AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
 // Lazily-loaded Recharts chart components.
@@ -353,6 +354,7 @@ export default function StatsPage() {
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
+  const [pokemonNameLocale, setPokemonNameLocale] = useState<AppLocale>("en");
   const [cardTypeSettings, setCardTypeSettings] = useState<{
     evolutionCardsEnabled: boolean;
     reverseEvolutionCardsEnabled: boolean;
@@ -395,6 +397,7 @@ export default function StatsPage() {
         : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
+      setPokemonNameLocale(settings.pokemonNameLocale);
       setCardTypeSettings({
         evolutionCardsEnabled: settings.evolutionCardsEnabled,
         reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
@@ -498,7 +501,8 @@ export default function StatsPage() {
     masteryRepetitions: masteryRepetitions ?? undefined,
     forceAllMastered: flags.pretendAllMastered,
     retentionTarget,
-  }), [masteryRepetitions, flags.pretendAllMastered, retentionTarget]);
+    locale: pokemonNameLocale,
+  }), [masteryRepetitions, flags.pretendAllMastered, retentionTarget, pokemonNameLocale]);
 
   const snapshotInput = useMemo(() => {
     if (cards === null || masteryRepetitions === null) return null;
@@ -540,6 +544,7 @@ export default function StatsPage() {
               today,
               masteryRepetitions ?? undefined,
               flags.pretendAllMastered,
+              pokemonNameLocale,
             ),
           };
         })()
