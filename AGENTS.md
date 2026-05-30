@@ -51,6 +51,7 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 | Supabase schema / RLS | supabase-expert designs; data-coder implements |
 | Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
 | Multi-locale work (`pokemonNameLocale`, `appLocale`, transliteration, message catalogs, locale routing, locale-aware sync, adding a new locale) | i18n-expert advises (read-only); data-coder implements settings/sync/seed changes, ui-coder implements rendering, catalogs, and `<lang>` placement |
+| Onboarding / discoverability surfaces (`components/onboarding/**`, empty states, locked-state UI, first-contact flows, nav affordances) | ux-advisor advises (read-only); ui-coder implements |
 | `README.md`, `CHANGELOG.md` | orchestrator — updated inline as part of each commit, no specialist agent |
 | `e2e/**` | playwright |
 | `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
@@ -97,6 +98,10 @@ const { name: localeName } = useLocalePokemonName(pokemon.speciesId, pokemon.dis
 **Legitimate `.displayName` reads** (annotate with `// eslint-disable-next-line no-restricted-syntax`): passing `displayName` as the fallback *argument* to the hook itself; inside `app/api/**` (server-side, locale-irrelevant). `lib/**`, `scripts/**`, `e2e/**` are outside the rule's glob.
 
 When the call site is inside a `.map()` (hooks can't be called in map callbacks), extract a named sub-component with one hook call per tile — see `SpritePickerTile` in `SpritePicker.tsx` and `KnownPokemonCard` in `KnownPokemonQuiz.tsx`.
+
+### Discoverability
+
+Every new user-facing feature must declare its discovery path in the PR body or linked-issue body — how a first-time user encounters the feature (navigation link, onboarding step, empty-state prompt, tooltip, badge, etc.). `ux-advisor` reviews this on the brief before implementation; `code-reviewer` raises an undeclared path as a **Concern** at review time. Surfaces gated behind an existing discoverable action (e.g. a detail view reachable only after tapping a card) are exempt, provided the gating action is itself discoverable.
 
 ### Message-catalogue completeness gate
 
