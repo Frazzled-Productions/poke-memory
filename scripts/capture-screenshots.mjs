@@ -164,6 +164,11 @@ async function writeSeedToPage(page, seed) {
       // A 15-day streak would otherwise trigger the 3-day milestone
       // (the smallest un-seen milestone <= 15) on every fresh screenshot run.
       seenStreakMilestones: [3, 7, 14],
+      // Force the bottom tab bar. Without this key parseStoredSettings
+      // defaults an absent mobileNav to "hamburger" (the #661
+      // existing-user-preservation fallback), so screenshots show the
+      // desktop hamburger instead of the mobile bottom tab bar.
+      mobileNav: "bottom",
       onboarding: {
         firstVisitOnboardingDismissed: true,
         welcomeDismissed: true,

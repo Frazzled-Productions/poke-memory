@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { Milestone } from "@/lib/journey/milestones";
 import { generateMilestoneShareImage } from "@/lib/share/generateShareImage";
 
@@ -25,6 +26,7 @@ type Props = {
  *   4. Clipboard text copy — last resort.
  */
 export function MilestoneShareButton({ milestone }: Props) {
+  const t = useTranslations("journey.milestoneShare");
   const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -153,20 +155,20 @@ export function MilestoneShareButton({ milestone }: Props) {
       </p>
       <button
         type="button"
-        aria-label={`Share milestone: ${label}`}
+        aria-label={t("shareAriaLabel", { label })}
         onClick={handleShare}
         className="rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 dark:bg-emerald-600 dark:hover:bg-emerald-500"
       >
-        Share
+        {t("share")}
       </button>
       {status === "copied" ? (
         <p className="text-xs text-emerald-700 dark:text-emerald-400" role="status">
-          Copied to clipboard
+          {t("copied")}
         </p>
       ) : null}
       {status === "error" ? (
         <p className="text-xs text-rose-600 dark:text-rose-400" role="status">
-          Couldn&apos;t copy. Please try again.
+          {t("copyError")}
         </p>
       ) : null}
     </div>

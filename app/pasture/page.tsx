@@ -21,9 +21,10 @@ import { pushSingleCard } from "@/lib/sync/cloud";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
+import { hydrateSession } from "@/lib/review/session";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { generationOf } from "@/lib/stats/derive";
@@ -154,7 +155,33 @@ export default function PasturePage() {
   useEffect(() => {
     async function load() {
       const s = await loadSession();
-      setSession(s);
+      if (s) {
+        // Hydrate so each card carries the full SEED_POKEMON fields (habitat,
+        // isDefaultForm, etc.) that biomeStats and buildZoneData depend on.
+        // Without hydration, QA-seeded cards and any other minimal cards lack
+        // those fields, causing all species to fall into the "unknown"/Wildlands
+        // bucket and biomeStats to report 0 mastered per biome.
+        const { pokemonNameLocale } = loadSettings();
+        // All *Enabled flags are false — we only want the refresh step of
+        // hydrateSession (backfill habitat, isDefaultForm, types, etc. onto
+        // each saved card from SEED_POKEMON). Adding new cards here would bloat
+        // session.cards with ~1 000 unseen species, hurting filterMastered perf.
+        const hydrated = hydrateSession(s.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+          reverseEnabled: false,
+          nameEnabled: false,
+          evolutionEnabled: false,
+          reverseEvolutionEnabled: false,
+          cryEnabled: false,
+          // `locale` only affects newly-created cards; all *Enabled flags are
+          // false here so no new cards are added. Existing saved cards keep
+          // their own persisted `locale` tag unchanged. This opt is present
+          // for completeness but is effectively dead in this refresh pass.
+          locale: pokemonNameLocale,
+        });
+        setSession({ ...s, cards: hydrated });
+      } else {
+        setSession(null);
+      }
       setLoaded(true);
     }
     void load();
@@ -175,7 +202,7 @@ export default function PasturePage() {
     : flags.pretendAllMastered
       ? SEED_POKEMON.length
       : session
-        ? filterMastered(session.cards, false, masteryRepetitions).length
+        ? filterMastered(session.cards, false, masteryRepetitions, pokemonNameLocale).length
         : 0;
 
   // Reset filters whenever the mastered set transitions to empty
@@ -258,6 +285,7 @@ export default function PasturePage() {
           session.cards,
           false,
           masteryRepetitions,
+          pokemonNameLocale,
         ) as NameReviewCard[])
       : [];
 

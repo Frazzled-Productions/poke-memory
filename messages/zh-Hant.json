@@ -336,7 +336,31 @@
     "readyForMoreVariety": "準備好更多挑戰了嗎？",
     "openPracticeSettings": "開啟練習設定",
     "readyForMoreVarietyBody": "試試反向進化卡片或異形態卡片，體驗全新挑戰。",
-    "gradeErrorMessage": "由於意外錯誤，此次評分無法儲存。您的工作階段仍然有效，請重試。"
+    "gradeErrorMessage": "由於意外錯誤，此次評分無法儲存。您的工作階段仍然有效，請重試。",
+    "scope": {
+      "label": "範圍",
+      "clear": "清除",
+      "generation": "世代",
+      "type": "屬性",
+      "groups": "分組",
+      "games": "遊戲",
+      "alternateForms": "異形態",
+      "gamesDescription": "將練習限制為特定遊戲原生圖鑑中的寶可夢。",
+      "presetStarters": "御三家",
+      "presetLegendaries": "傳說寶可夢",
+      "presetIncompleteChains": "未完成進化鏈",
+      "formIncludeAll": "包含全部",
+      "formDefaultOnly": "僅預設形態",
+      "formChooseCategories": "選擇類別…",
+      "formCategoryRegional": "地區形態",
+      "formCategoryForme": "戰鬥外形態",
+      "formCategoryMega": "超級進化",
+      "formCategoryGmax": "超極巨化",
+      "formCategoryPrimal": "原始回歸",
+      "noAlternateForms": "當前種子中沒有異形態。",
+      "matchCount": "{total} 隻中有 {match} 隻符合",
+      "hiddenCardsPaused": "隱藏的卡片已暫停：它們的複習日期會向後推移，因此刪除範圍不會讓過期卡片湧入佇列。"
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -367,7 +391,8 @@
     "hasAlternateForms": "有異形態",
     "introduced": "{introduced} / {total} 已引入",
     "generationAll": "全部",
-    "generationLabel": "第 {gen} 代"
+    "generationLabel": "第 {gen} 代",
+    "masteryCount": "{mastered} / {total} 已掌握"
   },
   "pasture": {
     "title": "牧場",
@@ -382,7 +407,33 @@
     "searchPasturePlaceholder": "搜尋寶可夢…",
     "clearSearch": "清除搜尋",
     "filterByTypeAriaLabel": "按屬性篩選",
-    "filterByGenerationAriaLabel": "按世代篩選"
+    "filterByGenerationAriaLabel": "按世代篩選",
+    "biomeStats": {
+      "ariaLabel": "生物群系統計",
+      "mastered": "已掌握",
+      "captured": "已捕獲",
+      "latestAddition": "最新加入"
+    },
+    "landscape": "景觀",
+    "landscapeAriaLabel": "在景觀中檢視{zone}",
+    "zones": {
+      "grassland": "草原",
+      "forest": "森林",
+      "sea": "大海",
+      "cave": "洞穴",
+      "mountain": "山地",
+      "urban": "城市",
+      "waters-edge": "水邊",
+      "rough-terrain": "崎嶇地形",
+      "rare": "聖所",
+      "unknown": "荒野"
+    },
+    "zoneAriaLabel": "{zone}區域",
+    "biome": {
+      "backLabel": "牧場",
+      "backAriaLabel": "返回牧場",
+      "emptyState": "此生物群系中還沒有掌握的寶可夢。繼續練習吧！"
+    }
   },
   "stats": {
     "title": "記錄",
@@ -414,7 +465,48 @@
       "error": "拉取失敗。請檢查您的網路連線後重試。",
       "confirmMessage": "這將用雲端的最新資料取代您的本地進度、設定和顯示偏好。是否繼續？"
     },
-    "allTimeGradeBreakdown": "全時段評分分佈"
+    "allTimeGradeBreakdown": "全時段評分分佈",
+    "trainerCard": {
+      "ariaLabel": "訓練師卡片",
+      "trainerLabel": "訓練師",
+      "trainerFallback": "訓練師",
+      "levelLabel": "等級",
+      "levelDescription": "等級隨掌握的寶可夢名稱卡數量增長（至少3次正確且下次複習間隔不少於21天）。",
+      "allMastered": "全部掌握",
+      "masteryProgress": "{mastered} / {next} 已掌握 · 距 {levelNext} 級還差 {needed}",
+      "formsMastered": "{mastered} / {total} 形態已掌握",
+      "generationBadgesAriaLabel": "世代完成徽章",
+      "generationComplete": "{name}：完成！",
+      "generationProgress": "{name}：{mastered}/{total} 已掌握",
+      "gymBadgesAriaLabel": "已獲得道館徽章"
+    },
+    "records": {
+      "heading": "記錄",
+      "longestStreakDay": "天最長連續",
+      "longestStreakDays": "天最長連續",
+      "bestReviewDay": "最佳複習日",
+      "avgDaysToMastery": "平均掌握天數",
+      "fromFirstSight": "自首次出現",
+      "masteredInWeek": "一週內掌握",
+      "bestSevenDayWindow": "最佳7天視窗"
+    },
+    "streakProtection": {
+      "heading": "連續記錄保護",
+      "earnAndSpentBanner": "您獲得了一個連續記錄保護令牌，並在同一天使用它來彌補昨天的缺失。您的連續記錄是安全的。",
+      "dismissAriaLabel": "關閉連續記錄保護通知",
+      "tokenSingular": "令牌",
+      "tokenPlural": "令牌",
+      "tokenMax": "（最大）",
+      "earnDescription": "令牌自動補償一次缺失。每連續複習{earnInterval}天獲得一個，最多{maxBalance}個。",
+      "nextTokenStart": "今天複習以開始獲取下一個令牌。",
+      "nextTokenCount": "{count, plural, other {再 {count} 天複習即可獲得下一個令牌。}}",
+      "streakPreserved": "{date} 連續記錄已保護。",
+      "tokensRemaining": "{count, plural, other {剩餘 {count} 個令牌}}",
+      "recentProtectionHeading": "最近保護",
+      "eventEarned": "已獲得",
+      "eventUsed": "已使用",
+      "eventEarnedAndUsed": "獲得並使用"
+    }
   },
   "journey": {
     "title": "旅程",
@@ -434,7 +526,69 @@
     "byGenerationColumn": "世代",
     "collectionTimeline": "收藏時間線",
     "evolutionWall": "進化牆",
-    "closeToMastery": "即將掌握"
+    "closeToMastery": "即將掌握",
+    "collectionTimelineWidget": {
+      "heading": "收藏時間線",
+      "past": "過去",
+      "now": "現在",
+      "future": "未來",
+      "directionPast": "過去",
+      "directionNow": "現在",
+      "directionFuture": "未來",
+      "stillRetained": "仍記住",
+      "forgotten": "已遺忘",
+      "introduced": "已引入",
+      "mastered": "已掌握",
+      "dragHintNow": "向左拖動回顧旅程，向右拖動查看遺忘地平線。",
+      "dragHintFuture": "如果不複習，記憶將按此預測衰退。",
+      "dragHintPast": "回顧收藏建立的過程。",
+      "reset": "重置",
+      "resetAriaLabel": "將時間線重置到現在",
+      "scrubberAriaLabel": "收藏時間線滑桿",
+      "announcementRetained": "{date}：{mastered} 種族仍記住（佔{total}的{pct}%）",
+      "announcementBuilt": "{date}：{introduced} 已引入，{mastered} 已掌握",
+      "noHistoryYet": "暫無複習記錄",
+      "noHistoryBody": "複習一些卡片即可在此查看收藏的增長。時間線顯示過去的進度並預測記憶保持時長。"
+    },
+    "evolutionWallWidget": {
+      "heading": "進化牆",
+      "familiesCompleted": "已完成進化系統:",
+      "filterAll": "全部",
+      "filterInProgress": "進行中",
+      "filterCompleted": "已完成",
+      "filterAriaLabel": "篩選進化系統",
+      "collapse": "折疊",
+      "expand": "展開",
+      "familyDone": "完成",
+      "familyCompletedSrOnly": "已完成",
+      "galleriesAriaLabel": "進化系統",
+      "noFamiliesInProgress": "暫無進行中的系統。開始練習進化卡吧！",
+      "noFamiliesCompleted": "暫無已完成的系統。繼續加油！",
+      "noFamiliesFound": "未找到進化系統。",
+      "legendBothMastered": "兩個方向均已掌握",
+      "legendOneDirection": "已掌握一個方向",
+      "legendNotYet": "尚未掌握"
+    },
+    "closeToMasteryWidget": {
+      "heading": "即將掌握",
+      "body": "名稱已知，逆向卡還需學習:",
+      "speciesToGo": "{count, plural, other {還剩 <em>{count}</em> 種族。}}",
+      "emptyState": "目前沒有需要彌補的差距。做得很好！",
+      "listAriaLabel": "即將掌握的種族",
+      "notStarted": "未開始",
+      "notStartedLabel": "尚未開始",
+      "progressLabel": "{current} / {max} 天間隔",
+      "readyForMastery": "已準備好掌握",
+      "daysNeeded": "還需 {days} 天",
+      "ready": "準備好了",
+      "showingOf": "顯示 {total} 中的 {shown} 個 - 練習逆向卡以縮小差距。"
+    },
+    "milestoneShare": {
+      "shareAriaLabel": "分享里程碑: {label}",
+      "share": "分享",
+      "copied": "已複製到剪貼簿",
+      "copyError": "無法複製。請重試。"
+    }
   },
   "error": {
     "heading": "發生錯誤",
@@ -476,5 +630,25 @@
   "banner": {
     "machineTranslated": "本應用程式的{language}翻譯由機器自動產生，尚未經過完整審校。部分措辭可能有所偏差。發現錯誤？請寄信至 fbrookhouse@gmail.com 告知我們。",
     "dismiss": "關閉"
+  },
+  "types": {
+    "bug": "蟲",
+    "dark": "惡",
+    "dragon": "龍",
+    "electric": "電",
+    "fairy": "妖精",
+    "fighting": "格鬥",
+    "fire": "火",
+    "flying": "飛行",
+    "ghost": "幽靈",
+    "grass": "草",
+    "ground": "地面",
+    "ice": "冰",
+    "normal": "一般",
+    "poison": "毒",
+    "psychic": "超能力",
+    "rock": "岩石",
+    "steel": "鋼",
+    "water": "水"
   }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { mergeGradeLog, pullGradeLog, pushGradeLog } from "./gradeLog";
+import { mergeGradeLog, pullGradeLog, pushGradeLog, GRADE_LOG_CONFLICT_COLS } from "./gradeLog";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
 function makeClientWithUpsert(error: null | object = null) {
@@ -73,7 +73,7 @@ describe("pushGradeLog", () => {
         { user_id: "user-1", occurred_at: 100, entry_date: "2026-05-12", card_type: "name", grade: 4, subject_key: null, locale: "en" },
         { user_id: "user-1", occurred_at: 101, entry_date: "2026-05-12", card_type: "evolution", grade: 1, subject_key: null, locale: "en" },
       ],
-      { onConflict: "user_id,occurred_at", ignoreDuplicates: true },
+      { onConflict: GRADE_LOG_CONFLICT_COLS, ignoreDuplicates: true },
     );
   });
 

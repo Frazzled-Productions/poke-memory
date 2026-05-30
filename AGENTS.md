@@ -80,6 +80,14 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 
 **Trade-off.** A premature abstraction is worse than three similar lines. The rule is *don't fragment what's already shared*, not *abstract every duplication*. Three sites with the same pattern that aren't going to grow are fine; three sites that ARE going to need a cross-cutting change next month must share a helper now. Where the failure mode is easy to encode at PR time, prefer a lint rule (see #1327 for the Pokémon-name case) over a convention-only enforcement.
 
+**Every single-source helper ships with a forcing function.** A convention that relies on reviewer vigilance fragments eventually (the #1259 / #1369 i18n surface misses; the recurring "discovered another surface later" pattern). When you centralise a concept into a helper, also add a mechanism that makes a bypassing call site fail CI — not just a line in this file:
+
+- a **lint rule** banning the raw form the helper replaces (model: the #1327 `no-restricted-syntax` rule that bans raw `.displayName` reads, forcing `useLocalePokemonName`), and/or
+- a **fitness / contract test** asserting the invariant holds across all sites (model: the #1356 onConflict↔PK parity test, which fails if any client upsert's conflict columns drift from the table constraint — note this is a non-i18n example, the pattern is general), and/or
+- **type-system forcing** that makes the raw form un-representable or requires the cross-cutting argument (model: `computeStats(…, forceAllMastered)` — you cannot construct the call without considering the superuser axis).
+
+A helper that is convention-only (documented here but unenforced) is a latent fragmentation site. The enforcement-gap candidate list (class-name constants, sprite-size constants, date formatting, `forceAllMastered` honoring, type labels) and the i18n English-leak gate are tracked in #1406 / #1405.
+
 ### Multi-locale rendering
 
 All Pokémon names shown to users must flow through `useLocalePokemonName(speciesId, fallbackName)` from `lib/i18n/useLocalePokemonName.ts`. A lint rule (`no-restricted-syntax` in `eslint.config.mjs`, covering `components/**` and `app/**` minus `app/api/**`) enforces this at PR time — direct `.displayName` reads in those trees are a CI error (#1327).
@@ -131,6 +139,12 @@ Superuser mode is a QA cheat unlocked by typing `super` (desktop) or 7-tapping t
 Do **not** add a per-page toggle that re-derives mastery — wire the page into `flags.pretendAllMastered` instead.
 
 **QA seed scenarios** (available when `qaSeedMode` is on): `fsrs-locale-mastery` — 30 mastered en-locale name cards + due-soon + in-learning; switch Pokémon name language to Japanese to verify locale-aware mastery reset. `optimiser-stress` — 20 heavily-reviewed cards + 2 single-review cards; run the FSRS optimiser from Settings to verify it returns weights. `pasture-progression` — 40 mastered + 20 in-progress + 15 in-learning species; visit Pasture for a realistic populated view. `mastery-gaps` — reviewed-but-unmastered species (high reps, short scheduled days) + name-mastered-but-reverse-pending species; visit Pasture "Next arrivals" and Journey "Close to mastery" to verify both sections populate correctly. To clear seeded state: click "Clear seed" and reload, or lock superuser mode (which offers to restore cloud state for signed-in users, or reset local state for guests).
+
+**QA-seed data must be a faithful proxy for real data, or it is worthless.** The `lib/qa-seed/scenarios.ts` builders are test/QA fixtures: a fixture that can occupy states real data can never reach — or that misses states real data does reach — validates nothing and ships QA-only crashes. Two bugs in the #1394 batch came from hand-fabricated seed data (a locale-invariant seed, and en+ja cards sharing a numeric `id` that collided in `buildSessionQueues` and broke Practice — the local session keys cards by `id`, so it can never hold two cards with the same id). Rules:
+
+- **Match real invariants.** Every constraint real data obeys, the seed must obey: unique numeric `id` per session (one card per id — per-locale rows live in cloud `card_reviews`, not the local session), FSRS states within the scheduler's reachable bounds, name+reverse pairing (#1234), locale consistency.
+- **Prefer deriving over fabricating.** Reach "mastered"/"learning"/"due" states by replaying real grades through the actual scheduler (`lib/srs/scheduler.ts::nextReview`) and building cards via the real `hydrateSession` path, rather than writing FSRS-state literals and placeholder names/ids by hand. Hand-fabrication is how the data drifts from reality. (Tracked rebuild: #1421.)
+- **Enforce with forcing functions, not vigilance.** `lib/qa-seed/scenarios.test.ts` asserts every scenario emits unique card ids (the invariant the crash violated); add a per-scenario `hydrateSession` → `buildSessionQueues` no-throw smoke and FSRS-bounds/pairing assertions as the seed grows. A convention-only "be careful with seed data" rule fails the same way (see [[single source of truth]] forcing-function rule).
 
 **Every new user-facing feature must honour the relevant superuser flag.** Specifically: if a feature displays mastery state, completion counts, per-Pokémon collection state, or anything gated on having mastered things, it must read `useSuperuser().flags.pretendAllMastered` (or a future appropriate flag) and treat it as "fully mastered" when on. The canonical pattern is `forceAllMastered || isMastered(...)`; pure functions take an optional `forceAllMastered` parameter (see `computeStats`, `computeRecords`, `filterMastered`).
 
@@ -312,7 +326,9 @@ npm run screenshots -- --page=pasture  # one surface
 npm run screenshots -- --page=journey  # journey surface
 ```
 
-The script uses the `pretendAllMastered` superuser flag so renders are deterministic without depending on a particular review history. Don't change the viewport, the device-scale factor, or the surface list without updating every existing screenshot in the same commit — the README layout assumes consistent shape.
+The script uses a deterministic lived-in seed (`scripts/screenshot-seed.mjs`, Pikachu staged as the practice protagonist via the #1296 approach) so renders are deterministic without depending on a particular review history. Don't change the viewport, the device-scale factor, or the surface list without updating every existing screenshot in the same commit — the README layout assumes consistent shape.
+
+**Animations.** `npm run animations` runs `scripts/capture-animations.mjs` to produce a looping GIF of the practice card flip (`docs/screenshots/practice-cardflip.gif`). The same seed and viewport are used. Requirements: ffmpeg (Homebrew: `brew install ffmpeg`). macOS-only capture — the same font anti-aliasing constraint as the PNGs. Budget: each animation file must stay under **4 MB**.
 
 ### Versioning
 

@@ -60,3 +60,19 @@ Apply the migration to the live Supabase project **before merging** the PR that 
 ## Wire cross-device sync
 
 If the new table needs to follow users across devices: add `lib/sync/<feature>.ts` exporting `push`, `pull`, and a `merge` helper. Match the union-merge or last-write-wins pattern from `streak.ts` / `gradeLog.ts` / `settings.ts`. Wire the pull side into `pullAndMerge` (`lib/sync/pullAndMerge.ts`) as a best-effort leg after the existing `pullRegionalPrefs` block — wrap it in `try/catch`, `console.warn` on failure, and never flip the overall result into `"error"`. Wire the push side wherever the feature's data is written: add a handler to `AutoSyncOnChange` (`components/sync/AutoSyncOnChange.tsx`) listening for that feature's local change event, or call `push<Feature>` alongside the existing `saveX(...)` write. Add module tests in `lib/sync/<feature>.test.ts`, plus an end-to-end mock in `lib/sync/pullAndMerge.test.ts` covering the new pull leg.
+
+## Constraint-affecting migrations (two-phase rollout)
+
+A migration that changes a **primary key** or any **unique constraint that a client `onConflict` clause names** is backward-incompatible with the currently-deployed client, and the usual "apply the migration before merge" rule (see [Apply the migration](#apply-the-migration)) makes the hazard worse rather than better: the constraint flips on prod while the old client is still live, and every upsert that targets the old constraint shape fails.
+
+This is exactly what happened in #1344. Migration 029 widened the `card_reviews` PK from `(user_id, card_type, subject_key)` to `(user_id, card_type, subject_key, locale)` and was applied to prod before the matching 4-column-`onConflict` client (#1307) shipped. For ~19 hours every `card_reviews` upsert failed with `ERROR: there is no unique or exclusion constraint matching the ON CONFLICT specification` (SQLSTATE **42P10**) — silently, because sync is best-effort — producing the #584-shape `grade_log`-vs-`card_reviews` divergence the monitor caught days later.
+
+**A wider PK is not a backward-compatible superset.** Postgres `ON CONFLICT (a, b, c)` requires a unique constraint on **exactly** `(a, b, c)`; widening the PK to `(a, b, c, d)` removes that constraint, so the old client breaks immediately. There is no constraint shape under which the old narrower `onConflict` keeps working against the new wider PK — and even if there were, it would arbitrate against the wrong row (an inserted `locale = 'ja'` row would collide with the existing `en` row and silently UPDATE it). Do not reach for a one-shot PK swap.
+
+**Required process: a three-migration transitional sequence.** Any such change MUST roll out in this order — the constraining step is never applied before the matching client is live in prod:
+
+1. **Add** a new `UNIQUE` index on the **new** column set `(a, b, c, d)` *alongside* the existing PK `(a, b, c)`. Both constraints coexist; the deployed client's `onConflict (a, b, c)` still resolves to the old PK, so nothing breaks.
+2. **Ship and deploy the client** that sends the new `onConflict (a, b, c, d)`, and wait until it is actually live in production — the `qa → main` promotion plus the Vercel production deploy, not merely a merge to `qa`. Only the production client matters here, because only the production client issues the upserts the constraint must accept.
+3. **Only then** drop the old PK and promote the new unique index to be the primary key (a third migration).
+
+The matching deploy-ordering rule, the full incident write-up, and the [Client-cannot-regress checklist](sync.md#client-cannot-regress-checklist) item live in [docs/sync.md — Constraint-affecting migration ordering](sync.md#constraint-affecting-migration-ordering). Surfacing 42P10 as a loud, alertable failure rather than a silent swallow is tracked separately in #1358.

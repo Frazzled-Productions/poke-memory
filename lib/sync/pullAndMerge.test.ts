@@ -80,6 +80,7 @@ vi.mock("@/lib/streak/persistence", () => ({
   STREAK_UPDATED_EVENT: "poke-memory:streak-updated",
 }));
 
+
 vi.mock("@/lib/sync/gradeLog", async () => {
   const actual = await vi.importActual<typeof import("@/lib/sync/gradeLog")>(
     "@/lib/sync/gradeLog",
@@ -124,7 +125,8 @@ const baseSyncStatus = {
   failedCardCount: null,
   lastPullAt: null,
   lastSettingsPullAt: null,
-    lastSeenResetAt: null,
+  lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 describe("pullAndMerge", () => {
@@ -648,4 +650,127 @@ describe("pullAndMerge", () => {
       expect(mockDispatch).not.toHaveBeenCalled();
     });
   });
+
+  // ─── MT-banner dismissal write-through (#1387, AC2) ─────────────────────
+  // On pull, cloud dismissedMtBannerLocales are UNIONED into the standalone
+  // localStorage keys so MachineTranslationBanner's read path (which reads
+  // the standalone key directly) reflects the cloud state.
+
+  describe("MT-banner dismissal write-through", () => {
+    let mockLocalStorage: Record<string, string>;
+
+    beforeEach(() => {
+      mockLocalStorage = {};
+      vi.stubGlobal("window", {
+        dispatchEvent: vi.fn(),
+        localStorage: {
+          getItem: (k: string) => mockLocalStorage[k] ?? null,
+          setItem: (k: string, v: string) => { mockLocalStorage[k] = v; },
+        },
+      });
+      vi.stubGlobal("localStorage", {
+        getItem: (k: string) => mockLocalStorage[k] ?? null,
+        setItem: (k: string, v: string) => { mockLocalStorage[k] = v; },
+      });
+      vi.stubGlobal(
+        "CustomEvent",
+        class {
+          type: string;
+          constructor(type: string, _init?: unknown) { this.type = type; }
+        },
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("writes standalone localStorage keys for each cloud-dismissed locale", async () => {
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: { dismissedMtBannerLocales: ["ja", "zh-Hans"] } as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockHasStoredSettings.mockReturnValue(true);
+      mockLoadSyncStatus.mockReturnValue({
+        ...baseSyncStatus,
+        lastSettingsPullAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockLocalStorage["poke-memory:mt-banner-dismissed:ja"]).toBe("1");
+      expect(mockLocalStorage["poke-memory:mt-banner-dismissed:zh-Hans"]).toBe("1");
+    });
+
+    it("unions cloud locales with existing local keys (does not evict a locally-dismissed locale)", async () => {
+      // Local has zh-Hant dismissed; cloud only knows about ja.
+      // After pull, BOTH should be present in localStorage.
+      mockLocalStorage["poke-memory:mt-banner-dismissed:zh-Hant"] = "1";
+
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: { dismissedMtBannerLocales: ["ja"] } as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockHasStoredSettings.mockReturnValue(true);
+      mockLoadSyncStatus.mockReturnValue({
+        ...baseSyncStatus,
+        lastSettingsPullAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockLocalStorage["poke-memory:mt-banner-dismissed:ja"]).toBe("1");
+      // Locally-dismissed locale must survive — union, not replace.
+      expect(mockLocalStorage["poke-memory:mt-banner-dismissed:zh-Hant"]).toBe("1");
+    });
+
+    it("skips write-through when dismissedMtBannerLocales is empty", async () => {
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: { dismissedMtBannerLocales: [] } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockHasStoredSettings.mockReturnValue(true);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      // No banner keys should have been written.
+      const bannerKeys = Object.keys(mockLocalStorage).filter(k =>
+        k.startsWith("poke-memory:mt-banner-dismissed:"),
+      );
+      expect(bannerKeys).toHaveLength(0);
+    });
+
+    it("skips write-through when settings row has no dismissedMtBannerLocales field (pre-#1387 row)", async () => {
+      // A cloud row from before this feature has no dismissedMtBannerLocales key.
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {} as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockHasStoredSettings.mockReturnValue(true);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      const bannerKeys = Object.keys(mockLocalStorage).filter(k =>
+        k.startsWith("poke-memory:mt-banner-dismissed:"),
+      );
+      expect(bannerKeys).toHaveLength(0);
+    });
+
+    it("skips write-through when no settings row exists (guest path)", async () => {
+      // Guest / no cloud row — pullUserSettingsRow returns null.
+      mockPullUserSettingsRow.mockResolvedValue(null);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      const bannerKeys = Object.keys(mockLocalStorage).filter(k =>
+        k.startsWith("poke-memory:mt-banner-dismissed:"),
+      );
+      expect(bannerKeys).toHaveLength(0);
+    });
+  });
+
 });

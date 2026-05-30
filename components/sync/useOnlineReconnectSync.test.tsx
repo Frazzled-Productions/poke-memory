@@ -121,6 +121,7 @@ const NO_FAILURE_STATUS: SyncStatus = {
   lastPullAt: null,
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 const FAILED_STATUS: SyncStatus = {
@@ -131,6 +132,7 @@ const FAILED_STATUS: SyncStatus = {
   lastPullAt: null,
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 function fireOnline() {

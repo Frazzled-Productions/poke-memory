@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { CloudRow } from "@/lib/sync/cloud";
+import { CARD_REVIEWS_CONFLICT_COLS, isStructuralError } from "@/lib/sync/cloud";
 
 type BeaconPayload = {
   cards: CloudRow[];
@@ -18,7 +19,8 @@ type BeaconPayload = {
 //
 // To make path #2 reliable each batch is retried up to BATCH_RETRIES times
 // before being declared failed, so a transient Supabase blip does not turn
-// into a user-visible "Sync failed" banner.
+// into a user-visible "Sync failed" banner. Structural errors (42xxx, 23505,
+// 23503) break out of the retry loop immediately and return HTTP 409 (#1358).
 export async function POST(request: Request) {
   let payload: BeaconPayload;
   try {
@@ -56,11 +58,20 @@ export async function POST(request: Request) {
   // (RLS regression, constraint violation) will still bubble up after the
   // attempts are exhausted, but with N=3 a flaky network blip on a single
   // batch is unlikely to surface to the user as a sync failure.
+  //
+  // Exception: structural errors (42xxx ON CONFLICT mismatch, 23505/23503
+  // constraint violations) break out of the retry loop immediately — retrying
+  // is pointless because the error always indicates a deploy/schema mismatch.
+  // The route returns HTTP 409 for structural errors so the client (the
+  // fetch+keepalive path) can distinguish them from transient 502 failures
+  // and suppress the retry UI.
   const BATCH_RETRIES = 3;
   const RETRY_DELAY_MS = 100;
   const updatedAt = new Date().toISOString();
   let allOk = true;
+  let structuralErrorCode: string | null = null;
 
+  outerLoop:
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH).map((r) => ({
       user_id: user.id,
@@ -92,19 +103,42 @@ export async function POST(request: Request) {
       try {
         const { error } = await supabase
           .from("card_reviews")
-          .upsert(batch, { onConflict: "user_id,card_type,subject_key,locale" });
+          .upsert(batch, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
         if (!error) {
           batchOk = true;
           break;
         }
+        if (isStructuralError(error)) {
+          // Structural errors are never transient — do not retry. Log for error
+          // monitoring and break both loops to return a 409 immediately.
+          console.error(
+            `[sync/route] structural error on card_reviews upsert (SQLSTATE ${error.code}): ${error.message}`
+          );
+          structuralErrorCode = error.code;
+          allOk = false;
+          break outerLoop;
+        }
       } catch {
-        // fall through to retry
+        // Network-level error — fall through to retry.
       }
       if (attempt < BATCH_RETRIES - 1) {
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
       }
     }
     if (!batchOk) allOk = false;
+  }
+
+  if (structuralErrorCode !== null) {
+    // 409 Conflict: the client should NOT retry — the error means the ON CONFLICT
+    // target no longer matches any unique constraint, or a constraint is violated.
+    // This is distinguishable from a transient 502 so a future client version
+    // can show the structural-error banner without waiting for FAILURE_THRESHOLD
+    // retries. sendBeacon callers (pagehide path) cannot observe this code, but
+    // the fetch+keepalive path (visibilitychange) can.
+    return NextResponse.json(
+      { ok: false, error: "structural_error", code: structuralErrorCode },
+      { status: 409 }
+    );
   }
 
   if (!allOk) {

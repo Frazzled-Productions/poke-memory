@@ -113,6 +113,53 @@ describe("scenario payload builders", () => {
     expect(learning.length).toBeGreaterThanOrEqual(10);
   });
 
+  it("pasture-progression: sets pokemonNameLocale to 'en'", () => {
+    const payload = SCENARIO_BY_SLUG.get("pasture-progression")!.build();
+    expect(payload.pokemonNameLocale).toBe("en");
+  });
+
+  it("pasture-progression: has 40 en-locale mastered name cards and NO ja duplicates (per-locale FSRS demo)", () => {
+    const payload = SCENARIO_BY_SLUG.get("pasture-progression")!.build();
+    const cards = payload.session?.cards ?? [];
+
+    // 40 en-locale mastered name cards (the main set).
+    const enMasteredNames = cards.filter(
+      (c) => c.cardType === "name" &&
+        (c as { locale?: string }).locale === "en" &&
+        c.state.reps >= 3 && c.state.scheduledDays >= 21,
+    );
+    expect(enMasteredNames.length).toBeGreaterThanOrEqual(40);
+
+    // No ja-locale duplicates: the local session keys cards by numeric `id`, so
+    // seeding an en+ja pair for the same species collides and breaks Practice
+    // (#1394 mini-batch regression). pokemonNameLocale 'en' shows 40; switching
+    // to ja shows 0 — which already demonstrates per-locale storage.
+    const jaCards = cards.filter((c) => (c as { locale?: string }).locale === "ja");
+    expect(jaCards).toHaveLength(0);
+    expect(payload.pokemonNameLocale).toBe("en");
+  });
+
+  // Regression guard for the #1394 mini-batch crash: the local review session
+  // keys cards by numeric `id`, so a scenario must never emit two cards sharing
+  // an `id` (e.g. an en+ja pair for one species). Duplicate ids collide in
+  // buildSessionQueues and break the Practice page.
+  it("every scenario emits session cards with unique numeric ids", () => {
+    for (const scenario of SCENARIOS) {
+      const cards = scenario.build().session?.cards ?? [];
+      const ids = cards.map((c) => c.id);
+      const unique = new Set(ids);
+      expect(
+        unique.size,
+        `scenario '${scenario.slug}' has ${ids.length - unique.size} duplicate card id(s)`,
+      ).toBe(ids.length);
+    }
+  });
+
+  it("mastery-gaps: sets pokemonNameLocale to 'en'", () => {
+    const payload = SCENARIO_BY_SLUG.get("mastery-gaps")!.build();
+    expect(payload.pokemonNameLocale).toBe("en");
+  });
+
   describe("mastery-gaps scenario", () => {
     function buildCards() {
       const payload = SCENARIO_BY_SLUG.get("mastery-gaps")!.build();

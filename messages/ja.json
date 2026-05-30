@@ -336,7 +336,31 @@
     "readyForMoreVariety": "もっと多様性を",
     "openPracticeSettings": "練習設定を開く",
     "readyForMoreVarietyBody": "逆引き進化カードや異なるフォルムカードで新鮮な挑戦をしてみましょう。",
-    "gradeErrorMessage": "予期しないエラーにより採点を保存できませんでした。セッションはまだ有効です。もう一度お試しください。"
+    "gradeErrorMessage": "予期しないエラーにより採点を保存できませんでした。セッションはまだ有効です。もう一度お試しください。",
+    "scope": {
+      "label": "スコープ",
+      "clear": "クリア",
+      "generation": "世代",
+      "type": "タイプ",
+      "groups": "グループ",
+      "games": "ゲーム",
+      "alternateForms": "異なるフォルム",
+      "gamesDescription": "特定のゲームのネイティブ図鑑に登場する Pokémon のみ練習します。",
+      "presetStarters": "御三家",
+      "presetLegendaries": "伝説",
+      "presetIncompleteChains": "未完成の進化チェーン",
+      "formIncludeAll": "すべて含む",
+      "formDefaultOnly": "デフォルトフォルムのみ",
+      "formChooseCategories": "カテゴリを選択…",
+      "formCategoryRegional": "リージョンフォルム",
+      "formCategoryForme": "戦闘外フォルム",
+      "formCategoryMega": "メガ進化",
+      "formCategoryGmax": "キョダイマックス",
+      "formCategoryPrimal": "ゲンシカイキ",
+      "noAlternateForms": "現在のシードに異なるフォルムはありません。",
+      "matchCount": "{total} 匹中 {match} 匹が一致",
+      "hiddenCardsPaused": "非表示のカードは一時停止されています。スコープを削除してもレビュー期限切れのカードが溢れることはありません。"
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -367,7 +391,8 @@
     "hasAlternateForms": "異なるフォルムあり",
     "introduced": "{introduced} / {total} 表示済み",
     "generationAll": "すべて",
-    "generationLabel": "第{gen}世代"
+    "generationLabel": "第{gen}世代",
+    "masteryCount": "{mastered} / {total} 習得済み"
   },
   "pasture": {
     "title": "牧場",
@@ -382,7 +407,33 @@
     "searchPasturePlaceholder": "Pokémon を検索…",
     "clearSearch": "検索をクリア",
     "filterByTypeAriaLabel": "タイプでフィルター",
-    "filterByGenerationAriaLabel": "世代でフィルター"
+    "filterByGenerationAriaLabel": "世代でフィルター",
+    "biomeStats": {
+      "ariaLabel": "バイオーム統計",
+      "mastered": "習得済み",
+      "captured": "捕獲済み",
+      "latestAddition": "最新追加"
+    },
+    "landscape": "ランドスケープ",
+    "landscapeAriaLabel": "{zone} のランドスケープを表示",
+    "zones": {
+      "grassland": "草原",
+      "forest": "森",
+      "sea": "大海原",
+      "cave": "洞窟",
+      "mountain": "山",
+      "urban": "都市",
+      "waters-edge": "水辺",
+      "rough-terrain": "荒地",
+      "rare": "聖域",
+      "unknown": "荒野"
+    },
+    "zoneAriaLabel": "{zone} ゾーン",
+    "biome": {
+      "backLabel": "牧場",
+      "backAriaLabel": "牧場に戻る",
+      "emptyState": "このバイオームにはまだ習得済みの Pokémon がいません。練習を続けましょう！"
+    }
   },
   "stats": {
     "title": "記録",
@@ -414,7 +465,48 @@
       "error": "取得に失敗しました。接続を確認してもう一度お試しください。",
       "confirmMessage": "ローカルの進捗、設定、表示設定がクラウドの最新データで置き換えられます。続けますか？"
     },
-    "allTimeGradeBreakdown": "全期間の採点内訳"
+    "allTimeGradeBreakdown": "全期間の採点内訳",
+    "trainerCard": {
+      "ariaLabel": "トレーナーカード",
+      "trainerLabel": "トレーナー",
+      "trainerFallback": "トレーナー",
+      "levelLabel": "Lv",
+      "levelDescription": "レベルは習得済みの Pokémon 名前カード数に応じて上がります（3回以上の正解かつ次回間隔21日以上）。",
+      "allMastered": "すべて習得済み",
+      "masteryProgress": "{mastered} / {next} 習得済み · Lv {levelNext} まであと {needed}",
+      "formsMastered": "{mastered} / {total} フォルム習得済み",
+      "generationBadgesAriaLabel": "世代達成バッジ",
+      "generationComplete": "{name}: コンプリート！",
+      "generationProgress": "{name}: {mastered}/{total} 習得済み",
+      "gymBadgesAriaLabel": "獲得ジムバッジ"
+    },
+    "records": {
+      "heading": "記録",
+      "longestStreakDay": "日 最長連続",
+      "longestStreakDays": "日 最長連続",
+      "bestReviewDay": "最多レビュー日",
+      "avgDaysToMastery": "平均習得日数",
+      "fromFirstSight": "初見から",
+      "masteredInWeek": "1週間で習得",
+      "bestSevenDayWindow": "最良の7日間"
+    },
+    "streakProtection": {
+      "heading": "連続記録の保護",
+      "earnAndSpentBanner": "連続記録保護トークンを獲得し、同日に使用して昨日の記録を守りました。連続記録は安全です。",
+      "dismissAriaLabel": "連続記録保護の通知を閉じる",
+      "tokenSingular": "トークン",
+      "tokenPlural": "トークン",
+      "tokenMax": "（最大）",
+      "earnDescription": "トークンは1回のミスをカバーします。{earnInterval}日連続レビューごとに1枚獲得、最大{maxBalance}枚。",
+      "nextTokenStart": "今日レビューして次のトークンの獲得を始めましょう。",
+      "nextTokenCount": "{count, plural, other {あと {count} 日のレビューで次のトークン。}}",
+      "streakPreserved": "{date} に連続記録を保護しました。",
+      "tokensRemaining": "{count, plural, other {{count} トークン残り}}",
+      "recentProtectionHeading": "最近の保護",
+      "eventEarned": "獲得",
+      "eventUsed": "使用",
+      "eventEarnedAndUsed": "獲得＋使用"
+    }
   },
   "journey": {
     "title": "旅",
@@ -434,7 +526,69 @@
     "byGenerationColumn": "ジェネレーション",
     "collectionTimeline": "コレクションタイムライン",
     "evolutionWall": "進化ウォール",
-    "closeToMastery": "習得間近"
+    "closeToMastery": "習得間近",
+    "collectionTimelineWidget": {
+      "heading": "コレクションタイムライン",
+      "past": "過去",
+      "now": "現在",
+      "future": "未来",
+      "directionPast": "過去",
+      "directionNow": "現在",
+      "directionFuture": "未来",
+      "stillRetained": "記憶保持中",
+      "forgotten": "忘れた",
+      "introduced": "表示済み",
+      "mastered": "習得済み",
+      "dragHintNow": "左にドラッグして旅を振り返り、右にドラッグして忘却の地平を確認。",
+      "dragHintFuture": "レビューしない場合の記憶の減衰予測。",
+      "dragHintPast": "コレクションが構築された過程の再現。",
+      "reset": "リセット",
+      "resetAriaLabel": "タイムラインを現在にリセット",
+      "scrubberAriaLabel": "コレクションタイムラインスクロール",
+      "announcementRetained": "{date}: {mastered} 種族が記憶保持中（{total} の {pct}%）",
+      "announcementBuilt": "{date}: {introduced} 表示済み、{mastered} 習得済み",
+      "noHistoryYet": "レビュー履歴がまだありません",
+      "noHistoryBody": "カードをレビューするとコレクションの成長が確認できます。タイムラインは過去の進捗と記憶の保持期間を予測します。"
+    },
+    "evolutionWallWidget": {
+      "heading": "進化ウォール",
+      "familiesCompleted": "完了した進化系統:",
+      "filterAll": "すべて",
+      "filterInProgress": "進行中",
+      "filterCompleted": "完了",
+      "filterAriaLabel": "進化系統をフィルター",
+      "collapse": "折りたたむ",
+      "expand": "展開する",
+      "familyDone": "完了",
+      "familyCompletedSrOnly": "完了済み",
+      "galleriesAriaLabel": "進化系統",
+      "noFamiliesInProgress": "まだ進行中の系統はありません。進化カードの練習を始めましょう！",
+      "noFamiliesCompleted": "まだ完了した系統はありません。頑張りましょう！",
+      "noFamiliesFound": "進化系統が見つかりません。",
+      "legendBothMastered": "両方向習得済み",
+      "legendOneDirection": "片方向習得済み",
+      "legendNotYet": "未習得"
+    },
+    "closeToMasteryWidget": {
+      "heading": "習得間近",
+      "body": "名前は分かっている、逆引きカードはまだ:",
+      "speciesToGo": "{count, plural, other {<em>{count}</em> 種族残り。}}",
+      "emptyState": "今は埋めるギャップがありません。すばらしい！",
+      "listAriaLabel": "習得間近の種族",
+      "notStarted": "未開始",
+      "notStartedLabel": "まだ開始されていません",
+      "progressLabel": "{current} / {max} 日間隔",
+      "readyForMastery": "習得準備完了",
+      "daysNeeded": "あと {days} 日必要",
+      "ready": "準備完了",
+      "showingOf": "{total} 件中 {shown} 件表示 - 逆引きカードを練習してギャップを埋めましょう。"
+    },
+    "milestoneShare": {
+      "shareAriaLabel": "マイルストーンをシェア: {label}",
+      "share": "シェア",
+      "copied": "クリップボードにコピーしました",
+      "copyError": "コピーできませんでした。もう一度お試しください。"
+    }
   },
   "error": {
     "heading": "エラーが発生しました",
@@ -476,5 +630,25 @@
   "banner": {
     "machineTranslated": "このアプリの{language}翻訳は自動的に作成されており、完全にはレビューされていません。表現が不自然な場合があります。誤りを見つけましたか？fbrookhouse@gmail.com までお知らせください。",
     "dismiss": "閉じる"
+  },
+  "types": {
+    "bug": "むし",
+    "dark": "あく",
+    "dragon": "ドラゴン",
+    "electric": "でんき",
+    "fairy": "フェアリー",
+    "fighting": "かくとう",
+    "fire": "ほのお",
+    "flying": "ひこう",
+    "ghost": "ゴースト",
+    "grass": "くさ",
+    "ground": "じめん",
+    "ice": "こおり",
+    "normal": "ノーマル",
+    "poison": "どく",
+    "psychic": "エスパー",
+    "rock": "いわ",
+    "steel": "はがね",
+    "water": "みず"
   }
 }

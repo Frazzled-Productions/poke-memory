@@ -59,7 +59,16 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
    - **`qa` ahead** (`ahead > 0`): a previous batch was drained into `qa` but never promoted. Stop and ask the maintainer whether to **promote** (open the `qa -> main` PR for the existing work first) or **discard** (`git push origin +origin/main:qa`) before starting a new batch — do not silently stack a new batch on top.
    - If `qa` does not exist at all, stop and surface it — the qa staging-branch setup (#806) has not been applied.
 
-5. **Per-issue staleness check (#1322).** For every non-trivial issue surfaced in step 1, run:
+5. **Check for existing open PRs (#1368).** The step-4 ahead/behind count only sees *merged* commits — it cannot surface open, unmerged PRs that already implement a backlog issue. Before dispatching any coder, list open PRs and reconcile them against the backlog:
+
+   ```bash
+   gh pr list --state open --json number,title,headRefName,baseRefName \
+     --jq '.[] | "#\(.number) [\(.baseRefName)] \(.title) (\(.headRefName))"'
+   ```
+
+   Map each open PR to a backlog issue (via title, branch name, or `closes #N` in the body). On any overlap with an issue you are about to implement, **stop and ask the maintainer** whether to resume/finish the existing PR or supersede it — never spawn a fresh coder on top of an in-flight PR. This guards the duplicate-work detour that hit the #1313/#1314/#1316 batch when PRs #1340/#1341/#1342 were already open for those issues. (memory: `feedback_batch_preflight_check_open_prs`.)
+
+6. **Per-issue staleness check (#1322).** For every non-trivial issue surfaced in step 1, run:
 
    ```bash
    .github/scripts/check-issue-staleness.sh <N>
@@ -69,7 +78,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
    Skip the staleness check for trivial issues (typo fixes, doc tweaks, one-liner workflow changes) — they are exempt under the same rule that lets them skip the planner.
 
-6. **Pre-existing CI noise + stale-preview pre-flight.** Two advisory checks so this session is not blamed for unrelated red signals or a stale preview:
+7. **Pre-existing CI noise + stale-preview pre-flight.** Two advisory checks so this session is not blamed for unrelated red signals or a stale preview:
 
    ```bash
    # 6a. Workflows that have been red on qa for multiple runs — known noise,
@@ -85,7 +94,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
    For each workflow surfaced by 6a, check that a tracking issue already exists; if not, file one (`priority:later` by default) so the noise is captured and the session does not silently inherit blame. Carry the list into the Wrap-up handoff so the maintainer sees "known noise" annotated separately from "introduced by this batch". The freshness check (6b) is a hint for the Wrap-up `Fire qa preview deploy` step — if the SHAs already diverge before this session even starts, the maintainer needs to know this batch is not the first to land work since the last preview.
 
-7. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
+8. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
 
    - **Code** — a concrete, implementable change. Goes into the implementation batches.
    - **Analysis** — a read-only audit or umbrella issue whose deliverable is a report plus scoped follow-up issues, not a PR.
@@ -139,6 +148,10 @@ For each batch, in order:
 
    If the worktree is on the wrong branch (e.g. a stale `chore/...` left over from a prior run) or the HEAD is on a release-tag commit instead of `origin/qa`, stop that agent immediately with `TaskStop` and re-dispatch into a fresh worktree. A stalled or wrong-branched agent can spend ~1h producing edits that never reach the assigned branch — the canonical failure mode is the #1329 Context-refactor agent that edited files in a sibling worktree on `chore/1328-dry-single-source-of-truth-rule` instead of its own assignment. (memory: `feedback_verify_agent_reports`.)
 
+   **MCP-needing agents must be `general-purpose` (#1368).** `data-coder` and `ui-coder` have NO access to the Supabase MCP tools (`execute_sql`, `get_logs`, `apply_migration`). Any task that must query or mutate the live database — a divergence investigation, a recovery dry-run, an analysis that reads prod state — must go to a `general-purpose` agent, which loads MCP tools via ToolSearch. A DB-needing task handed to `data-coder`/`ui-coder` fails silently. Migrations are still *authored* by `data-coder` per file-ownership; only the `apply_migration` MCP *call* needs a general-purpose agent or the orchestrator applying it directly after the coder writes the `.sql` file. (memory: `feedback_mcp_needs_general_purpose_agent`.)
+
+   **Do NOT delegate open-ended local verification to sub-agents — they stall silently.** Briefing an agent to "verify by running the app", "run the full build gate", or "wait for CI to go green after pushing" reliably hangs it: a sub-agent's intermediate output does not stream to the main chat, so a stall is indistinguishable from normal quiet work and there is no completion notification. In the #1394 mini-batch, two consecutive fix agents stalled (one ~2h in a wait-for-CI loop after pushing, one on a file-read mid-build-gate) and only the maintainer caught them by opening the sub-agent chat. Brief agents to **push and report immediately**; the orchestrator owns CI-watching (bounded background `gh pr view --json` polls) and the app-run / `/verify` step. When a sub-agent goes quiet abnormally long (no commit/push in ~15-20 min), **stop it with `TaskStop` and take over** — it usually left correct work *uncommitted* in its worktree (`git worktree list` → `git -C <wt> status`), so inspect the diff, run the build gate yourself, fix any failing test, and commit + push directly rather than redispatching. (memory: `feedback_dont_delegate_open_ended_local_verification`.)
+
 2. **Each agent's prompt must include:**
    - The issue number and **the full body, verbatim** — not paraphrased, not summarised. Include all subsections; the implementer cross-checks against them in the PR body. The orchestrator-side scope drop that landed #1259/#1260 without per-locale FSRS rows happened because the brief paraphrased the issue's "Data model" section instead of pasting it.
    - **"Echo back any `## Data model` / `## Schema` / `## Acceptance criteria` / `## Acceptance` sections from the issue body verbatim in the PR description before opening the PR."** The implementer's own copy is the cross-check anchor for both the auto-review job (`feedback_consult_specialist_on_brief`) and the in-session reviewer.
@@ -167,6 +180,7 @@ Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
 1. **No rebase tax.** The `qa` ruleset does not require strict-up-to-date, so a PR does not need rebasing when a sibling merges ahead of it, and merging one PR does not invalidate another's checks. Merge each PR as soon as its required checks are green — order does not matter:
    - `gh pr checks <PR>` — wait for required checks (`test`, `e2e`) green.
+   - **Also check the `integration` result, even though it is not required on `qa`.** A red `integration` is a real failure that surfaces on the eventual `qa -> main` release PR (where it *is* enforced) — do not filter it out of your merge-readiness check. In the #1394 batch an `integration`-only failure (a test-date bug) merged into `qa` because the readiness check looked only at `test`/`e2e`, then blocked the promotion PR. If `integration` is red for a reason unrelated to the PR, note it; if the PR caused it, fix before merge.
    - If `Migration drift check` fails, the agent forgot to apply the migration via MCP — apply it now and the check re-runs.
    - `gh pr merge <PR> --squash --delete-branch`.
    - Loop until the queue is empty. **No rebase step** between merges — that strict-`main` cost is exactly what the qa flow removes.
@@ -220,8 +234,8 @@ After every batch is merged into `qa` and the queue is drained:
 
    - **What went well** — patterns worth keeping; honest, not performative.
    - **What went poorly** — named incidents with one-line cost and root-cause attribution. Distinguish "we caught this in the session" from "the user caught it for us". Surface dropped scope, partial-fix loops, symptom-chasing, fire-and-forget async work, silent agent stalls, missed memory consultations, and any moment the orchestrator paraphrased an issue body instead of reading it verbatim.
-   - **Concrete improvements** — proposed edits to this skill, agent definitions (`.claude/agents/**`), AGENTS.md, or `.github/workflows/**`. Bias toward writing the edits in the same PR that closes out the session, not filing a follow-up issue ("file an issue" for a process gap defers the fix to the next session and the failure mode usually recurs first).
-   - **Memories** — new feedback / reference memories to file, or stale ones to update / remove. Verify each `Write` succeeds and the file exists before claiming it was saved (memory: `feedback_dont_claim_memory_without_verify`).
+   - **Concrete improvements — codify IN-REPO, not in memory.** Any learning that would apply to a future contributor or agent on *any* clone of this repo MUST be written into a repo file, never (only) into a machine-local memory: a rule/convention → `AGENTS.md` or `WORKFLOW.md`; an agent-behaviour fix → `.claude/agents/**`; a process fix → this skill / `.claude/commands/**`; a CI gate → `.github/workflows/**`; and — strongest — an enforceable invariant → a **forcing-function test** that fails in CI. Memories live under `~/.claude` on one machine: they do not travel with a clone, are not read by CI, and are not seen by an agent run on a fresh machine, so a repo-applicable rule left only in memory is effectively lost on the next machine. Bias toward landing these edits in the same PR that closes out the session, not a follow-up issue ("file an issue" for a process gap defers the fix and the failure mode usually recurs first).
+   - **Memories** — reserve for genuinely *session/this-machine-local* hints or the maintainer's personal working preferences that have no place in the shared repo (e.g. "this user dislikes the word 'slice'"). Anything an agent on a fresh clone would need belongs in-repo per the bullet above. For the memories you do file, verify each `Write` succeeds and the file exists before claiming it was saved (memory: `feedback_dont_claim_memory_without_verify`).
 
    Hand the retro back to the user as a punch list. If the user picks improvements to implement, fold them into the same PR (or a separate retro PR if they touch many files); never let a retro lapse silently.
 
@@ -254,7 +268,7 @@ After every batch is merged into `qa` and the queue is drained:
    - Mini-batch follow-ups filed but **not** implemented this session, with their numbers and priority labels.
    - Coverage ratchet applied (old → new floor per metric); link to the commit.
    - Retro punch list — at minimum, list the proposed improvements and whether each landed in this session or was deferred (with the deferral issue number).
-   - Pre-existing red CI inherited from step 6 of Pre-flight, with the tracking issue link for each.
+   - Pre-existing red CI inherited from step 7 of Pre-flight, with the tracking issue link for each.
    - Next steps for the maintainer: "Test the `qa` preview deploy. When satisfied, mark draft PR #N ready and merge it — that cuts the release, deploys production, and resets `qa`. If the batch carries a `minor-bump` fragment, apply `version-bump:approved` to the promotion PR first."
    - **Analysis/Exploration** issues run — which umbrella issues got a report comment, and how many follow-up issues each filed (the umbrellas stay open for the user to review and close).
    - Any `[USER-DECISION]` items still awaiting a choice.

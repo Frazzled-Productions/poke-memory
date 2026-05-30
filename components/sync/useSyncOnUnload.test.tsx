@@ -26,8 +26,18 @@ vi.mock("@/lib/sync/backgroundSync", () => ({
   registerBackgroundSync: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/lib/sync/structuralError", () => ({
+  markStructuralSyncError: vi.fn(),
+  clearStructuralSyncError: vi.fn(),
+  getStructuralSyncError: vi.fn(() => null),
+  hasStructuralProbeBeenAttempted: vi.fn(() => false),
+  markStructuralProbeAttempted: vi.fn(),
+  resetStructuralProbe: vi.fn(),
+}));
+
 import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
+import { markStructuralSyncError } from "@/lib/sync/structuralError";
 
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
@@ -39,7 +49,8 @@ const ZERO_STATUS: SyncStatus = {
   failedCardCount: null,
   lastPullAt: null,
   lastSettingsPullAt: null,
-    lastSeenResetAt: null,
+  lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 function mockUnsynced(count: number) {
@@ -194,6 +205,78 @@ describe("useSyncOnUnload — visibilitychange path (fetch+keepalive)", () => {
     const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(init.keepalive).toBe(true);
     expect(init.method).toBe("POST");
+  });
+
+  it("calls markStructuralSyncError when the route returns 409 with structural_error body (#1358 FIX 4)", async () => {
+    // The route returns HTTP 409 with { error: "structural_error", code: "42P10" }
+    // when a structural (never-transient) SQLSTATE is detected server-side.
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ error: "structural_error", code: "42P10" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() =>
+      expect(vi.mocked(markStructuralSyncError)).toHaveBeenCalledWith("42P10"),
+    );
+    // The generic failure path also runs (lastPushFailed: true).
+    expect(saveSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ lastPushFailed: true }),
+    );
+  });
+
+  it("preserves structuralSyncError in saveSyncStatus after 409: loadSyncStatus re-read, not stale prev (#1414)", async () => {
+    // Regression guard for the stale-snapshot overwrite race:
+    // markStructuralSyncError writes { structuralSyncError: "42P10" } to
+    // localStorage. If saveSyncStatus is called with the pre-fetch `prev`
+    // snapshot as its base, that field gets spread back to null.
+    //
+    // This test simulates the sequence by configuring loadSyncStatus to return
+    // the updated value (with structuralSyncError set) AFTER markStructuralSyncError
+    // has run — exactly what a fresh re-read of localStorage would return. If the
+    // production code still spreads the stale `prev` instead of calling
+    // loadSyncStatus() after the mark, this assertion fails.
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ error: "structural_error", code: "42P10" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    // Simulate markStructuralSyncError updating localStorage by making the
+    // SECOND call to loadSyncStatus (inside saveSyncStatus base object) return
+    // a status that already has structuralSyncError set.
+    let loadCallCount = 0;
+    vi.mocked(loadSyncStatus).mockImplementation(() => {
+      loadCallCount += 1;
+      // First call: pre-fetch snapshot (prev). Second call: post-mark re-read.
+      if (loadCallCount === 1) return ZERO_STATUS;
+      return { ...ZERO_STATUS, structuralSyncError: "42P10", lastPushFailed: true, lastPushAttemptAt: new Date().toISOString() };
+    });
+
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(vi.mocked(saveSyncStatus)).toHaveBeenCalled());
+
+    // The payload passed to saveSyncStatus must carry the structural code — it
+    // came from the fresh loadSyncStatus() re-read, not the stale pre-fetch prev.
+    const lastCall = vi.mocked(saveSyncStatus).mock.calls.at(-1)?.[0];
+    expect(lastCall?.structuralSyncError).toBe("42P10");
+  });
+
+  it("does NOT call markStructuralSyncError on a 502 (transient failure)", async () => {
+    fetchSpy.mockResolvedValue(new Response(null, { status: 502 }));
+
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(2)));
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(saveSyncStatus).toHaveBeenCalled());
+    expect(vi.mocked(markStructuralSyncError)).not.toHaveBeenCalled();
   });
 });
 

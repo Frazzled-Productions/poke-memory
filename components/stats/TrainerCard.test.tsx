@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 import { TrainerCard, trainerLevel, nextLevelMastered, BASE_SPECIES_COUNT } from "./TrainerCard";
 import type { GenerationStats } from "@/lib/stats/derive";
 
@@ -55,7 +56,7 @@ describe("nextLevelMastered", () => {
 
 describe("TrainerCard", () => {
   it("falls back to 'Trainer' when handle is null", () => {
-    render(
+    renderWithIntl(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
     // Both the label and the fallback handle read "Trainer"; assert at least
@@ -64,7 +65,7 @@ describe("TrainerCard", () => {
   });
 
   it("shows the user handle when provided", () => {
-    render(
+    renderWithIntl(
       <TrainerCard handle="ash" totalMastered={50} perGeneration={ALL_INCOMPLETE} />,
     );
     expect(screen.getByText("ash")).toBeInTheDocument();
@@ -74,13 +75,13 @@ describe("TrainerCard", () => {
     const perGen: GenerationStats[] = ALL_INCOMPLETE.map((g, idx) =>
       idx === 0 ? gen(1, 100, 100) : g,
     );
-    render(<TrainerCard handle={null} totalMastered={100} perGeneration={perGen} />);
+    renderWithIntl(<TrainerCard handle={null} totalMastered={100} perGeneration={perGen} />);
     const gen1Badge = screen.getByTitle(/Generation 1: complete!/);
     expect(gen1Badge.className).toContain("bg-amber-300");
   });
 
   it("renders a progress line with correct numbers for 0 mastered", () => {
-    render(
+    renderWithIntl(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
     // At Lv 1, nextLevelMastered(1) = 2, needed = 2
@@ -88,7 +89,7 @@ describe("TrainerCard", () => {
   });
 
   it("renders a progress line with correct numbers for a higher mastered count", () => {
-    render(
+    renderWithIntl(
       <TrainerCard handle={null} totalMastered={10} perGeneration={ALL_INCOMPLETE} />,
     );
     // At Lv 5, nextLevelMastered(5) = 15, needed = 5
@@ -96,21 +97,21 @@ describe("TrainerCard", () => {
   });
 
   it("shows 'All mastered' when totalMastered reaches the base species cap", () => {
-    render(
+    renderWithIntl(
       <TrainerCard handle={null} totalMastered={BASE_SPECIES_COUNT} perGeneration={ALL_INCOMPLETE} />,
     );
     expect(screen.getByText("All mastered")).toBeInTheDocument();
   });
 
   it("renders no forms line when totalFormCards is omitted or zero", () => {
-    render(
+    renderWithIntl(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
     expect(screen.queryByText(/forms mastered/)).toBeNull();
   });
 
   it("renders the secondary forms line when totalFormCards > 0", () => {
-    render(
+    renderWithIntl(
       <TrainerCard
         handle={null}
         totalMastered={10}
@@ -123,7 +124,7 @@ describe("TrainerCard", () => {
   });
 
   it("renders 0 forms mastered when formsMastered is omitted but totalFormCards is set", () => {
-    render(
+    renderWithIntl(
       <TrainerCard
         handle={null}
         totalMastered={10}
@@ -135,7 +136,7 @@ describe("TrainerCard", () => {
   });
 
   it("level number is described by the mastery criterion text", () => {
-    render(
+    renderWithIntl(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
     // sr-only element carries the accessible description
@@ -147,14 +148,14 @@ describe("TrainerCard", () => {
   });
 
   it("renders no badge rail when earnedBadges is omitted or empty", () => {
-    const { container } = render(
+    const { container } = renderWithIntl(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
     expect(container.querySelector('[aria-label="Gym badges earned"]')).toBeNull();
   });
 
   it("does not hint at unearned badges in any UI text (secret until earned)", () => {
-    render(
+    renderWithIntl(
       <TrainerCard
         handle={null}
         totalMastered={0}
@@ -175,7 +176,7 @@ describe("TrainerCard", () => {
   });
 
   it("renders an earned-badge chip for each entry", () => {
-    render(
+    renderWithIntl(
       <TrainerCard
         handle={null}
         totalMastered={9}
@@ -202,6 +203,63 @@ describe("TrainerCard", () => {
     expect(screen.getByText("Cascade Badge")).toBeInTheDocument();
     expect(
       screen.getByRole("list", { name: "Gym badges earned" }),
+    ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale coverage (mandatory per AGENTS.md)
+// ---------------------------------------------------------------------------
+
+describe("TrainerCard — locale coverage (i18n #1393)", () => {
+  const perGen = Array.from({ length: 9 }, (_, i) =>
+    gen(i + 1, 0, 100),
+  );
+
+  it("renders the Japanese Trainer label in ja locale", () => {
+    renderJa(
+      <TrainerCard handle={null} totalMastered={0} perGeneration={perGen} />,
+    );
+    // ja stats.trainerCard.trainerLabel = "トレーナー"
+    expect(screen.getAllByText("トレーナー").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("renders the Japanese level label in ja locale", () => {
+    renderJa(
+      <TrainerCard handle={null} totalMastered={0} perGeneration={perGen} />,
+    );
+    // ja stats.trainerCard.levelLabel = "Lv" (same in ja)
+    expect(screen.getByText("Lv")).toBeInTheDocument();
+  });
+
+  it("renders the Japanese 'all mastered' string in ja locale", () => {
+    renderJa(
+      <TrainerCard handle={null} totalMastered={BASE_SPECIES_COUNT} perGeneration={perGen} />,
+    );
+    // ja stats.trainerCard.allMastered = "すべて習得済み"
+    expect(screen.getByText("すべて習得済み")).toBeInTheDocument();
+  });
+
+  it("renders the Japanese gym badges aria-label in ja locale", () => {
+    renderJa(
+      <TrainerCard
+        handle={null}
+        totalMastered={0}
+        perGeneration={perGen}
+        earnedBadges={[
+          {
+            id: "test-badge",
+            name: "Test",
+            description: "Test badge",
+            lockedHint: "Hint",
+            criterion: { kind: "all-mastered", speciesIds: [1] },
+          },
+        ]}
+      />,
+    );
+    // ja stats.trainerCard.gymBadgesAriaLabel = "獲得ジムバッジ"
+    expect(
+      screen.getByRole("list", { name: "獲得ジムバッジ" }),
     ).toBeInTheDocument();
   });
 });

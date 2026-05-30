@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
@@ -16,6 +17,7 @@ import {
   type ScopeMatchContext,
 } from "@/lib/review/scope";
 import { GameScopePicker } from "@/components/review/GameScopePicker";
+import { getTypeName, type TypeTranslations } from "@/lib/i18n/typeNames";
 
 type Props = {
   scope: PracticeScope;
@@ -40,11 +42,8 @@ const ROMAN: Record<number, string> = {
   1: "I", 2: "II", 3: "III", 4: "IV", 5: "V",
   6: "VI", 7: "VII", 8: "VIII", 9: "IX",
 };
-const PRESETS: { key: PracticeScopePreset; label: string }[] = [
-  { key: "starters", label: "Starters" },
-  { key: "legendaries", label: "Legendaries" },
-  { key: "incomplete-chains", label: "Incomplete evolution chains" },
-];
+// Keys only — labels are resolved via t() at render time to support locale switching.
+const PRESET_KEYS: PracticeScopePreset[] = ["starters", "legendaries", "incomplete-chains"];
 
 function toggleNum(arr: number[], v: number): number[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -71,13 +70,7 @@ function presentFormCategories(seed: typeof SEED_POKEMON): FormCategory[] {
   return ORDER.filter((c) => seen.has(c));
 }
 
-const FORM_CATEGORY_LABELS: Partial<Record<FormCategory, string>> = {
-  regional: "Regional variants",
-  forme: "Out-of-battle formes",
-  mega: "Mega Evolutions",
-  gmax: "Gigantamax",
-  primal: "Primal Reversion",
-};
+// Form category labels are resolved via tScope() at render time — see ScopeControl.
 
 const UNSELECTED_PILL =
   "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900";
@@ -144,6 +137,11 @@ export function ScopeControl({
   incompleteChainSpeciesIds,
 }: Props) {
   const [open, setOpen] = useState(false);
+  // Note: the loop variable inside POKEMON_TYPES.map is named `type` (not `t`)
+  // to avoid shadowing the `tTypes` translation function. See LANDMINE note in
+  // issue #1389 specialist notes.
+  const tTypes = useTranslations("types") as TypeTranslations;
+  const tScope = useTranslations("practice.scope");
   const active = !isScopeEmpty(scope);
   // Context for the "Incomplete evolution chains" preset (#995): the live
   // count must consult the same incomplete-chain species set the session uses.
@@ -188,7 +186,7 @@ export function ScopeControl({
           aria-controls="scope-panel"
         >
           <span className={sectionLabel}>
-            Scope
+            {tScope("label")}
           </span>
           <span
             className={
@@ -209,7 +207,7 @@ export function ScopeControl({
             onClick={() => onChange(EMPTY_SCOPE)}
             className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
           >
-            Clear
+            {tScope("clear")}
           </button>
         ) : null}
       </div>
@@ -223,7 +221,7 @@ export function ScopeControl({
               Label reads "I"–"IX" so it is visually distinct from the
               games-axis bulk-action labels which spell out game names. */}
           <ScopeSection
-            legend="Generation"
+            legend={tScope("generation")}
             legendId="scope-section-generation"
             defaultOpen={gensActive}
           >
@@ -250,31 +248,32 @@ export function ScopeControl({
 
           {/* Type axis. */}
           <ScopeSection
-            legend="Type"
+            legend={tScope("type")}
             legendId="scope-section-type"
             defaultOpen={typesActive}
           >
             <div className="flex flex-wrap gap-1.5">
-              {POKEMON_TYPES.map((t) => {
-                const selected = scope.types.includes(t);
-                const colors = TYPE_COLORS[t];
+              {POKEMON_TYPES.map((type) => {
+                const selected = scope.types.includes(type);
+                const colors = TYPE_COLORS[type];
                 const selectedClasses = colors
                   ? `border-transparent ${colors.bg} ${colors.text}`
                   : SELECTED_ACCENT;
+                const typeName = getTypeName(type, tTypes);
                 return (
                   <button
-                    key={t}
+                    key={type}
                     type="button"
-                    onClick={() => onChange({ ...scope, types: toggleStr(scope.types, t) })}
-                    aria-label={`Type ${t}`}
+                    onClick={() => onChange({ ...scope, types: toggleStr(scope.types, type) })}
+                    aria-label={typeName}
                     aria-pressed={selected}
                     className={
                       PILL_BASE +
-                      " capitalize " +
+                      " " +
                       (selected ? selectedClasses : UNSELECTED_PILL)
                     }
                   >
-                    {t}
+                    {typeName}
                   </button>
                 );
               })}
@@ -283,26 +282,30 @@ export function ScopeControl({
 
           {/* Presets axis. */}
           <ScopeSection
-            legend="Groups"
+            legend={tScope("groups")}
             legendId="scope-section-groups"
             defaultOpen={presetsActive}
           >
             <div className="flex flex-wrap gap-1.5">
-              {PRESETS.map((p) => {
-                const selected = scope.presets.includes(p.key);
+              {PRESET_KEYS.map((key) => {
+                const selected = scope.presets.includes(key);
+                const presetLabel =
+                  key === "starters" ? tScope("presetStarters")
+                  : key === "legendaries" ? tScope("presetLegendaries")
+                  : tScope("presetIncompleteChains");
                 return (
                   <button
-                    key={p.key}
+                    key={key}
                     type="button"
                     onClick={() =>
-                      onChange({ ...scope, presets: togglePreset(scope.presets, p.key) })
+                      onChange({ ...scope, presets: togglePreset(scope.presets, key) })
                     }
                     aria-pressed={selected}
                     className={
                       PILL_BASE + " " + (selected ? SELECTED_ACCENT : UNSELECTED_PILL)
                     }
                   >
-                    {p.label}
+                    {presetLabel}
                   </button>
                 );
               })}
@@ -315,13 +318,13 @@ export function ScopeControl({
               filters by species introduction generation. Bulk-action labels spell
               out game names to prevent confusion with the gens-axis labels (#1110). */}
           <ScopeSection
-            legend="Games"
+            legend={tScope("games")}
             legendId="scope-section-games"
             defaultOpen={gamesActive}
             hasDivider={alternateFormsEnabled}
           >
             <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
-              Limit practice to Pokémon in the native Pokédex of specific games.
+              {tScope("gamesDescription")}
             </p>
             <GameScopePicker
               selected={scope.games ?? []}
@@ -334,7 +337,7 @@ export function ScopeControl({
               entirely because no form cards surface in practice (#658). */}
           {alternateFormsEnabled ? (
             <ScopeSection
-              legend="Alternate forms"
+              legend={tScope("alternateForms")}
               legendId="scope-section-forms"
               defaultOpen={formsActive}
               hasDivider={false}
@@ -342,11 +345,11 @@ export function ScopeControl({
               <div className="flex flex-col gap-2">
                 {(
                   [
-                    { value: "all", label: "Include all" },
-                    { value: "default-only", label: "Default form only" },
-                    { value: "include", label: "Choose categories…" },
-                  ] as const
-                ).map(({ value, label }) => (
+                    { value: "all" as const, labelKey: "formIncludeAll" as const },
+                    { value: "default-only" as const, labelKey: "formDefaultOnly" as const },
+                    { value: "include" as const, labelKey: "formChooseCategories" as const },
+                  ]
+                ).map(({ value, labelKey }) => (
                   <label key={value} className="flex cursor-pointer items-center gap-2 text-xs">
                     <input
                       type="radio"
@@ -362,7 +365,7 @@ export function ScopeControl({
                       }}
                       className="accent-rose-500"
                     />
-                    <span className="text-zinc-700 dark:text-zinc-300">{label}</span>
+                    <span className="text-zinc-700 dark:text-zinc-300">{tScope(labelKey)}</span>
                   </label>
                 ))}
                 {formFilter.mode === "include" && availableFormCategories.length > 0 ? (
@@ -370,6 +373,13 @@ export function ScopeControl({
                     {availableFormCategories.map((cat) => {
                       const checked =
                         formFilter.mode === "include" && formFilter.categories.includes(cat);
+                      const formCatLabel =
+                        cat === "regional" ? tScope("formCategoryRegional")
+                        : cat === "forme" ? tScope("formCategoryForme")
+                        : cat === "mega" ? tScope("formCategoryMega")
+                        : cat === "gmax" ? tScope("formCategoryGmax")
+                        : cat === "primal" ? tScope("formCategoryPrimal")
+                        : cat;
                       return (
                         <label
                           key={cat}
@@ -389,7 +399,7 @@ export function ScopeControl({
                             className="accent-rose-500"
                           />
                           <span className="text-zinc-700 dark:text-zinc-300">
-                            {FORM_CATEGORY_LABELS[cat] ?? cat}
+                            {formCatLabel}
                           </span>
                         </label>
                       );
@@ -398,7 +408,7 @@ export function ScopeControl({
                 ) : null}
                 {formFilter.mode === "include" && availableFormCategories.length === 0 ? (
                   <p className="ml-5 text-xs text-zinc-400 dark:text-zinc-500">
-                    No alternate forms in the current seed.
+                    {tScope("noAlternateForms")}
                   </p>
                 ) : null}
               </div>
@@ -415,13 +425,11 @@ export function ScopeControl({
                   : "text-zinc-600 dark:text-zinc-400")
               }
             >
-              {matchCount} of {totalCount} Pokémon match
+              {tScope("matchCount", { match: matchCount, total: totalCount })}
             </p>
             {active ? (
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Hidden cards are paused: their review dates shift forward by the time
-                they&apos;re hidden, so removing the scope won&apos;t flood your queue with overdue
-                reviews.
+                {tScope("hiddenCardsPaused")}
               </p>
             ) : null}
           </div>

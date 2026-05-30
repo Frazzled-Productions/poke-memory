@@ -6,9 +6,14 @@ import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
 import {
   markPushSucceeded,
   markPushFailed,
+  loadSyncStatus,
   savePendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
+import {
+  hasStructuralProbeBeenAttempted,
+  markStructuralProbeAttempted,
+} from "@/lib/sync/structuralError";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
@@ -17,6 +22,10 @@ const FAILURE_THRESHOLD = 3;
 
 /** Debounce delay (ms) for writing the pending queue to localStorage (#893). */
 const PERSIST_DEBOUNCE_MS = 500;
+
+// Session-scoped self-heal probe guard lives in structuralError.ts and is
+// accessed via hasStructuralProbeBeenAttempted / markStructuralProbeAttempted.
+// See structuralError.ts JSDoc for the full rationale (#1358 FIX 3).
 
 /**
  * Debounced per-grade sync hook. Returns { enqueueGrade, flushPending }.
@@ -83,6 +92,26 @@ export function usePerGradeSync(
     const uid = userIdRef.current;
     if (!c || !uid) return;
 
+    // Short-circuit if a structural error was already recorded (#1358). Retrying
+    // a schema-mismatch error is pointless until a deploy fixes the mismatch.
+    // Exception: allow ONE self-heal probe per session in case a deploy fix landed
+    // while the user stayed online (the 'online' event would not fire, so
+    // useOnlineReconnectSync cannot reset the flag). If the probe succeeds,
+    // pushSingleCard clears structuralSyncError automatically via cloud.ts. If it
+    // fails again, the banner persists and subsequent drains continue to
+    // short-circuit (#1358 FIX 3).
+    if (loadSyncStatus().structuralSyncError !== null) {
+      if (hasStructuralProbeBeenAttempted()) {
+        // Already probed this session and it failed (or is still in progress).
+        // Short-circuit without another attempt.
+        return;
+      }
+      markStructuralProbeAttempted();
+      // Fall through — allow the drain to proceed as the single probe attempt.
+      // pushSingleCard / pushSession will mark or clear structuralSyncError based
+      // on the result, so this path self-heals automatically on success.
+    }
+
     const toSend = [...pendingQueueRef.current];
     if (toSend.length === 0) return;
     // Locale-aware sent/failed sets: key by "id:locale" so cards with the same
@@ -101,6 +130,17 @@ export function usePerGradeSync(
         return { card, ok };
       }),
     );
+
+    // Check whether any push produced a new structural error (#1358). If so,
+    // markStructuralSyncError was already called inside pushSingleCard — persist
+    // the queue so grades survive and return early. Further drains short-circuit
+    // on the structuralSyncError guard above (or attempt a single probe next session).
+    if (loadSyncStatus().structuralSyncError !== null && !results.some((r) => r.ok)) {
+      // At least one card returned a structural error and nothing succeeded.
+      savePendingQueue(pendingQueueRef.current);
+      return;
+    }
+
     const failedKeys = new Set(results.filter((r) => !r.ok).map((r) => cardLocaleKey(r.card)));
 
     // Keep a card in the queue if it wasn't part of this drain (a newer grade

@@ -26,15 +26,30 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 vi.mock("@/lib/sync/cloud", () => ({
   pushSingleCard: vi.fn(),
   isSyncSafe: vi.fn(() => true),
+  // popStructuralErrorCode returns null by default so drainQueue does not
+  // call markStructuralSyncError in tests not testing that path.
+  popStructuralErrorCode: vi.fn(() => null),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({
   markPushSucceeded: vi.fn(),
   markPushFailed: vi.fn(),
+  markStructuralSyncError: vi.fn(),
   savePendingQueue: vi.fn(),
   clearPendingQueue: vi.fn(),
   loadPendingQueue: vi.fn(() => []),
-  loadSyncStatus: vi.fn(),
+  // Return a status with no structural error so drainQueue does not
+  // short-circuit (#1358) in tests that aren't testing that path.
+  loadSyncStatus: vi.fn(() => ({
+    lastPushAt: null,
+    lastPushFailed: false,
+    lastPushAttemptAt: null,
+    failedCardCount: null,
+    lastPullAt: null,
+    lastSettingsPullAt: null,
+    lastSeenResetAt: null,
+    structuralSyncError: null,
+  })),
   saveSyncStatus: vi.fn(),
 }));
 
@@ -137,6 +152,7 @@ const FAILED_STATUS: SyncStatus = {
   lastPullAt: null,
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 function fireOnline() {

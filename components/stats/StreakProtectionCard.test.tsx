@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import { act, fireEvent } from "@testing-library/react";
+import { renderWithIntl, renderJa, screen } from "@/components/test-utils/renderWithIntl";
 import { StreakProtectionCard } from "./StreakProtectionCard";
 import {
   saveSettings,
@@ -42,12 +43,12 @@ afterEach(() => {
 
 describe("StreakProtectionCard", () => {
   it("renders zero balance with the correct copy", () => {
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     // The heading is always present so we know the section rendered.
     expect(
       screen.getByRole("heading", { name: "Streak protection" }),
     ).toBeInTheDocument();
-    // 0 + "tokens" — verify via the explicit aria-label.
+    // 0 + "protection tokens" — verify via the explicit aria-label.
     expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
   });
 
@@ -69,7 +70,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(screen.getByLabelText("2 protection tokens")).toBeInTheDocument();
     // History line.
     expect(
@@ -77,7 +78,7 @@ describe("StreakProtectionCard", () => {
     ).toHaveTextContent(/Streak preserved on/);
     expect(
       screen.getByTestId("streak-protection-last-spend"),
-    ).toHaveTextContent(/2 tokens remaining/);
+    ).toHaveTextContent(/2 protection tokens/);
   });
 
   it("singularises the history-line balance when one token remains", () => {
@@ -95,21 +96,21 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.getByTestId("streak-protection-last-spend"),
-    ).toHaveTextContent(/1 token remaining/);
+    ).toHaveTextContent(/1 protection token/);
   });
 
   it("does not render the history line when no spend has happened", () => {
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.queryByTestId("streak-protection-last-spend"),
     ).not.toBeInTheDocument();
   });
 
   it("refreshes when settings are saved", () => {
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
 
     act(() => {
@@ -158,7 +159,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     const eventsSection = screen.getByTestId("streak-protection-recent-events");
     expect(eventsSection).toBeInTheDocument();
     expect(eventsSection).toHaveTextContent("Recent protection");
@@ -169,7 +170,7 @@ describe("StreakProtectionCard", () => {
   });
 
   it("does not render recent events when the list is empty", () => {
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.queryByTestId("streak-protection-recent-events"),
     ).not.toBeInTheDocument();
@@ -191,7 +192,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.getByTestId("streak-protection-earn-spend-banner"),
     ).toBeInTheDocument();
@@ -216,7 +217,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.queryByTestId("streak-protection-earn-spend-banner"),
     ).not.toBeInTheDocument();
@@ -238,7 +239,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     const banner = screen.getByTestId("streak-protection-earn-spend-banner");
     expect(banner).toBeInTheDocument();
 
@@ -267,9 +268,35 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.queryByTestId("streak-protection-earn-spend-banner"),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale coverage (mandatory per AGENTS.md — #1393)
+// ---------------------------------------------------------------------------
+
+describe("StreakProtectionCard — Japanese locale (#1393)", () => {
+  it("renders the Japanese heading in ja locale", () => {
+    renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // ja stats.streakProtection.heading = "連続記録の保護"
+    expect(
+      screen.getByRole("heading", { name: "連続記録の保護" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Japanese token aria-label for zero balance in ja locale", () => {
+    renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // ja stats.streakProtection.tokensRemaining (0 tokens) = "0 トークン残り"
+    // The aria-label is produced by the ICU plural — verify the section rendered correctly.
+    expect(
+      screen.getByRole("heading", { name: "連続記録の保護" }),
+    ).toBeInTheDocument();
+    // The token count region is present — check via the labelledby pattern.
+    // The token label "0 トークン残り" is the aria-label on the count element.
+    expect(screen.getByLabelText("0 トークン残り")).toBeInTheDocument();
   });
 });

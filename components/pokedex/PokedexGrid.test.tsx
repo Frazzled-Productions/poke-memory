@@ -6,8 +6,8 @@
  * by the coverage gate.
  */
 
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
 
 // ---------------------------------------------------------------------------
@@ -67,21 +67,21 @@ import PokedexGrid from "@/components/pokedex/PokedexGrid";
 
 describe("PokedexGrid", () => {
   it("renders the empty-state message when pokemon list is empty (line 217)", () => {
-    render(<PokedexGrid pokemon={[]} />);
+    renderWithIntl(<PokedexGrid pokemon={[]} />);
     expect(
       screen.getByText(/no pokémon match your filters/i),
     ).toBeInTheDocument();
   });
 
   it("renders a Clear filters link in the empty state", () => {
-    render(<PokedexGrid pokemon={[]} />);
+    renderWithIntl(<PokedexGrid pokemon={[]} />);
     expect(
       screen.getByRole("link", { name: /clear filters/i }),
     ).toHaveAttribute("href", "/pokedex");
   });
 
   it("renders a grid of pokemon cells when data is provided", () => {
-    render(<PokedexGrid pokemon={[CELL]} />);
+    renderWithIntl(<PokedexGrid pokemon={[CELL]} />);
     // When no activeGen is set the grid renders a flat list.
     // The cell uses the name as aria-label when not locked; locked cells use
     // "Pokémon #NNN". CELL has cardClass "locked" so an aria-label link is

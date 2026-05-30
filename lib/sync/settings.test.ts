@@ -82,6 +82,7 @@ const SAMPLE: UserSettings = {
   labsFlags: { ...DEFAULT_LABS_FLAGS },
   pokemonNameLocale: "en" as const,
   pushNotificationHour: null,
+  dismissedMtBannerLocales: [],
 };
 
 describe("pushSettings", () => {

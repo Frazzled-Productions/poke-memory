@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import type { PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
 import type { PokedexSortOrder } from "@/lib/pokedex/sort";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
+import { getTypeName, type TypeTranslations } from "@/lib/i18n/typeNames";
 
 // ---------------------------------------------------------------------------
 // Roman numeral map for generation pills
@@ -54,6 +55,7 @@ export default function PokedexFilterBar({
   superuserMasteryLocked = false,
 }: FilterBarProps) {
   const t = useTranslations("pokedex");
+  const tTypes = useTranslations("types") as TypeTranslations;
 
   // Defined inside the component so t() is in scope.
   const MASTERY_OPTIONS: { value: MasteryStatus; label: string }[] = [
@@ -133,6 +135,7 @@ export default function PokedexFilterBar({
         {POKEMON_TYPES.map((type) => {
           const isSelected = filters.types.includes(type);
           const colors = TYPE_COLORS[type];
+          const label = getTypeName(type, tTypes);
           return (
             <button
               key={type}
@@ -140,13 +143,13 @@ export default function PokedexFilterBar({
               onClick={() => onTypeToggle(type)}
               aria-pressed={isSelected}
               className={[
-                "rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
+                "rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
                 isSelected && colors
                   ? `${colors.bg} ${colors.text}`
                   : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
               ].join(" ")}
             >
-              {type.charAt(0).toUpperCase() + type.slice(1)}
+              {label}
             </button>
           );
         })}
