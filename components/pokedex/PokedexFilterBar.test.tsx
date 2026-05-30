@@ -301,3 +301,93 @@ describe("PokedexFilterBar — Japanese locale", () => {
     expect(screen.getByRole("button", { name: "第I世代" })).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Type pill locale coverage (#1389) — type names must localise with appLocale
+// ---------------------------------------------------------------------------
+
+describe("PokedexFilterBar — type pills in Japanese locale", () => {
+  it("renders the Fire pill in Japanese as ほのお", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json types.fire = "ほのお"
+    expect(screen.getByRole("button", { name: "ほのお" })).toBeInTheDocument();
+  });
+
+  it("renders the Water pill in Japanese as みず", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    // messages/ja.json types.water = "みず"
+    expect(screen.getByRole("button", { name: "みず" })).toBeInTheDocument();
+  });
+});
+
+describe("PokedexFilterBar — type pills in Simplified Chinese locale", () => {
+  it("renders the Fire pill in Simplified Chinese as 火", () => {
+    renderWithIntl(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+      { locale: "zh-Hans" },
+    );
+    // messages/zh-Hans.json types.fire = "火"
+    // Both fire and water are "火" and "水" in zh-Hans — spot-check fire
+    const typeGroup = screen.getByRole("group", { name: "按属性筛选" });
+    expect(typeGroup).toBeInTheDocument();
+    // The fire button in zh-Hans is "火"
+    const buttons = Array.from(typeGroup.querySelectorAll("button"));
+    const fireBtn = buttons.find((b) => b.textContent === "火");
+    expect(fireBtn).toBeTruthy();
+  });
+});
+
+describe("PokedexFilterBar — type pills in Traditional Chinese locale", () => {
+  it("renders the Dragon pill in Traditional Chinese as 龍", () => {
+    renderWithIntl(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+      { locale: "zh-Hant" },
+    );
+    // messages/zh-Hant.json types.dragon = "龍"
+    const typeGroup = screen.getByRole("group", { name: "按屬性篩選" });
+    expect(typeGroup).toBeInTheDocument();
+    const buttons = Array.from(typeGroup.querySelectorAll("button"));
+    const dragonBtn = buttons.find((b) => b.textContent === "龍");
+    expect(dragonBtn).toBeTruthy();
+  });
+});
