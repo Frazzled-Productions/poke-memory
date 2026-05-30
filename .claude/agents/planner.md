@@ -26,7 +26,7 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 
    Trivial issues (typo fixes, doc tweaks, one-liner workflow changes — the same set that may skip the planner entirely per WORKFLOW.md) are exempt from the AC-quality check.
 
-   **Pre-flight: testability + first-contact UX checklist (#1276).** For any user-facing feature change, before drafting the plan answer the two question sets below and fold the answers into the plan (as acceptance criteria, a dedicated step, or an `## Out of scope` note). Surface any gap you cannot resolve from the issue + codebase as a `[USER-DECISION]` open question — do not pick a default unilaterally.
+   **Pre-flight: testability + first-contact UX checklist (#1276).** For any user-facing feature change, before drafting the plan answer the two question sets below and fold the answers into the plan (as acceptance criteria, a dedicated step, or an `## Out of scope` note). Surface any gap you cannot resolve from the issue + codebase as a `[USER-DECISION]` open question — do not pick a default unilaterally. When the change adds a new user-facing feature, changes how something is displayed, or changes how something is accessed, invoke `ux-advisor` on the brief before proceeding — the same pattern as invoking `srs-expert` for scheduler changes or `supabase-expert` for schema changes. Any discoverability gap `ux-advisor` cannot resolve from the existing code becomes a `[USER-DECISION]` open question or a dedicated AC.
 
    *Testability*
    - How would a tester confirm this works in under 10 minutes on a fresh environment?
