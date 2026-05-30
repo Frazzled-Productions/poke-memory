@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { GenerationStats } from "@/lib/stats/derive";
 import type { BadgeDefinition } from "@/lib/badges/catalog";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
@@ -70,27 +71,28 @@ export function TrainerCard({
   formsMastered,
   totalFormCards,
 }: Props) {
+  const t = useTranslations("stats.trainerCard");
   const level = trainerLevel(totalMastered);
   const next = nextLevelMastered(level);
   const needed = next - totalMastered;
 
   return (
     <section
-      aria-label="Trainer card"
+      aria-label={t("ariaLabel")}
       className="rounded-xl border border-zinc-200 bg-gradient-to-r from-amber-50 via-rose-50 to-sky-50 p-4 dark:border-zinc-800 dark:from-amber-950/30 dark:via-rose-950/30 dark:to-sky-950/30"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col">
           <span className={sectionLabel}>
-            Trainer
+            {t("trainerLabel")}
           </span>
           <span className="text-lg font-semibold text-foreground">
-            {handle ?? "Trainer"}
+            {handle ?? t("trainerFallback")}
           </span>
         </div>
         <div className="flex items-baseline gap-2">
           <span className={sectionLabel}>
-            Lv
+            {t("levelLabel")}
           </span>
           <span
             className="text-3xl font-bold tabular-nums text-foreground"
@@ -99,25 +101,24 @@ export function TrainerCard({
             {level}
           </span>
           <span id="trainer-level-desc" className="sr-only">
-            Level grows with the number of Pokémon name cards you&apos;ve mastered
-            (reps ≥ 3 and scheduled interval ≥ 21 days).
+            {t("levelDescription")}
           </span>
         </div>
       </div>
       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
         {totalMastered >= BASE_SPECIES_COUNT
-          ? "All mastered"
-          : `${totalMastered} / ${next} mastered · ${needed} to Lv ${level + 1}`}
+          ? t("allMastered")
+          : t("masteryProgress", { mastered: totalMastered, next, needed, levelNext: level + 1 })}
       </p>
       {totalFormCards !== undefined && totalFormCards > 0 ? (
         <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-          {formsMastered ?? 0} / {totalFormCards} forms mastered
+          {t("formsMastered", { mastered: formsMastered ?? 0, total: totalFormCards })}
         </p>
       ) : null}
       <ul
         role="list"
         className="mt-3 flex flex-wrap gap-1.5"
-        aria-label="Generation completion badges"
+        aria-label={t("generationBadgesAriaLabel")}
       >
         {perGeneration.map((gen, idx) => {
           const completed = gen.total > 0 && gen.mastered === gen.total;
@@ -126,8 +127,8 @@ export function TrainerCard({
               key={gen.gen}
               title={
                 completed
-                  ? `${gen.name}: complete!`
-                  : `${gen.name}: ${gen.mastered}/${gen.total} mastered`
+                  ? t("generationComplete", { name: gen.name })
+                  : t("generationProgress", { name: gen.name, mastered: gen.mastered, total: gen.total })
               }
               className={
                 "flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-semibold tabular-nums transition-colors " +
@@ -145,7 +146,7 @@ export function TrainerCard({
         <ul
           role="list"
           className="mt-3 flex flex-wrap gap-1.5"
-          aria-label="Gym badges earned"
+          aria-label={t("gymBadgesAriaLabel")}
         >
           {earnedBadges.map((badge) => (
             <li

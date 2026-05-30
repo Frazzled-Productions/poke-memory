@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   loadSettings,
   saveSettings,
@@ -23,17 +24,7 @@ type Props = {
   timezone: string;
 };
 
-/** Human-readable label for each event kind. British English; no em dashes. */
-function eventLabel(kind: ProtectionEvent["kind"]): string {
-  switch (kind) {
-    case "earned":
-      return "Earned";
-    case "spent":
-      return "Used";
-    case "earned-and-spent":
-      return "Earned + used";
-  }
-}
+// eventLabel is resolved via useTranslations inside StreakProtectionCard.
 
 /**
  * Streak-protection summary for the Stats page (#1227, #1233).
@@ -46,6 +37,7 @@ function eventLabel(kind: ProtectionEvent["kind"]): string {
  * the cloud.
  */
 export function StreakProtectionCard({ dateFormat, timezone }: Props) {
+  const t = useTranslations("stats.streakProtection");
   const [state, setState] = useState<StreakProtection | null>(null);
 
   useEffect(() => {
@@ -106,7 +98,7 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
         id="streak-protection-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        Streak protection
+        {t("heading")}
       </h2>
       <div className={cn("flex flex-col gap-2", cardPanel)}>
         {showBanner && (
@@ -116,13 +108,12 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
             className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
           >
             <span>
-              You earned a streak protection token and used it the same day to
-              cover yesterday. Your streak is safe.
+              {t("earnAndSpentBanner")}
             </span>
             <button
               type="button"
               onClick={dismissBanner}
-              aria-label="Dismiss streak protection notice"
+              aria-label={t("dismissAriaLabel")}
               className="shrink-0 rounded text-amber-600 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-1 dark:text-amber-400 dark:hover:text-amber-200"
             >
               ×
@@ -132,26 +123,23 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
         <div className="flex items-baseline gap-2">
           <span
             className="text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400"
-            aria-label={
-              balance === 1 ? "1 protection token" : `${balance} protection tokens`
-            }
+            aria-label={t("tokensRemaining", { count: balance })}
           >
             {balance}
           </span>
           <span className={mutedText}>
-            {balance === 1 ? "token" : "tokens"}
-            {balance >= MAX_BALANCE ? " (max)" : ""}
+            {balance === 1 ? t("tokenSingular") : t("tokenPlural")}
+            {balance >= MAX_BALANCE ? t("tokenMax") : ""}
           </span>
         </div>
         <p className={cn("text-xs", mutedText)}>
-          Tokens cover one missed day, automatically. Earn one for every{" "}
-          {EARN_INTERVAL_DAYS} consecutive review days, up to {MAX_BALANCE}.
+          {t("earnDescription", { earnInterval: EARN_INTERVAL_DAYS, maxBalance: MAX_BALANCE })}
         </p>
         {balance < MAX_BALANCE && (
           <p className={cn("text-xs", mutedText)}>
             {daysUntilNext === EARN_INTERVAL_DAYS
-              ? `Review today to start earning your next token.`
-              : `Next token in ${daysUntilNext} review day${daysUntilNext === 1 ? "" : "s"}.`}
+              ? t("nextTokenStart")
+              : t("nextTokenCount", { count: daysUntilNext })}
           </p>
         )}
         {lastSpend !== null && (
@@ -159,8 +147,8 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
             className={cn("text-xs", mutedText)}
             data-testid="streak-protection-last-spend"
           >
-            Streak preserved on {formatDate(lastSpend, dateFormat, timezone)}.{" "}
-            {balance === 1 ? "1 token remaining" : `${balance} tokens remaining`}.
+            {t("streakPreserved", { date: formatDate(lastSpend, dateFormat, timezone) })}{" "}
+            {t("tokensRemaining", { count: balance })}.
           </p>
         )}
         {recentEvents.length > 0 && (
@@ -169,18 +157,24 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
             data-testid="streak-protection-recent-events"
           >
             <p className={cn("mb-1 text-xs font-medium", mutedText)}>
-              Recent protection
+              {t("recentProtectionHeading")}
             </p>
             <ul className="flex flex-col gap-0.5">
-              {recentEvents.map((event, index) => (
-                <li
-                  key={`${event.date}-${index}`}
-                  className={cn("text-xs", mutedText)}
-                >
-                  {formatDate(event.date, dateFormat, timezone)} -{" "}
-                  {eventLabel(event.kind)}
-                </li>
-              ))}
+              {recentEvents.map((event, index) => {
+                const eventKindLabel =
+                  event.kind === "earned" ? t("eventEarned")
+                  : event.kind === "spent" ? t("eventUsed")
+                  : t("eventEarnedAndUsed");
+                return (
+                  <li
+                    key={`${event.date}-${index}`}
+                    className={cn("text-xs", mutedText)}
+                  >
+                    {formatDate(event.date, dateFormat, timezone)} -{" "}
+                    {eventKindLabel}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

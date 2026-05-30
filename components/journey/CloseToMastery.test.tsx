@@ -12,8 +12,9 @@
  * Lives in components/ so the jsdom vitest project picks it up.
  */
 
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 import { CloseToMastery } from "./CloseToMastery";
 import type { CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
 
@@ -66,26 +67,26 @@ function makeEntry(
 
 describe("CloseToMastery — empty state", () => {
   it("shows the section heading", () => {
-    render(<CloseToMastery entries={[]} />);
+    renderWithIntl(<CloseToMastery entries={[]} />);
     expect(
       screen.getByRole("heading", { name: "Close to mastery" }),
     ).toBeInTheDocument();
   });
 
   it("shows the empty-state message", () => {
-    render(<CloseToMastery entries={[]} />);
+    renderWithIntl(<CloseToMastery entries={[]} />);
     expect(
       screen.getByText(/No gap to close right now/i),
     ).toBeInTheDocument();
   });
 
   it("does not render the subtitle count paragraph", () => {
-    render(<CloseToMastery entries={[]} />);
+    renderWithIntl(<CloseToMastery entries={[]} />);
     expect(screen.queryByText(/species to go/i)).not.toBeInTheDocument();
   });
 
   it("does not render the species list", () => {
-    render(<CloseToMastery entries={[]} />);
+    renderWithIntl(<CloseToMastery entries={[]} />);
     expect(
       screen.queryByRole("list", { name: "Species close to mastery" }),
     ).not.toBeInTheDocument();
@@ -99,40 +100,41 @@ describe("CloseToMastery — populated list", () => {
   ];
 
   it("shows the section heading", () => {
-    render(<CloseToMastery entries={entries} />);
+    renderWithIntl(<CloseToMastery entries={entries} />);
     expect(
       screen.getByRole("heading", { name: "Close to mastery" }),
     ).toBeInTheDocument();
   });
 
   it("shows the subtitle with the species count", () => {
-    render(<CloseToMastery entries={entries} />);
-    // The subtitle contains the entry count as a number
-    expect(screen.getByText("2")).toBeInTheDocument();
+    renderWithIntl(<CloseToMastery entries={entries} />);
+    // The count is now rendered inline via t.rich — query for it via the paragraph text.
+    // "Name known, reverse card still to learn: 2 species to go." is the full text.
     expect(screen.getByText(/species to go/i)).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
   });
 
   it("renders the accessible list", () => {
-    render(<CloseToMastery entries={entries} />);
+    renderWithIntl(<CloseToMastery entries={entries} />);
     expect(
       screen.getByRole("list", { name: "Species close to mastery" }),
     ).toBeInTheDocument();
   });
 
   it("renders a list item for each entry", () => {
-    render(<CloseToMastery entries={entries} />);
+    renderWithIntl(<CloseToMastery entries={entries} />);
     const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(2);
   });
 
   it("renders each entry's English name", () => {
-    render(<CloseToMastery entries={entries} />);
+    renderWithIntl(<CloseToMastery entries={entries} />);
     expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
     expect(screen.getByText("Charmander")).toBeInTheDocument();
   });
 
   it("renders each entry's sprite image (decorative, empty alt)", () => {
-    const { container } = render(<CloseToMastery entries={entries} />);
+    const { container } = renderWithIntl(<CloseToMastery entries={entries} />);
     // The sprite images have alt="" and are wrapped in aria-hidden="true" divs
     // so they get the "presentation" role in the accessibility tree. Query by
     // the img element directly.
@@ -143,7 +145,7 @@ describe("CloseToMastery — populated list", () => {
   });
 
   it("renders interval progress labels for introduced entries", () => {
-    render(<CloseToMastery entries={entries} />);
+    renderWithIntl(<CloseToMastery entries={entries} />);
     // aria-label: "18 / 21 day interval" and "7 / 21 day interval"
     expect(
       screen.getByLabelText("18 / 21 day interval"),
@@ -154,7 +156,7 @@ describe("CloseToMastery — populated list", () => {
   });
 
   it("renders the days-remaining badge for introduced entries", () => {
-    render(<CloseToMastery entries={entries} />);
+    renderWithIntl(<CloseToMastery entries={entries} />);
     // Bulbasaur: 21 - 18 = 3 days remaining → "-3d"
     // Charmander: 21 - 7 = 14 days remaining → "-14d"
     expect(screen.getByLabelText("3 more days needed")).toBeInTheDocument();
@@ -162,7 +164,7 @@ describe("CloseToMastery — populated list", () => {
   });
 
   it("does not show the overflow footer when entries <= 10", () => {
-    render(<CloseToMastery entries={entries} />);
+    renderWithIntl(<CloseToMastery entries={entries} />);
     expect(screen.queryByText(/Showing 10 of/i)).not.toBeInTheDocument();
   });
 });
@@ -175,17 +177,17 @@ describe("CloseToMastery — not-yet-started entry (reverseIntroduced = false)",
   });
 
   it("shows the 'not started' label for an unintroduced reverse card", () => {
-    render(<CloseToMastery entries={[entry]} />);
+    renderWithIntl(<CloseToMastery entries={[entry]} />);
     expect(screen.getByLabelText("Not yet started")).toBeInTheDocument();
   });
 
   it("shows 'not started' text in the interval column", () => {
-    render(<CloseToMastery entries={[entry]} />);
+    renderWithIntl(<CloseToMastery entries={[entry]} />);
     expect(screen.getByText("not started")).toBeInTheDocument();
   });
 
   it("does not render a days-remaining badge for an unintroduced entry", () => {
-    render(<CloseToMastery entries={[entry]} />);
+    renderWithIntl(<CloseToMastery entries={[entry]} />);
     // The badge only renders when reverseIntroduced is true.
     expect(screen.queryByLabelText(/more days needed/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Ready for mastery")).not.toBeInTheDocument();
@@ -201,12 +203,12 @@ describe("CloseToMastery — ready-for-mastery entry (daysRemaining = 0)", () =>
   });
 
   it("shows the 'Ready for mastery' label", () => {
-    render(<CloseToMastery entries={[entry]} />);
+    renderWithIntl(<CloseToMastery entries={[entry]} />);
     expect(screen.getByLabelText("Ready for mastery")).toBeInTheDocument();
   });
 
   it("renders 'Ready' text in the badge", () => {
-    render(<CloseToMastery entries={[entry]} />);
+    renderWithIntl(<CloseToMastery entries={[entry]} />);
     expect(screen.getByText("Ready")).toBeInTheDocument();
   });
 });
@@ -222,18 +224,18 @@ describe("CloseToMastery — truncation (more than 10 entries)", () => {
   );
 
   it("renders exactly 10 list items when 12 entries are provided", () => {
-    render(<CloseToMastery entries={manyEntries} />);
+    renderWithIntl(<CloseToMastery entries={manyEntries} />);
     const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(10);
   });
 
   it("shows the overflow footer citing the total count", () => {
-    render(<CloseToMastery entries={manyEntries} />);
+    renderWithIntl(<CloseToMastery entries={manyEntries} />);
     expect(screen.getByText(/Showing 10 of 12/i)).toBeInTheDocument();
   });
 
   it("footer mentions practising reverse cards", () => {
-    render(<CloseToMastery entries={manyEntries} />);
+    renderWithIntl(<CloseToMastery entries={manyEntries} />);
     expect(screen.getByText(/practise reverse cards/i)).toBeInTheDocument();
   });
 });
@@ -246,13 +248,71 @@ describe("CloseToMastery — exactly 10 entries (no footer)", () => {
   );
 
   it("renders all 10 list items", () => {
-    render(<CloseToMastery entries={tenEntries} />);
+    renderWithIntl(<CloseToMastery entries={tenEntries} />);
     const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(10);
   });
 
   it("does not show the overflow footer for exactly 10 entries", () => {
-    render(<CloseToMastery entries={tenEntries} />);
+    renderWithIntl(<CloseToMastery entries={tenEntries} />);
     expect(screen.queryByText(/Showing 10 of/i)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale coverage (mandatory per AGENTS.md — #1393)
+// ---------------------------------------------------------------------------
+
+describe("CloseToMastery — locale coverage (i18n #1393)", () => {
+  const entry = {
+    speciesId: 1,
+    englishName: "Bulbasaur",
+    spriteUrl: "/sprites/pokemon/1.png",
+    reverseScheduledDays: 10,
+    reverseReps: 2,
+    reverseIntroduced: true,
+  };
+
+  it("renders the Japanese heading in ja locale", () => {
+    renderJa(<CloseToMastery entries={[]} />);
+    // ja journey.closeToMasteryWidget.heading = "習得間近"
+    expect(screen.getByRole("heading", { name: "習得間近" })).toBeInTheDocument();
+  });
+
+  it("renders the Japanese empty-state message in ja locale", () => {
+    renderJa(<CloseToMastery entries={[]} />);
+    // ja journey.closeToMasteryWidget.emptyState = "今は埋めるギャップがありません。すばらしい！"
+    expect(screen.getByText(/今は埋めるギャップがありません/i)).toBeInTheDocument();
+  });
+
+  it("renders the Japanese list aria-label in ja locale when populated", () => {
+    const { container } = renderJa(<CloseToMastery entries={[entry]} />);
+    // ja journey.closeToMasteryWidget.listAriaLabel = "習得間近の種族"
+    expect(
+      container.querySelector('[aria-label="習得間近の種族"]'),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Japanese not-started text in ja locale", () => {
+    renderJa(
+      <CloseToMastery
+        entries={[{ ...entry, reverseScheduledDays: 0, reverseReps: 0, reverseIntroduced: false }]}
+      />,
+    );
+    // ja journey.closeToMasteryWidget.notStarted = "未開始"
+    expect(screen.getByText("未開始")).toBeInTheDocument();
+  });
+
+  it("renders the Japanese speciesToGo text with count appearing exactly once", () => {
+    const twoEntries = [entry, { ...entry, speciesId: 2, englishName: "Ivysaur" }];
+    renderJa(<CloseToMastery entries={twoEntries} />);
+    // ja journey.closeToMasteryWidget.speciesToGo = "2 種族残り。" (count rendered once via t.rich)
+    expect(screen.getByText(/種族残り/)).toBeInTheDocument();
+    // The count "2" appears in the subtitle span exactly once (not doubled).
+    const countEls = screen.getAllByText("2");
+    // Only one "2" in the subtitle (the em-wrapped count from t.rich).
+    // There may be an additional "2" from the interval progress label — filter to the subtitle paragraph.
+    const subtitlePara = screen.getByText(/種族残り/).closest("p");
+    expect(subtitlePara?.querySelectorAll("span")).toHaveLength(1);
   });
 });

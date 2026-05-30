@@ -14,6 +14,7 @@
  */
 
 import { useState, useId, useMemo, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import type { CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { snapshotAtPosition } from "@/lib/timeline/reconstruct";
 import { chartTickText } from "@/lib/utils/class-names";
@@ -36,15 +37,7 @@ function pct(numerator: number, denominator: number): number {
   return Math.round((numerator / denominator) * 100);
 }
 
-/**
- * Label for the direction indicator above the scrubber.
- * Negative = past, positive = future, zero = now.
- */
-function directionLabel(position: number): string {
-  if (position < -0.01) return "Past";
-  if (position > 0.01) return "Future";
-  return "Now";
-}
+// directionLabel is computed inside the component using tWidget so it can localise.
 
 /**
  * Colour swatch for the direction pill.
@@ -124,14 +117,14 @@ function ProgressBar({
 // ---------------------------------------------------------------------------
 
 function EmptyState() {
+  const tWidget = useTranslations("journey.collectionTimelineWidget");
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-6 py-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
       <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-        No review history yet
+        {tWidget("noHistoryYet")}
       </p>
       <p className="max-w-xs text-xs text-zinc-400 dark:text-zinc-500">
-        Review some cards to see your collection grow here. The timeline shows
-        your past progress and projects how long your memory will hold.
+        {tWidget("noHistoryBody")}
       </p>
     </div>
   );
@@ -146,6 +139,7 @@ export type CollectionTimelineProps = {
 };
 
 export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
+  const tWidget = useTranslations("journey.collectionTimelineWidget");
   const sliderId = useId();
   const liveId = useId();
 
@@ -161,6 +155,13 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
   const { totalSpecies } = timeline;
   const isFuture = position > 0.01;
   const isPast = position < -0.01;
+
+  /** Locale-aware direction label. */
+  const directionLabel = isPast
+    ? tWidget("directionPast")
+    : isFuture
+      ? tWidget("directionFuture")
+      : tWidget("directionNow");
 
   // Static two-colour track: blue left half (past), amber right half (future).
   // The thumb's position on the track communicates which direction the user
@@ -189,7 +190,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
           id="timeline-heading"
           className="mb-4 text-lg font-semibold text-foreground"
         >
-          Collection timeline
+          {tWidget("heading")}
         </h2>
         <EmptyState />
       </section>
@@ -201,8 +202,17 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
 
   // Accessible announcement for screen readers.
   const announcementText = isFuture
-    ? `${formatDate(snapshot.atMs)}: ${snapshot.mastered} species still retained (${masteredPct}% of ${totalSpecies})`
-    : `${formatDate(snapshot.atMs)}: ${snapshot.introduced} introduced, ${snapshot.mastered} mastered`;
+    ? tWidget("announcementRetained", {
+        date: formatDate(snapshot.atMs),
+        mastered: snapshot.mastered,
+        pct: masteredPct,
+        total: totalSpecies,
+      })
+    : tWidget("announcementBuilt", {
+        date: formatDate(snapshot.atMs),
+        introduced: snapshot.introduced,
+        mastered: snapshot.mastered,
+      });
 
   return (
     <section aria-labelledby="timeline-heading">
@@ -210,7 +220,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
         id="timeline-heading"
         className="mb-4 text-lg font-semibold text-foreground"
       >
-        Collection timeline
+        {tWidget("heading")}
       </h2>
 
       <div className="rounded-xl border border-zinc-200 bg-background px-5 py-5 dark:border-zinc-800">
@@ -220,7 +230,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
             data-testid="timeline-direction-pill"
             className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${directionClass(position)}`}
           >
-            {directionLabel(position)}
+            {directionLabel}
           </span>
           <span className="text-sm tabular-nums text-zinc-500 dark:text-zinc-400">
             {formatDate(snapshot.atMs)}
@@ -236,12 +246,12 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
             <>
               <CountPill
                 count={snapshot.mastered}
-                label="still retained"
+                label={tWidget("stillRetained")}
                 colour="text-amber-500 dark:text-amber-400"
               />
               <CountPill
                 count={totalSpecies - snapshot.mastered}
-                label="forgotten"
+                label={tWidget("forgotten")}
                 colour={chartTickText}
               />
             </>
@@ -249,12 +259,12 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
             <>
               <CountPill
                 count={snapshot.introduced}
-                label="introduced"
+                label={tWidget("introduced")}
                 colour="text-blue-600 dark:text-blue-400"
               />
               <CountPill
                 count={snapshot.mastered}
-                label="mastered"
+                label={tWidget("mastered")}
                 colour="text-emerald-600 dark:text-emerald-400"
               />
             </>
@@ -294,9 +304,9 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
           className="mb-1 flex justify-between text-xs text-zinc-400 dark:text-zinc-500"
           aria-hidden="true"
         >
-          <span>Past</span>
-          <span>Now</span>
-          <span>Future</span>
+          <span>{tWidget("past")}</span>
+          <span>{tWidget("now")}</span>
+          <span>{tWidget("future")}</span>
         </div>
 
         {/* Scrubber */}
@@ -322,7 +332,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
             value={sliderValue}
             onChange={handleChange}
             onDoubleClick={handleDoubleClick}
-            aria-label="Collection timeline scrubber"
+            aria-label={tWidget("scrubberAriaLabel")}
             aria-describedby={liveId}
             aria-valuetext={announcementText}
             className={[
@@ -366,19 +376,19 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
         <div className="mt-2 flex items-center justify-center gap-3">
           <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
             {position === 0
-              ? "Drag left to replay your journey, right to see the forgetting horizon."
+              ? tWidget("dragHintNow")
               : isFuture
-                ? "Projected memory decay if no cards are reviewed."
-                : "Replay of your collection as it was built."}
+                ? tWidget("dragHintFuture")
+                : tWidget("dragHintPast")}
           </p>
           {position !== 0 && (
             <button
               type="button"
               onClick={() => setSliderValue(RANGE_CENTRE)}
               className="shrink-0 rounded px-2 py-0.5 text-xs text-zinc-500 underline-offset-2 hover:underline dark:text-zinc-400"
-              aria-label="Reset timeline to now"
+              aria-label={tWidget("resetAriaLabel")}
             >
-              Reset
+              {tWidget("reset")}
             </button>
           )}
         </div>

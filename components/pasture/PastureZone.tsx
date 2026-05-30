@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type { HabitatZone } from "@/lib/pasture/zones";
 import type { BiomeStats } from "@/lib/pasture/stats";
 import { PasturePokemon } from "./PasturePokemon";
@@ -78,19 +79,31 @@ const LABEL_COLOURS: Record<string, string> = {
   unknown:        "text-zinc-700 dark:text-zinc-400",
 };
 
+/** All PokéAPI habitat values catalogued in pasture.zones. */
+const CATALOGUED_HABITATS = new Set([
+  "grassland", "forest", "sea", "cave", "mountain",
+  "urban", "waters-edge", "rough-terrain", "rare", "unknown",
+]);
+
 export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats }: Props) {
+  const t = useTranslations("pasture");
   const biomeRenderer = BIOME_RENDERERS[zone.habitat];
   const tint = HABITAT_TINTS[zone.habitat] ?? HABITAT_TINTS.unknown;
   const labelColour = LABEL_COLOURS[zone.habitat] ?? LABEL_COLOURS.unknown;
+  // Resolve locale-aware zone label from the catalogue; fall back to the
+  // static English label for any habitat not yet catalogued.
+  const zoneLabel = CATALOGUED_HABITATS.has(zone.habitat)
+    ? t(`zones.${zone.habitat as "grassland" | "forest" | "sea" | "cave" | "mountain" | "urban" | "waters-edge" | "rough-terrain" | "rare" | "unknown"}`)
+    : zone.label;
 
   const zoneRef = useRef<HTMLDivElement>(null);
   useIdleBehaviour(zoneRef, placements);
 
   return (
-    <section aria-label={`${zone.label} zone`}>
+    <section aria-label={t("zoneAriaLabel", { zone: zoneLabel })}>
       <div className="mb-1.5 flex items-center gap-2">
         <h2 className={`text-sm font-semibold ${labelColour}`}>
-          {zone.label}
+          {zoneLabel}
           <span className="ml-1.5 font-normal opacity-60">
             ({placements.length})
           </span>
@@ -98,7 +111,7 @@ export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats }: 
         {biomeHref && (
           <Link
             href={biomeHref}
-            aria-label={`View ${zone.label} in landscape`}
+            aria-label={t("landscapeAriaLabel", { zone: zoneLabel })}
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1"
           >
             <svg
@@ -125,7 +138,7 @@ export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats }: 
                 strokeLinejoin="round"
               />
             </svg>
-            Landscape
+            {t("landscape")}
           </Link>
         )}
       </div>

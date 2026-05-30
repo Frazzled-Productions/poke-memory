@@ -6,8 +6,12 @@
  * no override is present.
  */
 
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import {
+  renderWithIntl,
+  renderJa,
+  screen,
+} from "@/components/test-utils/renderWithIntl";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
 import type { LocaleNameOverride } from "@/components/pokedex/PokedexGrid";
 
@@ -73,7 +77,7 @@ import PokedexGrid from "@/components/pokedex/PokedexGrid";
 
 describe("PokedexGrid — locale name rendering", () => {
   it("renders the English name when no localeNames map is supplied", () => {
-    render(<PokedexGrid pokemon={[BULBASAUR]} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
     expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
   });
 
@@ -81,7 +85,7 @@ describe("PokedexGrid — locale name rendering", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "フシギダネ", lang: "ja" }],
     ]);
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     expect(screen.getByText("フシギダネ")).toBeInTheDocument();
     expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
   });
@@ -90,20 +94,20 @@ describe("PokedexGrid — locale name rendering", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "フシギダネ", lang: "ja" }],
     ]);
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     const nameSpan = screen.getByText("フシギダネ");
     expect(nameSpan).toHaveAttribute("lang", "ja");
   });
 
   it("does not apply a lang attribute when no locale override is present", () => {
-    render(<PokedexGrid pokemon={[BULBASAUR]} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
     const nameSpan = screen.getByText("Bulbasaur");
     // lang attribute should be absent (not set to anything) for English names.
     expect(nameSpan).not.toHaveAttribute("lang");
   });
 
   it("uses the English name in the aria-label link when no locale override is present", () => {
-    render(<PokedexGrid pokemon={[BULBASAUR]} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
     // Non-locked cell: aria-label equals the display name.
     expect(screen.getByRole("link", { name: "Bulbasaur" })).toBeInTheDocument();
   });
@@ -112,7 +116,7 @@ describe("PokedexGrid — locale name rendering", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "フシギダネ", lang: "ja" }],
     ]);
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     expect(screen.getByRole("link", { name: "フシギダネ" })).toBeInTheDocument();
   });
 
@@ -121,7 +125,7 @@ describe("PokedexGrid — locale name rendering", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [99, { name: "Unrelated", lang: "ja" }],
     ]);
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
   });
 
@@ -132,7 +136,7 @@ describe("PokedexGrid — locale name rendering", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "妙蛙种子", lang: "zh-Hans" }],
     ]);
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     expect(screen.getByText("妙蛙种子")).toBeInTheDocument();
     expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
   });
@@ -141,7 +145,7 @@ describe("PokedexGrid — locale name rendering", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "妙蛙种子", lang: "zh-Hans" }],
     ]);
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     const nameSpan = screen.getByText("妙蛙种子");
     expect(nameSpan).toHaveAttribute("lang", "zh-Hans");
   });
@@ -153,7 +157,7 @@ describe("PokedexGrid — locale name rendering", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "妙蛙種子", lang: "zh-Hant" }],
     ]);
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     expect(screen.getByText("妙蛙種子")).toBeInTheDocument();
     expect(screen.queryByText("Bulbasaur")).not.toBeInTheDocument();
   });
@@ -162,7 +166,7 @@ describe("PokedexGrid — locale name rendering", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "妙蛙種子", lang: "zh-Hant" }],
     ]);
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     const nameSpan = screen.getByText("妙蛙種子");
     expect(nameSpan).toHaveAttribute("lang", "zh-Hant");
   });
@@ -176,13 +180,32 @@ describe("PokedexGrid — locale name rendering", () => {
     const hantMap: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "妙蛙種子", lang: "zh-Hant" }],
     ]);
-    const { unmount } = render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={hansMap} />);
+    const { unmount } = renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={hansMap} />);
     expect(screen.getByText("妙蛙种子")).toHaveAttribute("lang", "zh-Hans");
     expect(screen.queryByText("妙蛙種子")).not.toBeInTheDocument();
     unmount();
 
-    render(<PokedexGrid pokemon={[BULBASAUR]} localeNames={hantMap} />);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={hantMap} />);
     expect(screen.getByText("妙蛙種子")).toHaveAttribute("lang", "zh-Hant");
     expect(screen.queryByText("妙蛙种子")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// masteryCount label locale coverage (#1393)
+// ---------------------------------------------------------------------------
+
+describe("PokedexGrid — masteryCount label locale coverage (#1393)", () => {
+  it("renders the English mastery count label in en locale", () => {
+    // BULBASAUR has cardClass: 'learning', so mastered=0, total=1
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
+    // pokedex.masteryCount = "{mastered} / {total} mastered" → "0 / 1 mastered"
+    expect(screen.getByText(/0 \/ 1 mastered/)).toBeInTheDocument();
+  });
+
+  it("renders the Japanese mastery count label in ja locale", () => {
+    renderJa(<PokedexGrid pokemon={[BULBASAUR]} />);
+    // ja pokedex.masteryCount = "{mastered} / {total} 習得済み" → "0 / 1 習得済み"
+    expect(screen.getByText(/0 \/ 1 習得済み/)).toBeInTheDocument();
   });
 });

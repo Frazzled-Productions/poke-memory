@@ -336,7 +336,31 @@
     "readyForMoreVariety": "准备好更多挑战了吗？",
     "openPracticeSettings": "打开练习设置",
     "readyForMoreVarietyBody": "试试反向进化卡片或异形态卡片，体验全新挑战。",
-    "gradeErrorMessage": "由于意外错误，此次评分无法保存。您的会话仍然有效，请重试。"
+    "gradeErrorMessage": "由于意外错误，此次评分无法保存。您的会话仍然有效，请重试。",
+    "scope": {
+      "label": "范围",
+      "clear": "清除",
+      "generation": "世代",
+      "type": "属性",
+      "groups": "分组",
+      "games": "游戏",
+      "alternateForms": "异形态",
+      "gamesDescription": "将练习限制为特定游戏原生图鉴中的宝可梦。",
+      "presetStarters": "御三家",
+      "presetLegendaries": "传说宝可梦",
+      "presetIncompleteChains": "未完成进化链",
+      "formIncludeAll": "包含全部",
+      "formDefaultOnly": "仅默认形态",
+      "formChooseCategories": "选择类别…",
+      "formCategoryRegional": "地区形态",
+      "formCategoryForme": "战斗外形态",
+      "formCategoryMega": "超级进化",
+      "formCategoryGmax": "极巨化",
+      "formCategoryPrimal": "原始回归",
+      "noAlternateForms": "当前种子中没有异形态。",
+      "matchCount": "{total} 只中有 {match} 只匹配",
+      "hiddenCardsPaused": "隐藏的卡片已暂停：它们的复习日期会向后推移，因此删除范围不会让过期卡片涌入队列。"
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -367,7 +391,8 @@
     "hasAlternateForms": "有异形态",
     "introduced": "{introduced} / {total} 已引入",
     "generationAll": "全部",
-    "generationLabel": "第 {gen} 代"
+    "generationLabel": "第 {gen} 代",
+    "masteryCount": "{mastered} / {total} 已掌握"
   },
   "pasture": {
     "title": "牧场",
@@ -382,7 +407,28 @@
     "searchPasturePlaceholder": "搜索宝可梦…",
     "clearSearch": "清除搜索",
     "filterByTypeAriaLabel": "按属性筛选",
-    "filterByGenerationAriaLabel": "按世代筛选"
+    "filterByGenerationAriaLabel": "按世代筛选",
+    "biomeStats": {
+      "ariaLabel": "生物群系统计",
+      "mastered": "已掌握",
+      "captured": "已捕获",
+      "latestAddition": "最新加入"
+    },
+    "landscape": "景观",
+    "landscapeAriaLabel": "在景观中查看{zone}",
+    "zones": {
+      "grassland": "草原",
+      "forest": "森林",
+      "sea": "大海",
+      "cave": "洞穴",
+      "mountain": "山地",
+      "urban": "城市",
+      "waters-edge": "水边",
+      "rough-terrain": "崎岖地形",
+      "rare": "圣所",
+      "unknown": "荒野"
+    },
+    "zoneAriaLabel": "{zone}区域"
   },
   "stats": {
     "title": "统计",
@@ -414,7 +460,48 @@
       "error": "拉取失败。请检查您的网络连接后重试。",
       "confirmMessage": "这将用云端的最新数据替换您的本地进度、设置和显示偏好。是否继续？"
     },
-    "allTimeGradeBreakdown": "全时段评分分布"
+    "allTimeGradeBreakdown": "全时段评分分布",
+    "trainerCard": {
+      "ariaLabel": "训练家卡片",
+      "trainerLabel": "训练家",
+      "trainerFallback": "训练家",
+      "levelLabel": "等级",
+      "levelDescription": "等级随掌握的宝可梦名称卡数量增长（至少3次正确且下次复习间隔不少于21天）。",
+      "allMastered": "全部掌握",
+      "masteryProgress": "{mastered} / {next} 已掌握 · 距 {levelNext} 级还差 {needed}",
+      "formsMastered": "{mastered} / {total} 形态已掌握",
+      "generationBadgesAriaLabel": "世代完成徽章",
+      "generationComplete": "{name}: 完成！",
+      "generationProgress": "{name}: {mastered}/{total} 已掌握",
+      "gymBadgesAriaLabel": "已获得道馆徽章"
+    },
+    "records": {
+      "heading": "记录",
+      "longestStreakDay": "天最长连续",
+      "longestStreakDays": "天最长连续",
+      "bestReviewDay": "最佳复习日",
+      "avgDaysToMastery": "平均掌握天数",
+      "fromFirstSight": "自首次出现",
+      "masteredInWeek": "一周内掌握",
+      "bestSevenDayWindow": "最佳7天窗口"
+    },
+    "streakProtection": {
+      "heading": "连续记录保护",
+      "earnAndSpentBanner": "您获得了一个连续记录保护令牌，并在同一天使用它来弥补昨天的缺失。您的连续记录是安全的。",
+      "dismissAriaLabel": "关闭连续记录保护通知",
+      "tokenSingular": "令牌",
+      "tokenPlural": "令牌",
+      "tokenMax": "（最大）",
+      "earnDescription": "令牌自动补偿一次缺失。每连续复习{earnInterval}天获得一个，最多{maxBalance}个。",
+      "nextTokenStart": "今天复习以开始获取下一个令牌。",
+      "nextTokenCount": "{count, plural, other {再 {count} 天复习即可获得下一个令牌。}}",
+      "streakPreserved": "{date} 连续记录已保护。",
+      "tokensRemaining": "{count, plural, other {剩余 {count} 个令牌}}",
+      "recentProtectionHeading": "最近保护",
+      "eventEarned": "已获得",
+      "eventUsed": "已使用",
+      "eventEarnedAndUsed": "获得并使用"
+    }
   },
   "journey": {
     "title": "旅程",
@@ -434,7 +521,69 @@
     "byGenerationColumn": "世代",
     "collectionTimeline": "收集时间线",
     "evolutionWall": "进化墙",
-    "closeToMastery": "即将掌握"
+    "closeToMastery": "即将掌握",
+    "collectionTimelineWidget": {
+      "heading": "收集时间线",
+      "past": "过去",
+      "now": "现在",
+      "future": "未来",
+      "directionPast": "过去",
+      "directionNow": "现在",
+      "directionFuture": "未来",
+      "stillRetained": "仍记住",
+      "forgotten": "已遗忘",
+      "introduced": "已引入",
+      "mastered": "已掌握",
+      "dragHintNow": "向左拖动回顾旅程，向右拖动查看遗忘地平线。",
+      "dragHintFuture": "如果不复习，记忆将按此预测衰退。",
+      "dragHintPast": "回顾收集建立的过程。",
+      "reset": "重置",
+      "resetAriaLabel": "将时间线重置到现在",
+      "scrubberAriaLabel": "收集时间线滑块",
+      "announcementRetained": "{date}: {mastered} 种族仍记住（占{total}的{pct}%）",
+      "announcementBuilt": "{date}: {introduced} 已引入，{mastered} 已掌握",
+      "noHistoryYet": "暂无复习记录",
+      "noHistoryBody": "复习一些卡片即可在此查看收集的增长。时间线显示过去的进度并预测记忆保持时长。"
+    },
+    "evolutionWallWidget": {
+      "heading": "进化墙",
+      "familiesCompleted": "已完成进化系统:",
+      "filterAll": "全部",
+      "filterInProgress": "进行中",
+      "filterCompleted": "已完成",
+      "filterAriaLabel": "筛选进化系统",
+      "collapse": "折叠",
+      "expand": "展开",
+      "familyDone": "完成",
+      "familyCompletedSrOnly": "已完成",
+      "galleriesAriaLabel": "进化系统",
+      "noFamiliesInProgress": "暂无进行中的系统。开始练习进化卡吧！",
+      "noFamiliesCompleted": "暂无已完成的系统。继续加油！",
+      "noFamiliesFound": "未找到进化系统。",
+      "legendBothMastered": "两个方向均已掌握",
+      "legendOneDirection": "已掌握一个方向",
+      "legendNotYet": "尚未掌握"
+    },
+    "closeToMasteryWidget": {
+      "heading": "即将掌握",
+      "body": "名称已知，逆向卡还需学习:",
+      "speciesToGo": "{count, plural, other {还剩 <em>{count}</em> 种族。}}",
+      "emptyState": "目前没有需要弥补的差距。做得很好！",
+      "listAriaLabel": "即将掌握的种族",
+      "notStarted": "未开始",
+      "notStartedLabel": "尚未开始",
+      "progressLabel": "{current} / {max} 天间隔",
+      "readyForMastery": "已准备好掌握",
+      "daysNeeded": "还需 {days} 天",
+      "ready": "准备好了",
+      "showingOf": "显示 {total} 中的 {shown} 个 - 练习逆向卡以缩小差距。"
+    },
+    "milestoneShare": {
+      "shareAriaLabel": "分享里程碑: {label}",
+      "share": "分享",
+      "copied": "已复制到剪贴板",
+      "copyError": "无法复制。请重试。"
+    }
   },
   "error": {
     "heading": "发生错误",

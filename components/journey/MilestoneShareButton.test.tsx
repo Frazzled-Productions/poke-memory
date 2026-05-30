@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import { act, fireEvent } from "@testing-library/react";
+import { renderWithIntl, renderJa, screen } from "@/components/test-utils/renderWithIntl";
 import { MilestoneShareButton } from "./MilestoneShareButton";
 import type { Milestone } from "@/lib/journey/milestones";
 
@@ -42,7 +43,7 @@ const allMasteredMilestone: Milestone = {
 
 describe("MilestoneShareButton — null prop", () => {
   it("renders nothing when milestone is null", () => {
-    const { container } = render(<MilestoneShareButton milestone={null} />);
+    const { container } = renderWithIntl(<MilestoneShareButton milestone={null} />);
     expect(container.firstChild).toBeNull();
   });
 });
@@ -53,33 +54,33 @@ describe("MilestoneShareButton — null prop", () => {
 
 describe("MilestoneShareButton — rendering", () => {
   it("shows the mastery-count label for a count milestone", () => {
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     expect(screen.getByText("100 Pokémon mastered")).toBeInTheDocument();
   });
 
   it("shows the gen-complete label for a generation milestone", () => {
-    render(<MilestoneShareButton milestone={genMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={genMilestone} />);
     expect(screen.getByText("Generation I complete!")).toBeInTheDocument();
   });
 
   it("shows the 'all mastered' label", () => {
-    render(<MilestoneShareButton milestone={allMasteredMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={allMasteredMilestone} />);
     expect(screen.getByText("You've mastered all Pokémon!")).toBeInTheDocument();
   });
 
   it("renders a Share button with an accessible label", () => {
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     const btn = screen.getByRole("button", { name: /Share milestone: 100 Pokémon mastered/i });
     expect(btn).toBeInTheDocument();
   });
 
   it("renders the milestone banner data-testid", () => {
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     expect(screen.getByTestId("milestone-share-banner")).toBeInTheDocument();
   });
 
   it("does not render a status message initially", () => {
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     expect(screen.queryByRole("status")).toBeNull();
   });
 });
@@ -118,7 +119,7 @@ describe("MilestoneShareButton — clipboard fallback", () => {
       configurable: true,
     });
 
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
     });
@@ -140,7 +141,7 @@ describe("MilestoneShareButton — clipboard fallback", () => {
       configurable: true,
     });
 
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
     });
@@ -187,7 +188,7 @@ describe("MilestoneShareButton — Web Share API file path", () => {
       writable: true,
     });
 
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
     });
@@ -219,7 +220,7 @@ describe("MilestoneShareButton — Web Share API file path", () => {
       writable: true,
     });
 
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
     });
@@ -244,7 +245,7 @@ describe("MilestoneShareButton — Web Share API file path", () => {
       writable: true,
     });
 
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
     });
@@ -299,7 +300,7 @@ describe("MilestoneShareButton — PNG download fallback", () => {
       return realCreateElement(tag);
     });
 
-    render(<MilestoneShareButton milestone={countMilestone} />);
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
     });
@@ -309,5 +310,25 @@ describe("MilestoneShareButton — PNG download fallback", () => {
     expect(anchorClickFn).toHaveBeenCalledOnce();
     // No status message on a successful download.
     expect(screen.queryByRole("status")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale coverage (mandatory per AGENTS.md — #1393)
+// ---------------------------------------------------------------------------
+
+describe("MilestoneShareButton — Japanese locale (#1393)", () => {
+  it("renders the Japanese Share button label in ja locale", () => {
+    renderJa(<MilestoneShareButton milestone={countMilestone} />);
+    // ja journey.milestoneShare.share = "シェア"
+    expect(screen.getByRole("button", { name: /シェア/ })).toBeInTheDocument();
+  });
+
+  it("renders the Japanese aria-label on the Share button in ja locale", () => {
+    renderJa(<MilestoneShareButton milestone={countMilestone} />);
+    // ja journey.milestoneShare.shareAriaLabel = "マイルストーンをシェア: {label}"
+    expect(
+      screen.getByRole("button", { name: /マイルストーンをシェア/ }),
+    ).toBeInTheDocument();
   });
 });
