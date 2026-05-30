@@ -6,6 +6,19 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.26] - 2026-05-30
+
+### Changed
+
+- Improved Japanese and Chinese onboarding wording for clarity and age-appropriate register.
+- Progress bars on the Stats and Journey pages now emit consistent accessible meter semantics (`role="meter"` with `aria-valuenow`/`aria-valuemin`/`aria-valuemax` and an accessible label), improving the experience for screen-reader users.
+
+### Fixed
+
+- Streak protection tokens now bridge a multi-day absence in a single app open. Previously, the auto-spend logic only covered a one-day gap, so a user ill for several consecutive days would lose their streak despite holding enough tokens. The fix walks back across the full run of missed days and spends one token per day in a single pass (all-or-nothing: if the gap is longer than the balance no tokens are spent and the balance is preserved).
+- Number formatting and pluralisation now respect the active locale. Counts on the Stats, Journey, Settings, and Pokédex pages were previously hardcoded to `en-GB`; review counts, card counts, streak labels, and similar strings are now formatted with `Intl.NumberFormat` (via `useFormatter` from next-intl) and pluralised with ICU plural rules in all supported languages, fixing grammatically incorrect output in Japanese, Simplified Chinese, and Traditional Chinese.
+- Localised the sync status strings on the Stats page ("Last synced", "N cards may be out of sync", "Sync failed", "Not synced yet", "Retrying", "Retry failed") into Japanese, Simplified Chinese, and Traditional Chinese.
+
 ## [0.10.25] - 2026-05-30
 
 ### Added
@@ -1493,7 +1506,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.25...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.26...HEAD
+[0.10.26]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.26
 [0.10.25]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.25
 [0.10.24]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.24
 [0.10.23]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.23
