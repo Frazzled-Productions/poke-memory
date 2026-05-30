@@ -326,6 +326,38 @@ describe("FirstVisitOnboardingModal", () => {
     });
   });
 
+  describe("i18n locale coverage: honestGradeNote (#1431)", () => {
+    it("en: renders honest-grade note in English", async () => {
+      renderWithIntl(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      expect(screen.getByText(/be honest when you grade/i)).toBeInTheDocument();
+    });
+
+    it("ja: renders honest-grade note in Japanese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // Distinctive phrase from ja honestGradeNote: 正直に答えること
+      expect(screen.getByText(/正直に答えること/)).toBeInTheDocument();
+    });
+
+    it("zh-Hans: renders honest-grade note in Simplified Chinese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("zh-Hans");
+      renderZhHans(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // Distinctive phrase from zh-Hans honestGradeNote: 如实作答
+      expect(screen.getByText(/如实作答/)).toBeInTheDocument();
+    });
+
+    it("zh-Hant: renders honest-grade note in Traditional Chinese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("zh-Hant");
+      renderZhHant(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // Distinctive phrase from zh-Hant honestGradeNote: 如實作答
+      expect(screen.getByText(/如實作答/)).toBeInTheDocument();
+    });
+  });
+
   describe("MachineTranslationBanner inside modal", () => {
     it("banner is absent when locale is English", async () => {
       vi.mocked(useAppLocale).mockReturnValue("en");
