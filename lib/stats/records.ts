@@ -1,7 +1,9 @@
-import type { NameReviewCard } from "@/lib/review/session";
+import type { ReviewableCard } from "@/lib/review/session";
 import type { GradeLog } from "@/lib/gradelog/persistence";
-import { isMastered } from "./derive";
+import type { AppLocale } from "@/i18n/locales";
 import { isoDate } from "@/lib/utils/format-date";
+import { MASTERY_REPETITIONS } from "./derive";
+import { masteredSpeciesEvents, nameCardsForLocale } from "./mastery-species-events";
 
 export type Records = {
   /** Longest run of consecutive review dates ever recorded. */
@@ -9,18 +11,20 @@ export type Records = {
   /** Highest number of reviews recorded on any single calendar day. */
   bestReviewDay: number;
   /**
-   * Approximate average days from a card's `firstSeen` to current mastery.
-   * Computed across currently-mastered cards as
-   * `avg(lastReview - firstSeen)`. This is an upper bound — a card might
-   * have crossed the mastery threshold earlier than `lastReview` — but
-   * without persisted "first mastered at" we trade exactness for not
-   * needing a schema migration. Null when no card is mastered yet.
+   * Approximate average days from a species' name card's `firstSeen` to
+   * species-level mastery date. Computed across currently species-mastered
+   * pairs as `avg(masteredDate - nameCard.firstSeen)`, where `masteredDate`
+   * is the later of the name and reverse cards' `lastReview` dates. This is
+   * an upper bound — a species might have crossed the threshold earlier —
+   * but without a persisted "first mastered at" we trade exactness for no
+   * schema migration. Null when no species is mastered yet.
    */
   avgDaysToMastery: number | null;
   /**
-   * Highest count of mastered-card review events landing in any rolling
-   * 7-day window. Looks at `lastReview` on currently-mastered cards and
-   * finds the densest week. Null when no mastered card exists.
+   * Highest count of species mastery events landing in any rolling 7-day
+   * window. Looks at the species-level `masteredDate` (later of name +
+   * reverse `lastReview`) on currently-mastered species and finds the
+   * densest week. Null when no mastered species exist.
    */
   mostMasteredIn7d: number | null;
 };
@@ -73,53 +77,67 @@ export function computeBestReviewDay(log: GradeLog): number {
 }
 
 /**
- * Pure: build `Records` from the name-card review state plus the
+ * Pure: build `Records` from the FULL card array (all card types) plus the
  * grade log plus the streak-date list. All four metrics gracefully
  * degrade to zero / null when input is empty.
+ *
+ * Since #1448, `avgDaysToMastery` and `mostMasteredIn7d` are derived from
+ * species-level mastery (both name + reverse legs required, #1234). The full
+ * card array is required so the reverse leg can be found.
+ *
+ * `masteryRepetitions` defaults to MASTERY_REPETITIONS for callers that pass
+ * the full card array without an explicit threshold. Callers from `app/` should
+ * always pass the value from user settings.
  */
 export function computeRecords(
-  cards: readonly NameReviewCard[],
+  cards: readonly ReviewableCard[],
   log: GradeLog,
   streakDates: readonly string[],
-  masteryRepetitions: number,
+  masteryRepetitions: number = MASTERY_REPETITIONS,
   forceAllMastered = false,
+  locale: AppLocale = "en",
 ): Records {
   // Superuser pretendAllMastered: project the mastery-derived metrics onto
   // "you've mastered everything". longestStreak / bestReviewDay derive from
   // grade-log/streak data and stay honest — pretend-mastered doesn't change
   // your actual review history.
-  if (forceAllMastered && cards.length > 0) {
+  const nameCards = nameCardsForLocale(cards, locale);
+  if (forceAllMastered && nameCards.length > 0) {
     return {
       longestStreak: computeLongestStreak(streakDates),
       bestReviewDay: computeBestReviewDay(log),
       avgDaysToMastery: 0,
-      mostMasteredIn7d: cards.length,
+      mostMasteredIn7d: nameCards.length,
     };
   }
 
-  const masteredCards = cards.filter(
-    (c) =>
-      isMastered(c.state, masteryRepetitions) &&
-      c.state.firstSeen !== null &&
-      c.state.lastReview !== null,
-  );
+  // Build a firstSeen lookup from name cards (keyed by speciesId).
+  const nameCardFirstSeen = new Map<number, string | null>();
+  for (const card of nameCards) {
+    nameCardFirstSeen.set(card.id, card.state.firstSeen);
+  }
+
+  // Derive species-level mastery events (both legs required, #1448).
+  const events = masteredSpeciesEvents(cards, masteryRepetitions, false, locale);
 
   let avgDaysToMastery: number | null = null;
-  if (masteredCards.length > 0) {
+  if (events.length > 0) {
     let sum = 0;
-    for (const c of masteredCards) {
-      // firstSeen/lastReview both non-null per filter above; the `!`
-      // assertions narrow TS without an extra runtime check.
-      sum += daysBetween(c.state.firstSeen!, c.state.lastReview!);
+    let counted = 0;
+    for (const ev of events) {
+      const firstSeen = nameCardFirstSeen.get(ev.speciesId);
+      if (firstSeen === null || firstSeen === undefined) continue;
+      sum += daysBetween(firstSeen, ev.masteredDate);
+      counted++;
     }
-    avgDaysToMastery = sum / masteredCards.length;
+    if (counted > 0) {
+      avgDaysToMastery = sum / counted;
+    }
   }
 
   let mostMasteredIn7d: number | null = null;
-  if (masteredCards.length > 0) {
-    const dates = masteredCards
-      .map((c) => c.state.lastReview!)
-      .sort();
+  if (events.length > 0) {
+    const dates = events.map((e) => e.masteredDate).sort();
     // Two-pointer over the sorted date array: count how many dates fall in
     // any 7-day window anchored on each date.
     let best = 0;

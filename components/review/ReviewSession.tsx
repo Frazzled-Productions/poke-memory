@@ -17,7 +17,7 @@ import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/Grad
 import { useSwipeGrade } from "@/components/review/useSwipeGrade";
 import { SwipeHint } from "@/components/review/SwipeHint";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import { reconcileHiddenState } from "@/lib/review/filters";
 import { pickDistractors } from "@/lib/pokemon/distractors";
 import { buildMcOptions } from "@/lib/srs/multipleChoiceDistractors";
@@ -41,7 +41,7 @@ import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 import { GradeErrorBanner } from "@/components/review/GradeErrorBanner";
 import { recordReview } from "@/lib/streak";
 import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
-import { nextReview } from "@/lib/srs/scheduler";
+import { nextReview, type ReviewState } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, loadFlavorTexts, type PokemonFact } from "@/lib/pokemon/facts";
 import { playCry } from "@/lib/audio/cry";
@@ -156,6 +156,62 @@ function limitsFromSettings(settings: UserSettings): DailyLimits {
       maxReviewsPerDay: settings.maxReviewsCryPerDay,
     },
   };
+}
+
+/**
+ * Determine whether a grade on `gradedCard` caused a species to transition from
+ * NOT-species-mastered to species-mastered (#1448/#1234).
+ *
+ * A species is mastered when BOTH its name card AND its paired reverse card have
+ * cleared the FSRS gate. This helper checks:
+ *   1. After the grade (`newCards`), is the species now fully mastered?
+ *   2. Before the grade (using `preGradeState` for the graded card, `newCards`
+ *      for all others which are unchanged), was it NOT fully mastered?
+ *
+ * Only name and reverse cards can trigger a species mastery crossing.
+ */
+function speciesBecameMastered(
+  gradedCard: ReviewableCard,
+  preGradeState: ReviewState,
+  newCards: ReviewableCard[],
+  masteryRepetitions: number,
+): boolean {
+  let nameCardId: number;
+  let reverseCardId: number;
+
+  if (gradedCard.cardType === "name") {
+    nameCardId = gradedCard.id;
+    reverseCardId = REVERSE_ID_OFFSET + gradedCard.id;
+  } else if (gradedCard.cardType === "reverse") {
+    reverseCardId = gradedCard.id;
+    nameCardId = gradedCard.id - REVERSE_ID_OFFSET;
+  } else {
+    // Evolution / cry cards cannot complete species mastery.
+    return false;
+  }
+
+  // After the grade: both legs must be mastered in newCards.
+  const nameCardAfter = newCards.find((c) => c.id === nameCardId && c.cardType === "name");
+  const reverseCardAfter = newCards.find((c) => c.id === reverseCardId && c.cardType === "reverse");
+
+  if (nameCardAfter === undefined || reverseCardAfter === undefined) return false;
+  const nameAfterMastered = isMastered(nameCardAfter.state, masteryRepetitions);
+  const reverseAfterMastered = isMastered(reverseCardAfter.state, masteryRepetitions);
+  if (!nameAfterMastered || !reverseAfterMastered) return false;
+
+  // Before the grade: the graded card used preGradeState; all other cards are
+  // unchanged in newCards (same object reference for non-graded entries).
+  const nameBeforeMastered =
+    gradedCard.id === nameCardId
+      ? isMastered(preGradeState, masteryRepetitions)
+      : isMastered(nameCardAfter.state, masteryRepetitions);
+  const reverseBeforeMastered =
+    gradedCard.id === reverseCardId
+      ? isMastered(preGradeState, masteryRepetitions)
+      : isMastered(reverseCardAfter.state, masteryRepetitions);
+
+  // Species transition: was NOT species-mastered before, IS now.
+  return !(nameBeforeMastered && reverseBeforeMastered);
 }
 
 /**
@@ -1897,6 +1953,14 @@ export function ReviewSession() {
     const wasNew = effectiveCard.state.firstSeen === null;
     const wasMastered = isMastered(effectiveCard.state, settings.masteryRepetitions);
     const nowMastered = isMastered(nextState, settings.masteryRepetitions);
+    // Species-level mastery crossing: BOTH name + reverse must cross the gate.
+    // Used for the share card "Mastered" count and the daily summary (#1448).
+    const speciesJustMastered = speciesBecameMastered(
+      effectiveCard,
+      effectiveCard.state,
+      newCards,
+      settings.masteryRepetitions,
+    );
 
     // Decode-ahead: fetch and decode the next card's sprite(s) before advancing
     // React state. `SpritePreloader` has already warmed the network cache —
@@ -2050,20 +2114,20 @@ export function ReviewSession() {
       });
       return next;
     });
-    // Track new / mastered transitions for the daily share card. Uses
-    // `isMastered` against the current mastery threshold.
+    // Track new / species-mastered transitions for the daily share card.
+    // `speciesJustMastered` is true only when BOTH name + reverse legs crossed
+    // the FSRS gate (species-level mastery, #1448/#1234).
     if (wasNew && nextState.firstSeen !== null) {
       setNewCardsThisSession((n) => n + 1);
     }
-    if (!wasMastered && nowMastered) {
+    if (speciesJustMastered) {
       setMasteredThisSession((n) => n + 1);
       // Write the lightweight "has mastered" flag so NavLinks / BottomTabBar
       // can reveal the Pasture tab without re-parsing the full session blob
       // from IDB on every SESSION_CHANGED_EVENT (#1191 Class A item 3).
-      // Guard on cardType "name": filterMastered (lib/pasture/arrivals.ts) only
-      // counts name cards, so mastering a reverse/cry/evolution card must not
-      // flip the flag (#1219).
-      if (effectiveCard.cardType === "name" && !superuserGuarded) {
+      // The Pasture shows species-level mastered entries, so this flag is now
+      // guarded on species mastery (both legs) rather than name-card-only (#1448).
+      if (!superuserGuarded) {
         writeHasMasteredFlag(true);
       }
     }
@@ -2186,7 +2250,7 @@ export function ReviewSession() {
         snapshot.newCardsThisSession +
         (wasNew && nextState.firstSeen !== null ? 1 : 0);
       const nextMastered =
-        snapshot.masteredThisSession + (!wasMastered && nowMastered ? 1 : 0);
+        snapshot.masteredThisSession + (speciesJustMastered ? 1 : 0);
       saveDailySummary({
         date: todayString(now, timezone),
         gradeSequence: nextGradeSeq,

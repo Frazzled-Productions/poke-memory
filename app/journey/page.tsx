@@ -38,6 +38,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, cardPanelPadded, mutedText, sectionLabel } from "@/lib/utils/class-names";
 import { MeterBar } from "@/components/ui/MeterBar";
+import type { AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -404,6 +405,7 @@ export default function JourneyPage() {
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<Awaited<ReturnType<typeof buildSession>> | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
+  const [pokemonNameLocale, setPokemonNameLocale] = useState<AppLocale>("en");
   const [eligibilitySettings, setEligibilitySettings] = useState<EligibilitySettings>({
     evolutionCardsEnabled: true,
     reverseEvolutionCardsEnabled: false,
@@ -429,6 +431,7 @@ export default function JourneyPage() {
         : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
+      setPokemonNameLocale(settings.pokemonNameLocale);
       setEligibilitySettings({
         evolutionCardsEnabled: settings.evolutionCardsEnabled,
         reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
@@ -542,7 +545,8 @@ export default function JourneyPage() {
   const snapshotOptions = useMemo(() => ({
     masteryRepetitions: masteryRepetitions ?? undefined,
     forceAllMastered: flags.pretendAllMastered,
-  }), [masteryRepetitions, flags.pretendAllMastered]);
+    locale: pokemonNameLocale,
+  }), [masteryRepetitions, flags.pretendAllMastered, pokemonNameLocale]);
 
   const snapshotInput = useMemo(() => {
     if (cards === null || masteryRepetitions === null) return null;
@@ -560,12 +564,6 @@ export default function JourneyPage() {
   // Read the shared snapshot from context and extract the mastery axis.
   const dashboardSnapshot = useDashboardSnapshot();
   const masterySnapshot: MasterySnapshot | null = dashboardSnapshot?.mastery ?? null;
-
-  // nameCards is still needed for computeRecords which isn't part of the snapshot.
-  const nameCards =
-    cards !== null
-      ? cards.filter((c) => c.cardType === "name")
-      : null;
 
   const badgesToShow: readonly BadgeDefinition[] = flags.pretendAllMastered
     ? BADGE_CATALOG
@@ -587,14 +585,17 @@ export default function JourneyPage() {
       ? masteredSpeciesIds(cards, masteryRepetitions, flags.pretendAllMastered)
       : undefined;
 
+  // Pass the full card array so computeRecords can apply species-level
+  // (both-legs) mastery counting (#1448).
   const records: Records | null =
-    nameCards !== null && masteryRepetitions !== null
+    cards !== null && masteryRepetitions !== null
       ? computeRecords(
-          nameCards as Parameters<typeof computeRecords>[0],
+          cards,
           gradeLog,
           streakDates,
           masteryRepetitions,
           flags.pretendAllMastered,
+          pokemonNameLocale,
         )
       : null;
 

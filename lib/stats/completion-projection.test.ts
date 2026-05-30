@@ -7,8 +7,9 @@ import {
 } from "./completion-projection";
 import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "./derive";
 import type { ReviewState } from "@/lib/srs/scheduler";
-import type { NameReviewCard } from "@/lib/review/session";
+import type { ReviewableCard, NameReviewCard, ReverseReviewCard } from "@/lib/review/session";
 import { isoMinusDays } from "./date";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,7 +37,7 @@ function state(overrides: Partial<ReviewState> = {}): ReviewState {
   };
 }
 
-function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard {
+function nameCard(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard {
   return {
     id,
     speciesId: id,
@@ -48,12 +49,8 @@ function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard 
     spriteUrl: "",
     types: ["normal"],
     stats: {
-      hp: 50,
-      attack: 50,
-      defense: 50,
-      specialAttack: 50,
-      specialDefense: 50,
-      speed: 50,
+      hp: 50, attack: 50, defense: 50,
+      specialAttack: 50, specialDefense: 50, speed: 50,
     },
     flavorText: "",
     flavorTexts: [""],
@@ -77,10 +74,23 @@ function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard 
   };
 }
 
-/** Builds a mastered card whose last review falls at `daysAgo` days before TODAY. */
-function masteredCard(id: number, daysAgo: number): NameReviewCard {
+function reverseCard(speciesId: number, overrides: Partial<ReviewState> = {}): ReverseReviewCard {
+  const base = nameCard(speciesId, overrides);
+  const { id: _id, cardType: _ct, ...rest } = base;
+  return {
+    ...rest,
+    cardType: "reverse" as const,
+    id: REVERSE_ID_OFFSET + speciesId,
+    pokemonId: speciesId,
+    subjectKey: String(speciesId),
+    state: state(overrides),
+  };
+}
+
+/** A species with both legs fully mastered, last reviewed `daysAgo` before TODAY. */
+function masteredPair(id: number, daysAgo: number): ReviewableCard[] {
   const lastReview = isoMinusDays(TODAY, daysAgo);
-  return card(id, {
+  const masteryOverrides: Partial<ReviewState> = {
     reps: MASTERY_REPETITIONS,
     scheduledDays: MASTERY_INTERVAL_DAYS,
     fsrsState: "review",
@@ -88,12 +98,16 @@ function masteredCard(id: number, daysAgo: number): NameReviewCard {
     firstSeen: isoMinusDays(TODAY, daysAgo + 30),
     stability: 30,
     difficulty: 5,
-  });
+  };
+  return [
+    nameCard(id, masteryOverrides),
+    reverseCard(id, masteryOverrides),
+  ];
 }
 
-/** A card that has not been seen at all (locked). */
+/** A name card that has not been seen at all (locked). No reverse needed — still not mastered. */
 function lockedCard(id: number): NameReviewCard {
-  return card(id);
+  return nameCard(id);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,10 +133,33 @@ describe("forceAllMastered", () => {
 // ---------------------------------------------------------------------------
 
 describe("all species mastered", () => {
-  it("returns complete when every card is mastered", () => {
-    const cards = [masteredCard(1, 10), masteredCard(2, 10), masteredCard(3, 10)];
+  it("returns complete when every species has both legs mastered", () => {
+    // 3 species, all with both legs mastered.
+    const cards: ReviewableCard[] = [
+      ...masteredPair(1, 10),
+      ...masteredPair(2, 10),
+      ...masteredPair(3, 10),
+    ];
     const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
     expect(result.kind).toBe("complete");
+  });
+
+  it("returns insufficient-history when name leg is mastered but reverse is absent", () => {
+    // Only the name leg exists — species not species-mastered → remaining = 1.
+    const cards: ReviewableCard[] = [
+      nameCard(1, {
+        reps: MASTERY_REPETITIONS,
+        scheduledDays: MASTERY_INTERVAL_DAYS,
+        fsrsState: "review",
+        lastReview: isoMinusDays(TODAY, 10),
+        firstSeen: isoMinusDays(TODAY, 40),
+        stability: 30,
+        difficulty: 5,
+      }),
+    ];
+    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    // remaining = 1 (name card exists but species not mastered), no events in window → insufficient.
+    expect(result.kind).toBe("insufficient-history");
   });
 });
 
@@ -140,37 +177,55 @@ describe("insufficient history", () => {
   it("returns insufficient-history when mastery events are all outside the trailing window", () => {
     // Mastered long ago — beyond PROJECTION_WINDOW_DAYS.
     const oldDate = isoMinusDays(TODAY, PROJECTION_WINDOW_DAYS + 5);
-    const oldMastered = card(1, {
-      reps: MASTERY_REPETITIONS,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
-      fsrsState: "review",
-      lastReview: oldDate,
-      firstSeen: isoMinusDays(TODAY, PROJECTION_WINDOW_DAYS + 60),
-      stability: 30,
-      difficulty: 5,
-    });
-    const cards = [oldMastered, lockedCard(2), lockedCard(3)];
+    const cards: ReviewableCard[] = [
+      nameCard(1, {
+        reps: MASTERY_REPETITIONS,
+        scheduledDays: MASTERY_INTERVAL_DAYS,
+        fsrsState: "review",
+        lastReview: oldDate,
+        firstSeen: isoMinusDays(TODAY, PROJECTION_WINDOW_DAYS + 60),
+        stability: 30,
+        difficulty: 5,
+      }),
+      reverseCard(1, {
+        reps: MASTERY_REPETITIONS,
+        scheduledDays: MASTERY_INTERVAL_DAYS,
+        fsrsState: "review",
+        lastReview: oldDate,
+        firstSeen: isoMinusDays(TODAY, PROJECTION_WINDOW_DAYS + 60),
+        stability: 30,
+        difficulty: 5,
+      }),
+      lockedCard(2),
+      lockedCard(3),
+    ];
     const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
     expect(result.kind).toBe("insufficient-history");
   });
 
   it("returns insufficient-history when history is less than MIN_HISTORY_DAYS old", () => {
-    // Mastered exactly MIN_HISTORY_DAYS - 1 days ago — one day short of the threshold.
-    const cards = [masteredCard(1, MIN_HISTORY_DAYS - 1), lockedCard(2), lockedCard(3)];
+    const cards: ReviewableCard[] = [
+      ...masteredPair(1, MIN_HISTORY_DAYS - 1),
+      lockedCard(2),
+      lockedCard(3),
+    ];
     const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
     expect(result.kind).toBe("insufficient-history");
   });
 
   it("returns projected when history is exactly MIN_HISTORY_DAYS old", () => {
-    // Mastered exactly MIN_HISTORY_DAYS days ago — the first day it should produce a projection.
-    const cards = [masteredCard(1, MIN_HISTORY_DAYS), lockedCard(2), lockedCard(3)];
+    const cards: ReviewableCard[] = [
+      ...masteredPair(1, MIN_HISTORY_DAYS),
+      lockedCard(2),
+      lockedCard(3),
+    ];
     const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
     expect(result.kind).toBe("projected");
   });
 
   it("returns insufficient-history when the projected date exceeds MAX_PROJECTION_DAYS", () => {
     // 1 species mastered in 7 days, 100_000 remaining → projection in the far future.
-    const fewMastered = [masteredCard(1, MIN_HISTORY_DAYS)];
+    const fewMastered: ReviewableCard[] = [...masteredPair(1, MIN_HISTORY_DAYS)];
     const manyLocked = Array.from({ length: 100_000 }, (_, i) => lockedCard(i + 100));
     const result = computeCompletionProjection(
       [...fewMastered, ...manyLocked],
@@ -187,8 +242,11 @@ describe("insufficient history", () => {
 
 describe("projected", () => {
   it("returns a projected date when there is sufficient history", () => {
-    // 7 mastered over 14 days = 3.5/week. 10 remaining → ~20 days.
-    const mastered = Array.from({ length: 7 }, (_, i) => masteredCard(i + 1, 14 - i));
+    // 7 species mastered over 14 days = 3.5/week. 10 remaining → ~20 days.
+    const mastered: ReviewableCard[] = Array.from(
+      { length: 7 },
+      (_, i) => masteredPair(i + 1, 14 - i),
+    ).flat();
     const locked = Array.from({ length: 10 }, (_, i) => lockedCard(i + 100));
     const result = computeCompletionProjection(
       [...mastered, ...locked],
@@ -200,36 +258,41 @@ describe("projected", () => {
     expect(result.remaining).toBe(10);
     expect(result.weeklyRate).toBeGreaterThan(0);
     expect(result.projectedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    // The projected date must be in the future.
     expect(result.projectedDate > TODAY).toBe(true);
   });
 
   it("respects the masteryRepetitions parameter", () => {
-    // With masteryRepetitions=5, a card with reps=3 is not mastered.
-    const notMastered = card(1, {
-      reps: 3,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
-      fsrsState: "review",
-      lastReview: isoMinusDays(TODAY, 10),
-      firstSeen: isoMinusDays(TODAY, 40),
-      stability: 30,
-      difficulty: 5,
-    });
-    const moreLocked = lockedCard(2);
-    const result = computeCompletionProjection(
-      [notMastered, moreLocked],
-      TODAY,
-      5, // custom masteryRepetitions
-    );
-    // notMastered has reps=3 < 5, so it's NOT mastered → 0 mastery events → insufficient.
+    // With masteryRepetitions=5, a pair with reps=3 is not species-mastered.
+    const notMastered: ReviewableCard[] = [
+      nameCard(1, {
+        reps: 3,
+        scheduledDays: MASTERY_INTERVAL_DAYS,
+        fsrsState: "review",
+        lastReview: isoMinusDays(TODAY, 10),
+        firstSeen: isoMinusDays(TODAY, 40),
+        stability: 30,
+        difficulty: 5,
+      }),
+      reverseCard(1, {
+        reps: 3,
+        scheduledDays: MASTERY_INTERVAL_DAYS,
+        fsrsState: "review",
+        lastReview: isoMinusDays(TODAY, 10),
+        firstSeen: isoMinusDays(TODAY, 40),
+        stability: 30,
+        difficulty: 5,
+      }),
+      lockedCard(2),
+    ];
+    const result = computeCompletionProjection(notMastered, TODAY, 5);
     expect(result.kind).toBe("insufficient-history");
   });
 
   it("the projected date is at least MIN_HISTORY_DAYS in the future with normal history", () => {
-    // 3 mastered at the boundary of the min-history window, 30 remaining.
-    const mastered = Array.from({ length: 3 }, (_, i) =>
-      masteredCard(i + 1, MIN_HISTORY_DAYS + i),
-    );
+    const mastered: ReviewableCard[] = Array.from(
+      { length: 3 },
+      (_, i) => masteredPair(i + 1, MIN_HISTORY_DAYS + i),
+    ).flat();
     const locked = Array.from({ length: 30 }, (_, i) => lockedCard(i + 100));
     const result = computeCompletionProjection(
       [...mastered, ...locked],
@@ -237,19 +300,20 @@ describe("projected", () => {
       MASTERY_REPETITIONS,
     );
     if (result.kind !== "projected") {
-      // Allow insufficient-history for edge cases — just not "complete".
       expect(result.kind).not.toBe("complete");
       return;
     }
-    // With any positive remaining, projection should be strictly after today.
     expect(result.projectedDate > TODAY).toBe(true);
   });
 
   it("weekly rate is computed correctly over a known window", () => {
-    // 27 cards mastered at days 1..27 ago (earliest = 27 days ago, latest = 1 day ago).
+    // 27 species mastered at days 1..27 ago (earliest = 27 days ago).
     // historyDays = 27, effectiveWindowDays = min(27, 28) = 27.
     // weeklyRate = 27/27 * 7 = 7.0 exactly.
-    const mastered = Array.from({ length: 27 }, (_, i) => masteredCard(i + 1, i + 1));
+    const mastered: ReviewableCard[] = Array.from(
+      { length: 27 },
+      (_, i) => masteredPair(i + 1, i + 1),
+    ).flat();
     const locked = [lockedCard(1000)];
     const result = computeCompletionProjection(
       [...mastered, ...locked],
@@ -258,7 +322,6 @@ describe("projected", () => {
     );
     expect(result.kind).toBe("projected");
     if (result.kind !== "projected") throw new Error("unreachable");
-    // 27 events / 27 days × 7 = 7.0/week.
     expect(result.weeklyRate).toBeCloseTo(7, 5);
   });
 });
@@ -268,22 +331,17 @@ describe("projected", () => {
 // ---------------------------------------------------------------------------
 
 describe("edge cases", () => {
-  it("handles an empty card array", () => {
+  it("handles an empty card array (no remaining, no mastered → complete)", () => {
     const result = computeCompletionProjection([], TODAY, MASTERY_REPETITIONS);
-    // No remaining, no mastered → complete (remaining === 0).
     expect(result.kind).toBe("complete");
   });
 
   it("handles mastery events exactly on the window boundary date", () => {
-    // Card last reviewed exactly PROJECTION_WINDOW_DAYS - 1 days ago (= windowStart).
-    const boundaryCard = masteredCard(1, PROJECTION_WINDOW_DAYS - 1);
-    const locked = Array.from({ length: 5 }, (_, i) => lockedCard(i + 100));
-    const result = computeCompletionProjection(
-      [boundaryCard, ...locked],
-      TODAY,
-      MASTERY_REPETITIONS,
-    );
-    // History span = PROJECTION_WINDOW_DAYS - 1 days; sufficient if >= MIN_HISTORY_DAYS.
+    const cards: ReviewableCard[] = [
+      ...masteredPair(1, PROJECTION_WINDOW_DAYS - 1),
+      ...Array.from({ length: 5 }, (_, i) => lockedCard(i + 100)),
+    ];
+    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
     if (PROJECTION_WINDOW_DAYS - 1 >= MIN_HISTORY_DAYS) {
       expect(result.kind).toBe("projected");
     } else {

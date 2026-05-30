@@ -3066,8 +3066,20 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     //
     // Grade a card with nextReview mocked to return a state that satisfies
     // isMastered (reps=3 >= masteryRepetitions=3, scheduledDays=21 >= 21).
+    //
+    // Species-level mastery (#1448): BOTH name card AND paired reverse card must
+    // be mastered. Pre-seed loadSession with an already-mastered reverse card for
+    // species 1 so that when the name card crosses the gate the species transitions.
     const user = userEvent.setup();
     mockLoadSettings.mockReturnValue({ ...flipSettings, masteryRepetitions: 3 });
+    // loadSession returns a session with the unmastered name card and an already-
+    // mastered reverse card (reps=3, scheduledDays=25). maxNewReversePerDay=0 in
+    // flipSettings keeps the reverse card out of the queue, but it is present in
+    // newCards so speciesBecameMastered can detect the species crossing.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
 
     renderWithIntl(<ReviewSession />);
 
@@ -3121,8 +3133,9 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
   });
 
   it("hasMastered flag is NOT written when a non-name card (reverse) transitions into mastery (#1219)", async () => {
-    // Guard: mastering a reverse card must not flip the flag because
-    // filterMastered (lib/pasture/arrivals.ts) only counts name cards.
+    // Guard: mastering a reverse card alone must not flip the flag because
+    // species-level mastery (#1448/#1234) requires BOTH the name AND reverse legs
+    // to be mastered — the name leg is unreviewed (reps=0) in this session.
     //
     // Use the 4-card seed with reverse-only settings so the session renders a
     // SpritePicker. nextReview is mocked to return a mastered state so that
@@ -3185,7 +3198,8 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     // Wait for the grade to be processed (tiles swap or feedback appears).
     await waitFor(() => expect(saveSession).toHaveBeenCalled());
 
-    // The flag must remain absent — a reverse card mastery must not flip it.
+    // The flag must remain absent — the name leg is unmastered so no species
+    // reached species-level mastery despite the reverse leg crossing the gate.
     expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
 
     // Restore so the mocked implementation does not leak into subsequent tests.
