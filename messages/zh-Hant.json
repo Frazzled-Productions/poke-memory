@@ -567,7 +567,7 @@
     "closeToMasteryWidget": {
       "heading": "即將掌握",
       "body": "名稱已知，逆向卡還需學習:",
-      "speciesToGo": "{count, plural, other {還剩 {count} 種族。}}",
+      "speciesToGo": "{count, plural, other {還剩 <em>{count}</em> 種族。}}",
       "emptyState": "目前沒有需要彌補的差距。做得很好！",
       "listAriaLabel": "即將掌握的種族",
       "notStarted": "未開始",

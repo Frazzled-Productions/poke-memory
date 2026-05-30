@@ -567,7 +567,7 @@
     "closeToMasteryWidget": {
       "heading": "Close to mastery",
       "body": "Name known, reverse card still to learn:",
-      "speciesToGo": "{count, plural, one {1 species to go.} other {{count} species to go.}}",
+      "speciesToGo": "{count, plural, one {<em>{count}</em> species to go.} other {<em>{count}</em> species to go.}}",
       "emptyState": "No gap to close right now. Great work!",
       "listAriaLabel": "Species close to mastery",
       "notStarted": "not started",

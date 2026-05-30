@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa, screen } from "@/components/test-utils/renderWithIntl";
 import { RecordsCard } from "@/components/stats/RecordsCard";
 import type { Records } from "@/lib/stats/records";
 
@@ -41,5 +41,23 @@ describe("RecordsCard", () => {
     );
     // fmt() returns "—" for null values.
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale coverage (mandatory per AGENTS.md — #1393)
+// ---------------------------------------------------------------------------
+
+describe("RecordsCard — Japanese locale (#1393)", () => {
+  it("renders the Japanese heading in ja locale", () => {
+    renderJa(<RecordsCard records={baseRecords} />);
+    // ja stats.records.heading = "記録"
+    expect(screen.getByRole("heading", { name: "記録" })).toBeInTheDocument();
+  });
+
+  it("renders the Japanese best-review-day label in ja locale", () => {
+    renderJa(<RecordsCard records={baseRecords} />);
+    // ja stats.records.bestReviewDay = "最多レビュー日"
+    expect(screen.getByText("最多レビュー日")).toBeInTheDocument();
   });
 });

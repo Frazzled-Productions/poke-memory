@@ -108,9 +108,10 @@ describe("CloseToMastery — populated list", () => {
 
   it("shows the subtitle with the species count", () => {
     renderWithIntl(<CloseToMastery entries={entries} />);
-    // The subtitle contains the entry count as a number
-    expect(screen.getByText("2")).toBeInTheDocument();
+    // The count is now rendered inline via t.rich — query for it via the paragraph text.
+    // "Name known, reverse card still to learn: 2 species to go." is the full text.
     expect(screen.getByText(/species to go/i)).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
   });
 
   it("renders the accessible list", () => {
@@ -300,5 +301,18 @@ describe("CloseToMastery — locale coverage (i18n #1393)", () => {
     );
     // ja journey.closeToMasteryWidget.notStarted = "未開始"
     expect(screen.getByText("未開始")).toBeInTheDocument();
+  });
+
+  it("renders the Japanese speciesToGo text with count appearing exactly once", () => {
+    const twoEntries = [entry, { ...entry, speciesId: 2, englishName: "Ivysaur" }];
+    renderJa(<CloseToMastery entries={twoEntries} />);
+    // ja journey.closeToMasteryWidget.speciesToGo = "2 種族残り。" (count rendered once via t.rich)
+    expect(screen.getByText(/種族残り/)).toBeInTheDocument();
+    // The count "2" appears in the subtitle span exactly once (not doubled).
+    const countEls = screen.getAllByText("2");
+    // Only one "2" in the subtitle (the em-wrapped count from t.rich).
+    // There may be an additional "2" from the interval progress label — filter to the subtitle paragraph.
+    const subtitlePara = screen.getByText(/種族残り/).closest("p");
+    expect(subtitlePara?.querySelectorAll("span")).toHaveLength(1);
   });
 });

@@ -147,10 +147,14 @@ export function CloseToMastery({
       {entries.length > 0 && (
         <p className={cn("mb-3 text-sm", mutedText)}>
           {tWidget("body")}{" "}
-          <span className="font-semibold tabular-nums text-foreground">
-            {entries.length.toLocaleString("en-GB")}
-          </span>{" "}
-          {tWidget("speciesToGo", { count: entries.length })}
+          {tWidget.rich("speciesToGo", {
+            count: entries.length,
+            em: (chunks) => (
+              <span className="font-semibold tabular-nums text-foreground">
+                {chunks}
+              </span>
+            ),
+          })}
         </p>
       )}
 

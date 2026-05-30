@@ -567,7 +567,7 @@
     "closeToMasteryWidget": {
       "heading": "習得間近",
       "body": "名前は分かっている、逆引きカードはまだ:",
-      "speciesToGo": "{count, plural, other {{count} 種族残り。}}",
+      "speciesToGo": "{count, plural, other {<em>{count}</em> 種族残り。}}",
       "emptyState": "今は埋めるギャップがありません。すばらしい！",
       "listAriaLabel": "習得間近の種族",
       "notStarted": "未開始",

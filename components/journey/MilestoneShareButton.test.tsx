@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent } from "@testing-library/react";
-import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa, screen } from "@/components/test-utils/renderWithIntl";
 import { MilestoneShareButton } from "./MilestoneShareButton";
 import type { Milestone } from "@/lib/journey/milestones";
 
@@ -310,5 +310,25 @@ describe("MilestoneShareButton — PNG download fallback", () => {
     expect(anchorClickFn).toHaveBeenCalledOnce();
     // No status message on a successful download.
     expect(screen.queryByRole("status")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale coverage (mandatory per AGENTS.md — #1393)
+// ---------------------------------------------------------------------------
+
+describe("MilestoneShareButton — Japanese locale (#1393)", () => {
+  it("renders the Japanese Share button label in ja locale", () => {
+    renderJa(<MilestoneShareButton milestone={countMilestone} />);
+    // ja journey.milestoneShare.share = "シェア"
+    expect(screen.getByRole("button", { name: /シェア/ })).toBeInTheDocument();
+  });
+
+  it("renders the Japanese aria-label on the Share button in ja locale", () => {
+    renderJa(<MilestoneShareButton milestone={countMilestone} />);
+    // ja journey.milestoneShare.shareAriaLabel = "マイルストーンをシェア: {label}"
+    expect(
+      screen.getByRole("button", { name: /マイルストーンをシェア/ }),
+    ).toBeInTheDocument();
   });
 });

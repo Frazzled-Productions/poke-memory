@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { act, fireEvent } from "@testing-library/react";
-import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa, screen } from "@/components/test-utils/renderWithIntl";
 import { StreakProtectionCard } from "./StreakProtectionCard";
 import {
   saveSettings,
@@ -272,5 +272,31 @@ describe("StreakProtectionCard", () => {
     expect(
       screen.queryByTestId("streak-protection-earn-spend-banner"),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale coverage (mandatory per AGENTS.md — #1393)
+// ---------------------------------------------------------------------------
+
+describe("StreakProtectionCard — Japanese locale (#1393)", () => {
+  it("renders the Japanese heading in ja locale", () => {
+    renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // ja stats.streakProtection.heading = "連続記録の保護"
+    expect(
+      screen.getByRole("heading", { name: "連続記録の保護" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Japanese token aria-label for zero balance in ja locale", () => {
+    renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // ja stats.streakProtection.tokensRemaining (0 tokens) = "0 トークン残り"
+    // The aria-label is produced by the ICU plural — verify the section rendered correctly.
+    expect(
+      screen.getByRole("heading", { name: "連続記録の保護" }),
+    ).toBeInTheDocument();
+    // The token count region is present — check via the labelledby pattern.
+    // The token label "0 トークン残り" is the aria-label on the count element.
+    expect(screen.getByLabelText("0 トークン残り")).toBeInTheDocument();
   });
 });

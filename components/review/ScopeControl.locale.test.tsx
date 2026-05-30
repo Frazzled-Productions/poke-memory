@@ -136,6 +136,26 @@ describe("ScopeControl — type pills in Simplified Chinese locale", () => {
   });
 });
 
+describe("ScopeControl — scope section legends in Simplified Chinese locale (#1393)", () => {
+  it("renders the zh-Hans Generation legend", async () => {
+    await renderAndOpen("zh-Hans");
+    // messages/zh-Hans.json practice.scope.generation = "世代"
+    expect(screen.getByText("世代")).toBeInTheDocument();
+  });
+
+  it("renders the zh-Hans Groups legend", async () => {
+    await renderAndOpen("zh-Hans");
+    // messages/zh-Hans.json practice.scope.groups = "分组"
+    expect(screen.getByText("分组")).toBeInTheDocument();
+  });
+
+  it("renders the zh-Hans Games legend", async () => {
+    await renderAndOpen("zh-Hans");
+    // messages/zh-Hans.json practice.scope.games = "游戏"
+    expect(screen.getByText("游戏")).toBeInTheDocument();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Traditional Chinese
 // ---------------------------------------------------------------------------
@@ -145,5 +165,25 @@ describe("ScopeControl — type pills in Traditional Chinese locale", () => {
     await renderAndOpen("zh-Hant");
     // messages/zh-Hant.json types.ghost = "幽靈"
     expect(screen.getByRole("button", { name: "幽靈" })).toBeInTheDocument();
+  });
+});
+
+describe("ScopeControl — scope section legends in Traditional Chinese locale (#1393)", () => {
+  it("renders the zh-Hant Generation legend", async () => {
+    await renderAndOpen("zh-Hant");
+    // messages/zh-Hant.json practice.scope.generation = "世代"
+    expect(screen.getByText("世代")).toBeInTheDocument();
+  });
+
+  it("renders the zh-Hant Groups legend", async () => {
+    await renderAndOpen("zh-Hant");
+    // messages/zh-Hant.json practice.scope.groups = "分組"
+    expect(screen.getByText("分組")).toBeInTheDocument();
+  });
+
+  it("renders the zh-Hant Games legend", async () => {
+    await renderAndOpen("zh-Hant");
+    // messages/zh-Hant.json practice.scope.games = "遊戲"
+    expect(screen.getByText("遊戲")).toBeInTheDocument();
   });
 });
