@@ -99,6 +99,8 @@ const { name: localeName } = useLocalePokemonName(pokemon.speciesId, pokemon.dis
 
 When the call site is inside a `.map()` (hooks can't be called in map callbacks), extract a named sub-component with one hook call per tile — see `SpritePickerTile` in `SpritePicker.tsx` and `KnownPokemonCard` in `KnownPokemonQuiz.tsx`.
 
+**English-leak gate (#1405 lever 1).** `scripts/generate-pseudo-locale.mjs` builds `messages/xx-pseudo.json` (sentinel-bracketed catalogue). Components under test are rendered via `renderPseudo()` (`components/test-utils/renderWithIntl.tsx`); text not in `[...]` and not on the allowlist (`scripts/i18n-leak-allowlist.ts`) is an untranslated English string. Run: `npm run test:i18n-leak`. The allowlist starts wide (#1434 narrows it as strings move into the catalogue).
+
 ### Discoverability
 
 Every new user-facing feature must declare its discovery path in the PR body or linked-issue body — how a first-time user encounters the feature (navigation link, onboarding step, empty-state prompt, tooltip, badge, etc.). `ux-advisor` reviews this on the brief before implementation; `code-reviewer` raises an undeclared path as a **Concern** at review time. Surfaces gated behind an existing discoverable action (e.g. a detail view reachable only after tapping a card) are exempt, provided the gating action is itself discoverable.
