@@ -276,6 +276,77 @@ describe("StreakProtectionCard", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Multi-day bridge rendering (#1399)
+// ---------------------------------------------------------------------------
+
+describe("StreakProtectionCard — multi-day bridge (#1399)", () => {
+  it("renders correctly after a 3-day bridge: balance, last-spend date, and spend event", () => {
+    // Simulate the state after applyProtectionStep bridged a 3-day absence.
+    // User had balance=3, missed days 05-02, 05-03, 05-04, opened on 05-05.
+    // Result: balance=0, spendDates=[05-02, 05-03, 05-04], one "spent" event.
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          balance: 0,
+          spendDates: ["2026-05-02", "2026-05-03", "2026-05-04"],
+          daysSinceLastEarn: 10,
+          lastEarnCheckDate: "2026-05-01",
+          protectionEvents: [{ date: "2026-05-05", kind: "spent" }],
+          lastAcknowledgedProtectionEventDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    // Balance shows 0.
+    expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
+    // History line shows the most recent spend date (last entry in spendDates).
+    expect(
+      screen.getByTestId("streak-protection-last-spend"),
+    ).toHaveTextContent("Streak preserved on");
+    expect(
+      screen.getByTestId("streak-protection-last-spend"),
+    ).toHaveTextContent("2026-05-04");
+    // Recent events list contains the combined spend event.
+    const eventsSection = screen.getByTestId("streak-protection-recent-events");
+    expect(eventsSection).toBeInTheDocument();
+    expect(eventsSection).toHaveTextContent("Used");
+    expect(eventsSection).toHaveTextContent("2026-05-05");
+  });
+
+  it("renders correctly after a combined earn-and-spend: balance=1 with earned-and-spent event", () => {
+    // User had balance=3 (bridged 3 days) and earned a token in the same step.
+    // Net: balance=1, one "earned-and-spent" event.
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...loadSettings(),
+        streakProtection: {
+          balance: 1,
+          spendDates: ["2026-05-02", "2026-05-03", "2026-05-04"],
+          daysSinceLastEarn: 0,
+          lastEarnCheckDate: "2026-05-05",
+          protectionEvents: [{ date: "2026-05-05", kind: "earned-and-spent" }],
+          lastAcknowledgedProtectionEventDate: null,
+        },
+      }),
+    );
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    expect(screen.getByLabelText("1 protection token")).toBeInTheDocument();
+    // The earn-and-spend banner should appear (unacknowledged).
+    expect(
+      screen.getByTestId("streak-protection-earn-spend-banner"),
+    ).toBeInTheDocument();
+    // Recent events list shows "Earned + used".
+    const eventsSection = screen.getByTestId("streak-protection-recent-events");
+    expect(eventsSection).toHaveTextContent("Earned + used");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Locale coverage (mandatory per AGENTS.md — #1393)
 // ---------------------------------------------------------------------------
 
