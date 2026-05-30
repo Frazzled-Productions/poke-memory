@@ -2,6 +2,7 @@
 
 import type { TypeStats } from "@/lib/stats/derive";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
+import { MeterBar } from "@/components/ui/MeterBar";
 
 type Props = {
   perType: readonly TypeStats[];
@@ -51,18 +52,13 @@ export function TypeBreakdown({ perType }: Props) {
                   {t.mastered}/{t.total}
                 </span>
               </div>
-              <div
-                className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
-                aria-hidden="true"
-              >
-                <div
-                  className={`h-full ${colors?.bg ?? "bg-zinc-500"}`}
-                  style={{ width: `${masteredPct}%` }}
-                />
-              </div>
-              <span className="sr-only">
-                {masteredPct}% of {t.type}-type Pokémon mastered
-              </span>
+              <MeterBar
+                value={t.mastered}
+                max={t.total}
+                fillClass={colors?.bg ?? "bg-zinc-500"}
+                label={`${masteredPct}% of ${t.type}-type Pokémon mastered`}
+                trackClass="dark:bg-zinc-800"
+              />
             </li>
           );
         })}

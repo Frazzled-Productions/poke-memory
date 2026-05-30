@@ -37,6 +37,7 @@ import { CloseToMastery } from "@/components/journey/CloseToMastery";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, cardPanelPadded, mutedText, sectionLabel } from "@/lib/utils/class-names";
+import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -369,15 +370,14 @@ function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
                 >
                   <span className="text-foreground">{gen.name}</span>
                   <span className="flex items-center justify-end gap-3">
-                    <span
-                      className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
-                      aria-hidden="true"
-                    >
-                      <span
-                        className="block h-full bg-emerald-500"
-                        style={{ width: `${masteredPct}%` }}
-                      />
-                    </span>
+                    <MeterBar
+                      value={gen.mastered}
+                      max={gen.total}
+                      fillClass="bg-emerald-500"
+                      label={`${gen.name}: ${gen.mastered} of ${gen.total} mastered (${masteredPct}%)`}
+                      trackClass="dark:bg-zinc-800"
+                      className="w-20"
+                    />
                     <span className="min-w-[64px] text-right tabular-nums text-zinc-500 dark:text-zinc-400">
                       {gen.mastered} / {gen.total}
                     </span>

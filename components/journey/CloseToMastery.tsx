@@ -22,6 +22,7 @@ import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { cn } from "@/lib/utils/cn";
 import { mutedText } from "@/lib/utils/class-names";
+import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -34,25 +35,8 @@ const INITIAL_VISIBLE = 10;
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/**
- * A compact progress bar showing how close the reverse card is to the
- * 21-day interval gate.
- */
-function IntervalBar({ scheduledDays }: { scheduledDays: number }) {
-  const clamped = Math.min(MASTERY_INTERVAL_DAYS, Math.max(0, scheduledDays));
-  const pct = Math.round((clamped / MASTERY_INTERVAL_DAYS) * 100);
-  return (
-    <div
-      className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700"
-      aria-hidden="true"
-    >
-      <div
-        className="h-full rounded-full bg-amber-400 transition-[width] dark:bg-amber-500"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
+// IntervalBar replaced by MeterBar from @/components/ui/MeterBar.
+// Accessible label is supplied via the aria-label prop on the span below.
 
 /** A single row in the close-to-mastery list. */
 function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
@@ -86,11 +70,14 @@ function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{name}</p>
         <div className="mt-1 flex items-center gap-2">
-          <IntervalBar scheduledDays={entry.reverseScheduledDays} />
-          <span
-            className={cn("text-xs tabular-nums", mutedText)}
-            aria-label={progressLabel}
-          >
+          <MeterBar
+            value={Math.min(MASTERY_INTERVAL_DAYS, Math.max(0, entry.reverseScheduledDays))}
+            max={MASTERY_INTERVAL_DAYS}
+            fillClass="bg-amber-400 dark:bg-amber-500"
+            label={progressLabel}
+            className="w-20"
+          />
+          <span className={cn("text-xs tabular-nums", mutedText)}>
             {entry.reverseIntroduced
               ? `${entry.reverseScheduledDays}d`
               : tWidget("notStarted")}
