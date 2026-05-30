@@ -622,14 +622,14 @@
   "onboarding": {
     "welcomeHeading": "Welcome to Poké Memory",
     "closeAriaLabel": "Close welcome guide",
-    "intro": "Learn every Pokémon name and evolution with spaced repetition. New cards arrive daily; the app surfaces each card right before you would likely forget it, so gaps grow as your memory strengthens.",
+    "intro": "Learn every Pokémon name and evolution. New cards appear each day, and the app shows you each card again just before you are likely to forget it. The more you remember, the longer the gap before it comes back.",
     "howToGrade": {
       "heading": "How to grade",
       "again": "<term>Again</term> - you forgot completely.",
       "hard": "<term>Hard</term> - you recalled it, but struggled.",
       "good": "<term>Good</term> - you recalled it with some effort.",
       "easy": "<term>Easy</term> - instant recall, no hesitation.",
-      "honestGradeNote": "Grade honestly. Hitting Again sometimes is normal and part of the system working; the scheduler only improves if you tell it the truth."
+      "honestGradeNote": "Be honest when you grade. Picking Again sometimes is completely normal. The app only gets better at helping you if you tell it how you really did."
     },
     "addingSound": {
       "heading": "Adding sound (optional)",
@@ -638,7 +638,7 @@
     },
     "guestStorage": {
       "heading": "Your progress is saved on this device",
-      "body": "Progress is stored in your browser and is not backed up automatically. On iOS Safari, the browser may clear it after 7 days without a visit. To keep it safe: add this page to your Home Screen, or sign in to back it up to the cloud."
+      "body": "Your progress is kept on this device. On iPhone and iPad, Safari may clear saved data after 7 days if you do not visit. Adding this page to your Home Screen prevents that. If you sign in, your progress is also saved online so you can use it on other devices."
     },
     "getStarted": "Get started"
   },

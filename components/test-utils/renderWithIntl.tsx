@@ -85,6 +85,22 @@ export function renderJa(ui: React.ReactElement): RenderResult {
   return renderWithIntl(ui, { locale: "ja" });
 }
 
+/**
+ * Convenience shorthand — renders `ui` in the Simplified Chinese locale.
+ * Satisfies the mandatory non-English locale test requirement.
+ */
+export function renderZhHans(ui: React.ReactElement): RenderResult {
+  return renderWithIntl(ui, { locale: "zh-Hans" });
+}
+
+/**
+ * Convenience shorthand — renders `ui` in the Traditional Chinese locale.
+ * Satisfies the mandatory non-English locale test requirement.
+ */
+export function renderZhHant(ui: React.ReactElement): RenderResult {
+  return renderWithIntl(ui, { locale: "zh-Hant" });
+}
+
 // ---------------------------------------------------------------------------
 // Re-export @testing-library/react so callers only need one import line.
 //

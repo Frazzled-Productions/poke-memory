@@ -92,7 +92,7 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 
 ### 13. Nudge techniques
 
-**Met, worth keeping under review.** The app uses no dark patterns to push children toward lower-privacy choices or to extend engagement against their interests. The streak counter and daily review limits are study-habit features common to spaced-repetition tools, and the daily review cap actively works *against* over-engagement by design. There is no nudging toward sign-in, toward disclosing more data, or toward weakening privacy settings. This standard should be re-checked whenever engagement-oriented features (notifications, reminders, reward mechanics) are added.
+**Met.** The app uses no dark patterns to push children toward lower-privacy choices or to extend engagement against their interests. The streak counter and daily review limits are study-habit features common to spaced-repetition tools, and the daily review cap actively works against over-engagement by design. The `onboarding.guestStorage.body` copy was updated in #1431 to remove a soft sign-in nudge (the previous hazard-with-remedy framing presented sign-in as the fix for local-storage eviction). Sign-in is now described as a neutral capability (cross-device access) with no urgency framing. This standard should be re-checked whenever engagement-oriented features (notifications, reminders, reward mechanics) are added.
 
 ### 14. Connected toys and devices
 
@@ -118,7 +118,7 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 | 10 | Geolocation | Met (record only) |
 | 11 | Parental controls | Met (not applicable) |
 | 12 | Profiling | Met (record only) |
-| 13 | Nudge techniques | Met |
+| 13 | Nudge techniques | Met (updated #1431) |
 | 14 | Connected toys and devices | Met (not applicable) |
 | 15 | Online tools | Met |
 
@@ -175,6 +175,9 @@ A best-effort review of the onboarding modal (`onboarding` namespace in `message
 - The "preview" label on the locale picker.
 
 The Standard 4 status in the table above remains **Gap** for non-English locales until the native review is completed.
+
+---
+**English-source onboarding copy simplified (#1431, 2026-05-30).** The `onboarding.intro`, `onboarding.howToGrade.honestGradeNote`, and `onboarding.guestStorage.body` strings in `messages/en.json` were rewritten to remove technical jargon ("spaced repetition", "scheduler", "surfaces each card") and reduce reading age. This edit improves the Standard 4 position on the English onboarding surface. The Standard 4 status for non-English locales remains Gap pending native-speaker review (tracked in #1376).
 
 ---
 
