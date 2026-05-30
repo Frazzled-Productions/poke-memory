@@ -642,6 +642,19 @@
     },
     "getStarted": "开始"
   },
+  "sync": {
+    "status": {
+      "lastSynced": "上次同步: {time}",
+      "atTime": "{time}",
+      "notSyncedYet": "尚未同步。",
+      "syncFailed": "同步失败",
+      "cardsOutOfSync": "{count, plural, other {# 张卡片可能未同步}}",
+      "retrying": "重试中…",
+      "retryFailed": "重试失败 · 再次尝试",
+      "schemaError": "同步错误：检测到架构不匹配。您的进度已安全保存在本地。",
+      "retry": "重试"
+    }
+  },
   "common": {
     "viewInPokedex": "在图鉴中查看{name}",
     "noResults": "没有符合筛选条件的宝可梦。"

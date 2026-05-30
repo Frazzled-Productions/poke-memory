@@ -1,21 +1,29 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useTranslations, useFormatter } from "next-intl";
 import { loadSyncStatus, STORAGE_KEY as SYNC_STATUS_KEY } from "@/lib/sync/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import type { RetryState } from "@/lib/sync/useRetryPush";
 import { mutedText } from "@/lib/utils/class-names";
 
-type SyncState = {
-  text: string;
-  errorDetail: string | null;
-  failed: boolean;
-  /**
-   * Non-null when a structural (non-transient) error was recorded on the
-   * card_reviews primary path (#1358). Retrying is pointless until a deploy
-   * fixes the schema mismatch — the Retry button is hidden in this state.
-   */
-  structuralSyncError: string | null;
-};
+// ---------------------------------------------------------------------------
+// Typed state — stores raw data so the render can format it via t().
+// ---------------------------------------------------------------------------
+
+type SyncStatusState =
+  | { kind: "lastSynced"; time: Date }
+  | { kind: "notSyncedYet" }
+  | { kind: "syncFailed"; timeStr: string | null }
+  | { kind: "cardsOutOfSync"; count: number; timeStr: string | null }
+  | {
+      kind: "schemaError";
+      /**
+       * Non-null when a structural (non-transient) error was recorded on the
+       * card_reviews primary path (#1358). Retrying is pointless until a deploy
+       * fixes the schema mismatch — the Retry button is hidden in this state.
+       */
+      detail: string;
+    };
 
 type Props = {
   retryState: RetryState;
@@ -28,62 +36,41 @@ export function SyncStatusLine({
   retryNow,
   superuserPaused = false,
 }: Props) {
+  const t = useTranslations("sync.status");
+  const fmt = useFormatter();
   const syncStatusVersion = useLocalStorageKey(SYNC_STATUS_KEY);
-  const [state, setState] = useState<SyncState | null>(null);
+  const [state, setState] = useState<SyncStatusState | null>(null);
 
   useEffect(() => {
     const status = loadSyncStatus();
-    const fmt = (iso: string) =>
-      new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
     // Structural errors take priority over the generic failed state. The Retry
     // button is hidden entirely — retrying is pointless until a deploy fixes
     // the mismatch.
     if (status.structuralSyncError !== null) {
-      setState({
-        text: "Sync error: a schema mismatch was detected. Your progress is safe locally.",
-        errorDetail: status.structuralSyncError,
-        failed: true,
-        structuralSyncError: status.structuralSyncError,
-      });
+      setState({ kind: "schemaError", detail: status.structuralSyncError });
     } else if (status.lastPushFailed) {
-      const timeStr = status.lastPushAttemptAt ? ` at ${fmt(status.lastPushAttemptAt)}` : "";
       const { failedCardCount } = status;
+      const rawTimeStr = status.lastPushAttemptAt ?? null;
+
       if (failedCardCount === 0) {
         // Either the unload push succeeded before .then() cleared lastPushFailed,
         // or a retry succeeded and wrote failedCardCount: 0.
-        setState({
-          text: `Last synced: ${status.lastPushAt ? fmt(status.lastPushAt) : "recently"}`,
-          errorDetail: null,
-          failed: false,
-          structuralSyncError: null,
-        });
-      } else if (failedCardCount === 1) {
-        setState({
-          text: `1 card may be out of sync${timeStr}`,
-          errorDetail: null,
-          failed: true,
-          structuralSyncError: null,
-        });
-      } else if (typeof failedCardCount === "number" && failedCardCount > 1) {
-        setState({
-          text: `${failedCardCount} cards may be out of sync${timeStr}`,
-          errorDetail: null,
-          failed: true,
-          structuralSyncError: null,
-        });
+        const pushAt = status.lastPushAt ? new Date(status.lastPushAt) : null;
+        setState(
+          pushAt
+            ? { kind: "lastSynced", time: pushAt }
+            : { kind: "notSyncedYet" },
+        );
+      } else if (typeof failedCardCount === "number" && failedCardCount >= 1) {
+        setState({ kind: "cardsOutOfSync", count: failedCardCount, timeStr: rawTimeStr });
       } else {
-        setState({
-          text: `Sync failed${timeStr}`,
-          errorDetail: null,
-          failed: true,
-          structuralSyncError: null,
-        });
+        setState({ kind: "syncFailed", timeStr: rawTimeStr });
       }
     } else if (status.lastPushAt) {
-      setState({ text: `Last synced: ${fmt(status.lastPushAt)}`, errorDetail: null, failed: false, structuralSyncError: null });
+      setState({ kind: "lastSynced", time: new Date(status.lastPushAt) });
     } else {
-      setState({ text: "Not synced yet.", errorDetail: null, failed: false, structuralSyncError: null });
+      setState({ kind: "notSyncedYet" });
     }
   }, [syncStatusVersion]);
 
@@ -93,10 +80,10 @@ export function SyncStatusLine({
   // button is intentionally absent: 42P10 (and other structural codes) always
   // indicate a deploy/schema mismatch; retrying will always fail until the
   // server is fixed. Progress is safe locally.
-  if (state.structuralSyncError !== null) {
+  if (state.kind === "schemaError") {
     return (
       <div className={mutedText} aria-live="polite">
-        <span>{state.text}</span>
+        <span>{t("schemaError")}</span>
       </div>
     );
   }
@@ -105,7 +92,7 @@ export function SyncStatusLine({
   if (retryState === "retrying") {
     return (
       <div className={mutedText} aria-live="polite">
-        <span>Retrying…</span>
+        <span>{t("retrying")}</span>
       </div>
     );
   }
@@ -128,17 +115,34 @@ export function SyncStatusLine({
           }
           className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
         >
-          Retry failed · Try again
+          {t("retryFailed")}
         </button>
       </div>
     );
   }
 
-  if (state.failed) {
+  const isFailed =
+    state.kind === "cardsOutOfSync" || state.kind === "syncFailed";
+
+  if (isFailed) {
     const isDisabled = superuserPaused;
     const disabledTitle = superuserPaused
       ? "Sync is paused while a superuser flag is on."
       : undefined;
+
+    // Build a locale-aware time suffix when available.
+    const timeStr =
+      state.kind === "cardsOutOfSync" || state.kind === "syncFailed"
+        ? state.timeStr
+        : null;
+    const timeSuffix = timeStr
+      ? ` ${t("atTime", { time: fmt.dateTime(new Date(timeStr), { hour: "2-digit", minute: "2-digit" }) })}`
+      : "";
+
+    const errorText =
+      state.kind === "cardsOutOfSync"
+        ? t("cardsOutOfSync", { count: state.count }) + timeSuffix
+        : t("syncFailed") + timeSuffix;
 
     return (
       <div className={mutedText} aria-live="polite">
@@ -149,15 +153,23 @@ export function SyncStatusLine({
           title={disabledTitle}
           className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
         >
-          {state.text} · Retry
+          {errorText} · {t("retry")}
         </button>
       </div>
     );
   }
 
+  // Success / not-synced-yet states.
+  const statusText =
+    state.kind === "lastSynced"
+      ? t("lastSynced", {
+          time: fmt.dateTime(state.time, { hour: "2-digit", minute: "2-digit" }),
+        })
+      : t("notSyncedYet");
+
   return (
     <div className={mutedText}>
-      <span>{state.text}</span>
+      <span>{statusText}</span>
     </div>
   );
 }
