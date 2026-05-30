@@ -36,7 +36,8 @@ const INITIAL_VISIBLE = 10;
 // ---------------------------------------------------------------------------
 
 // IntervalBar replaced by MeterBar from @/components/ui/MeterBar.
-// Accessible label is supplied via the aria-label prop on the span below.
+// The accessible label comes from the progressLabel string passed as the
+// `label` prop to MeterBar.
 
 /** A single row in the close-to-mastery list. */
 function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
