@@ -6,8 +6,8 @@
  * previously uninstrumented and failing the diff-coverage gate.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderWithIntl, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
 // Mocks — declared before the component import.
@@ -170,7 +170,7 @@ beforeEach(() => {
 
 describe("PasturePage", () => {
   it("calls useLocalStorageKey with the session storage key (line 95)", () => {
-    render(<PasturePage />);
+    renderWithIntl(<PasturePage />);
 
     expect(useLocalStorageKey).toHaveBeenCalledWith("poke-memory:review-session:v1");
   });
@@ -180,7 +180,7 @@ describe("PasturePage", () => {
     // after loading — this exercises the loaded branch at line 157 onwards.
     mockLoadSession.mockResolvedValue(null);
 
-    render(<PasturePage />);
+    renderWithIntl(<PasturePage />);
 
     await waitFor(() => {
       expect(

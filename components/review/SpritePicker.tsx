@@ -43,6 +43,7 @@ type TileProps = {
  * unconditionally — hooks may not be called inside array maps (#1260 followup).
  */
 function SpritePickerTile({ tile, answered, selectedId, onTap, tileClassName }: TileProps) {
+  // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
   const { name: localeName } = useLocalePokemonName(tile.speciesId, tile.displayName);
 
   const ariaLabel = !answered
@@ -127,6 +128,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
   // until the locale sidecar loads (#1260 followup).
   const { name: targetLocaleName } = useLocalePokemonName(
     targetPokemon.speciesId,
+    // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
     targetPokemon.displayName,
   );
 

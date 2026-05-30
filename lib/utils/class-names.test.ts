@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   sectionLabel,
+  sectionLabelSm,
+  sectionLabelSubtle,
+  sectionLabelSmSubtle,
   dialogPanel,
   statValue,
   cardPanel,
@@ -21,6 +24,45 @@ describe("class-names constants", () => {
     it("matches the expected literal", () => {
       expect(sectionLabel).toBe(
         "text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400",
+      );
+    });
+  });
+
+  describe("sectionLabelSm", () => {
+    it("is a non-empty string", () => {
+      expect(typeof sectionLabelSm).toBe("string");
+      expect(sectionLabelSm.length).toBeGreaterThan(0);
+    });
+
+    it("matches the expected literal", () => {
+      expect(sectionLabelSm).toBe(
+        "text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400",
+      );
+    });
+  });
+
+  describe("sectionLabelSubtle", () => {
+    it("is a non-empty string", () => {
+      expect(typeof sectionLabelSubtle).toBe("string");
+      expect(sectionLabelSubtle.length).toBeGreaterThan(0);
+    });
+
+    it("matches the expected literal", () => {
+      expect(sectionLabelSubtle).toBe(
+        "text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500",
+      );
+    });
+  });
+
+  describe("sectionLabelSmSubtle", () => {
+    it("is a non-empty string", () => {
+      expect(typeof sectionLabelSmSubtle).toBe("string");
+      expect(sectionLabelSmSubtle.length).toBeGreaterThan(0);
+    });
+
+    it("matches the expected literal", () => {
+      expect(sectionLabelSmSubtle).toBe(
+        "text-sm font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500",
       );
     });
   });

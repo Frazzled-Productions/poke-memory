@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
-import { cardPanelPadded, colStack, colStackLg, mutedText } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, mutedText, sectionLabelSm } from "@/lib/utils/class-names";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -69,7 +69,7 @@ export function FsrsOptimizerSection({
       if (!res.ok) {
         setOptimizerState("error");
         const body = (await res.json().catch(() => null)) as
-          | { error?: string; reviewCount?: number; retryAfterMs?: number }
+          | { error?: string; reviewCount?: number; retryAfterMs?: number; detail?: string }
           | null;
         const errorCode = body?.error;
 
@@ -103,8 +103,17 @@ export function FsrsOptimizerSection({
           setErrorMsg("Couldn't load your settings. Check your connection and try again.");
         } else if (errorCode === "save_failed") {
           setErrorMsg("Optimisation succeeded but couldn't be saved. Try again.");
+        } else if (errorCode === "unknown") {
+          // The server returned a structured unknown error — surface the status
+          // code so the next opaque failure can be diagnosed from a screenshot.
+          setErrorMsg(
+            `Couldn't optimise (HTTP ${res.status}). Please file an issue.`,
+          );
         } else {
-          setErrorMsg("Couldn't optimise. Try again later.");
+          // Unexpected error code or missing body — include status for diagnosability.
+          setErrorMsg(
+            `Couldn't optimise (HTTP ${res.status}). Try again later.`,
+          );
         }
         return;
       }
@@ -125,7 +134,8 @@ export function FsrsOptimizerSection({
       onOptimized(data.optimizedAt, data.weights);
     } catch {
       setOptimizerState("error");
-      setErrorMsg("Couldn't optimise. Try again later.");
+      // Network-level failure (fetch threw — no HTTP response available).
+      setErrorMsg("Couldn't reach the server. Check your connection and try again.");
     }
   }
 
@@ -133,7 +143,7 @@ export function FsrsOptimizerSection({
     <section className={colStackLg} aria-labelledby="optimizer-heading">
       <h2
         id="optimizer-heading"
-        className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+        className={sectionLabelSm}
       >
         Personalize my schedule
       </h2>

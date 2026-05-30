@@ -26,6 +26,23 @@ Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly.
 
    Trivial issues (typo fixes, doc tweaks, one-liner workflow changes — the same set that may skip the planner entirely per WORKFLOW.md) are exempt from the AC-quality check.
 
+   **Pre-flight: testability + first-contact UX checklist (#1276).** For any user-facing feature change, before drafting the plan answer the two question sets below and fold the answers into the plan (as acceptance criteria, a dedicated step, or an `## Out of scope` note). Surface any gap you cannot resolve from the issue + codebase as a `[USER-DECISION]` open question — do not pick a default unilaterally.
+
+   *Testability*
+   - How would a tester confirm this works in under 10 minutes on a fresh environment?
+   - What state must the feature be in to verify each branch (initial, intermediate, graduated/complete)?
+   - Is there a way to seed that state for QA / dev / E2E? If not, what is the workaround (a superuser flag, a seed helper, a documented test path)? If the only way to reach the state is days of real usage, that is a gap — propose the seed/flag as a plan step or a `[USER-DECISION]`.
+
+   *First-contact UX*
+   - What does a first-time user see when they enable or first encounter this feature?
+   - Is that experience self-explanatory? If not, what is the explanation strategy (inline help, toast, banner, onboarding modal)?
+   - What does an existing user see the first time they turn the feature on after release? Same answer?
+   - Are there affordances that would surprise the user versus their intuition (e.g. they enable typed entry, expect typed entry, and see multiple-choice during the learning phase)?
+
+   Worked example: the #1237 "MC during learning, typed entry on graduation" spec shipped, then user QA of the preview surfaced two gaps that became #1270 (no way for a tester to reach graduated state in a reasonable window — fixed with a `forceCardsGraduated` superuser flag) and #1271 (a first-time user enabling typed entry sees MC and assumes it is broken — fixed with three-touch onboarding). Both were obvious in retrospect and this checklist exists to catch that class upfront, during planning, instead of after a preview-QA round.
+
+   Trivial issues (typo fixes, doc tweaks, one-liner workflow changes — the same set that may skip the planner entirely per WORKFLOW.md) are exempt from the testability + first-contact UX checklist.
+
    **Pre-flight: centralisation + call-site audit.** If the plan adds a new render or computation of a domain concept (Pokémon name, date display, mastery count, sprite URL, class-name constant), call out which existing helper the implementer should use. If no helper exists but the concept is already rendered elsewhere, propose a new helper in the plan with the existing call sites enumerated as ones to centralise in the same PR — do not plan a fresh fragmented call site.
 
    **Additionally**, when the work modifies the *behaviour* of an existing shared concept (e.g. adding locale-awareness to Pokémon-name rendering, adding superuser-flag gating to a mastery counter), grep the whole repo for every existing call site of that concept and include a top-level `## Affected call sites` subsection in the plan listing each one as either **in-scope** (must be updated in this change, with the file path and a one-line note on what changes) or **out-of-scope with rationale** (explicitly preserved for a future change, with the reason). Never leave the implementer to discover the call sites from the visibly-broken surface alone — that is the failure mode #1259/#1311/#1318/#1329 went through four QA rounds to escape. The implementer's audit then becomes verification, not discovery. See AGENTS.md "Single source of truth for shared concepts" for the canonical helper list (`useLocalePokemonName`, `formatDate`, `isMastered`, `filterMastered`, `computeStats`, `useCardClass`, `lib/utils/class-names.ts`). (memory: `feedback_agent_fix_full_audit`.)

@@ -1,15 +1,17 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { NavLinks, NavLinksFallback } from "./NavLinks";
 import { FavouriteMascot } from "./theme/FavouriteMascot";
 import { MobileNavSlot } from "@/components/MobileNavSlot";
 
-export function Nav() {
+export async function Nav() {
+  const t = await getTranslations("nav");
   return (
     <header className="border-b border-theme-secondary bg-theme-primary pt-[env(safe-area-inset-top)]">
       <nav
         className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3"
-        aria-label="Main navigation"
+        aria-label={t("ariaLabel")}
       >
         {/* Brand — always visible */}
         <Link
@@ -20,7 +22,7 @@ export function Nav() {
           <span aria-hidden="true">
             <FavouriteMascot />
           </span>
-          poke-memory
+          {t("brand")}
         </Link>
 
         {/* Desktop horizontal link row — hidden below md */}

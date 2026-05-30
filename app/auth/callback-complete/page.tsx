@@ -223,8 +223,15 @@ export default function CallbackCompletePage() {
         ...local,
         ...(data.cloudPrefs.timezone !== null ? { timezone: data.cloudPrefs.timezone } : {}),
         ...(data.cloudPrefs.dateFormat !== null ? { dateFormat: data.cloudPrefs.dateFormat } : {}),
+        ...(data.cloudPrefs.pushNotificationHour !== null
+          ? { pushNotificationHour: data.cloudPrefs.pushNotificationHour }
+          : {}),
       };
-      if (next.timezone !== local.timezone || next.dateFormat !== local.dateFormat) {
+      if (
+        next.timezone !== local.timezone ||
+        next.dateFormat !== local.dateFormat ||
+        next.pushNotificationHour !== local.pushNotificationHour
+      ) {
         saveSettings(next);
       }
     }
@@ -281,6 +288,7 @@ export default function CallbackCompletePage() {
         pushRegionalPrefs(supabase, user.id, {
           timezone: localSettings.timezone,
           dateFormat: localSettings.dateFormat,
+          pushNotificationHour: localSettings.pushNotificationHour,
         }).catch((e) => {
           console.warn("[callback-complete] keep-local regional prefs push failed", e);
           return false;

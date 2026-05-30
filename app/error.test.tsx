@@ -1,14 +1,17 @@
 /**
- * Component tests for app/error.tsx (closes #1167).
+ * Component tests for app/error.tsx (closes #1167, updated for #1369).
  *
  * Verifies that the offline-aware variant renders when navigator.onLine is
  * false, and the generic red-box variant renders when online.
  *
  * navigator.onLine is mocked via Object.defineProperty so each branch can be
  * exercised independently without real network state.
+ *
+ * Tests use renderWithIntl so the component's useTranslations() calls are
+ * backed by real catalogue values.
  */
 
-import { render, screen, act } from "@testing-library/react";
+import { renderWithIntl, renderJa, screen, act } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -53,7 +56,7 @@ afterEach(() => {
 describe("Error page — online variant", () => {
   it("renders the generic red-box heading when online", () => {
     setOnline(true);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.getByRole("heading", { name: /something went wrong/i }),
@@ -62,17 +65,26 @@ describe("Error page — online variant", () => {
 
   it("renders the Try again button when online", () => {
     setOnline(true);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.getByRole("button", { name: /try again/i }),
     ).toBeInTheDocument();
   });
 
+  it("renders the Go to Practice link when online", () => {
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    const link = screen.getByRole("link", { name: /go to practice/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/");
+  });
+
   it("calls reset when Try again is clicked (online)", async () => {
     setOnline(true);
     const reset = vi.fn();
-    render(<ErrorPage error={fakeError} reset={reset} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={reset} />);
 
     screen.getByRole("button", { name: /try again/i }).click();
     expect(reset).toHaveBeenCalledOnce();
@@ -80,7 +92,7 @@ describe("Error page — online variant", () => {
 
   it("does not render the offline heading when online", () => {
     setOnline(true);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.queryByRole("heading", { name: /you're offline/i }),
@@ -91,7 +103,7 @@ describe("Error page — online variant", () => {
 describe("Error page — offline variant", () => {
   it("renders the offline heading when navigator.onLine is false", () => {
     setOnline(false);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.getByRole("heading", { name: /you're offline/i }),
@@ -100,7 +112,7 @@ describe("Error page — offline variant", () => {
 
   it("renders the offline body copy", () => {
     setOnline(false);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.getByText(/some pages aren't available without a connection/i),
@@ -109,7 +121,7 @@ describe("Error page — offline variant", () => {
 
   it("renders a Try again button when offline", () => {
     setOnline(false);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.getByRole("button", { name: /try again/i }),
@@ -119,15 +131,15 @@ describe("Error page — offline variant", () => {
   it("calls reset when Try again is clicked (offline)", () => {
     setOnline(false);
     const reset = vi.fn();
-    render(<ErrorPage error={fakeError} reset={reset} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={reset} />);
 
     screen.getByRole("button", { name: /try again/i }).click();
     expect(reset).toHaveBeenCalledOnce();
   });
 
-  it("renders a Go to practice link pointing to /", () => {
+  it("renders a Go to Practice link pointing to /", () => {
     setOnline(false);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     const link = screen.getByRole("link", { name: /go to practice/i });
     expect(link).toBeInTheDocument();
@@ -136,7 +148,7 @@ describe("Error page — offline variant", () => {
 
   it("does not render the generic error heading when offline", () => {
     setOnline(false);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.queryByRole("heading", { name: /something went wrong/i }),
@@ -145,7 +157,7 @@ describe("Error page — offline variant", () => {
 
   it("switches to the online variant when an online event fires", () => {
     setOnline(false);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.getByRole("heading", { name: /you're offline/i }),
@@ -167,7 +179,7 @@ describe("Error page — offline variant", () => {
 
   it("switches to the offline variant when an offline event fires", () => {
     setOnline(true);
-    render(<ErrorPage error={fakeError} reset={noop} />);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
     expect(
       screen.getByRole("heading", { name: /something went wrong/i }),
@@ -181,6 +193,48 @@ describe("Error page — offline variant", () => {
 
     expect(
       screen.getByRole("heading", { name: /you're offline/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("Error page — Japanese locale", () => {
+  it("renders the error heading in Japanese", () => {
+    setOnline(true);
+    renderJa(<ErrorPage error={fakeError} reset={noop} />);
+
+    // ja: error.heading = "エラーが発生しました"
+    expect(
+      screen.getByRole("heading", { name: /エラーが発生しました/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the offline heading in Japanese", () => {
+    setOnline(false);
+    renderJa(<ErrorPage error={fakeError} reset={noop} />);
+
+    // ja: error.offline.heading = "オフラインです"
+    expect(
+      screen.getByRole("heading", { name: /オフラインです/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Try again button label in Japanese", () => {
+    setOnline(true);
+    renderJa(<ErrorPage error={fakeError} reset={noop} />);
+
+    // ja: error.tryAgain = "もう一度試す"
+    expect(
+      screen.getByRole("button", { name: /もう一度試す/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Go to Practice link label in Japanese", () => {
+    setOnline(true);
+    renderJa(<ErrorPage error={fakeError} reset={noop} />);
+
+    // ja: error.goHome = "練習に戻る"
+    expect(
+      screen.getByRole("link", { name: /練習に戻る/ }),
     ).toBeInTheDocument();
   });
 });

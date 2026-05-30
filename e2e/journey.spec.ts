@@ -504,6 +504,105 @@ test.describe("Journey page — next badge proximity hint", () => {
   });
 });
 
+test.describe("Journey page — close to mastery section", () => {
+  test("section heading is visible after hydration on a fresh guest session", async ({
+    page,
+  }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("heading", { name: "Close to mastery" }),
+    ).toBeVisible();
+  });
+
+  test("shows empty state copy when no species qualify", async ({ page }) => {
+    // A fresh guest session has no mastered cards, so no species qualify.
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("heading", { name: "Close to mastery" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByText(/No gap to close right now/i),
+    ).toBeVisible();
+  });
+
+  test("shows qualifying species when name card is mastered but reverse card is not", async ({
+    page,
+  }) => {
+    // Seed species 1 (Bulbasaur): name card mastered, no reverse card.
+    await page.addInitScript(() => {
+      const masteredState = {
+        stability: 30,
+        difficulty: 5,
+        elapsedDays: 0,
+        scheduledDays: 28,
+        reps: 4,
+        lapses: 0,
+        fsrsState: "review",
+        dueDate: "2099-01-01",
+        lastReview: "2025-01-01",
+        firstSeen: "2024-12-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      };
+      const cards = [
+        {
+          id: 1,
+          speciesId: 1,
+          cardType: "name",
+          subjectKey: "1",
+          name: "Bulbasaur",
+          displayName: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          types: ["grass", "poison"],
+          state: masteredState,
+        },
+      ];
+      window.localStorage.setItem(
+        "poke-memory:review-session:v1",
+        JSON.stringify({
+          cards,
+          limits: {
+            name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+            reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+            cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+          },
+        }),
+      );
+    });
+
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("heading", { name: "Close to mastery" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // The list must be visible and contain the qualifying species.
+    const list = page.getByRole("list", { name: "Species close to mastery" });
+    await expect(list).toBeVisible();
+    // Bulbasaur should appear in the list.
+    await expect(list.getByText("Bulbasaur")).toBeVisible();
+  });
+
+  test("section is empty when pretendAllMastered superuser flag is on", async ({
+    page,
+  }) => {
+    await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("heading", { name: "Close to mastery" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // With forceAllMastered on the list is always empty.
+    await expect(
+      page.getByText(/No gap to close right now/i),
+    ).toBeVisible();
+  });
+});
+
 test.describe("Journey page — navigation", () => {
   test("Journey link in the desktop nav navigates to /journey", async ({
     page,

@@ -14,7 +14,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 
 | Agent | Role | Read-only? |
 |---|---|---|
-| [planner](.claude/agents/planner.md) | Designs implementation plans; surfaces unknowns before any code is written | Yes |
+| [planner](.claude/agents/planner.md) | Designs implementation plans; surfaces unknowns before any code is written; runs the pre-flight staleness (#1322), AC-quality (#1321), centralisation, and testability + first-contact UX (#1276) checks before drafting a plan | Yes |
 | [next16-expert](.claude/agents/next16-expert.md) | Next.js 16 API, caching, routing, rendering questions | Yes |
 | [pokeapi-expert](.claude/agents/pokeapi-expert.md) | PokéAPI endpoint selection, schemas, caching strategy — low-frequency: the dataset is build-time-seeded, so invoke only when changing the seed script or adding a data category | Yes |
 | [srs-expert](.claude/agents/srs-expert.md) | Spaced-repetition algorithm design and scheduler-code review (data-coder implements) | No |

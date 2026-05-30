@@ -40,6 +40,7 @@ import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
 import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
 import { TtsControls } from "@/components/settings/TtsControls";
+import { QaSeedSection } from "@/components/settings/QaSeedSection";
 import { CollapsibleSection } from "@/components/settings/CollapsibleSection";
 import { SettingsSearch } from "@/components/settings/SettingsSearch";
 import {
@@ -59,7 +60,7 @@ import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg, sectionLabel } from "@/lib/utils/class-names";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
-import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
+import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
 
 /**
@@ -122,12 +123,13 @@ function SkeletonBlock({ className }: { className: string }) {
  * user explicitly exits superuser mode.
  */
 function ResetEarnedBadgesRow() {
+  const t = useTranslations();
   const [cleared, setCleared] = useState(false);
 
   useEffect(() => {
     if (!cleared) return;
-    const t = setTimeout(() => setCleared(false), 1500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setCleared(false), 1500);
+    return () => clearTimeout(timer);
   }, [cleared]);
 
   function handleClear() {
@@ -140,20 +142,19 @@ function ResetEarnedBadgesRow() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-foreground">
-            Reset earned badges
+            {t("settings.developer.resetEarnedBadges.label")}
           </p>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Clears your gym-badge list so you can re-trigger the reveal
-            toasts. Local-only while superuser is on.
+            {t("settings.developer.resetEarnedBadges.description")}
           </p>
         </div>
         <button
           type="button"
           onClick={handleClear}
           className="min-h-[36px] shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
-          aria-label="Reset earned badges"
+          aria-label={t("settings.developer.resetEarnedBadges.label")}
         >
-          {cleared ? "Cleared" : "Reset"}
+          {cleared ? t("settings.developer.resetEarnedBadges.cleared") : t("settings.developer.resetEarnedBadges.reset")}
         </button>
       </div>
     </div>
@@ -161,8 +162,9 @@ function ResetEarnedBadgesRow() {
 }
 
 function LoadingSkeleton() {
+  const t = useTranslations();
   return (
-    <div className={colStackLg} aria-busy="true" aria-label="Loading settings">
+    <div className={colStackLg} aria-busy="true" aria-label={t("settings.loadingAriaLabel")}>
       <SkeletonBlock className="h-20 w-full" />
       <SkeletonBlock className="h-20 w-full" />
       <SkeletonBlock className="h-20 w-full" />
@@ -179,6 +181,7 @@ function FavouritePicker({
   favouriteId: number | null;
   onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
 }) {
+  const t = useTranslations();
   const { flags } = useSuperuser();
   // Loaded once at mount. Nothing on this page writes to the session so a
   // snapshot is safe and avoids re-reading on every render.
@@ -207,10 +210,10 @@ function FavouritePicker({
         id="theme-heading"
         className="text-sm font-semibold text-foreground"
       >
-        App Theme
+        {t("settings.appearance.theme.heading")}
       </h3>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Master a Pokémon to unlock it as an app colour theme.
+        {t("settings.appearance.theme.description")}
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {unlockedEntries.map((entry) => {
@@ -244,14 +247,14 @@ function FavouritePicker({
               {selected ? (
                 <div className="flex flex-col items-center gap-1 w-full">
                   <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    Selected ✓
+                    {t("settings.appearance.theme.selected")} ✓
                   </span>
                   <button
                     type="button"
                     onClick={() => onSelect(null, null)}
                     className="w-full min-h-[36px] rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-400"
                   >
-                    Remove
+                    {t("settings.appearance.theme.remove")}
                   </button>
                 </div>
               ) : (
@@ -260,7 +263,7 @@ function FavouritePicker({
                   onClick={() => onSelect(entry, seed?.spriteUrl ?? null)}
                   className="w-full min-h-[36px] rounded-lg bg-foreground px-3 py-1 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
                 >
-                  Set as theme
+                  {t("settings.appearance.theme.setAsTheme")}
                 </button>
               )}
             </div>
@@ -274,8 +277,10 @@ function FavouritePicker({
 
 type FieldConfig = {
   key: keyof UserSettings;
-  label: string;
-  helper: string;
+  /** Translation key passed to t() at render time. */
+  labelKey: string;
+  /** Translation key passed to t() at render time. */
+  helperKey: string;
   min: number;
   max: number;
 };
@@ -291,8 +296,8 @@ const GROUPS: FieldGroup[] = [
     fields: [
       {
         key: "masteryRepetitions",
-        label: "Mastery threshold",
-        helper: "Cards with this many consecutive correct reviews count as mastered.",
+        labelKey: "settings.practice.masteryThreshold.label",
+        helperKey: "settings.practice.masteryThreshold.description",
         min: 1,
         max: 10,
       },
@@ -303,15 +308,15 @@ const GROUPS: FieldGroup[] = [
 const NAME_NUMERIC_FIELDS: FieldConfig[] = [
   {
     key: "maxNewPerDay",
-    label: "New cards per day",
-    helper: "Hard daily cap. Raising this grows tomorrow's review pile faster.",
+    labelKey: "settings.practice.nameCards.newPerDay.label",
+    helperKey: "settings.practice.nameCards.newPerDay.description",
     min: 1,
     max: 50,
   },
   {
     key: "maxReviewsPerDay",
-    label: "Reviews per day",
-    helper: "Soft cap; you can always override it during a session.",
+    labelKey: "settings.practice.nameCards.reviewsPerDay.label",
+    helperKey: "settings.practice.nameCards.reviewsPerDay.description",
     min: 1,
     max: 500,
   },
@@ -320,15 +325,15 @@ const NAME_NUMERIC_FIELDS: FieldConfig[] = [
 const EVOLUTION_NUMERIC_FIELDS: FieldConfig[] = [
   {
     key: "maxNewEvolutionPerDay",
-    label: "New cards per day",
-    helper: "Hard daily cap for evolution cards. Tracked separately from name cards.",
+    labelKey: "settings.practice.evolutionCards.newPerDay.label",
+    helperKey: "settings.practice.evolutionCards.newPerDay.description",
     min: 1,
     max: 50,
   },
   {
     key: "maxReviewsEvolutionPerDay",
-    label: "Reviews per day",
-    helper: "Soft cap for evolution reviews. Independent of the name-card review cap.",
+    labelKey: "settings.practice.evolutionCards.reviewsPerDay.label",
+    helperKey: "settings.practice.evolutionCards.reviewsPerDay.description",
     min: 1,
     max: 500,
   },
@@ -345,15 +350,15 @@ const ALL_NUMERIC_FIELDS: FieldConfig[] = [
 const REVERSE_NUMERIC_FIELDS: FieldConfig[] = [
   {
     key: "maxNewReversePerDay",
-    label: "New cards per day",
-    helper: "Hard daily cap for reverse cards. Tracked separately from name cards.",
+    labelKey: "settings.practice.reverseCards.newPerDay.label",
+    helperKey: "settings.practice.reverseCards.newPerDay.description",
     min: 1,
     max: 50,
   },
   {
     key: "maxReviewsReversePerDay",
-    label: "Reviews per day",
-    helper: "Soft cap for reverse reviews. Independent of the name-card review cap.",
+    labelKey: "settings.practice.reverseCards.reviewsPerDay.label",
+    helperKey: "settings.practice.reverseCards.reviewsPerDay.description",
     min: 1,
     max: 500,
   },
@@ -428,13 +433,9 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "danger-zone-heading": "advanced-heading",
 };
 
-/** Human-readable labels for each supported locale. */
-const LOCALE_LABELS: Record<AppLocale, string> = {
-  en: "English",
-  ja: "Japanese",
-  "zh-Hans": "Simplified Chinese",
-  "zh-Hant": "Traditional Chinese",
-};
+// LOCALE_ENDONYMS is imported from @/i18n/locales — the single source of truth
+// for locale endonyms used across the settings locale picker and the machine-
+// translation banner (#1349).
 
 /** Read the active locale from document.cookie without importing the hook. */
 function readActiveLocale(): AppLocale {
@@ -558,9 +559,12 @@ export default function SettingsPage() {
     if (!user || !supabase || !autoDetectedPrefsRef.current) return;
     const prefs = autoDetectedPrefsRef.current;
     autoDetectedPrefsRef.current = null;
+    // pushNotificationHour is not auto-detected; current settings value is passed
+    // through so the UPDATE does not null the column on other devices (#1315).
     void pushRegionalPrefs(supabase, user.id, {
       timezone: prefs.timezone,
       dateFormat: prefs.dateFormat,
+      pushNotificationHour: loadSettings().pushNotificationHour,
     }).catch(() => {});
   }, [user, supabase]);
 
@@ -798,7 +802,7 @@ export default function SettingsPage() {
                   className="mt-4 text-sm text-zinc-500 dark:text-zinc-400"
                   aria-live="polite"
                 >
-                  No settings match &ldquo;{searchQuery}&rdquo;.
+                  {t("settings.search.noMatch", { query: searchQuery })}
                 </p>
               )}
             </div>
@@ -809,7 +813,7 @@ export default function SettingsPage() {
               {visibleSectionIds.has("appearance-heading") && (
               <CollapsibleSection
                 sectionId="appearance-heading"
-                heading="Appearance"
+                heading={t("settings.section.appearance")}
                 forceOpen={targetCategoryId === "appearance-heading"}
                 transientOpen={isFiltering}
               >
@@ -842,22 +846,22 @@ export default function SettingsPage() {
                 {/* Mobile navigation style (#661) — bottom tab bar vs hamburger */}
                 <div id="mobile-nav-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Mobile navigation
+                    {t("settings.appearance.mobileNav.heading")}
                   </p>
                   <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          Bottom tab bar
+                          {t("settings.appearance.mobileNav.label")}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Show a fixed tab bar at the bottom of the screen on mobile. Turn off to use the classic hamburger menu instead. Has no effect on wide screens.
+                          {t("settings.appearance.mobileNav.description")}
                         </p>
                       </div>
                       <button
                         type="button"
                         role="switch"
-                        aria-label="Bottom tab bar"
+                        aria-label={t("settings.appearance.mobileNav.label")}
                         aria-checked={settings.mobileNav === "bottom"}
                         onClick={() => {
                           const next = settings.mobileNav === "bottom" ? "hamburger" as const : "bottom" as const;
@@ -887,27 +891,23 @@ export default function SettingsPage() {
               {visibleSectionIds.has("practice-heading") && (
               <CollapsibleSection
                 sectionId="practice-heading"
-                heading="Practice"
+                heading={t("settings.section.practice")}
                 forceOpen={targetCategoryId === "practice-heading"}
                 transientOpen={isFiltering}
               >
                 {/* Scheduler knobs */}
                 <div id="scheduler-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Scheduler
+                    {t("settings.practice.scheduler.heading")}
                   </p>
                   <OnboardingHint id="settingsHintDismissed" title="What recall target does">
                     <p>
-                      The scheduler aims to show each card just before
-                      you&apos;d forget it. A higher recall target means more
-                      reviews and stronger retention; a lower target means
-                      fewer reviews and a bit more forgetting. Most people
-                      leave this at 90%.
+                      {t("settings.practice.scheduler.hint")}
                     </p>
                   </OnboardingHint>
                   {/* Mastery threshold */}
                   {GROUPS.flatMap((g) =>
-                    g.fields.map(({ key, label, helper, min, max }) => (
+                    g.fields.map(({ key, labelKey, helperKey, min, max }) => (
                       <div
                         key={key}
                         className={cardPanelPadded}
@@ -916,7 +916,7 @@ export default function SettingsPage() {
                           htmlFor={key}
                           className="block text-sm font-medium text-foreground"
                         >
-                          {label}
+                          {t(labelKey)}
                         </label>
                         <input
                           id={key}
@@ -930,7 +930,7 @@ export default function SettingsPage() {
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          {helper}
+                          {t(helperKey)}
                         </p>
                       </div>
                     ))
@@ -941,7 +941,7 @@ export default function SettingsPage() {
                       htmlFor="retentionTarget"
                       className="block text-sm font-medium text-foreground"
                     >
-                      Recall target ({Math.round(settings.retentionTarget * 100)}%)
+                      {t("settings.practice.recallTarget.label", { percent: Math.round(settings.retentionTarget * 100) })}
                     </label>
                     <input
                       id="retentionTarget"
@@ -963,7 +963,7 @@ export default function SettingsPage() {
                       id="retentionTarget-helper"
                       className="mt-2 text-xs text-zinc-500 dark:text-zinc-400"
                     >
-                      Lower means fewer reviews but you&apos;ll forget more cards. Higher means more reviews but better retention. Default 90%.
+                      {t("settings.practice.recallTarget.description")}
                     </p>
                   </div>
                 </div>
@@ -991,19 +991,16 @@ export default function SettingsPage() {
                     real graduated state, not synthesised mastery. */}
                 <div id="known-quiz-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Quickstart
+                    {t("settings.practice.quickstart.heading")}
                   </p>
                   <div className={cardPanelPadded}>
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          Mark Pokémon I already know
+                          {t("settings.practice.quickstart.label")}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Tap the Pokémon you already recognise. Each one
-                          graduates straight into the scheduler with a long
-                          first interval, so you can skip the new-card queue
-                          for species you know cold.
+                          {t("settings.practice.quickstart.description")}
                         </p>
                       </div>
                       <button
@@ -1013,7 +1010,7 @@ export default function SettingsPage() {
                         aria-controls="known-quiz-panel"
                         className="min-h-[36px] shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
                       >
-                        {knownQuizOpen ? "Close" : "Open quiz"}
+                        {knownQuizOpen ? t("settings.practice.quickstart.close") : t("settings.practice.quickstart.open")}
                       </button>
                     </div>
                     {knownQuizOpen && (
@@ -1031,10 +1028,10 @@ export default function SettingsPage() {
                 {/* Name cards — always on since #1234 */}
                 <div id="name-cards-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Name cards
+                    {t("settings.practice.nameCards.heading")}
                   </p>
                   <div className={colStackLg}>
-                    {NAME_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                    {NAME_NUMERIC_FIELDS.map(({ key, labelKey, helperKey, min, max }) => (
                       <div
                         key={key}
                         className={cardPanelPadded}
@@ -1043,7 +1040,7 @@ export default function SettingsPage() {
                           htmlFor={key}
                           className="block text-sm font-medium text-foreground"
                         >
-                          {label}
+                          {t(labelKey)}
                         </label>
                         <input
                           id={key}
@@ -1057,7 +1054,7 @@ export default function SettingsPage() {
                           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         />
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          {helper}
+                          {t(helperKey)}
                         </p>
                       </div>
                     ))}
@@ -1066,17 +1063,17 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-foreground">
-                            Verified typed entry for name cards
+                            {t("settings.practice.typedEntry.label")}
                           </p>
                           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            Type the name instead of grading yourself. Grades are decided automatically based on how close your answer is.
+                            {t("settings.practice.typedEntry.description")}
                           </p>
                         </div>
                         <button
                           type="button"
                           role="switch"
                           aria-checked={settings.verifiedTypedEntryMode}
-                          aria-label="Verified typed entry for name cards"
+                          aria-label={t("settings.practice.typedEntry.label")}
                           onClick={() => handleToggle("verifiedTypedEntryMode")}
                           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
                             settings.verifiedTypedEntryMode
@@ -1093,7 +1090,7 @@ export default function SettingsPage() {
                       </div>
                       {/* Always-visible inline help explaining the MC ramp (#1271) */}
                       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        New cards start as multiple choice during the learning phase. Once a card has been reviewed enough times to graduate, it switches to verified typed entry.
+                        {t("settings.practice.typedEntry.mcRampNote")}
                       </p>
                       {/* One-time first-enable banner (#1271). Dismissed by the user; never re-fires. */}
                       {typedEntryBannerVisible && (
@@ -1103,11 +1100,11 @@ export default function SettingsPage() {
                           className="mt-3 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
                         >
                           <p className="flex-1">
-                            Verified typed entry is on. New cards will show multiple choice for the first few reviews. Once a card graduates into long-term review, you will be asked to type the name.
+                            {t("settings.practice.typedEntry.bannerText")}
                           </p>
                           <button
                             type="button"
-                            aria-label="Dismiss typed entry notice"
+                            aria-label={t("settings.practice.typedEntry.dismissBannerAriaLabel")}
                             onClick={() => setTypedEntryBannerVisible(false)}
                             className="shrink-0 text-blue-600 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:text-blue-400 dark:hover:text-blue-200"
                           >
@@ -1122,16 +1119,16 @@ export default function SettingsPage() {
                 {/* Evolution cards */}
                 <div id="evolution-cards-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Evolution cards
+                    {t("settings.practice.evolutionCards.heading")}
                   </p>
                   <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          Enable evolution cards
+                          {t("settings.practice.evolutionCards.enableLabel")}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Show sprite; identify the evolution chain. Disabling hides these cards without losing your progress.
+                          {t("settings.practice.evolutionCards.enableDescription")}
                         </p>
                       </div>
                       <button
@@ -1160,7 +1157,7 @@ export default function SettingsPage() {
                   )}
                   <div className={settings.evolutionCardsEnabled ? undefined : "opacity-50"}>
                     <div className={colStackLg}>
-                      {EVOLUTION_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                      {EVOLUTION_NUMERIC_FIELDS.map(({ key, labelKey, helperKey, min, max }) => (
                         <div
                           key={key}
                           className={cardPanelPadded}
@@ -1169,7 +1166,7 @@ export default function SettingsPage() {
                             htmlFor={key}
                             className="block text-sm font-medium text-foreground"
                           >
-                            {label}
+                            {t(labelKey)}
                           </label>
                           <input
                             id={key}
@@ -1184,7 +1181,7 @@ export default function SettingsPage() {
                             className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                           />
                           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            {helper}
+                            {t(helperKey)}
                           </p>
                         </div>
                       ))}
@@ -1195,18 +1192,16 @@ export default function SettingsPage() {
                 {/* Reverse-evolution cards */}
                 <div id="reverse-evolution-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Reverse-evolution cards
+                    {t("settings.practice.reverseEvolutionCards.heading")}
                   </p>
                   <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          Enable reverse-evolution cards
+                          {t("settings.practice.reverseEvolutionCards.enableLabel")}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Quiz the opposite direction of evolution edges (&quot;Which Pokémon evolves into X via Y?&quot;).
-                          Shares the same daily new/review budget as forward evolution cards.
-                          Disabling hides these cards without losing your progress.
+                          {t("settings.practice.reverseEvolutionCards.enableDescription")}
                         </p>
                       </div>
                       <button
@@ -1233,22 +1228,22 @@ export default function SettingsPage() {
                 {/* Alternate forms (#658) */}
                 <div id="alternate-forms-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Alternate forms
+                    {t("settings.practice.alternateForms.heading")}
                   </p>
                   <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          Include alternate forms in practice
+                          {t("settings.practice.alternateForms.enableLabel")}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Regional forms, Megas and other variants. Off by default: the base Pokédex is already a large deck.
+                          {t("settings.practice.alternateForms.enableDescription")}
                         </p>
                       </div>
                       <button
                         type="button"
                         role="switch"
-                        aria-label="Include alternate forms in practice"
+                        aria-label={t("settings.practice.alternateForms.enableLabel")}
                         aria-checked={settings.alternateFormsEnabled}
                         onClick={() => handleToggle("alternateFormsEnabled")}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
@@ -1270,9 +1265,9 @@ export default function SettingsPage() {
                 {/* Reverse cards — always on since #1234 */}
                 <div id="reverse-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Reverse cards
+                    {t("settings.practice.reverseCards.heading")}
                   </p>
-                  {REVERSE_NUMERIC_FIELDS.map(({ key, label, helper, min, max }) => (
+                  {REVERSE_NUMERIC_FIELDS.map(({ key, labelKey, helperKey, min, max }) => (
                     <div
                       key={key}
                       className={cardPanelPadded}
@@ -1281,7 +1276,7 @@ export default function SettingsPage() {
                         htmlFor={key}
                         className="block text-sm font-medium text-foreground"
                       >
-                        {label}
+                        {t(labelKey)}
                       </label>
                       <input
                         id={key}
@@ -1295,7 +1290,7 @@ export default function SettingsPage() {
                         className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                       />
                       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        {helper}
+                        {t(helperKey)}
                       </p>
                     </div>
                   ))}
@@ -1308,14 +1303,14 @@ export default function SettingsPage() {
                     onClick={handleSave}
                     className="min-h-[44px] rounded-lg bg-foreground px-8 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
                   >
-                    Save
+                    {t("settings.save")}
                   </button>
                   {saved && (
                     <p
                       className="text-sm font-medium text-emerald-600 dark:text-emerald-400"
                       aria-live="polite"
                     >
-                      Saved!
+                      {t("settings.saved")}
                     </p>
                   )}
                 </div>
@@ -1326,30 +1321,29 @@ export default function SettingsPage() {
               {visibleSectionIds.has("audio-heading") && (
               <CollapsibleSection
                 sectionId="audio-heading"
-                heading="Audio"
+                heading={t("settings.section.audio")}
                 forceOpen={targetCategoryId === "audio-heading"}
                 transientOpen={isFiltering}
               >
                 {/* Cry cards */}
                 <div id="cry-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Cry → name cards
+                    {t("settings.audio.cryCards.heading")}
                   </p>
                   <div className={cardPanelPadded}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          Enable cry cards
+                          {t("settings.audio.cryCards.enableLabel")}
                         </p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Audio prompt: hear the cry and name the Pokémon. Species without a cry are skipped automatically.
-                          Disabling hides these cards without losing your progress.
+                          {t("settings.audio.cryCards.enableDescription")}
                         </p>
                       </div>
                       <button
                         type="button"
                         role="switch"
-                        aria-label="Enable cry cards"
+                        aria-label={t("settings.audio.cryCards.enableLabel")}
                         aria-checked={settings.cryCardsEnabled}
                         onClick={() => handleToggle("cryCardsEnabled")}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
@@ -1373,10 +1367,10 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">
-                        Play cry on reveal
+                        {t("settings.audio.playCryOnReveal.label")}
                       </p>
                       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Plays the Pokémon&apos;s cry once when you reveal a name or evolution card, and when you answer a reverse (sprite-picker) card.
+                        {t("settings.audio.playCryOnReveal.description")}
                       </p>
                     </div>
                     <button
@@ -1402,16 +1396,16 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">
-                        Speak name on reveal
+                        {t("settings.audio.speakNameOnReveal.label")}
                       </p>
                       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Reads the Pokémon&apos;s name aloud using your device&apos;s text-to-speech engine when you reveal a card. British English voice preferred.
+                        {t("settings.audio.speakNameOnReveal.description")}
                       </p>
                     </div>
                     <button
                       type="button"
                       role="switch"
-                      aria-label="Speak name on reveal"
+                      aria-label={t("settings.audio.speakNameOnReveal.label")}
                       aria-checked={settings.speakNameOnReveal}
                       onClick={() => handleToggle("speakNameOnReveal")}
                       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
@@ -1443,16 +1437,16 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">
-                        Wait for audio before next card
+                        {t("settings.audio.waitForAudio.label")}
                       </p>
                       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        When on (default), the next card waits until the cry and spoken name finish before appearing. Turn off for a faster swap: audio continues playing under the next card and is not cut off.
+                        {t("settings.audio.waitForAudio.description")}
                       </p>
                     </div>
                     <button
                       type="button"
                       role="switch"
-                      aria-label="Wait for audio before next card"
+                      aria-label={t("settings.audio.waitForAudio.label")}
                       aria-checked={settings.waitForAudioOnGrade}
                       onClick={() => handleToggle("waitForAudioOnGrade")}
                       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
@@ -1474,21 +1468,20 @@ export default function SettingsPage() {
                 {/* Reverse-card feedback delay (#1200) — always shown since reverse is always on (#1234) */}
                 <div className={cardPanelPadded}>
                   <p className="text-sm font-medium text-foreground">
-                    Reverse card feedback delay
+                    {t("settings.audio.reverseFeedbackDelay.label")}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    How long the sprite picker lingers on the correct or incorrect highlight before advancing to the next card.
-                    Off: no pause. Fast: 250 ms correct / 500 ms incorrect. Default: 600 ms / 1200 ms.
+                    {t("settings.audio.reverseFeedbackDelay.description")}
                   </p>
                   <fieldset className="mt-3 flex gap-2">
-                    <legend className="sr-only">Reverse card feedback delay</legend>
+                    <legend className="sr-only">{t("settings.audio.reverseFeedbackDelay.legendAriaLabel")}</legend>
                     {(
                       [
-                        { value: "off", label: "Off" },
-                        { value: "fast", label: "Fast" },
-                        { value: "default", label: "Default" },
-                      ] as const
-                    ).map(({ value, label }) => (
+                        { value: "off" as const, labelKey: "settings.audio.reverseFeedbackDelay.off" },
+                        { value: "fast" as const, labelKey: "settings.audio.reverseFeedbackDelay.fast" },
+                        { value: "default" as const, labelKey: "settings.audio.reverseFeedbackDelay.default" },
+                      ]
+                    ).map(({ value, labelKey: delayLabelKey }) => (
                       <label
                         key={value}
                         className={`flex flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-foreground focus-within:ring-offset-2 ${
@@ -1509,7 +1502,7 @@ export default function SettingsPage() {
                           }}
                           className="sr-only"
                         />
-                        {label}
+                        {t(delayLabelKey)}
                       </label>
                     ))}
                   </fieldset>
@@ -1521,13 +1514,13 @@ export default function SettingsPage() {
               {visibleSectionIds.has("offline-heading") && (
               <CollapsibleSection
                 sectionId="offline-heading"
-                heading="Offline"
+                heading={t("settings.section.offline")}
                 forceOpen={targetCategoryId === "offline-heading"}
                 transientOpen={isFiltering}
               >
                 <div id="offline-download-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Download
+                    {t("settings.offline.downloadHeading")}
                   </p>
                   <OfflineSection />
                 </div>
@@ -1538,7 +1531,7 @@ export default function SettingsPage() {
               {visibleSectionIds.has("account-data-heading") && (
               <CollapsibleSection
                 sectionId="account-data-heading"
-                heading="Account & Data"
+                heading={t("settings.section.accountData")}
                 forceOpen={targetCategoryId === "account-data-heading"}
                 transientOpen={isFiltering}
               >
@@ -1558,45 +1551,35 @@ export default function SettingsPage() {
                 {/* Onboarding explainer */}
                 <div id="onboarding-heading" className={cn("flex flex-col gap-3", cardPanelPadded)}>
                   <p className={sectionLabel}>
-                    How this works
+                    {t("settings.howThisWorks.heading")}
                   </p>
                   <p className="text-sm text-foreground">
-                    Poké Memory uses{" "}
-                    <a
-                      href="https://github.com/open-spaced-repetition/ts-fsrs"
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="underline underline-offset-2"
-                    >
-                      FSRS
-                    </a>
-                    , a spaced-repetition scheduler that picks the best time
-                    to show each card based on how well you remember it.
+                    {t.rich("settings.howThisWorks.body1", {
+                      link: (chunks) => (
+                        <a
+                          href="https://github.com/open-spaced-repetition/ts-fsrs"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+                        >
+                          {chunks}
+                        </a>
+                      ),
+                    })}
                   </p>
                   <p className="text-sm text-foreground">
-                    After every grade the scheduler updates its model of how
-                    strong your memory of that card is, and sets the next
-                    review for when you&apos;re most likely to be about to
-                    forget it. Forgetting and then re-remembering is what
-                    actually moves a card into long-term memory, so getting
-                    a few <em>Again</em>s is normal and part of the system
-                    working.
+                    {t("settings.howThisWorks.body2")}
                   </p>
                   <p className="text-sm text-foreground">
-                    Honest grading matters more than getting every card
-                    right. If you almost forgot, press <em>Hard</em>. If you
-                    truly forgot, press <em>Again</em>. The scheduler
-                    can&apos;t help you if you mark cards <em>Easy</em> when
-                    you only just scraped it.
+                    {t("settings.howThisWorks.body3")}
                   </p>
                   <hr className="border-zinc-200 dark:border-zinc-800" />
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      Show onboarding again
+                      {t("settings.howThisWorks.showOnboardingAgainLabel")}
                     </p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Re-opens the welcome guide on the Practice page and
-                      restores contextual hints on Stats and Settings.
+                      {t("settings.howThisWorks.showOnboardingAgainDescription")}
                     </p>
                     <button
                       type="button"
@@ -1610,7 +1593,7 @@ export default function SettingsPage() {
                       }}
                       className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
-                      Show onboarding again
+                      {t("settings.howThisWorks.showOnboardingAgainButton")}
                     </button>
                   </div>
                 </div>
@@ -1618,19 +1601,19 @@ export default function SettingsPage() {
                 {/* Backup */}
                 <div id="backup-heading" className={cn(cardPanelPadded, "flex flex-col gap-3")}>
                   <p className={sectionLabel}>
-                    Backup
+                    {t("settings.backup.heading")}
                   </p>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Export progress</p>
+                    <p className="text-sm font-medium text-foreground">{t("settings.backup.exportLabel")}</p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Downloads a JSON backup of all your card progress and settings.
+                      {t("settings.backup.exportDescription")}
                     </p>
                     <button
                       type="button"
                       onClick={() => void exportProgress()}
                       className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
-                      Export
+                      {t("settings.backup.exportButton")}
                     </button>
                   </div>
 
@@ -1639,16 +1622,16 @@ export default function SettingsPage() {
                     <>
                       <hr className="border-zinc-200 dark:border-zinc-800" />
                       <div>
-                        <p className="text-sm font-medium text-foreground">Download review history</p>
+                        <p className="text-sm font-medium text-foreground">{t("settings.backup.downloadReviewHistory")}</p>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Downloads your full review history as a CSV file (date, Pokémon, card type, grade). Useful for personal analysis and satisfies GDPR data portability.
+                          {t("settings.backup.downloadReviewHistoryDescription")}
                         </p>
                         <a
                           href="/api/export"
                           download
                           className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                         >
-                          Download CSV
+                          {t("settings.backup.downloadCsv")}
                         </a>
                       </div>
                     </>
@@ -1657,9 +1640,9 @@ export default function SettingsPage() {
                   <hr className="border-zinc-200 dark:border-zinc-800" />
 
                   <div>
-                    <p className="text-sm font-medium text-foreground">Import progress</p>
+                    <p className="text-sm font-medium text-foreground">{t("settings.backup.importLabel")}</p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Restore from a previously exported backup. Replaces current progress after confirmation.
+                      {t("settings.backup.importDescription")}
                     </p>
                     <input
                       ref={fileInputRef}
@@ -1674,7 +1657,7 @@ export default function SettingsPage() {
                       onClick={() => fileInputRef.current?.click()}
                       className="mt-3 min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
-                      Import
+                      {t("settings.backup.importButton")}
                     </button>
                     {importError !== null && (
                       <p
@@ -1690,7 +1673,7 @@ export default function SettingsPage() {
                 {/* Regional */}
                 <div id="regional-heading" className={colStackLg}>
                   <p className={sectionLabel}>
-                    Regional
+                    {t("settings.regional.heading")}
                   </p>
 
                   {/* Timezone picker */}
@@ -1699,10 +1682,10 @@ export default function SettingsPage() {
                       htmlFor="timezone"
                       className="block text-sm font-medium text-foreground"
                     >
-                      Timezone
+                      {t("settings.regional.timezone.label")}
                     </label>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Used for daily review limits and streak roll-overs. Auto-detected on first load.
+                      {t("settings.regional.timezone.description")}
                     </p>
                     <select
                       id="timezone"
@@ -1715,6 +1698,7 @@ export default function SettingsPage() {
                           void pushRegionalPrefs(supabase, user.id, {
                             timezone: e.target.value,
                             dateFormat: next.dateFormat,
+                            pushNotificationHour: next.pushNotificationHour,
                           }).catch(() => {});
                         }
                       }}
@@ -1731,23 +1715,23 @@ export default function SettingsPage() {
                   {/* Date format picker */}
                   <div className={cardPanelPadded}>
                     <p className="text-sm font-medium text-foreground">
-                      Date format
+                      {t("settings.regional.dateFormat.label")}
                     </p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Controls how dates are shown throughout the app. Live preview updates below.
+                      {t("settings.regional.dateFormat.description")}
                     </p>
                     <fieldset className="mt-3 flex flex-col gap-2">
-                      <legend className="sr-only">Date format</legend>
+                      <legend className="sr-only">{t("settings.regional.dateFormat.legendAriaLabel")}</legend>
                       {(() => {
                         // Hoist outside the per-option map so it is computed once.
                         const todayIso = new Date().toISOString().slice(0, 10);
                         return (
                           [
-                            { value: "dmy" as DateFormat, label: "Day / Month / Year" },
-                            { value: "mdy" as DateFormat, label: "Month / Day / Year" },
-                            { value: "iso" as DateFormat, label: "ISO (Year-Month-Day)" },
+                            { value: "dmy" as DateFormat, labelKey: "settings.regional.dateFormat.dmy" },
+                            { value: "mdy" as DateFormat, labelKey: "settings.regional.dateFormat.mdy" },
+                            { value: "iso" as DateFormat, labelKey: "settings.regional.dateFormat.iso" },
                           ] as const
-                        ).map(({ value, label }) => (
+                        ).map(({ value, labelKey: dateLabelKey }) => (
                           <label
                             key={value}
                             className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-700"
@@ -1765,12 +1749,13 @@ export default function SettingsPage() {
                                   void pushRegionalPrefs(supabase, user.id, {
                                     timezone: next.timezone,
                                     dateFormat: value,
+                                    pushNotificationHour: next.pushNotificationHour,
                                   }).catch(() => {});
                                 }
                               }}
                               className="shrink-0 accent-foreground"
                             />
-                            <span className="flex-1 text-foreground">{label}</span>
+                            <span className="flex-1 text-foreground">{t(dateLabelKey)}</span>
                             <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
                               {formatShortDate(todayIso, value)}
                             </span>
@@ -1779,15 +1764,60 @@ export default function SettingsPage() {
                       })()}
                     </fieldset>
                   </div>
+
+                  {/* Push notification hour (#1315) */}
+                  <div className={cardPanelPadded}>
+                    <label
+                      htmlFor="push-notification-hour"
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      {t("settings.regional.dailyReminderTime.label")}
+                    </label>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      {t("settings.regional.dailyReminderTime.description")}
+                    </p>
+                    <select
+                      id="push-notification-hour"
+                      value={settings.pushNotificationHour ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const parsed = raw === "" ? null : parseInt(raw, 10);
+                        const hour = parsed !== null && !isNaN(parsed) && parsed >= 0 && parsed <= 23
+                          ? parsed
+                          : null;
+                        const next = { ...settings, pushNotificationHour: hour };
+                        setSettings(next);
+                        saveSettings(next);
+                        if (user && supabase) {
+                          void pushRegionalPrefs(supabase, user.id, {
+                            timezone: next.timezone,
+                            dateFormat: next.dateFormat,
+                            pushNotificationHour: hour,
+                          }).catch(() => {});
+                        }
+                      }}
+                      className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      <option value="">{t("settings.regional.dailyReminderTime.defaultOption")}</option>
+                      {Array.from({ length: 24 }, (_, h) => {
+                        const label = `${String(h).padStart(2, "0")}:00`;
+                        return (
+                          <option key={h} value={String(h)}>
+                            {label}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
                 </div>
 
                 {/* About */}
                 <div id="about-heading" className={cn(cardPanelPadded, "flex flex-col gap-3")}>
                   <p className={sectionLabel}>
-                    About
+                    {t("settings.about.heading")}
                   </p>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Version</p>
+                    <p className="text-sm font-medium text-foreground">{t("settings.about.version")}</p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       {process.env.NEXT_PUBLIC_APP_VERSION
                         ? `v${process.env.NEXT_PUBLIC_APP_VERSION}`
@@ -1798,15 +1828,15 @@ export default function SettingsPage() {
                   <hr className="border-zinc-200 dark:border-zinc-800" />
 
                   <div>
-                    <p className="text-sm font-medium text-foreground">What&apos;s new</p>
+                    <p className="text-sm font-medium text-foreground">{t("settings.about.whatsNew")}</p>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      See what shipped in recent releases.
+                      {t("settings.about.whatsNewDescription")}
                     </p>
                     <Link
                       href="/whats-new"
                       className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
-                      View changelog
+                      {t("settings.about.viewChangelog")}
                     </Link>
                   </div>
 
@@ -1817,13 +1847,13 @@ export default function SettingsPage() {
                       href="/privacy"
                       className="inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
-                      Privacy
+                      {t("settings.about.privacy")}
                     </Link>
                     <Link
                       href="/terms"
                       className="inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
                     >
-                      Terms
+                      {t("settings.about.terms")}
                     </Link>
                   </div>
 
@@ -1851,14 +1881,13 @@ export default function SettingsPage() {
               {visibleSectionIds.has("labs-heading") && Object.keys(LABS_FLAGS).length > 0 && (
               <CollapsibleSection
                 sectionId="labs-heading"
-                heading="Labs"
+                heading={t("settings.section.labs")}
                 forceOpen={targetCategoryId === "labs-heading"}
                 transientOpen={isFiltering}
               >
                 <div id="labs-heading" className={colStackLg}>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Preview features that are in active development. These may
-                    change or be removed. Your feedback helps shape what ships.
+                    {t("settings.labs.description")}
                   </p>
                   {(Object.entries(LABS_FLAGS) as [LabsFlagKey, { label: string; description: string; default: boolean }][]).map(
                     ([key, meta]) => (
@@ -1915,10 +1944,10 @@ export default function SettingsPage() {
                                 htmlFor="labs-app-locale-select"
                                 className="block text-sm font-medium text-foreground"
                               >
-                                App language
+                                {t("settings.labs.languages.appLanguageLabel")}
                               </label>
                               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                Controls the app UI language. App UI translation is in progress.
+                                {t("settings.labs.languages.appLanguageDescription")}
                               </p>
                               <select
                                 id="labs-app-locale-select"
@@ -1934,7 +1963,9 @@ export default function SettingsPage() {
                               >
                                 {SUPPORTED_LOCALES.map((loc) => (
                                   <option key={loc} value={loc}>
-                                    {LOCALE_LABELS[loc]}
+                                    {loc === "en"
+                                      ? LOCALE_ENDONYMS[loc]
+                                      : `${LOCALE_ENDONYMS[loc]} ${t("settings.labs.languages.previewSuffix")}`}
                                   </option>
                                 ))}
                               </select>
@@ -1946,11 +1977,10 @@ export default function SettingsPage() {
                                 htmlFor="labs-pokemon-name-locale-select"
                                 className="block text-sm font-medium text-foreground"
                               >
-                                Pokémon name language
+                                {t("settings.labs.languages.pokemonNameLanguageLabel")}
                               </label>
                               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                Pokémon names on cards will be shown in this language.
-                                Independent of the app language above.
+                                {t("settings.labs.languages.pokemonNameLanguageDescription")}
                               </p>
                               <select
                                 id="labs-pokemon-name-locale-select"
@@ -1965,7 +1995,9 @@ export default function SettingsPage() {
                               >
                                 {SUPPORTED_LOCALES.map((loc) => (
                                   <option key={loc} value={loc}>
-                                    {LOCALE_LABELS[loc]}
+                                    {loc === "en"
+                                      ? LOCALE_ENDONYMS[loc]
+                                      : `${LOCALE_ENDONYMS[loc]} ${t("settings.labs.languages.previewSuffix")}`}
                                   </option>
                                 ))}
                               </select>
@@ -1983,7 +2015,7 @@ export default function SettingsPage() {
               {visibleSectionIds.has("advanced-heading") && (
               <CollapsibleSection
                 sectionId="advanced-heading"
-                heading="Advanced"
+                heading={t("settings.section.advanced")}
                 forceOpen={targetCategoryId === "advanced-heading"}
                 transientOpen={isFiltering}
               >
@@ -1999,26 +2031,20 @@ export default function SettingsPage() {
                       id="developer-section-label"
                       className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400"
                     >
-                      Developer
+                      {t("settings.developer.heading")}
                     </p>
                     <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                      QA shortcuts. While any flag here is on, sync to the cloud is
-                      paused so QA state can&apos;t leak into your real data.
-                      Turning off the last flag (or locking superuser mode) restores
-                      cloud state for signed-in users, or offers to reset local
-                      state for guests.
+                      {t("settings.developer.description")}
                     </p>
                     <div className={cn("mt-4", cardPanelPadded)}>
                       <a
                         href="/audit-themes"
                         className="block text-sm font-medium text-foreground underline-offset-4 hover:underline"
                       >
-                        Theme audit →
+                        {t("settings.developer.themeAudit")}
                       </a>
                       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        Side-by-side preview of every mascot × intensity × colour
-                        scheme. Use when tweaking <code className="font-mono">globals.css</code> to spot
-                        combos where the grade buttons blend into the surface.
+                        {t("settings.developer.themeAuditDescription")}
                       </p>
                     </div>
 
@@ -2026,17 +2052,16 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-foreground">
-                            Pretend all Pokémon are mastered
+                            {t("settings.developer.pretendAllMastered.label")}
                           </p>
                           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            Renders every species as mastered across the Pokédex,
-                            detail pages, Pasture, Stats, and the theme picker.
+                            {t("settings.developer.pretendAllMastered.description")}
                           </p>
                         </div>
                         <button
                           type="button"
                           role="switch"
-                          aria-label="Pretend all Pokémon are mastered"
+                          aria-label={t("settings.developer.pretendAllMastered.label")}
                           aria-checked={flags.pretendAllMastered}
                           onClick={() =>
                             void setFlag("pretendAllMastered", !flags.pretendAllMastered)
@@ -2060,19 +2085,16 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-foreground">
-                            Force next streak milestone
+                            {t("settings.developer.forceNextStreakMilestone.label")}
                           </p>
                           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            Fires the smallest un-seen streak celebration on the
-                            next visit to Practice, regardless of the real streak.
-                            Self-clears after one fire. Locking superuser overwrites
-                            local progress with cloud state for signed-in users.
+                            {t("settings.developer.forceNextStreakMilestone.description")}
                           </p>
                         </div>
                         <button
                           type="button"
                           role="switch"
-                          aria-label="Force next streak milestone"
+                          aria-label={t("settings.developer.forceNextStreakMilestone.label")}
                           aria-checked={flags.forceNextStreakMilestone}
                           onClick={() =>
                             void setFlag(
@@ -2101,17 +2123,16 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-foreground">
-                            Force cards graduated
+                            {t("settings.developer.forceCardsGraduated.label")}
                           </p>
                           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            Treat all cards as graduated. Use to test typed
-                            entry without grinding learning steps.
+                            {t("settings.developer.forceCardsGraduated.description")}
                           </p>
                         </div>
                         <button
                           type="button"
                           role="switch"
-                          aria-label="Force cards graduated"
+                          aria-label={t("settings.developer.forceCardsGraduated.label")}
                           aria-checked={flags.forceCardsGraduated}
                           onClick={() =>
                             void setFlag(
@@ -2139,6 +2160,45 @@ export default function SettingsPage() {
                     <div className="mt-4">
                       <ResetEarnedBadgesRow />
                     </div>
+
+                    {/* QA seed mode toggle (#1326) */}
+                    <div className={cn("mt-4", cardPanelPadded)}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {t("settings.developer.qaSeedMode.label")}
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            {t("settings.developer.qaSeedMode.description")}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label={t("settings.developer.qaSeedMode.label")}
+                          aria-checked={flags.qaSeedMode}
+                          onClick={() =>
+                            void setFlag("qaSeedMode", !flags.qaSeedMode)
+                          }
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            flags.qaSeedMode
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              flags.qaSeedMode
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* QA seed panel — only shown when qaSeedMode is on */}
+                    {flags.qaSeedMode && <QaSeedSection />}
                   </div>
                 )}
 
@@ -2148,14 +2208,15 @@ export default function SettingsPage() {
                   className="rounded-xl border border-red-200 p-5 dark:border-red-900"
                 >
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
-                    Danger zone
+                    {t("settings.dangerZone.heading")}
                   </h3>
                   <div className="mt-4 flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-sm font-medium text-foreground">Reset all progress</p>
+                      <p className="text-sm font-medium text-foreground">{t("settings.dangerZone.resetAllProgress")}</p>
                       <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                        Permanently deletes your review history
-                        {user ? " and cloud data" : ""}.
+                        {user
+                          ? t("settings.dangerZone.resetDescriptionCloud")
+                          : t("settings.dangerZone.resetDescription")}
                       </p>
                     </div>
                     <button
@@ -2164,7 +2225,7 @@ export default function SettingsPage() {
                       disabled={anyFlagOn}
                       className="min-h-[44px] shrink-0 rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-950"
                     >
-                      Reset all progress
+                      {t("settings.dangerZone.resetAllProgress")}
                     </button>
                   </div>
 
@@ -2182,11 +2243,10 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-foreground">
-                            Delete account
+                            {t("settings.dangerZone.deleteAccount")}
                           </p>
                           <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                            Permanently erases your account, cloud data, and
-                            sign-in identity. This cannot be undone.
+                            {t("settings.dangerZone.deleteDescription")}
                           </p>
                         </div>
                         {anyFlagOn ? (
@@ -2194,10 +2254,10 @@ export default function SettingsPage() {
                             type="button"
                             disabled
                             data-testid="delete-account-button"
-                            title="Account deletion is paused while a superuser flag is on."
+                            title={t("settings.dangerZone.deletePausedTitle")}
                             className="min-h-[44px] shrink-0 rounded-lg bg-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
                           >
-                            Sync paused (superuser)
+                            {t("settings.dangerZone.syncPausedSuperuser")}
                           </button>
                         ) : (
                           <button
@@ -2206,7 +2266,7 @@ export default function SettingsPage() {
                             data-testid="delete-account-button"
                             className="min-h-[44px] shrink-0 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 dark:bg-red-600 dark:hover:bg-red-500"
                           >
-                            Delete account
+                            {t("settings.dangerZone.deleteAccount")}
                           </button>
                         )}
                       </div>

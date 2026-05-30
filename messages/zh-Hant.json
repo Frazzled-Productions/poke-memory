@@ -9,181 +9,472 @@
     "settings": "設定",
     "signIn": "登入",
     "signOut": "登出",
-    "ariaLabel": "主導覽"
+    "ariaLabel": "主導覽",
+    "mobileTabAriaLabel": "行動端分頁導覽",
+    "whatsNew": "新功能",
+    "privacy": "隱私",
+    "terms": "條款"
+  },
+  "auth": {
+    "signingIn": "登入中…",
+    "signingOut": "登出中…",
+    "signIn": "登入",
+    "signOut": "登出",
+    "continueWithGitHub": "使用 GitHub 繼續",
+    "continueWithGoogle": "使用 Google 繼續",
+    "providerHint": "請使用註冊時所用的登入方式，以保留您的進度。",
+    "chooseProvider": "選擇登入方式"
   },
   "settings": {
     "heading": "設定",
-    "saved": "Saved!",
-    "save": "Save",
+    "saved": "已儲存！",
+    "save": "儲存",
     "search": {
-      "placeholder": "Search settings...",
-      "noMatch": "No settings match \"{query}\".",
-      "ariaLabel": "Search settings"
+      "placeholder": "搜尋設定...",
+      "noMatch": "沒有與「{query}」相符的設定。",
+      "ariaLabel": "搜尋設定",
+      "clearAriaLabel": "清除搜尋",
+      "noMatchAnnouncement": "沒有與您的搜尋相符的設定。",
+      "matchAnnouncement": "{count, plural, other {{count} 個部分與您的搜尋相符。}}"
     },
     "section": {
-      "appearance": "Appearance",
-      "practice": "Practice",
-      "audio": "Audio",
-      "offline": "Offline",
-      "accountData": "Account & Data",
-      "advanced": "Advanced",
-      "labs": "Labs"
+      "appearance": "外觀",
+      "practice": "練習",
+      "audio": "音訊",
+      "offline": "離線",
+      "accountData": "帳號與資料",
+      "advanced": "進階",
+      "labs": "實驗室"
     },
     "appearance": {
       "mobileNav": {
-        "heading": "Mobile navigation",
-        "label": "Bottom tab bar",
-        "description": "Show a fixed tab bar at the bottom of the screen on mobile. Turn off to use the classic hamburger menu instead. Has no effect on wide screens."
+        "heading": "行動端導覽",
+        "label": "底部頁籤列",
+        "description": "在行動裝置螢幕底部顯示固定頁籤列。關閉後改用傳統漢堡選單。在寬螢幕上無效果。"
       },
       "theme": {
-        "heading": "App Theme",
-        "description": "Master a Pokémon to unlock it as an app colour theme.",
-        "selected": "Selected",
-        "setAsTheme": "Set as theme",
-        "remove": "Remove"
+        "heading": "應用程式主題",
+        "description": "掌握一隻寶可夢後，可將其解鎖為應用程式的配色主題。",
+        "selected": "已選擇",
+        "setAsTheme": "設為主題",
+        "remove": "移除"
       }
     },
     "labs": {
+      "description": "正在開發中的預覽功能。這些功能可能會更改或移除。您的意見回饋有助於決定最終形態。",
       "languages": {
-        "label": "Languages",
-        "description": "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese.",
+        "label": "語言",
+        "description": "以日語、簡體中文或繁體中文顯示寶可夢名稱。",
         "locale": {
           "en": "English",
-          "ja": "Japanese",
-          "zh-Hans": "Simplified Chinese",
-          "zh-Hant": "Traditional Chinese"
+          "ja": "日本語",
+          "zh-Hans": "简体中文",
+          "zh-Hant": "繁體中文"
         },
-        "selectLocale": "Language"
+        "selectLocale": "語言",
+        "appLanguageLabel": "應用程式語言",
+        "appLanguageDescription": "控制應用程式介面語言。介面翻譯仍在進行中。",
+        "pokemonNameLanguageLabel": "寶可夢名稱語言",
+        "pokemonNameLanguageDescription": "卡片上顯示的寶可夢名稱語言，與應用程式語言相互獨立。",
+        "previewSuffix": "（預覽）"
       }
     },
     "practice": {
       "scheduler": {
-        "heading": "Scheduler"
+        "heading": "排程器",
+        "hint": "排程器會在您即將遺忘之前顯示每張卡片。記憶目標越高，複習次數越多，記憶越牢固；越低則複習次數越少，遺忘也會更多。大多數人保持預設的 90%。"
       },
       "masteryThreshold": {
-        "label": "Mastery threshold",
-        "description": "Cards with this many consecutive correct reviews count as mastered."
+        "label": "掌握標準",
+        "description": "連續答對這麼多次的卡片將被視為已掌握。"
       },
       "recallTarget": {
-        "label": "Recall target ({percent}%)",
-        "description": "Lower means fewer reviews but you will forget more cards. Higher means more reviews but better retention. Default 90%."
+        "label": "記憶目標 ({percent}%)",
+        "description": "降低此值可減少複習次數，但會忘記更多卡片。提高此值可增加複習次數，從而提高記憶保留率。預設值為 90%。"
+      },
+      "quickstart": {
+        "heading": "快速開始",
+        "label": "標記我已知道的寶可夢",
+        "description": "點選您已經認識的寶可夢。每隻寶可夢將以較長的首次間隔直接加入排程器，讓您跳過已熟悉的寶可夢的新卡片佇列。",
+        "open": "開啟測驗",
+        "close": "關閉"
       },
       "nameCards": {
-        "heading": "Name cards"
+        "heading": "名稱卡片",
+        "newPerDay": {
+          "label": "每日新卡片數",
+          "description": "每日上限。增加此值會加快明天的複習堆積速度。"
+        },
+        "reviewsPerDay": {
+          "label": "每日複習數",
+          "description": "軟性上限，您可以在學習過程中隨時突破。"
+        }
+      },
+      "typedEntry": {
+        "label": "名稱卡片的驗證輸入",
+        "description": "輸入名稱而非自行評分。根據答案的準確程度自動評分。",
+        "mcRampNote": "新卡片在學習階段以選擇題形式顯示。卡片畢業後將切換為驗證輸入。",
+        "bannerText": "驗證輸入已開啟。新卡片在最初幾次複習中將顯示選擇題。卡片進入長期複習後，您將被要求輸入名稱。",
+        "dismissBannerAriaLabel": "關閉輸入模式提示"
       },
       "evolutionCards": {
-        "heading": "Evolution cards"
+        "heading": "進化卡片",
+        "enableLabel": "啟用進化卡片",
+        "enableDescription": "顯示精靈圖，判斷進化鏈。停用後進度不會遺失。",
+        "newPerDay": {
+          "label": "每日新卡片數",
+          "description": "進化卡片每日上限，與名稱卡片單獨計算。"
+        },
+        "reviewsPerDay": {
+          "label": "每日複習數",
+          "description": "進化卡片的軟性上限，與名稱卡片複習上限相互獨立。"
+        }
+      },
+      "reverseEvolutionCards": {
+        "heading": "反向進化卡片",
+        "enableLabel": "啟用反向進化卡片",
+        "enableDescription": "測驗進化的反向方向（「X 由什麼寶可夢進化而來？」）。與正向進化卡片共享每日新卡/複習配額。停用後進度不會遺失。"
+      },
+      "alternateForms": {
+        "heading": "異形態",
+        "enableLabel": "在練習中包含異形態",
+        "enableDescription": "地區形態、超級進化及其他變體。預設關閉：基礎圖鑑已經是一個很大的牌組了。"
       },
       "reverseCards": {
-        "heading": "Reverse cards"
+        "heading": "反向卡片",
+        "newPerDay": {
+          "label": "每日新卡片數",
+          "description": "反向卡片每日上限，與名稱卡片單獨計算。"
+        },
+        "reviewsPerDay": {
+          "label": "每日複習數",
+          "description": "反向卡片的軟性上限，與名稱卡片複習上限相互獨立。"
+        }
       },
-      "cryCards": {
-        "heading": "Cry to name cards"
-      },
-      "newPerDay": "New cards per day",
-      "reviewsPerDay": "Reviews per day",
-      "save": "Save"
+      "newPerDay": "每日新卡片數",
+      "reviewsPerDay": "每日複習數",
+      "save": "儲存"
     },
     "audio": {
+      "cryCards": {
+        "heading": "叫聲辨名卡片",
+        "enableLabel": "啟用叫聲卡片",
+        "enableDescription": "音訊提示：聆聽叫聲並說出寶可夢的名稱。沒有叫聲的種族會自動跳過。停用後進度不會遺失。"
+      },
       "playCryOnReveal": {
-        "label": "Play cry on reveal",
-        "description": "Plays the Pokémon's cry once when you reveal a name or evolution card."
+        "label": "翻牌時播放叫聲",
+        "description": "翻開名稱卡片或進化卡片時，播放一次寶可夢的叫聲，以及回答反向（精靈圖選擇）卡片時也會播放。"
       },
       "speakNameOnReveal": {
-        "label": "Speak name on reveal",
-        "description": "Reads the Pokémon's name aloud using your device's text-to-speech engine when you reveal a card."
+        "label": "翻牌時朗讀名稱",
+        "description": "翻開卡片時，使用裝置的文字轉語音引擎朗讀寶可夢的名稱。推薦使用英式英語語音。"
+      },
+      "waitForAudio": {
+        "label": "等待音訊後再顯示下一張卡片",
+        "description": "開啟（預設）時，叫聲和朗讀結束後才會顯示下一張卡片。關閉後切換更快：音訊會在下一張卡片下方繼續播放，不會被打斷。"
+      },
+      "reverseFeedbackDelay": {
+        "label": "反向卡片回饋延遲",
+        "description": "精靈圖選擇中，正確或錯誤高亮在進入下一張卡片前停留的時間。關閉：無暫停。快速：正確 250ms / 錯誤 500ms。預設：600ms / 1200ms。",
+        "legendAriaLabel": "反向卡片回饋延遲",
+        "off": "關閉",
+        "fast": "快速",
+        "default": "預設"
       }
     },
+    "offline": {
+      "downloadHeading": "下載"
+    },
     "backup": {
-      "heading": "Backup",
-      "exportLabel": "Export progress",
-      "exportDescription": "Downloads a JSON backup of all your card progress and settings.",
-      "exportButton": "Export",
-      "importLabel": "Import progress",
-      "importDescription": "Restore from a previously exported backup. Replaces current progress after confirmation.",
-      "importButton": "Import"
+      "heading": "備份",
+      "exportLabel": "匯出進度",
+      "exportDescription": "將所有卡片進度和設定下載為 JSON 備份檔案。",
+      "exportButton": "匯出",
+      "downloadReviewHistory": "下載複習記錄",
+      "downloadReviewHistoryDescription": "將完整的複習記錄下載為 CSV 檔案（日期、寶可夢、卡片類型、評分）。適合個人分析，滿足 GDPR 資料可攜性要求。",
+      "downloadCsv": "下載 CSV",
+      "importLabel": "匯入進度",
+      "importDescription": "從先前匯出的備份檔案還原。確認後將取代目前的進度。",
+      "importButton": "匯入"
+    },
+    "howThisWorks": {
+      "heading": "運作原理",
+      "body1": "Poké Memory 使用<link>FSRS</link>間隔重複排程器，根據您的記憶強度選擇最佳時間顯示每張卡片。",
+      "body2": "每次評分後，排程器都會更新對該卡片記憶強度的模型，並在您最可能即將遺忘時設定下次複習時間。遺忘後再想起才能真正將卡片轉入長期記憶，所以偶爾「再來一次」是正常的，說明系統在正常運作。",
+      "body3": "誠實評分比每次都答對更重要。如果幾乎忘了，就按「困難」；如果完全忘了，就按「再來一次」。如果明明勉強答對卻選「簡單」，排程器就無法幫助您。",
+      "showOnboardingAgainLabel": "重新顯示新手引導",
+      "showOnboardingAgainDescription": "在練習頁面重新開啟歡迎指南，並恢復記錄和設定中的情境提示。",
+      "showOnboardingAgainButton": "重新顯示新手引導"
     },
     "regional": {
-      "heading": "Regional",
+      "heading": "地區設定",
       "timezone": {
-        "label": "Timezone",
-        "description": "Used for daily review limits and streak roll-overs. Auto-detected on first load."
+        "label": "時區",
+        "description": "用於每日複習上限和連續天數重置。首次載入時自動偵測。"
       },
       "dateFormat": {
-        "label": "Date format",
-        "description": "Controls how dates are shown throughout the app."
+        "label": "日期格式",
+        "description": "控制應用程式中日期的顯示方式。下方預覽會即時更新。",
+        "legendAriaLabel": "日期格式",
+        "dmy": "日 / 月 / 年",
+        "mdy": "月 / 日 / 年",
+        "iso": "ISO（年-月-日）"
+      },
+      "dailyReminderTime": {
+        "label": "每日提醒時間",
+        "description": "每日練習提醒的首選本地時間。使用上方的時區。完整的每小時投遞將在排程更新後啟用。",
+        "defaultOption": "預設（08:00）"
       }
     },
     "about": {
-      "heading": "About",
-      "version": "Version",
-      "whatsNew": "What's new",
-      "viewChangelog": "View changelog"
+      "heading": "關於",
+      "version": "版本",
+      "whatsNew": "新功能",
+      "whatsNewDescription": "查看最近版本的更新內容。",
+      "viewChangelog": "查看更新記錄",
+      "privacy": "隱私",
+      "terms": "條款"
     },
     "dangerZone": {
-      "heading": "Danger zone",
-      "resetAllProgress": "Reset all progress",
-      "resetDescription": "Permanently deletes your review history",
-      "resetDescriptionCloud": "Permanently deletes your review history and cloud data.",
-      "deleteAccount": "Delete account",
-      "deleteDescription": "Permanently erases your account, cloud data, and sign-in identity. This cannot be undone."
+      "heading": "危險操作",
+      "resetAllProgress": "重置所有進度",
+      "resetDescription": "永久刪除您的複習記錄",
+      "resetDescriptionCloud": "永久刪除您的複習記錄和雲端資料。",
+      "deleteAccount": "刪除帳號",
+      "deleteDescription": "永久清除您的帳號、雲端資料和登入憑證。此操作無法復原。",
+      "syncPausedSuperuser": "同步已暫停（超級使用者）",
+      "deletePausedTitle": "超級使用者旗標開啟時，帳號刪除已暫停。"
     },
     "developer": {
-      "heading": "Developer",
-      "description": "QA shortcuts. While any flag here is on, sync to the cloud is paused so QA state cannot leak into your real data.",
+      "heading": "開發者",
+      "description": "QA 捷徑。任何旗標開啟時，雲端同步將暫停，以防 QA 狀態洩漏到真實資料中。關閉最後一個旗標（或鎖定超級使用者模式）將為已登入使用者恢復雲端狀態，或為訪客提供重置本地狀態的選項。",
       "pretendAllMastered": {
-        "label": "Pretend all Pokémon are mastered",
-        "description": "Renders every species as mastered across the Pokédex, detail pages, Pasture, Stats, and the theme picker."
-      }
-    }
+        "label": "假裝所有寶可夢已掌握",
+        "description": "在 Pokédex、詳細頁面、牧場、記錄和主題選擇器中，將所有種族顯示為已掌握。"
+      },
+      "forceNextStreakMilestone": {
+        "label": "強制下一個連續記錄里程碑",
+        "description": "無論實際連續記錄如何，在下次訪問練習時觸發最小的未顯示連續記錄慶祝。觸發一次後自動清除。鎖定超級使用者將用雲端狀態覆蓋已登入使用者的本地進度。"
+      },
+      "forceCardsGraduated": {
+        "label": "強制卡片畢業",
+        "description": "將所有卡片視為已畢業。用於在不經歷學習步驟的情況下測試輸入功能。"
+      },
+      "qaSeedMode": {
+        "label": "QA 種子模式",
+        "description": "顯示一個情境選擇器，將測試資料注入本地儲存。僅限本地：同步已暫停，以防種子資料到達雲端。"
+      },
+      "resetEarnedBadges": {
+        "label": "重置已獲得徽章",
+        "description": "清除道館徽章清單，以便重新觸發顯示提示。超級使用者開啟時僅限本地。",
+        "reset": "重置",
+        "cleared": "已清除"
+      },
+      "themeAudit": "主題稽核 →",
+      "themeAuditDescription": "所有吉祥物 × 強度 × 配色方案的並排預覽。在調整 globals.css 時使用，以找出評分按鈕與背景融合的組合。"
+    },
+    "loadingAriaLabel": "載入設定中"
   },
   "practice": {
-    "title": "Poké Memory - Learn every Pokémon",
-    "description": "Free spaced-repetition flashcards for learning all 1025 Pokémon names and evolutions. No sign-up required.",
-    "signInFailed": "Sign-in failed. Please try again.",
-    "allCaughtUp": "All caught up!",
-    "nothingDue": "Nothing due right now.",
-    "reveal": "Reveal",
-    "again": "Again",
-    "hard": "Hard",
-    "good": "Good",
-    "easy": "Easy",
-    "undo": "Undo",
-    "loadingCard": "Loading card..."
+    "title": "Poké Memory - 記住每一隻寶可夢",
+    "description": "免費間隔重複閃卡，幫助您學習全部 1025 隻寶可夢的名稱和進化。無需註冊。",
+    "signInFailed": "登入失敗，請重試。",
+    "allCaughtUp": "全部完成！",
+    "nothingDue": "現在沒有待複習的內容。",
+    "nothingDueBody": "今日卡片已全部完成。明天再來繼續吧。",
+    "newCardsLocked": "今日新卡片已鎖定",
+    "newCardsLockedBody": "已達到每日新卡片上限。明天再來獲取更多；保持此限制可防止明天的複習堆積過多。",
+    "reviewWall": "已達到每日複習上限",
+    "reviewWallBody": "已達到每日複習上限。還有更多卡片待複習。要繼續嗎？",
+    "doneForToday": "今天到此為止",
+    "keepReviewing": "繼續複習",
+    "dueTomorrow": "明天有 {count} 張卡片到期",
+    "nextCardIn": "下一張卡片",
+    "nextCardHangTight": "稍等，學習卡片即將準備好。",
+    "reveal": "翻牌",
+    "again": "再來一次",
+    "hard": "困難",
+    "good": "普通",
+    "easy": "簡單",
+    "undo": "復原",
+    "undoLastGrade": "撤銷上次評分 (⌘Z)",
+    "undoLastGradeAriaLabel": "撤銷上次評分",
+    "loadingCard": "載入卡片中...",
+    "loadingAriaLabel": "載入複習工作階段中",
+    "noCardTypesEnabled": "未啟用任何卡片類型",
+    "noCardTypesEnabledBody": "請在<link>設定</link>中至少啟用一種卡片類型以開始複習。",
+    "noScopeMatch": "沒有符合您範圍的寶可夢",
+    "noScopeMatchBody": "請調整上方的篩選條件，或清除後繼續練習。",
+    "clearScope": "清除範圍",
+    "outOfScopeHint": "正在完成進行中的卡片",
+    "gradeYourAnswer": "為您的回答評分",
+    "showKeyboardShortcuts": "顯示鍵盤快速鍵",
+    "keyboardShortcuts": {
+      "title": "鍵盤快速鍵",
+      "closeAriaLabel": "關閉鍵盤快速鍵面板",
+      "revealCard": "翻牌",
+      "gradeAgain": "評分：再來一次",
+      "gradeHard": "評分：困難",
+      "gradeGood": "評分：普通",
+      "gradeEasy": "評分：簡單",
+      "showOverlay": "顯示此面板",
+      "closeOverlay": "關閉此面板",
+      "inactiveNote": "輸入框聚焦時快速鍵不可用。"
+    },
+    "cryPrompt": "根據叫聲說出這隻寶可夢的名稱",
+    "playCry": "播放叫聲",
+    "thisSession": "本次工作階段",
+    "todayDoneHeading": "今日完成",
+    "cardTypeName": "名稱",
+    "cardTypeEvolution": "進化",
+    "cardTypeReverse": "反向",
+    "cardTypeCry": "叫聲",
+    "cardTypeReverseEvo": "反向進化",
+    "graduatedHint": "複習僅針對已畢業的卡片，因此某一方向可能佔主導。仍在學習步驟中的卡片在獨立的佇列中等待。",
+    "todayNew": "新卡",
+    "todayReviewed": "已複習",
+    "readyForMoreVariety": "準備好更多挑戰了嗎？",
+    "openPracticeSettings": "開啟練習設定",
+    "readyForMoreVarietyBody": "試試反向進化卡片或異形態卡片，體驗全新挑戰。",
+    "gradeErrorMessage": "由於意外錯誤，此次評分無法儲存。您的工作階段仍然有效，請重試。"
   },
   "pokedex": {
     "title": "Pokédex",
-    "description": "Browse all 1025 Pokémon. Filter by generation, type, or mastery status.",
-    "searchPlaceholder": "Search by name or number...",
-    "filterByGeneration": "Generation",
-    "filterByType": "Type",
-    "filterMastered": "Mastered only",
-    "noResults": "No Pokémon match your filters.",
-    "loadMore": "Load more"
+    "description": "瀏覽全部 1025 隻寶可夢，可按世代、屬性或掌握狀態篩選。",
+    "searchPlaceholder": "依名稱或編號搜尋...",
+    "filterByGeneration": "世代",
+    "filterByType": "屬性",
+    "filterMastered": "僅已掌握",
+    "noResults": "沒有符合篩選條件的寶可夢。",
+    "loadMore": "載入更多",
+    "filters": "篩選",
+    "activeFilters": "已啟用 {count} 個篩選條件",
+    "searchAriaLabel": "搜尋寶可夢",
+    "searchPokedexPlaceholder": "搜尋寶可夢…",
+    "clearSearch": "清除搜尋",
+    "sortBy": "排序方式",
+    "sortNational": "全國圖鑑編號",
+    "sortAlphabetical": "字母順序",
+    "sortClosestToMastery": "最接近掌握",
+    "masteryAll": "全部",
+    "masteryMastered": "已掌握",
+    "masteryNotYet": "未掌握",
+    "masteryFilterUnavailable": "假裝全部掌握模式開啟時，掌握度篩選不可用",
+    "filterByTypeAriaLabel": "按屬性篩選",
+    "filterByGenerationAriaLabel": "按世代篩選",
+    "additionalFiltersAriaLabel": "其他篩選條件",
+    "filterByMasteryAriaLabel": "按掌握度篩選",
+    "hasAlternateForms": "有異形態",
+    "introduced": "{introduced} / {total} 已引入",
+    "generationAll": "全部",
+    "generationLabel": "第 {gen} 代"
   },
   "pasture": {
-    "title": "Pasture",
-    "description": "Pokémon you have mastered live here.",
-    "empty": "Your pasture is empty. Master some Pokémon to see them here.",
-    "searchPlaceholder": "Search mastered Pokémon...",
-    "masteredCount": "{count} mastered"
+    "title": "牧場",
+    "description": "您已掌握的寶可夢住在這裡。",
+    "empty": "牧場是空的。掌握一些寶可夢後，它們就會出現在這裡。",
+    "emptyBody": "牧場是空的。在練習中掌握第一隻寶可夢後，牠就會出現在這裡。",
+    "searchPlaceholder": "搜尋已掌握的寶可夢...",
+    "masteredCount": "已掌握 {count} 隻",
+    "pokemonCount": "{count} 隻寶可夢",
+    "noFilterMatch": "沒有符合篩選條件的寶可夢。",
+    "searchAriaLabel": "搜尋寶可夢",
+    "searchPasturePlaceholder": "搜尋寶可夢…",
+    "clearSearch": "清除搜尋",
+    "filterByTypeAriaLabel": "按屬性篩選",
+    "filterByGenerationAriaLabel": "按世代篩選"
   },
   "stats": {
-    "title": "Stats",
-    "description": "Track your Pokémon learning progress.",
-    "loading": "Loading stats...",
-    "totalMastered": "Mastered",
-    "totalSeen": "Seen",
-    "streak": "Streak",
-    "days": "{count} days"
+    "title": "記錄",
+    "description": "追蹤您的寶可夢學習進度。",
+    "loading": "載入記錄中...",
+    "loadingAriaLabel": "載入記錄中",
+    "totalMastered": "已掌握",
+    "totalSeen": "已見過",
+    "streak": "連續天數",
+    "days": "{count} 天",
+    "accuracyHeading": "準確率",
+    "activityHeading": "活動",
+    "progressHeading": "進度",
+    "schedulingHeading": "排程",
+    "masteryMeaning": {
+      "title": "「已掌握」是什麼意思",
+      "body": "卡片在連續答對 {reps} 次<em>且</em>下次複習間隔至少 21 天後視為已掌握：這是排程器確認您真正學會而非短期記憶的時間點。"
+    },
+    "strugglingCards": {
+      "heading": "薄弱卡片",
+      "empty": "還沒有薄弱卡片。繼續保持！"
+    },
+    "forcePull": {
+      "heading": "資料",
+      "description": "如果您的記錄看起來有誤，請使用此功能從雲端取得權威資料。",
+      "button": "從雲端強制拉取",
+      "pulling": "正在從雲端拉取…",
+      "success": "完成。記錄已從雲端更新。",
+      "error": "拉取失敗。請檢查您的網路連線後重試。",
+      "confirmMessage": "這將用雲端的最新資料取代您的本地進度、設定和顯示偏好。是否繼續？"
+    },
+    "allTimeGradeBreakdown": "全時段評分分佈"
   },
   "journey": {
-    "title": "Journey",
-    "description": "Your Pokémon learning journey."
+    "title": "旅程",
+    "description": "您的寶可夢學習之旅。",
+    "loadingAriaLabel": "載入旅程中",
+    "currentStreak": "目前連續天數",
+    "daysInARow": "{count, plural, other {連續天}}",
+    "noStreak": "暫無連續記錄。複習一些卡片來開始吧！",
+    "masteryDistribution": "掌握度分佈",
+    "masteryLocked": "未開始",
+    "masteryLearning": "學習中",
+    "masteryMastered": "已掌握",
+    "introduced": "已引入",
+    "speciesSeenAtLeastOnce": "至少見過一次的種族",
+    "byGeneration": "按世代",
+    "byGenerationMasteredTotal": "已掌握 / 總數",
+    "byGenerationColumn": "世代",
+    "collectionTimeline": "收藏時間線",
+    "evolutionWall": "進化牆",
+    "closeToMastery": "即將掌握"
   },
   "error": {
-    "heading": "Something went wrong",
-    "tryAgain": "Try again",
-    "goHome": "Go to Practice"
+    "heading": "發生錯誤",
+    "body": "發生了意外錯誤。您可以重試，或稍後再來。",
+    "offline": {
+      "heading": "您目前離線",
+      "body": "沒有網路連線時，某些頁面無法使用。您之前查看過的卡片應該仍然可以正常使用。"
+    },
+    "tryAgain": "重試",
+    "goHome": "前往練習"
+  },
+  "onboarding": {
+    "welcomeHeading": "歡迎使用 Poké Memory",
+    "closeAriaLabel": "關閉歡迎指南",
+    "intro": "透過間隔重複學習每隻寶可夢的名稱和進化。新卡片每天到來；應用程式會在您即將遺忘前顯示每張卡片，隨著記憶增強，間隔也會越來越長。",
+    "howToGrade": {
+      "heading": "如何評分",
+      "again": "<term>再來一次</term> - 完全忘記了。",
+      "hard": "<term>困難</term> - 想起來了，但很費力。",
+      "good": "<term>普通</term> - 努力了一下想起來了。",
+      "easy": "<term>簡單</term> - 立刻就想起來了。",
+      "honestGradeNote": "請誠實評分。有時按「再來一次」是正常的，這說明系統在正常運作；只有誠實的輸入才能讓排程器不斷改進。"
+    },
+    "addingSound": {
+      "heading": "新增音效（選用）",
+      "body": "您可以開啟翻牌時播放寶可夢叫聲以及文字轉語音朗讀名稱。您也可以解鎖以叫聲為提示的叫聲卡片。",
+      "openAudioSettings": "開啟音訊設定"
+    },
+    "guestStorage": {
+      "heading": "您的進度儲存在此裝置上",
+      "body": "進度儲存在瀏覽器中，不會自動備份。在 iOS Safari 上，如果 7 天沒有訪問，瀏覽器可能會清除資料。為了安全儲存：將此頁面新增到主畫面，或登入以將其備份到雲端。"
+    },
+    "getStarted": "開始"
+  },
+  "common": {
+    "viewInPokedex": "在圖鑑中查看{name}",
+    "noResults": "沒有符合篩選條件的寶可夢。"
+  },
+  "banner": {
+    "machineTranslated": "本應用程式的{language}翻譯由機器自動產生，尚未經過完整審校。部分措辭可能有所偏差。發現錯誤？請寄信至 fbrookhouse@gmail.com 告知我們。",
+    "dismiss": "關閉"
   }
 }

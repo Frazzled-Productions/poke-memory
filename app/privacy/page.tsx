@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ChildFriendlySummary from "@/components/privacy/ChildFriendlySummary";
+import { resolveLocale } from "@/i18n/request";
 
 export const metadata: Metadata = {
   title: "Privacy Notice - Poké Memory",
@@ -7,9 +8,28 @@ export const metadata: Metadata = {
     "How Poké Memory collects, uses, and protects your data under UK GDPR / GDPR.",
 };
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const locale = await resolveLocale();
+  const showEnglishOnlyNotice = locale !== "en";
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+      {showEnglishOnlyNotice && (
+        <p
+          lang="en"
+          className="mb-6 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100"
+        >
+          This privacy notice is written in English only. It is the authoritative
+          version. If you need help understanding it, please contact{" "}
+          <a
+            href="mailto:fbrookhouse@gmail.com"
+            className="underline underline-offset-2 hover:text-blue-700 dark:hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
+          >
+            fbrookhouse@gmail.com
+          </a>
+          .
+        </p>
+      )}
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">

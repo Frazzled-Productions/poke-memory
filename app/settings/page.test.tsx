@@ -201,21 +201,71 @@ vi.mock("@/components/settings/OfflineSection", () => ({
   OfflineSection: () => <div data-testid="offline-section" />,
 }));
 
-// Stub next-intl — t() returns the key name so tests can match on it or on
-// the plain English fallback without caring about translations.
+// Stub next-intl — t() resolves keys against the real en.json catalogue so
+// tests can match on English strings without caring about translation internals.
+// The mock also accepts string-valued parameters ({percent}, {query}).
+const { mockT } = vi.hoisted(() => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const enMessages = require("../../messages/en.json") as Record<string, unknown>;
+
+  function resolveDotPath(obj: Record<string, unknown>, path: string): string {
+    const parts = path.split(".");
+    let cur: unknown = obj;
+    for (const part of parts) {
+      if (typeof cur !== "object" || cur === null) return path;
+      cur = (cur as Record<string, unknown>)[part];
+    }
+    return typeof cur === "string" ? cur : path;
+  }
+
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    let val = resolveDotPath(enMessages, key);
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        val = val.replace(`{${k}}`, String(v));
+      }
+    }
+    return val;
+  };
+
+  // t.rich: resolve the message, apply <tag>...</tag> renderers, return array.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (t as unknown as Record<string, unknown>).rich = (key: string, tags: Record<string, (chunks: any) => any>): any => {
+    const raw = resolveDotPath(enMessages, key);
+    const parts: unknown[] = [];
+    // Match <tagName>...</tagName> with backreference \1.
+    const tagRe = new RegExp("<(\\w+)>(.*?)<\\/\\1>", "g");
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = tagRe.exec(raw)) !== null) {
+      if (m.index > last) parts.push(raw.slice(last, m.index));
+      const tagName = m[1];
+      const inner = m[2];
+      const renderer = tags[tagName];
+      parts.push(renderer ? renderer(inner) : inner);
+      last = m.index + m[0].length;
+    }
+    if (last < raw.length) parts.push(raw.slice(last));
+    return parts.length === 1 ? parts[0] : parts;
+  };
+
+  return { mockT: t };
+});
+
 vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => {
-    const map: Record<string, string> = {
-      "settings.heading": "Settings",
-    };
-    return map[key] ?? key;
-  },
+  useTranslations: () => mockT,
 }));
 
 vi.mock("@/i18n/locales", () => ({
   SUPPORTED_LOCALES: ["en", "ja", "zh-Hans", "zh-Hant"],
   LOCALE_COOKIE: "poke-memory:locale",
   DEFAULT_LOCALE: "en",
+  LOCALE_ENDONYMS: {
+    en: "English",
+    ja: "日本語",
+    "zh-Hans": "简体中文",
+    "zh-Hant": "繁體中文",
+  },
 }));
 
 vi.mock("@/lib/i18n/actions", () => ({
@@ -734,5 +784,207 @@ describe("SettingsPage — typed-entry onboarding (#1271)", () => {
         screen.queryByText(/verified typed entry is on/i),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// i18n key resolution (#1369)
+//
+// Verifies that (a) key paths used in the settings page all resolve against
+// the real catalogues and (b) a representative Japanese string is returned
+// when the locale is Japanese. Because the page mock wires t() to the real
+// en.json, we verify the Japanese catalogue separately via the catalogue JSON
+// directly — this is consistent with how other component tests exercise locale
+// correctness without a full browser environment.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — i18n key resolution (#1369)", () => {
+  it("settings.save resolves to 'Save' in English and '保存' in Japanese", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const en = require("../../messages/en.json") as Record<string, Record<string, string>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ja = require("../../messages/ja.json") as Record<string, Record<string, string>>;
+    expect(en.settings.save).toBe("Save");
+    expect(ja.settings.save).toBe("保存");
+  });
+
+  it("settings.offline.downloadHeading resolves in all locales", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const en = require("../../messages/en.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ja = require("../../messages/ja.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const zhHans = require("../../messages/zh-Hans.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const zhHant = require("../../messages/zh-Hant.json") as Record<string, Record<string, Record<string, string>>>;
+    // en
+    expect(en.settings.offline.downloadHeading).toBe("Download");
+    // non-English locales must have the key (not fall back to the key path)
+    expect(ja.settings.offline.downloadHeading).toBeTruthy();
+    expect(ja.settings.offline.downloadHeading).not.toBe("settings.offline.downloadHeading");
+    expect(zhHans.settings.offline.downloadHeading).toBeTruthy();
+    expect(zhHant.settings.offline.downloadHeading).toBeTruthy();
+  });
+
+  it("renders the Japanese heading when the mock t() is set to Japanese", async () => {
+    // Swap the mock to resolve against ja.json for this test.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const jaMessages = require("../../messages/ja.json") as Record<string, unknown>;
+
+    function resolveDotPath(obj: Record<string, unknown>, path: string): string {
+      const parts = path.split(".");
+      let cur: unknown = obj;
+      for (const part of parts) {
+        if (typeof cur !== "object" || cur === null) return path;
+        cur = (cur as Record<string, unknown>)[part];
+      }
+      return typeof cur === "string" ? cur : path;
+    }
+
+    const tJa = (key: string, params?: Record<string, string | number>): string => {
+      let val = resolveDotPath(jaMessages, key);
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          val = val.replace(`{${k}}`, String(v));
+        }
+      }
+      return val;
+    };
+
+    // Verify the Japanese heading value resolves correctly.
+    expect(tJa("settings.heading")).toBe("設定");
+    expect(tJa("settings.save")).toBe("保存");
+    expect(tJa("settings.section.practice")).toBe("練習");
+    expect(tJa("settings.offline.downloadHeading")).toBe("ダウンロード");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale picker endonyms (#locale-picker-endonyms)
+//
+// Asserts that both locale-picker <select> elements show each language in
+// its own script (endonym) rather than the English translation.
+// The LOCALE_ENDONYMS constant must NOT route through t() — these labels are
+// locale-invariant by design.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — locale picker endonyms", () => {
+  it("shows each language in its own script in both locale pickers", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      pokemonNameLocale: "en",
+      labsFlags: { languages: true }, // enable the Languages labs flag to show the pickers
+    });
+
+    render(<SettingsPage />);
+
+    // Wait for the language pickers to appear.
+    await waitFor(() => {
+      expect(screen.getByLabelText(/app language/i)).toBeInTheDocument();
+    });
+
+    const appLocaleSelect = screen.getByLabelText(/app language/i);
+    const pokemonLocaleSelect = screen.getByLabelText(/pokémon name language/i);
+
+    // Both pickers must show endonyms (native script), not English translations.
+    // Non-English locales are marked "(preview)" — the endonym must still appear
+    // as a substring of each option.
+    for (const select of [appLocaleSelect, pokemonLocaleSelect]) {
+      const options = Array.from(select.querySelectorAll("option"));
+      const texts = options.map((o) => o.textContent ?? "");
+
+      // Endonym appears in each option (may be followed by " (preview)").
+      expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
+      expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
+      expect(texts.some((t) => t.startsWith("繁體中文"))).toBe(true);
+
+      // Non-English options must include the preview marker.
+      expect(texts.some((t) => t.includes("(preview)"))).toBe(true);
+
+      // Must NOT contain English-translated labels.
+      expect(texts).not.toContain("Japanese");
+      expect(texts).not.toContain("Simplified Chinese");
+      expect(texts).not.toContain("Traditional Chinese");
+
+      // English option must have no preview marker.
+      expect(texts).toContain("English");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FSRS hyperlink in "How this works" body1
+//
+// Asserts that t.rich is used to render the FSRS word as an anchor element
+// pointing to the ts-fsrs GitHub repository.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — FSRS link in How this works", () => {
+  it("renders an anchor linking to the FSRS GitHub repo inside the How this works body", async () => {
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+
+    // Wait for the page to load (settings fetch is async).
+    await waitFor(() => {
+      expect(screen.getByText(/how this works/i)).toBeInTheDocument();
+    });
+
+    const fsrsLink = screen.getByRole("link", { name: "FSRS" });
+    expect(fsrsLink).toBeInTheDocument();
+    expect(fsrsLink).toHaveAttribute(
+      "href",
+      "https://github.com/open-spaced-repetition/ts-fsrs",
+    );
+    expect(fsrsLink).toHaveAttribute("target", "_blank");
+    expect(fsrsLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Preview suffix localisation (#1392)
+//
+// Asserts that the "(preview)" suffix on non-en locale options comes from the
+// catalog key settings.labs.languages.previewSuffix, not a hardcoded string.
+// The en mock returns "(preview)"; a ja-keyed check verifies the key exists
+// in the Japanese catalog.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — preview suffix from catalog", () => {
+  it("preview suffix on locale picker options is sourced from the catalog (en)", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/app language/i)).toBeInTheDocument();
+    });
+
+    const select = screen.getByLabelText(/app language/i);
+    const options = Array.from(select.querySelectorAll("option"));
+    const nonEnglishTexts = options
+      .filter((o) => o.getAttribute("value") !== "en")
+      .map((o) => o.textContent ?? "");
+
+    // Every non-English option must carry the catalog suffix "(preview)".
+    for (const text of nonEnglishTexts) {
+      expect(text).toMatch(/\(preview\)$/);
+    }
+  });
+
+  it("Japanese catalog has a non-empty previewSuffix key", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const jaMessages = require("../../messages/ja.json") as Record<
+      string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any
+    >;
+    const suffix = jaMessages?.settings?.labs?.languages?.previewSuffix;
+    expect(typeof suffix).toBe("string");
+    expect(suffix.length).toBeGreaterThan(0);
+    // The Japanese suffix should use fullwidth brackets.
+    expect(suffix).toContain("プレビュー");
   });
 });

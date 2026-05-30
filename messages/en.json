@@ -9,7 +9,21 @@
     "settings": "Settings",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "ariaLabel": "Main navigation"
+    "ariaLabel": "Main navigation",
+    "mobileTabAriaLabel": "Mobile tab navigation",
+    "whatsNew": "What's new",
+    "privacy": "Privacy",
+    "terms": "Terms"
+  },
+  "auth": {
+    "signingIn": "Signing in…",
+    "signingOut": "Signing out…",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "continueWithGitHub": "Continue with GitHub",
+    "continueWithGoogle": "Continue with Google",
+    "providerHint": "Use the same provider you signed up with to keep your progress.",
+    "chooseProvider": "Choose a sign-in provider"
   },
   "settings": {
     "heading": "Settings",
@@ -18,7 +32,10 @@
     "search": {
       "placeholder": "Search settings...",
       "noMatch": "No settings match \"{query}\".",
-      "ariaLabel": "Search settings"
+      "ariaLabel": "Search settings",
+      "clearAriaLabel": "Clear search",
+      "noMatchAnnouncement": "No settings match your search.",
+      "matchAnnouncement": "{count, plural, one {1 section matches your search.} other {{count} sections match your search.}}"
     },
     "section": {
       "appearance": "Appearance",
@@ -44,6 +61,7 @@
       }
     },
     "labs": {
+      "description": "Preview features that are in active development. These may change or be removed. Your feedback helps shape what ships.",
       "languages": {
         "label": "Languages",
         "description": "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese.",
@@ -53,12 +71,18 @@
           "zh-Hans": "Simplified Chinese",
           "zh-Hant": "Traditional Chinese"
         },
-        "selectLocale": "Language"
+        "selectLocale": "Language",
+        "appLanguageLabel": "App language",
+        "appLanguageDescription": "Controls the app UI language. App UI translation is in progress.",
+        "pokemonNameLanguageLabel": "Pokémon name language",
+        "pokemonNameLanguageDescription": "Pokémon names on cards will be shown in this language. Independent of the app language above.",
+        "previewSuffix": "(preview)"
       }
     },
     "practice": {
       "scheduler": {
-        "heading": "Scheduler"
+        "heading": "Scheduler",
+        "hint": "The scheduler aims to show each card just before you'd forget it. A higher recall target means more reviews and stronger retention; a lower target means fewer reviews and a bit more forgetting. Most people leave this at 90%."
       },
       "masteryThreshold": {
         "label": "Mastery threshold",
@@ -68,40 +92,119 @@
         "label": "Recall target ({percent}%)",
         "description": "Lower means fewer reviews but you will forget more cards. Higher means more reviews but better retention. Default 90%."
       },
+      "quickstart": {
+        "heading": "Quickstart",
+        "label": "Mark Pokémon I already know",
+        "description": "Tap the Pokémon you already recognise. Each one graduates straight into the scheduler with a long first interval, so you can skip the new-card queue for species you know cold.",
+        "open": "Open quiz",
+        "close": "Close"
+      },
       "nameCards": {
-        "heading": "Name cards"
+        "heading": "Name cards",
+        "newPerDay": {
+          "label": "New cards per day",
+          "description": "Hard daily cap. Raising this grows tomorrow's review pile faster."
+        },
+        "reviewsPerDay": {
+          "label": "Reviews per day",
+          "description": "Soft cap; you can always override it during a session."
+        }
+      },
+      "typedEntry": {
+        "label": "Verified typed entry for name cards",
+        "description": "Type the name instead of grading yourself. Grades are decided automatically based on how close your answer is.",
+        "mcRampNote": "New cards start as multiple choice during the learning phase. Once a card has been reviewed enough times to graduate, it switches to verified typed entry.",
+        "bannerText": "Verified typed entry is on. New cards will show multiple choice for the first few reviews. Once a card graduates into long-term review, you will be asked to type the name.",
+        "dismissBannerAriaLabel": "Dismiss typed entry notice"
       },
       "evolutionCards": {
-        "heading": "Evolution cards"
+        "heading": "Evolution cards",
+        "enableLabel": "Enable evolution cards",
+        "enableDescription": "Show sprite; identify the evolution chain. Disabling hides these cards without losing your progress.",
+        "newPerDay": {
+          "label": "New cards per day",
+          "description": "Hard daily cap for evolution cards. Tracked separately from name cards."
+        },
+        "reviewsPerDay": {
+          "label": "Reviews per day",
+          "description": "Soft cap for evolution reviews. Independent of the name-card review cap."
+        }
+      },
+      "reverseEvolutionCards": {
+        "heading": "Reverse-evolution cards",
+        "enableLabel": "Enable reverse-evolution cards",
+        "enableDescription": "Quiz the opposite direction of evolution edges (\"Which Pokémon evolves into X via Y?\"). Shares the same daily new/review budget as forward evolution cards. Disabling hides these cards without losing your progress."
+      },
+      "alternateForms": {
+        "heading": "Alternate forms",
+        "enableLabel": "Include alternate forms in practice",
+        "enableDescription": "Regional forms, Megas and other variants. Off by default: the base Pokédex is already a large deck."
       },
       "reverseCards": {
-        "heading": "Reverse cards"
-      },
-      "cryCards": {
-        "heading": "Cry to name cards"
+        "heading": "Reverse cards",
+        "newPerDay": {
+          "label": "New cards per day",
+          "description": "Hard daily cap for reverse cards. Tracked separately from name cards."
+        },
+        "reviewsPerDay": {
+          "label": "Reviews per day",
+          "description": "Soft cap for reverse reviews. Independent of the name-card review cap."
+        }
       },
       "newPerDay": "New cards per day",
       "reviewsPerDay": "Reviews per day",
       "save": "Save"
     },
     "audio": {
+      "cryCards": {
+        "heading": "Cry → name cards",
+        "enableLabel": "Enable cry cards",
+        "enableDescription": "Audio prompt: hear the cry and name the Pokémon. Species without a cry are skipped automatically. Disabling hides these cards without losing your progress."
+      },
       "playCryOnReveal": {
         "label": "Play cry on reveal",
-        "description": "Plays the Pokémon's cry once when you reveal a name or evolution card."
+        "description": "Plays the Pokémon's cry once when you reveal a name or evolution card, and when you answer a reverse (sprite-picker) card."
       },
       "speakNameOnReveal": {
         "label": "Speak name on reveal",
-        "description": "Reads the Pokémon's name aloud using your device's text-to-speech engine when you reveal a card."
+        "description": "Reads the Pokémon's name aloud using your device's text-to-speech engine when you reveal a card. British English voice preferred."
+      },
+      "waitForAudio": {
+        "label": "Wait for audio before next card",
+        "description": "When on (default), the next card waits until the cry and spoken name finish before appearing. Turn off for a faster swap: audio continues playing under the next card and is not cut off."
+      },
+      "reverseFeedbackDelay": {
+        "label": "Reverse card feedback delay",
+        "description": "How long the sprite picker lingers on the correct or incorrect highlight before advancing to the next card. Off: no pause. Fast: 250 ms correct / 500 ms incorrect. Default: 600 ms / 1200 ms.",
+        "legendAriaLabel": "Reverse card feedback delay",
+        "off": "Off",
+        "fast": "Fast",
+        "default": "Default"
       }
+    },
+    "offline": {
+      "downloadHeading": "Download"
     },
     "backup": {
       "heading": "Backup",
       "exportLabel": "Export progress",
       "exportDescription": "Downloads a JSON backup of all your card progress and settings.",
       "exportButton": "Export",
+      "downloadReviewHistory": "Download review history",
+      "downloadReviewHistoryDescription": "Downloads your full review history as a CSV file (date, Pokémon, card type, grade). Useful for personal analysis and satisfies GDPR data portability.",
+      "downloadCsv": "Download CSV",
       "importLabel": "Import progress",
       "importDescription": "Restore from a previously exported backup. Replaces current progress after confirmation.",
       "importButton": "Import"
+    },
+    "howThisWorks": {
+      "heading": "How this works",
+      "body1": "Poké Memory uses <link>FSRS</link>, a spaced-repetition scheduler that picks the best time to show each card based on how well you remember it.",
+      "body2": "After every grade the scheduler updates its model of how strong your memory of that card is, and sets the next review for when you're most likely to be about to forget it. Forgetting and then re-remembering is what actually moves a card into long-term memory, so getting a few Agains is normal and part of the system working.",
+      "body3": "Honest grading matters more than getting every card right. If you almost forgot, press Hard. If you truly forgot, press Again. The scheduler can't help you if you mark cards Easy when you only just scraped it.",
+      "showOnboardingAgainLabel": "Show onboarding again",
+      "showOnboardingAgainDescription": "Re-opens the welcome guide on the Practice page and restores contextual hints on Stats and Settings.",
+      "showOnboardingAgainButton": "Show onboarding again"
     },
     "regional": {
       "heading": "Regional",
@@ -111,14 +214,26 @@
       },
       "dateFormat": {
         "label": "Date format",
-        "description": "Controls how dates are shown throughout the app."
+        "description": "Controls how dates are shown throughout the app. Live preview updates below.",
+        "legendAriaLabel": "Date format",
+        "dmy": "Day / Month / Year",
+        "mdy": "Month / Day / Year",
+        "iso": "ISO (Year-Month-Day)"
+      },
+      "dailyReminderTime": {
+        "label": "Daily reminder time",
+        "description": "Preferred local hour for your daily practice reminder. Uses your timezone above. Full per-hour delivery activates after a scheduled update.",
+        "defaultOption": "Default (08:00)"
       }
     },
     "about": {
       "heading": "About",
       "version": "Version",
       "whatsNew": "What's new",
-      "viewChangelog": "View changelog"
+      "whatsNewDescription": "See what shipped in recent releases.",
+      "viewChangelog": "View changelog",
+      "privacy": "Privacy",
+      "terms": "Terms"
     },
     "dangerZone": {
       "heading": "Danger zone",
@@ -126,16 +241,39 @@
       "resetDescription": "Permanently deletes your review history",
       "resetDescriptionCloud": "Permanently deletes your review history and cloud data.",
       "deleteAccount": "Delete account",
-      "deleteDescription": "Permanently erases your account, cloud data, and sign-in identity. This cannot be undone."
+      "deleteDescription": "Permanently erases your account, cloud data, and sign-in identity. This cannot be undone.",
+      "syncPausedSuperuser": "Sync paused (superuser)",
+      "deletePausedTitle": "Account deletion is paused while a superuser flag is on."
     },
     "developer": {
       "heading": "Developer",
-      "description": "QA shortcuts. While any flag here is on, sync to the cloud is paused so QA state cannot leak into your real data.",
+      "description": "QA shortcuts. While any flag here is on, sync to the cloud is paused so QA state can't leak into your real data. Turning off the last flag (or locking superuser mode) restores cloud state for signed-in users, or offers to reset local state for guests.",
       "pretendAllMastered": {
         "label": "Pretend all Pokémon are mastered",
         "description": "Renders every species as mastered across the Pokédex, detail pages, Pasture, Stats, and the theme picker."
-      }
-    }
+      },
+      "forceNextStreakMilestone": {
+        "label": "Force next streak milestone",
+        "description": "Fires the smallest un-seen streak celebration on the next visit to Practice, regardless of the real streak. Self-clears after one fire. Locking superuser overwrites local progress with cloud state for signed-in users."
+      },
+      "forceCardsGraduated": {
+        "label": "Force cards graduated",
+        "description": "Treat all cards as graduated. Use to test typed entry without grinding learning steps."
+      },
+      "qaSeedMode": {
+        "label": "QA seed mode",
+        "description": "Reveals a scenario picker to inject test data into local storage. Local-only: sync is paused so seeded data cannot reach the cloud."
+      },
+      "resetEarnedBadges": {
+        "label": "Reset earned badges",
+        "description": "Clears your gym-badge list so you can re-trigger the reveal toasts. Local-only while superuser is on.",
+        "reset": "Reset",
+        "cleared": "Cleared"
+      },
+      "themeAudit": "Theme audit →",
+      "themeAuditDescription": "Side-by-side preview of every mascot × intensity × colour scheme. Use when tweaking globals.css to spot combos where the grade buttons blend into the surface."
+    },
+    "loadingAriaLabel": "Loading settings"
   },
   "practice": {
     "title": "Poké Memory - Learn every Pokémon",
@@ -143,13 +281,62 @@
     "signInFailed": "Sign-in failed. Please try again.",
     "allCaughtUp": "All caught up!",
     "nothingDue": "Nothing due right now.",
+    "nothingDueBody": "No more cards due today. Come back tomorrow to keep going.",
+    "newCardsLocked": "New cards locked for today",
+    "newCardsLockedBody": "You have hit a daily new-card cap. Come back tomorrow for more; keeping this limit prevents tomorrow's review pile from growing too large.",
+    "reviewWall": "Daily review limit reached",
+    "reviewWallBody": "You have hit a daily review cap. More cards are due. Keep going?",
+    "doneForToday": "Done for today",
+    "keepReviewing": "Keep reviewing",
+    "dueTomorrow": "{count, plural, one {1 card} other {{count} cards}} due tomorrow",
+    "nextCardIn": "Next card in",
+    "nextCardHangTight": "Hang tight, a learning card will be ready shortly.",
     "reveal": "Reveal",
     "again": "Again",
     "hard": "Hard",
     "good": "Good",
     "easy": "Easy",
     "undo": "Undo",
-    "loadingCard": "Loading card..."
+    "undoLastGrade": "Undo last grade (⌘Z)",
+    "undoLastGradeAriaLabel": "Undo last grade",
+    "loadingCard": "Loading card...",
+    "loadingAriaLabel": "Loading review session",
+    "noCardTypesEnabled": "No card types enabled",
+    "noCardTypesEnabledBody": "Enable at least one card type in <link>Settings</link> to start reviewing.",
+    "noScopeMatch": "No Pokémon match your scope",
+    "noScopeMatchBody": "Adjust the filter above, or clear it to keep practising.",
+    "clearScope": "Clear scope",
+    "outOfScopeHint": "Finishing an in-progress card",
+    "gradeYourAnswer": "Grade your answer",
+    "showKeyboardShortcuts": "Show keyboard shortcuts",
+    "keyboardShortcuts": {
+      "title": "Keyboard shortcuts",
+      "closeAriaLabel": "Close keyboard shortcuts overlay",
+      "revealCard": "Reveal card",
+      "gradeAgain": "Grade: Again",
+      "gradeHard": "Grade: Hard",
+      "gradeGood": "Grade: Good",
+      "gradeEasy": "Grade: Easy",
+      "showOverlay": "Show this overlay",
+      "closeOverlay": "Close this overlay",
+      "inactiveNote": "Shortcuts are inactive while a text field is focused."
+    },
+    "cryPrompt": "Name this Pokémon from its cry",
+    "playCry": "Play cry",
+    "thisSession": "This session",
+    "todayDoneHeading": "Done today",
+    "cardTypeName": "Name",
+    "cardTypeEvolution": "Evolution",
+    "cardTypeReverse": "Reverse",
+    "cardTypeCry": "Cry",
+    "cardTypeReverseEvo": "Reverse evo",
+    "graduatedHint": "Reviews surface only graduated cards, so one direction can dominate. Cards still in learning steps wait in a separate queue.",
+    "todayNew": "new",
+    "todayReviewed": "reviewed",
+    "readyForMoreVariety": "Ready for more variety?",
+    "openPracticeSettings": "Open practice settings",
+    "readyForMoreVarietyBody": "Try reverse-evolution cards or alternate-form cards for a fresh challenge.",
+    "gradeErrorMessage": "This grade could not be saved due to an unexpected error. Your session is still active, please try again."
   },
   "pokedex": {
     "title": "Pokédex",
@@ -159,31 +346,135 @@
     "filterByType": "Type",
     "filterMastered": "Mastered only",
     "noResults": "No Pokémon match your filters.",
-    "loadMore": "Load more"
+    "loadMore": "Load more",
+    "filters": "Filters",
+    "activeFilters": "{count, plural, one {1 active filter} other {{count} active filters}}",
+    "searchAriaLabel": "Search Pokémon",
+    "searchPokedexPlaceholder": "Search Pokémon…",
+    "clearSearch": "Clear search",
+    "sortBy": "Sort by",
+    "sortNational": "National Number",
+    "sortAlphabetical": "Alphabetical",
+    "sortClosestToMastery": "Closest to mastery",
+    "masteryAll": "All",
+    "masteryMastered": "Mastered",
+    "masteryNotYet": "Not yet mastered",
+    "masteryFilterUnavailable": "Mastery filter unavailable while pretend-all-mastered is on",
+    "filterByTypeAriaLabel": "Filter by type",
+    "filterByGenerationAriaLabel": "Filter by generation",
+    "additionalFiltersAriaLabel": "Additional filters",
+    "filterByMasteryAriaLabel": "Filter by mastery",
+    "hasAlternateForms": "Has alternate forms",
+    "introduced": "{introduced} / {total} introduced",
+    "generationAll": "All",
+    "generationLabel": "Gen {gen}"
   },
   "pasture": {
     "title": "Pasture",
     "description": "Pokémon you have mastered live here.",
     "empty": "Your pasture is empty. Master some Pokémon to see them here.",
+    "emptyBody": "Your pasture is empty. Master your first Pokémon in Practice to see it here.",
     "searchPlaceholder": "Search mastered Pokémon...",
-    "masteredCount": "{count} mastered"
+    "masteredCount": "{count} mastered",
+    "pokemonCount": "{count} Pokémon",
+    "noFilterMatch": "No Pokémon match your filters.",
+    "searchAriaLabel": "Search Pokémon",
+    "searchPasturePlaceholder": "Search Pokémon…",
+    "clearSearch": "Clear search",
+    "filterByTypeAriaLabel": "Filter by type",
+    "filterByGenerationAriaLabel": "Filter by generation"
   },
   "stats": {
     "title": "Stats",
     "description": "Track your Pokémon learning progress.",
     "loading": "Loading stats...",
+    "loadingAriaLabel": "Loading stats",
     "totalMastered": "Mastered",
     "totalSeen": "Seen",
     "streak": "Streak",
-    "days": "{count} days"
+    "days": "{count} days",
+    "accuracyHeading": "Accuracy",
+    "activityHeading": "Activity",
+    "progressHeading": "Progress",
+    "schedulingHeading": "Scheduling",
+    "masteryMeaning": {
+      "title": "What \"mastered\" means",
+      "body": "A card is mastered once you've recalled it correctly {reps} {reps, plural, one {time} other {times}} in a row <em>and</em> the next review is scheduled at least 21 days out: that's when the scheduler is confident you've actually learnt it, not just memorised it short term."
+    },
+    "strugglingCards": {
+      "heading": "Struggling cards",
+      "empty": "No struggling cards yet. Keep it up!"
+    },
+    "forcePull": {
+      "heading": "Data",
+      "description": "Use this if your stats look wrong; it pulls authoritative data from the cloud.",
+      "button": "Force pull from cloud",
+      "pulling": "Pulling from cloud…",
+      "success": "Done. Stats updated from cloud.",
+      "error": "Pull failed. Check your connection and try again.",
+      "confirmMessage": "This will replace your local progress, settings, and display preferences with what's currently in the cloud. Continue?"
+    },
+    "allTimeGradeBreakdown": "All-time grade breakdown"
   },
   "journey": {
     "title": "Journey",
-    "description": "Your Pokémon learning journey."
+    "description": "Your Pokémon learning journey.",
+    "loadingAriaLabel": "Loading journey",
+    "currentStreak": "Current streak",
+    "daysInARow": "{count, plural, one {day in a row} other {days in a row}}",
+    "noStreak": "No active streak. Review some cards to start one!",
+    "masteryDistribution": "Mastery distribution",
+    "masteryLocked": "Locked",
+    "masteryLearning": "Learning",
+    "masteryMastered": "Mastered",
+    "introduced": "Introduced",
+    "speciesSeenAtLeastOnce": "species seen at least once",
+    "byGeneration": "By generation",
+    "byGenerationMasteredTotal": "Mastered / Total",
+    "byGenerationColumn": "Generation",
+    "collectionTimeline": "Collection timeline",
+    "evolutionWall": "Evolution wall",
+    "closeToMastery": "Close to mastery"
   },
   "error": {
     "heading": "Something went wrong",
+    "body": "An unexpected error occurred. You can try again, or come back later.",
+    "offline": {
+      "heading": "You're offline",
+      "body": "Some pages aren't available without a connection. Cards you've seen before should still work."
+    },
     "tryAgain": "Try again",
     "goHome": "Go to Practice"
+  },
+  "onboarding": {
+    "welcomeHeading": "Welcome to Poké Memory",
+    "closeAriaLabel": "Close welcome guide",
+    "intro": "Learn every Pokémon name and evolution with spaced repetition. New cards arrive daily; the app surfaces each card right before you would likely forget it, so gaps grow as your memory strengthens.",
+    "howToGrade": {
+      "heading": "How to grade",
+      "again": "<term>Again</term> - you forgot completely.",
+      "hard": "<term>Hard</term> - you recalled it, but struggled.",
+      "good": "<term>Good</term> - you recalled it with some effort.",
+      "easy": "<term>Easy</term> - instant recall, no hesitation.",
+      "honestGradeNote": "Grade honestly. Hitting Again sometimes is normal and part of the system working; the scheduler only improves if you tell it the truth."
+    },
+    "addingSound": {
+      "heading": "Adding sound (optional)",
+      "body": "You can enable Pokémon cries on card reveal and spoken names via text-to-speech. You can also unlock cry cards, where the audio is the prompt.",
+      "openAudioSettings": "Open audio settings"
+    },
+    "guestStorage": {
+      "heading": "Your progress is saved on this device",
+      "body": "Progress is stored in your browser and is not backed up automatically. On iOS Safari, the browser may clear it after 7 days without a visit. To keep it safe: add this page to your Home Screen, or sign in to back it up to the cloud."
+    },
+    "getStarted": "Get started"
+  },
+  "common": {
+    "viewInPokedex": "View {name} in Pokédex",
+    "noResults": "No Pokémon match your filters."
+  },
+  "banner": {
+    "machineTranslated": "This app's {language} translation was created automatically and has not been fully reviewed. Some wording may be off. Spotted a mistake? Tell us at fbrookhouse@gmail.com.",
+    "dismiss": "Dismiss"
   }
 }

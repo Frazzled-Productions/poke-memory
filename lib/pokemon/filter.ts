@@ -2,8 +2,17 @@ import { generationOf } from "@/lib/stats/derive";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { CardClass } from "@/lib/stats/derive";
+import type { MasteryProgress } from "@/lib/pokedex/sort";
 
-export type PokemonCellData = SeedPokemon & { cardClass: CardClass };
+export type PokemonCellData = SeedPokemon & {
+  cardClass: CardClass;
+  /**
+   * Optional FSRS snapshot for "closest to mastery" sort ranking. Populated by
+   * the Pokédex page layer when card state is available; absent for locked
+   * species (never reviewed). See `lib/pokedex/sort.ts`.
+   */
+  masteryProgress?: MasteryProgress;
+};
 
 export type MasteryStatus = "all" | "mastered" | "not-yet-mastered";
 

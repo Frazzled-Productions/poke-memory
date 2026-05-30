@@ -128,6 +128,27 @@ export const KEY_OFFLINE_DOWNLOADED_AT = "poke-memory:offline-downloaded-at";
  */
 export const KEY_HAS_MASTERED = "poke-memory:has-mastered:v2";
 
+// ─── QA seed active scenario ──────────────────────────────────────────────────
+
+/**
+ * Stores the slug of the currently active QA seed scenario.
+ * Written by applySeedScenario, cleared by clearSeedScenario.
+ * Read by QaSeedSection on mount to restore the active-seed indicator.
+ *
+ * Absence means no seed is active. Value is a raw slug string, e.g.
+ * "mastery-gaps" or "pasture-progression".
+ */
+export const KEY_QA_SEED_ACTIVE = "poke-memory:qa-seed-active";
+
+// ─── Pokédex sort preference ──────────────────────────────────────────────────
+
+/**
+ * The user's last-chosen Pokédex sort option
+ * ("national" | "alphabetical" | "closest-to-mastery").
+ * Persisted so the sort survives back-navigation and page reloads.
+ */
+export const KEY_POKEDEX_SORT = "poke-memory:pokedex-sort:v1";
+
 // ─── Per-device shuffle salt ──────────────────────────────────────────────────
 
 /**

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
+import { practiceReadyLocator } from "./helpers/practiceCard";
 
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
@@ -109,16 +110,15 @@ test.describe("Reset-progress dialog (#766)", () => {
     // Wait up to 10 s to allow any async IndexedDB clear to complete.
     await expect(page).toHaveURL("/", { timeout: 10_000 });
 
-    // The practice page must render correctly after reset.
-    const reveal = page.getByRole("button", { name: "Reveal" });
-    const endState = page.getByRole("heading", {
-      name: /All caught up|Daily review limit reached|New cards locked|Next card in|No card types enabled/,
-    });
+    // The practice page must render correctly after reset. The first card on
+    // the rebuilt session may be a flip card, sprite-picker, or multiple-choice
+    // card depending on the deterministic per-day shuffle (#1370), so match
+    // every interactable variant.
     // 20 s: post-#1234 the session must build ~2 050 cards from scratch
     // (name + reverse for every species) on a completely reset store, and
     // #1260's next-intl Suspense boundary adds a hydration round-trip on
     // top. The #1262 reconcileHiddenState no-op fix kept the original 15 s
     // budget viable, but the i18n overhead pushes chromium over it.
-    await expect(reveal.or(endState)).toBeVisible({ timeout: 20_000 });
+    await expect(practiceReadyLocator(page)).toBeVisible({ timeout: 20_000 });
   });
 });

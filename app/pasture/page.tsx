@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import type { SavedSession } from "@/lib/review/persistence";
 import { filterMastered, markSeenInPasture } from "@/lib/pasture/arrivals";
+import { nextArrivals } from "@/lib/pasture/nextArrivals";
+import { NextArrivalsStrip } from "@/components/pasture/NextArrivalsStrip";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
 import { assignAnchors } from "@/lib/pasture/assign";
 import { biomeStats } from "@/lib/pasture/stats";
@@ -125,6 +128,7 @@ function isFiltered(filters: PastureFilters): boolean {
 }
 
 export default function PasturePage() {
+  const t = useTranslations("pasture");
   const { user, supabase } = useAuth();
   const { flags } = useSuperuser();
   const [session, setSession] = useState<SavedSession | null>(null);
@@ -162,7 +166,7 @@ export default function PasturePage() {
   // `settingsVersion` here ties the value to the SETTINGS_SAVED_EVENT bump so
   // a threshold change re-derives the filtered pasture immediately.
   void settingsVersion;
-  const masteryRepetitions = loadSettings().masteryRepetitions;
+  const { masteryRepetitions, pokemonNameLocale } = loadSettings();
 
   // Derive mastered count so the reset-on-empty effect below can read it
   // without duplicating the full derivation logic.
@@ -257,16 +261,28 @@ export default function PasturePage() {
         ) as NameReviewCard[])
       : [];
 
+  // Compute next arrivals from the full raw session (all card types, all
+  // species — not just the mastered subset). Computed before the early-return
+  // so the strip can show upcoming arrivals even when the Pasture is empty.
+  // When pretendAllMastered is on, nextArrivals returns [] and the strip shows
+  // an all-caught-up message.
+  const arrivals = nextArrivals(
+    session?.cards ?? [],
+    flags.pretendAllMastered,
+    masteryRepetitions,
+    pokemonNameLocale,
+  );
+
   if (masteredCards.length === 0) {
     return (
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Pasture
+          {t("title")}
         </h1>
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
-          Your pasture is empty. Master your first Pokémon in Practice to see
-          it here.
+          {t("emptyBody")}
         </p>
+        <NextArrivalsStrip arrivals={arrivals} />
       </main>
     );
   }
@@ -284,9 +300,9 @@ export default function PasturePage() {
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
       <h1 className="mb-6 text-2xl font-bold tracking-tight text-foreground">
-        Pasture
+        {t("title")}
         <span className="ml-2 text-base font-normal text-zinc-500 dark:text-zinc-400">
-          {masteredCards.length} Pokémon
+          {t("pokemonCount", { count: masteredCards.length })}
         </span>
       </h1>
 
@@ -299,7 +315,7 @@ export default function PasturePage() {
 
       {zones.length === 0 && filtered ? (
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
-          No Pokémon match your filters.
+          {t("noFilterMatch")}
         </p>
       ) : (
         <div className="flex flex-col gap-8">
@@ -315,6 +331,8 @@ export default function PasturePage() {
           ))}
         </div>
       )}
+
+      <NextArrivalsStrip arrivals={arrivals} />
     </main>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * Component tests for NavLinks (issue #852).
+ * Component tests for NavLinks (issue #852, #1369 i18n wiring).
  *
  * Covers:
  *   - The Journey link is present in the nav.
@@ -8,10 +8,12 @@
  *   - Pasture link hidden when hasMastered=false and flag is off.
  *   - Pasture link re-derives on a SETTINGS_SAVED_EVENT (#868 follow-up).
  *   - NavLinksFallback renders the same static links (including Journey).
+ *   - Japanese locale renders the correct translated label (練習 for Practice).
  */
 
-import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, screen, waitFor } from "@testing-library/react";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -113,7 +115,7 @@ beforeEach(() => {
 
 describe("NavLinks", () => {
   it("renders the Journey link", async () => {
-    render(<NavLinks />);
+    renderWithIntl(<NavLinks />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Journey" })).toBeInTheDocument();
@@ -121,7 +123,7 @@ describe("NavLinks", () => {
   });
 
   it("includes all core nav links", () => {
-    render(<NavLinks />);
+    renderWithIntl(<NavLinks />);
 
     expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Stats" })).toBeInTheDocument();
@@ -133,7 +135,7 @@ describe("NavLinks", () => {
   it("marks the active link with aria-current='page' for /journey", async () => {
     mockPathname.value = "/journey";
 
-    render(<NavLinks />);
+    renderWithIntl(<NavLinks />);
 
     await waitFor(() => {
       expect(
@@ -149,7 +151,7 @@ describe("NavLinks", () => {
   it("marks the active link with aria-current='page' for /stats", async () => {
     mockPathname.value = "/stats";
 
-    render(<NavLinks />);
+    renderWithIntl(<NavLinks />);
 
     await waitFor(() => {
       expect(
@@ -159,7 +161,7 @@ describe("NavLinks", () => {
   });
 
   it("does not show the Pasture link when hasMastered=false and flag=off", async () => {
-    render(<NavLinks />);
+    renderWithIntl(<NavLinks />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
@@ -171,7 +173,7 @@ describe("NavLinks", () => {
   it("shows the Pasture link when pretendAllMastered flag is on", async () => {
     mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: true } });
 
-    render(<NavLinks />);
+    renderWithIntl(<NavLinks />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Pasture" })).toBeInTheDocument();
@@ -183,7 +185,7 @@ describe("NavLinks", () => {
     mockLoadSession.mockResolvedValue({ cards: [] });
     mockFilterMastered.mockReturnValue([]);
 
-    render(<NavLinks />);
+    renderWithIntl(<NavLinks />);
 
     await waitFor(() => {
       expect(
@@ -212,7 +214,7 @@ describe("NavLinks", () => {
     mockLoadSession.mockResolvedValue(null);
     mockFilterMastered.mockReturnValue([]);
 
-    render(<NavLinks />);
+    renderWithIntl(<NavLinks />);
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
@@ -236,12 +238,30 @@ describe("NavLinks", () => {
 
 describe("NavLinksFallback", () => {
   it("renders all static links including Journey", () => {
-    render(<NavLinksFallback />);
+    renderWithIntl(<NavLinksFallback />);
 
     expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Stats" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Journey" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Pokédex" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
+  });
+});
+
+describe("NavLinks — Japanese locale", () => {
+  it("renders the Practice link label in Japanese (練習)", async () => {
+    renderJa(<NavLinks />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "練習" })).toBeInTheDocument();
+    });
+  });
+
+  it("renders the Pokédex link label in Japanese (図鑑)", async () => {
+    renderJa(<NavLinks />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "図鑑" })).toBeInTheDocument();
+    });
   });
 });

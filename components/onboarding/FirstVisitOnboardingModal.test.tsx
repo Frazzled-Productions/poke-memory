@@ -1,11 +1,21 @@
 /**
- * Unit tests for FirstVisitOnboardingModal (#1103).
+ * Unit tests for FirstVisitOnboardingModal (#1103, #1369).
  *
  * Covers: open on fresh visit, dismiss persists flag, does not re-open after
- * dismiss, Settings reset re-opens it.
+ * dismiss, Settings reset re-opens it, locale rendering (ja), and
+ * MachineTranslationBanner visibility inside the modal.
+ *
+ * All renders use renderWithIntl / renderJa so the real message catalogues are
+ * exercised — bare render is intentionally avoided here.
  */
 
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import {
+  renderWithIntl,
+  renderJa,
+  screen,
+  act,
+  fireEvent,
+} from "@/components/test-utils/renderWithIntl";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { FirstVisitOnboardingModal } from "@/components/onboarding/FirstVisitOnboardingModal";
@@ -15,6 +25,15 @@ import { saveSettings, loadSettings, DEFAULT_ONBOARDING } from "@/lib/settings/p
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({ user: null, loading: false }),
 }));
+
+// useAppLocale is consumed by MachineTranslationBanner inside the modal.
+// Default to "en" so the banner self-hides in English tests; individual tests
+// that need non-English override this.
+vi.mock("@/lib/i18n/useAppLocale", () => ({
+  useAppLocale: vi.fn(() => "en"),
+}));
+
+import { useAppLocale } from "@/lib/i18n/useAppLocale";
 
 // jsdom on this Node version does not ship localStorage out of the box, so
 // the component test provides its own stub (same pattern as VoiceQualityHint.test.tsx).
@@ -45,6 +64,8 @@ describe("FirstVisitOnboardingModal", () => {
         writable: true,
       });
     }
+    // Reset locale mock to English for each test.
+    vi.mocked(useAppLocale).mockReturnValue("en");
   });
 
   afterEach(() => {
@@ -52,7 +73,7 @@ describe("FirstVisitOnboardingModal", () => {
   });
 
   it("opens on a fresh visit (flag absent)", async () => {
-    render(<FirstVisitOnboardingModal />);
+    renderWithIntl(<FirstVisitOnboardingModal />);
     // After useEffect runs the modal should appear.
     expect(
       await screen.findByRole("dialog", { name: /welcome to pok[eé] memory/i }),
@@ -60,17 +81,16 @@ describe("FirstVisitOnboardingModal", () => {
   });
 
   it("renders grading guidance content", async () => {
-    render(<FirstVisitOnboardingModal />);
+    renderWithIntl(<FirstVisitOnboardingModal />);
     await screen.findByRole("dialog", { name: /welcome to pok[eé] memory/i });
-    // "Again" appears as a bold label in the grading list; getAllByText handles
-    // the fact that the text matches both the <strong> and its parent <li>.
+    // "Again" appears as part of the grading list item text.
     expect(screen.getAllByText(/again/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/grade honestly/i)).toBeInTheDocument();
   });
 
   it("closes and persists flag when the Get started button is clicked", async () => {
     const user = userEvent.setup();
-    render(<FirstVisitOnboardingModal />);
+    renderWithIntl(<FirstVisitOnboardingModal />);
     await screen.findByRole("dialog");
 
     await user.click(screen.getByRole("button", { name: /get started/i }));
@@ -83,7 +103,7 @@ describe("FirstVisitOnboardingModal", () => {
 
   it("closes and persists flag when the X button is clicked", async () => {
     const user = userEvent.setup();
-    render(<FirstVisitOnboardingModal />);
+    renderWithIntl(<FirstVisitOnboardingModal />);
     await screen.findByRole("dialog");
 
     await user.click(screen.getByRole("button", { name: /close welcome guide/i }));
@@ -102,7 +122,7 @@ describe("FirstVisitOnboardingModal", () => {
       onboarding: { ...DEFAULT_ONBOARDING, firstVisitOnboardingDismissed: true },
     });
 
-    render(<FirstVisitOnboardingModal />);
+    renderWithIntl(<FirstVisitOnboardingModal />);
 
     // Give React time to run effects.
     await act(async () => {
@@ -115,7 +135,7 @@ describe("FirstVisitOnboardingModal", () => {
   it("calls onDismiss callback when closed", async () => {
     const user = userEvent.setup();
     const onDismiss = vi.fn();
-    render(<FirstVisitOnboardingModal onDismiss={onDismiss} />);
+    renderWithIntl(<FirstVisitOnboardingModal onDismiss={onDismiss} />);
     await screen.findByRole("dialog");
 
     await user.click(screen.getByRole("button", { name: /get started/i }));
@@ -125,7 +145,7 @@ describe("FirstVisitOnboardingModal", () => {
 
   it("re-opens after Settings resets DEFAULT_ONBOARDING", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<FirstVisitOnboardingModal />);
+    const { rerender } = renderWithIntl(<FirstVisitOnboardingModal />);
     await screen.findByRole("dialog");
 
     // Dismiss it.
@@ -148,7 +168,7 @@ describe("FirstVisitOnboardingModal", () => {
 
   describe("keyboard interaction", () => {
     it("Escape key dismisses the modal and persists the flag", async () => {
-      render(<FirstVisitOnboardingModal />);
+      renderWithIntl(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
 
       act(() => {
@@ -163,7 +183,7 @@ describe("FirstVisitOnboardingModal", () => {
 
     it("sets scroll-lock on open and restores overflow on dismiss", async () => {
       const user = userEvent.setup();
-      render(<FirstVisitOnboardingModal />);
+      renderWithIntl(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
 
       expect(document.body.style.overflow).toBe("hidden");
@@ -176,7 +196,7 @@ describe("FirstVisitOnboardingModal", () => {
 
     it("Tab cycling stays within the modal", async () => {
       const user = userEvent.setup();
-      render(<FirstVisitOnboardingModal />);
+      renderWithIntl(<FirstVisitOnboardingModal />);
       const dialog = await screen.findByRole("dialog");
 
       // Collect focusable elements inside the dialog.
@@ -197,6 +217,74 @@ describe("FirstVisitOnboardingModal", () => {
       // One more Tab from the last element wraps to the first.
       await user.tab();
       expect(document.activeElement).toBe(focusable[0]);
+    });
+  });
+
+  describe("i18n: Japanese locale", () => {
+    beforeEach(() => {
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+    });
+
+    it("renders the welcome heading in Japanese", async () => {
+      renderJa(<FirstVisitOnboardingModal />);
+      // The ja catalogue key onboarding.welcomeHeading is "Poké Memory へようこそ".
+      expect(
+        await screen.findByRole("dialog", { name: /poké memory へようこそ/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("renders the close button aria-label in Japanese", async () => {
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // ja catalogue: onboarding.closeAriaLabel = "ウェルカムガイドを閉じる"
+      expect(
+        screen.getByRole("button", { name: /ウェルカムガイドを閉じる/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("renders the Get started button in Japanese", async () => {
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // ja catalogue: onboarding.getStarted = "はじめる"
+      expect(
+        screen.getByRole("button", { name: /はじめる/ }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("MachineTranslationBanner inside modal", () => {
+    it("banner is absent when locale is English", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("en");
+      renderWithIntl(<FirstVisitOnboardingModal />, { locale: "en" });
+      await screen.findByRole("dialog");
+      // Banner self-hides for en locale — no role="note" element.
+      expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    });
+
+    it("banner is present inside the modal when locale is Japanese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // After the banner's useEffect fires (dismissed === false), the note renders.
+      // The dialog is the container — confirm the note is inside the DOM.
+      expect(await screen.findByRole("note")).toBeInTheDocument();
+    });
+
+    it("banner is absent when locale is Japanese and the dismissed flag is set", async () => {
+      // Pre-seed the per-locale dismissed flag in localStorage.
+      window.localStorage.setItem("poke-memory:mt-banner-dismissed:ja", "1");
+
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+
+      // Give the banner's useEffect time to read localStorage and update state.
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      // Banner must be absent — dismissed flag is set.
+      expect(screen.queryByRole("note")).not.toBeInTheDocument();
     });
   });
 });

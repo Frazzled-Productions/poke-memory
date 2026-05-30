@@ -80,6 +80,33 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 
 **Trade-off.** A premature abstraction is worse than three similar lines. The rule is *don't fragment what's already shared*, not *abstract every duplication*. Three sites with the same pattern that aren't going to grow are fine; three sites that ARE going to need a cross-cutting change next month must share a helper now. Where the failure mode is easy to encode at PR time, prefer a lint rule (see #1327 for the Pokémon-name case) over a convention-only enforcement.
 
+### Multi-locale rendering
+
+All Pokémon names shown to users must flow through `useLocalePokemonName(speciesId, fallbackName)` from `lib/i18n/useLocalePokemonName.ts`. A lint rule (`no-restricted-syntax` in `eslint.config.mjs`, covering `components/**` and `app/**` minus `app/api/**`) enforces this at PR time — direct `.displayName` reads in those trees are a CI error (#1327).
+
+**The canonical pattern:**
+
+```tsx
+const { name: localeName } = useLocalePokemonName(pokemon.speciesId, pokemon.displayName);
+// Then render `localeName`, not `pokemon.displayName`.
+```
+
+**When `.displayName` reads are legitimate** (and must be annotated with `// eslint-disable-next-line no-restricted-syntax`):
+
+- Passing `displayName` as the English-fallback *argument* to `useLocalePokemonName` itself — the hook uses it as a synchronous fallback, not as the final render value.
+- Inside `app/api/**` — server-side API routes where locale is irrelevant and the English baseline is correct.
+- Inside `lib/**`, `scripts/**`, `e2e/**` — these are excluded from the rule's file glob.
+
+When extracting a sub-component to use the hook (required when the call site is inside an array `.map()` — hooks may not be called inside map callbacks), follow the pattern in `SpritePicker.tsx` (`SpritePickerTile`) and `KnownPokemonQuiz.tsx` (`KnownPokemonCard`): one hook call per rendered tile, inside a named component.
+
+### Message-catalogue completeness gate
+
+`scripts/lint-i18n.mjs` (run via `npm run lint:i18n`) diffs every non-English catalogue (`messages/{ja,zh-Hans,zh-Hant}.json`) against `messages/en.json` as the structural baseline. The check fails (exit 1) when any locale is **missing** a key that `en` has, or has an **extra** key that `en` doesn't — both directions, because extra keys are dead code that signal drift.
+
+The gate is part of the `lint` chain (`eslint && lint:em-dash && lint:i18n`), so it runs automatically in the `test` CI job on every PR via `npm run lint`. No extra workflow step is needed.
+
+**When adding or renaming a message key:** add it to `messages/en.json` first, then propagate the same structural change to the three non-English files before committing. Running `node scripts/lint-i18n.mjs` locally verifies parity without waiting for CI.
+
 ### Caching
 
 - **Cache Components is enabled** (`cacheComponents: true` in `next.config.ts`). All cache APIs assume this model.
@@ -92,7 +119,18 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 
 Superuser mode is a QA cheat unlocked by typing `super` (desktop) or 7-tapping the nav title (mobile). It does **not** itself change behaviour — it reveals a **Developer** section on the Settings page that houses per-behaviour flags.
 
-**Flags are per axis of cheating, not per page.** Today there is one flag (`pretendAllMastered`) that renders every species as mastered. Future axes (e.g. "skip daily limits", "force-reveal cards") get their own flag. Do **not** add a per-page toggle that re-derives mastery — wire the page into `flags.pretendAllMastered` instead.
+**Flags are per axis of cheating, not per page.** Flags currently in use:
+
+| Flag | Purpose |
+|---|---|
+| `pretendAllMastered` | Renders every species as mastered across Pokédex, Pasture, Stats, and the theme picker. |
+| `forceNextStreakMilestone` | Fires the smallest un-seen streak celebration on next Practice visit. Self-clears after one fire. |
+| `forceCardsGraduated` | Treats all cards as graduated; skips the learning phase. Use to QA typed-entry without grinding. |
+| `qaSeedMode` | Reveals a scenario picker in the Developer section (#1326). Select a scenario and click "Apply seed" to inject deterministic test data into IndexedDB. Local-only — sync write-guard applies. See below for the scenario list. |
+
+Do **not** add a per-page toggle that re-derives mastery — wire the page into `flags.pretendAllMastered` instead.
+
+**QA seed scenarios** (available when `qaSeedMode` is on): `fsrs-locale-mastery` — 30 mastered en-locale name cards + due-soon + in-learning; switch Pokémon name language to Japanese to verify locale-aware mastery reset. `optimiser-stress` — 20 heavily-reviewed cards + 2 single-review cards; run the FSRS optimiser from Settings to verify it returns weights. `pasture-progression` — 40 mastered + 20 in-progress + 15 in-learning species; visit Pasture for a realistic populated view. `mastery-gaps` — reviewed-but-unmastered species (high reps, short scheduled days) + name-mastered-but-reverse-pending species; visit Pasture "Next arrivals" and Journey "Close to mastery" to verify both sections populate correctly. To clear seeded state: click "Clear seed" and reload, or lock superuser mode (which offers to restore cloud state for signed-in users, or reset local state for guests).
 
 **Every new user-facing feature must honour the relevant superuser flag.** Specifically: if a feature displays mastery state, completion counts, per-Pokémon collection state, or anything gated on having mastered things, it must read `useSuperuser().flags.pretendAllMastered` (or a future appropriate flag) and treat it as "fully mastered" when on. The canonical pattern is `forceAllMastered || isMastered(...)`; pure functions take an optional `forceAllMastered` parameter (see `computeStats`, `computeRecords`, `filterMastered`).
 
@@ -210,6 +248,16 @@ Playwright smoke tests live in `e2e/` and run against Vercel preview deployments
 - **Selectors**: prefer `getByRole`, `getByText`, and `getByLabel` over CSS selectors or test IDs. Match the accessible names already in the markup (ARIA labels, headings, button text).
 - **When to add E2E tests**: any change that adds a new page, a new interactive flow, or modifies an existing user-facing flow should include or update an E2E test in `e2e/`. The bar is smoke-level coverage — verify the happy path loads and key interactions work, not exhaustive edge cases. Absence-only test suites do not satisfy this requirement: a suite that only asserts the feature is hidden, disabled, or absent under various conditions leaves a rendering regression undetected. At least one test must assert the feature actually renders and its core interaction succeeds in the happy path.
 - **File naming**: one spec file per feature area (e.g. `e2e/smoke.spec.ts` for cross-cutting smoke tests, `e2e/pokedex.spec.ts` for Pokédex-specific flows).
+
+#### Mandatory coverage rules (state and locale)
+
+Two non-negotiable rules for every user-facing change, enforced in the implementer's own tests (unit/component **and** e2e) and re-checked by the orchestrator at close-out by actually running the app. These exist because the #1302 / #1327 batch shipped three broken headline behaviours (English names on the Pokédex grid, an untranslated UI after switching locale, English picker labels) that all passed unit tests, CI, and code-review — because nothing exercised the feature in the broken state / locale.
+
+- **State coverage — test IN and OUT of every state.** Any change that introduces or gates on a state must be tested in *both* the on and off states, never just the happy one. "State" includes: a superuser / Labs / feature flag (on **and** off), each meaningful value of a setting, a mode (e.g. typed-entry strict/lenient), signed-in vs guest, and **empty vs populated data** (a list or section must be tested both when it has entries *and* when it is empty — the empty / all-caught-up branch is where regressions hide). A suite that exercises only one side of a state does not satisfy this rule. When the state is data-dependent and a fresh preview can't reach it, drive it via the #1326 QA-seed scenarios or superuser flags.
+
+- **Locale coverage — test names and labels in EVERY supported locale.** Any change that renders, formats, or passes through a Pokémon name or a user-facing label/text must be verified in all supported locales — `en`, `ja`, `zh-Hans`, `zh-Hant` — on **every** surface that renders it, for both axes where relevant (`appLocale` for UI chrome, `pokemonNameLocale` for names). This **explicitly includes allowlisted / perf-exempted surfaces** (e.g. the Pokédex grid): exemption from the `.displayName` lint rule (#1327) is **not** exemption from rendering the correct localised value — add a locale-rendering test for the exempted surface too, and resolve names there through the pure resolver (`lib/pokemon/localeNames.ts::getLocaleName`), not the raw English seed field.
+
+- **Verify by running the app, not just green CI.** Unit + e2e green is necessary but not sufficient for core user-facing mechanics. At close-out the orchestrator runs the app (or drives Playwright / the `/verify` skill) in the relevant state — locale switched, seed applied, the empty branch — and eyeballs every affected surface, including the exempted ones, before declaring done. (memory: `feedback_verify_core_mechanics_by_running_app`.)
 
 ### Local development gotchas
 
@@ -359,6 +407,8 @@ The smoke subset is intentionally smaller than CI's full e2e matrix — the goal
 **Planner pre-flight: AC-quality check (#1321).** For non-trivial issues, the `planner` sub-agent reads the issue body and assesses whether the `## Acceptance criteria` section exists and is concrete enough to test against (an implementer or reviewer can produce a yes/no verdict from a build, test run, screenshot, or diff inspection). If the section is missing entirely, or any criterion is vague (subjective wording like "works well", "is intuitive", "looks nice"), the planner returns a **Proposed acceptance criteria** block instead of a full plan. The orchestrator surfaces those proposals to the user via `AskUserQuestion`; on approval it posts the agreed checklist as a comment on the issue, then re-dispatches the planner. Downstream implementer and reviewer cross-checks anchor on the comment-formalised ACs. Trivial issues (typo fixes, doc tweaks, one-liner workflow changes — the same set that may skip the planner entirely) are exempt.
 
 **Planner / `/batch-issues` pre-flight: staleness check (#1322).** Before dispatching an implementer, the planner (and the `/batch-issues` skill during its triage step) runs `.github/scripts/check-issue-staleness.sh <N>` against every non-trivial issue. The script reports `STALE: yes` when the issue is older than the threshold (default 3 days; this project moves fast enough that 3 days is the safe default) **or** when `git log --since=<createdAt>` shows commits touching any backtick-quoted file path in the body. A stale verdict pauses dispatch and surfaces a "confirm ACs still hold" prompt to the user; the user can confirm and proceed, or amend the issue. Per-issue overrides live on the issue itself as a `stale-check:N` label (set the age threshold to N days, e.g. `stale-check:14`) or `stale-check:off` (disable the age branch entirely; the file-activity branch still runs). Run-wide override via the `STALE_THRESHOLD_DAYS` env var. Trivial issues are exempt.
+
+**Planner pre-flight: testability + first-contact UX checklist (#1276).** For any user-facing feature change, the `planner` sub-agent works through two question sets — testability (how a tester reaches each state in under 10 minutes on a fresh environment; whether a seed/flag exists for QA) and first-contact UX (what a first-time or newly-enabling user sees; whether it is self-explanatory). Any gap the planner cannot resolve from the issue and codebase surfaces as a `[USER-DECISION]` open question rather than an unilateral default. Answers fold into the plan as acceptance criteria, a dedicated step, or an `## Out of scope` note. Trivial issues (typo fixes, doc tweaks, one-liner workflow changes — the same set that may skip the planner entirely) are exempt.
 
 **Expect a mini-batch after preview QA.** The `/batch-issues` drain is not finished when the promotion PR opens — the maintainer's QA on the `qa` preview reliably surfaces 1-3 small follow-ups per session (the worked examples: #1270 / #1271 after the #1234 batch; #1331 / #1332 after the multi-locale batch). The skill's playbook bakes in an explicit "mini-batch follow-up" stage between the initial preview QA and the final handoff — file the follow-ups as new issues (`priority:later` by default; `priority:next` if clearly higher), implement the in-scope ones inline, and re-fire the preview deploy after they land. The `feedback_mini_batch_after_qa` memory has the longer rationale.
 

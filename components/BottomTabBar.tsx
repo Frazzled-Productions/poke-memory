@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
@@ -139,18 +140,22 @@ function JourneyIcon({ className }: { className?: string }) {
 }
 
 // ─── Static tab definitions ───────────────────────────────────────────────
+// Hrefs and icon mappings are locale-independent and live at module level.
+// Labels are derived inside each component via t() so the catalogue key is
+// the source of truth rather than a hardcoded English string.
 
-const STATIC_TABS = [
-  { href: "/", label: "Practice", Icon: PracticeIcon },
-  { href: "/stats", label: "Stats", Icon: StatsIcon },
-  { href: "/journey", label: "Journey", Icon: JourneyIcon },
-  { href: "/pokedex", label: "Pokédex", Icon: PokedexIcon },
-  { href: "/settings", label: "Settings", Icon: SettingsIcon },
+const STATIC_TAB_DEFS = [
+  { href: "/", key: "practice", Icon: PracticeIcon },
+  { href: "/stats", key: "stats", Icon: StatsIcon },
+  { href: "/journey", key: "journey", Icon: JourneyIcon },
+  { href: "/pokedex", key: "pokedex", Icon: PokedexIcon },
+  { href: "/settings", key: "settings", Icon: SettingsIcon },
 ] as const;
 
 // ─── Inner component (requires client hooks) ─────────────────────────────
 
 function BottomTabBarInner() {
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const { flags } = useSuperuser();
   const [hasMastered, setHasMastered] = useState(false);
@@ -242,16 +247,16 @@ function BottomTabBarInner() {
     Icon: React.ComponentType<{ className?: string }>;
   }> = [];
 
-  for (const tab of STATIC_TABS) {
+  for (const tab of STATIC_TAB_DEFS) {
     if (tab.href === "/settings" && showPasture) {
-      tabs.push({ href: "/pasture", label: "Pasture", Icon: PastureIcon });
+      tabs.push({ href: "/pasture", label: t("pasture"), Icon: PastureIcon });
     }
-    tabs.push(tab);
+    tabs.push({ href: tab.href, label: t(tab.key), Icon: tab.Icon });
   }
 
   return (
     <nav
-      aria-label="Mobile tab navigation"
+      aria-label={t("mobileTabAriaLabel")}
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-theme-secondary bg-theme-primary md:hidden"
     >
       <ul
@@ -301,8 +306,11 @@ function BottomTabBarInner() {
  * Uses a plain `<div>` with `aria-hidden` rather than a `<nav>` because a
  * hidden landmark is semantically odd — assistive technology should not
  * discover a nav that provides no interactive content.
+ *
+ * Exported for direct unit testing (coverage of the fallback render path).
  */
-function BottomTabBarFallback() {
+export function BottomTabBarFallback() {
+  const t = useTranslations("nav");
   return (
     <div
       aria-hidden="true"
@@ -312,13 +320,13 @@ function BottomTabBarFallback() {
         role="list"
         className="mx-auto flex max-w-5xl items-stretch justify-around"
       >
-        {STATIC_TABS.map(({ href, label, Icon }) => (
+        {STATIC_TAB_DEFS.map(({ href, key, Icon }) => (
           <li key={href} className="flex-1">
             <span
               className="flex flex-col items-center gap-0.5 px-2 pt-3 min-h-[44px] pb-[max(12px,env(safe-area-inset-bottom))] text-[10px] font-medium text-theme-fg-on-primary opacity-55"
             >
               <Icon />
-              <span>{label}</span>
+              <span>{t(key)}</span>
             </span>
           </li>
         ))}

@@ -10,7 +10,7 @@
  * chart stub and the force-pull button, which remain on Stats.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithIntl as render, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -421,6 +421,16 @@ vi.mock("@/components/onboarding/OnboardingHint", () => ({
   ),
 }));
 
+vi.mock("@/components/stats/GameBreakdown", () => ({
+  GameBreakdown: () => <div data-testid="game-breakdown" />,
+}));
+
+vi.mock("@/lib/stats/per-game", () => ({
+  computePerGameStats: vi.fn(() => [
+    { slug: "red-blue", total: 151, introduced: 0, mastered: 0 },
+  ]),
+}));
+
 // ---------------------------------------------------------------------------
 // Import the page component (after all vi.mock calls)
 // ---------------------------------------------------------------------------
@@ -597,6 +607,7 @@ describe("StatsPage — Force pull from cloud button", () => {
     vi.mocked(pullRegionalPrefs).mockResolvedValueOnce({
       timezone: "Europe/London",
       dateFormat: "dmy",
+      pushNotificationHour: null,
     });
     vi.mocked(pullStreak).mockResolvedValueOnce(["2026-05-13", "2026-05-14"]);
     vi.mocked(pullGradeLog).mockResolvedValueOnce([

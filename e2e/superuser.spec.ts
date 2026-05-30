@@ -129,11 +129,17 @@ test.describe("Superuser mode", () => {
   test("pretendAllMastered populates the Pasture", async ({ page }) => {
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
     await page.goto("/pasture");
-    // Empty-state copy contains "Your pasture is empty". Under the flag, the
-    // page should instead show the Pasture header with a species count.
+    // Wait positively for the populated state: the count span ("{N} Pokémon")
+    // only appears in the populated heading branch, never in the empty-state
+    // branch. This auto-waits for the heavy ~1 025-species WebKit render instead
+    // of racing a fixed-window negative assertion.
+    // 30 s: synthesising and placing all SEED_POKEMON into habitat zones is
+    // significantly heavier on WebKit than Chromium.
     await expect(
-      page.getByRole("heading", { level: 1, name: /Pasture/ }),
-    ).toBeVisible();
+      page.getByText(/\d+ Pokémon/),
+    ).toBeVisible({ timeout: 30_000 });
+    // Once the populated state is confirmed visible, the empty-state copy must
+    // be absent (the two branches are mutually exclusive in page.tsx).
     await expect(page.getByText(/Your pasture is empty/)).toHaveCount(0);
   });
 

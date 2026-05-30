@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getChangelog } from "@/lib/changelog/parse";
 import { BulletText } from "@/components/whats-new/BulletText";
 import { MarkVisited } from "@/components/whats-new/MarkVisited";
+import { sectionLabelSm } from "@/lib/utils/class-names";
 
 export const metadata: Metadata = {
   title: "What's New - Poké Memory",
@@ -49,7 +50,7 @@ export default function WhatsNewPage() {
               <div className="space-y-4">
                 {release.sections.map((section) => (
                   <section key={section.kind}>
-                    <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    <h3 className={`mb-1 ${sectionLabelSm}`}>
                       {section.kind}
                     </h3>
                     <ul

@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { RetentionComparison } from "@/lib/stats/retention";
-import { cardPanel, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, mutedText, sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
   /** Actual-vs-target comparison from `computeRetentionComparison`. */
@@ -97,7 +97,7 @@ export function RetentionIndicator({ comparison }: Props) {
                 <span className="text-2xl font-bold tabular-nums text-foreground">
                   {formatPct(actual)}
                 </span>
-                <span className="text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                <span className={sectionLabel}>
                   recall
                 </span>
               </div>

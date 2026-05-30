@@ -1,6 +1,8 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { PokedexFilters, MasteryStatus } from "@/lib/pokemon/filter";
+import type { PokedexSortOrder } from "@/lib/pokedex/sort";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 
 // ---------------------------------------------------------------------------
@@ -25,11 +27,13 @@ const ROMAN: Record<number, string> = {
 
 type FilterBarProps = {
   filters: PokedexFilters;
+  sort: PokedexSortOrder;
   onQueryChange: (q: string) => void;
   onTypeToggle: (type: string) => void;
   onGenChange: (gen: number | null) => void;
   onAlternateFormsToggle: () => void;
   onMasteryChange: (masteryStatus: MasteryStatus) => void;
+  onSortChange: (sort: PokedexSortOrder) => void;
   /** When true (superuser pretendAllMastered on), the mastery filter is locked to "all" and disabled. */
   superuserMasteryLocked?: boolean;
 };
@@ -38,41 +42,52 @@ type FilterBarProps = {
 // PokedexFilterBar
 // ---------------------------------------------------------------------------
 
-const MASTERY_OPTIONS: { value: MasteryStatus; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "mastered", label: "Mastered" },
-  { value: "not-yet-mastered", label: "Not yet mastered" },
-];
-
 export default function PokedexFilterBar({
   filters,
+  sort,
   onQueryChange,
   onTypeToggle,
   onGenChange,
   onAlternateFormsToggle,
   onMasteryChange,
+  onSortChange,
   superuserMasteryLocked = false,
 }: FilterBarProps) {
+  const t = useTranslations("pokedex");
+
+  // Defined inside the component so t() is in scope.
+  const MASTERY_OPTIONS: { value: MasteryStatus; label: string }[] = [
+    { value: "all", label: t("masteryAll") },
+    { value: "mastered", label: t("masteryMastered") },
+    { value: "not-yet-mastered", label: t("masteryNotYet") },
+  ];
+
+  const SORT_OPTIONS: { value: PokedexSortOrder; label: string }[] = [
+    { value: "national", label: t("sortNational") },
+    { value: "alphabetical", label: t("sortAlphabetical") },
+    { value: "closest-to-mastery", label: t("sortClosestToMastery") },
+  ];
+
   return (
     <div className="rounded-b-lg border border-t-0 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-4">
       {/* Search input */}
       <div className="relative mb-3">
         <label htmlFor="pokedex-search" className="sr-only">
-          Search Pokémon
+          {t("searchAriaLabel")}
         </label>
         <input
           id="pokedex-search"
           type="text"
           value={filters.query}
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Search Pokémon…"
+          placeholder={t("searchPokedexPlaceholder")}
           className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-8 text-sm text-foreground placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 dark:placeholder:text-zinc-500"
         />
         {filters.query && (
           <button
             type="button"
             onClick={() => onQueryChange("")}
-            aria-label="Clear search"
+            aria-label={t("clearSearch")}
             className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
           >
             <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
@@ -87,10 +102,32 @@ export default function PokedexFilterBar({
         )}
       </div>
 
+      {/* Sort control */}
+      <div className="mb-3">
+        <label
+          htmlFor="pokedex-sort"
+          className="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400"
+        >
+          {t("sortBy")}
+        </label>
+        <select
+          id="pokedex-sort"
+          value={sort}
+          onChange={(e) => onSortChange(e.target.value as PokedexSortOrder)}
+          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 sm:w-auto"
+        >
+          {SORT_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Type chips */}
       <div
         role="group"
-        aria-label="Filter by type"
+        aria-label={t("filterByTypeAriaLabel")}
         className="flex flex-wrap gap-2 mb-3"
       >
         {POKEMON_TYPES.map((type) => {
@@ -118,7 +155,7 @@ export default function PokedexFilterBar({
       {/* Generation pills */}
       <div
         role="group"
-        aria-label="Filter by generation"
+        aria-label={t("filterByGenerationAriaLabel")}
         className="flex flex-wrap gap-2 mb-3"
       >
         <button
@@ -132,7 +169,7 @@ export default function PokedexFilterBar({
               : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
           ].join(" ")}
         >
-          All
+          {t("generationAll")}
         </button>
         {([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((gen) => (
           <button
@@ -147,7 +184,7 @@ export default function PokedexFilterBar({
                 : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
             ].join(" ")}
           >
-            Gen {ROMAN[gen]}
+            {t("generationLabel", { gen: ROMAN[gen] })}
           </button>
         ))}
       </div>
@@ -155,7 +192,7 @@ export default function PokedexFilterBar({
       {/* Extra toggles */}
       <div
         role="group"
-        aria-label="Additional filters"
+        aria-label={t("additionalFiltersAriaLabel")}
         className="flex flex-wrap gap-2 mb-3"
       >
         <button
@@ -169,14 +206,14 @@ export default function PokedexFilterBar({
               : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
           ].join(" ")}
         >
-          Has alternate forms
+          {t("hasAlternateForms")}
         </button>
       </div>
 
       {/* Mastery status filter */}
       <div
         role="group"
-        aria-label="Filter by mastery"
+        aria-label={t("filterByMasteryAriaLabel")}
         className="flex flex-wrap gap-2"
       >
         {MASTERY_OPTIONS.map(({ value, label }) => {
@@ -190,7 +227,7 @@ export default function PokedexFilterBar({
               disabled={superuserMasteryLocked && value !== "all"}
               title={
                 superuserMasteryLocked && value !== "all"
-                  ? "Mastery filter unavailable while pretend-all-mastered is on"
+                  ? t("masteryFilterUnavailable")
                   : undefined
               }
               className={[

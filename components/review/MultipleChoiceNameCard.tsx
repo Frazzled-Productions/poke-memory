@@ -53,6 +53,7 @@ function NameOptionButton({
 }: NameOptionButtonProps) {
   const { name: localeName } = useLocalePokemonName(
     option.pokemon.speciesId,
+    // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
     option.pokemon.displayName,
   );
   const wasChosen = submitted && index === chosenIndex;

@@ -1,9 +1,13 @@
-"use client";
-
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/GradeButtons";
+import {
+  renderWithIntl,
+  renderJa,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
 // KeyboardShortcutsOverlay
@@ -11,13 +15,13 @@ import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/Grad
 
 describe("KeyboardShortcutsOverlay", () => {
   it("renders with role='dialog' and the correct accessible name", () => {
-    render(<KeyboardShortcutsOverlay onClose={() => {}} />);
+    renderWithIntl(<KeyboardShortcutsOverlay onClose={() => {}} />);
 
     expect(screen.getByRole("dialog", { name: /keyboard shortcuts/i })).toBeInTheDocument();
   });
 
   it("lists all seven shortcut rows including the '3 / 4' alias for Good", () => {
-    render(<KeyboardShortcutsOverlay onClose={() => {}} />);
+    renderWithIntl(<KeyboardShortcutsOverlay onClose={() => {}} />);
 
     // Spot-check a few rows.
     expect(screen.getByText("Space / Enter")).toBeInTheDocument();
@@ -30,7 +34,7 @@ describe("KeyboardShortcutsOverlay", () => {
   it("calls onClose when the close button is clicked", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<KeyboardShortcutsOverlay onClose={onClose} />);
+    renderWithIntl(<KeyboardShortcutsOverlay onClose={onClose} />);
 
     await user.click(screen.getByRole("button", { name: /close keyboard shortcuts overlay/i }));
 
@@ -39,7 +43,7 @@ describe("KeyboardShortcutsOverlay", () => {
 
   it("calls onClose when the backdrop is clicked", async () => {
     const onClose = vi.fn();
-    render(
+    renderWithIntl(
       <div data-testid="root">
         <KeyboardShortcutsOverlay onClose={onClose} />
       </div>,
@@ -56,7 +60,7 @@ describe("KeyboardShortcutsOverlay", () => {
   it("does NOT call onClose when the dialog panel itself is clicked", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<KeyboardShortcutsOverlay onClose={onClose} />);
+    renderWithIntl(<KeyboardShortcutsOverlay onClose={onClose} />);
 
     // Click the inner dialog panel — stopPropagation prevents backdrop handler.
     await user.click(screen.getByRole("dialog"));
@@ -65,7 +69,7 @@ describe("KeyboardShortcutsOverlay", () => {
   });
 
   it("moves focus into the dialog on mount", async () => {
-    render(<KeyboardShortcutsOverlay onClose={() => {}} />);
+    renderWithIntl(<KeyboardShortcutsOverlay onClose={() => {}} />);
 
     // The first focusable element inside the dialog (Close button) should receive focus.
     await waitFor(() => {
@@ -75,7 +79,7 @@ describe("KeyboardShortcutsOverlay", () => {
   });
 
   it("traps Tab inside the dialog (forward cycle wraps to first)", () => {
-    render(<KeyboardShortcutsOverlay onClose={() => {}} />);
+    renderWithIntl(<KeyboardShortcutsOverlay onClose={() => {}} />);
 
     // Only one focusable element (the Close button). Tab from it should wrap back.
     const closeBtn = screen.getByRole("button", { name: /close keyboard shortcuts overlay/i });
@@ -88,7 +92,7 @@ describe("KeyboardShortcutsOverlay", () => {
   });
 
   it("traps Shift+Tab inside the dialog (reverse cycle wraps to last)", () => {
-    render(<KeyboardShortcutsOverlay onClose={() => {}} />);
+    renderWithIntl(<KeyboardShortcutsOverlay onClose={() => {}} />);
 
     const closeBtn = screen.getByRole("button", { name: /close keyboard shortcuts overlay/i });
     closeBtn.focus();
@@ -98,6 +102,13 @@ describe("KeyboardShortcutsOverlay", () => {
 
     expect(document.activeElement).toBe(closeBtn);
   });
+
+  it("renders shortcut action text in Japanese when using the ja locale", () => {
+    // ja.json: keyboardShortcuts.revealCard = "カードをめくる"
+    renderJa(<KeyboardShortcutsOverlay onClose={() => {}} />);
+
+    expect(screen.getByText("カードをめくる")).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -106,7 +117,7 @@ describe("KeyboardShortcutsOverlay", () => {
 
 describe("GradeButtons", () => {
   it("renders four grade buttons", () => {
-    render(<GradeButtons onGrade={() => {}} />);
+    renderWithIntl(<GradeButtons onGrade={() => {}} />);
 
     for (const label of ["Again", "Hard", "Good", "Easy"]) {
       expect(screen.getByRole("button", { name: new RegExp(label, "i") })).toBeInTheDocument();
@@ -116,7 +127,7 @@ describe("GradeButtons", () => {
   it("calls onGrade with the correct grade value when a button is clicked", async () => {
     const onGrade = vi.fn();
     const user = userEvent.setup();
-    render(<GradeButtons onGrade={onGrade} />);
+    renderWithIntl(<GradeButtons onGrade={onGrade} />);
 
     await user.click(screen.getByRole("button", { name: /good/i }));
 
@@ -124,7 +135,7 @@ describe("GradeButtons", () => {
   });
 
   it("disables all grade buttons when disabled prop is true", () => {
-    render(<GradeButtons onGrade={() => {}} disabled />);
+    renderWithIntl(<GradeButtons onGrade={() => {}} disabled />);
 
     for (const label of ["Again", "Hard", "Good", "Easy"]) {
       expect(screen.getByRole("button", { name: new RegExp(label, "i") })).toBeDisabled();
@@ -133,7 +144,7 @@ describe("GradeButtons", () => {
 
   it("opens the overlay in uncontrolled mode when the ? button is clicked", async () => {
     const user = userEvent.setup();
-    render(<GradeButtons onGrade={() => {}} />);
+    renderWithIntl(<GradeButtons onGrade={() => {}} />);
 
     const hintBtn = screen.getByRole("button", { name: /show keyboard shortcuts/i });
     await user.click(hintBtn);
@@ -144,7 +155,7 @@ describe("GradeButtons", () => {
   it("does NOT render the overlay independently when in controlled mode (parent owns it)", () => {
     // When showShortcuts / onOpenShortcuts / onCloseShortcuts are all provided,
     // GradeButtons defers overlay rendering to the parent — no dialog in DOM.
-    render(
+    renderWithIntl(
       <GradeButtons
         onGrade={() => {}}
         showShortcuts={false}
@@ -159,7 +170,7 @@ describe("GradeButtons", () => {
   it("calls onOpenShortcuts instead of self-managing when in controlled mode", async () => {
     const onOpenShortcuts = vi.fn();
     const user = userEvent.setup();
-    render(
+    renderWithIntl(
       <GradeButtons
         onGrade={() => {}}
         showShortcuts={false}
@@ -174,5 +185,15 @@ describe("GradeButtons", () => {
     expect(onOpenShortcuts).toHaveBeenCalledOnce();
     // Overlay still not in DOM — parent controls rendering.
     expect(screen.queryByRole("dialog", { name: /keyboard shortcuts/i })).not.toBeInTheDocument();
+  });
+
+  it("renders grade button labels in Japanese when using the ja locale", () => {
+    // ja.json: again = "もう一度", hard = "難しい", good = "普通", easy = "簡単"
+    renderJa(<GradeButtons onGrade={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "もう一度" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "難しい" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "普通" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "簡単" })).toBeInTheDocument();
   });
 });
