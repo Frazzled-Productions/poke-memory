@@ -561,12 +561,6 @@ export default function JourneyPage() {
   const dashboardSnapshot = useDashboardSnapshot();
   const masterySnapshot: MasterySnapshot | null = dashboardSnapshot?.mastery ?? null;
 
-  // nameCards is still needed for computeRecords which isn't part of the snapshot.
-  const nameCards =
-    cards !== null
-      ? cards.filter((c) => c.cardType === "name")
-      : null;
-
   const badgesToShow: readonly BadgeDefinition[] = flags.pretendAllMastered
     ? BADGE_CATALOG
     : (() => {
@@ -587,10 +581,12 @@ export default function JourneyPage() {
       ? masteredSpeciesIds(cards, masteryRepetitions, flags.pretendAllMastered)
       : undefined;
 
+  // Pass the full card array so computeRecords can apply species-level
+  // (both-legs) mastery counting (#1448).
   const records: Records | null =
-    nameCards !== null && masteryRepetitions !== null
+    cards !== null && masteryRepetitions !== null
       ? computeRecords(
-          nameCards as Parameters<typeof computeRecords>[0],
+          cards,
           gradeLog,
           streakDates,
           masteryRepetitions,

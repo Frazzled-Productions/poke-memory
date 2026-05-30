@@ -147,6 +147,13 @@ function replayLog(
   // Per-species output keyed by subjectKey (numeric species ID string).
   const speciesEvents = new Map<string, SpeciesEvent>();
 
+  // Track per-species whether each leg (name / reverse) has crossed the
+  // mastery gate, and when. Species mastery requires BOTH legs (#1448/#1234).
+  // nameMasteredAtMs / reverseMasteredAtMs store the epoch-ms when each leg
+  // first crossed, so we can record `masteredAtMs` as the later of the two.
+  const nameMasteredAtMs = new Map<string, number>();
+  const reverseMasteredAtMs = new Map<string, number>();
+
   const byCard = groupByCard(log);
 
   // Collect all grade events (subjectKey present) sorted chronologically.
@@ -178,30 +185,57 @@ function replayLog(
 
     cardStates.set(cardKey, nextState);
 
-    // Only track species events from "name" cards. Evolution and other
-    // card types don't map 1:1 to a species introduction.
-    if (entry.cardType !== "name") continue;
-
     const speciesKey = entry.subjectKey;
-    const existing = speciesEvents.get(speciesKey);
-    const firstSeenMs = existing?.firstSeenMs ?? entry.occurredAt;
-    const wasMastered = existing?.masteredAtMs !== null && existing?.masteredAtMs !== undefined;
     const nowMastered = isMastered(nextState, masteryRepetitions);
 
-    if (existing === undefined) {
-      speciesEvents.set(speciesKey, {
-        firstSeenMs,
-        masteredAtMs: nowMastered ? entry.occurredAt : null,
-      });
-    } else if (!wasMastered && nowMastered) {
-      // First mastery crossing.
-      speciesEvents.set(speciesKey, {
-        firstSeenMs: existing.firstSeenMs,
-        masteredAtMs: entry.occurredAt,
-      });
+    if (entry.cardType === "name") {
+      // Track firstSeen for the species (from the name card).
+      const existing = speciesEvents.get(speciesKey);
+      const firstSeenMs = existing?.firstSeenMs ?? entry.occurredAt;
+      if (existing === undefined) {
+        speciesEvents.set(speciesKey, { firstSeenMs, masteredAtMs: null });
+      }
+
+      // Record when the name leg first crossed mastery.
+      if (nowMastered && !nameMasteredAtMs.has(speciesKey)) {
+        nameMasteredAtMs.set(speciesKey, entry.occurredAt);
+        // Check whether the reverse leg was already mastered — if so, this
+        // grade completes species-level mastery.
+        const revMs = reverseMasteredAtMs.get(speciesKey);
+        if (revMs !== undefined) {
+          const speciesmasteredAtMs = Math.max(entry.occurredAt, revMs);
+          const ev = speciesEvents.get(speciesKey);
+          if (ev !== undefined && ev.masteredAtMs === null) {
+            speciesEvents.set(speciesKey, {
+              firstSeenMs: ev.firstSeenMs,
+              masteredAtMs: speciesmasteredAtMs,
+            });
+          }
+        }
+      }
+    } else if (entry.cardType === "reverse") {
+      // Record when the reverse leg first crossed mastery.
+      if (nowMastered && !reverseMasteredAtMs.has(speciesKey)) {
+        reverseMasteredAtMs.set(speciesKey, entry.occurredAt);
+        // Check whether the name leg was already mastered — if so, this
+        // grade completes species-level mastery.
+        const nameMs = nameMasteredAtMs.get(speciesKey);
+        if (nameMs !== undefined) {
+          const speciesmasteredAtMs = Math.max(entry.occurredAt, nameMs);
+          const ev = speciesEvents.get(speciesKey);
+          // The species event (firstSeenMs) may exist from name-card grading,
+          // or may not if only reverse has been graded — fall back to entry.occurredAt.
+          if (ev !== undefined && ev.masteredAtMs === null) {
+            speciesEvents.set(speciesKey, {
+              firstSeenMs: ev.firstSeenMs,
+              masteredAtMs: speciesmasteredAtMs,
+            });
+          }
+        }
+      }
     }
-    // Once mastered, we do not un-master in this reconstruction (the
-    // mastery threshold can regress in theory but not in this data model).
+    // Evolution and other card types don't map 1:1 to a species introduction;
+    // they contribute to per-card FSRS state tracking but not to species events.
   }
 
   return speciesEvents;

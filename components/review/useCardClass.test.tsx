@@ -1,5 +1,5 @@
 /**
- * Component tests for useCardClass (issue #1282).
+ * Component tests for useCardClass (issue #1282, #1448).
  *
  * Covers:
  *   - Returns "pending" until session loads.
@@ -7,7 +7,9 @@
  *   - Returns "locked" when the session has no matching card.
  *   - Delegates to classifyCard with masteryRepetitions from settings.
  *   - Returns "learning" for an introduced, non-mastered card.
- *   - Returns "mastered" for a card that passes the mastery gate.
+ *   - Returns "mastered" for a card that passes the mastery gate (species-level: both legs).
+ *   - Returns "learning" when name card is mastered but reverse leg is absent (#1448).
+ *   - Returns "learning" when name card is mastered but reverse leg is not mastered (#1448).
  */
 
 import { renderHook, waitFor } from "@testing-library/react";
@@ -28,13 +30,16 @@ vi.mock("@/lib/settings/persistence", () => ({
 }));
 
 const mockClassifyCard = vi.fn();
+const mockIsMastered = vi.fn();
 vi.mock("@/lib/stats/derive", () => ({
   classifyCard: (...args: unknown[]) => mockClassifyCard(...args),
+  isMastered: (...args: unknown[]) => mockIsMastered(...args),
 }));
 
 // ---------------------------------------------------------------------------
 
 import { useCardClass } from "@/lib/review/useCardClass";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +75,15 @@ function makeNameCard(id: number, stateOverrides: Partial<ReviewState> = {}) {
   };
 }
 
+/** A minimal reverse card as the hook expects: id + cardType + state. */
+function makeReverseCard(speciesId: number, stateOverrides: Partial<ReviewState> = {}) {
+  return {
+    id: REVERSE_ID_OFFSET + speciesId,
+    cardType: "reverse" as const,
+    state: makeState(stateOverrides),
+  };
+}
+
 function makeSettings(masteryRepetitions = 3) {
   return { masteryRepetitions };
 }
@@ -80,6 +94,7 @@ beforeEach(() => {
   mockLoadSession.mockReset();
   mockLoadSettings.mockReset();
   mockClassifyCard.mockReset();
+  mockIsMastered.mockReset();
 });
 
 // ---------------------------------------------------------------------------
@@ -152,20 +167,51 @@ describe("useCardClass", () => {
     });
   });
 
-  it('returns "mastered" when classifyCard returns "mastered"', async () => {
-    const card = makeNameCard(25, {
-      lastReview: "2026-04-01",
-      reps: 3,
-      scheduledDays: 30,
-    });
-    mockLoadSession.mockResolvedValue({ cards: [card], limits: {} });
+  it('returns "mastered" when classifyCard returns "mastered" and reverse leg is mastered (#1448)', async () => {
+    // Species-level mastery: BOTH name card AND reverse card must be mastered.
+    const nameCard = makeNameCard(25, { lastReview: "2026-04-01", reps: 3, scheduledDays: 30 });
+    const reverseCard = makeReverseCard(25, { lastReview: "2026-04-01", reps: 3, scheduledDays: 30 });
+    mockLoadSession.mockResolvedValue({ cards: [nameCard, reverseCard], limits: {} });
     mockLoadSettings.mockReturnValue(makeSettings(3));
     mockClassifyCard.mockReturnValue("mastered");
+    // isMastered returns true for the reverse card (it is mastered).
+    mockIsMastered.mockReturnValue(true);
 
     const { result } = renderHook(() => useCardClass(25));
 
     await waitFor(() => {
       expect(result.current).toBe("mastered");
+    });
+  });
+
+  it('returns "learning" when name card is mastered but reverse leg is absent (#1448)', async () => {
+    // Only name card — no reverse card in session. Name-only mastery does not count.
+    const nameCard = makeNameCard(25, { lastReview: "2026-04-01", reps: 3, scheduledDays: 30 });
+    mockLoadSession.mockResolvedValue({ cards: [nameCard], limits: {} });
+    mockLoadSettings.mockReturnValue(makeSettings(3));
+    mockClassifyCard.mockReturnValue("mastered");
+    // isMastered never called when reverse is absent; irrelevant — default is undefined.
+
+    const { result } = renderHook(() => useCardClass(25));
+
+    await waitFor(() => {
+      expect(result.current).toBe("learning");
+    });
+  });
+
+  it('returns "learning" when name card is mastered but reverse leg is not yet mastered (#1448)', async () => {
+    const nameCard = makeNameCard(25, { lastReview: "2026-04-01", reps: 3, scheduledDays: 30 });
+    const reverseCard = makeReverseCard(25, { lastReview: "2026-04-01", reps: 1, scheduledDays: 3 });
+    mockLoadSession.mockResolvedValue({ cards: [nameCard, reverseCard], limits: {} });
+    mockLoadSettings.mockReturnValue(makeSettings(3));
+    mockClassifyCard.mockReturnValue("mastered");
+    // isMastered returns false for the unmastered reverse card.
+    mockIsMastered.mockReturnValue(false);
+
+    const { result } = renderHook(() => useCardClass(25));
+
+    await waitFor(() => {
+      expect(result.current).toBe("learning");
     });
   });
 

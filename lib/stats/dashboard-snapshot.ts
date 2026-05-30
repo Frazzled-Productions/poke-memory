@@ -358,11 +358,12 @@ export function computeDashboardSnapshot(
     struggling = statsResult.struggling;
   }
 
-  // Projection axis.
+  // Projection axis — pass the FULL card array so computeCompletionProjection
+  // can apply the species-level (both-legs) mastery rule (#1448).
   let projection: CompletionProjection | null = null;
   if (wants("projection")) {
     projection = computeCompletionProjection(
-      nameCards,
+      cards,
       today,
       masteryRepetitions ?? 3,
       forceAllMastered,

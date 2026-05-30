@@ -1,7 +1,8 @@
-import type { NameReviewCard } from "@/lib/review/session";
-import { isMastered } from "@/lib/stats/derive";
+import type { ReviewableCard } from "@/lib/review/session";
 import { addDaysToIsoDate } from "@/lib/utils/dates";
 import { isoMinusDays } from "@/lib/stats/date";
+import { MASTERY_REPETITIONS } from "@/lib/stats/derive";
+import { masteredSpeciesEvents, nameCardsForLocale } from "./mastery-species-events";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -66,28 +67,29 @@ export const MAX_PROJECTION_DAYS = 365 * 10;
 /**
  * Pure: estimate when the user will have mastered all species.
  *
+ * Since #1448, mastery is counted at the species level (both name + reverse
+ * legs required, #1234). The full mixed-type card array is required so the
+ * reverse leg can be found.
+ *
  * Algorithm:
- *   1. Count mastery events (cards whose `lastReview` falls within the
- *      trailing `PROJECTION_WINDOW_DAYS` window AND that are currently
- *      mastered). We use `lastReview` as a proxy for "when this card was
- *      last confirmed mastered" — the same approximation used in
- *      `computeRecords` for `avgDaysToMastery`.
- *   2. Derive a weekly rate from that count and the span of the window
- *      actually covered by history (clamped to the window size).
- *   3. Check the minimum-history guard: if the earliest mastery event in the
+ *   1. Derive species-level mastery events from the full card array.
+ *   2. Count "remaining" species = name cards whose species is NOT yet mastered.
+ *   3. Count mastery events whose `masteredDate` falls within the trailing
+ *      `PROJECTION_WINDOW_DAYS` window.
+ *   4. Check the minimum-history guard: if the earliest mastery event in the
  *      window is fewer than `MIN_HISTORY_DAYS` ago, return
  *      `"insufficient-history"`.
- *   4. Extrapolate `remaining / weeklyRate * 7` days from today.
+ *   5. Extrapolate `remaining / weeklyRate * 7` days from today.
  *
- * @param cards              Name-card array from the session.
+ * @param cards              Full mixed-type card array from the session.
  * @param today              Today's date as YYYY-MM-DD.
  * @param masteryRepetitions Mastery threshold (matches the user's setting).
  * @param forceAllMastered   Superuser flag — when on, returns `"complete"`.
  */
 export function computeCompletionProjection(
-  cards: readonly NameReviewCard[],
+  cards: readonly ReviewableCard[],
   today: string,
-  masteryRepetitions: number,
+  masteryRepetitions: number = MASTERY_REPETITIONS,
   forceAllMastered = false,
 ): CompletionProjection {
   // Superuser shortcut: the user pretends everything is mastered.
@@ -95,35 +97,37 @@ export function computeCompletionProjection(
     return { kind: "complete" };
   }
 
-  // Count remaining (unmastered) species and mastery events in the trailing window.
-  let remaining = 0;
-  // Mastery events that fall within the trailing window (last-review date).
-  const windowStart = isoMinusDays(today, PROJECTION_WINDOW_DAYS - 1);
-  let masteryEventsInWindow = 0;
-  // Track the earliest mastery-event date in the window to apply the
-  // minimum-history guard.
-  let earliestInWindow: string | null = null;
+  // Derive species-level mastery events (both name + reverse legs, #1448).
+  const events = masteredSpeciesEvents(cards, masteryRepetitions, false);
+  const masteredSpeciesIdSet = new Set(events.map((e) => e.speciesId));
 
-  for (const card of cards) {
-    const mastered = isMastered(card.state, masteryRepetitions);
-    if (mastered) {
-      // Check whether the card's last review falls within the window —
-      // this is our proxy for "mastered recently".
-      const lr = card.state.lastReview;
-      if (lr !== null && lr >= windowStart && lr <= today) {
-        masteryEventsInWindow++;
-        if (earliestInWindow === null || lr < earliestInWindow) {
-          earliestInWindow = lr;
-        }
-      }
-    } else {
+  // Count name cards (species) that are NOT yet mastered.
+  const nameCards = nameCardsForLocale(cards);
+  let remaining = 0;
+  for (const card of nameCards) {
+    if (!masteredSpeciesIdSet.has(card.id)) {
       remaining++;
     }
   }
 
-  // All species are already mastered.
+  // All species are already mastered (or no name cards exist).
   if (remaining === 0) {
     return { kind: "complete" };
+  }
+
+  // Count mastery events in the trailing window.
+  const windowStart = isoMinusDays(today, PROJECTION_WINDOW_DAYS - 1);
+  let masteryEventsInWindow = 0;
+  let earliestInWindow: string | null = null;
+
+  for (const ev of events) {
+    const d = ev.masteredDate;
+    if (d >= windowStart && d <= today) {
+      masteryEventsInWindow++;
+      if (earliestInWindow === null || d < earliestInWindow) {
+        earliestInWindow = d;
+      }
+    }
   }
 
   // No mastery events in the trailing window → cannot project.
@@ -149,7 +153,7 @@ export function computeCompletionProjection(
   const weeklyRate = (masteryEventsInWindow / effectiveWindowDays) * 7;
 
   // Extrapolate days to completion.
-  const daysToCompletion = Math.ceil(remaining / weeklyRate * 7);
+  const daysToCompletion = Math.ceil((remaining / weeklyRate) * 7);
 
   // Cap absurdly large projections.
   if (daysToCompletion > MAX_PROJECTION_DAYS) {

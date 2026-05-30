@@ -769,8 +769,15 @@ describe("projection axis", () => {
     expect(snapshot.projection).toEqual({ kind: "complete" });
   });
 
-  it("returns complete when all cards are mastered", () => {
-    const cards: ReviewableCard[] = [masteredCard(1), masteredCard(2)];
+  it("returns complete when all species are mastered (both legs, #1448)", () => {
+    // Species-level mastery requires both name + reverse legs to be mastered.
+    const masteredState = { lastReview: "2026-04-01", firstSeen: "2026-02-01", reps: 5, scheduledDays: 30, dueDate: "2026-05-01", fsrsState: "review" as const };
+    const cards: ReviewableCard[] = [
+      makeCard(1, masteredState),
+      makeReverseCard(1, masteredState),
+      makeCard(2, masteredState),
+      makeReverseCard(2, masteredState),
+    ];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["projection"],
       masteryRepetitions: 3,

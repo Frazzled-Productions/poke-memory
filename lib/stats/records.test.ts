@@ -6,8 +6,9 @@ import {
 } from "./records";
 import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "./derive";
 import type { ReviewState } from "@/lib/srs/scheduler";
-import type { NameReviewCard } from "@/lib/review/session";
+import type { ReviewableCard, NameReviewCard, ReverseReviewCard } from "@/lib/review/session";
 import type { GradeLog } from "@/lib/gradelog/persistence";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 
 function state(overrides: Partial<ReviewState> = {}): ReviewState {
   return {
@@ -20,7 +21,7 @@ function state(overrides: Partial<ReviewState> = {}): ReviewState {
   };
 }
 
-function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard {
+function nameCard(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard {
   return {
     id,
     speciesId: id,
@@ -37,6 +38,35 @@ function card(id: number, overrides: Partial<ReviewState> = {}): NameReviewCard 
     isLegendary: false, isMythical: false, cryUrl: null,
     cardType: "name", subjectKey: String(id), state: state(overrides),
   };
+}
+
+function reverseCard(speciesId: number, overrides: Partial<ReviewState> = {}): ReverseReviewCard {
+  const base = nameCard(speciesId, overrides);
+  const { id: _id, cardType: _ct, ...rest } = base;
+  return {
+    ...rest,
+    cardType: "reverse" as const,
+    id: REVERSE_ID_OFFSET + speciesId,
+    pokemonId: speciesId,
+    subjectKey: String(speciesId),
+    state: state(overrides),
+  };
+}
+
+/** Build a fully mastered species pair (both legs mastered). */
+function masteredPair(
+  id: number,
+  nameOverrides: Partial<ReviewState> = {},
+  reverseOverrides: Partial<ReviewState> = {},
+): ReviewableCard[] {
+  const masteryState = {
+    reps: MASTERY_REPETITIONS,
+    scheduledDays: MASTERY_INTERVAL_DAYS,
+  };
+  return [
+    nameCard(id, { ...masteryState, ...nameOverrides }),
+    reverseCard(id, { ...masteryState, ...reverseOverrides }),
+  ];
 }
 
 function entry(date: string, grade: 1 | 2 | 4 | 5 = 4): GradeLog[number] {
@@ -103,13 +133,12 @@ describe("computeBestReviewDay", () => {
   });
 
   it("single-day log — all reviews on one day — returns that day's count", () => {
-    // Issue #1019 scenario: single-day log behaves correctly.
     const log: GradeLog = [entry("2026-05-12"), entry("2026-05-12")];
     expect(computeBestReviewDay(log)).toBe(2);
   });
 });
 
-describe("computeRecords", () => {
+describe("computeRecords — species-level mastery (both legs, #1448)", () => {
   it("empty inputs produce zeros and nulls", () => {
     const r = computeRecords([], [], [], MASTERY_REPETITIONS);
     expect(r).toEqual({
@@ -120,65 +149,84 @@ describe("computeRecords", () => {
     });
   });
 
-  it("avgDaysToMastery averages (lastReview - firstSeen) over mastered cards", () => {
-    const cards = [
-      // mastered, 10 days between firstSeen and lastReview
-      card(1, {
+  it("name-only mastered cards produce null (reverse leg absent — not species-mastered)", () => {
+    // Per #1448: name-card mastery alone does not count as species mastery.
+    const cards: ReviewableCard[] = [
+      nameCard(1, {
         reps: MASTERY_REPETITIONS,
         scheduledDays: MASTERY_INTERVAL_DAYS,
         firstSeen: "2026-05-02",
         lastReview: "2026-05-12",
       }),
-      // mastered, 20 days
-      card(2, {
+    ];
+    const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    expect(r.avgDaysToMastery).toBeNull();
+    expect(r.mostMasteredIn7d).toBeNull();
+  });
+
+  it("avgDaysToMastery averages (masteredDate - nameCard.firstSeen) over mastered species", () => {
+    // Species 1: name firstSeen=May 2, both legs lastReview=May 12 → 10 days.
+    // Species 2: name firstSeen=Apr 22, both legs lastReview=May 12 → 20 days.
+    // Species 3: name mastered, reverse NOT mastered → excluded.
+    const cards: ReviewableCard[] = [
+      ...masteredPair(1,
+        { firstSeen: "2026-05-02", lastReview: "2026-05-12" },
+        { firstSeen: "2026-05-02", lastReview: "2026-05-12" },
+      ),
+      ...masteredPair(2,
+        { firstSeen: "2026-04-22", lastReview: "2026-05-12" },
+        { firstSeen: "2026-04-22", lastReview: "2026-05-12" },
+      ),
+      nameCard(3, {
         reps: MASTERY_REPETITIONS,
         scheduledDays: MASTERY_INTERVAL_DAYS,
-        firstSeen: "2026-04-22",
-        lastReview: "2026-05-12",
-      }),
-      // not yet mastered — ignored
-      card(3, {
-        reps: 1,
-        scheduledDays: 1,
         firstSeen: "2026-05-01",
         lastReview: "2026-05-12",
       }),
+      reverseCard(3, { reps: 1, scheduledDays: 1 }), // not mastered
     ];
     const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
     expect(r.avgDaysToMastery).toBe(15);
   });
 
-  it("avgDaysToMastery is 0 when firstSeen === lastReview on all mastered cards", () => {
-    // Edge: a card mastered on the same day it was first seen contributes 0 to
-    // the average rather than being filtered out.
-    const cards = [
-      card(1, {
-        reps: MASTERY_REPETITIONS,
-        scheduledDays: MASTERY_INTERVAL_DAYS,
-        firstSeen: "2026-05-12",
-        lastReview: "2026-05-12",
-      }),
+  it("avgDaysToMastery uses the later of the two leg dates as masteredDate", () => {
+    // Name leg: firstSeen=May 1, lastReview=May 5.
+    // Reverse leg: lastReview=May 10 (later).
+    // masteredDate = May 10; days from May 1 → May 10 = 9.
+    const cards: ReviewableCard[] = [
+      ...masteredPair(1,
+        { firstSeen: "2026-05-01", lastReview: "2026-05-05" },
+        { firstSeen: "2026-05-01", lastReview: "2026-05-10" },
+      ),
+    ];
+    const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    expect(r.avgDaysToMastery).toBe(9);
+  });
+
+  it("avgDaysToMastery is 0 when firstSeen equals masteredDate", () => {
+    const cards: ReviewableCard[] = [
+      ...masteredPair(1,
+        { firstSeen: "2026-05-12", lastReview: "2026-05-12" },
+        { firstSeen: "2026-05-12", lastReview: "2026-05-12" },
+      ),
     ];
     const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
     expect(r.avgDaysToMastery).toBe(0);
   });
 
-  it("mostMasteredIn7d finds the densest 7-day window of lastReview dates", () => {
+  it("mostMasteredIn7d finds the densest 7-day window of species mastery dates", () => {
     const mk = (id: number, lastReview: string) =>
-      card(id, {
-        reps: MASTERY_REPETITIONS,
-        scheduledDays: MASTERY_INTERVAL_DAYS,
-        firstSeen: "2026-04-01",
-        lastReview,
-      });
-    // 4 reviews within 7 days, then a gap, then 2 reviews close together.
-    const cards = [
-      mk(1, "2026-05-01"),
-      mk(2, "2026-05-02"),
-      mk(3, "2026-05-04"),
-      mk(4, "2026-05-07"),
-      mk(5, "2026-05-20"),
-      mk(6, "2026-05-21"),
+      masteredPair(id,
+        { firstSeen: "2026-04-01", lastReview },
+        { firstSeen: "2026-04-01", lastReview },
+      );
+    const cards: ReviewableCard[] = [
+      ...mk(1, "2026-05-01"),
+      ...mk(2, "2026-05-02"),
+      ...mk(3, "2026-05-04"),
+      ...mk(4, "2026-05-07"),
+      ...mk(5, "2026-05-20"),
+      ...mk(6, "2026-05-21"),
     ];
     const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
     expect(r.mostMasteredIn7d).toBe(4);
@@ -196,15 +244,15 @@ describe("computeRecords", () => {
   });
 
   describe("with forceAllMastered (superuser pretendAllMastered)", () => {
-    it("avgDaysToMastery is 0 and mostMasteredIn7d equals card count", () => {
-      const cards = [card(1), card(2), card(3)];
+    it("avgDaysToMastery is 0 and mostMasteredIn7d equals name-card count", () => {
+      const cards: ReviewableCard[] = [nameCard(1), nameCard(2), nameCard(3)];
       const r = computeRecords(cards, [], [], MASTERY_REPETITIONS, true);
       expect(r.avgDaysToMastery).toBe(0);
       expect(r.mostMasteredIn7d).toBe(3);
     });
 
     it("still plumbs the honest longestStreak and bestReviewDay", () => {
-      const cards = [card(1)];
+      const cards: ReviewableCard[] = [nameCard(1)];
       const r = computeRecords(
         cards,
         [entry("2026-05-12"), entry("2026-05-12"), entry("2026-05-11")],
@@ -216,9 +264,7 @@ describe("computeRecords", () => {
       expect(r.bestReviewDay).toBe(2);
     });
 
-    it("with zero cards, falls through to the honest computation", () => {
-      // Edge case: forceAllMastered short-circuits only when there are cards
-      // to project mastery onto; an empty card array still produces null.
+    it("with zero cards, falls through to the honest computation (null)", () => {
       const r = computeRecords([], [], [], MASTERY_REPETITIONS, true);
       expect(r.avgDaysToMastery).toBeNull();
       expect(r.mostMasteredIn7d).toBeNull();

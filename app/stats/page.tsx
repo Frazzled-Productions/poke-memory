@@ -520,8 +520,6 @@ export default function StatsPage() {
     cards !== null && snapshot !== null
       ? (() => {
           const today = todayString(new Date(), userTimezone);
-          // nameCards is needed for masteryOverTime — derived from cards directly.
-          const nameCardsForCharts = cards.filter((c) => c.cardType === "name");
           return {
             directionRows: computeDirectionBreakdown(
               gradeLog,
@@ -535,8 +533,10 @@ export default function StatsPage() {
             gradeDistribution: computeGradeDistribution(gradeLog),
             gradeTrend: computeGradeTrend(gradeLog, today, 12),
             activityHistory: computeActivityHistory(gradeLog, today, 365),
+            // Pass the full card array so computeMasteryOverTime can apply
+            // species-level (both-legs) mastery counting (#1448).
             masteryOverTime: computeMasteryOverTime(
-              nameCardsForCharts as Parameters<typeof computeMasteryOverTime>[0],
+              cards,
               today,
               masteryRepetitions ?? undefined,
               flags.pretendAllMastered,
