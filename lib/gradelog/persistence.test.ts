@@ -113,6 +113,50 @@ describe("appendGradeEntry (IDB-backed)", () => {
     expect(log[0].subjectKey).toBeUndefined();
   });
 
+  // --- migration 033: learningStep / stepStartedAt ---
+
+  it("persists learningStep and stepStartedAt when an in-learning card is graded", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 1, cardType: "name", learningStep: 0, stepStartedAt: 1_000_000 });
+    const log = await loadGradeLog();
+    expect(log[0].learningStep).toBe(0);
+    expect(log[0].stepStartedAt).toBe(1_000_000);
+  });
+
+  it("persists learningStep: null and stepStartedAt: null for a graduated card", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name", learningStep: null, stepStartedAt: null });
+    const log = await loadGradeLog();
+    expect(log[0].learningStep).toBeNull();
+    expect(log[0].stepStartedAt).toBeNull();
+  });
+
+  it("does not set learningStep or stepStartedAt when neither is provided (legacy call site)", async () => {
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    const log = await loadGradeLog();
+    expect(log[0].learningStep).toBeUndefined();
+    expect(log[0].stepStartedAt).toBeUndefined();
+  });
+
+  it("rejects stored entries with a non-number learningStep", async () => {
+    // Force a bad JSON blob directly into IDB to verify isStoredEntryShape rejects it.
+    const { openAppDb } = await import("@/lib/idb/db");
+    const db = await openAppDb();
+    const badEntry = [{ date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 9999, learningStep: "bad" }];
+    await db.put("kv", JSON.stringify(badEntry), "poke-memory:grade-log:v1");
+    const log = await loadGradeLog();
+    expect(log).toEqual([]); // shape invalid → parseGradeLog returns []
+  });
+
+  it("accepts stored entries with learningStep: null (graduated card persisted to IDB)", async () => {
+    const { openAppDb } = await import("@/lib/idb/db");
+    const db = await openAppDb();
+    const entry = [{ date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 8888, learningStep: null, stepStartedAt: null }];
+    await db.put("kv", JSON.stringify(entry), "poke-memory:grade-log:v1");
+    const log = await loadGradeLog();
+    expect(log).toHaveLength(1);
+    expect(log[0].learningStep).toBeNull();
+    expect(log[0].stepStartedAt).toBeNull();
+  });
+
   it("appends to an existing log without overwriting prior entries", async () => {
     await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
     await appendGradeEntry({ date: "2026-05-09", grade: 1, cardType: "name" });

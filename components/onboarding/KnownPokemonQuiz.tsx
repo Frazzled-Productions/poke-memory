@@ -303,11 +303,15 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         // appendGradeEntry is awaited individually inside the loop so an IDB
         // error on one entry does not break the others — sequential writes
         // avoid contention on the single IDB store.
+        // Onboarding bulk-grades at Easy which graduates immediately;
+        // learningStep and stepStartedAt are null for graduated cards (#1416).
         await appendGradeEntry({
           date: todayUtc,
           grade: 5,
           cardType: card.cardType,
           subjectKey: card.subjectKey,
+          learningStep: null,
+          stepStartedAt: null,
         });
         enqueueGrade(card);
       }

@@ -28,6 +28,19 @@ export type GradeLogEntry = {
    * Absent in pre-#1259 entries; back-fills to `"en"` on read.
    */
   locale?: AppLocale;
+  /**
+   * The scheduler's 0-based learning-step index at the moment this grade was
+   * recorded (#1416). NULL (or absent) means the card was graduated — not in a
+   * learning or relearning step — when graded. Pre-existing entries lack this
+   * field; treated as NULL on read and on cloud round-trip.
+   */
+  learningStep?: number | null;
+  /**
+   * Epoch ms when the current learning step started (#1416). Matches the
+   * occurred_at type (bigint epoch ms). NULL (or absent) for graduated cards
+   * and pre-existing entries.
+   */
+  stepStartedAt?: number | null;
 };
 
 export type GradeLog = GradeLogEntry[];
@@ -81,7 +94,9 @@ function isStoredEntryShape(v: unknown): v is Omit<GradeLogEntry, "occurredAt"> 
       e.cardType === "reverse" ||
       e.cardType === "cry") &&
     (e.occurredAt === undefined || typeof e.occurredAt === "number") &&
-    (e.subjectKey === undefined || typeof e.subjectKey === "string")
+    (e.subjectKey === undefined || typeof e.subjectKey === "string") &&
+    (e.learningStep === undefined || e.learningStep === null || typeof e.learningStep === "number") &&
+    (e.stepStartedAt === undefined || e.stepStartedAt === null || typeof e.stepStartedAt === "number")
   );
 }
 
@@ -215,6 +230,12 @@ export async function appendGradeEntry(
       cardType: entry.cardType,
       occurredAt: Date.now(),
       ...(typeof entry.subjectKey === "string" ? { subjectKey: entry.subjectKey } : {}),
+      // Propagate learningStep and stepStartedAt when present (migration 033).
+      // Both are optional on the entry — legacy call sites that omit them produce
+      // a stamped entry without the fields, which is valid and reads back as NULL
+      // from the cloud.
+      ...(entry.learningStep !== undefined ? { learningStep: entry.learningStep } : {}),
+      ...(entry.stepStartedAt !== undefined ? { stepStartedAt: entry.stepStartedAt } : {}),
     };
     const existing = await loadGradeLog();
     existing.push(stamped);
