@@ -6,6 +6,27 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.25] - 2026-05-30
+
+### Added
+
+- README now includes an animated GIF of the practice card flip (Pikachu front -> Reveal -> name + grade buttons), generated with `npm run animations`.
+- Added a server-side weekly job (`reconcile_grade_log_orphans`) that auto-heals sync orphans: subjects with graduated grade_log entries but no card_reviews row are given a conservative placeholder row so future client reviews can restore correct FSRS state. Ships in dry-run mode by default; live activation is a deferred manual step after an observation period.
+- Machine-translation banner dismissals now sync across devices. Dismiss the banner on one device and it stays hidden on others after the next sync pull.
+
+### Changed
+
+- Push reminders now honour each user's chosen notification hour. The pg_cron job runs hourly and the per-user UTC hour gate (added in #1315) activates for all users. Users with no preference continue to receive their reminder at 08:00 UTC as before.
+
+### Fixed
+
+- Structural sync errors on the card_reviews primary path (SQLSTATE 42P10 ON CONFLICT mismatch, and other schema errors) now surface in the Stats page sync banner immediately instead of being swallowed silently. The banner reads "Sync error: a schema mismatch was detected. Your progress is safe locally." and has no Retry button, since retrying a schema mismatch always fails. Previously, these errors were logged only as console.warn and were indistinguishable from transient network failures (the root cause of the 19-hour silent outage in #1344).
+- Pokémon type-filter pill labels (Bug, Fire, Water, etc.) now localise when the app language is set to Japanese, Simplified Chinese, or Traditional Chinese. Previously they stayed in English after a locale switch.
+- Fixed a silent bug where duplicate keys in a message catalogue (e.g. `practice.todayNew` appearing twice with different values) were invisible to the lint gate - JSON.parse kept only the last value, so the first was dead code. The `lint:i18n` gate now scans the raw text before parsing and fails with the full dot-path and both line numbers for any duplicate found in any locale file.
+- Pokédex generation mastery count ("X / Y mastered"), Pasture biome stats labels, PastureZone landscape link and habitat names, practice scope section legends and preset labels, Stats trainer card, records, and streak protection labels, and Journey timeline, evolution wall, close-to-mastery, and milestone share button now all localise when the app language is switched.
+- Pasture page now honours the active Pokémon name locale when computing mastered species. Switching to Japanese or Chinese in Settings correctly shows only cards mastered in that locale, instead of always showing the English count.
+- Mastered Pokémon now appear in their correct biomes (Grasslands, Forest, Cave, and so on) instead of all falling into Wildlands. Previously, QA-seeded and freshly-loaded cards were missing habitat data, so every species defaulted to the "unknown" bucket and biome stats showed zero mastered.
+
 ## [0.10.24] - 2026-05-30
 
 ### Added
@@ -1472,7 +1493,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.24...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.25...HEAD
+[0.10.25]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.25
 [0.10.24]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.24
 [0.10.23]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.23
 [0.10.22]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.22
