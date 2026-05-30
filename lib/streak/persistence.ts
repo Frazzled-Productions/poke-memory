@@ -1,5 +1,7 @@
 import type { StreakData } from "./types";
 import { KEY_STREAK } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
 
 const STREAK_KEY = KEY_STREAK;
 export const STREAK_UPDATED_EVENT = "poke-memory:streak-updated";
@@ -9,27 +11,21 @@ export const STREAK_UPDATED_EVENT = "poke-memory:streak-updated";
 export const STREAK_MIN_CARDS = 5;
 
 export function loadStreakData(): StreakData {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STREAK_KEY);
-    if (raw === null) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.every((v) => typeof v === "string")) {
-      return [];
-    }
-    return parsed as StreakData;
-  } catch {
-    return [];
-  }
+  return readLocalStorage(
+    STREAK_KEY,
+    (raw) => {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.every((v) => typeof v === "string")) {
+        return [];
+      }
+      return parsed as StreakData;
+    },
+    [],
+  );
 }
 
 export function saveStreakData(data: StreakData): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STREAK_KEY, JSON.stringify(data));
-  } catch {
-    // QuotaExceededError or similar — streak write is best-effort
-  }
+  writeLocalStorage(STREAK_KEY, data);
 }
 
 export function recordReview(

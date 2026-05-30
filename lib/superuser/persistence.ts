@@ -10,6 +10,8 @@
 // unlocked but no flags active — equivalent to a closed inspector window.
 
 import { KEY_SUPERUSER_UNLOCKED, KEY_SUPERUSER_FLAGS } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorageRaw, writeLocalStorage } from "@/lib/storage/writeLocalStorage";
 
 export const UNLOCKED_KEY = KEY_SUPERUSER_UNLOCKED;
 export const FLAGS_KEY = KEY_SUPERUSER_FLAGS;
@@ -46,35 +48,37 @@ export const DEFAULT_FLAGS: SuperuserFlags = {
 };
 
 export function isUnlocked(): boolean {
+  // Raw string "true" — not JSON, so read directly rather than via readLocalStorage.
   if (typeof window === "undefined") return false;
   return localStorage.getItem(UNLOCKED_KEY) === "true";
 }
 
 export function setUnlocked(value: boolean): void {
-  if (value) localStorage.setItem(UNLOCKED_KEY, "true");
-  else localStorage.removeItem(UNLOCKED_KEY);
-}
-
-export function loadFlags(): SuperuserFlags {
-  if (typeof window === "undefined") return DEFAULT_FLAGS;
-  try {
-    const raw = localStorage.getItem(FLAGS_KEY);
-    if (!raw) return DEFAULT_FLAGS;
-    const parsed = JSON.parse(raw) as Partial<SuperuserFlags> | null;
-    return {
-      pretendAllMastered: parsed?.pretendAllMastered === true,
-      forceNextStreakMilestone: parsed?.forceNextStreakMilestone === true,
-      forceCardsGraduated: parsed?.forceCardsGraduated === true,
-      qaSeedMode: parsed?.qaSeedMode === true,
-    };
-  } catch {
-    return DEFAULT_FLAGS;
+  if (value) writeLocalStorageRaw(UNLOCKED_KEY, "true");
+  else {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(UNLOCKED_KEY);
   }
 }
 
+export function loadFlags(): SuperuserFlags {
+  return readLocalStorage(
+    FLAGS_KEY,
+    (raw) => {
+      const parsed = JSON.parse(raw) as Partial<SuperuserFlags> | null;
+      return {
+        pretendAllMastered: parsed?.pretendAllMastered === true,
+        forceNextStreakMilestone: parsed?.forceNextStreakMilestone === true,
+        forceCardsGraduated: parsed?.forceCardsGraduated === true,
+        qaSeedMode: parsed?.qaSeedMode === true,
+      };
+    },
+    DEFAULT_FLAGS,
+  );
+}
+
 export function saveFlags(flags: SuperuserFlags): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(FLAGS_KEY, JSON.stringify(flags));
+  writeLocalStorage(FLAGS_KEY, flags);
 }
 
 export function clearFlags(): void {

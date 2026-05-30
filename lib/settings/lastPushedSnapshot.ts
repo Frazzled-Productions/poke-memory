@@ -1,6 +1,7 @@
 import type { UserSettings } from "./persistence";
 import { KEY_SETTINGS_LAST_PUSHED } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
 
 /**
  * Tracks the settings object this device last successfully pushed to cloud,
@@ -25,12 +26,7 @@ export function loadLastPushedSettings(): UserSettings | null {
 }
 
 export function saveLastPushedSettings(settings: UserSettings): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(settings));
-  } catch {
-    // QuotaExceededError or similar — snapshot write is best-effort.
-  }
+  writeLocalStorage(KEY, settings);
 }
 
 // Keys that are device-local and must never cross the sync boundary in either

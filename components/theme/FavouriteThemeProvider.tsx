@@ -12,6 +12,7 @@ import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { loadSession } from "@/lib/review/persistence";
 import { loadFlags } from "@/lib/superuser/persistence";
 import type { StoredFavourite } from "@/lib/theme/persistence";
+import { KEY_SETTINGS, KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
 
 // Belt-and-braces invariant for #428: a stored favourite is only applied if
 // its underlying card is actually mastered, OR the `pretendAllMastered`
@@ -81,7 +82,7 @@ export function FavouriteThemeProvider({
       // The favourite theme lives inside the settings blob (#307). Watch
       // both keys so a legacy write (during the one-time migration window)
       // still triggers a refresh.
-      if (e.key !== "poke-memory:settings:v1" && e.key !== "poke-memory:favourite:v1") {
+      if (e.key !== KEY_SETTINGS && e.key !== KEY_LEGACY_FAVOURITE_THEME) {
         return;
       }
       void resolveFavourite().then((updated) => {

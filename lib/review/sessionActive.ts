@@ -35,30 +35,33 @@
  */
 
 import { KEY_REVIEW_SESSION_ACTIVE } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 
 /** Read the current raw count from storage, defaulting to 0 on any error. */
 function readCount(): number {
-  try {
-    const raw = window.localStorage.getItem(KEY_REVIEW_SESSION_ACTIVE);
-    if (raw === null) return 0;
-    const n = parseInt(raw, 10);
-    // NaN (unparseable legacy or corrupt value) → treat as 0
-    return Number.isNaN(n) ? 0 : n;
-  } catch {
-    return 0;
-  }
+  return readLocalStorage(
+    KEY_REVIEW_SESSION_ACTIVE,
+    (raw) => {
+      const n = parseInt(raw, 10);
+      // NaN (unparseable legacy or corrupt value) → treat as 0
+      return Number.isNaN(n) ? 0 : n;
+    },
+    0,
+  );
 }
 
 /** Write a count to storage, swallowing errors (best-effort). */
 function writeCount(n: number): void {
-  try {
-    if (n <= 0) {
+  if (n <= 0) {
+    try {
       window.localStorage.removeItem(KEY_REVIEW_SESSION_ACTIVE);
-    } else {
-      window.localStorage.setItem(KEY_REVIEW_SESSION_ACTIVE, String(n));
+    } catch {
+      // best-effort; see module doc
     }
-  } catch {
-    // best-effort; see module doc
+  } else {
+    // Store as a raw decimal string (not JSON-encoded).
+    writeLocalStorageRaw(KEY_REVIEW_SESSION_ACTIVE, String(n));
   }
 }
 

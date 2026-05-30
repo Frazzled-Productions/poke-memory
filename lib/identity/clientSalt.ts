@@ -1,4 +1,6 @@
 import { KEY_CLIENT_SALT } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 
 /**
  * Returns a stable per-device salt for use in `stableShuffleForDay`.
@@ -16,16 +18,15 @@ export function getOrCreateClientSalt(): string {
   if (typeof window === "undefined" || typeof localStorage === "undefined") {
     return "";
   }
-  const existing = localStorage.getItem(KEY_CLIENT_SALT);
+  // The salt is stored as a raw string (not JSON-encoded), so we pass the raw
+  // value through directly without JSON.parse.
+  const existing = readLocalStorage(KEY_CLIENT_SALT, (raw) => raw, null);
   if (existing !== null) {
     return existing;
   }
   const fresh = crypto.randomUUID();
-  try {
-    localStorage.setItem(KEY_CLIENT_SALT, fresh);
-  } catch {
-    // localStorage write failed (quota or privacy mode) — return the
-    // generated value for this session only; it won't persist.
-  }
+  // writeLocalStorageRaw swallows quota / privacy-mode errors; if the write
+  // fails the generated value is returned for this session only and won't persist.
+  writeLocalStorageRaw(KEY_CLIENT_SALT, fresh);
   return fresh;
 }

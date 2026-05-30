@@ -4,6 +4,7 @@ import { Subject } from "@/lib/cards/subjectKey";
 import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
 import { KEY_REVIEW_SESSION } from "@/lib/storage/keys";
 import { isBaseCardShaped, isNonNullObject } from "@/lib/review/card-shape";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 
 export type { DailyLimits };
 
@@ -290,14 +291,7 @@ function parseSession(raw: string): SavedSession | null {
 
 // Synchronous localStorage fallback used when IndexedDB is unavailable.
 function loadSessionLS(): SavedSession | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return null;
-    return parseSession(raw);
-  } catch {
-    return null;
-  }
+  return readLocalStorage(STORAGE_KEY, parseSession, null);
 }
 
 export async function loadSession(): Promise<SavedSession | null> {

@@ -18,6 +18,7 @@
 
 import { KEY_SYNC_STATUS } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
 
 /**
  * Session-scoped self-heal probe guard (#1358 FIX 3).
@@ -81,37 +82,32 @@ export function getStructuralSyncError(): string | null {
  */
 function patchSyncStatus(patch: Record<string, unknown>): void {
   if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(KEY_SYNC_STATUS);
-    const current: Record<string, unknown> =
-      raw !== null
-        ? (() => {
-            try {
-              const p = JSON.parse(raw) as unknown;
-              return typeof p === "object" && p !== null ? (p as Record<string, unknown>) : {};
-            } catch {
-              return {};
-            }
-          })()
-        : {};
-    const next = { ...current, ...patch };
-    window.localStorage.setItem(KEY_SYNC_STATUS, JSON.stringify(next));
+  const current = readLocalStorage(
+    KEY_SYNC_STATUS,
+    (raw) => {
+      const p: unknown = JSON.parse(raw);
+      return typeof p === "object" && p !== null ? (p as Record<string, unknown>) : {};
+    },
+    {} as Record<string, unknown>,
+  );
+  const next = { ...current, ...patch };
+  // writeLocalStorage handles the SSR guard + try/catch for the write.
+  writeLocalStorage(KEY_SYNC_STATUS, next);
 
-    // Dispatch a synthetic StorageEvent so same-tab subscribers (useLocalStorageKey)
-    // receive the update — the browser only fires the native event in OTHER tabs.
-    try {
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key: KEY_SYNC_STATUS,
-          storageArea: window.localStorage,
-          newValue: window.localStorage.getItem(KEY_SYNC_STATUS),
-        }),
-      );
-    } catch {
-      // Non-standard environments without a StorageEvent constructor — ignore.
-    }
+  // Dispatch a synthetic StorageEvent so same-tab subscribers (useLocalStorageKey)
+  // receive the update — the browser only fires the native event in OTHER tabs.
+  // Re-reads after the write so newValue reflects the actually-stored form (the
+  // defensive re-read convention used throughout the sync layer).
+  try {
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: KEY_SYNC_STATUS,
+        storageArea: window.localStorage,
+        newValue: window.localStorage.getItem(KEY_SYNC_STATUS),
+      }),
+    );
   } catch {
-    // Storage full or unavailable — best effort.
+    // Non-standard environments without a StorageEvent constructor — ignore.
   }
 }
 
