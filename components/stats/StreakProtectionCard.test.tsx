@@ -48,8 +48,8 @@ describe("StreakProtectionCard", () => {
     expect(
       screen.getByRole("heading", { name: "Streak protection" }),
     ).toBeInTheDocument();
-    // 0 + "tokens" — verify via the explicit aria-label.
-    expect(screen.getByLabelText("0 tokens remaining")).toBeInTheDocument();
+    // 0 + "protection tokens" — verify via the explicit aria-label.
+    expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
   });
 
   it("renders a non-zero balance and the recent-spend history line", () => {
@@ -71,14 +71,14 @@ describe("StreakProtectionCard", () => {
     );
 
     renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
-    expect(screen.getByLabelText("2 tokens remaining")).toBeInTheDocument();
+    expect(screen.getByLabelText("2 protection tokens")).toBeInTheDocument();
     // History line.
     expect(
       screen.getByTestId("streak-protection-last-spend"),
     ).toHaveTextContent(/Streak preserved on/);
     expect(
       screen.getByTestId("streak-protection-last-spend"),
-    ).toHaveTextContent(/2 tokens remaining/);
+    ).toHaveTextContent(/2 protection tokens/);
   });
 
   it("singularises the history-line balance when one token remains", () => {
@@ -99,7 +99,7 @@ describe("StreakProtectionCard", () => {
     renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.getByTestId("streak-protection-last-spend"),
-    ).toHaveTextContent(/1 token remaining/);
+    ).toHaveTextContent(/1 protection token/);
   });
 
   it("does not render the history line when no spend has happened", () => {
@@ -111,7 +111,7 @@ describe("StreakProtectionCard", () => {
 
   it("refreshes when settings are saved", () => {
     renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
-    expect(screen.getByLabelText("0 tokens remaining")).toBeInTheDocument();
+    expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
 
     act(() => {
       saveSettings({
@@ -126,7 +126,7 @@ describe("StreakProtectionCard", () => {
       });
     });
 
-    expect(screen.getByLabelText("3 tokens remaining")).toBeInTheDocument();
+    expect(screen.getByLabelText("3 protection tokens")).toBeInTheDocument();
     // "(max)" label appears at the cap.
     expect(screen.getByText(/\(max\)/)).toBeInTheDocument();
   });

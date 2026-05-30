@@ -496,7 +496,7 @@
       "nextTokenStart": "Review today to start earning your next token.",
       "nextTokenCount": "{count, plural, one {Next token in 1 review day.} other {Next token in {count} review days.}}",
       "streakPreserved": "Streak preserved on {date}.",
-      "tokensRemaining": "{count, plural, one {1 token remaining} other {{count} tokens remaining}}",
+      "tokensRemaining": "{count, plural, one {{count} protection token} other {{count} protection tokens}}",
       "recentProtectionHeading": "Recent protection",
       "eventEarned": "Earned",
       "eventUsed": "Used",
