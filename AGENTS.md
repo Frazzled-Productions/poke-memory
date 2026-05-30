@@ -320,7 +320,9 @@ npm run screenshots -- --page=pasture  # one surface
 npm run screenshots -- --page=journey  # journey surface
 ```
 
-The script uses the `pretendAllMastered` superuser flag so renders are deterministic without depending on a particular review history. Don't change the viewport, the device-scale factor, or the surface list without updating every existing screenshot in the same commit — the README layout assumes consistent shape.
+The script uses a deterministic lived-in seed (`scripts/screenshot-seed.mjs`, Pikachu staged as the practice protagonist via the #1296 approach) so renders are deterministic without depending on a particular review history. Don't change the viewport, the device-scale factor, or the surface list without updating every existing screenshot in the same commit — the README layout assumes consistent shape.
+
+**Animations.** `npm run animations` runs `scripts/capture-animations.mjs` to produce a looping GIF of the practice card flip (`docs/screenshots/practice-cardflip.gif`). The same seed and viewport are used. Requirements: ffmpeg (Homebrew: `brew install ffmpeg`). macOS-only capture — the same font anti-aliasing constraint as the PNGs. Budget: each animation file must stay under **4 MB**.
 
 ### Versioning
 

@@ -20,20 +20,25 @@
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/practice-front.png" width="180" alt="Practice — card front" />
+  <img src="docs/screenshots/practice-cardflip.gif" width="200" alt="Practice card flip - card front showing Pikachu sprite, Reveal clicked, then grade buttons appear" />
+</p>
+<p align="center"><em>Card flip in action - Pikachu front, Reveal, then grade buttons. Loops automatically.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/practice-front.png" width="180" alt="Practice - card front" />
   &nbsp;
-  <img src="docs/screenshots/practice-flipped.png" width="180" alt="Practice — card flipped, with grade buttons" />
+  <img src="docs/screenshots/practice-flipped.png" width="180" alt="Practice - card flipped with grade buttons" />
   &nbsp;
-  <img src="docs/screenshots/stats.png" width="180" alt="Stats — analytical dashboard" />
+  <img src="docs/screenshots/stats.png" width="180" alt="Stats - analytical dashboard" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/journey.png" width="180" alt="Journey — trainer card and badges" />
+  <img src="docs/screenshots/journey.png" width="180" alt="Journey - trainer card and badges" />
   &nbsp;
   <img src="docs/screenshots/pokedex-grid.png" width="180" alt="Pokédex grid" />
   &nbsp;
   <img src="docs/screenshots/pasture.png" width="180" alt="Pasture" />
 </p>
-<p align="center"><em>Practice (front and flipped), Stats, Journey, Pokédex, and Pasture — captured on iPhone 17 Pro.</em></p>
+<p align="center"><em>Practice (front and flipped), Stats, Journey, Pokédex, and Pasture - captured on iPhone 17 Pro.</em></p>
 
 ## How a review works
 
