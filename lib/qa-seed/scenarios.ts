@@ -15,9 +15,21 @@
  * To add a new scenario: add an entry to SCENARIOS and implement a builder
  * function that returns a SeedPayload. Keep builders pure (no side effects);
  * the save step lives in applySeedScenario.
+ *
+ * FAITHFULNESS RULE: all FSRS states MUST be derived by replaying real grades
+ * through nextReview (lib/srs/scheduler.ts) — never hand-set FSRS literals.
+ * Card identity (name, spriteUrl, id) MUST come from the real SEED_POKEMON /
+ * SEED_EVOLUTION_CARDS data — never placeholders. This ensures seeded data
+ * obeys the same invariants as real data (#1421).
  */
 
 import type { ReviewState } from "@/lib/srs/scheduler";
+import { initialReviewState, nextReview } from "@/lib/srs/scheduler";
+import {
+  SEED_POKEMON,
+  SEED_EVOLUTION_CARDS,
+  REVERSE_ID_OFFSET,
+} from "@/lib/pokemon/seed";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,24 +102,204 @@ export type Scenario = {
   build: () => SeedPayload;
 };
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// ─── Deterministic time anchors ───────────────────────────────────────────────
+
+/**
+ * Fixed epoch for grade replays. NEVER use Date.now() inside a replay loop.
+ * Using a fixed past date keeps scenarios deterministic across runs.
+ */
+const T0 = new Date("2025-01-01T00:00:00Z");
+
+/**
+ * Returns a Date that is `days` days after T0.
+ * Used to pass `now` to nextReview calls in the replay sequence.
+ */
+function T(days: number): Date {
+  return new Date(T0.getTime() + days * 86_400_000);
+}
 
 /**
  * Returns an ISO "YYYY-MM-DD" date string offset from today by `days` days.
  * Positive = future (scheduled ahead), negative = past (overdue).
+ * Used only POST-replay to anchor due-dates relative to wall-clock "today",
+ * NOT inside the grade replay loops.
  */
 function relativeDate(days: number): string {
   const d = new Date(Date.now() + days * 86_400_000);
   return d.toISOString().slice(0, 10);
 }
 
-const TODAY = relativeDate(0);
-const PAST_30 = relativeDate(-30);
-const PAST_15 = relativeDate(-15);
-const PAST_7 = relativeDate(-7);
-const FUTURE_3 = relativeDate(3);
-const FUTURE_7 = relativeDate(7);
-const FUTURE_21 = relativeDate(21);
+// ─── Real-data lookups ────────────────────────────────────────────────────────
+
+/** Map of pokemonId → SeedPokemon for O(1) lookups. */
+const SEED_BY_ID = new Map(SEED_POKEMON.map((p) => [p.id, p]));
+
+/** Map of (preEvoId, postEvoId) → EvolutionCard to look up edges by endpoint IDs. */
+const EVO_BY_ENDPOINTS = new Map(
+  SEED_EVOLUTION_CARDS.map((e) => [`${e.preEvoId}:${e.postEvoId}`, e]),
+);
+
+// ─── Grade-replay helpers ─────────────────────────────────────────────────────
+
+/**
+ * Derives a MASTERED ReviewState by replaying three Easy grades through the
+ * real scheduler. Three Easy grades on T0, T(5), and T(20) give:
+ *   reps=3, scheduledDays>=21, fsrsState="review"
+ *
+ * srs-expert prescription:
+ *   s = initialReviewState(T0)
+ *   s = nextReview(s, 5, T0)     // A2: Easy on brand-new → graduate via FSRS
+ *   s = nextReview(s, 5, T(5))   // A4: graduated + Easy → FSRS update, reps=2
+ *   s = nextReview(s, 5, T(20))  // A4: reps=3, scheduledDays>=21
+ *
+ * Post-replay: override dueDate and lastReview to anchors relative to today so
+ * the card appears in the correct queue bucket when the scenario is applied.
+ * firstSeen is kept at T0's date (a historical timestamp).
+ */
+function deriveMasteredState(opts: {
+  /** Days from today to set the due date (positive = future, 0 = today). Default: +7 */
+  dueDaysFromNow?: number;
+  /** Days from today to set lastReview (negative = past). Default: -7 */
+  lastReviewDaysFromNow?: number;
+} = {}): SeededState {
+  let s = initialReviewState(T0);
+  s = nextReview(s, 5, T0);
+  s = nextReview(s, 5, T(5));
+  s = nextReview(s, 5, T(20));
+
+  // Post-replay: shift due-date and lastReview to wall-clock anchors so the
+  // card appears in the correct queue bucket when the scenario is applied.
+  // firstSeen remains the historical T0 date — it is set during the first replay.
+  const dueDate = relativeDate(opts.dueDaysFromNow ?? 7);
+  const lastReview = relativeDate(opts.lastReviewDaysFromNow ?? -7);
+
+  return {
+    ...s,
+    dueDate,
+    lastReview,
+    seenInPasture: true,
+  };
+}
+
+/**
+ * Derives a DUE-SOON ReviewState by replaying three Good grades (to graduate)
+ * then one more Good at T(2) through the real scheduler.
+ *
+ * srs-expert prescription:
+ *   s = initialReviewState(T0)
+ *   s = nextReview(s, 4, T0)   // A1: enters learning step 0
+ *   s = nextReview(s, 4, T0)   // B3: advances to step 1
+ *   s = nextReview(s, 4, T0)   // B3 graduate: scheduledDays=1, reps=1
+ *   s = nextReview(s, 4, T(2)) // A4: reps=2, scheduledDays~4-6
+ *
+ * Results in: reps>=1, scheduledDays in [1,21), fsrsState="review".
+ * Post-replay: override dueDate/lastReview to wall-clock anchors.
+ */
+function deriveDueSoonState(opts: {
+  /** Days from today to set the due date. Default: +3 */
+  dueDaysFromNow?: number;
+} = {}): SeededState {
+  let s = initialReviewState(T0);
+  s = nextReview(s, 4, T0);   // enter learning
+  s = nextReview(s, 4, T0);   // advance step
+  s = nextReview(s, 4, T0);   // graduate
+  s = nextReview(s, 4, T(2)); // first scheduled review
+
+  const dueDate = relativeDate(opts.dueDaysFromNow ?? 3);
+  const lastReview = relativeDate(-4);
+
+  return {
+    ...s,
+    dueDate,
+    lastReview,
+  };
+}
+
+/**
+ * Derives an IN-LEARNING ReviewState by replaying a single Again grade through
+ * the real scheduler.
+ *
+ * srs-expert prescription:
+ *   s = initialReviewState(T0)
+ *   s = nextReview(s, 1, T0)  // A1: learningStep=0, reps=0, scheduledDays=0
+ *
+ * Keep lastReview=null (new-card learning vs relearning).
+ * Post-replay: override stepStartedAt so the step timer is live on load.
+ * firstSeen is set during the replay from T0's date.
+ */
+function deriveLearningState(): SeededState {
+  let s = initialReviewState(T0);
+  s = nextReview(s, 1, T0); // A1: enter step 0
+
+  // Override stepStartedAt post-replay so the step countdown is live.
+  // This is the ONLY legitimate use of Date.now() in seed scenarios.
+  return {
+    ...s,
+    stepStartedAt: Date.now() - 60_000,
+  };
+}
+
+/**
+ * Derives a "graduated but not yet mastered" ReviewState by replaying
+ * several Good grades. Produces reps>=1, scheduledDays in [1,21).
+ * A variant of deriveDueSoonState that takes an explicit reps count and
+ * scheduled days target for fine-grained control.
+ *
+ * Replay: 3 Good grades to graduate, then `extraGoodGrades` additional
+ * Good reviews at sequential days. Results in reps = 1 + extraGoodGrades.
+ */
+function deriveGraduatedState(opts: {
+  extraGoodGrades?: number;
+  dueDaysFromNow?: number;
+  lastReviewDaysFromNow?: number;
+} = {}): SeededState {
+  const extraGrades = opts.extraGoodGrades ?? 1;
+  let s = initialReviewState(T0);
+  s = nextReview(s, 4, T0);  // enter learning
+  s = nextReview(s, 4, T0);  // advance step
+  s = nextReview(s, 4, T0);  // graduate, reps=1
+
+  for (let i = 0; i < extraGrades; i++) {
+    // Each review a few days after the previous — picks up consecutive reps.
+    s = nextReview(s, 4, T(2 + i * 5));
+  }
+
+  const dueDate = relativeDate(opts.dueDaysFromNow ?? s.scheduledDays);
+  const lastReview = relativeDate(opts.lastReviewDaysFromNow ?? -s.scheduledDays);
+
+  return {
+    ...s,
+    dueDate,
+    lastReview,
+  };
+}
+
+/**
+ * Derives a high-reps ReviewState by replaying `reps` Easy grades through the
+ * scheduler. Used for the optimiser-stress scenario which needs many review
+ * entries per card. reps=1 is just one Easy on a fresh card.
+ */
+function deriveHighRepsState(reps: number, scheduledDayOffset = 0): SeededState {
+  let s = initialReviewState(T0);
+  // First Easy from fresh state graduates immediately.
+  s = nextReview(s, 5, T0);
+  // Subsequent Easy grades at increasing day offsets.
+  for (let i = 1; i < reps; i++) {
+    s = nextReview(s, 5, T(i * 10));
+  }
+
+  const dueDate = relativeDate(7 + scheduledDayOffset);
+  const lastReview = relativeDate(-7);
+
+  return {
+    ...s,
+    dueDate,
+    lastReview,
+    seenInPasture: reps >= 4,
+  };
+}
+
+// ─── Card factories ───────────────────────────────────────────────────────────
 
 const DEFAULT_LIMITS: DailyLimits = {
   name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
@@ -116,124 +308,68 @@ const DEFAULT_LIMITS: DailyLimits = {
   cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
-/** Returns a mastered ReviewState (reps >= 3, scheduledDays >= 21). */
-function masteredState(opts: {
-  dueDate?: string;
-  lastReview?: string;
-  firstSeen?: string;
-  scheduledDays?: number;
-} = {}): SeededState {
-  return {
-    stability: 50,
-    difficulty: 4.5,
-    elapsedDays: 21,
-    scheduledDays: opts.scheduledDays ?? 28,
-    reps: 4,
-    lapses: 0,
-    fsrsState: "review",
-    dueDate: opts.dueDate ?? FUTURE_7,
-    lastReview: opts.lastReview ?? PAST_7,
-    firstSeen: opts.firstSeen ?? PAST_30,
-    learningStep: null,
-    stepStartedAt: null,
-    hiddenSince: null,
-    seenInPasture: true,
-  };
-}
-
-/** Returns an in-learning ReviewState (reps = 0, stepIndex = 0). */
-function learningState(opts: {
-  dueDate?: string;
-  firstSeen?: string;
-} = {}): SeededState {
-  return {
-    stability: 0,
-    difficulty: 5,
-    elapsedDays: 0,
-    scheduledDays: 0,
-    reps: 0,
-    lapses: 0,
-    fsrsState: "learning",
-    dueDate: opts.dueDate ?? TODAY,
-    lastReview: null,
-    firstSeen: opts.firstSeen ?? PAST_7,
-    learningStep: 0,
-    stepStartedAt: Date.now() - 60_000,
-    hiddenSince: null,
-    seenInPasture: false,
-  };
-}
-
-/** Returns a due-soon ReviewState (graduated, reps >= 1, scheduledDays < 21). */
-function dueSoonState(opts: {
-  dueDate?: string;
-  lastReview?: string;
-  firstSeen?: string;
-} = {}): SeededState {
-  return {
-    stability: 10,
-    difficulty: 5,
-    elapsedDays: 4,
-    scheduledDays: 5,
-    reps: 2,
-    lapses: 0,
-    fsrsState: "review",
-    dueDate: opts.dueDate ?? FUTURE_3,
-    lastReview: opts.lastReview ?? PAST_7,
-    firstSeen: opts.firstSeen ?? PAST_15,
-    learningStep: null,
-    stepStartedAt: null,
-    hiddenSince: null,
-    seenInPasture: false,
-  };
-}
-
+/**
+ * Builds a name card from real SEED_POKEMON data.
+ * name and spriteUrl come from the actual seed — no placeholders.
+ */
 function nameCard(id: number, state: SeededState, locale = "en"): SeededNameCard {
+  const pokemon = SEED_BY_ID.get(id);
+  if (!pokemon) {
+    throw new Error(`QA seed: no SeedPokemon found for id=${id}`);
+  }
   return {
     cardType: "name",
     id,
     locale,
-    // The app's hydrateSession backfills name/spriteUrl from SEED_POKEMON on
-    // load; these strings are placeholders so the persistence validator passes.
-    name: `pokemon-${id}`,
-    spriteUrl: `/sprites/pokemon/${id}.png`,
+    name: pokemon.displayName,
+    spriteUrl: pokemon.spriteUrl,
     subjectKey: `species:${id}`,
-    state,
-  };
-}
-
-function evolutionCard(preEvoId: number, postEvoId: number, edgeId: number, state: SeededState): SeededEvolutionCard {
-  return {
-    cardType: "evolution",
-    id: edgeId,
-    preEvoId,
-    postEvoId,
-    locale: "en",
-    subjectKey: `edge:${preEvoId}:${postEvoId}`,
     state,
   };
 }
 
 /**
- * Since #1234, the Pasture requires BOTH the name card AND the paired reverse
- * card to be mastered before a species appears. Seed reverse cards alongside
- * mastered name cards so pasture-facing scenarios actually populate the Pasture.
+ * Builds a reverse card from real SEED_POKEMON data.
+ * id = REVERSE_ID_OFFSET + pokemonId — matching hydrateSession.
+ * name/spriteUrl come from the actual seed; hydrateSession also backfills
+ * all SeedPokemon fields on load.
  *
- * id = REVERSE_ID_OFFSET (2_000_000) + pokemonId — matching the offset used
- * by hydrateSession. name/spriteUrl are placeholders; hydrateSession backfills
- * all SeedPokemon fields from the seed on load.
+ * Since #1234, the Pasture requires BOTH the name card AND the paired reverse
+ * card to be mastered before a species appears.
  */
-const REVERSE_ID_OFFSET = 2_000_000;
-
 function reverseCard(id: number, state: SeededState, locale = "en"): SeededReverseCard {
+  const pokemon = SEED_BY_ID.get(id);
+  if (!pokemon) {
+    throw new Error(`QA seed: no SeedPokemon found for id=${id}`);
+  }
   return {
     cardType: "reverse",
     id: REVERSE_ID_OFFSET + id,
     pokemonId: id,
     locale,
-    name: `pokemon-${id}`,
-    spriteUrl: `/sprites/pokemon/${id}.png`,
+    name: pokemon.displayName,
+    spriteUrl: pokemon.spriteUrl,
     subjectKey: `species:${id}`,
+    state,
+  };
+}
+
+/**
+ * Builds an evolution card from real SEED_EVOLUTION_CARDS data.
+ * Looks up the edge by (preEvoId, postEvoId) so the edgeId matches the real seed.
+ */
+function evolutionCard(preEvoId: number, postEvoId: number, state: SeededState): SeededEvolutionCard {
+  const edge = EVO_BY_ENDPOINTS.get(`${preEvoId}:${postEvoId}`);
+  if (!edge) {
+    throw new Error(`QA seed: no evolution edge found for ${preEvoId}→${postEvoId}`);
+  }
+  return {
+    cardType: "evolution",
+    id: edge.id,
+    preEvoId,
+    postEvoId,
+    locale: "en",
+    subjectKey: `edge:${preEvoId}:${postEvoId}`,
     state,
   };
 }
@@ -262,10 +398,9 @@ function buildFsrsLocaleMastery(): SeedPayload {
     66, 74, 79, 81, 84, 86, 90, 92, 95, 98,
   ];
   for (const id of masteredIds) {
-    const state = masteredState({
-      dueDate: FUTURE_7,
-      lastReview: PAST_7,
-      firstSeen: PAST_30,
+    const state = deriveMasteredState({
+      dueDaysFromNow: 7,
+      lastReviewDaysFromNow: -7,
     });
     cards.push(nameCard(id, state, "en"));
     cards.push(reverseCard(id, state, "en"));
@@ -274,19 +409,19 @@ function buildFsrsLocaleMastery(): SeedPayload {
   // 10 due-soon (en locale)
   const dueSoonIds = [100, 102, 109, 111, 114, 115, 116, 120, 122, 124];
   for (const id of dueSoonIds) {
-    cards.push(nameCard(id, dueSoonState(), "en"));
+    cards.push(nameCard(id, deriveDueSoonState(), "en"));
   }
 
   // 5 in-learning (en locale)
   const learningIds = [127, 128, 129, 130, 131];
   for (const id of learningIds) {
-    cards.push(nameCard(id, learningState(), "en"));
+    cards.push(nameCard(id, deriveLearningState(), "en"));
   }
 
   // A handful of mastered evolution cards
-  cards.push(evolutionCard(1, 2, 1500001, masteredState({ dueDate: FUTURE_21 })));
-  cards.push(evolutionCard(4, 5, 1500003, masteredState({ dueDate: FUTURE_21 })));
-  cards.push(evolutionCard(7, 8, 1500005, masteredState({ dueDate: FUTURE_21 })));
+  cards.push(evolutionCard(1, 2, deriveMasteredState({ dueDaysFromNow: 21 })));
+  cards.push(evolutionCard(4, 5, deriveMasteredState({ dueDaysFromNow: 21 })));
+  cards.push(evolutionCard(7, 8, deriveMasteredState({ dueDaysFromNow: 21 })));
 
   return {
     session: { cards, limits: DEFAULT_LIMITS },
@@ -297,7 +432,7 @@ function buildFsrsLocaleMastery(): SeedPayload {
 /**
  * `optimiser-stress`
  *
- * ~220 grades across ~20 cards (simulated via high-reps graduated states +
+ * ~220 grades across ~20 cards (derived via high-reps graduated states +
  * 2 single-review cards). Provides enough grade history for the FSRS
  * optimiser endpoint to compute weights instead of returning a 500.
  *
@@ -308,7 +443,7 @@ function buildFsrsLocaleMastery(): SeedPayload {
 function buildOptimiserStress(): SeedPayload {
   const cards: SeededCard[] = [];
 
-  // 20 heavily-reviewed cards — each with many reps
+  // 20 heavily-reviewed cards — each with many reps derived from real grades.
   const stressIds = [
     1, 4, 7, 25, 39, 52, 63, 66, 74, 79,
     84, 90, 95, 100, 109, 111, 122, 127, 130, 131,
@@ -317,58 +452,13 @@ function buildOptimiserStress(): SeedPayload {
   for (let i = 0; i < stressIds.length; i++) {
     const id = stressIds[i];
     const reps = 8 + (i % 5); // 8..12 reps
-    const scheduledDays = 28 + (i % 14); // 28..41 days
-    cards.push(nameCard(id, {
-      stability: 60,
-      difficulty: 4 + (i % 3) * 0.5, // 4.0..5.0
-      elapsedDays: scheduledDays,
-      scheduledDays,
-      reps,
-      lapses: i % 4 === 0 ? 1 : 0,
-      fsrsState: "review",
-      dueDate: FUTURE_7,
-      lastReview: PAST_7,
-      firstSeen: PAST_30,
-      learningStep: null,
-      stepStartedAt: null,
-      hiddenSince: null,
-      seenInPasture: reps >= 4,
-    }));
+    cards.push(nameCard(id, deriveHighRepsState(reps, i % 14)));
   }
 
-  // 2 single-review cards (the deltaT=0 scenario that caused the #1304 500)
-  cards.push(nameCard(2, {
-    stability: 2,
-    difficulty: 5,
-    elapsedDays: 0,
-    scheduledDays: 1,
-    reps: 1,
-    lapses: 0,
-    fsrsState: "review",
-    dueDate: TODAY,
-    lastReview: TODAY,
-    firstSeen: TODAY,
-    learningStep: null,
-    stepStartedAt: null,
-    hiddenSince: null,
-    seenInPasture: false,
-  }));
-  cards.push(nameCard(3, {
-    stability: 2,
-    difficulty: 5,
-    elapsedDays: 0,
-    scheduledDays: 1,
-    reps: 1,
-    lapses: 0,
-    fsrsState: "review",
-    dueDate: TODAY,
-    lastReview: TODAY,
-    firstSeen: TODAY,
-    learningStep: null,
-    stepStartedAt: null,
-    hiddenSince: null,
-    seenInPasture: false,
-  }));
+  // 2 single-review cards (the deltaT=0 scenario that caused the #1304 500).
+  // Derived: 1 Easy on a fresh card graduates immediately (reps=1).
+  cards.push(nameCard(2, deriveHighRepsState(1)));
+  cards.push(nameCard(3, deriveHighRepsState(1)));
 
   return {
     session: { cards, limits: DEFAULT_LIMITS },
@@ -412,10 +502,9 @@ function buildPastureProgression(): SeedPayload {
   ];
   for (const id of masteredIds) {
     const offsetDays = ((id % 14) + 1); // vary the due-dates
-    const state = masteredState({
-      dueDate: relativeDate(offsetDays),
-      lastReview: relativeDate(-offsetDays),
-      firstSeen: PAST_30,
+    const state = deriveMasteredState({
+      dueDaysFromNow: offsetDays,
+      lastReviewDaysFromNow: -offsetDays,
     });
     cards.push(nameCard(id, state, "en"));
     cards.push(reverseCard(id, state, "en"));
@@ -435,8 +524,8 @@ function buildPastureProgression(): SeedPayload {
     114, 115, 116, 118, 120, 122, 124, 126, 128, 130,
   ];
   for (const id of dueSoonIds) {
-    cards.push(nameCard(id, dueSoonState({
-      dueDate: relativeDate((id % 6) + 1),
+    cards.push(nameCard(id, deriveDueSoonState({
+      dueDaysFromNow: (id % 6) + 1,
     })));
   }
 
@@ -446,21 +535,21 @@ function buildPastureProgression(): SeedPayload {
     147, 148, 149, 150, 151,
   ];
   for (const id of learningIds) {
-    cards.push(nameCard(id, learningState()));
+    cards.push(nameCard(id, deriveLearningState()));
   }
 
   // A few mastered evolution cards to populate the Pasture evo column
-  const masteredEdges: Array<[number, number, number]> = [
-    [1, 2, 1500001],
-    [2, 3, 1500002],
-    [4, 5, 1500003],
-    [5, 6, 1500004],
-    [7, 8, 1500005],
-    [8, 9, 1500006],
-    [25, 26, 1500015], // Pikachu → Raichu
+  const masteredEdges: Array<[number, number]> = [
+    [1, 2],
+    [2, 3],
+    [4, 5],
+    [5, 6],
+    [7, 8],
+    [8, 9],
+    [25, 26], // Pikachu → Raichu
   ];
-  for (const [preEvoId, postEvoId, edgeId] of masteredEdges) {
-    cards.push(evolutionCard(preEvoId, postEvoId, edgeId, masteredState({ dueDate: FUTURE_21 })));
+  for (const [preEvoId, postEvoId] of masteredEdges) {
+    cards.push(evolutionCard(preEvoId, postEvoId, deriveMasteredState({ dueDaysFromNow: 21 })));
   }
 
   return {
@@ -506,10 +595,9 @@ function buildMasteryGaps(): SeedPayload {
   ];
   for (const id of fullMasteredIds) {
     const offsetDays = ((id % 7) + 1);
-    const state = masteredState({
-      dueDate: relativeDate(offsetDays),
-      lastReview: relativeDate(-offsetDays),
-      firstSeen: PAST_30,
+    const state = deriveMasteredState({
+      dueDaysFromNow: offsetDays,
+      lastReviewDaysFromNow: -offsetDays,
     });
     cards.push(nameCard(id, state));
     cards.push(reverseCard(id, state));
@@ -521,32 +609,21 @@ function buildMasteryGaps(): SeedPayload {
   const nearMissPartialIds = [41, 43, 46, 48, 50];
   for (const id of nearMissPartialIds) {
     // Name card: fully mastered.
-    cards.push(nameCard(id, masteredState({ firstSeen: PAST_30 })));
+    cards.push(nameCard(id, deriveMasteredState()));
     // Reverse card: graduated but not mastered (scheduledDays 5–15 depending on id).
-    const scheduledDays = 5 + (id % 11); // 5..15
-    cards.push(reverseCard(id, {
-      stability: 8,
-      difficulty: 5,
-      elapsedDays: scheduledDays,
-      scheduledDays,
-      reps: 2,
-      lapses: 0,
-      fsrsState: "review",
-      dueDate: relativeDate(scheduledDays),
-      lastReview: relativeDate(-scheduledDays),
-      firstSeen: PAST_15,
-      learningStep: null,
-      stepStartedAt: null,
-      hiddenSince: null,
-      seenInPasture: false,
-    }));
+    const extraGrades = (id % 2); // 0 or 1 extra grades for variety
+    cards.push(reverseCard(id, deriveGraduatedState({
+      extraGoodGrades: 1 + extraGrades,
+      dueDaysFromNow: 5 + (id % 11),
+      lastReviewDaysFromNow: -(5 + (id % 11)),
+    })));
   }
 
   // Five with an unseen reverse card (no reverse seeded at all — it is "new"):
   const nearMissUnseenIds = [52, 54, 56, 58, 60];
   for (const id of nearMissUnseenIds) {
     // Name card: fully mastered.
-    cards.push(nameCard(id, masteredState({ firstSeen: PAST_30 })));
+    cards.push(nameCard(id, deriveMasteredState()));
     // No reverse card seeded — hydrateSession treats it as new, and
     // deriveCloseToMastery reports reverseIntroduced: false for the row.
   }
@@ -554,37 +631,25 @@ function buildMasteryGaps(): SeedPayload {
   // ── (3) 10 reviewed-but-unmastered name cards → Next arrivals strip ─────────
   //
   // These are name-only cards (no reverse seeded), so they satisfy nextArrivals:
-  // • firstSeen is set (seen at least once)
-  // • NOT mastered (reps < 3)
-  // • reverse is NOT mastered (no reverse card at all)
+  // - firstSeen is set (seen at least once)
+  // - NOT mastered (reps < 3 or scheduledDays < 21)
+  // - reverse is NOT mastered (no reverse card at all)
   const nextArrivalsIds = [63, 66, 69, 72, 74, 77, 79, 81, 83, 84];
   for (let i = 0; i < nextArrivalsIds.length; i++) {
     const id = nextArrivalsIds[i];
     // Vary reps and scheduledDays so the strip shows a ranked list, not all ties.
-    const reps = (i % 2) + 1; // 1 or 2
-    const scheduledDays = 3 + (i % 8); // 3..10
-    cards.push(nameCard(id, {
-      stability: 5 + i,
-      difficulty: 5,
-      elapsedDays: scheduledDays,
-      scheduledDays,
-      reps,
-      lapses: 0,
-      fsrsState: "review",
-      dueDate: relativeDate(scheduledDays),
-      lastReview: relativeDate(-scheduledDays),
-      firstSeen: PAST_15,
-      learningStep: null,
-      stepStartedAt: null,
-      hiddenSince: null,
-      seenInPasture: false,
-    }));
+    const extraGrades = i % 2; // 0 or 1 extra grade (reps=1 or reps=2)
+    cards.push(nameCard(id, deriveGraduatedState({
+      extraGoodGrades: extraGrades,
+      dueDaysFromNow: 3 + (i % 8),
+      lastReviewDaysFromNow: -(3 + (i % 8)),
+    })));
   }
 
   // ── (4) 5 in-learning name cards ─────────────────────────────────────────────
   const learningIds = [86, 88, 90, 92, 95];
   for (const id of learningIds) {
-    cards.push(nameCard(id, learningState()));
+    cards.push(nameCard(id, deriveLearningState()));
   }
 
   return {
@@ -618,9 +683,9 @@ export const SCENARIOS: Scenario[] = [
     slug: "pasture-progression",
     label: "Pasture progression",
     description:
-      "40 mastered (en) + 5 mastered (ja) + 20 in-progress + 15 in-learning species. " +
+      "40 mastered (en) + 20 in-progress + 15 in-learning species. " +
       "Visit the Pasture to see multiple biomes populated. Switch Pokémon name language to Japanese " +
-      "to see only 5 mastered — confirming per-locale FSRS storage.",
+      "to see 0 mastered, confirming per-locale FSRS storage.",
     build: buildPastureProgression,
   },
   {
@@ -630,7 +695,7 @@ export const SCENARIOS: Scenario[] = [
       "15 fully mastered pairs (en), 10 name-mastered/reverse-pending pairs, " +
       "10 reviewed-but-unmastered names, and 5 in-learning. " +
       "Visit Pasture to verify the Next arrivals strip, and Journey to verify Close to mastery. " +
-      "Switch to Japanese to see 0 mastered — confirming per-locale FSRS storage.",
+      "Switch to Japanese to see 0 mastered, confirming per-locale FSRS storage.",
     build: buildMasteryGaps,
   },
 ];
@@ -638,3 +703,4 @@ export const SCENARIOS: Scenario[] = [
 export const SCENARIO_BY_SLUG: Map<string, Scenario> = new Map(
   SCENARIOS.map((s) => [s.slug, s]),
 );
+
