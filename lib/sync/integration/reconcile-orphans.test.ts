@@ -117,7 +117,18 @@ async function getCardReviewRows(
      WHERE user_id = $1 AND subject_key = $2 AND locale = $3`,
     [userId, subjectKey, locale],
   );
-  return res.rows;
+  // pg returns DATE columns (first_seen/last_review/due_date) as JS Date
+  // objects; normalise them to 'YYYY-MM-DD' (UTC) strings so date assertions
+  // compare ISO-to-ISO rather than against a locale-stringified Date.
+  return res.rows.map((row) => {
+    const out = { ...row };
+    for (const col of ["first_seen", "last_review", "due_date"]) {
+      if (out[col] instanceof Date) {
+        out[col] = (out[col] as Date).toISOString().slice(0, 10);
+      }
+    }
+    return out;
+  });
 }
 
 // Today's date formatted as 'YYYY-MM-DD' using UTC.
