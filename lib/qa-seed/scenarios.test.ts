@@ -195,11 +195,42 @@ describe("scenario payload builders", () => {
     it("produces name-mastered/reverse-pending pairs that satisfy deriveCloseToMastery", () => {
       const cards = buildCards();
       const closeToMastery = deriveCloseToMastery(cards);
-      // Must have at least one entry (not the "No gap to close" empty state).
-      expect(closeToMastery.length).toBeGreaterThanOrEqual(1);
+      // Must have all 10 intended entries: 5 nearMissPartialIds (partially-reviewed
+      // reverse) + 5 nearMissUnseenIds (unseen reverse). Setting the floor to 10
+      // is a real forcing function: the pre-fix code produced 8 because ids 41 and
+      // 43 had extraGoodGrades=2 → reps=3/scheduledDays=30, which crossed the mastery
+      // gate and dropped those two pairs from the list. A floor of >= 1 or even >= 5
+      // would not have caught that regression (#1421 review).
+      expect(closeToMastery.length).toBeGreaterThanOrEqual(10);
       // Every entry should have a reverseScheduledDays < 21 (reverse is not yet mastered).
       for (const entry of closeToMastery) {
         expect(entry.reverseScheduledDays).toBeLessThan(MASTERY_INTERVAL_DAYS);
+      }
+    });
+
+    it("nearMissPartialIds reverse cards are all un-mastered (reps < 3 or scheduledDays < 21)", () => {
+      // This is the direct invariant the #1421 bug violated: extraGoodGrades=2 on ids
+      // 41 and 43 produced reps=3/scheduledDays=30, silently graduating them into the
+      // fully-mastered pool and shrinking the Close-to-mastery list.
+      const nearMissPartialIds = [41, 43, 46, 48, 50];
+      const cards = buildCards();
+      for (const pokemonId of nearMissPartialIds) {
+        const reverseCard = cards.find(
+          (c) => c.cardType === "reverse" && (c as unknown as { pokemonId: number }).pokemonId === pokemonId,
+        );
+        expect(
+          reverseCard,
+          `reverse card for nearMissPartialId=${pokemonId} must be present in the seed`,
+        ).toBeDefined();
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const s = reverseCard!.state;
+        const mastered = s.reps >= MASTERY_REPETITIONS && s.scheduledDays >= MASTERY_INTERVAL_DAYS;
+        expect(
+          mastered,
+          `nearMissPartialId=${pokemonId} reverse card must NOT be mastered ` +
+          `(reps=${s.reps}, scheduledDays=${s.scheduledDays}); ` +
+          `if it is, extraGoodGrades is too high and the card has graduated out of Close-to-mastery`,
+        ).toBe(false);
       }
     });
 

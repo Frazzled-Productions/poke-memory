@@ -190,7 +190,7 @@ function deriveMasteredState(opts: {
  *   s = nextReview(s, 4, T0)   // A1: enters learning step 0
  *   s = nextReview(s, 4, T0)   // B3: advances to step 1
  *   s = nextReview(s, 4, T0)   // B3 graduate: scheduledDays=1, reps=1
- *   s = nextReview(s, 4, T(2)) // A4: reps=2, scheduledDays~4-6
+ *   s = nextReview(s, 4, T(2)) // A4: reps=2, scheduledDays=11 (real FSRS output; in [1,21))
  *
  * Results in: reps>=1, scheduledDays in [1,21), fsrsState="review".
  * Post-replay: override dueDate/lastReview to wall-clock anchors.
@@ -455,8 +455,10 @@ function buildOptimiserStress(): SeedPayload {
     cards.push(nameCard(id, deriveHighRepsState(reps, i % 14)));
   }
 
-  // 2 single-review cards (the deltaT=0 scenario that caused the #1304 500).
-  // Derived: 1 Easy on a fresh card graduates immediately (reps=1).
+  // 2 single-review cards (reps=1: one Easy from a fresh card).
+  // These cards have a dueDate 7 days from now and lastReview 7 days ago (deltaT=7),
+  // so they are not a deltaT=0 edge case. They provide minimal-history data points
+  // alongside the high-reps set to stress the optimiser endpoint.
   cards.push(nameCard(2, deriveHighRepsState(1)));
   cards.push(nameCard(3, deriveHighRepsState(1)));
 
@@ -610,10 +612,15 @@ function buildMasteryGaps(): SeedPayload {
   for (const id of nearMissPartialIds) {
     // Name card: fully mastered.
     cards.push(nameCard(id, deriveMasteredState()));
-    // Reverse card: graduated but not mastered (scheduledDays 5–15 depending on id).
-    const extraGrades = (id % 2); // 0 or 1 extra grades for variety
+    // Reverse card: graduated but deliberately below the mastery gate. Cap the
+    // replay at a single extra Good review so reps stays at 2 (< MASTERY_REPETITIONS
+    // = 3); this keeps the reverse un-mastered regardless of its scheduledDays, so
+    // the pair stays in the Close-to-mastery list instead of graduating into the
+    // fully-mastered pool. (Two extra Goods would reach reps=3, scheduledDays=30,
+    // which crosses the gate and silently drops the pair from the list. See the
+    // #1421 review.) Display variety still comes from the per-id dueDate anchors.
     cards.push(reverseCard(id, deriveGraduatedState({
-      extraGoodGrades: 1 + extraGrades,
+      extraGoodGrades: 1,
       dueDaysFromNow: 5 + (id % 11),
       lastReviewDaysFromNow: -(5 + (id % 11)),
     })));
