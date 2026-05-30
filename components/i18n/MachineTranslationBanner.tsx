@@ -33,11 +33,7 @@ import { useTranslations } from "next-intl";
 import { useAppLocale } from "@/lib/i18n/useAppLocale";
 import { LOCALE_ENDONYMS } from "@/i18n/locales";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
-
-/** Returns the localStorage key for the given locale's dismissal flag. */
-export function mtBannerDismissedKey(locale: string): string {
-  return `poke-memory:mt-banner-dismissed:${locale}`;
-}
+import { mtBannerDismissedKey } from "@/lib/storage/keys";
 
 export function MachineTranslationBanner() {
   const t = useTranslations("banner");

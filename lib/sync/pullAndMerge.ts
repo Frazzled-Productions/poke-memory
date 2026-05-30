@@ -19,7 +19,7 @@ import {
 } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
 import { preserveDeviceLocalKeys } from "@/lib/settings/lastPushedSnapshot";
-import { mtBannerDismissedKey } from "@/components/i18n/MachineTranslationBanner";
+import { mtBannerDismissedKey } from "@/lib/storage/keys";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
@@ -188,16 +188,20 @@ export async function pullAndMerge(
       // This runs on every cycle (not just when cloudIsNewer) because the
       // write is idempotent and the banner may have been dismissed on another
       // device after this device's lastSettingsPullAt cursor was stamped.
-      if (typeof window !== "undefined") {
-        const cloudLocales: unknown = (pulledRow.settings as Record<string, unknown> | null)
-          ?.dismissedMtBannerLocales;
-        if (Array.isArray(cloudLocales)) {
-          for (const locale of cloudLocales) {
-            if (typeof locale === "string") {
-              localStorage.setItem(mtBannerDismissedKey(locale), "1");
+      try {
+        if (typeof window !== "undefined") {
+          const cloudLocales: unknown = (pulledRow.settings as Record<string, unknown> | null)
+            ?.dismissedMtBannerLocales;
+          if (Array.isArray(cloudLocales)) {
+            for (const locale of cloudLocales) {
+              if (typeof locale === "string") {
+                localStorage.setItem(mtBannerDismissedKey(locale), "1");
+              }
             }
           }
         }
+      } catch (e) {
+        console.warn("[pullAndMerge] mt-banner write-through failed (non-fatal)", e);
       }
 
       if (pulledRow.updatedAt !== null) {

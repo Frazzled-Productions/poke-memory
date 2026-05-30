@@ -80,9 +80,6 @@ vi.mock("@/lib/streak/persistence", () => ({
   STREAK_UPDATED_EVENT: "poke-memory:streak-updated",
 }));
 
-vi.mock("@/components/i18n/MachineTranslationBanner", () => ({
-  mtBannerDismissedKey: (locale: string) => `poke-memory:mt-banner-dismissed:${locale}`,
-}));
 
 vi.mock("@/lib/sync/gradeLog", async () => {
   const actual = await vi.importActual<typeof import("@/lib/sync/gradeLog")>(

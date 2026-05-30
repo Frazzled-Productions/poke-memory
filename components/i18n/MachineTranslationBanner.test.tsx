@@ -16,7 +16,8 @@ import {
   screen,
   fireEvent,
 } from "@/components/test-utils/renderWithIntl";
-import { MachineTranslationBanner, mtBannerDismissedKey } from "./MachineTranslationBanner";
+import { MachineTranslationBanner } from "./MachineTranslationBanner";
+import { mtBannerDismissedKey } from "@/lib/storage/keys";
 
 // ---------------------------------------------------------------------------
 // localStorage mock
