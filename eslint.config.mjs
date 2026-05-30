@@ -74,6 +74,25 @@ const eslintConfig = defineConfig([
           message:
             "Do not read .displayName directly in components/pages. Use useLocalePokemonName(speciesId, displayName) so the active pokemonNameLocale is respected.",
         },
+        // Multi-locale guard (#1405 lever 2 / #1406 candidate): forbid inline
+        // capitalisation of a Pokémon type id. #1389 replaced the three
+        // `type.charAt(0).toUpperCase() + type.slice(1)` pill labels with
+        // getTypeName(type, t) (lib/i18n/typeNames.ts). Banning the raw
+        // capitalise form makes the "third surface" miss (a new type-pill
+        // surface that hardcodes the English title-case) fail CI instead of
+        // depending on a reviewer noticing.
+        //
+        // The selector targets `<expr>.charAt(0).toUpperCase()` — the exact
+        // signature #1389 removed. It is deliberately narrow: it fires on the
+        // inline title-case idiom (overwhelmingly used here for type ids) and
+        // not on arbitrary string transforms. A type label produced any other
+        // way must still route through getTypeName so the active appLocale wins.
+        {
+          selector:
+            "CallExpression[callee.property.name='toUpperCase'][callee.object.callee.property.name='charAt']",
+          message:
+            "Do not inline-capitalise type ids (or other localised labels) in components/pages. Use getTypeName(type, t) from lib/i18n/typeNames.ts so the active appLocale is respected.",
+        },
       ],
     },
   },
