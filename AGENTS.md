@@ -92,6 +92,8 @@ A helper that is convention-only (documented here but unenforced) is a latent fr
 
 All Pokémon names shown to users must flow through `useLocalePokemonName(speciesId, fallbackName)` from `lib/i18n/useLocalePokemonName.ts`. A lint rule (`no-restricted-syntax` in `eslint.config.mjs`, covering `components/**` and `app/**` minus `app/api/**`) enforces this at PR time — direct `.displayName` reads in those trees are a CI error (#1327).
 
+Localised Pokémon **type** names follow the same model: every type-filter pill routes through `getTypeName(type, t)` from `lib/i18n/typeNames.ts` (#1389), and a second `no-restricted-syntax` selector in the same `eslint.config.mjs` block bans the inline `type.charAt(0).toUpperCase() + type.slice(1)` capitalisation form so a new type-pill surface that hardcodes the English title-case fails CI rather than relying on a reviewer noticing (#1405 lever 2 / #1406).
+
 **The canonical pattern:**
 
 ```tsx
