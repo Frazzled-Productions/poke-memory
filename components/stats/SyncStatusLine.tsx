@@ -5,7 +5,17 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import type { RetryState } from "@/lib/sync/useRetryPush";
 import { mutedText } from "@/lib/utils/class-names";
 
-type SyncState = { text: string; errorDetail: string | null; failed: boolean };
+type SyncState = {
+  text: string;
+  errorDetail: string | null;
+  failed: boolean;
+  /**
+   * Non-null when a structural (non-transient) error was recorded on the
+   * card_reviews primary path (#1358). Retrying is pointless until a deploy
+   * fixes the schema mismatch — the Retry button is hidden in this state.
+   */
+  structuralSyncError: string | null;
+};
 
 type Props = {
   retryState: RetryState;
@@ -26,7 +36,17 @@ export function SyncStatusLine({
     const fmt = (iso: string) =>
       new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-    if (status.lastPushFailed) {
+    // Structural errors take priority over the generic failed state. The Retry
+    // button is hidden entirely — retrying is pointless until a deploy fixes
+    // the mismatch.
+    if (status.structuralSyncError !== null) {
+      setState({
+        text: "Sync error: a schema mismatch was detected. Your progress is safe locally.",
+        errorDetail: status.structuralSyncError,
+        failed: true,
+        structuralSyncError: status.structuralSyncError,
+      });
+    } else if (status.lastPushFailed) {
       const timeStr = status.lastPushAttemptAt ? ` at ${fmt(status.lastPushAttemptAt)}` : "";
       const { failedCardCount } = status;
       if (failedCardCount === 0) {
@@ -36,34 +56,50 @@ export function SyncStatusLine({
           text: `Last synced: ${status.lastPushAt ? fmt(status.lastPushAt) : "recently"}`,
           errorDetail: null,
           failed: false,
+          structuralSyncError: null,
         });
       } else if (failedCardCount === 1) {
         setState({
           text: `1 card may be out of sync${timeStr}`,
           errorDetail: null,
           failed: true,
+          structuralSyncError: null,
         });
       } else if (typeof failedCardCount === "number" && failedCardCount > 1) {
         setState({
           text: `${failedCardCount} cards may be out of sync${timeStr}`,
           errorDetail: null,
           failed: true,
+          structuralSyncError: null,
         });
       } else {
         setState({
           text: `Sync failed${timeStr}`,
           errorDetail: null,
           failed: true,
+          structuralSyncError: null,
         });
       }
     } else if (status.lastPushAt) {
-      setState({ text: `Last synced: ${fmt(status.lastPushAt)}`, errorDetail: null, failed: false });
+      setState({ text: `Last synced: ${fmt(status.lastPushAt)}`, errorDetail: null, failed: false, structuralSyncError: null });
     } else {
-      setState({ text: "Not synced yet.", errorDetail: null, failed: false });
+      setState({ text: "Not synced yet.", errorDetail: null, failed: false, structuralSyncError: null });
     }
   }, [syncStatusVersion]);
 
   if (state === null) return null;
+
+  // Structural error — show a non-dismissable, NON-retryable message. The Retry
+  // button is intentionally absent: 42P10 (and other structural codes) always
+  // indicate a deploy/schema mismatch; retrying will always fail until the
+  // server is fixed. Progress is safe locally.
+  if (state.structuralSyncError !== null) {
+    return (
+      <div className={mutedText} aria-live="polite">
+        <span>{state.text}</span>
+      </div>
+    );
+  }
 
   // While retrying, always show "Retrying…" regardless of stored status.
   if (retryState === "retrying") {

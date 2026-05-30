@@ -4,6 +4,14 @@ import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { idbSet, idbDelete } from "@/lib/idb/db";
 import { toCloudRows } from "@/lib/sync/cloud";
 
+// Re-export from structuralError.ts so callers that already import from
+// persistence.ts do not need to change their imports (#1358 FIX 1).
+export {
+  markStructuralSyncError,
+  clearStructuralSyncError,
+  getStructuralSyncError,
+} from "@/lib/sync/structuralError";
+
 export const STORAGE_KEY = KEY_SYNC_STATUS;
 /**
  * localStorage key for the persisted pending-grade queue (#893).
@@ -31,6 +39,16 @@ export type SyncStatus = {
   lastSettingsPullAt: string | null;
   /** ISO timestamp of the `user_settings.last_reset_at` this device has already reconciled. When cloud advances this past the local value, `pullAndMerge` calls `clearLocalProgress` before merging — that's how stale local stops resurrecting deleted rows (#576). Null = never seen a reset on this device. */
   lastSeenResetAt: string | null;
+  /**
+   * SQLSTATE code of a structural (non-transient) error on the card_reviews
+   * primary sync path (#1358). Set immediately on detection; never set by the
+   * auxiliary legs (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs).
+   * Non-null means retrying is pointless — the error signals a deploy/schema
+   * mismatch (e.g. 42P10: ON CONFLICT column list does not match any unique
+   * constraint). Only cleared when a push subsequently succeeds (structural
+   * fixes require a deploy, not a user action).
+   */
+  structuralSyncError: string | null;
 };
 
 const ZERO: SyncStatus = {
@@ -41,6 +59,7 @@ const ZERO: SyncStatus = {
   lastPullAt: null,
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
+  structuralSyncError: null,
 };
 
 export function loadSyncStatus(): SyncStatus {
@@ -59,13 +78,14 @@ function parseSyncStatus(raw: string): SyncStatus {
     lastPullAt: typeof obj.lastPullAt === "string" ? obj.lastPullAt : null,
     lastSettingsPullAt: typeof obj.lastSettingsPullAt === "string" ? obj.lastSettingsPullAt : null,
     lastSeenResetAt: typeof obj.lastSeenResetAt === "string" ? obj.lastSeenResetAt : null,
+    structuralSyncError: typeof obj.structuralSyncError === "string" ? obj.structuralSyncError : null,
   };
 }
 
 /**
  * Record a successful push. Clears lastPushFailed and stamps lastPushAt.
- * Call this inside the success branch of any push path so the Stats page
- * "Last synced" indicator stays current after auto-sync runs.
+ * Call this inside the success branch of ANY push path (card_reviews or
+ * auxiliary legs) so the Stats page "Last synced" indicator stays current.
  *
  * Semantics notes (#473):
  * - `failedCardCount` is intentionally left as-is on success. `useRetryPush`
@@ -78,6 +98,14 @@ function parseSyncStatus(raw: string): SyncStatus {
  *   progress" semantic is deliberate — a partial-success debounced push still
  *   moved the cloud forward — and differs from the unload path, which flags
  *   failure whenever `failedCardCount > 0`.
+ * - `structuralSyncError` is deliberately NOT cleared here. A successful
+ *   auxiliary-leg push (pushSettings, pushStreak, etc.) during a live 42P10
+ *   incident must not clear the card_reviews structural banner — that would
+ *   cause a false-clear flicker. Only a successful card_reviews push clears
+ *   it, via clearStructuralSyncError in pushSingleCard / pushSession (#1358
+ *   FIX 2). The Stats page banner correctly reads structuralSyncError from
+ *   the SyncStatus record, so clearing the generic failed flag here does not
+ *   hide the structural banner.
  */
 export function markPushSucceeded(at = new Date().toISOString()): void {
   const current = loadSyncStatus();
@@ -101,6 +129,11 @@ export function markPushFailed(failedCardCount: number, at = new Date().toISOStr
     failedCardCount,
   });
 }
+
+// markStructuralSyncError, clearStructuralSyncError, and getStructuralSyncError
+// are re-exported from structuralError.ts above. Their implementations live
+// there so cloud.ts can import them without creating a circular dependency
+// through this module (#1358 FIX 1).
 
 export function saveSyncStatus(status: SyncStatus): void {
   if (typeof window === "undefined") return;

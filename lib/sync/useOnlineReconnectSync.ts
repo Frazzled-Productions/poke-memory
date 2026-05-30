@@ -12,6 +12,7 @@ import {
   loadPendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
+import { resetStructuralProbe } from "@/lib/sync/structuralError";
 import { loadSession } from "@/lib/review/persistence";
 import { todayString } from "@/lib/review/session";
 import { SW_REPLAY_MESSAGE } from "@/lib/sync/backgroundSync";
@@ -73,6 +74,13 @@ export function useOnlineReconnectSync(
       runningRef.current = true;
 
       try {
+        // Reset the session-scoped structural-error probe guard (#1358 FIX 3).
+        // The 'online' event signals that connectivity was lost and has now
+        // returned — a deploy fix is more likely to have landed during the
+        // outage than during continuous operation. Resetting the guard lets the
+        // next drainQueue attempt serve as a fresh self-heal probe.
+        resetStructuralProbe();
+
         // Step 1: Pull-before-push — bring local state up to date. If pull
         // fails, abort: pushing without knowing cloud state risks clobbering
         // cloud progress (the exact failure mode of incident #293).

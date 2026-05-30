@@ -1,8 +1,14 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
 import type { ReviewableCard, BuildSessionOpts } from "@/lib/review/session";
 import { buildSession } from "@/lib/review/session";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
 import { appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
+import { markStructuralSyncError, clearStructuralSyncError } from "@/lib/sync/structuralError";
+
+// cloud.ts imports markStructuralSyncError from structuralError.ts — a leaf
+// module that has no imports from cloud.ts or persistence.ts — so there is no
+// circular dependency. persistence.ts re-exports those helpers from the same
+// leaf for callers that already import from persistence.ts.
 
 /** Options forwarded to `buildSession` when rebuilding a card set from seed. */
 export type SeedOpts = BuildSessionOpts;
@@ -20,9 +26,48 @@ export type SeedOpts = BuildSessionOpts;
 export const CARD_REVIEWS_CONFLICT_COLS =
   "user_id,card_type,subject_key,locale" as const;
 
+/**
+ * Returns true when a PostgrestError code indicates a structural (non-transient)
+ * failure on the card_reviews write path (#1358).
+ *
+ * Structural codes:
+ *   42xxx — schema/SQL errors (42P10 ON CONFLICT mismatch, 42P01 relation
+ *            not found, 42703 column not found, 42501 insufficient privilege
+ *            at the PG layer). These always mean a deploy/schema mismatch and
+ *            are NEVER transient.
+ *   23505 — unique_violation. Upsert should never produce this unless the
+ *            conflict target is wrong.
+ *   23503 — foreign_key_violation.
+ *
+ * Excluded from this predicate:
+ *   23514 — check_violation. This is the regression trigger (migration 002 /
+ *            015 / 016 / 017), a DELIBERATE DB guard. Treat as best-effort/skip
+ *            (the trigger rejects bad state — that's the intended behaviour).
+ *   PGRST* — PostgREST HTTP-layer codes, transient during schema-cache reload.
+ *   Network TypeErrors — land in the catch block, not error.code. Best-effort.
+ *   Generic 5xx — transient; retrying is appropriate.
+ *
+ * IMPORTANT: Only call this from the card_reviews primary path. Auxiliary legs
+ * (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs) must warn-and-
+ * continue regardless of error code.
+ */
+export function isStructuralError(error: PostgrestError | null): boolean {
+  if (!error) return false;
+  const code = error.code;
+  if (typeof code !== "string") return false;
+  // Exclude 23514 (check_violation — deliberate regression trigger).
+  if (code === "23514") return false;
+  // Exclude PGRST-prefixed PostgREST HTTP-layer codes (transient schema-cache).
+  if (code.startsWith("PGRST")) return false;
+  // All 42xxx schema errors are structural.
+  if (code.startsWith("42")) return true;
+  // Unique and FK violations on the cards path are structural.
+  if (code === "23505" || code === "23503") return true;
+  return false;
+}
 
-// Sync is best-effort: all errors are swallowed so a network hiccup never
-// breaks the local-first review flow.
+// Sync is best-effort for transient errors. Structural errors on the
+// card_reviews primary path call markStructuralSyncError directly (#1358).
 
 /**
  * Returns true when a card's SM-2 state is safe to write to the cloud.
@@ -171,10 +216,31 @@ export async function pushSession(
       const { error } = await client
         .from("card_reviews")
         .upsert(batch, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
-      if (error) allOk = false;
+      if (error) {
+        allOk = false;
+        if (isStructuralError(error)) {
+          // Structural errors are never transient — fail loud immediately rather
+          // than swallowing as best-effort (#1358). console.error reaches error
+          // monitoring; markStructuralSyncError persists the code directly so
+          // no caller-must-pop indirection is needed.
+          console.error(
+            `[sync] structural error on card_reviews upsert (SQLSTATE ${error.code}): ${error.message}`
+          );
+          markStructuralSyncError(error.code);
+          // Break early — retrying a structural error is pointless until a
+          // deploy fixes the mismatch.
+          break;
+        }
+      }
     } catch {
       allOk = false;
     }
+  }
+  if (allOk) {
+    // All batches succeeded — clear any outstanding structural error.
+    // Only the card_reviews success path clears structuralSyncError; auxiliary
+    // legs must not (#1358 FIX 2).
+    clearStructuralSyncError();
   }
   return allOk;
 }
@@ -218,7 +284,23 @@ export async function pushSingleCard(
       },
       { onConflict: CARD_REVIEWS_CONFLICT_COLS },
     );
-    return !error;
+    if (!error) {
+      // Successful card_reviews push — clear any outstanding structural error.
+      // This is the ONLY path that clears structuralSyncError; auxiliary-leg
+      // success (pushSettings, pushStreak, etc.) must not clear it (#1358 FIX 2).
+      clearStructuralSyncError();
+      return true;
+    }
+    if (isStructuralError(error)) {
+      // Structural errors are never transient — fail loud immediately (#1358).
+      // console.error reaches error monitoring; markStructuralSyncError persists
+      // the code directly so no caller-must-pop indirection is needed.
+      console.error(
+        `[sync] structural error on card_reviews upsert (SQLSTATE ${error.code}): ${error.message}`
+      );
+      markStructuralSyncError(error.code);
+    }
+    return false;
   } catch {
     return false;
   }
