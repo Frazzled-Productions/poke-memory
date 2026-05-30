@@ -20,6 +20,7 @@
     "audit:forms": "node scripts/audit-form-categories.mjs",
     "seed:tts": "node --env-file-if-exists=.env.local scripts/seed-tts-audio.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
+    "animations": "node scripts/capture-animations.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "coverage:diff": "git diff origin/qa...HEAD | node scripts/diff-coverage.mjs",
