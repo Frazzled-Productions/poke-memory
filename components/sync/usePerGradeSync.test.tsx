@@ -7,15 +7,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 vi.mock("@/lib/sync/cloud", () => ({
   pushSingleCard: vi.fn(),
   isSyncSafe: vi.fn(() => true),
-  // popStructuralErrorCode returns null by default so drainQueue does not
-  // call markStructuralSyncError in tests not testing that path.
-  popStructuralErrorCode: vi.fn(() => null),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({
   markPushSucceeded: vi.fn(),
   markPushFailed: vi.fn(),
-  markStructuralSyncError: vi.fn(),
   // loadSyncStatus returns no structural error by default so drainQueue does
   // not short-circuit in most tests. Individual tests can override as needed.
   loadSyncStatus: vi.fn(() => ({
@@ -32,8 +28,18 @@ vi.mock("@/lib/sync/persistence", () => ({
   clearPendingQueue: vi.fn(),
 }));
 
+vi.mock("@/lib/sync/structuralError", () => ({
+  hasStructuralProbeBeenAttempted: vi.fn(() => false),
+  markStructuralProbeAttempted: vi.fn(),
+  resetStructuralProbe: vi.fn(),
+  markStructuralSyncError: vi.fn(),
+  clearStructuralSyncError: vi.fn(),
+  getStructuralSyncError: vi.fn(() => null),
+}));
+
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
-import { markPushSucceeded, markPushFailed } from "@/lib/sync/persistence";
+import { markPushSucceeded, markPushFailed, loadSyncStatus } from "@/lib/sync/persistence";
+import { hasStructuralProbeBeenAttempted, markStructuralProbeAttempted } from "@/lib/sync/structuralError";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import type { ReviewableCard } from "@/lib/review/session";
 
@@ -367,6 +373,129 @@ describe("usePerGradeSync — superuser write-guard (null client/userId)", () =>
       await Promise.resolve();
     });
 
+    expect(pushSingleCard).not.toHaveBeenCalled();
+    expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+    expect(vi.mocked(markPushFailed)).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Structural-error hook-integration tests (#1358 FIX 5) ───────────────────
+//
+// These tests verify the hook-level wiring for structural errors — the paths
+// between drainQueue and the structuralError.ts / persistence.ts markers. The
+// raw function behaviour (markStructuralSyncError firing) is covered in
+// cloud.test.ts; these tests cover the hook's short-circuit and probe logic.
+
+describe("usePerGradeSync — structural error: drain marks structural immediately and persists queue", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.mocked(isSyncSafe).mockReturnValue(true);
+    // Default: no structural error already set.
+    vi.mocked(loadSyncStatus).mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: false,
+      lastPushAttemptAt: null,
+      failedCardCount: null,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+    });
+    vi.mocked(hasStructuralProbeBeenAttempted).mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it("when a push causes a structural error, drain persists the queue and does NOT call markPushSucceeded", async () => {
+    // pushSingleCard returns false (structural error side-effect already recorded
+    // in cloud.ts; here we simulate loadSyncStatus returning the structural error
+    // after the push, which is what the hook checks).
+    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    // After the push, structuralSyncError is now set (simulating markStructuralSyncError
+    // having been called by cloud.ts during the push).
+    vi.mocked(loadSyncStatus)
+      .mockReturnValueOnce({ lastPushAt: null, lastPushFailed: false, lastPushAttemptAt: null, failedCardCount: null, lastPullAt: null, lastSettingsPullAt: null, lastSeenResetAt: null, structuralSyncError: null })  // first call: pre-push check
+      .mockReturnValue({ lastPushAt: null, lastPushFailed: true, lastPushAttemptAt: null, failedCardCount: null, lastPullAt: null, lastSettingsPullAt: null, lastSeenResetAt: null, structuralSyncError: "42P10" }); // post-push check
+
+    const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => { result.current.enqueueGrade(makeCard(1)); });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The queue should be persisted (grades survive until deploy fix).
+    const { savePendingQueue } = await import("@/lib/sync/persistence");
+    expect(vi.mocked(savePendingQueue)).toHaveBeenCalled();
+    // Success path must NOT be reached on a structural error.
+    expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+  });
+
+  it("when structuralSyncError is already set and probe not attempted, drain allows ONE probe attempt", async () => {
+    // Structural error already in persisted status — but probe not yet attempted.
+    vi.mocked(loadSyncStatus).mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: true,
+      lastPushAttemptAt: null,
+      failedCardCount: null,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: "42P10",
+    });
+    vi.mocked(hasStructuralProbeBeenAttempted).mockReturnValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue(true); // probe succeeds!
+
+    const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => { result.current.enqueueGrade(makeCard(1)); });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The probe was attempted — markStructuralProbeAttempted should have been called.
+    expect(vi.mocked(markStructuralProbeAttempted)).toHaveBeenCalledTimes(1);
+    // The push was attempted (probe runs).
+    expect(pushSingleCard).toHaveBeenCalledTimes(1);
+    // On probe success, markPushSucceeded is called (clear the error banner).
+    expect(vi.mocked(markPushSucceeded)).toHaveBeenCalledTimes(1);
+  });
+
+  it("when structuralSyncError is set AND probe already attempted, drain short-circuits (no push)", async () => {
+    vi.mocked(loadSyncStatus).mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: true,
+      lastPushAttemptAt: null,
+      failedCardCount: null,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: "42P10",
+    });
+    // Probe already attempted this session.
+    vi.mocked(hasStructuralProbeBeenAttempted).mockReturnValue(true);
+
+    const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => { result.current.enqueueGrade(makeCard(1)); });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Short-circuits — pushSingleCard must NOT be called.
     expect(pushSingleCard).not.toHaveBeenCalled();
     expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
     expect(vi.mocked(markPushFailed)).not.toHaveBeenCalled();

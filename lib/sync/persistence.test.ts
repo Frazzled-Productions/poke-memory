@@ -239,10 +239,16 @@ describe("markPushSucceeded", () => {
     expect(loadSyncStatus().lastPushFailed).toBe(false);
   });
 
-  it("clears structuralSyncError — a successful push proves the schema mismatch is resolved", () => {
+  it("does NOT clear structuralSyncError — only a card_reviews push clears it (#1358 FIX 2)", () => {
+    // markPushSucceeded is called from auxiliary legs (settings, streak, etc.) as
+    // well as the card_reviews path. An auxiliary-leg success during a live 42P10
+    // incident must not clear the structural banner. Only pushSingleCard /
+    // pushSession (via clearStructuralSyncError in cloud.ts) clears it.
     saveSyncStatus({ ...ZERO, structuralSyncError: "42P10", lastPushFailed: true });
     markPushSucceeded("2026-05-10T12:00:00.000Z");
-    expect(loadSyncStatus().structuralSyncError).toBeNull();
+    // structuralSyncError must remain — markPushSucceeded does not clear it.
+    expect(loadSyncStatus().structuralSyncError).toBe("42P10");
+    // lastPushFailed is cleared (generic failure cleared by any success).
     expect(loadSyncStatus().lastPushFailed).toBe(false);
   });
 

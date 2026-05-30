@@ -4,6 +4,14 @@ import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { idbSet, idbDelete } from "@/lib/idb/db";
 import { toCloudRows } from "@/lib/sync/cloud";
 
+// Re-export from structuralError.ts so callers that already import from
+// persistence.ts do not need to change their imports (#1358 FIX 1).
+export {
+  markStructuralSyncError,
+  clearStructuralSyncError,
+  getStructuralSyncError,
+} from "@/lib/sync/structuralError";
+
 export const STORAGE_KEY = KEY_SYNC_STATUS;
 /**
  * localStorage key for the persisted pending-grade queue (#893).
@@ -75,9 +83,9 @@ function parseSyncStatus(raw: string): SyncStatus {
 }
 
 /**
- * Record a successful push. Clears lastPushFailed, clears any structuralSyncError,
- * and stamps lastPushAt. Call this inside the success branch of any push path so
- * the Stats page "Last synced" indicator stays current after auto-sync runs.
+ * Record a successful push. Clears lastPushFailed and stamps lastPushAt.
+ * Call this inside the success branch of ANY push path (card_reviews or
+ * auxiliary legs) so the Stats page "Last synced" indicator stays current.
  *
  * Semantics notes (#473):
  * - `failedCardCount` is intentionally left as-is on success. `useRetryPush`
@@ -90,14 +98,18 @@ function parseSyncStatus(raw: string): SyncStatus {
  *   progress" semantic is deliberate — a partial-success debounced push still
  *   moved the cloud forward — and differs from the unload path, which flags
  *   failure whenever `failedCardCount > 0`.
- * - `structuralSyncError` is cleared on success because a successful push
- *   proves the schema mismatch has been resolved (the schema fix will have been
- *   deployed). Clearing here avoids a stale error banner after a deploy fix
- *   without requiring a user action.
+ * - `structuralSyncError` is deliberately NOT cleared here. A successful
+ *   auxiliary-leg push (pushSettings, pushStreak, etc.) during a live 42P10
+ *   incident must not clear the card_reviews structural banner — that would
+ *   cause a false-clear flicker. Only a successful card_reviews push clears
+ *   it, via clearStructuralSyncError in pushSingleCard / pushSession (#1358
+ *   FIX 2). The Stats page banner correctly reads structuralSyncError from
+ *   the SyncStatus record, so clearing the generic failed flag here does not
+ *   hide the structural banner.
  */
 export function markPushSucceeded(at = new Date().toISOString()): void {
   const current = loadSyncStatus();
-  saveSyncStatus({ ...current, lastPushAt: at, lastPushFailed: false, structuralSyncError: null });
+  saveSyncStatus({ ...current, lastPushAt: at, lastPushFailed: false });
 }
 
 /**
@@ -118,42 +130,10 @@ export function markPushFailed(failedCardCount: number, at = new Date().toISOStr
   });
 }
 
-/**
- * Record a structural (non-transient) error on the card_reviews primary path
- * (#1358). Call this IMMEDIATELY when a push returns a structural SQLSTATE
- * (42xxx, 23505, 23503) — do not wait for FAILURE_THRESHOLD consecutive drains.
- *
- * Structural errors are never transient: 42P10 always means an ON CONFLICT
- * mismatch (deploy/schema mismatch), 23505 unique violation, 23503 FK violation.
- * Retrying will always fail until a schema fix is deployed.
- *
- * Does NOT flip lastPushFailed — the structural banner is a separate, more
- * prominent signal that disables the Retry button entirely.
- *
- * IMPORTANT: Only call this from the card_reviews push path. Auxiliary legs
- * (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs) must warn-and-
- * continue regardless of error code.
- */
-export function markStructuralSyncError(code: string, at = new Date().toISOString()): void {
-  const current = loadSyncStatus();
-  saveSyncStatus({
-    ...current,
-    lastPushAttemptAt: at,
-    lastPushFailed: true,
-    structuralSyncError: code,
-  });
-}
-
-/**
- * Clear the structural sync error after a successful push proves the schema
- * mismatch has been resolved. Callers should prefer `markPushSucceeded` which
- * clears this automatically — this helper is exposed for targeted test use only.
- */
-export function clearStructuralSyncError(): void {
-  const current = loadSyncStatus();
-  if (current.structuralSyncError === null) return;
-  saveSyncStatus({ ...current, structuralSyncError: null });
-}
+// markStructuralSyncError, clearStructuralSyncError, and getStructuralSyncError
+// are re-exported from structuralError.ts above. Their implementations live
+// there so cloud.ts can import them without creating a circular dependency
+// through this module (#1358 FIX 1).
 
 export function saveSyncStatus(status: SyncStatus): void {
   if (typeof window === "undefined") return;

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
+import { markStructuralSyncError } from "@/lib/sync/structuralError";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
@@ -125,6 +126,29 @@ export function useSyncOnUnload(
             keepalive: true,
           });
           const ok = res.ok;
+
+          if (!ok && res.status === 409) {
+            // 409 = structural_error from route.ts. Read the body to extract
+            // the SQLSTATE code and persist it immediately so the banner appears
+            // on the next page load without waiting for FAILURE_THRESHOLD drains
+            // (#1358 FIX 4). Best-effort: if body parsing fails, the generic
+            // failure path below still records lastPushFailed.
+            //
+            // Note: the sendBeacon / pagehide path CANNOT read the server
+            // response (the browser's sendBeacon API is fire-and-forget). This
+            // fix applies only to the visibilitychange path, which uses
+            // fetch+keepalive and CAN observe the response. The pagehide
+            // limitation is documented as expected.
+            try {
+              const body = (await res.json()) as { error?: string; code?: string };
+              if (body.error === "structural_error" && typeof body.code === "string") {
+                markStructuralSyncError(body.code);
+              }
+            } catch {
+              // Body parse failed — fall through to the generic failure path.
+            }
+          }
+
           saveSyncStatus({
             ...prev,
             lastPushAttemptAt: now,

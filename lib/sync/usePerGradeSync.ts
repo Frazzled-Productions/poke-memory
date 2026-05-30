@@ -2,15 +2,18 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
-import { pushSingleCard, isSyncSafe, popStructuralErrorCode } from "@/lib/sync/cloud";
+import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
 import {
   markPushSucceeded,
   markPushFailed,
-  markStructuralSyncError,
   loadSyncStatus,
   savePendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
+import {
+  hasStructuralProbeBeenAttempted,
+  markStructuralProbeAttempted,
+} from "@/lib/sync/structuralError";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 
@@ -19,6 +22,10 @@ const FAILURE_THRESHOLD = 3;
 
 /** Debounce delay (ms) for writing the pending queue to localStorage (#893). */
 const PERSIST_DEBOUNCE_MS = 500;
+
+// Session-scoped self-heal probe guard lives in structuralError.ts and is
+// accessed via hasStructuralProbeBeenAttempted / markStructuralProbeAttempted.
+// See structuralError.ts JSDoc for the full rationale (#1358 FIX 3).
 
 /**
  * Debounced per-grade sync hook. Returns { enqueueGrade, flushPending }.
@@ -87,9 +94,23 @@ export function usePerGradeSync(
 
     // Short-circuit if a structural error was already recorded (#1358). Retrying
     // a schema-mismatch error is pointless until a deploy fixes the mismatch.
-    // pushSingleCard records the error as a side-effect on first encounter; this
-    // guard prevents subsequent drains from hammering the same broken endpoint.
-    if (loadSyncStatus().structuralSyncError !== null) return;
+    // Exception: allow ONE self-heal probe per session in case a deploy fix landed
+    // while the user stayed online (the 'online' event would not fire, so
+    // useOnlineReconnectSync cannot reset the flag). If the probe succeeds,
+    // pushSingleCard clears structuralSyncError automatically via cloud.ts. If it
+    // fails again, the banner persists and subsequent drains continue to
+    // short-circuit (#1358 FIX 3).
+    if (loadSyncStatus().structuralSyncError !== null) {
+      if (hasStructuralProbeBeenAttempted()) {
+        // Already probed this session and it failed (or is still in progress).
+        // Short-circuit without another attempt.
+        return;
+      }
+      markStructuralProbeAttempted();
+      // Fall through — allow the drain to proceed as the single probe attempt.
+      // pushSingleCard / pushSession will mark or clear structuralSyncError based
+      // on the result, so this path self-heals automatically on success.
+    }
 
     const toSend = [...pendingQueueRef.current];
     if (toSend.length === 0) return;
@@ -110,14 +131,12 @@ export function usePerGradeSync(
       }),
     );
 
-    // Drain the structural-error slot set by pushSingleCard (#1358). If any
-    // push produced a structural error (42P10 ON CONFLICT mismatch, etc.),
-    // record it immediately — don't wait for FAILURE_THRESHOLD drains.
-    const structuralCode = popStructuralErrorCode();
-    if (structuralCode !== null) {
-      markStructuralSyncError(structuralCode);
-      // Persist the queue so grades survive; further drains will short-circuit
-      // on the structuralSyncError guard above until a deploy fix resolves it.
+    // Check whether any push produced a new structural error (#1358). If so,
+    // markStructuralSyncError was already called inside pushSingleCard — persist
+    // the queue so grades survive and return early. Further drains short-circuit
+    // on the structuralSyncError guard above (or attempt a single probe next session).
+    if (loadSyncStatus().structuralSyncError !== null && !results.some((r) => r.ok)) {
+      // At least one card returned a structural error and nothing succeeded.
       savePendingQueue(pendingQueueRef.current);
       return;
     }

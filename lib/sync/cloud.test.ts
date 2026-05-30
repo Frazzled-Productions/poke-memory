@@ -8,7 +8,6 @@ import {
   mergeCloudIntoLocalSilent,
   applyCloudAuthoritative,
   isStructuralError,
-  popStructuralErrorCode,
   CARD_REVIEWS_CONFLICT_COLS,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
@@ -839,58 +838,69 @@ describe("isStructuralError (#1358)", () => {
 
 // ─── structural-error side-effects in pushSingleCard / pushSession (#1358) ────
 //
-// pushSingleCard / pushSession record structural error codes in a module-level
-// slot. Callers drain the slot via popStructuralErrorCode() and forward to
-// markStructuralSyncError (in persistence.ts) themselves. This avoids the
-// circular dependency cloud.ts → persistence.ts → cloud.ts (toCloudRows).
+// pushSingleCard / pushSession call markStructuralSyncError and clearStructuralSyncError
+// directly from structuralError.ts (no module-level slot, no pop indirection).
+// These tests verify the direct-mark behaviour by mocking structuralError.ts.
+
+vi.mock("@/lib/sync/structuralError", () => ({
+  markStructuralSyncError: vi.fn(),
+  clearStructuralSyncError: vi.fn(),
+  getStructuralSyncError: vi.fn(() => null),
+  hasStructuralProbeBeenAttempted: vi.fn(() => false),
+  markStructuralProbeAttempted: vi.fn(),
+  resetStructuralProbe: vi.fn(),
+}));
+
+import {
+  markStructuralSyncError,
+  clearStructuralSyncError,
+} from "@/lib/sync/structuralError";
 
 describe("pushSingleCard structural error handling (#1358)", () => {
   beforeEach(() => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
-    // Drain any stale code from previous tests before each run.
-    popStructuralErrorCode();
+    vi.mocked(markStructuralSyncError).mockClear();
+    vi.mocked(clearStructuralSyncError).mockClear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    // Drain any remaining code so other tests are not affected.
-    popStructuralErrorCode();
   });
 
-  it("popStructuralErrorCode returns '42P10' and console.error fires on a 42P10 error", async () => {
+  it("calls markStructuralSyncError('42P10') and console.error fires on a 42P10 error", async () => {
     const client = makeSupabaseClient({ code: "42P10", message: "ON CONFLICT mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(1, "2026-05-10", "2026-05-10");
 
     const result = await pushSingleCard(client, "user-1", card);
 
     expect(result).toBe(false);
-    expect(popStructuralErrorCode()).toBe("42P10");
+    expect(markStructuralSyncError).toHaveBeenCalledWith("42P10");
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("42P10")
     );
   });
 
-  it("popStructuralErrorCode returns '23505' for a unique violation", async () => {
+  it("calls markStructuralSyncError('23505') for a unique violation", async () => {
     const client = makeSupabaseClient({ code: "23505", message: "unique violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(2, "2026-05-10", "2026-05-10");
 
     await pushSingleCard(client, "user-1", card);
 
-    expect(popStructuralErrorCode()).toBe("23505");
+    expect(markStructuralSyncError).toHaveBeenCalledWith("23505");
   });
 
-  it("popStructuralErrorCode returns null on a 23514 (deliberate regression trigger)", async () => {
+  it("does not call markStructuralSyncError on a 23514 (deliberate regression trigger)", async () => {
     // 23514 is deliberate — the regression trigger rejecting bad state.
     const client = makeSupabaseClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(3, "2026-05-10", "2026-05-10");
 
     await pushSingleCard(client, "user-1", card);
 
-    expect(popStructuralErrorCode()).toBeNull();
+    expect(markStructuralSyncError).not.toHaveBeenCalled();
   });
 
-  it("popStructuralErrorCode returns null on a network TypeError (catch path)", async () => {
+  it("does not call markStructuralSyncError on a network TypeError (catch path)", async () => {
     const upsertSpy = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
     const client = {
       from: vi.fn().mockReturnValue({ upsert: upsertSpy }),
@@ -900,16 +910,27 @@ describe("pushSingleCard structural error handling (#1358)", () => {
     const result = await pushSingleCard(client, "user-1", card);
 
     expect(result).toBe(false);
-    expect(popStructuralErrorCode()).toBeNull();
+    expect(markStructuralSyncError).not.toHaveBeenCalled();
   });
 
-  it("popStructuralErrorCode returns null on a transient PGRST error", async () => {
+  it("does not call markStructuralSyncError on a transient PGRST error", async () => {
     const client = makeSupabaseClient({ code: "PGRST116", message: "transient", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(5, "2026-05-10", "2026-05-10");
 
     await pushSingleCard(client, "user-1", card);
 
-    expect(popStructuralErrorCode()).toBeNull();
+    expect(markStructuralSyncError).not.toHaveBeenCalled();
+  });
+
+  it("calls clearStructuralSyncError on a successful push (self-heal after deploy fix)", async () => {
+    const client = makeSupabaseClient(null); // no error — success
+    const card = makeCard(6, "2026-05-10", "2026-05-10");
+
+    const result = await pushSingleCard(client, "user-1", card);
+
+    expect(result).toBe(true);
+    expect(clearStructuralSyncError).toHaveBeenCalledTimes(1);
+    expect(markStructuralSyncError).not.toHaveBeenCalled();
   });
 });
 
@@ -917,27 +938,27 @@ describe("pushSession structural error handling (#1358)", () => {
   beforeEach(() => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
-    popStructuralErrorCode();
+    vi.mocked(markStructuralSyncError).mockClear();
+    vi.mocked(clearStructuralSyncError).mockClear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    popStructuralErrorCode();
   });
 
-  it("popStructuralErrorCode returns '42P10' and console.error fires when a batch returns 42P10", async () => {
+  it("calls markStructuralSyncError('42P10') and console.error fires when a batch returns 42P10", async () => {
     const client = makeSupabaseClient({ code: "42P10", message: "ON CONFLICT mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const cards = [makeCard(1, "2026-05-10", "2026-05-10"), makeCard(2, "2026-05-10", "2026-05-10")];
 
     const result = await pushSession(client, "user-1", cards);
 
     expect(result).toBe(false);
-    expect(popStructuralErrorCode()).toBe("42P10");
+    expect(markStructuralSyncError).toHaveBeenCalledWith("42P10");
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining("42P10"));
   });
 
   it("breaks early and calls upsert only once on structural error (does not retry remaining batches)", async () => {
-    // With BATCH=200 and 2 cards, there is only 1 batch. Verify the early-break
+    // With BATCH=200 and 1 card, there is only 1 batch. Verify the early-break
     // logic by checking upsert was called exactly once.
     const client = makeSupabaseClient({ code: "42P10", message: "mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const cards = [makeCard(10, "2026-05-10", "2026-05-10")];
@@ -945,15 +966,26 @@ describe("pushSession structural error handling (#1358)", () => {
     await pushSession(client, "user-1", cards);
 
     expect(client._upsertSpy).toHaveBeenCalledTimes(1);
-    expect(popStructuralErrorCode()).toBe("42P10");
+    expect(markStructuralSyncError).toHaveBeenCalledWith("42P10");
   });
 
-  it("popStructuralErrorCode returns null on a 23514 (deliberate regression trigger)", async () => {
+  it("does not call markStructuralSyncError on a 23514 (deliberate regression trigger)", async () => {
     const client = makeSupabaseClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const cards = [makeCard(11, "2026-05-10", "2026-05-10")];
 
     await pushSession(client, "user-1", cards);
 
-    expect(popStructuralErrorCode()).toBeNull();
+    expect(markStructuralSyncError).not.toHaveBeenCalled();
+  });
+
+  it("calls clearStructuralSyncError when all batches succeed (self-heal)", async () => {
+    const client = makeSupabaseClient(null); // no error — success
+    const cards = [makeCard(12, "2026-05-10", "2026-05-10")];
+
+    const result = await pushSession(client, "user-1", cards);
+
+    expect(result).toBe(true);
+    expect(clearStructuralSyncError).toHaveBeenCalledTimes(1);
+    expect(markStructuralSyncError).not.toHaveBeenCalled();
   });
 });

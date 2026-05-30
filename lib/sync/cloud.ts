@@ -3,12 +3,12 @@ import type { ReviewableCard, BuildSessionOpts } from "@/lib/review/session";
 import { buildSession } from "@/lib/review/session";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
 import { appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
+import { markStructuralSyncError, clearStructuralSyncError } from "@/lib/sync/structuralError";
 
-// NOTE: cloud.ts intentionally does NOT import from persistence.ts — that
-// would create a circular dependency (persistence.ts → cloud.ts → persistence.ts
-// via toCloudRows). Instead, pushSingleCard / pushSession record structural
-// errors in a module-level slot; callers drain it via popStructuralErrorCode()
-// and call markStructuralSyncError from persistence.ts themselves.
+// cloud.ts imports markStructuralSyncError from structuralError.ts — a leaf
+// module that has no imports from cloud.ts or persistence.ts — so there is no
+// circular dependency. persistence.ts re-exports those helpers from the same
+// leaf for callers that already import from persistence.ts.
 
 /** Options forwarded to `buildSession` when rebuilding a card set from seed. */
 export type SeedOpts = BuildSessionOpts;
@@ -66,32 +66,8 @@ export function isStructuralError(error: PostgrestError | null): boolean {
   return false;
 }
 
-/**
- * Module-level slot for the most recent structural error code produced by
- * pushSingleCard / pushSession on the card_reviews path (#1358).
- *
- * Callers (usePerGradeSync.drainQueue, useRetryPush) drain this slot via
- * popStructuralErrorCode() after each push attempt and call
- * markStructuralSyncError from persistence.ts with the code. This indirection
- * avoids a circular import: persistence.ts already imports toCloudRows from
- * cloud.ts, so cloud.ts must not import from persistence.ts.
- */
-let _lastStructuralErrorCode: string | null = null;
-
-/**
- * Returns and clears the most recent structural error code produced by
- * pushSingleCard / pushSession, or null if none has occurred since the last
- * call. Callers should check this after any push and forward to
- * markStructuralSyncError if non-null.
- */
-export function popStructuralErrorCode(): string | null {
-  const code = _lastStructuralErrorCode;
-  _lastStructuralErrorCode = null;
-  return code;
-}
-
 // Sync is best-effort for transient errors. Structural errors on the
-// card_reviews primary path fail loud via popStructuralErrorCode (#1358).
+// card_reviews primary path call markStructuralSyncError directly (#1358).
 
 /**
  * Returns true when a card's SM-2 state is safe to write to the cloud.
@@ -245,12 +221,12 @@ export async function pushSession(
         if (isStructuralError(error)) {
           // Structural errors are never transient — fail loud immediately rather
           // than swallowing as best-effort (#1358). console.error reaches error
-          // monitoring; the slot is drained by callers (pushSession callers in
-          // app/auth and useOnlineReconnectSync) to call markStructuralSyncError.
+          // monitoring; markStructuralSyncError persists the code directly so
+          // no caller-must-pop indirection is needed.
           console.error(
             `[sync] structural error on card_reviews upsert (SQLSTATE ${error.code}): ${error.message}`
           );
-          _lastStructuralErrorCode = error.code;
+          markStructuralSyncError(error.code);
           // Break early — retrying a structural error is pointless until a
           // deploy fixes the mismatch.
           break;
@@ -259,6 +235,12 @@ export async function pushSession(
     } catch {
       allOk = false;
     }
+  }
+  if (allOk) {
+    // All batches succeeded — clear any outstanding structural error.
+    // Only the card_reviews success path clears structuralSyncError; auxiliary
+    // legs must not (#1358 FIX 2).
+    clearStructuralSyncError();
   }
   return allOk;
 }
@@ -302,15 +284,21 @@ export async function pushSingleCard(
       },
       { onConflict: CARD_REVIEWS_CONFLICT_COLS },
     );
-    if (!error) return true;
+    if (!error) {
+      // Successful card_reviews push — clear any outstanding structural error.
+      // This is the ONLY path that clears structuralSyncError; auxiliary-leg
+      // success (pushSettings, pushStreak, etc.) must not clear it (#1358 FIX 2).
+      clearStructuralSyncError();
+      return true;
+    }
     if (isStructuralError(error)) {
       // Structural errors are never transient — fail loud immediately (#1358).
-      // console.error reaches error monitoring; the slot is drained by callers
-      // (usePerGradeSync.drainQueue, useRetryPush) which call markStructuralSyncError.
+      // console.error reaches error monitoring; markStructuralSyncError persists
+      // the code directly so no caller-must-pop indirection is needed.
       console.error(
         `[sync] structural error on card_reviews upsert (SQLSTATE ${error.code}): ${error.message}`
       );
-      _lastStructuralErrorCode = error.code;
+      markStructuralSyncError(error.code);
     }
     return false;
   } catch {
