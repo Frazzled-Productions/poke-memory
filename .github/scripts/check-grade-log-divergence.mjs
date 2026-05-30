@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 //
-// Monitor: grade_log vs card_reviews divergence (closes #607, #1047, #1221)
+// Monitor: grade_log vs card_reviews divergence (closes #607, #1047, #1221, #1357)
 //
 // Why this exists
 // ---------------
 // The #584 incident — signed-in users grading cards without producing
 // card_reviews rows — went unnoticed for ~24 hours because the only signal
 // was a client-side `console.warn`. This script catches the same class of
-// failure from the data side, splitting the question into two independent
-// shapes so each can alert on its own.
+// failure from the data side, splitting the question into three
+// independent shapes so each can alert on its own.
 //
 // What the metric measures (#1047, refined in #1221)
 // --------------------------------------------------
@@ -17,7 +17,7 @@
 // per (user_id, card_type, subject_key) tuple — i.e. one row per *card*,
 // not per grade.
 //
-// There are two distinct failure shapes:
+// There are three distinct failure shapes:
 //
 //   Option A — "row never written"
 //     A subject was graded but has NO matching card_reviews row at all.
@@ -33,6 +33,19 @@
 //     Option B" below). This catches the case Option A misses: the row
 //     was written once (e.g. during the initial pull / merge) but every
 //     subsequent per-grade update was silently dropped.
+//
+//   Option C — "graduated orphan, no grace" (#1357)
+//     A subject whose grade_log shows a graduating grade
+//     (MAX(grade) >= 4) has NO matching card_reviews row at all,
+//     REGARDLESS of the 2-day grace Option A applies. Option A's
+//     persistence window excludes orphans whose grades are <2 days old
+//     even when they have already graduated; the #1344 assessment found
+//     15 of 24 orphaned subjects slipped through exactly this gap. A
+//     graduated card must sync immediately, so a graduated orphan at any
+//     age is a real signal. This arm is intentionally noisier than
+//     Option A (MAX(grade) >= 4 also matches a Good at an intermediate
+//     step) — see the OPTION_C_QUERY comment for the trade-off. Option A
+//     is left untouched; Option C is purely additive.
 //
 // In-step false positives (#1221)
 // -------------------------------
@@ -136,7 +149,7 @@
 // CASE below replicates appTypeToDbType on the grade_log side so the join
 // is expressed in the same card_type vocabulary as card_reviews. All other
 // card types (name / reverse / cry) are identical across both tables and
-// pass through unchanged. Both Option A and Option B apply this
+// pass through unchanged. Options A, B, and C all apply this
 // normalisation so they share a single join vocabulary.
 //
 // Required env vars
@@ -144,8 +157,8 @@
 //   SUPABASE_ACCESS_TOKEN — Management API personal access token (same
 //     secret already used by refresh-user-count.yml and migration-check).
 //   SUPABASE_PROJECT_REF  — project ref slug.
-//   DIVERGENCE_THRESHOLD  — optional, integer, default 0. Applied to both
-//     queries independently: a query whose row count exceeds the threshold
+//   DIVERGENCE_THRESHOLD  — optional, integer, default 0. Applied to all
+//     three queries independently: a query whose row count exceeds the threshold
 //     contributes to the alert. With the corrected metrics every flagged
 //     subject is a real signal, so the default is 0. The env var remains
 //     an escape hatch for temporarily muting a known-noisy run, but it
@@ -201,6 +214,12 @@ const OPTION_A_LOWER_BOUND_DAYS_AGO = 4;
 const OPTION_B_UPPER_BOUND_DAYS_AGO = 2;
 const OPTION_B_LOWER_BOUND_DAYS_AGO = 4;
 const OPTION_B_MIN_GRADES = 3;
+
+// Option C look-back floor (#1357). Unlike Option A, Option C has NO
+// upper-bound recency grace — that is the whole point of the arm. The
+// only reason to bound the look-back at all is query cost, so we reuse
+// Option A's lower-bound floor as the single window edge.
+const OPTION_C_LOWER_BOUND_DAYS_AGO = OPTION_A_LOWER_BOUND_DAYS_AGO;
 
 // Option A query — "row never written".
 //
@@ -307,6 +326,78 @@ HAVING COUNT(*) > 0
 ORDER BY stuck_subjects DESC;
 `.trim();
 
+// Option C query — "graduated orphan, regardless of grace" (#1357).
+//
+// This arm exists because Option A's 2-day persistence window
+// (OPTION_A_UPPER_BOUND_DAYS_AGO) has a blind spot: a card that has
+// already GRADUATED but whose grades are <2 days old is excluded by the
+// `MAX(entry_date) <= CURRENT_DATE - 2` grace filter. The #1344
+// assessment found 15 of 24 orphaned subjects (user 6fbfd530) were never
+// flagged for exactly this reason. A graduated card must sync
+// immediately (`isSyncSafe()` returns true the moment it leaves learning
+// steps), so a graduated subject with no card_reviews row is a real
+// signal at ANY age — the in-step grace does not apply to it.
+//
+// The query is Option A's CTE with the upper-bound recency grace
+// REMOVED. We keep only the lower-bound look-back floor
+// (OPTION_C_LOWER_BOUND_DAYS_AGO, reusing Option A's floor) to bound
+// query cost — see the #1230 floor rationale in the header. The
+// evolution-stream card_type normalisation (#970) is copied verbatim
+// from Options A/B; dropping it would falsely flag every evolution-stream
+// card.
+//
+// Trade-off — Option C is intentionally noisier than Option A.
+// "Graduated" is approximated from grade_log alone as `MAX(grade) >= 4`,
+// the same proxy Option A already uses. But because Option C drops the
+// recency offset, this proxy is looser here: a single Good (4) at an
+// intermediate learning step also satisfies `MAX(grade) >= 4` even though
+// that card has NOT actually graduated yet, so an in-step card that has
+// been graded Good once but not yet finished its steps can show up in
+// this arm during the leading edge. We accept that false-positive surface
+// deliberately: the cost of a benign Option C hit is one investigation,
+// whereas the cost of the blind spot it closes is a silently un-synced
+// graduated card (the #1344 shape). Do NOT add an upper-bound recency
+// grace to this arm to quieten it — that re-creates the exact blind spot
+// Option A already owns and this arm exists to cover.
+//
+// Option A is left untouched: its 2-day grace is deliberate and removing
+// it re-introduces the in-step noise that produced #1213 / #1224. Option
+// C is purely additive — a third arm alongside A and B, never a
+// replacement for A.
+//
+// Grade ratings: 1=Again, 2=Hard, 4=Good, 5=Easy (per
+// `lib/srs/scheduler.ts`).
+const OPTION_C_QUERY = `
+WITH gl_graduated AS (
+  SELECT
+    user_id,
+    CASE card_type
+      WHEN 'evolution' THEN 'evolution-edge'
+      WHEN 'reverse-evolution' THEN 'reverse-evolution-edge'
+      ELSE card_type
+    END AS card_type,
+    subject_key,
+    MAX(entry_date) AS last_entry_date,
+    MAX(grade)      AS max_grade
+  FROM grade_log
+  WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_C_LOWER_BOUND_DAYS_AGO} days')::date
+  GROUP BY user_id, card_type, subject_key
+  HAVING MAX(grade) >= 4
+)
+SELECT
+  g.user_id::text AS user_id,
+  COUNT(*)::int AS graduated_orphan_subjects
+FROM gl_graduated g
+LEFT JOIN card_reviews cr
+  ON cr.user_id = g.user_id
+ AND cr.card_type = g.card_type
+ AND cr.subject_key = g.subject_key
+WHERE cr.user_id IS NULL
+GROUP BY g.user_id
+HAVING COUNT(*) > 0
+ORDER BY graduated_orphan_subjects DESC;
+`.trim();
+
 async function runQuery(projectRef, token, query) {
   const url = `https://api.supabase.com/v1/projects/${projectRef}/database/query`;
   const res = await fetch(url, {
@@ -403,24 +494,63 @@ function formatOptionBSection(rows) {
   return lines.join("\n");
 }
 
-function formatMarkdownReport(flaggedA, flaggedB, threshold) {
+function formatOptionCSection(rows) {
+  const lines = [];
+  lines.push("### Option C — graduated subject with no `card_reviews` row (no grace)");
+  lines.push("");
+  lines.push(
+    `**${rows.length} user(s)** have a subject whose grade_log shows a graduating grade (\`MAX(grade) >= 4\`) within the last ${OPTION_C_LOWER_BOUND_DAYS_AGO} days but **no matching \`card_reviews\` row at all**, regardless of how recent the grade is.`,
+  );
+  lines.push("");
+  lines.push("This is the blind spot Option A cannot see (#1357, from the #1344");
+  lines.push("assessment): Option A's 2-day in-step grace excludes orphans whose");
+  lines.push("grades are <2 days old, even when they have already graduated. A");
+  lines.push("graduated card must sync immediately (`isSyncSafe()` returns true on");
+  lines.push("graduation), so a graduated orphan is a real #584-shape signal at any");
+  lines.push("age — the in-step grace deliberately does not apply to it.");
+  lines.push("");
+  lines.push("Trade-off: this arm is noisier than Option A by design. `MAX(grade)");
+  lines.push(">= 4` is a graduation proxy from grade_log alone, so a single Good at");
+  lines.push("an intermediate learning step can also match. A benign hit here is");
+  lines.push("one investigation; the blind spot it closes is a silently un-synced");
+  lines.push("graduated card. Option A is left untouched — its grace is deliberate.");
+  lines.push("");
+  lines.push("| user_id (prefix) | graduated subjects missing a card_reviews row |");
+  lines.push("|---|---:|");
+  for (const row of rows) {
+    lines.push(`| \`${maskUserId(row.user_id)}\` | **${row.graduated_orphan_subjects}** |`);
+  }
+  lines.push("");
+  lines.push("```sql");
+  lines.push(OPTION_C_QUERY);
+  lines.push("```");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold) {
   const lines = [];
   lines.push("## grade_log vs card_reviews divergence detected");
   lines.push("");
   const firedParts = [];
   if (flaggedA.length > 0) firedParts.push(`**Option A**: ${flaggedA.length} user(s)`);
   if (flaggedB.length > 0) firedParts.push(`**Option B**: ${flaggedB.length} user(s)`);
+  if (flaggedC.length > 0) firedParts.push(`**Option C**: ${flaggedC.length} user(s)`);
   lines.push(`Fired: ${firedParts.join(" • ")}.`);
   lines.push("");
-  lines.push("This monitor splits the divergence question into two independent");
-  lines.push("shapes (introduced in #1221). Either firing is a real signal; both");
-  lines.push("firing for the same user is the loudest possible #584 alert.");
+  lines.push("This monitor splits the divergence question into three independent");
+  lines.push("shapes (Options A/B introduced in #1221, Option C in #1357). Any");
+  lines.push("firing is a real signal; several firing for the same user is the");
+  lines.push("loudest possible #584 alert.");
   lines.push("");
   if (flaggedA.length > 0) {
     lines.push(formatOptionASection(flaggedA));
   }
   if (flaggedB.length > 0) {
     lines.push(formatOptionBSection(flaggedB));
+  }
+  if (flaggedC.length > 0) {
+    lines.push(formatOptionCSection(flaggedC));
   }
   lines.push("### What the metric measures");
   lines.push("");
@@ -430,7 +560,7 @@ function formatMarkdownReport(flaggedA, flaggedB, threshold) {
   lines.push("not per grade. A card's `card_reviews` row, once written, exists");
   lines.push("permanently; sync upserts it and never deletes it.");
   lines.push("");
-  lines.push("Both queries first normalise the grade_log `card_type` to the");
+  lines.push("All three queries first normalise the grade_log `card_type` to the");
   lines.push("`card_reviews` vocabulary (`evolution` → `evolution-edge`,");
   lines.push("`reverse-evolution` → `reverse-evolution-edge`) so evolution-stream");
   lines.push("cards are not falsely counted (#970).");
@@ -472,25 +602,27 @@ async function main() {
     process.exit(2);
   }
 
-  // Run both queries independently so a failure in one does not mask
-  // the other. We do NOT Promise.all here: a fault in either query
+  // Run each query independently so a failure in one does not mask
+  // the others. We do NOT Promise.all here: a fault in any query
   // should bubble up as a workflow failure (the "check is broken"
   // signal), and serial execution makes the failing query obvious in
   // the workflow log.
   const rowsA = await runQuery(projectRef, token, OPTION_A_QUERY);
   const rowsB = await runQuery(projectRef, token, OPTION_B_QUERY);
+  const rowsC = await runQuery(projectRef, token, OPTION_C_QUERY);
 
-  // Per-query threshold filter. Both default to "any non-zero".
+  // Per-query threshold filter. All default to "any non-zero".
   const flaggedA = rowsA.filter((r) => Number(r.missing_subjects) > threshold);
   const flaggedB = rowsB.filter((r) => Number(r.stuck_subjects) > threshold);
+  const flaggedC = rowsC.filter((r) => Number(r.graduated_orphan_subjects) > threshold);
 
   // Always emit a one-line summary to stderr so the workflow log shows
   // what we saw, regardless of whether we're alerting.
   console.error(
-    `[divergence-check] Option A: ${rowsA.length} user(s) with subjects ≥${OPTION_A_UPPER_BOUND_DAYS_AGO}d old missing a card_reviews row (${flaggedA.length} above threshold). Option B: ${rowsB.length} user(s) with stuck card_reviews rows despite ≥${OPTION_B_MIN_GRADES} grades ≥${OPTION_B_UPPER_BOUND_DAYS_AGO}d old (${flaggedB.length} above threshold).`,
+    `[divergence-check] Option A: ${rowsA.length} user(s) with subjects ≥${OPTION_A_UPPER_BOUND_DAYS_AGO}d old missing a card_reviews row (${flaggedA.length} above threshold). Option B: ${rowsB.length} user(s) with stuck card_reviews rows despite ≥${OPTION_B_MIN_GRADES} grades ≥${OPTION_B_UPPER_BOUND_DAYS_AGO}d old (${flaggedB.length} above threshold). Option C: ${rowsC.length} user(s) with graduated orphans within ${OPTION_C_LOWER_BOUND_DAYS_AGO}d, no grace (${flaggedC.length} above threshold).`,
   );
 
-  if (flaggedA.length === 0 && flaggedB.length === 0) {
+  if (flaggedA.length === 0 && flaggedB.length === 0 && flaggedC.length === 0) {
     console.log("OK");
     return;
   }
@@ -503,15 +635,16 @@ async function main() {
   const bodyPath =
     process.env.DIVERGENCE_BODY_PATH ??
     join(mkdtempSync(join(tmpdir(), "divergence-")), "body.md");
-  writeFileSync(bodyPath, formatMarkdownReport(flaggedA, flaggedB, threshold), "utf8");
+  writeFileSync(bodyPath, formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold), "utf8");
 
   // Log the masked summary to stdout — the workflow grep / wc -l doesn't
   // rely on this, but the JSON shape is useful for manual inspection.
-  // `user_count` is the union of users flagged by either query, so the
+  // `user_count` is the union of users flagged by any query, so the
   // workflow's issue title reflects the total breadth of the alert.
   const flaggedUserIds = new Set([
     ...flaggedA.map((r) => r.user_id),
     ...flaggedB.map((r) => r.user_id),
+    ...flaggedC.map((r) => r.user_id),
   ]);
   console.log(
     JSON.stringify(
@@ -534,6 +667,14 @@ async function main() {
           users: flaggedB.map((r) => ({
             user_id_prefix: maskUserId(r.user_id),
             stuck_subjects: Number(r.stuck_subjects),
+          })),
+        },
+        option_c: {
+          lower_bound_days_ago: OPTION_C_LOWER_BOUND_DAYS_AGO,
+          user_count: flaggedC.length,
+          users: flaggedC.map((r) => ({
+            user_id_prefix: maskUserId(r.user_id),
+            graduated_orphan_subjects: Number(r.graduated_orphan_subjects),
           })),
         },
         user_count: flaggedUserIds.size,
