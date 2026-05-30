@@ -7,6 +7,20 @@ import { appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
 /** Options forwarded to `buildSession` when rebuilding a card set from seed. */
 export type SeedOpts = BuildSessionOpts;
 
+/**
+ * The `onConflict` column list for `card_reviews` upserts.
+ *
+ * Must exactly match the table's PRIMARY KEY: (user_id, card_type, subject_key, locale).
+ * Migration 029 widened the PK from 3 columns to 4 (adding locale). Exporting
+ * this constant — and importing it at every upsert call site (cloud.ts + route.ts)
+ * — means the integration test in lib/sync/integration/onconflict-pk-parity.test.ts
+ * mechanically catches any future PK change that is not matched by a client update.
+ * That is the safeguard that would have caught the #1344 silent-outage shape at CI time.
+ */
+export const CARD_REVIEWS_CONFLICT_COLS =
+  "user_id,card_type,subject_key,locale" as const;
+
+
 // Sync is best-effort: all errors are swallowed so a network hiccup never
 // breaks the local-first review flow.
 
@@ -156,7 +170,7 @@ export async function pushSession(
     try {
       const { error } = await client
         .from("card_reviews")
-        .upsert(batch, { onConflict: "user_id,card_type,subject_key,locale" });
+        .upsert(batch, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
       if (error) allOk = false;
     } catch {
       allOk = false;
@@ -202,7 +216,7 @@ export async function pushSingleCard(
         seen_in_pasture: card.state.seenInPasture,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id,card_type,subject_key,locale" },
+      { onConflict: CARD_REVIEWS_CONFLICT_COLS },
     );
     return !error;
   } catch {
