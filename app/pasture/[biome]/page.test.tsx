@@ -62,9 +62,14 @@ vi.mock("@/lib/settings/persistence", () => ({
     practiceScope: { gens: [], types: [], presets: [] },
     earnedBadges: [],
     retentionTarget: 0.9,
+    pokemonNameLocale: "en" as const,
   })),
   saveSettings: vi.fn(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
+}));
+
+vi.mock("@/lib/review/session", () => ({
+  hydrateSession: vi.fn((_saved: unknown[]) => []),
 }));
 
 vi.mock("@/lib/superuser/SuperuserContext", () => ({

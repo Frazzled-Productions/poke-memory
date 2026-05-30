@@ -113,6 +113,39 @@ describe("scenario payload builders", () => {
     expect(learning.length).toBeGreaterThanOrEqual(10);
   });
 
+  it("pasture-progression: sets pokemonNameLocale to 'en'", () => {
+    const payload = SCENARIO_BY_SLUG.get("pasture-progression")!.build();
+    expect(payload.pokemonNameLocale).toBe("en");
+  });
+
+  it("pasture-progression: has both en-locale and ja-locale mastered name cards (per-locale FSRS demo)", () => {
+    const payload = SCENARIO_BY_SLUG.get("pasture-progression")!.build();
+    const cards = payload.session?.cards ?? [];
+
+    // Must have en-locale mastered name cards (the main 40).
+    const enMasteredNames = cards.filter(
+      (c) => c.cardType === "name" &&
+        (c as { locale?: string }).locale === "en" &&
+        c.state.reps >= 3 && c.state.scheduledDays >= 21,
+    );
+    expect(enMasteredNames.length).toBeGreaterThanOrEqual(40);
+
+    // Must also have ja-locale mastered name cards (the locale-demo subset).
+    const jaMasteredNames = cards.filter(
+      (c) => c.cardType === "name" &&
+        (c as { locale?: string }).locale === "ja" &&
+        c.state.reps >= 3 && c.state.scheduledDays >= 21,
+    );
+    expect(jaMasteredNames.length).toBeGreaterThanOrEqual(1);
+    // ja count must be strictly less than en count so switching locale shows a different number.
+    expect(jaMasteredNames.length).toBeLessThan(enMasteredNames.length);
+  });
+
+  it("mastery-gaps: sets pokemonNameLocale to 'en'", () => {
+    const payload = SCENARIO_BY_SLUG.get("mastery-gaps")!.build();
+    expect(payload.pokemonNameLocale).toBe("en");
+  });
+
   describe("mastery-gaps scenario", () => {
     function buildCards() {
       const payload = SCENARIO_BY_SLUG.get("mastery-gaps")!.build();

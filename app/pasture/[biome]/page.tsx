@@ -11,9 +11,10 @@ import { biomeStats } from "@/lib/pasture/stats";
 import { PastureZone } from "@/components/pasture/PastureZone";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
+import { hydrateSession } from "@/lib/review/session";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
@@ -108,15 +109,30 @@ export default function BiomeLandscapePage({
         setMasteredCards(all);
       } else {
         const session = await loadSession();
-        const masteryRepetitions = loadSettings().masteryRepetitions;
-        const cards = session
-          ? (filterMastered(
-              session.cards,
-              false,
-              masteryRepetitions,
-            ) as NameReviewCard[])
-          : [];
-        setMasteredCards(cards);
+        const { masteryRepetitions, pokemonNameLocale } = loadSettings();
+        if (session) {
+          // Hydrate so each card carries the full SEED_POKEMON fields (habitat,
+          // isDefaultForm, etc.) that biomeStats and the biome filter depend on.
+          // All *Enabled flags are false — only refresh existing cards from seed
+          // (backfill habitat, isDefaultForm, etc.) without adding ~1 000 new unseen cards.
+          const hydrated = hydrateSession(session.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+            reverseEnabled: false,
+            nameEnabled: false,
+            evolutionEnabled: false,
+            reverseEvolutionEnabled: false,
+            cryEnabled: false,
+            locale: pokemonNameLocale,
+          });
+          const cards = filterMastered(
+            hydrated,
+            false,
+            masteryRepetitions,
+            pokemonNameLocale,
+          ) as NameReviewCard[];
+          setMasteredCards(cards);
+        } else {
+          setMasteredCards([]);
+        }
       }
     }
     void load();

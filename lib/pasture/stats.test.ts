@@ -195,6 +195,19 @@ describe("biomeStats", () => {
     expect(stats.capturedPercent).toBeLessThanOrEqual(100);
   });
 
+  it("cards with isDefaultForm=true are counted (regression: unhydrated seed had undefined)", () => {
+    // When cards come from a QA seed (minimal shape), isDefaultForm is undefined/falsy.
+    // The pasture page now calls hydrateSession before filterMastered, so all cards
+    // flowing into biomeStats have isDefaultForm set from SEED_POKEMON.
+    // This test documents the expected (post-hydration) behaviour: only cards with
+    // isDefaultForm=true are counted.
+    const cards = [
+      makeCard(10, "Caterpie", "forest"), // isDefaultForm: true — should count
+    ];
+    const stats = biomeStats("forest", cards);
+    expect(stats.masteredCount).toBe(1);
+  });
+
   it("non-default-form cards are not counted toward masteredCount or capturedPercent", () => {
     // A mastered alternate forme (isDefaultForm: false) in the forest habitat
     // must not inflate masteredCount above the default-form denominator.
