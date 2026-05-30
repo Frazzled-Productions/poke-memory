@@ -149,8 +149,11 @@ export function useSyncOnUnload(
             }
           }
 
+          // Re-read the persisted status after markStructuralSyncError may have
+          // written to localStorage (409 path), so a stale `prev` snapshot does
+          // not overwrite the just-written structuralSyncError back to null.
           saveSyncStatus({
-            ...prev,
+            ...loadSyncStatus(),
             lastPushAttemptAt: now,
             lastPushFailed: !ok,
             failedCardCount: ok ? 0 : unsynced.length,
