@@ -76,7 +76,7 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 - `computeStats(…)` from `lib/stats/derive.ts` — aggregate stats with the same superuser axis.
 - `masteredSpeciesIds(…)` from `lib/badges/derive.ts` — mastered species set.
 - `useCardClass(…)` from `lib/review/useCardClass.ts` — card-class derivation.
-- Class-name constants in `lib/utils/class-names.ts` — `cardPanel`, `cardPanelPadded`, `colStack`, `colStackLg`, `sectionLabel`, `dialogPanel`, `statValue`, `chartTickText`, `mutedText`, `inlineLink`, `mutedTextXs`, `chartTooltipCard`. Never inline the underlying Tailwind literal — import the named constant so a visual convention change lives in one file. (`mutedTextXs` is the base `text-xs` muted form; compose spacing like `mt-1` at the call site.)
+- Class-name constants in `lib/utils/class-names.ts` — `cardPanel`, `cardPanelPadded`, `colStack`, `colStackLg`, `sectionLabel`, `sectionLabelSm`, `sectionLabelSubtle`, `sectionLabelSmSubtle`, `dialogPanel`, `statValue`, `chartTickText`, `mutedText`, `inlineLink`, `mutedTextXs`, `chartTooltipCard`. Never inline the underlying Tailwind literal — import the named constant so a visual convention change lives in one file. (`mutedTextXs` is the base `text-xs` muted form; compose spacing like `mt-1` at the call site.)
 
 **Trade-off.** A premature abstraction is worse than three similar lines. The rule is *don't fragment what's already shared*, not *abstract every duplication*. Three sites with the same pattern that aren't going to grow are fine; three sites that ARE going to need a cross-cutting change next month must share a helper now. Where the failure mode is easy to encode at PR time, prefer a lint rule (see #1327 for the Pokémon-name case) over a convention-only enforcement.
 
@@ -275,7 +275,7 @@ Two non-negotiable rules for every user-facing change, enforced in the implement
 
 - **Verify by running the app, not just green CI.** Unit + e2e green is necessary but not sufficient for core user-facing mechanics. At close-out the orchestrator runs the app (or drives Playwright / the `/verify` skill) in the relevant state — locale switched, seed applied, the empty branch — and eyeballs every affected surface, including the exempted ones, before declaring done. (memory: `feedback_verify_core_mechanics_by_running_app`.)
 
-- **Localising a number can break a `\d+` assertion.** When a number is rendered through `Intl.NumberFormat` / next-intl `useFormatter().number()` / an ICU `#` placeholder, the value gains locale digit-grouping (e.g. `26,645`, or a narrow-NBSP separator in some locales). Any unit or e2e assertion that matched the raw number with `\d+` must be updated to tolerate the separator (e.g. `[\d,  ]+`). This bit #1408: a Pokédex "Next review: in N days" e2e regex broke on a grouped day count. When touching number rendering, grep `e2e/` and tests for `\d+`-near-number assertions.
+- **Localising a number can break a `\d+` assertion.** When a number is rendered through `Intl.NumberFormat` / next-intl `useFormatter().number()` / an ICU `#` placeholder, the value gains locale digit-grouping (e.g. `26,645`, or a narrow-NBSP separator in some locales). Any unit or e2e assertion that matched the raw number with `\d+` must be updated to tolerate the separator (e.g. `[\d\s, ]+`). This bit #1408: a Pokédex "Next review: in N days" e2e regex broke on a grouped day count. When touching number rendering, grep `e2e/` and tests for `\d+`-near-number assertions.
 
 ### Local development gotchas
 
