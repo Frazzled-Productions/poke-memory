@@ -545,7 +545,8 @@ export default function JourneyPage() {
   const snapshotOptions = useMemo(() => ({
     masteryRepetitions: masteryRepetitions ?? undefined,
     forceAllMastered: flags.pretendAllMastered,
-  }), [masteryRepetitions, flags.pretendAllMastered]);
+    locale: pokemonNameLocale,
+  }), [masteryRepetitions, flags.pretendAllMastered, pokemonNameLocale]);
 
   const snapshotInput = useMemo(() => {
     if (cards === null || masteryRepetitions === null) return null;
