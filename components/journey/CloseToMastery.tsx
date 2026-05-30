@@ -76,9 +76,12 @@ function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
             max={MASTERY_INTERVAL_DAYS}
             fillClass="bg-amber-400 dark:bg-amber-500"
             label={progressLabel}
+            transitionClass="transition-[width]"
             className="w-20"
           />
-          <span className={cn("text-xs tabular-nums", mutedText)}>
+          {/* aria-hidden: the meter's aria-label already carries the "Xd of 21d"
+              semantic; hiding the visual "Xd" avoids double announcement. */}
+          <span className={cn("text-xs tabular-nums", mutedText)} aria-hidden="true">
             {entry.reverseIntroduced
               ? `${entry.reverseScheduledDays}d`
               : tWidget("notStarted")}

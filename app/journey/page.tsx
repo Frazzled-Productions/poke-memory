@@ -376,6 +376,7 @@ function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
                       fillClass="bg-emerald-500"
                       label={`${gen.name}: ${gen.mastered} of ${gen.total} mastered (${masteredPct}%)`}
                       trackClass="dark:bg-zinc-800"
+                      transitionClass=""
                       className="w-20"
                     />
                     <span className="min-w-[64px] text-right tabular-nums text-zinc-500 dark:text-zinc-400">

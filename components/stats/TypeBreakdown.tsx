@@ -58,6 +58,7 @@ export function TypeBreakdown({ perType }: Props) {
                 fillClass={colors?.bg ?? "bg-zinc-500"}
                 label={`${masteredPct}% of ${t.type}-type Pokémon mastered`}
                 trackClass="dark:bg-zinc-800"
+                transitionClass=""
               />
             </li>
           );

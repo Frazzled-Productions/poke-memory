@@ -164,4 +164,45 @@ describe("MeterBar", () => {
     );
     expect(screen.getByRole("meter").className).toContain("w-20");
   });
+
+  // -------------------------------------------------------------------------
+  // transitionClass — animation fidelity
+  // -------------------------------------------------------------------------
+
+  it("applies the default transition-all class to the fill div when transitionClass is omitted", () => {
+    render(
+      <MeterBar value={50} max={100} fillClass="bg-emerald-500" label="Test" />,
+    );
+    const fill = screen.getByRole("meter").firstElementChild as HTMLElement;
+    expect(fill.className).toContain("transition-all");
+  });
+
+  it("applies a custom transitionClass to the fill div", () => {
+    render(
+      <MeterBar
+        value={50}
+        max={100}
+        fillClass="bg-emerald-500"
+        label="Test"
+        transitionClass="transition-all duration-300"
+      />,
+    );
+    const fill = screen.getByRole("meter").firstElementChild as HTMLElement;
+    expect(fill.className).toContain("transition-all");
+    expect(fill.className).toContain("duration-300");
+  });
+
+  it("suppresses all transition when transitionClass is empty string", () => {
+    render(
+      <MeterBar
+        value={50}
+        max={100}
+        fillClass="bg-emerald-500"
+        label="Test"
+        transitionClass=""
+      />,
+    );
+    const fill = screen.getByRole("meter").firstElementChild as HTMLElement;
+    expect(fill.className).not.toContain("transition");
+  });
 });

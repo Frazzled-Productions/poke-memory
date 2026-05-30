@@ -258,6 +258,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
               fillClass="bg-blue-500"
               label={`Introduced: ${introducedPct}%`}
               trackClass="dark:bg-zinc-800"
+              transitionClass="transition-all duration-200"
             />
             <MeterBar
               value={snapshot.mastered}
@@ -265,6 +266,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
               fillClass="bg-emerald-500"
               label={`Mastered: ${masteredPct}%`}
               trackClass="dark:bg-zinc-800"
+              transitionClass="transition-all duration-200"
             />
           </div>
         )}
@@ -276,6 +278,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
               fillClass="bg-amber-400"
               label={`Retained: ${masteredPct}%`}
               trackClass="dark:bg-zinc-800"
+              transitionClass="transition-all duration-200"
             />
           </div>
         )}

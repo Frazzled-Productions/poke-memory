@@ -54,6 +54,7 @@ function GameRow({ row }: { row: GameStats }) {
           max={row.total}
           fillClass="bg-emerald-500 dark:bg-emerald-400"
           label={`${label}: ${row.mastered} of ${row.total} mastered (${masteredPct}%)`}
+          transitionClass="transition-all duration-300"
           className="flex-1"
         />
         <span className="w-9 text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">

@@ -14,6 +14,11 @@
  *   - `fillClass` — fill colour (e.g. "bg-emerald-500 dark:bg-emerald-400")
  *   - `trackClass` — dark-mode track override (defaults to "dark:bg-zinc-700");
  *     pass "dark:bg-zinc-800" for surfaces that use the darker track tone
+ *   - `transitionClass` — CSS transition applied to the fill div. Defaults to
+ *     "transition-all". Pass "" to suppress animation, or e.g.
+ *     "transition-all duration-300" to match an exact original timing. Each
+ *     adopted site threads its own value so the animation behaviour is
+ *     identical to what it was before extraction.
  *   - `className` — extra structural classes, e.g. "flex-1" or "w-20"
  *
  * When `max === 0` the fill renders at 0% width (empty bar).
@@ -45,6 +50,12 @@ type MeterBarProps = {
    * the visual is preserved exactly.
    */
   trackClass?: string;
+  /**
+   * Tailwind transition class(es) applied to the fill div. Defaults to
+   * "transition-all". Pass "" to suppress animation entirely, or e.g.
+   * "transition-all duration-300" to reproduce a specific original timing.
+   */
+  transitionClass?: string;
   /** Optional extra Tailwind classes, e.g. "flex-1" or "w-20". */
   className?: string;
 };
@@ -59,6 +70,7 @@ export function MeterBar({
   fillClass,
   label,
   trackClass = "dark:bg-zinc-700",
+  transitionClass = "transition-all",
   className,
 }: MeterBarProps) {
   const pct = max === 0 ? 0 : Math.round((value / max) * 100);
@@ -79,7 +91,13 @@ export function MeterBar({
         .join(" ")}
     >
       <div
-        className={`h-full rounded-full transition-all ${fillClass}`}
+        className={[
+          "h-full rounded-full",
+          transitionClass,
+          fillClass,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         style={{ width: `${pct}%` }}
       />
     </div>
