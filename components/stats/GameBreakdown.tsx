@@ -9,6 +9,7 @@ import {
   VERSION_GROUP_ORDER,
 } from "@/lib/pokemon/versionGroupLabels";
 import { mutedTextXs } from "@/lib/utils/class-names";
+import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,22 +49,18 @@ function GameRow({ row }: { row: GameStats }) {
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <div
-          className="flex-1 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700"
-          aria-hidden="true"
-        >
-          <div
-            className="h-full bg-emerald-500 dark:bg-emerald-400 transition-all duration-300"
-            style={{ width: `${masteredPct}%` }}
-          />
-        </div>
+        <MeterBar
+          value={row.mastered}
+          max={row.total}
+          fillClass="bg-emerald-500 dark:bg-emerald-400"
+          label={`${label}: ${row.mastered} of ${row.total} mastered (${masteredPct}%)`}
+          transitionClass="transition-all duration-300"
+          className="flex-1"
+        />
         <span className="w-9 text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
           {masteredPct}%
         </span>
       </div>
-      <span className="sr-only">
-        {label}: {row.mastered} of {row.total} mastered ({masteredPct}%)
-      </span>
     </li>
   );
 }
