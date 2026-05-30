@@ -642,6 +642,19 @@
     },
     "getStarted": "はじめる"
   },
+  "sync": {
+    "status": {
+      "lastSynced": "最終同期: {time}",
+      "atTime": "{time}に",
+      "notSyncedYet": "まだ同期されていません。",
+      "syncFailed": "同期に失敗しました",
+      "cardsOutOfSync": "{count, plural, other {# 件のカードが同期されていない可能性があります}}",
+      "retrying": "再試行中…",
+      "retryFailed": "再試行に失敗しました · もう一度試す",
+      "schemaError": "同期エラー: スキーマの不一致が検出されました。進捗はローカルに安全に保存されています。",
+      "retry": "再試行"
+    }
+  },
   "common": {
     "viewInPokedex": "Pokédex で{name}を見る",
     "noResults": "フィルターに一致する Pokémon がいません。"

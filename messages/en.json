@@ -642,6 +642,19 @@
     },
     "getStarted": "Get started"
   },
+  "sync": {
+    "status": {
+      "lastSynced": "Last synced: {time}",
+      "atTime": "at {time}",
+      "notSyncedYet": "Not synced yet.",
+      "syncFailed": "Sync failed",
+      "cardsOutOfSync": "{count, plural, one {# card may be out of sync} other {# cards may be out of sync}}",
+      "retrying": "Retrying…",
+      "retryFailed": "Retry failed · Try again",
+      "schemaError": "Sync error: a schema mismatch was detected. Your progress is safe locally.",
+      "retry": "Retry"
+    }
+  },
   "common": {
     "viewInPokedex": "View {name} in Pokédex",
     "noResults": "No Pokémon match your filters."
