@@ -12,6 +12,8 @@
 import {
   renderWithIntl,
   renderJa,
+  renderZhHans,
+  renderZhHant,
   screen,
   act,
   fireEvent,
@@ -85,7 +87,7 @@ describe("FirstVisitOnboardingModal", () => {
     await screen.findByRole("dialog", { name: /welcome to pok[eé] memory/i });
     // "Again" appears as part of the grading list item text.
     expect(screen.getAllByText(/again/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/grade honestly/i)).toBeInTheDocument();
+    expect(screen.getByText(/be honest when you grade/i)).toBeInTheDocument();
   });
 
   it("closes and persists flag when the Get started button is clicked", async () => {
@@ -249,6 +251,78 @@ describe("FirstVisitOnboardingModal", () => {
       expect(
         screen.getByRole("button", { name: /はじめる/ }),
       ).toBeInTheDocument();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Locale coverage for the three reworded keys (#1431).
+  // Each test picks a distinctive word/phrase from the updated translation so
+  // that a mis-wired or stale catalogue value would fail visibly.
+  // ---------------------------------------------------------------------------
+
+  describe("i18n locale coverage: intro (#1431)", () => {
+    it("en: renders plain-English intro (no 'spaced repetition' jargon)", async () => {
+      renderWithIntl(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // New en intro contains "longer the gap before it comes back" — distinctive phrase.
+      expect(screen.getByText(/longer the gap before it comes back/i)).toBeInTheDocument();
+    });
+
+    it("ja: renders updated intro in Japanese (no 間隔反復 jargon)", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // ja intro now starts with "すべての Pokémon の名前と進化を覚えましょう"
+      // Distinctive word: 間隔が長くなります (gap grows)
+      expect(screen.getByText(/間隔が長くなります/)).toBeInTheDocument();
+    });
+
+    it("zh-Hans: renders updated intro in Simplified Chinese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("zh-Hans");
+      renderZhHans(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // Distinctive phrase from zh-Hans intro: 间隔就越长
+      expect(screen.getByText(/间隔就越长/)).toBeInTheDocument();
+    });
+
+    it("zh-Hant: renders updated intro in Traditional Chinese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("zh-Hant");
+      renderZhHant(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // Distinctive phrase from zh-Hant intro: 間隔就越長
+      expect(screen.getByText(/間隔就越長/)).toBeInTheDocument();
+    });
+  });
+
+  describe("i18n locale coverage: guestStorage.body (#1431)", () => {
+    it("en: renders updated guest storage body ('kept on this device')", async () => {
+      renderWithIntl(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      expect(screen.getByText(/kept on this device/i)).toBeInTheDocument();
+    });
+
+    it("ja: renders updated guest storage body in Japanese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // ja guestStorage.body distinctive phrase: 他のデバイスでも使えるようになります
+      expect(screen.getByText(/他のデバイスでも使えるようになります/)).toBeInTheDocument();
+    });
+
+    it("zh-Hans: renders updated guest storage body in Simplified Chinese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("zh-Hans");
+      renderZhHans(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // Distinctive phrase from zh-Hans guestStorage.body: 在其他设备上使用
+      expect(screen.getByText(/在其他设备上使用/)).toBeInTheDocument();
+    });
+
+    it("zh-Hant: renders updated guest storage body in Traditional Chinese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("zh-Hant");
+      renderZhHant(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      // Distinctive phrase from zh-Hant guestStorage.body: 在其他裝置上使用
+      expect(screen.getByText(/在其他裝置上使用/)).toBeInTheDocument();
     });
   });
 

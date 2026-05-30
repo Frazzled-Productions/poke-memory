@@ -258,7 +258,7 @@ test.describe("Guest storage section in onboarding modal (#1057)", () => {
 
     // Guest storage info must be present inside the modal.
     await expect(modal.getByText(/your progress is saved on this device/i)).toBeVisible();
-    await expect(modal.getByText(/stored in your browser/i)).toBeVisible();
+    await expect(modal.getByText(/kept on this device/i)).toBeVisible();
   });
 
   test("guest storage section is absent after the modal is dismissed", async ({
