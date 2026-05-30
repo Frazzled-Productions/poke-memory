@@ -2,6 +2,7 @@ import type { Grade } from "@/lib/srs/scheduler";
 import { idbGet, idbSet, isIdbAvailable } from "@/lib/idb/db";
 import { KEY_GRADE_LOG } from "@/lib/storage/keys";
 import type { AppLocale } from "@/i18n/locales";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 
 export type GradeLogEntry = {
   date: string;
@@ -145,14 +146,7 @@ function parseGradeLog(raw: string): GradeLog {
 
 // Synchronous localStorage fallback used when IndexedDB is unavailable.
 function loadGradeLogLS(): GradeLog {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return [];
-    return parseGradeLog(raw);
-  } catch {
-    return [];
-  }
+  return readLocalStorage(STORAGE_KEY, parseGradeLog, []);
 }
 
 export async function loadGradeLog(): Promise<GradeLog> {

@@ -68,7 +68,7 @@ import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
 import { triggerHaptic } from "@/lib/review/haptic";
 import { markSessionActive, markSessionInactive } from "@/lib/review/sessionActive";
-import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
+import { KEY_HAS_MASTERED, KEY_SETTINGS } from "@/lib/storage/keys";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
   loadDailySummary,
@@ -992,7 +992,7 @@ export function ReviewSession() {
   // Reload when settings change in another tab so reverseEnabled and limits stay current.
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key === "poke-memory:settings:v1") {
+      if (e.key === KEY_SETTINGS) {
         window.location.reload();
       }
     }

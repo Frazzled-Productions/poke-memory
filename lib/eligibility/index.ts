@@ -18,6 +18,8 @@
  * The predicate is PURE: no I/O, no globals, no seed imports.
  */
 
+import { Subject } from "@/lib/cards/subjectKey";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -144,18 +146,15 @@ export function isCardEligible(
       cardType === "evolution-edge" ||
       cardType === "reverse-evolution-edge"
     ) {
-      // subjectKey format: "<fromId>>><toId>" — split on ">>>".
+      // Route through Subject.parseEdge (the canonical codec for "<fromId>>><toId>" keys).
       // See `docs/card-identity.md` and `lib/cards/subjectKey.ts`.
-      const parts = subjectKey.split(">>>");
-      if (parts.length === 2) {
-        const fromId = parseInt(parts[0], 10);
-        const toId = parseInt(parts[1], 10);
-        if (
-          (!isNaN(fromId) && fromId >= ALT_FORM_ID_THRESHOLD) ||
-          (!isNaN(toId) && toId >= ALT_FORM_ID_THRESHOLD)
-        ) {
+      try {
+        const { fromId, toId } = Subject.parseEdge(subjectKey);
+        if (fromId >= ALT_FORM_ID_THRESHOLD || toId >= ALT_FORM_ID_THRESHOLD) {
           return false;
         }
+      } catch {
+        // Malformed subjectKey — treat as eligible (unknown cards pass through).
       }
     }
   }

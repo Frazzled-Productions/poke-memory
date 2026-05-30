@@ -17,6 +17,7 @@
 
 import { useEffect } from "react";
 import { KEY_PERSIST_REQUESTED } from "@/lib/storage/keys";
+import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 
 export function usePersistentStorage(): void {
   useEffect(() => {
@@ -40,12 +41,12 @@ export function usePersistentStorage(): void {
       .persisted()
       .then((alreadyPersisted) => {
         if (alreadyPersisted) {
-          localStorage.setItem(KEY_PERSIST_REQUESTED, "true");
+          writeLocalStorageRaw(KEY_PERSIST_REQUESTED, "true");
           return;
         }
         return navigator.storage.persist().then((granted) => {
           if (granted) {
-            localStorage.setItem(KEY_PERSIST_REQUESTED, "true");
+            writeLocalStorageRaw(KEY_PERSIST_REQUESTED, "true");
           }
           // If not granted (e.g. no PWA install, no engagement heuristic met),
           // we don't record it — the next mount will try again, which is fine

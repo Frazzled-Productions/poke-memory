@@ -8,6 +8,7 @@ import {
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { isMastered } from "@/lib/stats/derive";
 import { KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 
 // Legacy localStorage key. The favourite theme used to live here standalone;
 // since #307 the canonical store is `user_settings.settings.favouriteTheme`
@@ -93,16 +94,22 @@ export function loadFavourite(): StoredFavourite | null {
       // One-time migration from the legacy standalone key. If a user has a
       // saved theme from before #307, copy it into settings and clear the
       // legacy key so subsequent loads come from the canonical source.
-      const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (raw !== null) {
-        try {
-          favourite = validateRawFavourite(JSON.parse(raw));
-        } catch {
-          favourite = null;
-        }
-        if (favourite !== null) {
+      //
+      // We check for key presence first so we know whether to attempt
+      // removal (avoid a no-op removeItem on every load once migrated).
+      const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacyRaw !== null) {
+        const legacyParsed = readLocalStorage(
+          LEGACY_STORAGE_KEY,
+          (raw) => validateRawFavourite(JSON.parse(raw) as unknown),
+          null,
+        );
+        if (legacyParsed !== null) {
+          favourite = legacyParsed;
           saveSettings({ ...settings, favouriteTheme: favourite });
         }
+        // Clear the legacy key regardless of whether it parsed — we've either
+        // migrated it or it was corrupt and we don't want to re-attempt.
         try {
           localStorage.removeItem(LEGACY_STORAGE_KEY);
         } catch {

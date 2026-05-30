@@ -10,6 +10,8 @@ import {
 } from "@/lib/review/scope";
 import type { DateFormat } from "@/lib/utils/format-date";
 import { KEY_SETTINGS } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
 import {
   DEFAULT_STREAK_PROTECTION,
   validateStreakProtection,
@@ -700,8 +702,11 @@ function validateEarnedBadges(
 // — once `saveSettings` runs it always carries `practiceScope`).
 export function loadSettings(): UserSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  const settings = parseStoredSettings(raw);
+  const settings = readLocalStorage(
+    STORAGE_KEY,
+    (raw) => parseStoredSettings(raw),
+    { ...DEFAULT_SETTINGS },
+  );
 
   // Legacy scope migration. Only fires when the current settings.practiceScope
   // is the empty default — a non-empty stored field always wins. The legacy
@@ -732,7 +737,10 @@ export const SETTINGS_SAVED_EVENT = "poke-memory:settings-saved";
 // Serialises to localStorage. No-op on server. Never throws.
 export function saveSettings(settings: UserSettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  // writeLocalStorage handles the guard + try/catch. The CustomEvent dispatch
+  // is kept explicit here because it carries a typed detail payload that is
+  // not a plain StorageEvent.
+  writeLocalStorage(STORAGE_KEY, settings);
   window.dispatchEvent(
     new CustomEvent(SETTINGS_SAVED_EVENT, { detail: settings }),
   );

@@ -27,6 +27,7 @@
  */
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { readLocalStorage } from "../storage/readLocalStorage";
 
 /** Public env var that opts a build into the mock-auth seam. */
 export const MOCK_AUTH_ENV_VAR = "NEXT_PUBLIC_E2E_AUTH_MOCK";
@@ -223,15 +224,16 @@ export const MOCK_CLOUD_FIXTURE_STORAGE_KEY = "poke-memory:e2e:mock-cloud-fixtur
 
 /** Reads the per-test cloud-fixture override from localStorage, if any. */
 function readFixtureOverride(): Partial<MockCloudFixture> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(MOCK_CLOUD_FIXTURE_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readLocalStorage(
+    MOCK_CLOUD_FIXTURE_STORAGE_KEY,
+    (raw) => {
+      const parsed: unknown = JSON.parse(raw);
+      return typeof parsed === "object" && parsed !== null
+        ? (parsed as Partial<MockCloudFixture>)
+        : {};
+    },
+    {},
+  );
 }
 
 /**
