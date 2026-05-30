@@ -164,6 +164,20 @@ Until the onboarding copy is human-reviewed, the non-English locales are treated
 
 No data-flow change is involved — locale selection is a display preference only (see `docs/dpia.md` and `docs/cookies-pecr.md`). The follow-up is copy quality, not data practice.
 
+---
+**Best-effort machine review pass (2026-05-30, #1376)**
+
+A best-effort review of the onboarding modal (`onboarding` namespace in `messages/ja.json`, `messages/zh-Hans.json`, and `messages/zh-Hant.json`) was applied on 2026-05-30 as part of issue #1376. This pass addressed obvious register and clarity issues against the Standard 4 checklist (reading age, removal of technical jargon, sentence simplicity, neutralising any pressure framing). It was not a native-speaker review and does not constitute human review for the purpose of Standard 4 compliance.
+
+**GA-quality native review of the onboarding copy remains outstanding.** Until fluent speakers of Japanese, Simplified Chinese, and Traditional Chinese have reviewed the `onboarding` namespace (approximately 200 words per locale) and confirmed it reads as age-appropriate for a child audience, issue #1376 stays open and the following in-product mitigations remain in place:
+
+- The "machine-translated, feedback welcome" banner (`banner.machineTranslated`) in-app and inside the onboarding modal (#1349).
+- The "preview" label on the locale picker.
+
+The Standard 4 status in the table above remains **Gap** for non-English locales until the native review is completed.
+
+---
+
 This assessment should be revisited if any of the following change:
 
 - The app adds its own account creation (removing the inherited 13+ age gate).
