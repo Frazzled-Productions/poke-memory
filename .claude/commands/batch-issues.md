@@ -59,7 +59,16 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
    - **`qa` ahead** (`ahead > 0`): a previous batch was drained into `qa` but never promoted. Stop and ask the maintainer whether to **promote** (open the `qa -> main` PR for the existing work first) or **discard** (`git push origin +origin/main:qa`) before starting a new batch — do not silently stack a new batch on top.
    - If `qa` does not exist at all, stop and surface it — the qa staging-branch setup (#806) has not been applied.
 
-5. **Per-issue staleness check (#1322).** For every non-trivial issue surfaced in step 1, run:
+5. **Check for existing open PRs (#1368).** The step-4 ahead/behind count only sees *merged* commits — it cannot surface open, unmerged PRs that already implement a backlog issue. Before dispatching any coder, list open PRs and reconcile them against the backlog:
+
+   ```bash
+   gh pr list --state open --json number,title,headRefName,baseRefName \
+     --jq '.[] | "#\(.number) [\(.baseRefName)] \(.title) (\(.headRefName))"'
+   ```
+
+   Map each open PR to a backlog issue (via title, branch name, or `closes #N` in the body). On any overlap with an issue you are about to implement, **stop and ask the maintainer** whether to resume/finish the existing PR or supersede it — never spawn a fresh coder on top of an in-flight PR. This guards the duplicate-work detour that hit the #1313/#1314/#1316 batch when PRs #1340/#1341/#1342 were already open for those issues. (memory: `feedback_batch_preflight_check_open_prs`.)
+
+6. **Per-issue staleness check (#1322).** For every non-trivial issue surfaced in step 1, run:
 
    ```bash
    .github/scripts/check-issue-staleness.sh <N>
@@ -69,7 +78,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
    Skip the staleness check for trivial issues (typo fixes, doc tweaks, one-liner workflow changes) — they are exempt under the same rule that lets them skip the planner.
 
-6. **Pre-existing CI noise + stale-preview pre-flight.** Two advisory checks so this session is not blamed for unrelated red signals or a stale preview:
+7. **Pre-existing CI noise + stale-preview pre-flight.** Two advisory checks so this session is not blamed for unrelated red signals or a stale preview:
 
    ```bash
    # 6a. Workflows that have been red on qa for multiple runs — known noise,
@@ -85,7 +94,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
    For each workflow surfaced by 6a, check that a tracking issue already exists; if not, file one (`priority:later` by default) so the noise is captured and the session does not silently inherit blame. Carry the list into the Wrap-up handoff so the maintainer sees "known noise" annotated separately from "introduced by this batch". The freshness check (6b) is a hint for the Wrap-up `Fire qa preview deploy` step — if the SHAs already diverge before this session even starts, the maintainer needs to know this batch is not the first to land work since the last preview.
 
-7. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
+8. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
 
    - **Code** — a concrete, implementable change. Goes into the implementation batches.
    - **Analysis** — a read-only audit or umbrella issue whose deliverable is a report plus scoped follow-up issues, not a PR.
@@ -138,6 +147,8 @@ For each batch, in order:
    ```
 
    If the worktree is on the wrong branch (e.g. a stale `chore/...` left over from a prior run) or the HEAD is on a release-tag commit instead of `origin/qa`, stop that agent immediately with `TaskStop` and re-dispatch into a fresh worktree. A stalled or wrong-branched agent can spend ~1h producing edits that never reach the assigned branch — the canonical failure mode is the #1329 Context-refactor agent that edited files in a sibling worktree on `chore/1328-dry-single-source-of-truth-rule` instead of its own assignment. (memory: `feedback_verify_agent_reports`.)
+
+   **MCP-needing agents must be `general-purpose` (#1368).** `data-coder` and `ui-coder` have NO access to the Supabase MCP tools (`execute_sql`, `get_logs`, `apply_migration`). Any task that must query or mutate the live database — a divergence investigation, a recovery dry-run, an analysis that reads prod state — must go to a `general-purpose` agent, which loads MCP tools via ToolSearch. A DB-needing task handed to `data-coder`/`ui-coder` fails silently. Migrations are still *authored* by `data-coder` per file-ownership; only the `apply_migration` MCP *call* needs a general-purpose agent or the orchestrator applying it directly after the coder writes the `.sql` file. (memory: `feedback_mcp_needs_general_purpose_agent`.)
 
 2. **Each agent's prompt must include:**
    - The issue number and **the full body, verbatim** — not paraphrased, not summarised. Include all subsections; the implementer cross-checks against them in the PR body. The orchestrator-side scope drop that landed #1259/#1260 without per-locale FSRS rows happened because the brief paraphrased the issue's "Data model" section instead of pasting it.
@@ -254,7 +265,7 @@ After every batch is merged into `qa` and the queue is drained:
    - Mini-batch follow-ups filed but **not** implemented this session, with their numbers and priority labels.
    - Coverage ratchet applied (old → new floor per metric); link to the commit.
    - Retro punch list — at minimum, list the proposed improvements and whether each landed in this session or was deferred (with the deferral issue number).
-   - Pre-existing red CI inherited from step 6 of Pre-flight, with the tracking issue link for each.
+   - Pre-existing red CI inherited from step 7 of Pre-flight, with the tracking issue link for each.
    - Next steps for the maintainer: "Test the `qa` preview deploy. When satisfied, mark draft PR #N ready and merge it — that cuts the release, deploys production, and resets `qa`. If the batch carries a `minor-bump` fragment, apply `version-bump:approved` to the promotion PR first."
    - **Analysis/Exploration** issues run — which umbrella issues got a report comment, and how many follow-up issues each filed (the umbrellas stay open for the user to review and close).
    - Any `[USER-DECISION]` items still awaiting a choice.
