@@ -80,6 +80,14 @@ When the same domain concept appears at multiple call sites — Pokémon names r
 
 **Trade-off.** A premature abstraction is worse than three similar lines. The rule is *don't fragment what's already shared*, not *abstract every duplication*. Three sites with the same pattern that aren't going to grow are fine; three sites that ARE going to need a cross-cutting change next month must share a helper now. Where the failure mode is easy to encode at PR time, prefer a lint rule (see #1327 for the Pokémon-name case) over a convention-only enforcement.
 
+**Every single-source helper ships with a forcing function.** A convention that relies on reviewer vigilance fragments eventually (the #1259 / #1369 i18n surface misses; the recurring "discovered another surface later" pattern). When you centralise a concept into a helper, also add a mechanism that makes a bypassing call site fail CI — not just a line in this file:
+
+- a **lint rule** banning the raw form the helper replaces (model: the #1327 `no-restricted-syntax` rule that bans raw `.displayName` reads, forcing `useLocalePokemonName`), and/or
+- a **fitness / contract test** asserting the invariant holds across all sites (model: the #1356 onConflict↔PK parity test, which fails if any client upsert's conflict columns drift from the table constraint — note this is a non-i18n example, the pattern is general), and/or
+- **type-system forcing** that makes the raw form un-representable or requires the cross-cutting argument (model: `computeStats(…, forceAllMastered)` — you cannot construct the call without considering the superuser axis).
+
+A helper that is convention-only (documented here but unenforced) is a latent fragmentation site. The enforcement-gap candidate list (class-name constants, sprite-size constants, date formatting, `forceAllMastered` honoring, type labels) and the i18n English-leak gate are tracked in #1406 / #1405.
+
 ### Multi-locale rendering
 
 All Pokémon names shown to users must flow through `useLocalePokemonName(speciesId, fallbackName)` from `lib/i18n/useLocalePokemonName.ts`. A lint rule (`no-restricted-syntax` in `eslint.config.mjs`, covering `components/**` and `app/**` minus `app/api/**`) enforces this at PR time — direct `.displayName` reads in those trees are a CI error (#1327).
