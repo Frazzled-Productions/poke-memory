@@ -5,6 +5,9 @@
  * and the most recently added Pokémon.
  */
 
+"use client";
+
+import { useTranslations } from "next-intl";
 import type { BiomeStats } from "@/lib/pasture/stats";
 
 type Props = {
@@ -21,15 +24,16 @@ type Props = {
  * inline format.
  */
 export function PastureBiomeStats({ stats, className = "" }: Props) {
+  const t = useTranslations("pasture");
   const { masteredCount, totalCount, capturedPercent, latestAddition } = stats;
 
   return (
     <dl
       className={`flex flex-wrap items-center gap-x-2 gap-y-0 text-xs font-normal opacity-70 ${className}`}
-      aria-label="Biome statistics"
+      aria-label={t("biomeStats.ariaLabel")}
     >
       <div className="flex items-center gap-1">
-        <dt className="sr-only">Mastered</dt>
+        <dt className="sr-only">{t("biomeStats.mastered")}</dt>
         <dd>
           {masteredCount}
           <span className="opacity-60">/{totalCount}</span>
@@ -39,7 +43,7 @@ export function PastureBiomeStats({ stats, className = "" }: Props) {
       <div aria-hidden="true" className="opacity-40">·</div>
 
       <div className="flex items-center gap-1">
-        <dt className="sr-only">Captured</dt>
+        <dt className="sr-only">{t("biomeStats.captured")}</dt>
         <dd>{capturedPercent}%</dd>
       </div>
 
@@ -47,7 +51,7 @@ export function PastureBiomeStats({ stats, className = "" }: Props) {
         <>
           <div aria-hidden="true" className="opacity-40">·</div>
           <div className="flex items-center gap-1">
-            <dt className="sr-only">Latest addition</dt>
+            <dt className="sr-only">{t("biomeStats.latestAddition")}</dt>
             <dd className="truncate max-w-[12ch]">{latestAddition}</dd>
           </div>
         </>

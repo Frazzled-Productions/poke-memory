@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { Records } from "@/lib/stats/records";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel } from "@/lib/utils/class-names";
@@ -35,32 +36,33 @@ function Stat({
 }
 
 export function RecordsCard({ records }: Props) {
+  const t = useTranslations("stats.records");
   return (
     <section aria-labelledby="records-heading">
       <h2
         id="records-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        Records
+        {t("heading")}
       </h2>
       <div className={cn("grid grid-cols-2 gap-4 sm:grid-cols-4", cardPanel)}>
         <Stat
-          label={records.longestStreak === 1 ? "day longest streak" : "days longest streak"}
+          label={records.longestStreak === 1 ? t("longestStreakDay") : t("longestStreakDays")}
           value={records.longestStreak.toString()}
         />
         <Stat
-          label="best review day"
+          label={t("bestReviewDay")}
           value={records.bestReviewDay.toString()}
         />
         <Stat
-          label="avg days to mastery"
+          label={t("avgDaysToMastery")}
           value={fmt(records.avgDaysToMastery)}
-          description="from first sight"
+          description={t("fromFirstSight")}
         />
         <Stat
-          label="mastered in a week"
+          label={t("masteredInWeek")}
           value={records.mostMasteredIn7d === null ? "—" : records.mostMasteredIn7d.toString()}
-          description="best 7-day window"
+          description={t("bestSevenDayWindow")}
         />
       </div>
     </section>

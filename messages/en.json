@@ -336,7 +336,31 @@
     "readyForMoreVariety": "Ready for more variety?",
     "openPracticeSettings": "Open practice settings",
     "readyForMoreVarietyBody": "Try reverse-evolution cards or alternate-form cards for a fresh challenge.",
-    "gradeErrorMessage": "This grade could not be saved due to an unexpected error. Your session is still active, please try again."
+    "gradeErrorMessage": "This grade could not be saved due to an unexpected error. Your session is still active, please try again.",
+    "scope": {
+      "label": "Scope",
+      "clear": "Clear",
+      "generation": "Generation",
+      "type": "Type",
+      "groups": "Groups",
+      "games": "Games",
+      "alternateForms": "Alternate forms",
+      "gamesDescription": "Limit practice to Pokémon in the native Pokédex of specific games.",
+      "presetStarters": "Starters",
+      "presetLegendaries": "Legendaries",
+      "presetIncompleteChains": "Incomplete evolution chains",
+      "formIncludeAll": "Include all",
+      "formDefaultOnly": "Default form only",
+      "formChooseCategories": "Choose categories…",
+      "formCategoryRegional": "Regional variants",
+      "formCategoryForme": "Out-of-battle formes",
+      "formCategoryMega": "Mega Evolutions",
+      "formCategoryGmax": "Gigantamax",
+      "formCategoryPrimal": "Primal Reversion",
+      "noAlternateForms": "No alternate forms in the current seed.",
+      "matchCount": "{match} of {total} Pokémon match",
+      "hiddenCardsPaused": "Hidden cards are paused: their review dates shift forward by the time they're hidden, so removing the scope won't flood your queue with overdue reviews."
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -367,7 +391,8 @@
     "hasAlternateForms": "Has alternate forms",
     "introduced": "{introduced} / {total} introduced",
     "generationAll": "All",
-    "generationLabel": "Gen {gen}"
+    "generationLabel": "Gen {gen}",
+    "masteryCount": "{mastered} / {total} mastered"
   },
   "pasture": {
     "title": "Pasture",
@@ -382,7 +407,28 @@
     "searchPasturePlaceholder": "Search Pokémon…",
     "clearSearch": "Clear search",
     "filterByTypeAriaLabel": "Filter by type",
-    "filterByGenerationAriaLabel": "Filter by generation"
+    "filterByGenerationAriaLabel": "Filter by generation",
+    "biomeStats": {
+      "ariaLabel": "Biome statistics",
+      "mastered": "Mastered",
+      "captured": "Captured",
+      "latestAddition": "Latest addition"
+    },
+    "landscape": "Landscape",
+    "landscapeAriaLabel": "View {zone} in landscape",
+    "zones": {
+      "grassland": "Grasslands",
+      "forest": "Forest",
+      "sea": "Open Sea",
+      "cave": "Cave",
+      "mountain": "Mountain",
+      "urban": "Urban",
+      "waters-edge": "Waters Edge",
+      "rough-terrain": "Rough Terrain",
+      "rare": "Sanctuary",
+      "unknown": "Wildlands"
+    },
+    "zoneAriaLabel": "{zone} zone"
   },
   "stats": {
     "title": "Stats",
@@ -414,7 +460,48 @@
       "error": "Pull failed. Check your connection and try again.",
       "confirmMessage": "This will replace your local progress, settings, and display preferences with what's currently in the cloud. Continue?"
     },
-    "allTimeGradeBreakdown": "All-time grade breakdown"
+    "allTimeGradeBreakdown": "All-time grade breakdown",
+    "trainerCard": {
+      "ariaLabel": "Trainer card",
+      "trainerLabel": "Trainer",
+      "trainerFallback": "Trainer",
+      "levelLabel": "Lv",
+      "levelDescription": "Level grows with the number of Pokémon name cards you've mastered (reps ≥ 3 and scheduled interval ≥ 21 days).",
+      "allMastered": "All mastered",
+      "masteryProgress": "{mastered} / {next} mastered · {needed} to Lv {levelNext}",
+      "formsMastered": "{mastered} / {total} forms mastered",
+      "generationBadgesAriaLabel": "Generation completion badges",
+      "generationComplete": "{name}: complete!",
+      "generationProgress": "{name}: {mastered}/{total} mastered",
+      "gymBadgesAriaLabel": "Gym badges earned"
+    },
+    "records": {
+      "heading": "Records",
+      "longestStreakDay": "day longest streak",
+      "longestStreakDays": "days longest streak",
+      "bestReviewDay": "best review day",
+      "avgDaysToMastery": "avg days to mastery",
+      "fromFirstSight": "from first sight",
+      "masteredInWeek": "mastered in a week",
+      "bestSevenDayWindow": "best 7-day window"
+    },
+    "streakProtection": {
+      "heading": "Streak protection",
+      "earnAndSpentBanner": "You earned a streak protection token and used it the same day to cover yesterday. Your streak is safe.",
+      "dismissAriaLabel": "Dismiss streak protection notice",
+      "tokenSingular": "token",
+      "tokenPlural": "tokens",
+      "tokenMax": " (max)",
+      "earnDescription": "Tokens cover one missed day, automatically. Earn one for every {earnInterval} consecutive review days, up to {maxBalance}.",
+      "nextTokenStart": "Review today to start earning your next token.",
+      "nextTokenCount": "{count, plural, one {Next token in 1 review day.} other {Next token in {count} review days.}}",
+      "streakPreserved": "Streak preserved on {date}.",
+      "tokensRemaining": "{count, plural, one {1 token remaining} other {{count} tokens remaining}}",
+      "recentProtectionHeading": "Recent protection",
+      "eventEarned": "Earned",
+      "eventUsed": "Used",
+      "eventEarnedAndUsed": "Earned + used"
+    }
   },
   "journey": {
     "title": "Journey",
@@ -434,7 +521,69 @@
     "byGenerationColumn": "Generation",
     "collectionTimeline": "Collection timeline",
     "evolutionWall": "Evolution wall",
-    "closeToMastery": "Close to mastery"
+    "closeToMastery": "Close to mastery",
+    "collectionTimelineWidget": {
+      "heading": "Collection timeline",
+      "past": "Past",
+      "now": "Now",
+      "future": "Future",
+      "directionPast": "Past",
+      "directionNow": "Now",
+      "directionFuture": "Future",
+      "stillRetained": "still retained",
+      "forgotten": "forgotten",
+      "introduced": "introduced",
+      "mastered": "mastered",
+      "dragHintNow": "Drag left to replay your journey, right to see the forgetting horizon.",
+      "dragHintFuture": "Projected memory decay if no cards are reviewed.",
+      "dragHintPast": "Replay of your collection as it was built.",
+      "reset": "Reset",
+      "resetAriaLabel": "Reset timeline to now",
+      "scrubberAriaLabel": "Collection timeline scrubber",
+      "announcementRetained": "{date}: {mastered} species still retained ({pct}% of {total})",
+      "announcementBuilt": "{date}: {introduced} introduced, {mastered} mastered",
+      "noHistoryYet": "No review history yet",
+      "noHistoryBody": "Review some cards to see your collection grow here. The timeline shows your past progress and projects how long your memory will hold."
+    },
+    "evolutionWallWidget": {
+      "heading": "Evolution wall",
+      "familiesCompleted": "Families completed:",
+      "filterAll": "All",
+      "filterInProgress": "In progress",
+      "filterCompleted": "Completed",
+      "filterAriaLabel": "Filter evolution families",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "familyDone": "Done",
+      "familyCompletedSrOnly": "Completed",
+      "galleriesAriaLabel": "Evolution families",
+      "noFamiliesInProgress": "No families in progress yet. Start practising evolution cards!",
+      "noFamiliesCompleted": "No families completed yet. Keep going!",
+      "noFamiliesFound": "No evolution families found.",
+      "legendBothMastered": "Both mastered",
+      "legendOneDirection": "One direction mastered",
+      "legendNotYet": "Not yet mastered"
+    },
+    "closeToMasteryWidget": {
+      "heading": "Close to mastery",
+      "body": "Name known, reverse card still to learn:",
+      "speciesToGo": "{count, plural, one {1 species to go.} other {{count} species to go.}}",
+      "emptyState": "No gap to close right now. Great work!",
+      "listAriaLabel": "Species close to mastery",
+      "notStarted": "not started",
+      "notStartedLabel": "Not yet started",
+      "progressLabel": "{current} / {max} day interval",
+      "readyForMastery": "Ready for mastery",
+      "daysNeeded": "{days} more days needed",
+      "ready": "Ready",
+      "showingOf": "Showing {shown} of {total} - practise reverse cards to close the gap."
+    },
+    "milestoneShare": {
+      "shareAriaLabel": "Share milestone: {label}",
+      "share": "Share",
+      "copied": "Copied to clipboard",
+      "copyError": "Couldn't copy. Please try again."
+    }
   },
   "error": {
     "heading": "Something went wrong",

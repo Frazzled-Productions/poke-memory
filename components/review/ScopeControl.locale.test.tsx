@@ -12,7 +12,6 @@ import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import {
   renderWithIntl,
-  renderJa,
   screen,
 } from "@/components/test-utils/renderWithIntl";
 import { ScopeControl } from "@/components/review/ScopeControl";
@@ -22,20 +21,22 @@ import { EMPTY_SCOPE } from "@/lib/review/scope";
 // Helper — render ScopeControl and open the scope panel
 // ---------------------------------------------------------------------------
 
+/** Label for the scope toggle button per locale. */
+const SCOPE_LABEL_PATTERN: Record<"en" | "ja" | "zh-Hans" | "zh-Hant", RegExp> = {
+  en: /scope/i,
+  ja: /スコープ/,
+  "zh-Hans": /范围/,
+  "zh-Hant": /範圍/,
+};
+
 async function renderAndOpen(locale: "en" | "ja" | "zh-Hans" | "zh-Hant" = "en") {
   const user = userEvent.setup();
-  if (locale === "ja") {
-    renderJa(
-      <ScopeControl scope={EMPTY_SCOPE} onChange={vi.fn()} />,
-    );
-  } else {
-    renderWithIntl(
-      <ScopeControl scope={EMPTY_SCOPE} onChange={vi.fn()} />,
-      { locale },
-    );
-  }
-  // The scope panel is initially closed. Click the "Scope" toggle to open it.
-  const toggleBtn = screen.getByRole("button", { name: /scope/i });
+  renderWithIntl(
+    <ScopeControl scope={EMPTY_SCOPE} onChange={vi.fn()} />,
+    { locale },
+  );
+  // The scope panel is initially closed. Click the locale-appropriate toggle to open it.
+  const toggleBtn = screen.getByRole("button", { name: SCOPE_LABEL_PATTERN[locale] });
   await user.click(toggleBtn);
   return user;
 }
@@ -59,6 +60,33 @@ describe("ScopeControl — type pills in English locale", () => {
 });
 
 // ---------------------------------------------------------------------------
+// English — scope section legends
+// ---------------------------------------------------------------------------
+
+describe("ScopeControl — scope section legends in English locale (#1393)", () => {
+  it("renders the Generation section legend as 'Generation'", async () => {
+    await renderAndOpen("en");
+    // practice.scope.generation = "Generation"
+    expect(screen.getByText("Generation")).toBeInTheDocument();
+  });
+
+  it("renders the Type section legend as 'Type'", async () => {
+    await renderAndOpen("en");
+    expect(screen.getByText("Type")).toBeInTheDocument();
+  });
+
+  it("renders the Groups section legend as 'Groups'", async () => {
+    await renderAndOpen("en");
+    expect(screen.getByText("Groups")).toBeInTheDocument();
+  });
+
+  it("renders the Games section legend as 'Games'", async () => {
+    await renderAndOpen("en");
+    expect(screen.getByText("Games")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Japanese
 // ---------------------------------------------------------------------------
 
@@ -73,6 +101,26 @@ describe("ScopeControl — type pills in Japanese locale", () => {
     await renderAndOpen("ja");
     // messages/ja.json types.psychic = "エスパー"
     expect(screen.getByRole("button", { name: "エスパー" })).toBeInTheDocument();
+  });
+});
+
+describe("ScopeControl — scope section legends in Japanese locale (#1393)", () => {
+  it("renders the Japanese Scope label in ja locale", async () => {
+    await renderAndOpen("ja");
+    // ja practice.scope.label = "スコープ"
+    expect(screen.getAllByText("スコープ").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders the Japanese Generation legend in ja locale", async () => {
+    await renderAndOpen("ja");
+    // ja practice.scope.generation = "世代"
+    expect(screen.getByText("世代")).toBeInTheDocument();
+  });
+
+  it("renders the Japanese Groups legend in ja locale", async () => {
+    await renderAndOpen("ja");
+    // ja practice.scope.groups = "グループ"
+    expect(screen.getByText("グループ")).toBeInTheDocument();
   });
 });
 

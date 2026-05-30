@@ -13,6 +13,7 @@
 
 import { useState, useMemo, useId } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import type {
   EvolutionFamily,
   FamilyEdge,
@@ -285,6 +286,7 @@ function BranchingTree({
 // ---------------------------------------------------------------------------
 
 function FamilyCard({ family }: { family: EvolutionFamily }) {
+  const tWidget = useTranslations("journey.evolutionWallWidget");
   return (
     <div
       className={[
@@ -299,11 +301,11 @@ function FamilyCard({ family }: { family: EvolutionFamily }) {
           className="absolute right-2 top-2 text-[10px] font-semibold uppercase tracking-widest text-emerald-500 dark:text-emerald-400"
           aria-hidden="true"
         >
-          Done
+          {tWidget("familyDone")}
         </span>
       )}
       {family.completed && (
-        <span className="sr-only">Completed</span>
+        <span className="sr-only">{tWidget("familyCompletedSrOnly")}</span>
       )}
       <FamilyTree family={family} />
     </div>
@@ -314,11 +316,7 @@ function FamilyCard({ family }: { family: EvolutionFamily }) {
 // FilterTabs
 // ---------------------------------------------------------------------------
 
-const FILTER_OPTIONS: { mode: FilterMode; label: string }[] = [
-  { mode: "all", label: "All" },
-  { mode: "in-progress", label: "In progress" },
-  { mode: "completed", label: "Completed" },
-];
+const FILTER_MODES: FilterMode[] = ["all", "in-progress", "completed"];
 
 function FilterTabs({
   active,
@@ -327,28 +325,35 @@ function FilterTabs({
   active: FilterMode;
   onChange: (mode: FilterMode) => void;
 }) {
+  const tWidget = useTranslations("journey.evolutionWallWidget");
   return (
     <div
       className="flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800/60"
       role="tablist"
-      aria-label="Filter evolution families"
+      aria-label={tWidget("filterAriaLabel")}
     >
-      {FILTER_OPTIONS.map(({ mode, label }) => (
-        <button
-          key={mode}
-          role="tab"
-          aria-selected={active === mode}
-          onClick={() => onChange(mode)}
-          className={[
-            "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
-            active === mode
-              ? "bg-background text-foreground shadow-sm"
-              : "text-zinc-500 hover:text-foreground dark:text-zinc-400",
-          ].join(" ")}
-        >
-          {label}
-        </button>
-      ))}
+      {FILTER_MODES.map((mode) => {
+        const label =
+          mode === "all" ? tWidget("filterAll")
+          : mode === "in-progress" ? tWidget("filterInProgress")
+          : tWidget("filterCompleted");
+        return (
+          <button
+            key={mode}
+            role="tab"
+            aria-selected={active === mode}
+            onClick={() => onChange(mode)}
+            className={[
+              "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1",
+              active === mode
+                ? "bg-background text-foreground shadow-sm"
+                : "text-zinc-500 hover:text-foreground dark:text-zinc-400",
+            ].join(" ")}
+          >
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -362,6 +367,7 @@ export function EvolutionWall({
 }: {
   families: readonly EvolutionFamily[];
 }) {
+  const tWidget = useTranslations("journey.evolutionWallWidget");
   const [filter, setFilter] = useState<FilterMode>("all");
   const [isOpen, setIsOpen] = useState(false);
   const headingId = useId();
@@ -385,7 +391,7 @@ export function EvolutionWall({
           id={headingId}
           className="text-base font-semibold text-foreground"
         >
-          Evolution wall
+          {tWidget("heading")}
         </h2>
         <button
           type="button"
@@ -394,7 +400,7 @@ export function EvolutionWall({
           onClick={() => setIsOpen((prev) => !prev)}
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
         >
-          <span>{isOpen ? "Collapse" : "Expand"}</span>
+          <span>{isOpen ? tWidget("collapse") : tWidget("expand")}</span>
           <svg
             viewBox="0 0 16 16"
             fill="none"
@@ -417,7 +423,7 @@ export function EvolutionWall({
 
       {/* Summary line — always visible, gives a progress snapshot at a glance */}
       <p className="mb-3 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-        Families completed:{" "}
+        {tWidget("familiesCompleted")}{" "}
         <span className="font-semibold tabular-nums text-foreground">
           {stats.completedFamilies.toLocaleString("en-GB")}
         </span>
@@ -441,16 +447,16 @@ export function EvolutionWall({
         {filtered.length === 0 ? (
           <p className="py-8 text-center text-sm text-zinc-400 dark:text-zinc-600">
             {filter === "in-progress"
-              ? "No families in progress yet. Start practising evolution cards!"
+              ? tWidget("noFamiliesInProgress")
               : filter === "completed"
-                ? "No families completed yet. Keep going!"
-                : "No evolution families found."}
+                ? tWidget("noFamiliesCompleted")
+                : tWidget("noFamiliesFound")}
           </p>
         ) : (
           <div
             className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
             role="list"
-            aria-label="Evolution families"
+            aria-label={tWidget("galleriesAriaLabel")}
             aria-live="polite"
             aria-atomic="false"
           >
@@ -469,21 +475,21 @@ export function EvolutionWall({
               <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-emerald-500 dark:stroke-emerald-400" stroke="currentColor" />
               <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-emerald-500 dark:stroke-emerald-400" stroke="currentColor" />
             </svg>
-            <span className="text-emerald-600 dark:text-emerald-400">Both mastered</span>
+            <span className="text-emerald-600 dark:text-emerald-400">{tWidget("legendBothMastered")}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
               <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-amber-500" stroke="currentColor" />
               <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-amber-500" stroke="currentColor" />
             </svg>
-            <span className="text-amber-600 dark:text-amber-400">One direction mastered</span>
+            <span className="text-amber-600 dark:text-amber-400">{tWidget("legendOneDirection")}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
               <line x1="1" y1="5" x2="10" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-zinc-300 dark:stroke-zinc-600" stroke="currentColor" />
               <polyline points="6,1 10,5 6,9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" className="stroke-zinc-300 dark:stroke-zinc-600" stroke="currentColor" />
             </svg>
-            <span>Not yet mastered</span>
+            <span>{tWidget("legendNotYet")}</span>
           </span>
         </div>
       </div>

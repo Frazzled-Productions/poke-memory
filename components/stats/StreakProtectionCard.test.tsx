@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import { act, fireEvent } from "@testing-library/react";
+import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
 import { StreakProtectionCard } from "./StreakProtectionCard";
 import {
   saveSettings,
@@ -42,13 +43,13 @@ afterEach(() => {
 
 describe("StreakProtectionCard", () => {
   it("renders zero balance with the correct copy", () => {
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     // The heading is always present so we know the section rendered.
     expect(
       screen.getByRole("heading", { name: "Streak protection" }),
     ).toBeInTheDocument();
     // 0 + "tokens" — verify via the explicit aria-label.
-    expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
+    expect(screen.getByLabelText("0 tokens remaining")).toBeInTheDocument();
   });
 
   it("renders a non-zero balance and the recent-spend history line", () => {
@@ -69,8 +70,8 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
-    expect(screen.getByLabelText("2 protection tokens")).toBeInTheDocument();
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    expect(screen.getByLabelText("2 tokens remaining")).toBeInTheDocument();
     // History line.
     expect(
       screen.getByTestId("streak-protection-last-spend"),
@@ -95,22 +96,22 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.getByTestId("streak-protection-last-spend"),
     ).toHaveTextContent(/1 token remaining/);
   });
 
   it("does not render the history line when no spend has happened", () => {
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.queryByTestId("streak-protection-last-spend"),
     ).not.toBeInTheDocument();
   });
 
   it("refreshes when settings are saved", () => {
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
-    expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    expect(screen.getByLabelText("0 tokens remaining")).toBeInTheDocument();
 
     act(() => {
       saveSettings({
@@ -125,7 +126,7 @@ describe("StreakProtectionCard", () => {
       });
     });
 
-    expect(screen.getByLabelText("3 protection tokens")).toBeInTheDocument();
+    expect(screen.getByLabelText("3 tokens remaining")).toBeInTheDocument();
     // "(max)" label appears at the cap.
     expect(screen.getByText(/\(max\)/)).toBeInTheDocument();
   });
@@ -158,7 +159,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     const eventsSection = screen.getByTestId("streak-protection-recent-events");
     expect(eventsSection).toBeInTheDocument();
     expect(eventsSection).toHaveTextContent("Recent protection");
@@ -169,7 +170,7 @@ describe("StreakProtectionCard", () => {
   });
 
   it("does not render recent events when the list is empty", () => {
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.queryByTestId("streak-protection-recent-events"),
     ).not.toBeInTheDocument();
@@ -191,7 +192,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.getByTestId("streak-protection-earn-spend-banner"),
     ).toBeInTheDocument();
@@ -216,7 +217,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.queryByTestId("streak-protection-earn-spend-banner"),
     ).not.toBeInTheDocument();
@@ -238,7 +239,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     const banner = screen.getByTestId("streak-protection-earn-spend-banner");
     expect(banner).toBeInTheDocument();
 
@@ -267,7 +268,7 @@ describe("StreakProtectionCard", () => {
       }),
     );
 
-    render(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     expect(
       screen.queryByTestId("streak-protection-earn-spend-banner"),
     ).not.toBeInTheDocument();

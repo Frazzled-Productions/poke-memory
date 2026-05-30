@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { GEN_RANGES, generationOf } from "@/lib/stats/derive";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
@@ -159,6 +160,7 @@ function GenerationSection({
   pokemon: PokemonCellData[];
   localeNames?: ReadonlyMap<number, LocaleNameOverride>;
 }) {
+  const t = useTranslations("pokedex");
   const { flags } = useSuperuser();
   const total = pokemon.length;
   const mastered = flags.pretendAllMastered
@@ -173,7 +175,7 @@ function GenerationSection({
       >
         {name}
         <span className="ml-2 font-normal tabular-nums">
-          · {mastered} / {total} mastered
+          · {t("masteryCount", { mastered, total })}
         </span>
       </h2>
       <ul

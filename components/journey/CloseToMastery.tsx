@@ -15,6 +15,7 @@
  */
 
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import type { CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
 import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
@@ -55,6 +56,7 @@ function IntervalBar({ scheduledDays }: { scheduledDays: number }) {
 
 /** A single row in the close-to-mastery list. */
 function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
+  const tWidget = useTranslations("journey.closeToMasteryWidget");
   const { name } = useLocalePokemonName(entry.speciesId, entry.englishName);
 
   const daysRemaining = Math.max(
@@ -63,8 +65,8 @@ function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
   );
 
   const progressLabel = entry.reverseIntroduced
-    ? `${entry.reverseScheduledDays} / ${MASTERY_INTERVAL_DAYS} day interval`
-    : "Not yet started";
+    ? tWidget("progressLabel", { current: entry.reverseScheduledDays, max: MASTERY_INTERVAL_DAYS })
+    : tWidget("notStartedLabel");
 
   return (
     <li className="flex items-center gap-3 py-2">
@@ -91,7 +93,7 @@ function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
           >
             {entry.reverseIntroduced
               ? `${entry.reverseScheduledDays}d`
-              : "not started"}
+              : tWidget("notStarted")}
           </span>
         </div>
       </div>
@@ -108,11 +110,11 @@ function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
             )}
             aria-label={
               daysRemaining === 0
-                ? "Ready for mastery"
-                : `${daysRemaining} more days needed`
+                ? tWidget("readyForMastery")
+                : tWidget("daysNeeded", { days: daysRemaining })
             }
           >
-            {daysRemaining === 0 ? "Ready" : `-${daysRemaining}d`}
+            {daysRemaining === 0 ? tWidget("ready") : `-${daysRemaining}d`}
           </span>
         ) : null}
       </div>
@@ -129,6 +131,7 @@ export function CloseToMastery({
 }: {
   entries: readonly CloseToMasteryEntry[];
 }) {
+  const tWidget = useTranslations("journey.closeToMasteryWidget");
   const visible = entries.slice(0, INITIAL_VISIBLE);
   const hasMore = entries.length > INITIAL_VISIBLE;
 
@@ -138,28 +141,28 @@ export function CloseToMastery({
         id="close-to-mastery-heading"
         className="mb-1 text-base font-semibold text-foreground"
       >
-        Close to mastery
+        {tWidget("heading")}
       </h2>
 
       {entries.length > 0 && (
         <p className={cn("mb-3 text-sm", mutedText)}>
-          Name known, reverse card still to learn:{" "}
+          {tWidget("body")}{" "}
           <span className="font-semibold tabular-nums text-foreground">
             {entries.length.toLocaleString("en-GB")}
           </span>{" "}
-          species to go.
+          {tWidget("speciesToGo", { count: entries.length })}
         </p>
       )}
 
       {entries.length === 0 ? (
         <p className={cn("py-4 text-center text-sm", mutedText)}>
-          No gap to close right now. Great work!
+          {tWidget("emptyState")}
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
           <ul
             role="list"
-            aria-label="Species close to mastery"
+            aria-label={tWidget("listAriaLabel")}
             className="divide-y divide-zinc-100 px-3 dark:divide-zinc-800"
           >
             {visible.map((entry) => (
@@ -168,8 +171,7 @@ export function CloseToMastery({
           </ul>
           {hasMore && (
             <p className="border-t border-zinc-100 px-4 py-2.5 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
-              Showing {INITIAL_VISIBLE} of {entries.length} - practise reverse
-              cards to close the gap.
+              {tWidget("showingOf", { shown: INITIAL_VISIBLE, total: entries.length })}
             </p>
           )}
         </div>

@@ -7,8 +7,9 @@
  * are fast and deterministic without importing the full seed data.
  */
 
-import { render, screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 import { EvolutionWall } from "./EvolutionWall";
 import type { EvolutionFamily, FamilyEdge, FamilyNode } from "@/lib/evolution/chains";
 
@@ -119,26 +120,26 @@ function expandWall() {
 
 describe("EvolutionWall — basic render", () => {
   it("renders the Evolution wall section heading", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expect(
       screen.getByRole("heading", { name: "Evolution wall" }),
     ).toBeInTheDocument();
   });
 
   it("renders the Expand toggle button collapsed by default", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     const btn = screen.getByRole("button", { name: /Expand/i });
     expect(btn).toBeInTheDocument();
     expect(btn).toHaveAttribute("aria-expanded", "false");
   });
 
   it("renders the families completed headline metric (visible while collapsed)", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expect(screen.getByText(/Families completed:/i)).toBeInTheDocument();
   });
 
   it("shows 0 / 1 when the only family is not completed", () => {
-    render(<EvolutionWall families={[makeLinearFamily({ completed: false })]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({ completed: false })]} />);
     // Should contain "0" for completedFamilies and "1" for totalFamilies.
     expect(screen.getByText(/Families completed:/i)).toBeInTheDocument();
     // Both numbers appear in the DOM.
@@ -147,7 +148,7 @@ describe("EvolutionWall — basic render", () => {
   });
 
   it("shows 1 / 1 when the only family is completed", () => {
-    render(
+    renderWithIntl(
       <EvolutionWall families={[makeLinearFamily({ edgeMastered: true, completed: true })]} />,
     );
     // completedFamilies = 1, totalFamilies = 1.
@@ -156,7 +157,7 @@ describe("EvolutionWall — basic render", () => {
   });
 
   it("Expand toggle shows panel and updates aria-expanded", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     const btn = screen.getByRole("button", { name: /Expand/i });
     expect(btn).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(btn);
@@ -166,7 +167,7 @@ describe("EvolutionWall — basic render", () => {
   });
 
   it("renders the All / In progress / Completed filter tabs (after expanding)", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expandWall();
     expect(screen.getByRole("tab", { name: "All" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "In progress" })).toBeInTheDocument();
@@ -174,7 +175,7 @@ describe("EvolutionWall — basic render", () => {
   });
 
   it("defaults to the All filter (aria-selected=true on All tab)", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expandWall();
     expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute(
       "aria-selected",
@@ -187,7 +188,7 @@ describe("EvolutionWall — basic render", () => {
   });
 
   it("renders the legend with all three states (after expanding)", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expandWall();
     expect(screen.getByText(/Both mastered/i)).toBeInTheDocument();
     expect(screen.getByText(/One direction mastered/i)).toBeInTheDocument();
@@ -197,14 +198,14 @@ describe("EvolutionWall — basic render", () => {
 
 describe("EvolutionWall — species nodes", () => {
   it("renders species names for a linear chain (after expanding)", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expandWall();
     expect(screen.getByAltText("Bulbasaur")).toBeInTheDocument();
     expect(screen.getByAltText("Ivysaur")).toBeInTheDocument();
   });
 
   it("renders species names for a branching family (after expanding)", () => {
-    render(<EvolutionWall families={[makeBranchingFamily()]} />);
+    renderWithIntl(<EvolutionWall families={[makeBranchingFamily()]} />);
     expandWall();
     expect(screen.getByAltText("Eevee")).toBeInTheDocument();
     expect(screen.getByAltText("Vaporeon")).toBeInTheDocument();
@@ -214,7 +215,7 @@ describe("EvolutionWall — species nodes", () => {
 
 describe("EvolutionWall — completed family styling", () => {
   it("shows a Done badge on completed families (after expanding)", () => {
-    render(
+    renderWithIntl(
       <EvolutionWall families={[makeLinearFamily({ edgeMastered: true, completed: true })]} />,
     );
     expandWall();
@@ -223,7 +224,7 @@ describe("EvolutionWall — completed family styling", () => {
   });
 
   it("does not show a Done badge on incomplete families", () => {
-    render(<EvolutionWall families={[makeLinearFamily({ completed: false })]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({ completed: false })]} />);
     expect(screen.queryByText("Done")).not.toBeInTheDocument();
   });
 });
@@ -262,7 +263,7 @@ describe("EvolutionWall — filter behaviour", () => {
   const allFamilies = [inProgressFamily, untouchedFamily, completedFamily];
 
   it("shows all families under the All filter (after expanding)", () => {
-    render(<EvolutionWall families={allFamilies} />);
+    renderWithIntl(<EvolutionWall families={allFamilies} />);
     expandWall();
     expect(screen.getByAltText("Bulbasaur")).toBeInTheDocument();
     expect(screen.getByAltText("Charmander")).toBeInTheDocument();
@@ -270,7 +271,7 @@ describe("EvolutionWall — filter behaviour", () => {
   });
 
   it("switches to In progress filter and hides completed + untouched families", () => {
-    render(<EvolutionWall families={allFamilies} />);
+    renderWithIntl(<EvolutionWall families={allFamilies} />);
     expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "In progress" }));
     expect(screen.queryByAltText("Charmander")).not.toBeInTheDocument();
@@ -279,7 +280,7 @@ describe("EvolutionWall — filter behaviour", () => {
   });
 
   it("switches to Completed filter and shows only completed families", () => {
-    render(<EvolutionWall families={allFamilies} />);
+    renderWithIntl(<EvolutionWall families={allFamilies} />);
     expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
     expect(screen.queryByAltText("Bulbasaur")).not.toBeInTheDocument();
@@ -288,7 +289,7 @@ describe("EvolutionWall — filter behaviour", () => {
   });
 
   it("shows empty-state message for In progress when nothing is in progress", () => {
-    render(<EvolutionWall families={[untouchedFamily, completedFamily]} />);
+    renderWithIntl(<EvolutionWall families={[untouchedFamily, completedFamily]} />);
     expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "In progress" }));
     expect(
@@ -297,7 +298,7 @@ describe("EvolutionWall — filter behaviour", () => {
   });
 
   it("shows empty-state message for Completed when nothing is completed", () => {
-    render(<EvolutionWall families={[untouchedFamily, inProgressFamily]} />);
+    renderWithIntl(<EvolutionWall families={[untouchedFamily, inProgressFamily]} />);
     expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
     expect(
@@ -306,7 +307,7 @@ describe("EvolutionWall — filter behaviour", () => {
   });
 
   it("marks the active filter tab as aria-selected=true", () => {
-    render(<EvolutionWall families={allFamilies} />);
+    renderWithIntl(<EvolutionWall families={allFamilies} />);
     expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
     expect(screen.getByRole("tab", { name: "Completed" })).toHaveAttribute(
@@ -320,7 +321,7 @@ describe("EvolutionWall — filter behaviour", () => {
   });
 
   it("returns to All filter after switching", () => {
-    render(<EvolutionWall families={allFamilies} />);
+    renderWithIntl(<EvolutionWall families={allFamilies} />);
     expandWall();
     fireEvent.click(screen.getByRole("tab", { name: "Completed" }));
     fireEvent.click(screen.getByRole("tab", { name: "All" }));
@@ -338,7 +339,7 @@ describe("EvolutionWall — edge accessibility labels", () => {
       edges: [makeEdge(1500001, 1, 2, { forwardMastered: true, reverseMastered: true, fullyMastered: true })],
       completed: true,
     };
-    render(<EvolutionWall families={[family]} />);
+    renderWithIntl(<EvolutionWall families={[family]} />);
     expandWall();
     expect(
       screen.getByRole("img", { name: /both directions mastered/i }),
@@ -352,7 +353,7 @@ describe("EvolutionWall — edge accessibility labels", () => {
       edges: [makeEdge(1500001, 1, 2, { forwardMastered: true, reverseMastered: false, fullyMastered: false })],
       completed: false,
     };
-    render(<EvolutionWall families={[family]} />);
+    renderWithIntl(<EvolutionWall families={[family]} />);
     expandWall();
     expect(
       screen.getByRole("img", { name: /forward mastered, reverse not yet/i }),
@@ -366,7 +367,7 @@ describe("EvolutionWall — edge accessibility labels", () => {
       edges: [makeEdge(1500001, 1, 2, { forwardMastered: false, reverseMastered: true, fullyMastered: false })],
       completed: false,
     };
-    render(<EvolutionWall families={[family]} />);
+    renderWithIntl(<EvolutionWall families={[family]} />);
     expandWall();
     expect(
       screen.getByRole("img", { name: /reverse mastered, forward not yet/i }),
@@ -374,7 +375,7 @@ describe("EvolutionWall — edge accessibility labels", () => {
   });
 
   it("labels an unmastered edge as 'not yet mastered' (after expanding)", () => {
-    render(<EvolutionWall families={[makeLinearFamily({})]} />);
+    renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expandWall();
     expect(
       screen.getByRole("img", { name: /not yet mastered/i }),
@@ -384,16 +385,49 @@ describe("EvolutionWall — edge accessibility labels", () => {
 
 describe("EvolutionWall — empty families list", () => {
   it("renders the section heading even with no families", () => {
-    render(<EvolutionWall families={[]} />);
+    renderWithIntl(<EvolutionWall families={[]} />);
     expect(
       screen.getByRole("heading", { name: "Evolution wall" }),
     ).toBeInTheDocument();
   });
 
   it("shows 0 / 0 for the metric", () => {
-    render(<EvolutionWall families={[]} />);
+    renderWithIntl(<EvolutionWall families={[]} />);
     // Both completedFamilies (0) and totalFamilies (0) — two zeros in the metric area.
     const zeros = screen.getAllByText("0");
     expect(zeros.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale coverage (mandatory per AGENTS.md — #1393)
+// ---------------------------------------------------------------------------
+
+describe("EvolutionWall — locale coverage (i18n #1393)", () => {
+  it("renders the Japanese heading in ja locale", () => {
+    renderJa(<EvolutionWall families={[makeLinearFamily({})]} />);
+    // ja journey.evolutionWallWidget.heading = "進化ウォール"
+    expect(screen.getByRole("heading", { name: "進化ウォール" })).toBeInTheDocument();
+  });
+
+  it("renders the Japanese families completed label in ja locale", () => {
+    renderJa(<EvolutionWall families={[makeLinearFamily({})]} />);
+    // ja journey.evolutionWallWidget.familiesCompleted = "完了した進化系統:"
+    expect(screen.getByText(/完了した進化系統:/i)).toBeInTheDocument();
+  });
+
+  it("renders the Japanese expand button in ja locale", () => {
+    renderJa(<EvolutionWall families={[makeLinearFamily({})]} />);
+    // ja journey.evolutionWallWidget.expand = "展開する"
+    expect(screen.getByRole("button", { name: /展開する/i })).toBeInTheDocument();
+  });
+
+  it("renders the Japanese filter tabs in ja locale (after expanding)", () => {
+    renderJa(<EvolutionWall families={[makeLinearFamily({})]} />);
+    fireEvent.click(screen.getByRole("button", { name: /展開する/i }));
+    // ja: filterAll = "すべて", filterInProgress = "進行中", filterCompleted = "完了"
+    expect(screen.getByRole("tab", { name: "すべて" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "進行中" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "完了" })).toBeInTheDocument();
   });
 });
