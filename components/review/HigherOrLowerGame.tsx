@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   pickPair,
   shufflePair,
@@ -95,6 +95,27 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   const [lastResult, setLastResult] = useState<LastResult>(null);
   // True while sprite decode is in-flight; prevents a second click from racing.
   const [transitioning, setTransitioning] = useState(false);
+
+  // Ref attached to the result block (result message + action button) that
+  // appears below the tiles when phase === "revealed". On reveal, we scroll
+  // this element into view so the action button is reachable without manual
+  // scrolling on tall mobile viewports (e.g. iPhone 17 Pro) where the reveal
+  // block lands below the fold (#1447).
+  // `block: "nearest"` is intentional: it only scrolls when the element is
+  // already out of view, so on desktop / short viewports where everything fits
+  // the tiles are never scrolled off-screen.
+  const resultBlockRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (phase !== "revealed" || resultBlockRef.current === null) return;
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    resultBlockRef.current.scrollIntoView({
+      behavior: prefersReducedMotion ? "instant" : "smooth",
+      block: "nearest",
+    });
+  }, [phase]);
 
   const canPlay = seenPokemon.length >= 2;
 
@@ -225,6 +246,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
 
       {phase === "revealed" && lastResult !== null && (
         <div
+          ref={resultBlockRef}
           aria-live="polite"
           className="flex flex-col items-center gap-3 w-full"
         >

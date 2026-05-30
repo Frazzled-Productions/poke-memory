@@ -421,4 +421,135 @@ describe("HigherOrLowerGame", () => {
       ).toBeInTheDocument();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Scroll-into-view on reveal (#1447)
+  // ---------------------------------------------------------------------------
+  //
+  // When the user makes a guess, the result block (result message + action
+  // button) should scroll into view so it is reachable without manual scrolling
+  // on tall mobile viewports. We verify this by spying on scrollIntoView called
+  // on the result block element.
+
+  describe("scroll-into-view on reveal (#1447)", () => {
+    let scrollIntoViewCalls: ScrollIntoViewOptions[];
+    let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
+    let originalMatchMedia: typeof window.matchMedia;
+
+    beforeEach(() => {
+      scrollIntoViewCalls = [];
+      originalScrollIntoView = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function (options?: ScrollIntoViewOptions | boolean) {
+        scrollIntoViewCalls.push(options as ScrollIntoViewOptions);
+      };
+
+      originalMatchMedia = window.matchMedia;
+      // Default: user has not requested reduced motion.
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+    });
+
+    afterEach(() => {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it("calls scrollIntoView on the result block after a correct guess", async () => {
+      const user = userEvent.setup();
+      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // No scroll before the user picks — still in picking phase.
+      expect(scrollIntoViewCalls).toHaveLength(0);
+
+      // Correct pick: Ivysaur has the higher attack.
+      await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+
+      // Result block is shown; scrollIntoView must have fired once.
+      expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
+      expect(scrollIntoViewCalls).toHaveLength(1);
+      // block: "nearest" means no scrolling when already in view — correct for
+      // desktop where everything fits; necessary scroll on tall mobile viewports.
+      expect(scrollIntoViewCalls[0]).toMatchObject({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    });
+
+    it("calls scrollIntoView after a wrong guess (Play again state)", async () => {
+      const user = userEvent.setup();
+      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+
+      // Wrong pick: Bulbasaur has the lower attack.
+      await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
+
+      expect(screen.getByRole("button", { name: /play again/i })).toBeInTheDocument();
+      expect(scrollIntoViewCalls).toHaveLength(1);
+      expect(scrollIntoViewCalls[0]).toMatchObject({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    });
+
+    it("calls scrollIntoView after a tie", async () => {
+      const tied = makePokemon({
+        id: 99,
+        name: "Tieface",
+        stats: { hp: 49, attack: 49, defense: 49, specialAttack: 49, specialDefense: 49, speed: 49 },
+      });
+      mockPickPair.mockReturnValue({ left: BULBASAUR, right: tied, stat: "attack" as const });
+
+      const user = userEvent.setup();
+      render(<HigherOrLowerGame seenPokemon={[BULBASAUR, tied]} />);
+
+      await user.click(screen.getByRole("button", { name: "Tieface" }));
+
+      expect(screen.getByText(/equal, both count/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
+      expect(scrollIntoViewCalls).toHaveLength(1);
+      expect(scrollIntoViewCalls[0]).toMatchObject({ block: "nearest" });
+    });
+
+    it("does NOT call scrollIntoView before a guess is made (picking phase)", () => {
+      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      // Still in picking phase — no scroll should have fired.
+      expect(scrollIntoViewCalls).toHaveLength(0);
+      // Both tile buttons are present and the result block is absent.
+      expect(screen.getByRole("button", { name: "Bulbasaur" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Ivysaur" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /next pair/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /play again/i })).toBeNull();
+    });
+
+    it("uses instant scroll when prefers-reduced-motion is set", async () => {
+      // Override matchMedia to report reduced-motion preference.
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query === "(prefers-reduced-motion: reduce)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      const user = userEvent.setup();
+      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      await user.click(screen.getByRole("button", { name: "Ivysaur" }));
+
+      expect(scrollIntoViewCalls).toHaveLength(1);
+      expect(scrollIntoViewCalls[0]).toMatchObject({
+        behavior: "instant",
+        block: "nearest",
+      });
+    });
+  });
 });
