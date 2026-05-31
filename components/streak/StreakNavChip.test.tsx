@@ -95,6 +95,19 @@ describe("StreakNavChip — state coverage", () => {
     expect(screen.getByText("7 days")).toBeInTheDocument();
   });
 
+  it("uses singular ICU forms for a 1-day streak and a 1-day milestone gap", () => {
+    mockStreakNavState.mockReturnValue({ streak: 1, tokenBalance: 0, daysToNextMilestone: 1 });
+
+    renderWithIntl(<StreakNavChip />);
+
+    // Visual streak count uses the singular "1 day" (not "1 days").
+    expect(screen.getByText("1 day")).toBeInTheDocument();
+    const link = screen.getByRole("link");
+    // aria-label uses the singular streak and milestone wording.
+    expect(link.getAttribute("aria-label")).toMatch(/1-day streak|1 day streak/i);
+    expect(link.getAttribute("aria-label")).toMatch(/1 day to your next milestone/i);
+  });
+
   it("hides token pip when tokenBalance is 0", () => {
     mockStreakNavState.mockReturnValue({ streak: 5, tokenBalance: 0, daysToNextMilestone: null });
 
