@@ -99,18 +99,13 @@ export const ALLOWLIST: Array<string | RegExp> = [
   /^\p{Emoji}+$/u,
 
   // -------------------------------------------------------------------------
-  // PR1 wide-allowlist: hard-coded English UI strings that are #1434 targets.
-  // These strings bypass the message catalogue and will be swept in #1434.
-  // Listed here so the PR1 green baseline holds while the infrastructure
-  // (harness, generate script, allowlist) is in place.
+  // PR1 wide-allowlist entries removed in PR2 (#1434) as those strings were
+  // moved into the message catalogue:
+  //   - DirectionBadge labels (Name this Pokémon, Evolution, Pre-evolution,
+  //     Pick the sprite, Name from cry) -- now in practice.direction.* keys.
+  //
   // Do NOT add new hard-coded English prose here -- add it to messages/ instead.
   // -------------------------------------------------------------------------
-  // DirectionBadge labels (lib/review card-type descriptions).
-  "Name this Pokémon",
-  "Evolution",
-  "Pre-evolution",
-  "Pick the sprite",
-  "Name from cry",
 
   // -------------------------------------------------------------------------
   // Version strings (v0.1.2 etc.).

@@ -365,10 +365,40 @@
       "noAlternateForms": "當前種子中沒有異形態。",
       "matchCount": "{total} 隻中有 {match} 隻符合",
       "hiddenCardsPaused": "隱藏的卡片已暫停：它們的複習日期會向後推移，因此刪除範圍不會讓過期卡片湧入佇列。"
+    },
+    "direction": {
+      "name": "這是哪隻寶可夢？",
+      "evolution": "進化",
+      "reverseEvolution": "前置進化",
+      "reverse": "選擇圖鑑圖像",
+      "cry": "聽叫聲猜名字"
+    },
+    "correct": "正確！",
+    "correctAnswerWas": "正確答案是 {name}",
+    "hearName": "聆聽 {name} 的發音",
+    "whichPokemon": "{name} 是哪隻寶可夢？",
+    "dismissError": "關閉",
+    "sidebar": {
+      "sessionProgress": "本次進度",
+      "today": "今天",
+      "cardsReviewed": "已複習卡片",
+      "accuracy": "正確率",
+      "gradeBreakdown": "評分明細",
+      "noCardsYet": "今天還沒有複習卡片。",
+      "recentGrades": "最近評分",
+      "recentGradesAriaLabel": "{count} 條最近評分（最新優先）",
+      "viewFullStats": "檢視完整統計"
     }
   },
   "review": {
-    "streakDays": "{count, plural, other {連續 # 天}}"
+    "streakDays": "{count, plural, other {連續 # 天}}",
+    "startStreak": "開始你的連續記錄吧！",
+    "queue": {
+      "new": "新卡",
+      "learning": "學習中",
+      "review": "複習",
+      "ariaLabel": "佇列數量"
+    }
   },
   "pokedex": {
     "title": "Pokédex",

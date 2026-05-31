@@ -365,10 +365,40 @@
       "noAlternateForms": "当前种子中没有异形态。",
       "matchCount": "{total} 只中有 {match} 只匹配",
       "hiddenCardsPaused": "隐藏的卡片已暂停：它们的复习日期会向后推移，因此删除范围不会让过期卡片涌入队列。"
+    },
+    "direction": {
+      "name": "这是哪只 Pokémon？",
+      "evolution": "进化",
+      "reverseEvolution": "前置进化",
+      "reverse": "选择图鉴图像",
+      "cry": "听叫声猜名字"
+    },
+    "correct": "正确！",
+    "correctAnswerWas": "正确答案是 {name}",
+    "hearName": "听 {name} 的发音",
+    "whichPokemon": "{name} 是哪只 Pokémon？",
+    "dismissError": "关闭",
+    "sidebar": {
+      "sessionProgress": "本次进度",
+      "today": "今天",
+      "cardsReviewed": "已复习卡片",
+      "accuracy": "正确率",
+      "gradeBreakdown": "评分明细",
+      "noCardsYet": "今天还没有复习卡片。",
+      "recentGrades": "最近评分",
+      "recentGradesAriaLabel": "{count} 条最近评分（最新优先）",
+      "viewFullStats": "查看完整统计"
     }
   },
   "review": {
-    "streakDays": "{count, plural, other {连续 # 天}}"
+    "streakDays": "{count, plural, other {连续 # 天}}",
+    "startStreak": "开始你的连续记录吧！",
+    "queue": {
+      "new": "新卡",
+      "learning": "学习中",
+      "review": "复习",
+      "ariaLabel": "队列数量"
+    }
   },
   "pokedex": {
     "title": "Pokédex",

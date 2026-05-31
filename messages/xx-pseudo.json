@@ -365,10 +365,40 @@
       "noAlternateForms": "[No alternate forms in the current seed.]",
       "matchCount": "[{match} of {total} Pokémon match]",
       "hiddenCardsPaused": "[Hidden cards are paused: their review dates shift forward by the time they're hidden, so removing the scope won't flood your queue with overdue reviews.]"
+    },
+    "direction": {
+      "name": "[Name this Pokémon]",
+      "evolution": "[Evolution]",
+      "reverseEvolution": "[Pre-evolution]",
+      "reverse": "[Pick the sprite]",
+      "cry": "[Name from cry]"
+    },
+    "correct": "[Correct!]",
+    "correctAnswerWas": "[The correct answer was {name}]",
+    "hearName": "[Hear {name}]",
+    "whichPokemon": "[Which Pokémon is {name}?]",
+    "dismissError": "[Dismiss]",
+    "sidebar": {
+      "sessionProgress": "[Session progress]",
+      "today": "[Today]",
+      "cardsReviewed": "[Cards reviewed]",
+      "accuracy": "[Accuracy]",
+      "gradeBreakdown": "[Grade breakdown]",
+      "noCardsYet": "[No cards reviewed yet today.]",
+      "recentGrades": "[Recent grades]",
+      "recentGradesAriaLabel": "[{count} recent grades, newest first]",
+      "viewFullStats": "[View full stats]"
     }
   },
   "review": {
-    "streakDays": "[{count, plural, one {# day streak} other {# days streak}}]"
+    "streakDays": "[{count, plural, one {# day streak} other {# days streak}}]",
+    "startStreak": "[Start your streak!]",
+    "queue": {
+      "new": "[New]",
+      "learning": "[Learning]",
+      "review": "[Review]",
+      "ariaLabel": "[Queue counts]"
+    }
   },
   "pokedex": {
     "title": "[Pokédex]",

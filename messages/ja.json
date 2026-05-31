@@ -365,10 +365,40 @@
       "noAlternateForms": "現在のシードに異なるフォルムはありません。",
       "matchCount": "{total} 匹中 {match} 匹が一致",
       "hiddenCardsPaused": "非表示のカードは一時停止されています。スコープを削除してもレビュー期限切れのカードが溢れることはありません。"
+    },
+    "direction": {
+      "name": "この Pokémon の名前は？",
+      "evolution": "進化",
+      "reverseEvolution": "前の進化",
+      "reverse": "スプライトを選ぶ",
+      "cry": "鳴き声から名前を当てる"
+    },
+    "correct": "正解！",
+    "correctAnswerWas": "正解は {name} でした",
+    "hearName": "{name} を聞く",
+    "whichPokemon": "{name} はどの Pokémon？",
+    "dismissError": "閉じる",
+    "sidebar": {
+      "sessionProgress": "セッション進捗",
+      "today": "今日",
+      "cardsReviewed": "レビュー済みカード",
+      "accuracy": "正確さ",
+      "gradeBreakdown": "採点内訳",
+      "noCardsYet": "今日はまだカードをレビューしていません。",
+      "recentGrades": "最近の採点",
+      "recentGradesAriaLabel": "{count} 件の最近の採点（新しい順）",
+      "viewFullStats": "全記録を見る"
     }
   },
   "review": {
-    "streakDays": "{count, plural, other {# 日連続中}}"
+    "streakDays": "{count, plural, other {# 日連続中}}",
+    "startStreak": "連続記録を始めましょう！",
+    "queue": {
+      "new": "新規",
+      "learning": "学習中",
+      "review": "復習",
+      "ariaLabel": "キュー数"
+    }
   },
   "pokedex": {
     "title": "Pokédex",

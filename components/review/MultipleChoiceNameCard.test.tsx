@@ -1,6 +1,6 @@
 import React from "react";
-import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderWithIntl as render, screen, fireEvent, act } from "@/components/test-utils/renderWithIntl";
 import { MultipleChoiceNameCard, FEEDBACK_HOLD_MS } from "./MultipleChoiceNameCard";
 import type { Grade } from "@/lib/review/session";
 

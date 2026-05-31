@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { speakName } from "@/lib/audio/tts";
@@ -119,6 +120,7 @@ type Props = {
 };
 
 export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAnswer = false, speakNameOnAnswer = false }: Props) {
+  const t = useTranslations("practice");
   const [answered, setAnswered] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,7 +214,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
         </p>
         <button
           type="button"
-          aria-label={`Hear ${targetLocaleName}`}
+          aria-label={t("hearName", { name: targetLocaleName })}
           onClick={() => speakName(targetLocaleName, targetPokemon.id)}
           className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
         >
@@ -224,7 +226,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
       <div
         className="grid grid-cols-2 gap-3"
         role="group"
-        aria-label={`Which Pokémon is ${targetLocaleName}?`}
+        aria-label={t("whichPokemon", { name: targetLocaleName })}
       >
         {tiles.map((tile) => (
           <SpritePickerTile
@@ -242,9 +244,9 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
       <div aria-live="polite" aria-atomic="true" className="min-h-[1.5rem]">
         {answered && selectedId !== null && (
           <p className="text-sm font-medium text-center text-zinc-600 dark:text-zinc-300">
-            {tiles.find((t) => t.id === selectedId)?.isCorrect
-              ? "Correct!"
-              : `The correct answer was ${targetLocaleName}`}
+            {tiles.find((tile) => tile.id === selectedId)?.isCorrect
+              ? t("correct")
+              : t("correctAnswerWas", { name: targetLocaleName })}
           </p>
         )}
       </div>
