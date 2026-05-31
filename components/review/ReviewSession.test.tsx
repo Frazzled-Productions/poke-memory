@@ -20,6 +20,7 @@ import { CRY_ID_OFFSET } from "@/lib/pokemon/seed";
 import { LEARNING_STEPS_MS, RELEARNING_STEPS_MS } from "@/lib/srs/constants";
 import { nextReview } from "@/lib/srs/scheduler";
 import { FEEDBACK_HOLD_MS } from "@/components/review/MultipleChoiceNameCard";
+import { todayInTimezone } from "@/lib/utils/format-date";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -2075,10 +2076,10 @@ describe("Share today button persistence (#896)", () => {
     } as unknown as ReverseReviewCard;
   }
 
+  // Use todayInTimezone from lib/utils/format-date to avoid raw Intl.DateTimeFormat
+  // calls in components/tests — banned by the #1456 lint rule.
   function todayUtc(): string {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(
-      new Date(),
-    );
+    return todayInTimezone("UTC");
   }
 
   // jsdom on this Node version does not ship localStorage out of the box, so
@@ -2346,10 +2347,10 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
     };
   }
 
+  // Use todayInTimezone from lib/utils/format-date to avoid raw Intl.DateTimeFormat
+  // calls in components/tests — banned by the #1456 lint rule.
   function todayUtc(): string {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(
-      new Date(),
-    );
+    return todayInTimezone("UTC");
   }
 
   function makeLocalStorage(): Storage {

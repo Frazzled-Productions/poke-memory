@@ -74,7 +74,7 @@ export function ThemeWatermark() {
           alt=""
           width={THEME_WATERMARK_SPRITE_SIZE}
           height={THEME_WATERMARK_SPRITE_SIZE}
-          className="h-[180px] w-[180px] object-contain"
+          className="object-contain" style={{ width: THEME_WATERMARK_SPRITE_SIZE, height: THEME_WATERMARK_SPRITE_SIZE }}
           priority={false}
         />
       ) : (

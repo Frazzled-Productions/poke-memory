@@ -153,7 +153,9 @@ export function AuthButton() {
         <Image
           src={avatarUrl}
           alt={displayName}
+          // eslint-disable-next-line no-restricted-syntax -- user avatar (24 px), not a Pokémon sprite; no entry in lib/sprites/sizes.ts applies
           width={24}
+          // eslint-disable-next-line no-restricted-syntax -- same as above
           height={24}
           className="rounded-full"
           unoptimized

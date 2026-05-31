@@ -14,6 +14,8 @@ import { fireEvent, screen } from "@testing-library/react";
 import {
   renderWithIntl,
   renderJa,
+  renderZhHans,
+  renderZhHant,
 } from "@/components/test-utils/renderWithIntl";
 import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import type { HeatmapCell } from "@/lib/stats/heatmap";
@@ -111,5 +113,48 @@ describe("ReviewHeatmap", () => {
 
     fireEvent.mouseLeave(svg);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  // Locale-rendering tests for the date migration (#1456).
+  // formatDate always uses en-GB ordering (day-month-year) regardless of
+  // appLocale — verifying the year appears in all four supported locales
+  // confirms the route through the shared helper is stable.
+  describe("date tooltip renders in all supported locales", () => {
+    function triggerTooltip() {
+      const svg = screen.getByRole("img", { name: /heatmap/i });
+      const rects = svg.querySelectorAll("rect");
+      fireEvent.mouseEnter(rects[0]!, { clientX: 10, clientY: 10 });
+      return screen.getByRole("tooltip");
+    }
+
+    it("en: tooltip shows year", () => {
+      renderWithIntl(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
+      const tooltip = triggerTooltip();
+      expect(tooltip.textContent).toMatch(/2026/);
+      expect(tooltip.textContent).toMatch(/Jan/);
+    });
+
+    it("ja: tooltip still shows en-GB date (formatDate is locale-stable)", () => {
+      renderJa(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
+      const tooltip = triggerTooltip();
+      // formatDate uses en-GB regardless of appLocale, so the date is
+      // always an English month name + year.
+      expect(tooltip.textContent).toMatch(/2026/);
+      expect(tooltip.textContent).toMatch(/Jan/);
+    });
+
+    it("zh-Hans: tooltip still shows en-GB date", () => {
+      renderZhHans(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
+      const tooltip = triggerTooltip();
+      expect(tooltip.textContent).toMatch(/2026/);
+      expect(tooltip.textContent).toMatch(/Jan/);
+    });
+
+    it("zh-Hant: tooltip still shows en-GB date", () => {
+      renderZhHant(<ReviewHeatmap columns={makeColumnsWithReviews()} />);
+      const tooltip = triggerTooltip();
+      expect(tooltip.textContent).toMatch(/2026/);
+      expect(tooltip.textContent).toMatch(/Jan/);
+    });
   });
 });

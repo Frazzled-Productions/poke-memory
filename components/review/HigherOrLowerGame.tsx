@@ -13,6 +13,7 @@ import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { mutedTextXs } from "@/lib/utils/class-names";
+import { POKEDEX_FORM_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 type Phase = "picking" | "revealed";
 type LastResult = "correct" | "wrong" | "tie" | null;
@@ -68,8 +69,8 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
       <Image
         src={pokemon.spriteUrl}
         alt={pokemon.name}
-        width={120}
-        height={120}
+        width={POKEDEX_FORM_SPRITE_SIZE}
+        height={POKEDEX_FORM_SPRITE_SIZE}
         className="h-24 w-24 object-contain sm:h-32 sm:w-32"
         unoptimized
       />

@@ -9,7 +9,7 @@ import { MultipleChoiceNameCard } from "@/components/review/MultipleChoiceNameCa
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
 import { SpritePreloader, type SizedSpriteUrl } from "@/components/sprites/SpritePreloader";
-import { preloadableSpriteUrls, PICKER_SPRITE_SIZE } from "@/lib/review/sprites";
+import { preloadableSpriteUrls, PICKER_SPRITE_SIZE, PRACTICE_SPRITE_SIZE } from "@/lib/review/sprites";
 import { decodeSpriteUrls, DECODE_GRADE_TIMEOUT_MS } from "@/lib/sprites/decode";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { QueueStateBadge } from "@/components/review/QueueStateBadge";
@@ -1366,7 +1366,7 @@ export function ReviewSession() {
         aria-busy="true"
         aria-label={t("loadingAriaLabel")}
       >
-        <div className="w-[320px] h-[320px] rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+        <div className="rounded-xl bg-zinc-200 dark:bg-zinc-800" style={{ width: PRACTICE_SPRITE_SIZE, height: PRACTICE_SPRITE_SIZE }} />
         <div className="h-10 w-40 rounded-md bg-zinc-200 dark:bg-zinc-800" />
         <div className="h-11 w-32 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
       </div>

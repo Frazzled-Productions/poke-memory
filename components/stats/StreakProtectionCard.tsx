@@ -14,7 +14,7 @@ import {
   type ProtectionEvent,
 } from "@/lib/streak";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, colStack, mutedText } from "@/lib/utils/class-names";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
 
 type Props = {
@@ -100,7 +100,7 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
       >
         {t("heading")}
       </h2>
-      <div className={cn("flex flex-col gap-2", cardPanel)}>
+      <div className={cn(colStack, cardPanel)}>
         {showBanner && (
           <div
             role="status"

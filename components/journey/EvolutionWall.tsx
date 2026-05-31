@@ -21,6 +21,7 @@ import type {
 } from "@/lib/evolution/chains";
 import { computeEvolutionWallStats } from "@/lib/evolution/chains";
 import { mutedTextXs } from "@/lib/utils/class-names";
+import { POKEDEX_NODE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,8 +126,8 @@ function SpeciesNode({ node }: { node: FamilyNode }) {
           <Image
             src={node.spriteUrl}
             alt={node.name}
-            width={40}
-            height={40}
+            width={POKEDEX_NODE_SPRITE_SIZE}
+            height={POKEDEX_NODE_SPRITE_SIZE}
             className="object-contain"
             loading="lazy"
           />

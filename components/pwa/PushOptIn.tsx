@@ -10,7 +10,7 @@ import {
   unsubscribeFromPush,
 } from "@/lib/push/subscribe";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanelPadded, mutedTextXs } from "@/lib/utils/class-names";
 
 /**
  * Daily-reminder opt-in toggle (#1056).
@@ -126,7 +126,7 @@ export function PushOptIn({
   return (
     <div
       id="push-reminders-heading"
-      className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800"
+      className={cardPanelPadded}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1">

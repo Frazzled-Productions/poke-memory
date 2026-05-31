@@ -8,7 +8,7 @@ import {
   versionGroupGeneration,
   VERSION_GROUP_ORDER,
 } from "@/lib/pokemon/versionGroupLabels";
-import { mutedTextXs } from "@/lib/utils/class-names";
+import { mutedText, colStack, mutedTextXs } from "@/lib/utils/class-names";
 import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ export function GameBreakdown({ perGame }: Props) {
         >
           {tG("heading")}
         </h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={mutedText}>
           {tG("noData")}
         </p>
       </section>
@@ -202,7 +202,7 @@ export function GameBreakdown({ perGame }: Props) {
       >
         {tG("heading")}
       </h2>
-      <div className="flex flex-col gap-2" role="list" aria-label={tG("listAriaLabel")}>
+      <div className={colStack} role="list" aria-label={tG("listAriaLabel")}>
         {groups.map((group) => (
           <div key={group.gen} role="listitem">
             <GenAccordion group={group} />
