@@ -58,6 +58,7 @@ const SAMPLE: UserSettings = {
     audioHintDismissed: false,
     cardTypesHintDismissed: false,
     guestStorageNoticeDismissed: false,
+    journeyMasteryExplainerDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

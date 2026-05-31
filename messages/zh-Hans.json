@@ -826,6 +826,13 @@
       "lockedAriaLabel": "未获得的道馆徽章",
       "hideLocked": "隐藏未获得的徽章（{count} 个）",
       "viewAll": "查看所有徽章（{count} 个已锁定）"
+    },
+    "masteryExplainer": {
+      "title": "圆环含义",
+      "lockedBody": "未开始：您还未在练习中见过此宝可梦。",
+      "learningBody": "学习中：您已见过它，正在巩固记忆。",
+      "masteredBody": "已掌握：连续答对 {reps} 次且下次复习间隔至少 21 天。这是调度器确认您真正学会的时间点。",
+      "introducedNote": "已引入统计您至少见过一次的宝可梦，无论是否已完全掌握。"
     }
   },
   "error": {
