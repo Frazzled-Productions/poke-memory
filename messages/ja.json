@@ -18,7 +18,16 @@
     "closeMenu": "ナビゲーションメニューを閉じる",
     "navigationMenu": "ナビゲーションメニュー",
     "mobileNavigation": "モバイルナビゲーション",
-    "menuLabel": "メニュー"
+    "menuLabel": "メニュー",
+    "streakChip": {
+      "startStreak": "連続を始めよう",
+      "startStreakLabel": "連続を始めよう",
+      "streak": "{count}日",
+      "streakLabel": "{count}日連続。",
+      "tokenLabel": "{count, plural, one {保護トークン#個。} other {保護トークン#個。}}",
+      "milestoneLabel": "{count, plural, one {次の目標まであと#日。} other {次の目標まであと#日。}}",
+      "milestoneBadge": "+{count}日"
+    }
   },
   "auth": {
     "signingIn": "サインイン中…",
