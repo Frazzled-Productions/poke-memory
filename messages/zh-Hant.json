@@ -826,6 +826,13 @@
       "lockedAriaLabel": "未獲得的道館徽章",
       "hideLocked": "隱藏未獲得的徽章（{count} 個）",
       "viewAll": "查看所有徽章（{count} 個已鎖定）"
+    },
+    "masteryExplainer": {
+      "title": "圓環含義",
+      "lockedBody": "未開始：您還未在練習中見過此寶可夢。",
+      "learningBody": "學習中：您已見過它，正在鞏固記憶。",
+      "masteredBody": "已掌握：連續答對 {reps} 次且下次複習間隔至少 21 天。這是排程器確認您真正學會的時間點。",
+      "introducedNote": "已引入統計您至少見過一次的寶可夢，無論是否已完全掌握。"
     }
   },
   "error": {

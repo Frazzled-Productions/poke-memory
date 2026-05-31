@@ -809,3 +809,187 @@ describe("JourneyPage — byGenerationColumn column header", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Mastery explainer hint (#1441)
+// ---------------------------------------------------------------------------
+
+describe("JourneyPage — mastery explainer hint (AC #1441)", () => {
+  it("renders the hint on a fresh guest session (empty, all-locked state)", async () => {
+    // Default mock: all cards reps=0 (locked). The hint must appear regardless of mastery count.
+    render(<JourneyPage />);
+
+    // Wait for both the mastery section AND the hint text (which uses its own useEffect).
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /mastery distribution/i }),
+      ).toBeInTheDocument();
+    });
+
+    // Hint title from catalogue: journey.masteryExplainer.title = "What the rings mean".
+    // Use another waitFor as OnboardingHint fires a separate useEffect to read dismissed state.
+    await waitFor(() => {
+      expect(screen.getByText("What the rings mean")).toBeInTheDocument();
+    });
+  });
+
+  it("does not render the hint when journeyMasteryExplainerDismissed is true (dismissed state)", async () => {
+    // The OnboardingHint component reads from loadSettings via its own useEffect.
+    // We need to override the return value so the onboarding.journeyMasteryExplainerDismissed
+    // key is true, which causes OnboardingHint to stay hidden.
+    const settingsMod = await import("@/lib/settings/persistence");
+    vi.mocked(settingsMod.loadSettings).mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      cryCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+      retentionTarget: 0.9,
+      timezone: "UTC",
+      streakProtection: {
+        balance: 0,
+        spendDates: [],
+        daysSinceLastEarn: 0,
+        lastEarnCheckDate: null,
+      },
+      onboarding: {
+        firstVisitOnboardingDismissed: false,
+        welcomeDismissed: false,
+        practiceHintDismissed: false,
+        statsHintDismissed: false,
+        settingsHintDismissed: false,
+        installNudgeDismissed: false,
+        audioHintDismissed: false,
+        cardTypesHintDismissed: false,
+        guestStorageNoticeDismissed: false,
+        journeyMasteryExplainerDismissed: true,
+      },
+    } as unknown as ReturnType<typeof settingsMod.loadSettings>);
+
+    render(<JourneyPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /mastery distribution/i }),
+      ).toBeInTheDocument();
+    });
+
+    // Hint is absent because the flag is dismissed.
+    expect(screen.queryByText("What the rings mean")).toBeNull();
+  });
+
+  it("existing-user reach: settings blob WITHOUT journeyMasteryExplainerDismissed still shows hint", async () => {
+    // Simulates a pre-#1441 settings blob that has no journeyMasteryExplainerDismissed key.
+    // The === true coercion in validateOnboarding (real module) means the absent key resolves
+    // to false — hint shows. Reset the mock to the factory default (no dismissal) before render
+    // so previous test mock overrides do not bleed in.
+    const settingsMod = await import("@/lib/settings/persistence");
+    vi.mocked(settingsMod.loadSettings).mockReset().mockImplementation(() => ({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      cryCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+      retentionTarget: 0.9,
+      timezone: "UTC",
+      streakProtection: {
+        balance: 0,
+        spendDates: [],
+        daysSinceLastEarn: 0,
+        lastEarnCheckDate: null,
+      },
+      // No onboarding field — simulates an older settings blob that pre-dates #1441.
+      // OnboardingHint reads onboarding?.[id] ?? false → false → hint shows.
+    } as unknown as ReturnType<typeof settingsMod.loadSettings>));
+    render(<JourneyPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /mastery distribution/i }),
+      ).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("What the rings mean")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("JourneyPage — mastery explainer hint locale rendering (#1441)", () => {
+  beforeEach(async () => {
+    // Reset loadSettings to the factory default so previous test overrides don't bleed in.
+    const settingsMod = await import("@/lib/settings/persistence");
+    vi.mocked(settingsMod.loadSettings).mockReset().mockImplementation(() => ({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      cryCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+      retentionTarget: 0.9,
+      timezone: "UTC",
+      streakProtection: {
+        balance: 0,
+        spendDates: [],
+        daysSinceLastEarn: 0,
+        lastEarnCheckDate: null,
+      },
+    } as unknown as ReturnType<typeof settingsMod.loadSettings>));
+  });
+
+  it("renders hint title in Japanese", async () => {
+    render(<JourneyPage />, { locale: "ja" });
+
+    await waitFor(() => {
+      // ja: journey.masteryExplainer.title = "リングの意味"
+      expect(screen.getByText("リングの意味")).toBeInTheDocument();
+    });
+  });
+
+  it("renders hint title in Simplified Chinese", async () => {
+    render(<JourneyPage />, { locale: "zh-Hans" });
+
+    await waitFor(() => {
+      // zh-Hans: journey.masteryExplainer.title = "圆环含义"
+      expect(screen.getByText("圆环含义")).toBeInTheDocument();
+    });
+  });
+
+  it("renders hint title in Traditional Chinese", async () => {
+    render(<JourneyPage />, { locale: "zh-Hant" });
+
+    await waitFor(() => {
+      // zh-Hant: journey.masteryExplainer.title = "圓環含義"
+      expect(screen.getByText("圓環含義")).toBeInTheDocument();
+    });
+  });
+});

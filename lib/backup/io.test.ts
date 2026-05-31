@@ -77,6 +77,7 @@ const VALID_SETTINGS: UserSettings = {
     audioHintDismissed: false,
     cardTypesHintDismissed: false,
     guestStorageNoticeDismissed: false,
+    journeyMasteryExplainerDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

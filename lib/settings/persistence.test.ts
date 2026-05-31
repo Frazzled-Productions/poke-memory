@@ -606,6 +606,7 @@ describe('themeIntensity setting (#411)', () => {
           audioHintDismissed: false,
           cardTypesHintDismissed: true,
           guestStorageNoticeDismissed: false,
+          journeyMasteryExplainerDismissed: false,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -618,6 +619,7 @@ describe('themeIntensity setting (#411)', () => {
         audioHintDismissed: false,
         cardTypesHintDismissed: true,
         guestStorageNoticeDismissed: false,
+        journeyMasteryExplainerDismissed: false,
       });
     });
 
@@ -656,6 +658,7 @@ describe('themeIntensity setting (#411)', () => {
         audioHintDismissed: false,
         cardTypesHintDismissed: false,
         guestStorageNoticeDismissed: false,
+        journeyMasteryExplainerDismissed: false,
       });
     });
   });

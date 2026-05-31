@@ -79,6 +79,12 @@ export type OnboardingFlags = {
    * dismissed it.
    */
   guestStorageNoticeDismissed: boolean;
+  /**
+   * Journey mastery-explainer hint (#1441). Shown near the mastery rings on
+   * the Journey page to explain Locked / Learning / Mastered. `true` = user
+   * dismissed it and it will not re-show automatically.
+   */
+  journeyMasteryExplainerDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -91,6 +97,7 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   audioHintDismissed: false,
   cardTypesHintDismissed: false,
   guestStorageNoticeDismissed: false,
+  journeyMasteryExplainerDismissed: false,
 };
 
 /**
@@ -641,6 +648,8 @@ function validateOnboarding(value: unknown): OnboardingFlags {
     audioHintDismissed: v.audioHintDismissed === true,
     cardTypesHintDismissed: v.cardTypesHintDismissed === true,
     guestStorageNoticeDismissed: v.guestStorageNoticeDismissed === true,
+    // === true coercion: absent key in pre-#1441 blobs resolves to false (hint shows).
+    journeyMasteryExplainerDismissed: v.journeyMasteryExplainerDismissed === true,
   };
 }
 
