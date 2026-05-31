@@ -74,7 +74,10 @@
         "description": "Pokémon を習得済みにするとアプリのカラーテーマとして使用できるようになります。",
         "selected": "選択中",
         "setAsTheme": "テーマに設定",
-        "remove": "削除"
+        "remove": "削除",
+        "lockedHeading": "アプリテーマ",
+        "lockedBody": "最初の Pokémon を習得するとテーマが解放されます。",
+        "practiceLink": "練習へ"
       },
       "intensityPicker": {
         "heading": "テーマの強度",
@@ -502,13 +505,14 @@
     "statDefense": "防御",
     "statSpAtk": "特攻",
     "statSpDef": "特防",
-    "statSpeed": "素早さ"
+    "statSpeed": "素早さ",
+    "lockedSectionHint": "この Pokémon を習得すると解放されます。"
   },
   "pasture": {
     "title": "牧場",
     "description": "習得済みの Pokémon がここに住んでいます。",
     "empty": "牧場は空です。Pokémon を習得するとここに表示されます。",
-    "emptyBody": "牧場は空です。練習で最初の Pokémon を習得するとここに表示されます。",
+    "emptyBody": "牧場はあなたが習得した Pokémon のコレクションです。練習で最初の Pokémon を習得するとここに表示されます。",
     "searchPlaceholder": "習得済みの Pokémon を検索...",
     "masteredCount": "{count}匹習得済み",
     "pokemonCount": "{count}匹",

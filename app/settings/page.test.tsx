@@ -82,10 +82,13 @@ vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({ user: null, supabase: null, loading: false }),
 }));
 
+const { mockSuperuserFlags } = vi.hoisted(() => ({
+  mockSuperuserFlags: { pretendAllMastered: false },
+}));
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => ({
     unlocked: false,
-    flags: { pretendAllMastered: false },
+    flags: mockSuperuserFlags,
     setFlag: vi.fn(),
     anyFlagOn: false,
   }),
@@ -986,5 +989,76 @@ describe("SettingsPage — preview suffix from catalog", () => {
     expect(suffix.length).toBeGreaterThan(0);
     // The Japanese suffix should use fullwidth brackets.
     expect(suffix).toContain("プレビュー");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Theme picker locked state (#1440)
+//
+// FavouritePicker renders a locked-state message when no Pokémon are mastered.
+// When pretendAllMastered is on (or mastered entries exist), the picker renders.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — theme picker locked state (#1440)", () => {
+  // Helper to get the settings page rendered, waiting for load.
+  async function renderAndWait() {
+    render(<SettingsPage />);
+    // Wait for the async loadSession effect to complete
+    await waitFor(() => {
+      // The page renders content after settings load
+      expect(screen.getByText(/App Theme/i)).toBeInTheDocument();
+    });
+  }
+
+  it("shows locked-state message when no Pokémon are mastered", async () => {
+    // loadSession returns null → cardStateById is empty → unlockedEntries is empty
+    mockLoadSession.mockResolvedValue(null);
+
+    await renderAndWait();
+
+    expect(screen.getByText("Master your first Pokémon to unlock themes.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to Practice" })).toBeInTheDocument();
+  });
+
+  it("locked state: Practice link points to /", async () => {
+    mockLoadSession.mockResolvedValue(null);
+
+    await renderAndWait();
+
+    const link = screen.getByRole("link", { name: "Go to Practice" });
+    expect(link).toHaveAttribute("href", "/");
+  });
+
+  it("locked state: no theme picker grid rendered", async () => {
+    mockLoadSession.mockResolvedValue(null);
+
+    await renderAndWait();
+
+    expect(screen.queryByRole("button", { name: /Set as theme/i })).not.toBeInTheDocument();
+  });
+
+  it("pretendAllMastered on: picker grid renders, locked message absent", async () => {
+    // The superuser flag forces unlockedEntries to include every CURATED_POKEMON
+    // entry (the real, non-empty curated list), so the locked branch is skipped.
+    // This exercises the actual `flags.pretendAllMastered || isMastered(...)`
+    // guard in the component, not just catalogue-key presence.
+    mockLoadSession.mockResolvedValue(null);
+    mockSuperuserFlags.pretendAllMastered = true;
+    try {
+      await renderAndWait();
+
+      // The locked signpost must NOT show when the superuser flag is on.
+      expect(
+        screen.queryByText("Master your first Pokémon to unlock themes."),
+      ).not.toBeInTheDocument();
+      // The picker grid renders at least one selectable theme.
+      await waitFor(() => {
+        expect(
+          screen.getAllByRole("button", { name: /Set as theme/i }).length,
+        ).toBeGreaterThan(0);
+      });
+    } finally {
+      mockSuperuserFlags.pretendAllMastered = false;
+    }
   });
 });

@@ -340,7 +340,7 @@ export function PokemonDetailDisclosure({
         </p>
       )}
 
-      {isMasteredCard && (
+      {isMasteredCard ? (
         <section aria-labelledby="stats-heading" className="mt-8">
           <h2
             id="stats-heading"
@@ -375,9 +375,21 @@ export function PokemonDetailDisclosure({
             })}
           </dl>
         </section>
+      ) : !isLocked ? null : (
+        <section aria-labelledby="stats-heading-locked" className="mt-8">
+          <h2
+            id="stats-heading-locked"
+            className={`mb-3 ${sectionLabelSmSubtle}`}
+          >
+            {t("baseStatsHeading")}
+          </h2>
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">
+            {t("lockedSectionHint")}
+          </p>
+        </section>
       )}
 
-      {isMasteredCard && (
+      {isMasteredCard ? (
         <section aria-labelledby="facts-heading" className="mt-10">
           <h2
             id="facts-heading"
@@ -396,9 +408,21 @@ export function PokemonDetailDisclosure({
             ))}
           </dl>
         </section>
+      ) : !isLocked ? null : (
+        <section aria-labelledby="facts-heading-locked" className="mt-10">
+          <h2
+            id="facts-heading-locked"
+            className={`mb-3 ${sectionLabelSmSubtle}`}
+          >
+            {t("factsHeading")}
+          </h2>
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">
+            {t("lockedSectionHint")}
+          </p>
+        </section>
       )}
 
-      {isMasteredCard && showEvolution && (
+      {isMasteredCard && showEvolution ? (
         <section aria-labelledby="evo-heading" className="mt-10">
           <h2
             id="evo-heading"
@@ -426,7 +450,19 @@ export function PokemonDetailDisclosure({
             ))}
           </div>
         </section>
-      )}
+      ) : isLocked && showEvolution ? (
+        <section aria-labelledby="evo-heading-locked" className="mt-10">
+          <h2
+            id="evo-heading-locked"
+            className={`mb-4 ${sectionLabelSmSubtle}`}
+          >
+            {t("evolutionChainHeading")}
+          </h2>
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">
+            {t("lockedSectionHint")}
+          </p>
+        </section>
+      ) : null}
 
       {!isLocked && forms.length > 0 && (
         <section aria-labelledby="forms-heading" className="mt-10">

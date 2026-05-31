@@ -74,7 +74,10 @@
         "description": "掌握一只 Pokémon 后，可将其解锁为应用配色主题。",
         "selected": "已选择",
         "setAsTheme": "设为主题",
-        "remove": "移除"
+        "remove": "移除",
+        "lockedHeading": "应用主题",
+        "lockedBody": "掌握第一只宝可梦后即可解锁主题。",
+        "practiceLink": "前往练习"
       },
       "intensityPicker": {
         "heading": "主题强度",
@@ -502,13 +505,14 @@
     "statDefense": "防御",
     "statSpAtk": "特攻",
     "statSpDef": "特防",
-    "statSpeed": "速度"
+    "statSpeed": "速度",
+    "lockedSectionHint": "掌握这只宝可梦后解锁。"
   },
   "pasture": {
     "title": "牧场",
     "description": "您已掌握的 Pokémon 住在这里。",
     "empty": "牧场是空的。掌握一些 Pokémon 后，它们就会出现在这里。",
-    "emptyBody": "牧场是空的。在练习中掌握第一只宝可梦后，它就会出现在这里。",
+    "emptyBody": "牧场是你已掌握宝可梦的收藏。在练习中掌握第一只宝可梦后，它就会出现在这里。",
     "searchPlaceholder": "搜索已掌握的 Pokémon...",
     "masteredCount": "已掌握 {count} 个",
     "pokemonCount": "{count} 只宝可梦",

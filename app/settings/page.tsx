@@ -203,7 +203,27 @@ function FavouritePicker({
     );
   });
 
-  if (unlockedEntries.length === 0) return null;
+  if (unlockedEntries.length === 0) {
+    return (
+      <div className="rounded-lg border border-zinc-200 bg-background px-4 py-5 dark:border-zinc-800">
+        <h3
+          id="theme-heading"
+          className="text-sm font-semibold text-foreground"
+        >
+          {t("settings.appearance.theme.lockedHeading")}
+        </h3>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          {t("settings.appearance.theme.lockedBody")}
+        </p>
+        <Link
+          href="/"
+          className="mt-3 inline-block text-sm font-medium text-foreground underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+        >
+          {t("settings.appearance.theme.practiceLink")}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <>
