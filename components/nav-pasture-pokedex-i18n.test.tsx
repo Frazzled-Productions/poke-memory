@@ -8,14 +8,16 @@
  *   - NextArrivalsStrip: empty arrivals vs. populated arrivals
  *   - BadgeGallery: no badges earned vs. some earned
  *   - StorageQuotaBanner: always visible (consumer dismisses it)
- *   - PwaInstallNudge: shown when conditions met vs. hidden
  *   - PokemonDetailDisclosure: locked vs. mastered state
+ *
+ * (PwaInstallNudge locale coverage lives in its own file,
+ *  components/onboarding/PwaInstallNudge.i18n.test.tsx — see #1464.)
  *
  * Refs: AGENTS.md "Mandatory coverage rules", closes #1434.
  */
 
 import React from "react";
-import { screen, act, fireEvent } from "@/components/test-utils/renderWithIntl";
+import { screen, fireEvent } from "@/components/test-utils/renderWithIntl";
 import {
   renderWithIntl,
   renderJa,
@@ -352,90 +354,6 @@ describe("StorageQuotaBanner — locale coverage", () => {
     expect(
       screen.getByText(/儲存空間已滿/),
     ).toBeInTheDocument();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// PwaInstallNudge — locale coverage (shown when conditions met + hidden when dismissed)
-// ---------------------------------------------------------------------------
-
-const VISIT_SESSION_KEY = "poke-memory:visit-counted:v1";
-
-// We need a mutable settings mock for PwaInstallNudge
-const mockPwaLoadSettings = vi.fn(() => ({
-  appVisitCount: 5,
-  onboarding: { installNudgeDismissed: false },
-}));
-const mockPwaSaveSettings = vi.fn();
-vi.mock("@/lib/settings/persistence", () => ({
-  loadSettings: () => mockPwaLoadSettings(),
-  saveSettings: (...args: unknown[]) => mockPwaSaveSettings(...args),
-  SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
-}));
-
-const mockInstallState = vi.fn(() => ({
-  platform: "ios" as const,
-}));
-vi.mock("@/lib/pwa/useInstallPrompt", () => ({
-  useInstallPrompt: () => mockInstallState(),
-}));
-
-import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
-
-describe("PwaInstallNudge — locale coverage", () => {
-  beforeEach(() => {
-    Object.defineProperty(window, "sessionStorage", {
-      value: makeLocalStorage(),
-      configurable: true,
-      writable: true,
-    });
-    // Pre-count the session so we don't double-increment
-    sessionStorage.setItem(VISIT_SESSION_KEY, "1");
-    mockPwaLoadSettings.mockReturnValue({
-      appVisitCount: 5,
-      onboarding: { installNudgeDismissed: false },
-    });
-    mockInstallState.mockReturnValue({ platform: "ios" as const });
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("en: shows nudge heading when visit threshold is met and not dismissed (state in)", async () => {
-    renderWithIntl(<PwaInstallNudge />);
-    // The nudge renders after an async mount effect; findByText polls for it.
-    // The default 1000ms is too tight under coverage instrumentation, so use a
-    // generous timeout (#1464).
-    await screen.findByText("Install Poké Memory", undefined, { timeout: 8000 });
-  });
-
-  it("en: does not show nudge when dismissed (state out)", async () => {
-    mockPwaLoadSettings.mockReturnValue({
-      appVisitCount: 5,
-      onboarding: { installNudgeDismissed: true },
-    });
-    renderWithIntl(<PwaInstallNudge />);
-    // Give time for effect to run
-    await act(async () => {});
-    expect(
-      screen.queryByText("Install Poké Memory"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("ja: heading in Japanese", async () => {
-    renderJa(<PwaInstallNudge />);
-    await screen.findByText("Poké Memory をインストール", undefined, { timeout: 8000 });
-  });
-
-  it("zh-Hans: heading in Simplified Chinese", async () => {
-    renderZhHans(<PwaInstallNudge />);
-    await screen.findByText("安装 Poké Memory", undefined, { timeout: 8000 });
-  });
-
-  it("zh-Hant: heading in Traditional Chinese", async () => {
-    renderZhHant(<PwaInstallNudge />);
-    await screen.findByText("安裝 Poké Memory", undefined, { timeout: 8000 });
   });
 });
 
