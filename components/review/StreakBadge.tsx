@@ -96,7 +96,7 @@ export function StreakBadge() {
       <div className="mb-2 flex items-center justify-center sm:mb-4">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
           {streak === 0
-            ? "Start your streak!"
+            ? t("startStreak")
             : t("streakDays", { count: streak })}
         </span>
       </div>

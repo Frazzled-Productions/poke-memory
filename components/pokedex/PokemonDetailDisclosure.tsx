@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCardClass } from "@/lib/review/useCardClass";
+import { getTypeName } from "@/lib/i18n/typeNames";
 import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
 import { colStack, mutedTextXs, sectionLabelSmSubtle } from "@/lib/utils/class-names";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
@@ -27,17 +28,17 @@ function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
 }
 
-const STAT_LABELS: Record<string, string> = {
-  hp:             "HP",
-  attack:         "Attack",
-  defense:        "Defense",
-  specialAttack:  "Sp. Atk",
-  specialDefense: "Sp. Def",
-  speed:          "Speed",
-};
-
 const STAT_ORDER = ["hp", "attack", "defense", "specialAttack", "specialDefense", "speed"] as const;
 type StatKey = (typeof STAT_ORDER)[number];
+
+const STAT_KEY_MAP: Record<StatKey, string> = {
+  hp: "statHp",
+  attack: "statAttack",
+  defense: "statDefense",
+  specialAttack: "statSpAtk",
+  specialDefense: "statSpDef",
+  speed: "statSpeed",
+};
 
 function statBarColor(value: number): string {
   if (value >= 100) return "bg-green-500";
@@ -50,6 +51,7 @@ const SPRITE_BY_ID: Record<number, string> = Object.fromEntries(
 );
 
 function EvolutionChainNode({ node }: { node: EvolutionNode }) {
+  const t = useTranslations("pokedex");
   const { flags } = useSuperuser();
   const nodeSprite = SPRITE_BY_ID[node.speciesId];
   const rawNodeClass: CardClassOrPending = useCardClass(node.speciesId);
@@ -71,13 +73,13 @@ function EvolutionChainNode({ node }: { node: EvolutionNode }) {
   return (
     <Link
       href={"/pokedex/" + node.speciesId}
-      aria-label={nodeLocked ? `Pokémon #${zeroPad(node.speciesId)} (locked)` : node.name}
+      aria-label={nodeLocked ? t("lockedAriaLabel", { number: zeroPad(node.speciesId) }) : node.name}
       className="flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
     >
       {nodeSprite ? (
         <Image
           src={nodeSprite}
-          alt={nodeLocked ? `#${zeroPad(node.speciesId)} (locked)` : node.name}
+          alt={nodeLocked ? t("lockedAriaLabel", { number: zeroPad(node.speciesId) }) : node.name}
           width={POKEDEX_NODE_SPRITE_SIZE}
           height={POKEDEX_NODE_SPRITE_SIZE}
           className={[
@@ -122,6 +124,8 @@ function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
 // ---------------------------------------------------------------------------
 
 function FormBlock({ form }: { form: SeedPokemon }) {
+  const tPokedex = useTranslations("pokedex");
+  const tTypes = useTranslations("types");
   // Resolve locale-aware name so alternate-form headings honour the active
   // pokemonNameLocale setting (#1327).
   // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
@@ -170,19 +174,19 @@ function FormBlock({ form }: { form: SeedPokemon }) {
         </div>
 
         {/* Types */}
-        <div className="mb-3 flex justify-center gap-2" aria-label="Types">
+        <div className="mb-3 flex justify-center gap-2" aria-label={tPokedex("typesAriaLabel")}>
           {form.types.map((type) => {
             const colors = TYPE_COLORS[type] ?? { bg: "bg-zinc-400", text: "text-white" };
             return (
               <span
                 key={type}
                 className={[
-                  "rounded-full px-3 py-0.5 text-xs font-semibold capitalize",
+                  "rounded-full px-3 py-0.5 text-xs font-semibold",
                   colors.bg,
                   colors.text,
                 ].join(" ")}
               >
-                {type}
+                {getTypeName(type, tTypes)}
               </span>
             );
           })}
@@ -206,6 +210,7 @@ export function PokemonDetailDisclosure({
   forms?: SeedPokemon[];
 }) {
   const t = useTranslations("pokedex");
+  const tTypes = useTranslations("types");
   const { flags } = useSuperuser();
   const { id, name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
   const rawCardClass = useCardClass(id);
@@ -275,7 +280,7 @@ export function PokemonDetailDisclosure({
         </p>
         <Image
           src={spriteUrl}
-          alt={isLocked ? `#${zeroPad(id)} (locked)` : name}
+          alt={isLocked ? t("lockedAriaLabel", { number: zeroPad(id) }) : name}
           width={POKEDEX_DETAIL_SPRITE_SIZE}
           height={POKEDEX_DETAIL_SPRITE_SIZE}
           priority
@@ -294,19 +299,19 @@ export function PokemonDetailDisclosure({
           </div>
         )}
         {!isLocked && (
-          <div className="flex gap-2" aria-label="Types">
+          <div className="flex gap-2" aria-label={t("typesAriaLabel")}>
             {types.map((type) => {
               const colors = TYPE_COLORS[type] ?? { bg: "bg-zinc-400", text: "text-white" };
               return (
                 <span
                   key={type}
                   className={[
-                    "rounded-full px-3 py-0.5 text-xs font-semibold capitalize",
+                    "rounded-full px-3 py-0.5 text-xs font-semibold",
                     colors.bg,
                     colors.text,
                   ].join(" ")}
                 >
-                  {type}
+                  {getTypeName(type, tTypes)}
                 </span>
               );
             })}
@@ -320,14 +325,14 @@ export function PokemonDetailDisclosure({
         nextReview.status !== "not-started" && (
           <p className={`mt-2 ${mutedTextXs}`}>
             {nextReview.status === "due-today"
-              ? "Due today"
+              ? t("dueToday")
               : t("nextReviewInDays", { count: nextReview.days })}
           </p>
         )}
 
       {isLocked ? (
         <p className="mt-8 text-sm text-zinc-400 dark:text-zinc-500 text-center">
-          Start learning this Pok&#233;mon to reveal its details.
+          {t("lockedHint")}
         </p>
       ) : (
         <p className="mt-8 text-sm italic text-zinc-500 dark:text-zinc-400 leading-relaxed">
@@ -341,7 +346,7 @@ export function PokemonDetailDisclosure({
             id="stats-heading"
             className={`mb-3 ${sectionLabelSmSubtle}`}
           >
-            Base Stats
+            {t("baseStatsHeading")}
           </h2>
           <dl className={colStack}>
             {STAT_ORDER.map((key: StatKey) => {
@@ -353,7 +358,7 @@ export function PokemonDetailDisclosure({
                   className="grid grid-cols-[6rem_1fr_2.5rem] items-center gap-3"
                 >
                   <dt className="text-xs font-medium text-zinc-500 dark:text-zinc-400 text-right">
-                    {STAT_LABELS[key]}
+                    {t(STAT_KEY_MAP[key] as Parameters<typeof t>[0])}
                   </dt>
                   <dd className="relative h-2.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
                     <div
@@ -378,7 +383,7 @@ export function PokemonDetailDisclosure({
             id="facts-heading"
             className={`mb-3 ${sectionLabelSmSubtle}`}
           >
-            Facts
+            {t("factsHeading")}
           </h2>
           <dl className={colStack}>
             {facts.map((fact, i) => (
@@ -399,7 +404,7 @@ export function PokemonDetailDisclosure({
             id="evo-heading"
             className={`mb-4 ${sectionLabelSmSubtle}`}
           >
-            Evolution Chain
+            {t("evolutionChainHeading")}
           </h2>
           <div className="flex flex-wrap items-start justify-center gap-2 sm:flex-nowrap">
             {stages.map((stage, stageIndex) => (
@@ -429,7 +434,7 @@ export function PokemonDetailDisclosure({
             id="forms-heading"
             className={`mb-4 ${sectionLabelSmSubtle}`}
           >
-            Forms
+            {t("formsHeading")}
           </h2>
           <div className={colStack}>
             {forms.map((form) => (

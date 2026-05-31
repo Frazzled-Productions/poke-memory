@@ -13,7 +13,12 @@
     "mobileTabAriaLabel": "Mobile tab navigation",
     "whatsNew": "What's new",
     "privacy": "Privacy",
-    "terms": "Terms"
+    "terms": "Terms",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
+    "navigationMenu": "Navigation menu",
+    "mobileNavigation": "Mobile navigation",
+    "menuLabel": "Menu"
   },
   "auth": {
     "signingIn": "Signing in…",
@@ -61,6 +66,15 @@
         "selected": "Selected",
         "setAsTheme": "Set as theme",
         "remove": "Remove"
+      },
+      "intensityPicker": {
+        "heading": "Theme intensity",
+        "accentsLabel": "Subtle accents only",
+        "accentsDescription": "Mascot colours appear on the nav bar and focus rings; body stays neutral.",
+        "tintedLabel": "Tinted backgrounds",
+        "tintedDescription": "A light wash of your mascot colour tints the page background.",
+        "fullLabel": "Full mascot theme",
+        "fullDescription": "Your mascot colour drives all backgrounds: loud by design."
       }
     },
     "labs": {
@@ -183,10 +197,36 @@
         "off": "Off",
         "fast": "Fast",
         "default": "Default"
+      },
+      "ttsControls": {
+        "voiceLabel": "Pronunciation voice",
+        "voiceAutoOption": "Auto (system default)",
+        "voiceHint": "English voices from your device. \"Auto\" picks the highest-quality British English voice available. This voice is used for the spoken-name fallback; pre-generated name audio uses a fixed British English voice.",
+        "rateLabel": "Speech rate ({rate}x)",
+        "hearSample": "Hear sample",
+        "rateSlow": "0.5x slow",
+        "rateFast": "2.0x fast",
+        "volumeLabel": "Speech volume ({pct}%)",
+        "volumeMute": "0% mute",
+        "volumeFull": "100% full"
+      },
+      "voiceQualityHint": {
+        "heading": "Voice sounding robotic?",
+        "body": "The default English voice on most devices is a low-quality \"compact\" version. Your device's accessibility or spoken-content settings let you download a higher-quality (Premium or Enhanced) British English voice. Once installed, the app picks it automatically.",
+        "dismissAriaLabel": "Dismiss tip"
       }
     },
     "offline": {
-      "downloadHeading": "Download"
+      "downloadHeading": "Download",
+      "downloadTitle": "Download for offline use",
+      "downloadDescription": "Pre-fetches every sprite and cry so you can practise without a connection. Recommended on Wi-Fi. About 166 MB.",
+      "storageUsage": "Using {usedMb} of {totalMb} available.",
+      "downloadedOn": "Downloaded on {date}.",
+      "downloadButton": "Download",
+      "updateButton": "Update",
+      "downloadingProgress": "Downloading {done} of {total}",
+      "downloadProgressAriaLabel": "Download progress",
+      "stopButton": "Stop"
     },
     "optimizerCooldown": "{count, plural, one {Next optimisation in # day} other {Next optimisation in # days}}",
     "optimizerRetryAfter": "{count, plural, one {Try again in # day.} other {Try again in # days.}}",
@@ -365,10 +405,42 @@
       "noAlternateForms": "No alternate forms in the current seed.",
       "matchCount": "{match} of {total} Pokémon match",
       "hiddenCardsPaused": "Hidden cards are paused: their review dates shift forward by the time they're hidden, so removing the scope won't flood your queue with overdue reviews."
+    },
+    "direction": {
+      "name": "Name this Pokémon",
+      "evolution": "Evolution",
+      "reverseEvolution": "Pre-evolution",
+      "reverse": "Pick the sprite",
+      "cry": "Name from cry"
+    },
+    "correct": "Correct!",
+    "correctAnswerWas": "The correct answer was {name}",
+    "hearName": "Hear {name}",
+    "whichPokemon": "Which Pokémon is {name}?",
+    "dismissError": "Dismiss",
+    "sidebar": {
+      "sessionProgress": "Session progress",
+      "today": "Today",
+      "cardsReviewed": "Cards reviewed",
+      "accuracy": "Accuracy",
+      "gradeBreakdown": "Grade breakdown",
+      "noCardsYet": "No cards reviewed yet today.",
+      "recentGrades": "Recent grades",
+      "recentGradesAriaLabel": "{count} recent grades, newest first",
+      "viewFullStats": "View full stats"
     }
   },
   "review": {
-    "streakDays": "{count, plural, one {# day streak} other {# days streak}}"
+    "streakDays": "{count, plural, one {# day streak} other {# days streak}}",
+    "startStreak": "Start your streak!",
+    "queue": {
+      "new": "New",
+      "learning": "Learning",
+      "review": "Review",
+      "ariaLabel": "Queue counts"
+    },
+    "storageFullBanner": "Progress saving is disabled: storage is full.",
+    "storageFullDismiss": "Dismiss"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -401,7 +473,21 @@
     "generationAll": "All",
     "generationLabel": "Gen {gen}",
     "masteryCount": "{mastered} / {total} mastered",
-    "nextReviewInDays": "{count, plural, one {Next review: in # day} other {Next review: in # days}}"
+    "nextReviewInDays": "{count, plural, one {Next review: in # day} other {Next review: in # days}}",
+    "dueToday": "Due today",
+    "lockedHint": "Start learning this Pokémon to reveal its details.",
+    "typesAriaLabel": "Types",
+    "baseStatsHeading": "Base Stats",
+    "factsHeading": "Facts",
+    "evolutionChainHeading": "Evolution Chain",
+    "formsHeading": "Forms",
+    "lockedAriaLabel": "#{number} (locked)",
+    "statHp": "HP",
+    "statAttack": "Attack",
+    "statDefense": "Defense",
+    "statSpAtk": "Sp. Atk",
+    "statSpDef": "Sp. Def",
+    "statSpeed": "Speed"
   },
   "pasture": {
     "title": "Pasture",
@@ -442,6 +528,12 @@
       "backLabel": "Pasture",
       "backAriaLabel": "Back to Pasture",
       "emptyState": "No mastered Pokémon in this biome yet. Keep practising!"
+    },
+    "nextArrivals": {
+      "ariaLabel": "Next arrivals",
+      "heading": "Next arrivals",
+      "upcomingAriaLabel": "Upcoming Pasture species",
+      "allCaughtUp": "All reviewed Pokémon are already in your Pasture."
     }
   },
   "stats": {
@@ -525,6 +617,104 @@
       "eventEarned": "Earned",
       "eventUsed": "Used",
       "eventEarnedAndUsed": "Earned + used"
+    },
+    "gradeBreakdown": {
+      "heading": "Grade breakdown",
+      "noGrades": "No grades yet.",
+      "ariaLabel": "{heading}: {again} Again, {hard} Hard, {good} Good, {easy} Easy"
+    },
+    "accuracy": {
+      "heading": "Recent accuracy",
+      "windowAriaLabel": "Accuracy window",
+      "window7d": "7d",
+      "window30d": "30d",
+      "window1yr": "1yr",
+      "window7dAriaLabel": "7-day",
+      "window30dAriaLabel": "30-day",
+      "window1yrAriaLabel": "1-year",
+      "rollingLabel": "{window} rolling",
+      "sparklineAriaLabel": "{window} accuracy sparkline",
+      "noReviewsDays": "No reviews yet in the last {days} days.",
+      "noReviewsYear": "No reviews yet in the last year."
+    },
+    "retention": {
+      "heading": "Recall vs target",
+      "description": "Your measured recall over the past year against the {target} retention target the scheduler aims for.",
+      "recallLabel": "recall",
+      "noReviews": "No reviews recorded in the past year. Grade some cards to see how your recall tracks against target.",
+      "onTarget": "Right on your {target} retention target.",
+      "above": "Running {delta} above your {target} target.",
+      "below": "Running {delta} below your {target} target."
+    },
+    "masteryOverTime": {
+      "heading": "Mastery over time",
+      "description": "Cumulative species mastered, using the last review date as a proxy for when each card crossed the mastery threshold.",
+      "noData": "No mastered species yet. Keep reviewing and the line will start climbing.",
+      "ofTotalMastered": "of {total} species mastered",
+      "speciesMastered": "species mastered",
+      "superuserMode": "Superuser mode: showing total as of today.",
+      "reviewMoreCards": "Review more cards to see your progress trend.",
+      "ariaLabel": "Mastery over time: {count} of {total} species mastered as of {date}",
+      "tooltipMastered": "mastered"
+    },
+    "gameBreakdown": {
+      "heading": "By game",
+      "noData": "No game data available. Re-seed the Pokémon data to enable this view.",
+      "listAriaLabel": "Mastery by game generation",
+      "speciesMastered": "{mastered}/{total} species mastered",
+      "gameListAriaLabel": "{name} games",
+      "gen1": "Generation I",
+      "gen2": "Generation II",
+      "gen3": "Generation III",
+      "gen4": "Generation IV",
+      "gen5": "Generation V",
+      "gen6": "Generation VI",
+      "gen7": "Generation VII",
+      "gen8": "Generation VIII",
+      "gen9": "Generation IX",
+      "genOther": "Other"
+    },
+    "completionProjection": {
+      "heading": "Pokédex completion",
+      "complete": "Complete!",
+      "completeCopy": "You have mastered every species. Congratulations!",
+      "notAvailable": "Projection not available yet",
+      "notAvailableDescription": "Available once you have mastered at least one species and kept it up for a week. Master a species by reviewing it until it is scheduled at least 21 days ahead, then come back after 7 days.",
+      "estimatedDate": "estimated completion date",
+      "speciesRemaining": "species remaining",
+      "masteredPerWeek": "mastered per week (recent pace)"
+    },
+    "directionBreakdown": {
+      "heading": "Accuracy by card direction",
+      "description": "How your recall compares across name, reverse, cry and evolution cards.",
+      "noData": "No reviews recorded yet. Grade some cards to see your breakdown.",
+      "disabledLabel": "{direction} (disabled)",
+      "tooltipAccuracy": "Accuracy: {pct}%",
+      "tooltipReviews": "{passes} of {total} reviews passed",
+      "tooltipDisabled": "This card type is currently disabled in Settings.",
+      "noReviewsLabel": "no reviews",
+      "disabledMark": "(disabled)"
+    },
+    "heatmap": {
+      "heading": "Review activity",
+      "less": "Less",
+      "more": "More"
+    },
+    "gradeDistribution": {
+      "heading": "Grade distribution",
+      "description": "How often you pressed Again, Hard, Good, or Easy over time. A higher Easy and Good share shows the cards are sticking.",
+      "noData": "No grades recorded yet. Start a review session to see your grade breakdown here.",
+      "weeklyVolumeHeading": "Weekly volume",
+      "weeklyVolumeHeadingWithCount": "{count, plural, one {Weekly volume (1 week)} other {Weekly volume ({count} weeks so far)}}",
+      "weeklyVolumeHeadingComplete": "Weekly volume ({count} weeks)",
+      "weeklyHistoryBuilding": "Weekly history builds up as you complete full weeks of reviews. Keep going!",
+      "tooltipWeekOf": "w/c {weekStart}",
+      "tooltipTotal": "Total: {count}",
+      "allTimeMixAriaLabel": "All-time grade mix: {again} Again, {hard} Hard, {good} Good, {easy} Easy"
+    },
+    "typeBreakdown": {
+      "heading": "By type",
+      "meterAriaLabel": "{masteredPct}% of {typeName}-type Pokémon mastered"
     }
   },
   "journey": {
@@ -607,6 +797,16 @@
       "share": "Share",
       "copied": "Copied to clipboard",
       "copyError": "Couldn't copy. Please try again."
+    },
+    "badges": {
+      "heading": "Gym badges",
+      "nextBadgeLabel": "Next badge:",
+      "nextBadgeRemaining": "{count, plural, one {# more Pokémon to master} other {# more Pokémon to master}}",
+      "noBadgesYet": "No badges earned yet. Keep mastering Pokémon to unlock your first gym badge!",
+      "earnedAriaLabel": "Earned gym badges",
+      "lockedAriaLabel": "Locked gym badges",
+      "hideLocked": "Hide locked badges ({count})",
+      "viewAll": "View all badges ({count} locked)"
     }
   },
   "error": {
@@ -622,14 +822,14 @@
   "onboarding": {
     "welcomeHeading": "Welcome to Poké Memory",
     "closeAriaLabel": "Close welcome guide",
-    "intro": "Learn every Pokémon name and evolution with spaced repetition. New cards arrive daily; the app surfaces each card right before you would likely forget it, so gaps grow as your memory strengthens.",
+    "intro": "Learn every Pokémon name and evolution. New cards appear each day, and the app shows you each card again just before you are likely to forget it. The more you remember, the longer the gap before it comes back.",
     "howToGrade": {
       "heading": "How to grade",
       "again": "<term>Again</term> - you forgot completely.",
       "hard": "<term>Hard</term> - you recalled it, but struggled.",
       "good": "<term>Good</term> - you recalled it with some effort.",
       "easy": "<term>Easy</term> - instant recall, no hesitation.",
-      "honestGradeNote": "Grade honestly. Hitting Again sometimes is normal and part of the system working; the scheduler only improves if you tell it the truth."
+      "honestGradeNote": "Be honest when you grade. Picking Again sometimes is completely normal. The app only gets better at helping you if you tell it how you really did."
     },
     "addingSound": {
       "heading": "Adding sound (optional)",
@@ -638,9 +838,21 @@
     },
     "guestStorage": {
       "heading": "Your progress is saved on this device",
-      "body": "Progress is stored in your browser and is not backed up automatically. On iOS Safari, the browser may clear it after 7 days without a visit. To keep it safe: add this page to your Home Screen, or sign in to back it up to the cloud."
+      "body": "Your progress is kept on this device. On iPhone and iPad, Safari may clear saved data after 7 days if you do not visit. Adding this page to your Home Screen prevents that. If you sign in, your progress is also saved online so you can use it on other devices."
     },
-    "getStarted": "Get started"
+    "getStarted": "Get started",
+    "pwaInstallNudge": {
+      "ariaLabel": "Install Poké Memory",
+      "dismissAriaLabel": "Dismiss install nudge",
+      "heading": "Install Poké Memory",
+      "androidBody": "Add to your home screen for quick access, no app store needed.",
+      "installButton": "Install app",
+      "iosBodyShare": "Tap",
+      "iosBodyShareAction": "Share",
+      "iosBodyThen": "then",
+      "iosBodyAddAction": "Add to Home Screen",
+      "iosBodySuffix": "to install."
+    }
   },
   "sync": {
     "status": {

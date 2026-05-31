@@ -13,7 +13,12 @@
     "mobileTabAriaLabel": "行動端分頁導覽",
     "whatsNew": "新功能",
     "privacy": "隱私",
-    "terms": "條款"
+    "terms": "條款",
+    "openMenu": "開啟導覽選單",
+    "closeMenu": "關閉導覽選單",
+    "navigationMenu": "導覽選單",
+    "mobileNavigation": "行動端導覽",
+    "menuLabel": "選單"
   },
   "auth": {
     "signingIn": "登入中…",
@@ -61,6 +66,15 @@
         "selected": "已選擇",
         "setAsTheme": "設為主題",
         "remove": "移除"
+      },
+      "intensityPicker": {
+        "heading": "主題強度",
+        "accentsLabel": "僅使用細微強調色",
+        "accentsDescription": "主題色僅顯示於導覽列和焦點環，主體保持中性色調。",
+        "tintedLabel": "背景著色",
+        "tintedDescription": "主題色以淡淡的色調覆蓋頁面背景。",
+        "fullLabel": "完整主題",
+        "fullDescription": "主題色覆蓋所有背景，個性鮮明。"
       }
     },
     "labs": {
@@ -183,10 +197,36 @@
         "off": "關閉",
         "fast": "快速",
         "default": "預設"
+      },
+      "ttsControls": {
+        "voiceLabel": "朗讀語音",
+        "voiceAutoOption": "自動（系統預設）",
+        "voiceHint": "來自裝置的英語語音清單。「自動」會選擇可用的最高品質英式英語語音。此語音用於語音名稱的備用朗讀；預先產生的名稱音訊使用固定的英式英語語音。",
+        "rateLabel": "朗讀速度（{rate}倍）",
+        "hearSample": "試聽",
+        "rateSlow": "0.5倍（慢速）",
+        "rateFast": "2.0倍（快速）",
+        "volumeLabel": "朗讀音量（{pct}%）",
+        "volumeMute": "0%（靜音）",
+        "volumeFull": "100%（最大）"
+      },
+      "voiceQualityHint": {
+        "heading": "語音聽起來像機器人？",
+        "body": "大多數裝置的預設英語語音為低品質的「緊湊」版本。您可以在裝置的輔助功能或朗讀內容設定中下載更高品質（進階或增強型）的英式英語語音，安裝後應用程式將自動選用。",
+        "dismissAriaLabel": "關閉提示"
       }
     },
     "offline": {
-      "downloadHeading": "下載"
+      "downloadHeading": "下載",
+      "downloadTitle": "下載離線內容",
+      "downloadDescription": "預先擷取所有精靈圖和叫聲，以便在無網路時也能練習。建議在 Wi-Fi 下使用。約 166 MB。",
+      "storageUsage": "已使用 {usedMb}，共 {totalMb}。",
+      "downloadedOn": "已於 {date} 下載。",
+      "downloadButton": "下載",
+      "updateButton": "更新",
+      "downloadingProgress": "正在下載 {total} 中的 {done}",
+      "downloadProgressAriaLabel": "下載進度",
+      "stopButton": "停止"
     },
     "optimizerCooldown": "{count, plural, other {下次最佳化還需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {請在 # 天後重試。}}",
@@ -365,10 +405,42 @@
       "noAlternateForms": "當前種子中沒有異形態。",
       "matchCount": "{total} 隻中有 {match} 隻符合",
       "hiddenCardsPaused": "隱藏的卡片已暫停：它們的複習日期會向後推移，因此刪除範圍不會讓過期卡片湧入佇列。"
+    },
+    "direction": {
+      "name": "這是哪隻寶可夢？",
+      "evolution": "進化",
+      "reverseEvolution": "前置進化",
+      "reverse": "選擇圖鑑圖像",
+      "cry": "聽叫聲猜名字"
+    },
+    "correct": "正確！",
+    "correctAnswerWas": "正確答案是 {name}",
+    "hearName": "聆聽 {name} 的發音",
+    "whichPokemon": "{name} 是哪隻寶可夢？",
+    "dismissError": "關閉",
+    "sidebar": {
+      "sessionProgress": "本次進度",
+      "today": "今天",
+      "cardsReviewed": "已複習卡片",
+      "accuracy": "正確率",
+      "gradeBreakdown": "評分明細",
+      "noCardsYet": "今天還沒有複習卡片。",
+      "recentGrades": "最近評分",
+      "recentGradesAriaLabel": "{count} 條最近評分（最新優先）",
+      "viewFullStats": "檢視完整統計"
     }
   },
   "review": {
-    "streakDays": "{count, plural, other {連續 # 天}}"
+    "streakDays": "{count, plural, other {連續 # 天}}",
+    "startStreak": "開始你的連續記錄吧！",
+    "queue": {
+      "new": "新卡",
+      "learning": "學習中",
+      "review": "複習",
+      "ariaLabel": "佇列數量"
+    },
+    "storageFullBanner": "儲存空間已滿，進度無法儲存。",
+    "storageFullDismiss": "關閉"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -401,7 +473,21 @@
     "generationAll": "全部",
     "generationLabel": "第 {gen} 代",
     "masteryCount": "{mastered} / {total} 已掌握",
-    "nextReviewInDays": "{count, plural, other {下次複習: # 天後}}"
+    "nextReviewInDays": "{count, plural, other {下次複習: # 天後}}",
+    "dueToday": "今日到期",
+    "lockedHint": "開始學習這隻寶可夢即可查看詳細資訊。",
+    "typesAriaLabel": "屬性",
+    "baseStatsHeading": "種族值",
+    "factsHeading": "資料",
+    "evolutionChainHeading": "進化鏈",
+    "formsHeading": "形態",
+    "lockedAriaLabel": "#{number}（已鎖定）",
+    "statHp": "HP",
+    "statAttack": "攻擊",
+    "statDefense": "防禦",
+    "statSpAtk": "特攻",
+    "statSpDef": "特防",
+    "statSpeed": "速度"
   },
   "pasture": {
     "title": "牧場",
@@ -442,6 +528,12 @@
       "backLabel": "牧場",
       "backAriaLabel": "返回牧場",
       "emptyState": "此生物群系中還沒有掌握的寶可夢。繼續練習吧！"
+    },
+    "nextArrivals": {
+      "ariaLabel": "即將到來",
+      "heading": "即將到來",
+      "upcomingAriaLabel": "即將加入牧場的寶可夢",
+      "allCaughtUp": "所有已複習的寶可夢都已在您的牧場中。"
     }
   },
   "stats": {
@@ -525,6 +617,104 @@
       "eventEarned": "已獲得",
       "eventUsed": "已使用",
       "eventEarnedAndUsed": "獲得並使用"
+    },
+    "gradeBreakdown": {
+      "heading": "評分分佈",
+      "noGrades": "尚無評分。",
+      "ariaLabel": "{heading}: {again} 再來一次, {hard} 困難, {good} 良好, {easy} 簡單"
+    },
+    "accuracy": {
+      "heading": "近期正確率",
+      "windowAriaLabel": "正確率視窗",
+      "window7d": "7天",
+      "window30d": "30天",
+      "window1yr": "1年",
+      "window7dAriaLabel": "7天",
+      "window30dAriaLabel": "30天",
+      "window1yrAriaLabel": "1年",
+      "rollingLabel": "{window}滾動",
+      "sparklineAriaLabel": "{window}正確率迷你圖",
+      "noReviewsDays": "過去 {days} 天內尚無複習記錄。",
+      "noReviewsYear": "過去一年內尚無複習記錄。"
+    },
+    "retention": {
+      "heading": "記憶率 vs 目標",
+      "description": "過去一年內您的實際記憶率與調度器目標 {target} 保留率的比較。",
+      "recallLabel": "記憶率",
+      "noReviews": "過去一年內尚無複習記錄。評分一些卡片以查看記憶率走勢。",
+      "onTarget": "正好達到您的 {target} 保留目標。",
+      "above": "高於您的 {target} 目標 {delta}。",
+      "below": "低於您的 {target} 目標 {delta}。"
+    },
+    "masteryOverTime": {
+      "heading": "掌握數量變化",
+      "description": "累計掌握的種族數量（以最後複習日期近似替代掌握日期）。",
+      "noData": "尚無已掌握的種族。繼續複習，折線將開始上升。",
+      "ofTotalMastered": "共 {total} 種族中已掌握",
+      "speciesMastered": "種族已掌握",
+      "superuserMode": "超級使用者模式：顯示截至今日的總數。",
+      "reviewMoreCards": "繼續複習卡片以查看進度趨勢。",
+      "ariaLabel": "掌握數量變化：截至 {date}，{total} 種族中已掌握 {count} 種",
+      "tooltipMastered": "已掌握"
+    },
+    "gameBreakdown": {
+      "heading": "按遊戲",
+      "noData": "無遊戲資料。請重新植入 Pokémon 資料以啟用此視圖。",
+      "listAriaLabel": "按世代的掌握情況",
+      "speciesMastered": "{mastered}/{total} 種族已掌握",
+      "gameListAriaLabel": "{name} 遊戲列表",
+      "gen1": "第一世代",
+      "gen2": "第二世代",
+      "gen3": "第三世代",
+      "gen4": "第四世代",
+      "gen5": "第五世代",
+      "gen6": "第六世代",
+      "gen7": "第七世代",
+      "gen8": "第八世代",
+      "gen9": "第九世代",
+      "genOther": "其他"
+    },
+    "completionProjection": {
+      "heading": "圖鑑完成預測",
+      "complete": "完成！",
+      "completeCopy": "您已掌握所有種族。恭喜！",
+      "notAvailable": "預測暫不可用",
+      "notAvailableDescription": "至少掌握一個種族並堅持一週後可用。將種族複習至計劃間隔至少21天後算作掌握，之後7天再來查看。",
+      "estimatedDate": "預計完成日期",
+      "speciesRemaining": "種族剩餘",
+      "masteredPerWeek": "每週掌握數（近期速度）"
+    },
+    "directionBreakdown": {
+      "heading": "按卡片方向的正確率",
+      "description": "名稱、反向、叫聲和進化卡片的記憶率比較。",
+      "noData": "尚無複習記錄。評分一些卡片以查看分佈。",
+      "disabledLabel": "{direction}（已停用）",
+      "tooltipAccuracy": "正確率: {pct}%",
+      "tooltipReviews": "{total} 次中 {passes} 次通過",
+      "tooltipDisabled": "此卡片類型目前在設定中已停用。",
+      "noReviewsLabel": "無複習",
+      "disabledMark": "（已停用）"
+    },
+    "heatmap": {
+      "heading": "複習活動",
+      "less": "少",
+      "more": "多"
+    },
+    "gradeDistribution": {
+      "heading": "評分分佈",
+      "description": "隨時間推移按下再來一次、困難、良好、簡單的次數。良好和簡單比例越高，卡片越牢固。",
+      "noData": "尚無評分記錄。開始複習會話以查看分佈。",
+      "weeklyVolumeHeading": "每週量",
+      "weeklyVolumeHeadingWithCount": "{count, plural, other {每週量（迄今 {count} 週）}}",
+      "weeklyVolumeHeadingComplete": "每週量（{count} 週）",
+      "weeklyHistoryBuilding": "完成完整的一週複習後，每週歷史將積累。繼續加油！",
+      "tooltipWeekOf": "週 {weekStart}",
+      "tooltipTotal": "總計: {count}",
+      "allTimeMixAriaLabel": "歷史評分分佈: {again} 再來一次, {hard} 困難, {good} 良好, {easy} 簡單"
+    },
+    "typeBreakdown": {
+      "heading": "按屬性",
+      "meterAriaLabel": "{masteredPct}% 的 {typeName} 屬性 Pokémon 已掌握"
     }
   },
   "journey": {
@@ -607,6 +797,16 @@
       "share": "分享",
       "copied": "已複製到剪貼簿",
       "copyError": "無法複製。請重試。"
+    },
+    "badges": {
+      "heading": "道館徽章",
+      "nextBadgeLabel": "下一個徽章:",
+      "nextBadgeRemaining": "{count, plural, other {還需掌握 # 隻寶可夢}}",
+      "noBadgesYet": "尚未獲得任何徽章。繼續掌握寶可夢來解鎖第一個道館徽章！",
+      "earnedAriaLabel": "已獲得的道館徽章",
+      "lockedAriaLabel": "未獲得的道館徽章",
+      "hideLocked": "隱藏未獲得的徽章（{count} 個）",
+      "viewAll": "查看所有徽章（{count} 個已鎖定）"
     }
   },
   "error": {
@@ -622,14 +822,14 @@
   "onboarding": {
     "welcomeHeading": "歡迎使用 Poké Memory",
     "closeAriaLabel": "關閉歡迎指南",
-    "intro": "透過間隔重複學習每隻寶可夢的名稱和進化。新卡片每天到來；應用程式會在你即將遺忘前顯示每張卡片，隨著記憶增強，間隔也會越來越長。",
+    "intro": "學習每隻寶可夢的名稱和進化。新卡片每天到來，應用程式會在你即將遺忘前再次顯示該卡片。你記得越多，下次出現的間隔就越長。",
     "howToGrade": {
       "heading": "如何評分",
       "again": "<term>再來一次</term> - 完全忘記了。",
       "hard": "<term>困難</term> - 想起來了，但很費力。",
       "good": "<term>還不錯</term> - 努力了一下想起來了。",
       "easy": "<term>簡單</term> - 立刻就想起來了。",
-      "honestGradeNote": "請誠實評分。有時按「再來一次」是正常的，這說明系統在正常運作；這樣應用程式才能越來越聰明。"
+      "honestGradeNote": "請誠實評分。有時按「再來一次」完全正常。只有如實作答，應用程式才能更好地幫助你。"
     },
     "addingSound": {
       "heading": "新增音效（選用）",
@@ -638,9 +838,21 @@
     },
     "guestStorage": {
       "heading": "你的進度儲存在此裝置上",
-      "body": "進度儲存在瀏覽器中，不會自動備份。在 iOS Safari 上，如果超過 7 天沒有開啟，瀏覽器可能會清除資料。為了安全儲存：將此頁面新增到主畫面，或登入以將其備份到雲端。"
+      "body": "你的進度儲存在此裝置上。在 iPhone 和 iPad 上，如果 7 天沒有使用，Safari 可能會清除已儲存的資料。將此頁面新增到主畫面可以防止這種情況。如果你登入，進度還會在線上儲存，以便在其他裝置上使用。"
     },
-    "getStarted": "開始"
+    "getStarted": "開始",
+    "pwaInstallNudge": {
+      "ariaLabel": "安裝 Poké Memory",
+      "dismissAriaLabel": "關閉安裝提示",
+      "heading": "安裝 Poké Memory",
+      "androidBody": "新增至主畫面即可快速存取，無需應用程式商店。",
+      "installButton": "安裝應用程式",
+      "iosBodyShare": "點選",
+      "iosBodyShareAction": "分享",
+      "iosBodyThen": "，然後",
+      "iosBodyAddAction": "加入主畫面",
+      "iosBodySuffix": "即可安裝。"
+    }
   },
   "sync": {
     "status": {

@@ -38,6 +38,7 @@ function gaugeColour(delta: number): string {
  */
 export function RetentionIndicator({ comparison }: Props) {
   const t = useTranslations("stats");
+  const tR = useTranslations("stats.retention");
   const format = useFormatter();
   const { actual, target, delta, reviews } = comparison;
 
@@ -52,27 +53,23 @@ export function RetentionIndicator({ comparison }: Props) {
         id="retention-heading"
         className="mb-1 text-base font-semibold text-foreground"
       >
-        Recall vs target
+        {tR("heading")}
       </h2>
       <p className={`mb-3 ${mutedTextXs}`}>
-        Your measured recall over the past year against the {formatPct(target)}{" "}
-        retention target the scheduler aims for.
+        {tR("description", { target: formatPct(target) })}
       </p>
 
       <div className={cardPanel}>
         {actual === null || delta === null ? (
           <p className={mutedText}>
-            No reviews recorded in the past year. Grade some cards to see how
-            your recall tracks against target.
+            {tR("noReviews")}
           </p>
         ) : (
           <div className="flex items-center gap-5">
             <div
               className="relative h-32 w-32 shrink-0"
               role="img"
-              aria-label={`Recall ${formatPct(actual)} against a ${formatPct(
-                target,
-              )} target, ${t("reviewsOverWindowInline", { count: reviews })}`}
+              aria-label={`${tR("heading")} ${formatPct(actual)} / ${formatPct(target)}, ${t("reviewsOverWindowInline", { count: reviews })}`}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <RadialBarChart
@@ -102,7 +99,7 @@ export function RetentionIndicator({ comparison }: Props) {
                   {formatPct(actual)}
                 </span>
                 <span className={sectionLabel}>
-                  recall
+                  {tR("recallLabel")}
                 </span>
               </div>
             </div>
@@ -110,35 +107,11 @@ export function RetentionIndicator({ comparison }: Props) {
             <div className="min-w-0 flex-1">
               <p className="text-sm text-zinc-600 dark:text-zinc-300">
                 {Math.round(delta * 100) === 0 ? (
-                  <>
-                    Right on your{" "}
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                      {formatPct(target)}
-                    </span>{" "}
-                    retention target.
-                  </>
+                  tR("onTarget", { target: formatPct(target) })
                 ) : delta > 0 ? (
-                  <>
-                    Running{" "}
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                      {formatPct(delta)}
-                    </span>{" "}
-                    above your {formatPct(target)} target.
-                  </>
+                  tR("above", { delta: formatPct(delta), target: formatPct(target) })
                 ) : (
-                  <>
-                    Running{" "}
-                    <span
-                      className={`font-semibold tabular-nums ${
-                        delta >= -0.1
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-rose-600 dark:text-rose-400"
-                      }`}
-                    >
-                      {formatPct(Math.abs(delta))}
-                    </span>{" "}
-                    below your {formatPct(target)} target.
-                  </>
+                  tR("below", { delta: formatPct(Math.abs(delta)), target: formatPct(target) })
                 )}
               </p>
               <p className={`mt-1 ${mutedTextXs} tabular-nums`}>

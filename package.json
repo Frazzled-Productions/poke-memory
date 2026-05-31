@@ -18,6 +18,8 @@
     "seed:locale-names": "node scripts/seed-locale-names.mjs",
     "seed:sprites": "node scripts/optimise-sprites.mjs",
     "generate:scope-lookup": "node scripts/generate-scope-lookup.mjs",
+    "generate:pseudo-locale": "node scripts/generate-pseudo-locale.mjs",
+    "test:i18n-leak": "vitest run --project jsdom --reporter=verbose components/**/*.i18n-leak.test.tsx",
     "audit:forms": "node scripts/audit-form-categories.mjs",
     "seed:tts": "node --env-file-if-exists=.env.local scripts/seed-tts-audio.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",

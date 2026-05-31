@@ -6,8 +6,8 @@
  * instrumented by the coverage gate.
  */
 
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
+import { renderWithIntl as render, screen } from "@/components/test-utils/renderWithIntl";
 import { AccuracySparkline } from "@/components/stats/AccuracySparkline";
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
 

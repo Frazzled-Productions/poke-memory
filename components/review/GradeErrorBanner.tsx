@@ -1,9 +1,14 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 type Props = {
   message: string;
   onDismiss: () => void;
 };
 
 export function GradeErrorBanner({ message, onDismiss }: Props) {
+  const t = useTranslations("practice");
   return (
     <div
       role="alert"
@@ -13,7 +18,7 @@ export function GradeErrorBanner({ message, onDismiss }: Props) {
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Dismiss"
+        aria-label={t("dismissError")}
         className="shrink-0 rounded text-red-600 hover:text-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-1 dark:text-red-400 dark:hover:text-red-200"
       >
         ×

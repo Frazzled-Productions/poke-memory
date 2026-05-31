@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useFormatter } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
 import type { DateFormat } from "@/lib/utils/format-date";
 import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
@@ -36,6 +36,7 @@ function ChartTooltip({
   active?: boolean;
   payload?: readonly unknown[];
 }) {
+  const t = useTranslations("stats.masteryOverTime");
   const format = useFormatter();
   if (!active || !payload || payload.length === 0) return null;
   const d = (payload[0] as { payload: TooltipPayload }).payload;
@@ -47,7 +48,7 @@ function ChartTooltip({
           className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
           style={{ backgroundColor: AREA_COLOUR }}
         />
-        {format.number(d.count)} mastered
+        {format.number(d.count)} {t("tooltipMastered")}
       </p>
     </div>
   );
@@ -104,6 +105,7 @@ type Props = {
  */
 export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", forceAllMastered = false }: Props) {
   const format = useFormatter();
+  const t = useTranslations("stats.masteryOverTime");
   const hasData = series.length > 0;
   const latestCount = hasData ? series[series.length - 1].count : 0;
 
@@ -120,18 +122,16 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
         id="mastery-over-time-heading"
         className="mb-1 text-base font-semibold text-foreground"
       >
-        Mastery over time
+        {t("heading")}
       </h2>
       <p className={`mb-3 ${mutedTextXs}`}>
-        Cumulative species mastered, using the last review date as a proxy for
-        when each card crossed the mastery threshold.
+        {t("description")}
       </p>
 
       <div className={cardPanel}>
         {!hasData ? (
           <p className={mutedText}>
-            No mastered species yet. Keep reviewing and the line will start
-            climbing.
+            {t("noData")}
           </p>
         ) : (
           <>
@@ -142,8 +142,8 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
               </span>
               <span className={mutedTextXs}>
                 {totalCards > 0
-                  ? `of ${format.number(totalCards)} species mastered`
-                  : "species mastered"}
+                  ? t("ofTotalMastered", { total: format.number(totalCards) })
+                  : t("speciesMastered")}
               </span>
             </div>
 
@@ -151,13 +151,17 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
               /* Single-point: no trend to draw — just show the headline. */
               <p className={mutedTextXs}>
                 {forceAllMastered
-                  ? "Superuser mode: showing total as of today."
-                  : "Review more cards to see your progress trend."}
+                  ? t("superuserMode")
+                  : t("reviewMoreCards")}
               </p>
             ) : (
               <div
                 role="img"
-                aria-label={`Mastery over time: ${format.number(latestCount)} of ${format.number(totalCards)} species mastered as of ${series[series.length - 1].date}`}
+                aria-label={t("ariaLabel", {
+                  count: format.number(latestCount),
+                  total: format.number(totalCards),
+                  date: series[series.length - 1].date,
+                })}
               >
                 <ResponsiveContainer width="100%" height={160}>
                   <AreaChart

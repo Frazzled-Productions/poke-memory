@@ -12,6 +12,7 @@
  */
 
 import type { ReviewableCard, NameReviewCard, DailyLimits } from "@/lib/review/session";
+import type { AppLocale } from "@/i18n/locales";
 import { buildSessionQueues } from "@/lib/review/session";
 import {
   computeEligibleCardIds,
@@ -135,6 +136,11 @@ export type DashboardSnapshotOptions = {
    * production call sites so the projection always counts from the real moment.
    */
   now?: Date;
+  /**
+   * Card locale to scope mastery checks in `computeCompletionProjection`.
+   * Should match the user's `pokemonNameLocale` setting. Defaults to `"en"`.
+   */
+  locale?: AppLocale;
 };
 
 // ---------------------------------------------------------------------------
@@ -234,6 +240,7 @@ export function computeDashboardSnapshot(
     forceAllMastered = false,
     retentionTarget = 0.9,
     now = new Date(),
+    locale = "en",
   } = options;
 
   function wants(axis: SnapshotAxis): boolean {
@@ -358,14 +365,16 @@ export function computeDashboardSnapshot(
     struggling = statsResult.struggling;
   }
 
-  // Projection axis.
+  // Projection axis — pass the FULL card array so computeCompletionProjection
+  // can apply the species-level (both-legs) mastery rule (#1448).
   let projection: CompletionProjection | null = null;
   if (wants("projection")) {
     projection = computeCompletionProjection(
-      nameCards,
+      cards,
       today,
       masteryRepetitions ?? 3,
       forceAllMastered,
+      locale,
     );
   }
 

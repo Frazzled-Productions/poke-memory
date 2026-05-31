@@ -58,6 +58,7 @@ type TooltipState = {
 
 export function ReviewHeatmap({ columns }: Props) {
   const t = useTranslations("stats");
+  const tH = useTranslations("stats.heatmap");
   const format = useFormatter();
 
   const width = COLS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
@@ -133,7 +134,7 @@ export function ReviewHeatmap({ columns }: Props) {
         id="heatmap-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        Review activity
+        {tH("heading")}
       </h2>
       <div className={cardPanel}>
         <p className={`mb-3 ${mutedTextXs} tabular-nums`}>
@@ -213,13 +214,13 @@ export function ReviewHeatmap({ columns }: Props) {
           )}
         </div>
         <div className="mt-3 flex items-center gap-2 text-[10px] text-zinc-500 dark:text-zinc-400">
-          <span>Less</span>
+          <span>{tH("less")}</span>
           {INTENSITY_FILLS.map((cls, i) => (
             <svg key={i} width={10} height={10} aria-hidden="true">
               <rect width={10} height={10} rx={2} ry={2} className={cls} />
             </svg>
           ))}
-          <span>More</span>
+          <span>{tH("more")}</span>
         </div>
       </div>
     </section>

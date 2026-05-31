@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { BadgeGalleryCard } from "@/components/badges/BadgeGalleryCard";
 import { cn } from "@/lib/utils/cn";
@@ -74,6 +75,7 @@ export function BadgeGallery({
   forceAllMastered = false,
   masteredSpeciesIds,
 }: Props) {
+  const t = useTranslations("journey.badges");
   const [lockedExpanded, setLockedExpanded] = useState(false);
 
   const earnedSet = new Set(earnedBadges.map((b) => b.id));
@@ -101,7 +103,7 @@ export function BadgeGallery({
         id="badge-gallery-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        Gym badges
+        {t("heading")}
       </h2>
 
       {nextBadge !== null && (
@@ -109,11 +111,9 @@ export function BadgeGallery({
           data-testid="next-badge-hint"
           className={cn("mb-3", mutedText)}
         >
-          <span className="font-medium text-foreground">Next badge:</span>{" "}
+          <span className="font-medium text-foreground">{t("nextBadgeLabel")}</span>{" "}
           {nextBadge.badge.name},{" "}
-          {nextBadge.remaining === 1
-            ? "1 more Pokémon to master"
-            : `${nextBadge.remaining} more Pokémon to master`}
+          {t("nextBadgeRemaining", { count: nextBadge.remaining })}
         </p>
       )}
 
@@ -121,7 +121,7 @@ export function BadgeGallery({
         <ul
           role="list"
           className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
-          aria-label="Earned gym badges"
+          aria-label={t("earnedAriaLabel")}
         >
           {earned.map((badge) => (
             <BadgeGalleryCard key={badge.id} badge={badge} earned />
@@ -129,7 +129,7 @@ export function BadgeGallery({
         </ul>
       ) : (
         <p className={mutedText}>
-          No badges earned yet. Keep mastering Pokémon to unlock your first gym badge!
+          {t("noBadgesYet")}
         </p>
       )}
 
@@ -149,8 +149,8 @@ export function BadgeGallery({
               &#9658;
             </span>
             {lockedExpanded
-              ? `Hide locked badges (${locked.length})`
-              : `View all badges (${locked.length} locked)`}
+              ? t("hideLocked", { count: locked.length })
+              : t("viewAll", { count: locked.length })}
           </button>
 
           {/* Always rendered so aria-controls references a real element; hidden attribute hides it when collapsed. */}
@@ -159,7 +159,7 @@ export function BadgeGallery({
             role="list"
             hidden={!lockedExpanded}
             className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
-            aria-label="Locked gym badges"
+            aria-label={t("lockedAriaLabel")}
           >
             {locked.map((badge) => (
               <BadgeGalleryCard key={badge.id} badge={badge} earned={false} />

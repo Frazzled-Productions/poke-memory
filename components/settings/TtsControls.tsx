@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { speakName } from "@/lib/audio/tts";
 import { cardPanelPadded, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
 
@@ -12,6 +13,7 @@ type TtsControlsProps = {
 };
 
 export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsControlsProps) {
+  const t = useTranslations("settings.audio.ttsControls");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
           htmlFor="tts-voice"
           className="block text-sm font-medium text-foreground"
         >
-          Pronunciation voice
+          {t("voiceLabel")}
         </label>
         <select
           id="tts-voice"
@@ -50,7 +52,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
           onChange={(e) => onChange({ ttsVoice: e.target.value === "" ? null : e.target.value })}
           className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
         >
-          <option value="">Auto (system default)</option>
+          <option value="">{t("voiceAutoOption")}</option>
           {voices.map((v) => (
             <option key={v.voiceURI} value={v.voiceURI}>
               {v.name} ({v.lang})
@@ -58,8 +60,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
           ))}
         </select>
         <p className={`mt-1 ${mutedTextXs}`}>
-          English voices from your device. &ldquo;Auto&rdquo; picks the highest-quality British English voice available.
-          This voice is used for the spoken-name fallback; pre-generated name audio uses a fixed British English voice.
+          {t("voiceHint")}
         </p>
       </div>
 
@@ -70,14 +71,14 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
             htmlFor="tts-rate"
             className="block text-sm font-medium text-foreground"
           >
-            Speech rate ({ttsRate.toFixed(1)}×)
+            {t("rateLabel", { rate: ttsRate.toFixed(1) })}
           </label>
           <button
             type="button"
             onClick={handlePreview}
             className="shrink-0 rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
           >
-            Hear sample
+            {t("hearSample")}
           </button>
         </div>
         <input
@@ -91,8 +92,8 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
           className="mt-3 w-full"
         />
         <div className="mt-1 flex justify-between text-xs text-zinc-400 dark:text-zinc-500">
-          <span>0.5× slow</span>
-          <span>2.0× fast</span>
+          <span>{t("rateSlow")}</span>
+          <span>{t("rateFast")}</span>
         </div>
       </div>
 
@@ -102,7 +103,7 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
           htmlFor="tts-volume"
           className="block text-sm font-medium text-foreground"
         >
-          Speech volume ({Math.round(ttsVolume * 100)}%)
+          {t("volumeLabel", { pct: Math.round(ttsVolume * 100) })}
         </label>
         <input
           id="tts-volume"
@@ -115,8 +116,8 @@ export function TtsControls({ ttsVoice, ttsRate, ttsVolume, onChange }: TtsContr
           className="mt-3 w-full"
         />
         <div className="mt-1 flex justify-between text-xs text-zinc-400 dark:text-zinc-500">
-          <span>0% mute</span>
-          <span>100% full</span>
+          <span>{t("volumeMute")}</span>
+          <span>{t("volumeFull")}</span>
         </div>
       </div>
     </div>

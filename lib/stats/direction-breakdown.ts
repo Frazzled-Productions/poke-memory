@@ -15,15 +15,6 @@ export const CARD_DIRECTIONS: readonly CardDirection[] = [
   "reverse-evolution",
 ] as const;
 
-/** Human-readable label for each card direction (British English copy). */
-export const DIRECTION_LABELS: Record<CardDirection, string> = {
-  name: "Name",
-  reverse: "Reverse",
-  cry: "Cry",
-  evolution: "Evolution",
-  "reverse-evolution": "Reverse evolution",
-};
-
 const PASS_GRADES: ReadonlySet<Grade> = new Set([4, 5]);
 
 /**

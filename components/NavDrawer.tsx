@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
@@ -12,12 +13,12 @@ import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
 
-const NAV_LINKS = [
-  { href: "/", label: "Practice" },
-  { href: "/stats", label: "Stats" },
-  { href: "/journey", label: "Journey" },
-  { href: "/pokedex", label: "Pokédex" },
-  { href: "/settings", label: "Settings" },
+const NAV_LINKS_HREFS = [
+  { href: "/", key: "practice" },
+  { href: "/stats", key: "stats" },
+  { href: "/journey", key: "journey" },
+  { href: "/pokedex", key: "pokedex" },
+  { href: "/settings", key: "settings" },
 ] as const;
 
 const LINK_BASE =
@@ -76,6 +77,7 @@ function CloseIcon({ className }: { className?: string }) {
  * - Drawer closes on route change.
  */
 export function NavDrawer() {
+  const tNav = useTranslations("nav");
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [hasMastered, setHasMastered] = useState(false);
@@ -250,7 +252,7 @@ export function NavDrawer() {
       <button
         ref={triggerRef}
         type="button"
-        aria-label={open ? "Close navigation menu" : "Open navigation menu"}
+        aria-label={open ? tNav("closeMenu") : tNav("openMenu")}
         aria-expanded={open}
         aria-controls="mobile-nav-drawer"
         onClick={() => setOpen((v) => !v)}
@@ -274,7 +276,7 @@ export function NavDrawer() {
         id="mobile-nav-drawer"
         ref={drawerRef}
         role="dialog"
-        aria-label="Navigation menu"
+        aria-label={tNav("navigationMenu")}
         aria-modal="true"
         aria-hidden={!open}
         // React 19 types `inert` as boolean. When closed the element is
@@ -292,11 +294,11 @@ export function NavDrawer() {
         {/* Drawer header */}
         <div className="flex items-center justify-between border-b border-theme-secondary px-4 py-3">
           <span className="text-sm font-semibold text-theme-fg-on-primary opacity-60">
-            Menu
+            {tNav("menuLabel")}
           </span>
           <button
             type="button"
-            aria-label="Close navigation menu"
+            aria-label={tNav("closeMenu")}
             onClick={close}
             className="flex items-center justify-center rounded p-2 text-theme-fg-on-primary transition-colors [@media(hover:hover)]:hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
           >
@@ -305,9 +307,9 @@ export function NavDrawer() {
         </div>
 
         {/* Link list */}
-        <nav aria-label="Mobile navigation">
+        <nav aria-label={tNav("mobileNavigation")}>
           <ul role="list" className="flex flex-col gap-1 p-3">
-            {NAV_LINKS.map(({ href, label }) => {
+            {NAV_LINKS_HREFS.map(({ href, key }) => {
               const isActive =
                 pathname === href ||
                 (href !== "/" && pathname.startsWith(href + "/"));
@@ -323,7 +325,7 @@ export function NavDrawer() {
                         : "text-theme-fg-on-primary opacity-75 [@media(hover:hover)]:hover:opacity-100",
                     ].join(" ")}
                   >
-                    {label}
+                    {tNav(key)}
                   </Link>
                 </li>
               );
@@ -340,7 +342,7 @@ export function NavDrawer() {
                       : "text-theme-fg-on-primary opacity-75 hover:opacity-100",
                   ].join(" ")}
                 >
-                  Pasture
+                  {tNav("pasture")}
                 </Link>
               </li>
             )}
@@ -363,10 +365,11 @@ export function NavDrawer() {
  * collapse or shift during hydration.
  */
 export function NavDrawerFallback() {
+  const tNav = useTranslations("nav");
   return (
     <button
       type="button"
-      aria-label="Open navigation menu"
+      aria-label={tNav("openMenu")}
       aria-expanded={false}
       disabled
       className="flex items-center justify-center rounded p-2 text-theme-fg-on-primary opacity-60 md:hidden"

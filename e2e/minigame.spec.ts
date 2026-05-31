@@ -203,6 +203,55 @@ test.describe("Higher-or-Lower mini-game", () => {
     await expect(gameRegion.getByRole("button")).toHaveCount(2);
   });
 
+  test("action button is in view and clickable after making a guess (#1447)", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "viewport-fit check is mobile-only",
+    );
+    // iPhone 17 Pro CSS viewport (the device reported in #1447). The default
+    // mobile-safari project uses iPhone 14 (390x844); override here so the
+    // assertion matches the actual reported device.
+    await page.setViewportSize({ width: 402, height: 874 });
+    // Regression: on tall mobile viewports (iPhone 17 Pro) the result block
+    // rendered below the fold after a guess, requiring manual scroll. The fix
+    // scrolls the result block into view on reveal. We assert the button is
+    // visible (in the viewport) and clickable — not just present in the DOM.
+    await seedSessionIdb(page, buildCompletedSession({
+      pokemonIds: SEED_POKEMON_IDS,
+      evolutionCardIds: EVOLUTION_CARD_IDS,
+    }));
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    await expect(page.getByText("All caught up!")).toBeVisible();
+
+    const gameRegion = page.getByRole("region", {
+      name: /higher or lower mini-game/i,
+    });
+    await expect(gameRegion).toBeVisible();
+
+    // Click the first Pokémon tile — the outcome (correct, tie, or wrong) does
+    // not matter; all three result states show an action button.
+    await gameRegion.getByRole("button").first().click();
+
+    // The action button ("Next pair" or "Play again") must be visible in the
+    // viewport — not merely present in the DOM — so the user can reach it
+    // without manual scrolling on a mobile viewport.
+    const actionButton = page.getByRole("button", { name: /next pair|play again/i });
+    await expect(actionButton).toBeInViewport();
+
+    // The button must also be clickable (enabled, not obstructed). Clicking it
+    // transitions back to the picking phase (sprite decode pending → button
+    // shows "Next pair" or re-renders the game).
+    await expect(actionButton).toBeEnabled();
+    await actionButton.click();
+
+    // After clicking the action button the result banner should disappear.
+    await expect(page.getByText(/correct!|equal, both count\.|game over/i)).not.toBeVisible({
+      timeout: 5000,
+    });
+  });
+
   test("nav links remain interactive on the all-caught-up screen (#1275)", async ({ page }) => {
     // Regression test: the bottom tab bar and header nav links were
     // unresponsive on the all-caught-up screen when the Higher-or-Lower

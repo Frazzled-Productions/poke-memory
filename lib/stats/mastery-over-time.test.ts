@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { computeMasteryOverTime } from "./mastery-over-time";
-import type { NameReviewCard } from "@/lib/review/session";
+import type { ReviewableCard, NameReviewCard, ReverseReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "./derive";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 
 const TODAY = "2026-05-17";
 
@@ -31,7 +32,7 @@ function makeState(overrides: Partial<ReviewState> = {}): ReviewState {
 }
 
 /** Build a minimal NameReviewCard for testing. */
-function makeCard(
+function makeNameCard(
   id: number,
   lastReview: string | null,
   masteredOverride = true,
@@ -74,33 +75,103 @@ function makeCard(
   };
 }
 
+/** Build a minimal ReverseReviewCard paired with a name card. */
+function makeReverseCard(
+  speciesId: number,
+  lastReview: string | null,
+  masteredOverride = true,
+): ReverseReviewCard {
+  const nameCardBase = makeNameCard(speciesId, lastReview, masteredOverride);
+  const { id: _id, cardType: _ct, ...rest } = nameCardBase;
+  return {
+    ...rest,
+    cardType: "reverse" as const,
+    id: REVERSE_ID_OFFSET + speciesId,
+    pokemonId: speciesId,
+    subjectKey: String(speciesId),
+    state: makeState({
+      lastReview,
+      firstSeen: lastReview ?? null,
+      reps: masteredOverride ? MASTERY_REPETITIONS : 0,
+      scheduledDays: masteredOverride ? MASTERY_INTERVAL_DAYS : 0,
+    }),
+  };
+}
+
+/** Build both legs (name + reverse) for a fully mastered species. */
+function makeMasteredSpecies(
+  id: number,
+  nameMasteredDate: string,
+  reverseMasteredDate: string,
+): ReviewableCard[] {
+  return [
+    makeNameCard(id, nameMasteredDate, true),
+    makeReverseCard(id, reverseMasteredDate, true),
+  ];
+}
+
 // ---------------------------------------------------------------------------
-// Tests
+// Tests: species-level mastery (both legs required, #1448)
 // ---------------------------------------------------------------------------
 
-describe("computeMasteryOverTime", () => {
-  it("returns empty array when no cards are mastered", () => {
-    const cards = [makeCard(1, null), makeCard(2, null)];
+describe("computeMasteryOverTime — species-level (both legs)", () => {
+  it("returns empty array when no cards are present", () => {
+    expect(computeMasteryOverTime([], TODAY)).toEqual([]);
+  });
+
+  it("returns empty array when only name cards are mastered (no reverse leg)", () => {
+    // The reverse leg is absent — species is NOT species-mastered.
+    const cards: ReviewableCard[] = [makeNameCard(1, "2026-05-01", true)];
     expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
   });
 
-  it("returns empty array when no cards have been reviewed at all", () => {
-    const cards = [makeCard(1, null, false), makeCard(2, null, false)];
+  it("returns empty array when only reverse cards are mastered (no name leg)", () => {
+    const cards: ReviewableCard[] = [makeReverseCard(1, "2026-05-01", true)];
     expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
   });
 
-  it("returns a single point for one mastered card", () => {
-    const cards = [makeCard(1, "2026-05-01")];
+  it("returns empty array when name is mastered but reverse is not", () => {
+    const cards: ReviewableCard[] = [
+      makeNameCard(1, "2026-05-01", true),
+      makeReverseCard(1, "2026-05-01", false), // reverse not mastered
+    ];
+    expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
+  });
+
+  it("returns empty array when reverse is mastered but name is not", () => {
+    const cards: ReviewableCard[] = [
+      makeNameCard(1, "2026-05-01", false), // name not mastered
+      makeReverseCard(1, "2026-05-01", true),
+    ];
+    expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
+  });
+
+  it("returns a single point when one species has both legs mastered on the same date", () => {
+    const cards = makeMasteredSpecies(1, "2026-05-01", "2026-05-01");
     const series = computeMasteryOverTime(cards, TODAY);
     expect(series).toEqual([{ date: "2026-05-01", count: 1 }]);
   });
 
-  it("returns cumulative counts in ascending date order", () => {
-    const cards = [
-      makeCard(1, "2026-04-01"),
-      makeCard(2, "2026-04-10"),
-      makeCard(3, "2026-04-10"),
-      makeCard(4, "2026-05-01"),
+  it("uses the LATER of the two leg dates as the species masteredDate", () => {
+    // Name mastered on May 1, reverse mastered on May 5 — species mastered on May 5.
+    const cards = makeMasteredSpecies(1, "2026-05-01", "2026-05-05");
+    const series = computeMasteryOverTime(cards, TODAY);
+    expect(series).toEqual([{ date: "2026-05-05", count: 1 }]);
+  });
+
+  it("uses the later date regardless of which leg comes last", () => {
+    // Reverse mastered on May 3, name mastered on May 10 — species mastered on May 10.
+    const cards = makeMasteredSpecies(1, "2026-05-10", "2026-05-03");
+    const series = computeMasteryOverTime(cards, TODAY);
+    expect(series).toEqual([{ date: "2026-05-10", count: 1 }]);
+  });
+
+  it("returns cumulative counts in ascending date order for multiple mastered species", () => {
+    const cards: ReviewableCard[] = [
+      ...makeMasteredSpecies(1, "2026-04-01", "2026-04-01"),
+      ...makeMasteredSpecies(2, "2026-04-10", "2026-04-10"),
+      ...makeMasteredSpecies(3, "2026-04-10", "2026-04-10"),
+      ...makeMasteredSpecies(4, "2026-05-01", "2026-05-01"),
     ];
     const series = computeMasteryOverTime(cards, TODAY);
     expect(series).toEqual([
@@ -110,29 +181,29 @@ describe("computeMasteryOverTime", () => {
     ]);
   });
 
-  it("excludes cards that are not currently mastered", () => {
-    const cards = [
-      makeCard(1, "2026-04-01"),             // mastered
-      makeCard(2, "2026-04-10", false),       // introduced but not mastered
+  it("excludes species where only one leg is mastered", () => {
+    const cards: ReviewableCard[] = [
+      ...makeMasteredSpecies(1, "2026-04-01", "2026-04-01"),
+      makeNameCard(2, "2026-04-10", true),   // name mastered, no paired reverse
     ];
     const series = computeMasteryOverTime(cards, TODAY);
-    // Only the mastered card should appear.
     expect(series).toHaveLength(1);
     expect(series[0].count).toBe(1);
   });
 
-  it("excludes cards with null lastReview even if mistakenly mastered", () => {
-    // Edge case: isMastered would be false for null lastReview anyway,
-    // but we guard defensively in the implementation.
-    const cards = [makeCard(1, null)];
+  it("excludes cards with null lastReview", () => {
+    const cards: ReviewableCard[] = [
+      makeNameCard(1, null, false),
+      makeReverseCard(1, null, false),
+    ];
     expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
   });
 
-  it("collapses multiple mastered cards on the same date into one point", () => {
-    const cards = [
-      makeCard(1, "2026-05-01"),
-      makeCard(2, "2026-05-01"),
-      makeCard(3, "2026-05-01"),
+  it("collapses multiple species mastered on the same date into one point", () => {
+    const cards: ReviewableCard[] = [
+      ...makeMasteredSpecies(1, "2026-05-01", "2026-05-01"),
+      ...makeMasteredSpecies(2, "2026-05-01", "2026-05-01"),
+      ...makeMasteredSpecies(3, "2026-05-01", "2026-05-01"),
     ];
     const series = computeMasteryOverTime(cards, TODAY);
     expect(series).toHaveLength(1);
@@ -140,21 +211,24 @@ describe("computeMasteryOverTime", () => {
   });
 
   it("respects a custom masteryRepetitions threshold", () => {
-    // Card has reps === 5, scheduledDays === MASTERY_INTERVAL_DAYS.
-    // With default threshold (3) it is mastered; with threshold 10 it is not.
-    const card: NameReviewCard = {
-      ...makeCard(1, "2026-05-01"),
-      state: makeState({
-        lastReview: "2026-05-01",
-        firstSeen: "2026-04-01",
-        reps: 5,
-        scheduledDays: MASTERY_INTERVAL_DAYS,
-      }),
-    };
-    const seriesDefault = computeMasteryOverTime([card], TODAY);
+    // With threshold 10, cards with reps=3 are not mastered.
+    const stateWith3Reps = makeState({
+      lastReview: "2026-05-01",
+      firstSeen: "2026-04-01",
+      reps: 3,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+    });
+    const cards: ReviewableCard[] = [
+      { ...makeNameCard(1, "2026-05-01", true), state: stateWith3Reps },
+      { ...makeReverseCard(1, "2026-05-01", true), state: stateWith3Reps },
+    ];
+
+    // Default threshold (3) — reps=3 meets the bar, species is mastered.
+    const seriesDefault = computeMasteryOverTime(cards, TODAY);
     expect(seriesDefault).toHaveLength(1);
 
-    const seriesHighThreshold = computeMasteryOverTime([card], TODAY, 10);
+    // High threshold (10) — reps=3 < 10, species is NOT mastered.
+    const seriesHighThreshold = computeMasteryOverTime(cards, TODAY, 10);
     expect(seriesHighThreshold).toHaveLength(0);
   });
 
@@ -162,18 +236,23 @@ describe("computeMasteryOverTime", () => {
   // forceAllMastered (superuser pretendAllMastered)
   // ---------------------------------------------------------------------------
 
-  it("forceAllMastered: returns a single point at today with count === cards.length", () => {
-    const cards = [
-      makeCard(1, null, false),
-      makeCard(2, null, false),
-      makeCard(3, "2026-04-01"),
+  it("forceAllMastered: returns a single point at today with count === name card count", () => {
+    const cards: ReviewableCard[] = [
+      makeNameCard(1, null, false),
+      makeNameCard(2, null, false),
+      makeNameCard(3, "2026-04-01", true),
+      // Reverse cards — they must not inflate the species count.
+      makeReverseCard(1, null, false),
+      makeReverseCard(2, null, false),
+      makeReverseCard(3, "2026-04-01", true),
     ];
     const series = computeMasteryOverTime(cards, TODAY, MASTERY_REPETITIONS, true);
+    // 3 name cards → count should be 3 (not 6).
     expect(series).toEqual([{ date: TODAY, count: 3 }]);
   });
 
-  it("forceAllMastered: returns the full population even when no cards are mastered", () => {
-    const cards = [makeCard(1, null, false), makeCard(2, null, false)];
+  it("forceAllMastered: returns the full name-card count even when nothing is mastered", () => {
+    const cards: ReviewableCard[] = [makeNameCard(1, null, false), makeNameCard(2, null, false)];
     const series = computeMasteryOverTime(cards, TODAY, MASTERY_REPETITIONS, true);
     expect(series).toEqual([{ date: TODAY, count: 2 }]);
   });
@@ -183,11 +262,11 @@ describe("computeMasteryOverTime", () => {
     expect(series).toEqual([{ date: TODAY, count: 0 }]);
   });
 
-  it("produces points in strictly ascending date order regardless of card order", () => {
-    const cards = [
-      makeCard(3, "2026-05-10"),
-      makeCard(1, "2026-04-01"),
-      makeCard(2, "2026-04-20"),
+  it("produces points in strictly ascending date order", () => {
+    const cards: ReviewableCard[] = [
+      ...makeMasteredSpecies(3, "2026-05-10", "2026-05-10"),
+      ...makeMasteredSpecies(1, "2026-04-01", "2026-04-01"),
+      ...makeMasteredSpecies(2, "2026-04-20", "2026-04-20"),
     ];
     const series = computeMasteryOverTime(cards, TODAY);
     for (let i = 1; i < series.length; i++) {
@@ -196,10 +275,10 @@ describe("computeMasteryOverTime", () => {
   });
 
   it("cumulative count never decreases", () => {
-    const cards = [
-      makeCard(1, "2026-04-01"),
-      makeCard(2, "2026-04-10"),
-      makeCard(3, "2026-05-01"),
+    const cards: ReviewableCard[] = [
+      ...makeMasteredSpecies(1, "2026-04-01", "2026-04-01"),
+      ...makeMasteredSpecies(2, "2026-04-10", "2026-04-10"),
+      ...makeMasteredSpecies(3, "2026-05-01", "2026-05-01"),
     ];
     const series = computeMasteryOverTime(cards, TODAY);
     for (let i = 1; i < series.length; i++) {

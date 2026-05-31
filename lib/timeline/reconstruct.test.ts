@@ -106,16 +106,11 @@ describe("buildCollectionTimeline — past direction", () => {
     expect(tl.past).toHaveLength(0);
   });
 
-  it("reconstructs mastery crossing after sufficient Good grades", () => {
-    // Give a card enough Good grades to cross mastery.
-    // nextReview with repeated Goods: needs reps >= MASTERY_REPETITIONS (3)
-    // and scheduledDays >= 21. We just need enough grades to see mastery
-    // become non-zero — the exact crossing depends on the scheduler.
+  it("reconstructs mastery crossing after sufficient Good grades on BOTH legs (#1448)", () => {
+    // Species-level mastery requires BOTH name and reverse cards to cross the
+    // FSRS gate. Both legs receive the same graduation sequence.
     const log: GradeLogEntry[] = [];
     const baseTime = NOW_MS - 50 * DAY_MS;
-    // Simulate a realistic graduation sequence:
-    // Grades: Good (learn step 0), Good (learn step 1 → graduate),
-    // then three spaced reviews with Good → eventually hits 21+ days interval.
     const grades: Array<[GradeLogEntry["grade"], number]> = [
       [4, 0],   // learn step 0
       [4, 0],   // graduate (1 day interval)
@@ -131,14 +126,44 @@ describe("buildCollectionTimeline — past direction", () => {
         occurredAt: baseTime + dayOffset * DAY_MS,
         subjectKey: "1",
       });
+      // Reverse card follows the same sequence (slightly offset to appear after name).
+      log.push({
+        date: "2026-01-01",
+        grade,
+        cardType: "reverse",
+        occurredAt: baseTime + dayOffset * DAY_MS + 1000,
+        subjectKey: "1",
+      });
     }
 
     const tl = buildCollectionTimeline(baseOpts({ log }));
     const last = tl.past[tl.past.length - 1];
-    // Introduced must be 1.
+    // Introduced must be 1 (driven by name card).
     expect(last.introduced).toBe(1);
-    // Mastery must be 1 after enough Good grades.
+    // Species mastery must be 1 after both legs clear the gate.
     expect(last.mastered).toBe(1);
+  });
+
+  it("name-only grades do NOT produce species mastery (reverse leg absent, #1448)", () => {
+    // Without a reverse card grade, species mastery cannot be achieved.
+    const log: GradeLogEntry[] = [];
+    const baseTime = NOW_MS - 50 * DAY_MS;
+    const grades: Array<[GradeLogEntry["grade"], number]> = [
+      [4, 0], [4, 0], [4, 1], [4, 8], [4, 20],
+    ];
+    for (const [grade, dayOffset] of grades) {
+      log.push({
+        date: "2026-01-01",
+        grade,
+        cardType: "name",
+        occurredAt: baseTime + dayOffset * DAY_MS,
+        subjectKey: "1",
+      });
+    }
+    const tl = buildCollectionTimeline(baseOpts({ log }));
+    const last = tl.past[tl.past.length - 1];
+    expect(last.introduced).toBe(1);
+    expect(last.mastered).toBe(0);
   });
 
   it("skips entries with invalid grades without throwing", () => {
@@ -305,30 +330,26 @@ describe("buildCollectionTimeline — past direction", () => {
     expect(last.atMs).toBe(NOW_MS);
   });
 
-  it("mastery achieved then lapsed: mastered status is not revoked in reconstruction", () => {
-    // After a card reaches mastery, the source documents an explicit design
-    // decision: once masteredAtMs is set it is never cleared, even if a
-    // subsequent Again grade causes a lapse (relearning). This mirrors the
-    // `replayLog` comment "Once mastered, we do not un-master".
-    //
-    // We use the same graduation sequence that the "reconstructs mastery
-    // crossing" test above already verifies produces mastered=1, then append
-    // an Again (grade=1) lapse and confirm the count is still 1.
+  it("mastery achieved then lapsed: mastered status is not revoked in reconstruction (#1448)", () => {
+    // After a species reaches mastery (both legs), the design decision is that
+    // once masteredAtMs is set it is never cleared, even if a subsequent Again
+    // grade causes a lapse. Both legs receive the same graduation sequence.
     const baseTime = NOW_MS - 50 * DAY_MS;
-    const log: GradeLogEntry[] = [
-      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime,                subjectKey: "1" },
-      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime + DAY_MS,       subjectKey: "1" },
-      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime + 2 * DAY_MS,   subjectKey: "1" },
-      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime + 9 * DAY_MS,   subjectKey: "1" },
-      { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: baseTime + 20 * DAY_MS,  subjectKey: "1" },
+    const makeLog = (cardType: GradeLogEntry["cardType"], timeOffset = 0): GradeLogEntry[] => [
+      { date: "2026-01-01", grade: 4, cardType, occurredAt: baseTime + timeOffset,                subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType, occurredAt: baseTime + DAY_MS + timeOffset,       subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType, occurredAt: baseTime + 2 * DAY_MS + timeOffset,   subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType, occurredAt: baseTime + 9 * DAY_MS + timeOffset,   subjectKey: "1" },
+      { date: "2026-01-01", grade: 4, cardType, occurredAt: baseTime + 20 * DAY_MS + timeOffset,  subjectKey: "1" },
     ];
+    const log: GradeLogEntry[] = [...makeLog("name"), ...makeLog("reverse", 500)];
 
-    // Verify this sequence achieves mastery before appending the lapse.
+    // Verify this sequence achieves species mastery (both legs) before appending the lapse.
     const tlBeforeLapse = buildCollectionTimeline(baseOpts({ log }));
     const lastBeforeLapse = tlBeforeLapse.past[tlBeforeLapse.past.length - 1];
     expect(lastBeforeLapse.mastered).toBe(1);
 
-    // Append a lapse (Again) after mastery.
+    // Append a lapse (Again) on the name card after mastery.
     const logWithLapse: GradeLogEntry[] = [
       ...log,
       { date: "2026-01-01", grade: 1, cardType: "name", occurredAt: baseTime + 25 * DAY_MS, subjectKey: "1" },

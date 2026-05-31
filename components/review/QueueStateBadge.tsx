@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
 type QueueState = "new" | "learning" | "review";
@@ -13,12 +16,6 @@ function deriveQueueState(
   return "review";
 }
 
-const LABELS: Record<QueueState, string> = {
-  new: "New",
-  learning: "Learning",
-  review: "Review",
-};
-
 const COLOURS: Record<QueueState, string> = {
   new: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
   learning: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
@@ -31,8 +28,9 @@ type Props = {
 };
 
 export function QueueStateBadge({ state, forceCardsGraduated = false }: Props) {
+  const t = useTranslations("review.queue");
   const queue = deriveQueueState(state, forceCardsGraduated);
-  const label = LABELS[queue];
+  const label = t(queue);
   return (
     <span
       role="status"

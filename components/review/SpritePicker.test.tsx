@@ -1,4 +1,4 @@
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import { renderWithIntl, screen, act, fireEvent } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SpritePicker, fisherYatesShuffle, resolveReverseFeedbackDelayMs } from "@/components/review/SpritePicker";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
@@ -126,7 +126,7 @@ describe("SpritePicker", () => {
   });
 
   it("renders 4 option buttons with correct aria-labels", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET}
         distractors={DISTRACTORS}
@@ -142,7 +142,7 @@ describe("SpritePicker", () => {
   });
 
   it("shows the target Pokémon name as the prompt heading", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET}
         distractors={DISTRACTORS}
@@ -162,7 +162,7 @@ describe("SpritePicker", () => {
     const orders: string[] = [];
 
     for (let i = 0; i < 20; i++) {
-      const { container, unmount } = render(
+      const { container, unmount } = renderWithIntl(
         <SpritePicker
           targetPokemon={TARGET}
           distractors={DISTRACTORS}
@@ -202,7 +202,7 @@ describe("SpritePicker playCryOnAnswer", () => {
   });
 
   it("plays the cry (volume 0.6) on a correct pick when playCryOnAnswer is true", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET_WITH_CRY}
         distractors={DISTRACTORS}
@@ -220,7 +220,7 @@ describe("SpritePicker playCryOnAnswer", () => {
   });
 
   it("plays the cry on an incorrect pick when playCryOnAnswer is true", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET_WITH_CRY}
         distractors={DISTRACTORS}
@@ -238,7 +238,7 @@ describe("SpritePicker playCryOnAnswer", () => {
   });
 
   it("does NOT play the cry when playCryOnAnswer is false", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET_WITH_CRY}
         distractors={DISTRACTORS}
@@ -254,7 +254,7 @@ describe("SpritePicker playCryOnAnswer", () => {
   });
 
   it("does NOT play the cry when playCryOnAnswer is omitted (default false)", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET_WITH_CRY}
         distractors={DISTRACTORS}
@@ -270,7 +270,7 @@ describe("SpritePicker playCryOnAnswer", () => {
 
   it("skips cry silently when the target's cryUrl is null, even when playCryOnAnswer is true", () => {
     // TARGET has cryUrl: null (the default in makePokemon).
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET}
         distractors={DISTRACTORS}
@@ -309,7 +309,7 @@ describe("SpritePicker speakNameOnAnswer", () => {
   });
 
   it("calls speakName directly when speakNameOnAnswer is true and playCryOnAnswer is false", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET_WITH_CRY}
         distractors={DISTRACTORS}
@@ -328,7 +328,7 @@ describe("SpritePicker speakNameOnAnswer", () => {
   });
 
   it("chains speakName after cry when both speakNameOnAnswer and playCryOnAnswer are true", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET_WITH_CRY}
         distractors={DISTRACTORS}
@@ -356,7 +356,7 @@ describe("SpritePicker speakNameOnAnswer", () => {
   });
 
   it("does NOT call speakName when speakNameOnAnswer is false (default)", () => {
-    render(
+    renderWithIntl(
       <SpritePicker
         targetPokemon={TARGET_WITH_CRY}
         distractors={DISTRACTORS}
@@ -409,7 +409,7 @@ describe("SpritePicker — locale-aware names", () => {
     const { SpritePicker: LocaleSpritePicker } = await import(
       "@/components/review/SpritePicker"
     );
-    render(
+    renderWithIntl(
       <LocaleSpritePicker
         targetPokemon={TARGET}
         distractors={DISTRACTORS}
@@ -433,7 +433,7 @@ describe("SpritePicker — locale-aware names", () => {
     const { SpritePicker: LocaleSpritePicker } = await import(
       "@/components/review/SpritePicker"
     );
-    render(
+    renderWithIntl(
       <LocaleSpritePicker
         targetPokemon={TARGET}
         distractors={DISTRACTORS}

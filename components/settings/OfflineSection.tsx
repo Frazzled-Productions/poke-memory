@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useFormatter } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import {
   getState,
@@ -24,19 +24,6 @@ function formatMb(bytes: number): string {
   return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
-/** Format an ISO timestamp as a short local date, e.g. "21 May 2026". */
-function formatDate(isoString: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }).format(new Date(isoString));
-  } catch {
-    return isoString;
-  }
-}
-
 /**
  * Offline section for the Settings page.
  *
@@ -49,6 +36,7 @@ function formatDate(isoString: string): string {
  * and shows live progress from the surviving run.
  */
 export function OfflineSection() {
+  const t = useTranslations("settings.offline");
   const format = useFormatter();
   // Initialise from the singleton synchronously. The subscribe() effect (below)
   // fires after mount and immediately calls setDownloadState with the current
@@ -118,14 +106,14 @@ export function OfflineSection() {
       <div className="flex flex-col gap-4">
         <div>
           <p className="text-sm font-medium text-foreground">
-            Download for offline use
+            {t("downloadTitle")}
           </p>
           <p className={`mt-1 ${mutedTextXs}`}>
-            Pre-fetches every sprite and cry so you can practise without a connection. Recommended on Wi-Fi. About 166 MB.
+            {t("downloadDescription")}
           </p>
           {storageInfo !== null && (
             <p className={`mt-1 ${mutedTextXs}`}>
-              Using {storageInfo.usedMb} of {storageInfo.totalMb} available.
+              {t("storageUsage", { usedMb: storageInfo.usedMb, totalMb: storageInfo.totalMb })}
             </p>
           )}
         </div>
@@ -135,7 +123,13 @@ export function OfflineSection() {
           <div className="flex flex-col gap-2">
             {downloadState.phase === "done" && (
               <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                Downloaded on {formatDate(downloadState.downloadedAt)}.
+                {t("downloadedOn", {
+                  date: format.dateTime(new Date(downloadState.downloadedAt), {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  }),
+                })}
               </p>
             )}
             {downloadState.phase === "error" && (
@@ -148,7 +142,7 @@ export function OfflineSection() {
               onClick={handleDownload}
               className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
             >
-              {downloadState.phase === "done" ? "Update" : "Download"}
+              {downloadState.phase === "done" ? t("updateButton") : t("downloadButton")}
             </button>
           </div>
         )}
@@ -162,8 +156,10 @@ export function OfflineSection() {
                 aria-live="polite"
                 aria-atomic="true"
               >
-                Downloading {format.number(downloadState.progress.done)} of{" "}
-                {format.number(downloadState.progress.total)}
+                {t("downloadingProgress", {
+                  done: format.number(downloadState.progress.done),
+                  total: format.number(downloadState.progress.total),
+                })}
                 {downloadState.progress.bytesSoFar > 0 && (
                   <> ({formatMb(downloadState.progress.bytesSoFar)})</>
                 )}
@@ -172,7 +168,7 @@ export function OfflineSection() {
               {downloadState.progress.total > 0 && (
                 <div
                   role="progressbar"
-                  aria-label="Download progress"
+                  aria-label={t("downloadProgressAriaLabel")}
                   aria-valuenow={downloadState.progress.done}
                   aria-valuemin={0}
                   aria-valuemax={downloadState.progress.total}
@@ -194,7 +190,7 @@ export function OfflineSection() {
               onClick={stopDownload}
               className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
             >
-              Stop
+              {t("stopButton")}
             </button>
           </div>
         )}
