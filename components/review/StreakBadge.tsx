@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   computeStreak,
@@ -18,12 +18,29 @@ import {
 } from "@/lib/settings/persistence";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { MilestoneCelebration } from "@/components/streak/MilestoneCelebration";
+import {
+  ProtectionToast,
+  type ProtectionToastKind,
+} from "@/components/review/ProtectionToast";
 
 export function StreakBadge() {
   const t = useTranslations("review");
   const [streak, setStreak] = useState<number | null>(null);
   const [pendingMilestone, setPendingMilestone] = useState<number | null>(null);
+  const [pendingToken, setPendingToken] = useState<ProtectionToastKind | null>(
+    null,
+  );
   const { flags, setFlag } = useSuperuser();
+
+  // Guard against re-showing the token toast on subsequent events within the
+  // same page visit. `runStreakProtection` is idempotent, but the
+  // STREAK_UPDATED_EVENT and SETTINGS_SAVED_EVENT can both fire multiple times
+  // during a session (e.g. on a settings save), and the earn guard in
+  // `applyProtectionStep` only prevents a *second earn on the same calendar
+  // day* — it does not prevent repeated `earned=true` returns when the result
+  // is read back from a stale-snapshot call path. A per-visit ref is the
+  // simplest, safest guard.
+  const hasShownTokenToastRef = useRef(false);
 
   // Recompute streak and milestone-to-fire whenever the underlying data
   // changes. Reads `loadSettings()` fresh inside the callback so a dismiss
@@ -39,7 +56,7 @@ export function StreakBadge() {
       // Run the streak-protection step before computing the streak so a token
       // spend (if any) bridges yesterday's gap. The step is idempotent across
       // same-day calls.
-      runStreakProtection(today);
+      const protectionResult = runStreakProtection(today);
       const s = computeStreak(
         effectiveStreakDates(
           loadStreakData(),
@@ -56,6 +73,23 @@ export function StreakBadge() {
         setPendingMilestone(findPendingMilestone(Number.MAX_SAFE_INTEGER, seen));
       } else {
         setPendingMilestone(findPendingMilestone(s, seen));
+      }
+
+      // Fire a token toast when the protection step earned or spent a token,
+      // but only once per page visit (the ref guard prevents re-fires from
+      // subsequent event dispatches within the same visit).
+      if (!hasShownTokenToastRef.current && protectionResult != null) {
+        const { earned, spent } = protectionResult;
+        if (earned && spent) {
+          setPendingToken("earned-and-spent");
+          hasShownTokenToastRef.current = true;
+        } else if (earned) {
+          setPendingToken("earned");
+          hasShownTokenToastRef.current = true;
+        } else if (spent) {
+          setPendingToken("spent");
+          hasShownTokenToastRef.current = true;
+        }
       }
     }
     refresh();
@@ -89,6 +123,10 @@ export function StreakBadge() {
     }
   }, [pendingMilestone, flags.forceNextStreakMilestone, setFlag]);
 
+  const dismissToken = useCallback(() => {
+    setPendingToken(null);
+  }, []);
+
   if (streak === null) return null;
 
   return (
@@ -105,6 +143,14 @@ export function StreakBadge() {
           key={pendingMilestone}
           milestone={pendingMilestone}
           onDismiss={dismissMilestone}
+        />
+      )}
+      {pendingToken !== null && (
+        <ProtectionToast
+          key={pendingToken}
+          kind={pendingToken}
+          streakCount={streak}
+          onDismiss={dismissToken}
         />
       )}
     </>
