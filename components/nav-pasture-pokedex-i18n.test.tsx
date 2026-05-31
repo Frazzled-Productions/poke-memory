@@ -405,7 +405,7 @@ describe("PwaInstallNudge — locale coverage", () => {
   it("en: shows nudge heading when visit threshold is met and not dismissed (state in)", async () => {
     renderWithIntl(<PwaInstallNudge />);
     // Wait for the useEffect to fire and set dismissed state
-    await screen.findByText("Install Poke Memory");
+    await screen.findByText("Install Poké Memory");
   });
 
   it("en: does not show nudge when dismissed (state out)", async () => {
@@ -417,23 +417,23 @@ describe("PwaInstallNudge — locale coverage", () => {
     // Give time for effect to run
     await act(async () => {});
     expect(
-      screen.queryByText("Install Poke Memory"),
+      screen.queryByText("Install Poké Memory"),
     ).not.toBeInTheDocument();
   });
 
   it("ja: heading in Japanese", async () => {
     renderJa(<PwaInstallNudge />);
-    await screen.findByText("Poke Memory をインストール");
+    await screen.findByText("Poké Memory をインストール");
   });
 
   it("zh-Hans: heading in Simplified Chinese", async () => {
     renderZhHans(<PwaInstallNudge />);
-    await screen.findByText("安装 Poke Memory");
+    await screen.findByText("安装 Poké Memory");
   });
 
   it("zh-Hant: heading in Traditional Chinese", async () => {
     renderZhHant(<PwaInstallNudge />);
-    await screen.findByText("安裝 Poke Memory");
+    await screen.findByText("安裝 Poké Memory");
   });
 });
 
