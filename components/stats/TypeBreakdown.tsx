@@ -1,8 +1,10 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { TypeStats } from "@/lib/stats/derive";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import { MeterBar } from "@/components/ui/MeterBar";
+import { getTypeName } from "@/lib/i18n/typeNames";
 
 type Props = {
   perType: readonly TypeStats[];
@@ -22,41 +24,45 @@ function pct(num: number, den: number): number {
  * filter — matches the Pokédex's existing intersection semantics.
  */
 export function TypeBreakdown({ perType }: Props) {
+  const tTB = useTranslations("stats.typeBreakdown");
+  const tTypes = useTranslations("types");
+
   return (
     <section aria-labelledby="type-heading">
       <h2
         id="type-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        By type
+        {tTB("heading")}
       </h2>
       <ul
         role="list"
         className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6"
       >
-        {perType.map((t) => {
-          const colors = TYPE_COLORS[t.type];
-          const masteredPct = pct(t.mastered, t.total);
+        {perType.map((typeStats) => {
+          const colors = TYPE_COLORS[typeStats.type];
+          const masteredPct = pct(typeStats.mastered, typeStats.total);
+          const typeName = getTypeName(typeStats.type, tTypes);
           return (
             <li
-              key={t.type}
+              key={typeStats.type}
               className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-background p-3 dark:border-zinc-800"
             >
               <div className="flex items-center justify-between">
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${colors?.bg ?? "bg-zinc-500"} ${colors?.text ?? "text-white"}`}
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${colors?.bg ?? "bg-zinc-500"} ${colors?.text ?? "text-white"}`}
                 >
-                  {t.type}
+                  {typeName}
                 </span>
                 <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-                  {t.mastered}/{t.total}
+                  {typeStats.mastered}/{typeStats.total}
                 </span>
               </div>
               <MeterBar
-                value={t.mastered}
-                max={t.total}
+                value={typeStats.mastered}
+                max={typeStats.total}
                 fillClass={colors?.bg ?? "bg-zinc-500"}
-                label={`${masteredPct}% of ${t.type}-type Pokémon mastered`}
+                label={tTB("meterAriaLabel", { masteredPct, typeName })}
                 trackClass="dark:bg-zinc-800"
                 transitionClass=""
               />

@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
+import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
 import { QueueStateBadge } from "@/components/review/QueueStateBadge";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
@@ -25,19 +25,19 @@ function makeState(overrides: Partial<ReviewState>): ReviewState {
 
 describe("QueueStateBadge", () => {
   it('renders "New" for a card never reviewed', () => {
-    render(<QueueStateBadge state={makeState({ lastReview: null, learningStep: null })} />);
+    renderWithIntl(<QueueStateBadge state={makeState({ lastReview: null, learningStep: null })} />);
     expect(screen.getByText("New")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Card queue state: New");
   });
 
   it('renders "Learning" when learningStep is non-null', () => {
-    render(<QueueStateBadge state={makeState({ learningStep: 0, stepStartedAt: Date.now() })} />);
+    renderWithIntl(<QueueStateBadge state={makeState({ learningStep: 0, stepStartedAt: Date.now() })} />);
     expect(screen.getByText("Learning")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Card queue state: Learning");
   });
 
   it('renders "Review" for a graduated card with a prior review', () => {
-    render(
+    renderWithIntl(
       <QueueStateBadge
         state={makeState({
           lastReview: "2026-01-01",
@@ -53,7 +53,7 @@ describe("QueueStateBadge", () => {
   });
 
   it('suppresses "Learning" and shows "New" when forceCardsGraduated is true and card has no prior review', () => {
-    render(
+    renderWithIntl(
       <QueueStateBadge
         state={makeState({ learningStep: 0, stepStartedAt: Date.now(), lastReview: null })}
         forceCardsGraduated
@@ -65,7 +65,7 @@ describe("QueueStateBadge", () => {
   });
 
   it('suppresses "Learning" and shows "Review" when forceCardsGraduated is true and card has a prior review', () => {
-    render(
+    renderWithIntl(
       <QueueStateBadge
         state={makeState({
           learningStep: 1,
@@ -82,7 +82,7 @@ describe("QueueStateBadge", () => {
   });
 
   it('still renders "Learning" when forceCardsGraduated is false', () => {
-    render(
+    renderWithIntl(
       <QueueStateBadge
         state={makeState({ learningStep: 0, stepStartedAt: Date.now() })}
         forceCardsGraduated={false}

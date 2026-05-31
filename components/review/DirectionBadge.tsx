@@ -1,11 +1,26 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 export type CardDirection = "name" | "evolution" | "reverse-evolution" | "reverse" | "cry";
 
-const LABELS: Record<CardDirection, { icon: string; label: string }> = {
-  name: { icon: "🔍", label: "Name this Pokémon" },
-  evolution: { icon: "→", label: "Evolution" },
-  "reverse-evolution": { icon: "←", label: "Pre-evolution" },
-  reverse: { icon: "🔍", label: "Pick the sprite" },
-  cry: { icon: "🔊", label: "Name from cry" },
+/** Maps each card direction to its icon and the i18n key within `practice.direction`. */
+const DIRECTION_ICONS: Record<CardDirection, string> = {
+  name: "🔍",
+  evolution: "→",
+  "reverse-evolution": "←",
+  reverse: "🔍",
+  cry: "🔊",
+};
+
+type DirectionLabelKey = "name" | "evolution" | "reverseEvolution" | "reverse" | "cry";
+
+const DIRECTION_LABEL_KEY: Record<CardDirection, DirectionLabelKey> = {
+  name: "name",
+  evolution: "evolution",
+  "reverse-evolution": "reverseEvolution",
+  reverse: "reverse",
+  cry: "cry",
 };
 
 type Props = {
@@ -13,7 +28,9 @@ type Props = {
 };
 
 export function DirectionBadge({ direction }: Props) {
-  const { icon, label } = LABELS[direction];
+  const t = useTranslations("practice.direction");
+  const icon = DIRECTION_ICONS[direction];
+  const label = t(DIRECTION_LABEL_KEY[direction]);
   return (
     <div
       role="status"

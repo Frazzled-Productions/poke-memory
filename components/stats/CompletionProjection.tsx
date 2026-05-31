@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormatter } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import type { CompletionProjection } from "@/lib/stats/completion-projection";
 import type { DateFormat } from "@/lib/utils/format-date";
 import { formatDate } from "@/lib/utils/format-date";
@@ -14,23 +14,24 @@ type Props = {
 
 export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Props) {
   const format = useFormatter();
+  const t = useTranslations("stats.completionProjection");
   return (
     <section aria-labelledby="completion-projection-heading">
       <h2
         id="completion-projection-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        Pokédex completion
+        {t("heading")}
       </h2>
 
       <div className={cardPanel}>
         {projection.kind === "complete" && (
           <div className="flex flex-col gap-1">
             <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              Complete!
+              {t("complete")}
             </p>
             <p className={mutedText}>
-              You have mastered every species. Congratulations!
+              {t("completeCopy")}
             </p>
           </div>
         )}
@@ -38,12 +39,10 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
         {projection.kind === "insufficient-history" && (
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-foreground">
-              Projection not available yet
+              {t("notAvailable")}
             </p>
             <p className={mutedText}>
-              Available once you have mastered at least one species and kept it
-              up for a week. Master a species by reviewing it until it is
-              scheduled at least 21 days ahead, then come back after 7 days.
+              {t("notAvailableDescription")}
             </p>
           </div>
         )}
@@ -55,7 +54,7 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
                 {formatDate(projection.projectedDate, fmt, tz)}
               </p>
               <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-                estimated completion date
+                {t("estimatedDate")}
               </p>
             </div>
             <div className={`flex flex-wrap gap-x-6 gap-y-1 ${mutedTextXs} tabular-nums`}>
@@ -63,13 +62,13 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
                 <span className="font-medium text-foreground">
                   {format.number(projection.remaining)}
                 </span>{" "}
-                species remaining
+                {t("speciesRemaining")}
               </span>
               <span>
                 <span className="font-medium text-foreground">
                   {projection.weeklyRate.toFixed(1)}
                 </span>{" "}
-                mastered per week (recent pace)
+                {t("masteredPerWeek")}
               </span>
             </div>
           </div>

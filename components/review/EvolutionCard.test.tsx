@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { renderWithIntl as render, screen } from "@/components/test-utils/renderWithIntl";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 
 vi.mock("next/image", () => ({

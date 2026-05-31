@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   SETTINGS_SAVED_EVENT,
   loadSettings,
@@ -12,6 +13,7 @@ const VISIT_SESSION_KEY = "poke-memory:visit-counted:v1";
 const VISIT_THRESHOLD = 3;
 
 export function PwaInstallNudge() {
+  const t = useTranslations("onboarding.pwaInstallNudge");
   const installState = useInstallPrompt();
   // `dismissed` stays null until the first read so the nudge never flashes
   // before localStorage is known.
@@ -75,38 +77,41 @@ export function PwaInstallNudge() {
   return (
     <div
       role="note"
-      aria-label="Install Poké Memory"
+      aria-label={t("ariaLabel")}
       className="relative mx-auto w-full max-w-md rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
     >
       <button
         type="button"
         onClick={handleDismiss}
-        aria-label="Dismiss install nudge"
+        aria-label={t("dismissAriaLabel")}
         className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
       >
         <span aria-hidden="true">×</span>
       </button>
       <div className="pr-8">
         <p className="text-sm font-semibold text-foreground">
-          Install Poké Memory
+          {t("heading")}
         </p>
         {installState.platform === "android" ? (
           <>
             <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-              Add to your home screen for quick access, no app store needed.
+              {t("androidBody")}
             </p>
             <button
               type="button"
               onClick={handleInstall}
               className="mt-3 inline-flex min-h-[36px] items-center rounded-lg bg-foreground px-4 py-1.5 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             >
-              Install app
+              {t("installButton")}
             </button>
           </>
         ) : (
           <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-            Tap <strong>Share</strong> then <strong>Add to Home Screen</strong>{" "}
-            to install.
+            {t("iosBodyShare")}{" "}
+            <strong>{t("iosBodyShareAction")}</strong>{" "}
+            {t("iosBodyThen")}{" "}
+            <strong>{t("iosBodyAddAction")}</strong>{" "}
+            {t("iosBodySuffix")}
           </p>
         )}
       </div>

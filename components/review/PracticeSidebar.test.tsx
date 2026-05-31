@@ -9,7 +9,7 @@
  *  - StorageEvent on the grade-log key (reset-all-progress path)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { renderWithIntl, screen, waitFor, act } from "@/components/test-utils/renderWithIntl";
 import { PracticeSidebar } from "@/components/review/PracticeSidebar";
 import { GRADE_LOG_APPENDED_EVENT } from "@/lib/gradelog/persistence";
 import { KEY_GRADE_LOG } from "@/lib/storage/keys";
@@ -74,7 +74,7 @@ describe("PracticeSidebar — loading state", () => {
     // Never-resolving promise keeps the component in the loading state.
     mockLoadGradeLog.mockReturnValue(new Promise(() => {}));
 
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     // The aside landmark is present even during loading.
     expect(screen.getByRole("complementary", { name: "Session progress" })).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe("PracticeSidebar — zero grades (empty state)", () => {
   });
 
   it("shows zero cards reviewed and the empty-state message", async () => {
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.getByText("Cards reviewed")).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe("PracticeSidebar — zero grades (empty state)", () => {
   });
 
   it("does not render any grade tally rows when total is 0", async () => {
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.getByText("Cards reviewed")).toBeInTheDocument();
@@ -138,7 +138,7 @@ describe("PracticeSidebar — non-zero grades", () => {
   });
 
   it("shows the correct total card count", async () => {
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.getByText("Cards reviewed")).toBeInTheDocument();
@@ -150,7 +150,7 @@ describe("PracticeSidebar — non-zero grades", () => {
   });
 
   it("shows the accuracy percentage (Good + Easy out of total)", async () => {
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.getByText("Accuracy")).toBeInTheDocument();
@@ -161,7 +161,7 @@ describe("PracticeSidebar — non-zero grades", () => {
   });
 
   it("renders tally rows only for grades that have a non-zero count", async () => {
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.getByText("Accuracy")).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe("PracticeSidebar — non-zero grades", () => {
   });
 
   it("renders per-grade counts correctly", async () => {
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.getByText("Good")).toBeInTheDocument();
@@ -193,7 +193,7 @@ describe("PracticeSidebar — non-zero grades", () => {
   });
 
   it("renders the 'View full stats' link pointing to /stats", async () => {
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.getByText("Cards reviewed")).toBeInTheDocument();
@@ -212,7 +212,7 @@ describe("PracticeSidebar — GRADE_LOG_APPENDED_EVENT live update", () => {
     // Second call (after event) returns one grade.
     mockLoadGradeLog.mockResolvedValueOnce([entry(4, 1000)]);
 
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     // Wait for the initial empty render.
     await waitFor(() => {
@@ -239,7 +239,7 @@ describe("PracticeSidebar — StorageEvent reset path", () => {
     // After reset, grade log is empty.
     mockLoadGradeLog.mockResolvedValueOnce([]);
 
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.queryByText("No cards reviewed yet today.")).toBeNull();
@@ -260,7 +260,7 @@ describe("PracticeSidebar — StorageEvent reset path", () => {
   it("ignores StorageEvents for unrelated keys", async () => {
     mockLoadGradeLog.mockResolvedValue([entry(4, 1000)]);
 
-    render(<PracticeSidebar />);
+    renderWithIntl(<PracticeSidebar />);
 
     await waitFor(() => {
       expect(screen.getByText("Cards reviewed")).toBeInTheDocument();

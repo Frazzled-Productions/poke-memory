@@ -13,7 +13,12 @@
     "mobileTabAriaLabel": "移动端标签导航",
     "whatsNew": "新功能",
     "privacy": "隐私",
-    "terms": "条款"
+    "terms": "条款",
+    "openMenu": "打开导航菜单",
+    "closeMenu": "关闭导航菜单",
+    "navigationMenu": "导航菜单",
+    "mobileNavigation": "移动端导航",
+    "menuLabel": "菜单"
   },
   "auth": {
     "signingIn": "登录中…",
@@ -61,6 +66,15 @@
         "selected": "已选择",
         "setAsTheme": "设为主题",
         "remove": "移除"
+      },
+      "intensityPicker": {
+        "heading": "主题强度",
+        "accentsLabel": "仅使用细微强调色",
+        "accentsDescription": "主题色仅显示在导航栏和焦点环上，主体保持中性色调。",
+        "tintedLabel": "背景着色",
+        "tintedDescription": "主题色以淡淡的色调覆盖页面背景。",
+        "fullLabel": "完整主题",
+        "fullDescription": "主题色覆盖所有背景，个性鲜明。"
       }
     },
     "labs": {
@@ -183,10 +197,36 @@
         "off": "关闭",
         "fast": "快速",
         "default": "默认"
+      },
+      "ttsControls": {
+        "voiceLabel": "朗读语音",
+        "voiceAutoOption": "自动（系统默认）",
+        "voiceHint": "来自设备的英语语音列表。“自动”会选择可用的最高质量英式英语语音。此语音用于语音名称的备用朗读；预生成的名称音频使用固定的英式英语语音。",
+        "rateLabel": "朗读速度（{rate}倍）",
+        "hearSample": "试听",
+        "rateSlow": "0.5倍（慢速）",
+        "rateFast": "2.0倍（快速）",
+        "volumeLabel": "朗读音量（{pct}%）",
+        "volumeMute": "0%（静音）",
+        "volumeFull": "100%（最大）"
+      },
+      "voiceQualityHint": {
+        "heading": "语音听起来像机器人？",
+        "body": "大多数设备默认英语语音为低质量的“紧凑”版本。您可以在设备的辅助功能或朗读内容设置中下载更高质量（高级或增强型）的英式英语语音，安装后应用将自动选用。",
+        "dismissAriaLabel": "关闭提示"
       }
     },
     "offline": {
-      "downloadHeading": "下载"
+      "downloadHeading": "下载",
+      "downloadTitle": "下载离线内容",
+      "downloadDescription": "预先获取所有精灵图和叫声，以便在无网络时也能练习。建议在 Wi-Fi 下使用。约 166 MB。",
+      "storageUsage": "已使用 {usedMb}，共 {totalMb}。",
+      "downloadedOn": "已于 {date} 下载。",
+      "downloadButton": "下载",
+      "updateButton": "更新",
+      "downloadingProgress": "正在下载 {total} 中的 {done}",
+      "downloadProgressAriaLabel": "下载进度",
+      "stopButton": "停止"
     },
     "optimizerCooldown": "{count, plural, other {下次优化还需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {请在 # 天后重试。}}",
@@ -365,10 +405,42 @@
       "noAlternateForms": "当前种子中没有异形态。",
       "matchCount": "{total} 只中有 {match} 只匹配",
       "hiddenCardsPaused": "隐藏的卡片已暂停：它们的复习日期会向后推移，因此删除范围不会让过期卡片涌入队列。"
+    },
+    "direction": {
+      "name": "这是哪只 Pokémon？",
+      "evolution": "进化",
+      "reverseEvolution": "前置进化",
+      "reverse": "选择图鉴图像",
+      "cry": "听叫声猜名字"
+    },
+    "correct": "正确！",
+    "correctAnswerWas": "正确答案是 {name}",
+    "hearName": "听 {name} 的发音",
+    "whichPokemon": "{name} 是哪只 Pokémon？",
+    "dismissError": "关闭",
+    "sidebar": {
+      "sessionProgress": "本次进度",
+      "today": "今天",
+      "cardsReviewed": "已复习卡片",
+      "accuracy": "正确率",
+      "gradeBreakdown": "评分明细",
+      "noCardsYet": "今天还没有复习卡片。",
+      "recentGrades": "最近评分",
+      "recentGradesAriaLabel": "{count} 条最近评分（最新优先）",
+      "viewFullStats": "查看完整统计"
     }
   },
   "review": {
-    "streakDays": "{count, plural, other {连续 # 天}}"
+    "streakDays": "{count, plural, other {连续 # 天}}",
+    "startStreak": "开始你的连续记录吧！",
+    "queue": {
+      "new": "新卡",
+      "learning": "学习中",
+      "review": "复习",
+      "ariaLabel": "队列数量"
+    },
+    "storageFullBanner": "存储空间已满，进度无法保存。",
+    "storageFullDismiss": "关闭"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -401,7 +473,21 @@
     "generationAll": "全部",
     "generationLabel": "第 {gen} 代",
     "masteryCount": "{mastered} / {total} 已掌握",
-    "nextReviewInDays": "{count, plural, other {下次复习: # 天后}}"
+    "nextReviewInDays": "{count, plural, other {下次复习: # 天后}}",
+    "dueToday": "今日到期",
+    "lockedHint": "开始学习这只宝可梦即可查看详细信息。",
+    "typesAriaLabel": "属性",
+    "baseStatsHeading": "种族值",
+    "factsHeading": "数据",
+    "evolutionChainHeading": "进化链",
+    "formsHeading": "形态",
+    "lockedAriaLabel": "#{number}（已锁定）",
+    "statHp": "HP",
+    "statAttack": "攻击",
+    "statDefense": "防御",
+    "statSpAtk": "特攻",
+    "statSpDef": "特防",
+    "statSpeed": "速度"
   },
   "pasture": {
     "title": "牧场",
@@ -442,6 +528,12 @@
       "backLabel": "牧场",
       "backAriaLabel": "返回牧场",
       "emptyState": "此生物群系中还没有掌握的宝可梦。继续练习吧！"
+    },
+    "nextArrivals": {
+      "ariaLabel": "即将到来",
+      "heading": "即将到来",
+      "upcomingAriaLabel": "即将加入牧场的宝可梦",
+      "allCaughtUp": "所有已复习的宝可梦都已在您的牧场中。"
     }
   },
   "stats": {
@@ -525,6 +617,104 @@
       "eventEarned": "已获得",
       "eventUsed": "已使用",
       "eventEarnedAndUsed": "获得并使用"
+    },
+    "gradeBreakdown": {
+      "heading": "评分分布",
+      "noGrades": "暂无评分。",
+      "ariaLabel": "{heading}: {again} 再来一次, {hard} 困难, {good} 良好, {easy} 简单"
+    },
+    "accuracy": {
+      "heading": "近期正确率",
+      "windowAriaLabel": "正确率窗口",
+      "window7d": "7天",
+      "window30d": "30天",
+      "window1yr": "1年",
+      "window7dAriaLabel": "7天",
+      "window30dAriaLabel": "30天",
+      "window1yrAriaLabel": "1年",
+      "rollingLabel": "{window}滚动",
+      "sparklineAriaLabel": "{window}正确率迷你图",
+      "noReviewsDays": "过去 {days} 天内暂无复习记录。",
+      "noReviewsYear": "过去一年内暂无复习记录。"
+    },
+    "retention": {
+      "heading": "记忆率 vs 目标",
+      "description": "过去一年内您的实际记忆率与调度器目标 {target} 保留率的比较。",
+      "recallLabel": "记忆率",
+      "noReviews": "过去一年内暂无复习记录。评分一些卡片以查看记忆率走势。",
+      "onTarget": "正好达到您的 {target} 保留目标。",
+      "above": "高于您的 {target} 目标 {delta}。",
+      "below": "低于您的 {target} 目标 {delta}。"
+    },
+    "masteryOverTime": {
+      "heading": "掌握数量变化",
+      "description": "累计掌握的种族数量（以最后复习日期近似替代掌握日期）。",
+      "noData": "暂无已掌握的种族。继续复习，折线将开始上升。",
+      "ofTotalMastered": "共 {total} 种族中已掌握",
+      "speciesMastered": "种族已掌握",
+      "superuserMode": "超级用户模式：显示截至今日的总数。",
+      "reviewMoreCards": "继续复习卡片以查看进度趋势。",
+      "ariaLabel": "掌握数量变化：截至 {date}，{total} 种族中已掌握 {count} 种",
+      "tooltipMastered": "已掌握"
+    },
+    "gameBreakdown": {
+      "heading": "按游戏",
+      "noData": "无游戏数据。请重新植入 Pokémon 数据以启用此视图。",
+      "listAriaLabel": "按世代的掌握情况",
+      "speciesMastered": "{mastered}/{total} 种族已掌握",
+      "gameListAriaLabel": "{name} 游戏列表",
+      "gen1": "第一世代",
+      "gen2": "第二世代",
+      "gen3": "第三世代",
+      "gen4": "第四世代",
+      "gen5": "第五世代",
+      "gen6": "第六世代",
+      "gen7": "第七世代",
+      "gen8": "第八世代",
+      "gen9": "第九世代",
+      "genOther": "其他"
+    },
+    "completionProjection": {
+      "heading": "图鉴完成预测",
+      "complete": "完成！",
+      "completeCopy": "您已掌握所有种族。恭喜！",
+      "notAvailable": "预测暂不可用",
+      "notAvailableDescription": "至少掌握一个种族并坚持一周后可用。将种族复习至计划间隔至少21天后算作掌握，之后7天再来查看。",
+      "estimatedDate": "预计完成日期",
+      "speciesRemaining": "种族剩余",
+      "masteredPerWeek": "每周掌握数（近期速度）"
+    },
+    "directionBreakdown": {
+      "heading": "按卡片方向的正确率",
+      "description": "名称、反向、叫声和进化卡片的记忆率比较。",
+      "noData": "暂无复习记录。评分一些卡片以查看分布。",
+      "disabledLabel": "{direction}（已禁用）",
+      "tooltipAccuracy": "正确率: {pct}%",
+      "tooltipReviews": "{total} 次中 {passes} 次通过",
+      "tooltipDisabled": "此卡片类型当前在设置中已禁用。",
+      "noReviewsLabel": "无复习",
+      "disabledMark": "（已禁用）"
+    },
+    "heatmap": {
+      "heading": "复习活动",
+      "less": "少",
+      "more": "多"
+    },
+    "gradeDistribution": {
+      "heading": "评分分布",
+      "description": "随时间推移按下再来一次、困难、良好、简单的次数。良好和简单比例越高，卡片越牢固。",
+      "noData": "暂无评分记录。开始复习会话以查看分布。",
+      "weeklyVolumeHeading": "每周量",
+      "weeklyVolumeHeadingWithCount": "{count, plural, other {每周量（迄今 {count} 周）}}",
+      "weeklyVolumeHeadingComplete": "每周量（{count} 周）",
+      "weeklyHistoryBuilding": "完成完整的一周复习后，每周历史将积累。继续加油！",
+      "tooltipWeekOf": "周 {weekStart}",
+      "tooltipTotal": "总计: {count}",
+      "allTimeMixAriaLabel": "历史评分分布: {again} 再来一次, {hard} 困难, {good} 良好, {easy} 简单"
+    },
+    "typeBreakdown": {
+      "heading": "按属性",
+      "meterAriaLabel": "{masteredPct}% 的 {typeName} 属性 Pokémon 已掌握"
     }
   },
   "journey": {
@@ -607,6 +797,16 @@
       "share": "分享",
       "copied": "已复制到剪贴板",
       "copyError": "无法复制。请重试。"
+    },
+    "badges": {
+      "heading": "道馆徽章",
+      "nextBadgeLabel": "下一个徽章:",
+      "nextBadgeRemaining": "{count, plural, other {还需掌握 # 只宝可梦}}",
+      "noBadgesYet": "尚未获得任何徽章。继续掌握宝可梦来解锁第一个道馆徽章！",
+      "earnedAriaLabel": "已获得的道馆徽章",
+      "lockedAriaLabel": "未获得的道馆徽章",
+      "hideLocked": "隐藏未获得的徽章（{count} 个）",
+      "viewAll": "查看所有徽章（{count} 个已锁定）"
     }
   },
   "error": {
@@ -640,7 +840,19 @@
       "heading": "你的进度保存在本设备上",
       "body": "你的进度保存在此设备上。在 iPhone 和 iPad 上，如果 7 天没有访问，Safari 可能会清除保存的数据。将此页面添加到主屏幕可以防止这种情况。如果你登录，进度还会在线保存，以便在其他设备上使用。"
     },
-    "getStarted": "开始"
+    "getStarted": "开始",
+    "pwaInstallNudge": {
+      "ariaLabel": "安装 Poké Memory",
+      "dismissAriaLabel": "关闭安装提示",
+      "heading": "安装 Poké Memory",
+      "androidBody": "添加到主屏幕即可快速访问，无需应用商店。",
+      "installButton": "安装应用",
+      "iosBodyShare": "点击",
+      "iosBodyShareAction": "分享",
+      "iosBodyThen": "，然后",
+      "iosBodyAddAction": "添加到主屏幕",
+      "iosBodySuffix": "即可安装。"
+    }
   },
   "sync": {
     "status": {
