@@ -182,7 +182,12 @@
       },
       "newPerDay": "每日新卡片数",
       "reviewsPerDay": "每日复习数",
-      "save": "保存"
+      "save": "保存",
+      "markWhatIKnowNudge": {
+        "title": "提示：跳过您已知宝可梦的新卡片队列",
+        "body": "使用下方的快速开始测验标记您已经认识的宝可梦。每只宝可梦将直接进入调度器，让您跳过新卡片队列。",
+        "cta": "打开快速开始测验"
+      }
     },
     "audio": {
       "cryCards": {
@@ -440,6 +445,11 @@
       "recentGrades": "最近评分",
       "recentGradesAriaLabel": "{count} 条最近评分（最新优先）",
       "viewFullStats": "查看完整统计"
+    },
+    "practiceScopeNudge": {
+      "title": "提示：可按世代、属性或分组筛选",
+      "body": "点击上方的「范围」按钮，将练习限定于特定世代、属性，或「御三家」「未完成进化链」等分组。",
+      "cta": "立即尝试"
     }
   },
   "review": {

@@ -609,6 +609,11 @@ export function ReviewSession() {
   // persisted setting is true. The session-load effect (~line 939) overwrites
   // this with the actual persisted value (default false for new users).
   const [mcCardOnboardingShown, setMcCardOnboardingShown] = useState(true);
+  // Whether the first-visit onboarding modal has been dismissed (#1103).
+  // Default true pre-hydration so the scope nudge does not flash on a
+  // brand-new session before the first-visit modal can show. Overwritten by
+  // the session-load effect with the actual persisted value.
+  const [firstVisitDone, setFirstVisitDone] = useState(true);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -994,6 +999,7 @@ export function ReviewSession() {
       setTimezone(settings.timezone ?? "UTC");
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
       setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
+      setFirstVisitDone(settings.onboarding?.firstVisitOnboardingDismissed === true);
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
@@ -2597,6 +2603,17 @@ export function ReviewSession() {
             <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
           )}
           <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+          {/* Scope nudge (#1443): one-shot hint explaining the scope filter.
+              Only shown after the first-visit onboarding modal is dismissed
+              so brand-new sessions are not hit with two simultaneous hints. */}
+          {firstVisitDone && (
+            <OnboardingHint
+              id="practiceScopeNudgeDismissed"
+              title={t("practiceScopeNudge.title")}
+            >
+              <p>{t("practiceScopeNudge.body")}</p>
+            </OnboardingHint>
+          )}
           <ScopeControl
             scope={scope}
             onChange={handleScopeChange}

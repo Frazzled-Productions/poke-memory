@@ -1010,6 +1010,15 @@ export default function SettingsPage() {
                     grinding through the new-card queue. Each selection runs
                     the brand-new card through the simulated-Easy FSRS path —
                     real graduated state, not synthesised mastery. */}
+                {/* Contextual nudge pointing users at the quickstart quiz (#1443).
+                    Uses its own flag so it shows for existing users who have never
+                    opened the quiz (absent key resolves to false via === true coercion). */}
+                <OnboardingHint
+                  id="markWhatIKnowNudgeDismissed"
+                  title={t("settings.practice.markWhatIKnowNudge.title")}
+                >
+                  <p>{t("settings.practice.markWhatIKnowNudge.body")}</p>
+                </OnboardingHint>
                 <div id="known-quiz-heading" className={colStackLg}>
                   <p className={sectionLabel}>
                     {t("settings.practice.quickstart.heading")}

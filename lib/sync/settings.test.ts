@@ -59,6 +59,8 @@ const SAMPLE: UserSettings = {
     cardTypesHintDismissed: false,
     guestStorageNoticeDismissed: false,
     journeyMasteryExplainerDismissed: false,
+    markWhatIKnowNudgeDismissed: false,
+    practiceScopeNudgeDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

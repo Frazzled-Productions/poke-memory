@@ -85,6 +85,19 @@ export type OnboardingFlags = {
    * dismissed it and it will not re-show automatically.
    */
   journeyMasteryExplainerDismissed: boolean;
+  /**
+   * "Mark Pokemon I already know" nudge (#1443). Shown near the Quickstart
+   * section on the Settings Practice tab, pointing users at the quiz that
+   * lets them fast-track species they already know. `true` = user dismissed
+   * it and it will not re-show automatically.
+   */
+  markWhatIKnowNudgeDismissed: boolean;
+  /**
+   * Practice scope nudge (#1443). Shown on the practice screen (above
+   * ScopeControl) for users who have completed the first-visit onboarding
+   * but have never opened the scope control. `true` = user dismissed it.
+   */
+  practiceScopeNudgeDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -98,6 +111,10 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   cardTypesHintDismissed: false,
   guestStorageNoticeDismissed: false,
   journeyMasteryExplainerDismissed: false,
+  // Default false: absent in pre-#1443 blobs resolves to not-seen (nudge shows).
+  markWhatIKnowNudgeDismissed: false,
+  // Default false: absent in pre-#1443 blobs resolves to not-seen (nudge shows).
+  practiceScopeNudgeDismissed: false,
 };
 
 /**
@@ -635,7 +652,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
   };
 }
 
-function validateOnboarding(value: unknown): OnboardingFlags {
+export function validateOnboarding(value: unknown): OnboardingFlags {
   if (typeof value !== "object" || value === null) return { ...DEFAULT_ONBOARDING };
   const v = value as Record<string, unknown>;
   return {
@@ -650,6 +667,10 @@ function validateOnboarding(value: unknown): OnboardingFlags {
     guestStorageNoticeDismissed: v.guestStorageNoticeDismissed === true,
     // === true coercion: absent key in pre-#1441 blobs resolves to false (hint shows).
     journeyMasteryExplainerDismissed: v.journeyMasteryExplainerDismissed === true,
+    // === true coercion: absent key in pre-#1443 blobs resolves to false (nudge shows).
+    markWhatIKnowNudgeDismissed: v.markWhatIKnowNudgeDismissed === true,
+    // === true coercion: absent key in pre-#1443 blobs resolves to false (nudge shows).
+    practiceScopeNudgeDismissed: v.practiceScopeNudgeDismissed === true,
   };
 }
 
