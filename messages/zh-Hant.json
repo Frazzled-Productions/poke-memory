@@ -65,7 +65,10 @@
         "description": "掌握一隻寶可夢後，可將其解鎖為應用程式的配色主題。",
         "selected": "已選擇",
         "setAsTheme": "設為主題",
-        "remove": "移除"
+        "remove": "移除",
+        "lockedHeading": "應用程式主題",
+        "lockedBody": "掌握第一隻寶可夢後即可解鎖主題。",
+        "practiceLink": "前往練習"
       },
       "intensityPicker": {
         "heading": "主題強度",
@@ -487,13 +490,14 @@
     "statDefense": "防禦",
     "statSpAtk": "特攻",
     "statSpDef": "特防",
-    "statSpeed": "速度"
+    "statSpeed": "速度",
+    "lockedSectionHint": "掌握這隻寶可夢後解鎖。"
   },
   "pasture": {
     "title": "牧場",
     "description": "您已掌握的寶可夢住在這裡。",
     "empty": "牧場是空的。掌握一些寶可夢後，它們就會出現在這裡。",
-    "emptyBody": "牧場是空的。在練習中掌握第一隻寶可夢後，牠就會出現在這裡。",
+    "emptyBody": "牧場是你已掌握寶可夢的收藏。在練習中掌握第一隻寶可夢後，牠就會出現在這裡。",
     "searchPlaceholder": "搜尋已掌握的寶可夢...",
     "masteredCount": "已掌握 {count} 隻",
     "pokemonCount": "{count} 隻寶可夢",

@@ -400,3 +400,57 @@ describe("PasturePage", () => {
     expect(screen.queryByText(/1 pokémon/i)).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pasture empty state copy (#1440)
+//
+// Verifies that the updated emptyBody copy explains the Pasture's purpose
+// (mastered-collection view) in all four locales.
+// ---------------------------------------------------------------------------
+
+describe("PasturePage — empty state copy (#1440)", () => {
+  it("en: empty state explains the mastered-collection purpose", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    renderWithIntl(<PasturePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/the pasture is your mastered-pokémon collection/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("ja: empty state copy renders in Japanese", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    renderWithIntl(<PasturePage />, { locale: "ja" });
+
+    await waitFor(() => {
+      // New ja emptyBody contains "牧場はあなたが習得した"
+      expect(
+        screen.getByText(/牧場はあなたが習得した/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("zh-Hans: empty state copy renders in Simplified Chinese", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    renderWithIntl(<PasturePage />, { locale: "zh-Hans" });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/牧场是你已掌握宝可梦的收藏/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("zh-Hant: empty state copy renders in Traditional Chinese", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    renderWithIntl(<PasturePage />, { locale: "zh-Hant" });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/牧場是你已掌握寶可夢的收藏/),
+      ).toBeInTheDocument();
+    });
+  });
+});

@@ -65,7 +65,10 @@
         "description": "[Master a Pokémon to unlock it as an app colour theme.]",
         "selected": "[Selected]",
         "setAsTheme": "[Set as theme]",
-        "remove": "[Remove]"
+        "remove": "[Remove]",
+        "lockedHeading": "[App Theme]",
+        "lockedBody": "[Master your first Pokémon to unlock themes.]",
+        "practiceLink": "[Go to Practice]"
       },
       "intensityPicker": {
         "heading": "[Theme intensity]",
@@ -487,13 +490,14 @@
     "statDefense": "[Defense]",
     "statSpAtk": "[Sp. Atk]",
     "statSpDef": "[Sp. Def]",
-    "statSpeed": "[Speed]"
+    "statSpeed": "[Speed]",
+    "lockedSectionHint": "[Unlocks when you master this Pokémon.]"
   },
   "pasture": {
     "title": "[Pasture]",
     "description": "[Pokémon you have mastered live here.]",
     "empty": "[Your pasture is empty. Master some Pokémon to see them here.]",
-    "emptyBody": "[Your pasture is empty. Master your first Pokémon in Practice to see it here.]",
+    "emptyBody": "[The Pasture is your mastered-Pokémon collection. Master your first Pokémon in Practice to see it here.]",
     "searchPlaceholder": "[Search mastered Pokémon...]",
     "masteredCount": "[{count} mastered]",
     "pokemonCount": "[{count} Pokémon]",
