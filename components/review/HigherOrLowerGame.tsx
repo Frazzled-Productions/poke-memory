@@ -109,7 +109,6 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   useEffect(() => {
     if (phase !== "revealed" || resultBlockRef.current === null) return;
     const prefersReducedMotion =
-      typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     resultBlockRef.current.scrollIntoView({
       behavior: prefersReducedMotion ? "instant" : "smooth",

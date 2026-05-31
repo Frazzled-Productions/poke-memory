@@ -203,7 +203,15 @@ test.describe("Higher-or-Lower mini-game", () => {
     await expect(gameRegion.getByRole("button")).toHaveCount(2);
   });
 
-  test("action button is in view and clickable after making a guess (#1447)", async ({ page }) => {
+  test("action button is in view and clickable after making a guess (#1447)", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "viewport-fit check is mobile-only",
+    );
+    // iPhone 17 Pro CSS viewport (the device reported in #1447). The default
+    // mobile-safari project uses iPhone 14 (390x844); override here so the
+    // assertion matches the actual reported device.
+    await page.setViewportSize({ width: 402, height: 874 });
     // Regression: on tall mobile viewports (iPhone 17 Pro) the result block
     // rendered below the fold after a guess, requiring manual scroll. The fix
     // scrolls the result block into view on reveal. We assert the button is
@@ -230,7 +238,7 @@ test.describe("Higher-or-Lower mini-game", () => {
     // viewport — not merely present in the DOM — so the user can reach it
     // without manual scrolling on a mobile viewport.
     const actionButton = page.getByRole("button", { name: /next pair|play again/i });
-    await expect(actionButton).toBeVisible();
+    await expect(actionButton).toBeInViewport();
 
     // The button must also be clickable (enabled, not obstructed). Clicking it
     // transitions back to the picking phase (sprite decode pending → button

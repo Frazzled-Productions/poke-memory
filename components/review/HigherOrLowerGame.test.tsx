@@ -514,7 +514,7 @@ describe("HigherOrLowerGame", () => {
       expect(screen.getByText(/equal, both count/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
       expect(scrollIntoViewCalls).toHaveLength(1);
-      expect(scrollIntoViewCalls[0]).toMatchObject({ block: "nearest" });
+      expect(scrollIntoViewCalls[0]).toMatchObject({ behavior: "smooth", block: "nearest" });
     });
 
     it("does NOT call scrollIntoView before a guess is made (picking phase)", () => {
