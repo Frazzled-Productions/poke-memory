@@ -8,6 +8,7 @@ import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import type { CardDirection } from "@/components/review/DirectionBadge";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { sectionLabelSubtle } from "@/lib/utils/class-names";
+import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 export const SPRITE_CLASS = "h-24 w-24 object-contain sm:h-48 sm:w-48";
 export const ARROW_CLASS =
@@ -101,8 +102,8 @@ export function EvolutionCardLayout({
     <Image
       src={preEvoSpriteUrl}
       alt={resolvedPreEvoName}
-      width={320}
-      height={320}
+      width={PRACTICE_SPRITE_SIZE}
+      height={PRACTICE_SPRITE_SIZE}
       priority={hiddenSide !== "pre"}
       className={SPRITE_CLASS}
     />
@@ -112,8 +113,8 @@ export function EvolutionCardLayout({
     <Image
       src={postEvoSpriteUrl}
       alt={resolvedPostEvoName}
-      width={320}
-      height={320}
+      width={PRACTICE_SPRITE_SIZE}
+      height={PRACTICE_SPRITE_SIZE}
       priority={hiddenSide !== "post"}
       className={SPRITE_CLASS}
     />

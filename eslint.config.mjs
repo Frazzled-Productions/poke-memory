@@ -93,6 +93,75 @@ const eslintConfig = defineConfig([
           message:
             "Do not inline-capitalise type ids (or other localised labels) in components/pages. Use getTypeName(type, t) from lib/i18n/typeNames.ts so the active appLocale is respected.",
         },
+        // Raw date API ban (#1456): forbid toLocaleDateString and new Intl.DateTimeFormat
+        // in components/pages. Route through formatDate / formatShortDate
+        // (lib/utils/format-date.ts) instead, so date rendering stays centralised,
+        // locale-stable, and consistently formatted.
+        //
+        // Allowlist: lib/utils/format-date.ts itself uses Intl.DateTimeFormat internally
+        // (it IS the helper) — that file is in lib/ and outside the files glob here.
+        // todayInTimezone in lib/ uses Intl.DateTimeFormat similarly.
+        {
+          selector: "CallExpression[callee.property.name='toLocaleDateString']",
+          message:
+            "Do not call .toLocaleDateString() directly in components/pages. Use formatDate(iso, fmt, tz) or formatShortDate(iso, fmt) from lib/utils/format-date.ts for locale-stable, centralised date rendering (#1456).",
+        },
+        {
+          selector:
+            "NewExpression[callee.object.name='Intl'][callee.property.name='DateTimeFormat']",
+          message:
+            "Do not construct new Intl.DateTimeFormat() directly in components/pages. Use formatDate(iso, fmt, tz), formatShortDate(iso, fmt), or todayInTimezone(tz) from lib/utils/format-date.ts instead (#1456).",
+        },
+        // Class-name literal ban (#1456): forbid the raw Tailwind strings that
+        // lib/utils/class-names.ts constants already represent. Import and use
+        // the constant instead to keep dark-mode / spacing changes in one place.
+        {
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value='text-sm text-zinc-500 dark:text-zinc-400']",
+          message:
+            "Use the mutedText constant from lib/utils/class-names.ts instead of this inline literal (#1456).",
+        },
+        {
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value='flex flex-col gap-2']",
+          message:
+            "Use the colStack constant from lib/utils/class-names.ts instead of this inline literal (#1456).",
+        },
+        {
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value='flex flex-col gap-4']",
+          message:
+            "Use the colStackLg constant from lib/utils/class-names.ts instead of this inline literal (#1456).",
+        },
+        {
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value='rounded-xl border border-zinc-200 bg-background p-4 dark:border-zinc-800']",
+          message:
+            "Use the cardPanel constant from lib/utils/class-names.ts instead of this inline literal (#1456).",
+        },
+        {
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value='rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800']",
+          message:
+            "Use the cardPanelPadded constant from lib/utils/class-names.ts instead of this inline literal (#1456).",
+        },
+        // Sprite pixel-literal ban (#1456): forbid raw numeric literals on the
+        // `width` and `height` props of <Image> components. Use the corresponding
+        // named constant from lib/sprites/sizes.ts so the optimiser variant and
+        // the painted CSS size stay in sync. Non-sprite images (user avatars, SVG
+        // icons) may use eslint-disable-next-line with a rationale comment.
+        {
+          selector:
+            "JSXOpeningElement[name.name='Image'] > JSXAttribute[name.name='width'] > JSXExpressionContainer > Literal",
+          message:
+            "Do not inline sprite pixel sizes. Import the named constant from lib/sprites/sizes.ts (e.g. PRACTICE_SPRITE_SIZE, PICKER_SPRITE_SIZE) and use it as the width prop (#1456).",
+        },
+        {
+          selector:
+            "JSXOpeningElement[name.name='Image'] > JSXAttribute[name.name='height'] > JSXExpressionContainer > Literal",
+          message:
+            "Do not inline sprite pixel sizes. Import the named constant from lib/sprites/sizes.ts (e.g. PRACTICE_SPRITE_SIZE, PICKER_SPRITE_SIZE) and use it as the height prop (#1456).",
+        },
       ],
     },
   },

@@ -62,6 +62,7 @@ import { cardPanelPadded, colStackLg, mutedTextXs, sectionLabel } from "@/lib/ut
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
+import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -138,7 +139,7 @@ function ResetEarnedBadgesRow() {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+    <div className={cardPanelPadded}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-foreground">
@@ -234,8 +235,8 @@ function FavouritePicker({
                 <Image
                   src={seed.spriteUrl}
                   alt={entry.name}
-                  width={64}
-                  height={64}
+                  width={POKEDEX_GRID_SPRITE_SIZE}
+                  height={POKEDEX_GRID_SPRITE_SIZE}
                   className="h-16 w-16 object-contain"
                 />
               ) : (

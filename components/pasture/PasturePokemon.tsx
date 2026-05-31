@@ -7,6 +7,7 @@ import { ArrivalSparkle } from "./ArrivalSparkle";
 import styles from "./Pasture.module.css";
 import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { mutedTextXs } from "@/lib/utils/class-names";
+import { formatDate } from "@/lib/utils/format-date";
 
 type Props = {
   card: NameReviewCard;
@@ -146,18 +147,13 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
     };
   }, [showPopover]);
 
-  // Anchor the parse mid-day so timezones west of UTC don't shift the display
-  // back a calendar day (firstSeen is a "YYYY-MM-DD" string, which Date parses
-  // as UTC midnight by default).
-  // en-GB locale gives English month names on all browser locales.
-  // Parse mid-day so timezones west of UTC don't shift the display back a
-  // calendar day (firstSeen is "YYYY-MM-DD", parsed as UTC midnight by default).
+  // Routes through formatDate (lib/utils/format-date.ts) so raw
+  // toLocaleDateString calls are banned from components (#1456 lint rule).
+  // "dmy-year" gives en-GB ordering ("18 May 2026") with year included.
+  // "UTC" timezone: firstSeen is a "YYYY-MM-DD" string; formatDate parses it
+  // at noon UTC so no DST shift occurs.
   const firstSeenLabel = card.state.firstSeen
-    ? new Date(card.state.firstSeen + "T12:00:00").toLocaleDateString("en-GB", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
+    ? formatDate(card.state.firstSeen, "dmy-year", "UTC")
     : "Unknown";
 
   const spriteClass = [

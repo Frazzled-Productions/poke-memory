@@ -6,6 +6,7 @@ import { GEN_RANGES, generationOf } from "@/lib/stats/derive";
 import type { PokemonCellData } from "@/lib/pokemon/filter";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { mutedText } from "@/lib/utils/class-names";
+import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,8 +110,8 @@ function PokemonCell({
           <img
             src={spriteUrl}
             alt={isLocked ? `#${zeroPad(id)} (locked)` : displayName}
-            width={64}
-            height={64}
+            width={POKEDEX_GRID_SPRITE_SIZE}
+            height={POKEDEX_GRID_SPRITE_SIZE}
             loading="lazy"
             className={[
               "h-16 w-16 object-contain",

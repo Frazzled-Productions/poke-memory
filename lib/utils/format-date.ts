@@ -7,7 +7,7 @@
  * than UTC.
  */
 
-export type DateFormat = "iso" | "dmy" | "mdy";
+export type DateFormat = "iso" | "dmy" | "mdy" | "dmy-year" | "mdy-year";
 
 /**
  * Format a `Date` as a UTC `YYYY-MM-DD` string.
@@ -59,6 +59,26 @@ export function formatDate(iso: string, fmt: DateFormat, tz: string): string {
         weekday: "short",
       }).format(d);
       return `${weekday}, ${iso}`;
+    }
+    // dmy-year / mdy-year: short-month + year, no weekday.
+    // Matches the output of toLocaleDateString("en-GB", { day, month: "short", year }),
+    // which existing call sites produced — centralised here to remove raw Intl calls
+    // from components (#1456).
+    if (fmt === "dmy-year") {
+      return new Intl.DateTimeFormat("en-GB", {
+        timeZone: tz,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(d);
+    }
+    if (fmt === "mdy-year") {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(d);
     }
     const opts: Intl.DateTimeFormatOptions = {
       timeZone: tz,

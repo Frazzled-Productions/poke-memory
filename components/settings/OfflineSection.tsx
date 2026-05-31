@@ -10,7 +10,7 @@ import {
   stopDownload,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
-import { cardPanelPadded, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
 
 /**
  * Species IDs eligible for offline caching — all default-form entries in the
@@ -103,7 +103,7 @@ export function OfflineSection() {
 
   return (
     <div className={cardPanelPadded}>
-      <div className="flex flex-col gap-4">
+      <div className={colStackLg}>
         <div>
           <p className="text-sm font-medium text-foreground">
             {t("downloadTitle")}
@@ -120,7 +120,7 @@ export function OfflineSection() {
 
         {/* Idle / done state */}
         {(downloadState.phase === "idle" || downloadState.phase === "done" || downloadState.phase === "error") && (
-          <div className="flex flex-col gap-2">
+          <div className={colStack}>
             {downloadState.phase === "done" && (
               <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                 {t("downloadedOn", {

@@ -53,7 +53,7 @@ import {
   applyKnownGrades,
   eligibleCardsForKnownQuiz,
 } from "@/lib/onboarding/applyKnownGrades";
-import { dialogPanel, sectionLabel } from "@/lib/utils/class-names";
+import { colStack, colStackLg, dialogPanel, mutedText, sectionLabel } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // KnownPokemonCard — single sprite tile in the "mark as known" grid.
@@ -333,7 +333,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
 
   if (!loaded) {
     return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400" aria-busy="true">
+      <p className={mutedText} aria-busy="true">
         Loading your Pokémon list...
       </p>
     );
@@ -341,16 +341,16 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
 
   if (eligibleCards.length === 0) {
     return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+      <p className={mutedText}>
         No new Pokémon left to mark. Every species in your deck has already been touched.
       </p>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={colStackLg}>
       {/* Generation switcher */}
-      <fieldset className="flex flex-col gap-2">
+      <fieldset className={colStack}>
         <legend className={sectionLabel}>
           Generation
         </legend>

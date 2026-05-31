@@ -6,6 +6,7 @@ import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { sectionLabelSubtle } from "@/lib/utils/class-names";
+import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 type Props = {
   spriteUrl: string;
@@ -29,8 +30,8 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
       <Image
         src={spriteUrl}
         alt={revealed ? displayName : "A Pokémon sprite, answer hidden"}
-        width={320}
-        height={320}
+        width={PRACTICE_SPRITE_SIZE}
+        height={PRACTICE_SPRITE_SIZE}
         priority
         className="h-36 w-36 object-contain sm:h-80 sm:w-80"
       />

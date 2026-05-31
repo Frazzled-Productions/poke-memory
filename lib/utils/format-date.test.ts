@@ -110,6 +110,34 @@ describe("formatDate", () => {
     expect(mdy).toMatch(/May/);
   });
 
+  it("dmy-year format shows day + month abbreviation + year, no weekday", () => {
+    const result = formatDate(ISO_DATE, "dmy-year", "UTC");
+    // 2026-05-14: en-GB gives "14 May 2026"
+    expect(result).toMatch(/14/);
+    expect(result).toMatch(/May/);
+    expect(result).toMatch(/2026/);
+    // Day before month.
+    const dayPos = result.indexOf("14");
+    const monPos = result.indexOf("May");
+    expect(dayPos).toBeLessThan(monPos);
+    // No weekday abbreviation.
+    expect(result).not.toMatch(/Thu/);
+  });
+
+  it("mdy-year format shows month abbreviation + day + year, no weekday", () => {
+    const result = formatDate(ISO_DATE, "mdy-year", "UTC");
+    // 2026-05-14: en-US gives "May 14, 2026"
+    expect(result).toMatch(/May/);
+    expect(result).toMatch(/14/);
+    expect(result).toMatch(/2026/);
+    // Month before day.
+    const monPos = result.indexOf("May");
+    const dayPos = result.indexOf("14");
+    expect(monPos).toBeLessThan(dayPos);
+    // No weekday abbreviation.
+    expect(result).not.toMatch(/Thu/);
+  });
+
   it("does not throw on an ISO date from a different month", () => {
     // January — en-GB: "Thu, 1 Jan" (or similar)
     const jan = formatDate("2026-01-01", "dmy", "UTC");

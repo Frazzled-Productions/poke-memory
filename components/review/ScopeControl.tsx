@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
-import { mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { colStack, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import {
   EMPTY_SCOPE,
   countMatchingSpecies,
@@ -342,7 +342,7 @@ export function ScopeControl({
               defaultOpen={formsActive}
               hasDivider={false}
             >
-              <div className="flex flex-col gap-2">
+              <div className={colStack}>
                 {(
                   [
                     { value: "all" as const, labelKey: "formIncludeAll" as const },

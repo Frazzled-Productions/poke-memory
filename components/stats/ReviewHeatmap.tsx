@@ -5,6 +5,7 @@ import { useTranslations, useFormatter } from "next-intl";
 import type { HeatmapCell } from "@/lib/stats/heatmap";
 import { intensityBucket } from "@/lib/stats/heatmap";
 import { cardPanel, mutedTextXs } from "@/lib/utils/class-names";
+import { formatDate } from "@/lib/utils/format-date";
 
 type Props = {
   /** 53 columns × 7 rows, oldest column first; today is in the rightmost column. */
@@ -33,19 +34,13 @@ const INTENSITY_HOVER_STROKES = [
   "stroke-emerald-700 dark:stroke-emerald-200", // 4
 ] as const;
 
-/** Build the tooltip date string. Uses en-GB for English month/weekday names
- *  regardless of locale — the date format is fixed but the count is localised
- *  separately by the caller via t(). */
+/** Build the tooltip date string.
+ *  Routes through formatDate (lib/utils/format-date.ts) so raw Intl.DateTimeFormat
+ *  and toLocaleDateString calls are banned from components by the #1456 lint rule.
+ *  Uses "dmy-year" (en-GB ordering: "1 Jan 2026") — includes the year so
+ *  January cells in a year-spanning heatmap are unambiguous. */
 function formatTooltipDate(cell: HeatmapCell): string {
-  // en-GB locale gives English month/weekday names on all browser locales.
-  const d = new Date(cell.date + "T00:00:00Z");
-  return d.toLocaleDateString("en-GB", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return formatDate(cell.date, "dmy-year", "UTC");
 }
 
 type TooltipState = {

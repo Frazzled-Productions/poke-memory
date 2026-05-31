@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, sectionLabelSm } from "@/lib/utils/class-names";
+import { formatDate } from "@/lib/utils/format-date";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -214,11 +215,7 @@ export function FsrsOptimizerSection({
               className={mutedTextXs}
             >
               Last optimized:{" "}
-              {new Date(cooldown.optimizedAt).toLocaleDateString("en-GB", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
+{formatDate(new Date(cooldown.optimizedAt).toISOString().slice(0, 10), "dmy-year", "UTC")}
             </p>
           </div>
         ) : (
@@ -267,11 +264,7 @@ export function FsrsOptimizerSection({
                   className={mutedTextXs}
                 >
                   Last optimized:{" "}
-                  {new Date(fsrsWeightsOptimizedAt).toLocaleDateString("en-GB", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
+{formatDate(new Date(fsrsWeightsOptimizedAt).toISOString().slice(0, 10), "dmy-year", "UTC")}
                 </p>
               )}
             </div>

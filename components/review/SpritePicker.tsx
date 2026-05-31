@@ -10,6 +10,7 @@ import { playCry } from "@/lib/audio/cry";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { PICKER_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 /**
  * Maps the tri-state delay setting to concrete millisecond values.
@@ -67,10 +68,10 @@ function SpritePickerTile({ tile, answered, selectedId, onTap, tileClassName }: 
         src={tile.spriteUrl}
         alt=""
         aria-hidden="true"
-        width={150}
-        height={150}
+        width={PICKER_SPRITE_SIZE}
+        height={PICKER_SPRITE_SIZE}
         loading="eager"
-        className="object-contain w-[150px] h-[150px]"
+        className="object-contain" style={{ width: PICKER_SPRITE_SIZE, height: PICKER_SPRITE_SIZE }}
       />
       {/* Visually hidden name for screen readers */}
       <span className="sr-only">{localeName}</span>
