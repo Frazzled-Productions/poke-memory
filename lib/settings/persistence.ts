@@ -86,7 +86,7 @@ export type OnboardingFlags = {
    */
   journeyMasteryExplainerDismissed: boolean;
   /**
-   * "Mark Pokemon I already know" nudge (#1443). Shown near the Quickstart
+   * "Mark Pokémon I already know" nudge (#1443). Shown near the Quickstart
    * section on the Settings Practice tab, pointing users at the quiz that
    * lets them fast-track species they already know. `true` = user dismissed
    * it and it will not re-show automatically.
