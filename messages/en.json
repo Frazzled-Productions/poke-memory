@@ -440,7 +440,13 @@
       "ariaLabel": "Queue counts"
     },
     "storageFullBanner": "Progress saving is disabled: storage is full.",
-    "storageFullDismiss": "Dismiss"
+    "storageFullDismiss": "Dismiss",
+    "tokenEarned": "Streak protection token earned - it will automatically cover one missed day.",
+    "tokenSpent": "{count, plural, one {We used a protection token to save your #-day streak.} other {We used a protection token to save your #-day streak.}}",
+    "tokenEarnedAndSpent": "Streak protection token earned and used - your {count}-day streak is safe.",
+    "tokenToastDismiss": "Dismiss token notice",
+    "tokenEarnedHeading": "Token earned",
+    "tokenSpentHeading": "Streak protected"
   },
   "pokedex": {
     "title": "Pokédex",

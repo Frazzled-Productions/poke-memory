@@ -440,7 +440,13 @@
       "ariaLabel": "キュー数"
     },
     "storageFullBanner": "ストレージが満杯のため進捗の保存が無効になっています。",
-    "storageFullDismiss": "閉じる"
+    "storageFullDismiss": "閉じる",
+    "tokenEarned": "連続ストリーク保護トークンを獲得しました。セーブされていない日を自動でカバーします。",
+    "tokenSpent": "{count, plural, other {保護トークンを使用して、{count}日連続のストリークを守りました。}}",
+    "tokenEarnedAndSpent": "連続ストリーク保護トークンを獲得して使用しました。{count}日連続は安全です。",
+    "tokenToastDismiss": "通知を閉じる",
+    "tokenEarnedHeading": "トークン獲得",
+    "tokenSpentHeading": "ストリーク保護"
   },
   "pokedex": {
     "title": "Pokédex",

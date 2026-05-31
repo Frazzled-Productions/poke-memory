@@ -440,7 +440,13 @@
       "ariaLabel": "队列数量"
     },
     "storageFullBanner": "存储空间已满，进度无法保存。",
-    "storageFullDismiss": "关闭"
+    "storageFullDismiss": "关闭",
+    "tokenEarned": "已获得连续保护令牌，它将自动补上一天未复习的记录。",
+    "tokenSpent": "{count, plural, other {已使用保护令牌保住了你的 {count} 天连续记录。}}",
+    "tokenEarnedAndSpent": "已获得并使用连续保护令牌，你的 {count} 天连续记录安全了。",
+    "tokenToastDismiss": "关闭提示",
+    "tokenEarnedHeading": "获得令牌",
+    "tokenSpentHeading": "连续记录已保护"
   },
   "pokedex": {
     "title": "Pokédex",
