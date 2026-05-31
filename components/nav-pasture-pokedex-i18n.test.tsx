@@ -404,11 +404,10 @@ describe("PwaInstallNudge — locale coverage", () => {
 
   it("en: shows nudge heading when visit threshold is met and not dismissed (state in)", async () => {
     renderWithIntl(<PwaInstallNudge />);
-    // Flush the mount effect deterministically (act drains the effect + the
-    // resulting re-render) rather than racing findByText's real-timer polling,
-    // which intermittently timed out under coverage instrumentation (#1464).
-    await act(async () => {});
-    expect(screen.getByText("Install Poké Memory")).toBeInTheDocument();
+    // The nudge renders after an async mount effect; findByText polls for it.
+    // The default 1000ms is too tight under coverage instrumentation, so use a
+    // generous timeout (#1464).
+    await screen.findByText("Install Poké Memory", undefined, { timeout: 8000 });
   });
 
   it("en: does not show nudge when dismissed (state out)", async () => {
@@ -426,20 +425,17 @@ describe("PwaInstallNudge — locale coverage", () => {
 
   it("ja: heading in Japanese", async () => {
     renderJa(<PwaInstallNudge />);
-    await act(async () => {});
-    expect(screen.getByText("Poké Memory をインストール")).toBeInTheDocument();
+    await screen.findByText("Poké Memory をインストール", undefined, { timeout: 8000 });
   });
 
   it("zh-Hans: heading in Simplified Chinese", async () => {
     renderZhHans(<PwaInstallNudge />);
-    await act(async () => {});
-    expect(screen.getByText("安装 Poké Memory")).toBeInTheDocument();
+    await screen.findByText("安装 Poké Memory", undefined, { timeout: 8000 });
   });
 
   it("zh-Hant: heading in Traditional Chinese", async () => {
     renderZhHant(<PwaInstallNudge />);
-    await act(async () => {});
-    expect(screen.getByText("安裝 Poké Memory")).toBeInTheDocument();
+    await screen.findByText("安裝 Poké Memory", undefined, { timeout: 8000 });
   });
 });
 
