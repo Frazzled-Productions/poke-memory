@@ -82,10 +82,13 @@ vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({ user: null, supabase: null, loading: false }),
 }));
 
+const { mockSuperuserFlags } = vi.hoisted(() => ({
+  mockSuperuserFlags: { pretendAllMastered: false },
+}));
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => ({
     unlocked: false,
-    flags: { pretendAllMastered: false },
+    flags: mockSuperuserFlags,
     setFlag: vi.fn(),
     anyFlagOn: false,
   }),
@@ -1034,32 +1037,28 @@ describe("SettingsPage — theme picker locked state (#1440)", () => {
     expect(screen.queryByRole("button", { name: /Set as theme/i })).not.toBeInTheDocument();
   });
 
-  it("locked state with pretendAllMastered on: picker grid renders, no locked message", async () => {
-    // pretendAllMastered forces unlockedEntries to include everything
-    // CURATED_POKEMON is non-empty in production but mocked with SEED_POKEMON: [] here.
-    // We test the guard condition: when pretendAllMastered is on, the locked branch
-    // is skipped. With SEED_POKEMON: [] and CURATED_POKEMON as empty, the picker
-    // renders nothing. We assert the locked message is absent.
-    const { useSuperuser: _orig } = await import(
-      "@/lib/superuser/SuperuserContext"
-    );
-    // Temporarily override the mock inline via module replacement is complex.
-    // Instead we verify the catalogue key is present in each locale.
-    // The component-level guard is covered by the locked/unlocked tests above.
-    // This test just verifies the catalogue key is in all four locales.
+  it("pretendAllMastered on: picker grid renders, locked message absent", async () => {
+    // The superuser flag forces unlockedEntries to include every CURATED_POKEMON
+    // entry (the real, non-empty curated list), so the locked branch is skipped.
+    // This exercises the actual `flags.pretendAllMastered || isMastered(...)`
+    // guard in the component, not just catalogue-key presence.
+    mockLoadSession.mockResolvedValue(null);
+    mockSuperuserFlags.pretendAllMastered = true;
+    try {
+      await renderAndWait();
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const en = require("../../messages/en.json");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ja = require("../../messages/ja.json");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const zhHans = require("../../messages/zh-Hans.json");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const zhHant = require("../../messages/zh-Hant.json");
-
-    expect(en.settings.appearance.theme.lockedBody).toBeTruthy();
-    expect(ja.settings.appearance.theme.lockedBody).toBeTruthy();
-    expect(zhHans.settings.appearance.theme.lockedBody).toBeTruthy();
-    expect(zhHant.settings.appearance.theme.lockedBody).toBeTruthy();
+      // The locked signpost must NOT show when the superuser flag is on.
+      expect(
+        screen.queryByText("Master your first Pokémon to unlock themes."),
+      ).not.toBeInTheDocument();
+      // The picker grid renders at least one selectable theme.
+      await waitFor(() => {
+        expect(
+          screen.getAllByRole("button", { name: /Set as theme/i }).length,
+        ).toBeGreaterThan(0);
+      });
+    } finally {
+      mockSuperuserFlags.pretendAllMastered = false;
+    }
   });
 });
