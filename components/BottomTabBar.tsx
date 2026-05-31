@@ -10,6 +10,8 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
+import { useStreakNavState } from "@/lib/streak/useStreakNavState";
+import { MAX_BALANCE } from "@/lib/streak/tokens";
 
 // ─── SVG icons ──────────────────────────────────────────────────────────────
 
@@ -233,6 +235,10 @@ function BottomTabBarInner() {
     }
   }, [sessionVersion, settingsVersion, hasMasteredVersion]);
 
+  // Streak data for the Stats tab overlay (#1439 / #1442). Must be called
+  // before any early returns to satisfy the rules of hooks.
+  const { streak, tokenBalance, daysToNextMilestone } = useStreakNavState();
+
   // Hidden in hamburger mode — the NavDrawer handles navigation instead.
   // While mobileNav is null (pre-mount), render the bottom bar to match the
   // server render and avoid a hydration mismatch.
@@ -267,11 +273,34 @@ function BottomTabBarInner() {
           const isActive =
             pathname === href ||
             (href !== "/" && pathname.startsWith(href + "/"));
+          const isStats = href === "/stats";
+          // Build an augmented aria-label for the Stats tab that surfaces streak
+          // state to screen readers (#1439 / #1442). Only applied once streak
+          // data has loaded (streak !== null) to avoid a hydration flash.
+          const statsAriaLabel: string | undefined =
+            isStats && streak !== null && tokenBalance !== null
+              ? (() => {
+                  const streakPart =
+                    streak === 0
+                      ? t("streakChip.startStreakLabel")
+                      : t("streakChip.streakLabel", { count: streak });
+                  const tokenPart =
+                    tokenBalance >= 1
+                      ? " " + t("streakChip.tokenLabel", { count: tokenBalance })
+                      : "";
+                  const milestonePart =
+                    daysToNextMilestone !== null
+                      ? " " + t("streakChip.milestoneLabel", { count: daysToNextMilestone })
+                      : "";
+                  return label + ". " + streakPart + tokenPart + milestonePart;
+                })()
+              : undefined;
           return (
             <li key={href} className="flex-1">
               <Link
                 href={href}
                 aria-current={isActive ? "page" : undefined}
+                aria-label={statsAriaLabel}
                 className={[
                   // py-3 top padding + safe-area-aware bottom padding so the
                   // interactive area extends into the iOS home-indicator strip —
@@ -287,10 +316,29 @@ function BottomTabBarInner() {
                     : "text-theme-fg-on-primary opacity-55 [@media(hover:hover)]:hover:opacity-80",
                 ].join(" ")}
               >
-                <Icon
-                  className={isActive ? "opacity-100" : "opacity-70"}
-                />
-                <span>{label}</span>
+                {/* Stats tab: show streak fire emoji as icon overlay when streak > 0 */}
+                <span className="relative inline-flex">
+                  <Icon
+                    className={isActive ? "opacity-100" : "opacity-70"}
+                  />
+                  {isStats && streak !== null && streak > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -right-2 -top-1 min-w-[14px] rounded-full bg-amber-500 px-0.5 text-center text-[9px] font-bold leading-[14px] text-white dark:bg-amber-400 dark:text-amber-900"
+                    >
+                      {streak}
+                    </span>
+                  )}
+                  {isStats && tokenBalance !== null && tokenBalance >= 1 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -bottom-1 -right-2 min-w-[12px] rounded-full bg-amber-700 px-0.5 text-center text-[8px] font-bold leading-[12px] text-amber-50 dark:bg-amber-400 dark:text-amber-900"
+                    >
+                      {Math.min(tokenBalance, MAX_BALANCE)}
+                    </span>
+                  )}
+                </span>
+                <span aria-hidden={isStats && statsAriaLabel !== undefined ? true : undefined}>{label}</span>
               </Link>
             </li>
           );

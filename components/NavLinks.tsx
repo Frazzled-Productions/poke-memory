@@ -11,6 +11,7 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
+import { StreakNavChip } from "@/components/streak/StreakNavChip";
 import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
 
 // NAV_LINKS_HREFS is kept module-level (href is not locale-dependent).
@@ -129,6 +130,7 @@ export function NavLinks() {
           </li>
         )}
       </ul>
+      <StreakNavChip />
       <WhatsNewIndicator />
       <AuthButton />
     </>

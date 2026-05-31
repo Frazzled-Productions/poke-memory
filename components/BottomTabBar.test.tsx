@@ -33,13 +33,15 @@ vi.mock("next/link", () => ({
     children,
     className,
     "aria-current": ariaCurrent,
+    "aria-label": ariaLabel,
   }: {
     href: string;
     children: React.ReactNode;
     className?: string;
     "aria-current"?: React.AriaAttributes["aria-current"];
+    "aria-label"?: string;
   }) => (
-    <a href={href} className={className} aria-current={ariaCurrent}>
+    <a href={href} className={className} aria-current={ariaCurrent} aria-label={ariaLabel}>
       {children}
     </a>
   ),
@@ -77,6 +79,12 @@ const mockLoadSettings = vi.fn(
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
+}));
+
+// Mock useStreakNavState so the Stats tab aria-label stays plain in these
+// tests (streak data defaulting to null = no aria-label override applied).
+vi.mock("@/lib/streak/useStreakNavState", () => ({
+  useStreakNavState: () => ({ streak: null, tokenBalance: null, daysToNextMilestone: null }),
 }));
 
 // ---------------------------------------------------------------------------
