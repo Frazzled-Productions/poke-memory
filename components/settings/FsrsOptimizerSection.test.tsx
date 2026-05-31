@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
 import { OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
+import { loadSettings } from "@/lib/settings/persistence";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -191,6 +192,29 @@ describe("FsrsOptimizerSection", () => {
       expect(lastRun).toHaveTextContent(/Last optimized:/);
       expect(lastRun).toHaveTextContent(/2025/);
       expect(lastRun).toHaveTextContent(/Mar/);
+    });
+
+    it("renders the last-optimized date in the user's configured timezone, not UTC", () => {
+      // 23:30 UTC on 1 Mar is already 2 Mar in Asia/Tokyo (UTC+9). The label is
+      // a user-facing day boundary, so it must reflect the user's timezone.
+      // (#1456 review: an earlier UTC date-slice regressed this to the previous
+      // calendar day for far-from-UTC users.)
+      vi.mocked(loadSettings).mockReturnValueOnce({
+        retentionTarget: 0.9,
+        fsrsWeights: undefined,
+        fsrsWeightsOptimizedAt: undefined,
+        timezone: "Asia/Tokyo",
+      } as ReturnType<typeof loadSettings>);
+      renderWithIntl(
+        <FsrsOptimizerSection
+          {...defaultProps}
+          isSignedIn={true}
+          optimizableReviewCount={250}
+          fsrsWeightsOptimizedAt="2025-03-01T23:30:00.000Z"
+        />,
+      );
+      const lastRun = screen.getByTestId("fsrs-optimize-last-run");
+      expect(lastRun).toHaveTextContent(/2 Mar 2025/);
     });
 
     it("does not render the last-optimized timestamp when not set", () => {
