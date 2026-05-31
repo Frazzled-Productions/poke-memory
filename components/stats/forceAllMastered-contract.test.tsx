@@ -163,11 +163,8 @@ describe("TrainerCard -- forceAllMastered contract (via totalMastered)", () => {
     renderWithIntl(
       <TrainerCard handle={null} totalMastered={0} perGeneration={GENS_EMPTY} />,
     );
-    // Should NOT show the all-mastered message.
-    // The translation key is stats.trainerCard.allMastered; we just check it
-    // is absent (the progress variant is shown instead).
-    // We verify the progress path is active by checking the rendered level.
-    expect(screen.getByText(/level/i)).toBeInTheDocument();
+    // The "all mastered" copy must NOT appear when totalMastered=0.
+    expect(screen.queryByText(/all mastered/i)).not.toBeInTheDocument();
   });
 
   it("totalMastered=BASE_SPECIES_COUNT + full gens => all-mastered state (from message catalogue)", () => {
@@ -179,19 +176,12 @@ describe("TrainerCard -- forceAllMastered contract (via totalMastered)", () => {
       />,
     );
     // All 9 generation badges should be highlighted (completed=true).
-    // They are rendered as <li> elements -- check by querying the list.
     const genList = screen.getByRole("list", { name: /generation/i });
     expect(genList).toBeInTheDocument();
     const genItems = genList.querySelectorAll("li");
     expect(genItems.length).toBe(9);
-    // The allMastered message from the catalogue should appear (en locale).
-    // The exact text is in messages/en.json stats.trainerCard.allMastered.
-    // TrainerCard renders t("allMastered") when totalMastered >= BASE_SPECIES_COUNT.
-    // We query for a non-empty paragraph (the content is catalogue-driven).
-    const paragraphs = screen.getAllByRole("paragraph").filter(
-      (el) => el.textContent && el.textContent.trim().length > 0,
-    );
-    // At least one paragraph must be present (the mastery progress line).
-    expect(paragraphs.length).toBeGreaterThan(0);
+    // The "all mastered" copy from the catalogue must appear.
+    // en.json stats.trainerCard.allMastered = "All mastered".
+    expect(screen.getByText(/all mastered/i)).toBeInTheDocument();
   });
 });

@@ -26,6 +26,20 @@
  *   4. Strip sentinel-wrapped values (they are translated).
  *   5. Strip allowlist matches (they are legitimately untranslated).
  *   6. Assert the remainder is empty -- any remaining text is an i18n leak.
+ *
+ * ## Known harness limitation -- rich messages
+ *
+ * Components that render rich-message strings (catalogue values containing
+ * `<link>`, `<em>`, or `<term>` tags) will produce false positives with this
+ * harness. `next-intl` splits such strings into multiple text nodes when
+ * injecting tag components; the leading and trailing text fragments no longer
+ * start with `[` and end with `]`, so `SENTINEL_RE` fails to match them and
+ * the harness incorrectly reports catalogue-sourced text as leaks.
+ *
+ * `DirectionBadge` has no rich messages so this limitation does not apply here.
+ * Components that DO use rich messages (e.g. `HowThisWorks`, onboarding flows,
+ * `closeToMasteryWidget`) must add the surrounding text fragments to the
+ * allowlist, or structure the test to avoid the sentinel-check path.
  */
 
 import { describe, it, expect } from "vitest";

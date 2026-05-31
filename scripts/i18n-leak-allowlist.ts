@@ -30,13 +30,22 @@
  *   green despite pre-existing hard-coded English strings (#1434 target sites).
  *   PR2 (#1434) -- sweeps hard-coded strings into the catalogue, then narrows
  *   this allowlist. Do not add more English prose here; add it to messages/.
+ *
+ * ## Known harness limitation -- rich messages
+ *
+ * The `SENTINEL_RE` pattern (`/^\[[\s\S]*\]$/`) assumes the entire text node is
+ * sentinel-wrapped. Components that render rich-message strings (catalogue values
+ * containing `<link>`, `<em>`, or `<term>` tags) will produce false positives:
+ * `next-intl` splits such strings into multiple text nodes when injecting tag
+ * components, and the leading/trailing fragments no longer satisfy `SENTINEL_RE`.
+ * Work-around: add the expected text fragments from rich messages to this
+ * allowlist, or restructure the test to avoid checking those nodes.
  */
 
 export const ALLOWLIST: Array<string | RegExp> = [
   // -------------------------------------------------------------------------
   // Brand / app name -- intentionally English everywhere.
   // -------------------------------------------------------------------------
-  "poke-memory",
   /^poke-?memory$/i,
 
   // -------------------------------------------------------------------------
@@ -48,7 +57,6 @@ export const ALLOWLIST: Array<string | RegExp> = [
   // -------------------------------------------------------------------------
   // Technical / framework terms used verbatim.
   // -------------------------------------------------------------------------
-  "FSRS",
   /^FSRS\b/,
 
   // -------------------------------------------------------------------------
@@ -57,6 +65,7 @@ export const ALLOWLIST: Array<string | RegExp> = [
   // capital letter. PR1 starts wide so the baseline is green; #1434 narrows
   // this once hard-coded English prose is swept into the catalogue.
   // -------------------------------------------------------------------------
+  // TODO(#1434): replace with tighter heuristic or species-name set
   /^[A-Z][a-zA-Zeé'-]+(?:\s[A-Z][a-zA-Zeé'-]+)*$/,
 
   // -------------------------------------------------------------------------
