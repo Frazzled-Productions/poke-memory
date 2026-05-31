@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
@@ -11,11 +12,7 @@ import { cardPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
 
 type Window = 7 | 30 | 365;
 
-const WINDOW_OPTIONS: { label: string; value: Window; ariaLabel: string }[] = [
-  { label: "7d",  value: 7,   ariaLabel: "7-day" },
-  { label: "30d", value: 30,  ariaLabel: "30-day" },
-  { label: "1yr", value: 365, ariaLabel: "1-year" },
-];
+const WINDOW_VALUES: Window[] = [7, 30, 365];
 
 type Props = {
   /**
@@ -85,6 +82,7 @@ function buildSegments(
 }
 
 export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, points365 }: Props) {
+  const t = useTranslations("stats.accuracy");
   const [activeWindow, setActiveWindow] = useState<Window>(7);
 
   // Resolve which data to render for the active window.
@@ -99,16 +97,24 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
     activeWindow === 30 ? (rolling30d ?? null) :
     (rolling365d ?? null);
 
-  const activeWindowOption = WINDOW_OPTIONS.find((o) => o.value === activeWindow)!;
-  const windowLabel = `${activeWindowOption.ariaLabel} rolling`;
+  // Resolve the aria-label key for the active window.
+  const windowAriaLabel: string =
+    activeWindow === 7 ? t("window7dAriaLabel") :
+    activeWindow === 30 ? t("window30dAriaLabel") :
+    t("window1yrAriaLabel");
+
+  const windowButtonLabel: (w: Window) => string = (w) =>
+    w === 7 ? t("window7d") : w === 30 ? t("window30d") : t("window1yr");
+
+  const windowLabel = t("rollingLabel", { window: windowAriaLabel });
 
   const { segments, dots } = buildSegments(displayPoints);
   const hasAnyData = displayPoints.some((p) => p.accuracy !== null);
 
   // Visible window tabs: only show "1yr" when the parent provided points365.
-  const availableWindows = points365 != null
-    ? WINDOW_OPTIONS
-    : WINDOW_OPTIONS.filter((o) => o.value !== 365);
+  const availableWindows: Window[] = points365 != null
+    ? WINDOW_VALUES
+    : WINDOW_VALUES.filter((v) => v !== 365);
 
   return (
     <section aria-labelledby="accuracy-heading">
@@ -117,30 +123,30 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
           id="accuracy-heading"
           className="text-base font-semibold text-foreground"
         >
-          Recent accuracy
+          {t("heading")}
         </h2>
         {/* Window selector — mutually exclusive, so tablist/tab/aria-selected */}
         <div
           role="tablist"
-          aria-label="Accuracy window"
+          aria-label={t("windowAriaLabel")}
           className="flex items-center gap-px rounded-lg border border-zinc-200 bg-zinc-100 p-px dark:border-zinc-700 dark:bg-zinc-800"
         >
-          {availableWindows.map((opt) => (
+          {availableWindows.map((val) => (
             <button
-              key={opt.value}
+              key={val}
               role="tab"
               type="button"
-              onClick={() => setActiveWindow(opt.value)}
-              aria-selected={activeWindow === opt.value}
-              tabIndex={activeWindow === opt.value ? 0 : -1}
+              onClick={() => setActiveWindow(val)}
+              aria-selected={activeWindow === val}
+              tabIndex={activeWindow === val ? 0 : -1}
               className={
                 "rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 " +
-                (activeWindow === opt.value
+                (activeWindow === val
                   ? "bg-background text-foreground shadow-sm dark:bg-zinc-700"
                   : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200")
               }
             >
-              {opt.label}
+              {windowButtonLabel(val)}
             </button>
           ))}
         </div>
@@ -160,7 +166,7 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
             width="100%"
             height={SVG_HEIGHT}
             role="img"
-            aria-label={`${activeWindowOption.ariaLabel} accuracy sparkline`}
+            aria-label={t("sparklineAriaLabel", { window: windowAriaLabel })}
             className="overflow-visible"
             preserveAspectRatio="none"
           >
@@ -188,7 +194,9 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
           </svg>
         ) : (
           <p className={mutedText}>
-            No reviews yet in the last {activeWindow === 365 ? "year" : `${activeWindow} days`}.
+            {activeWindow === 365
+              ? t("noReviewsYear")
+              : t("noReviewsDays", { days: activeWindow })}
           </p>
         )}
       </div>

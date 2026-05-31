@@ -11,10 +11,10 @@ import {
 } from "recharts";
 import { useTranslations } from "next-intl";
 import {
-  DIRECTION_LABELS,
   totalDirectionReviews,
   type DirectionBreakdownRow,
 } from "@/lib/stats/direction-breakdown";
+import type { CardDirection } from "@/lib/stats/direction-breakdown";
 import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 type Props = {
@@ -43,20 +43,21 @@ type ChartDatum = {
 };
 
 function TooltipBody({ datum }: { datum: ChartDatum }) {
+  const tDir = useTranslations("stats.directionBreakdown");
   return (
     <div className={chartTooltipCard}>
       <p className="font-semibold text-foreground">{datum.label}</p>
       {datum.hasData ? (
         <>
           <p className={`mt-1 ${statValue}`}>
-            Accuracy: {datum.accuracyPct}%
+            {tDir("tooltipAccuracy", { pct: datum.accuracyPct })}
           </p>
           <p className="tabular-nums text-zinc-500 dark:text-zinc-400">
-            {datum.passes} of {datum.total} reviews passed
+            {tDir("tooltipReviews", { passes: datum.passes, total: datum.total })}
           </p>
           {datum.disabled && (
             <p className="mt-1 text-zinc-400 dark:text-zinc-500">
-              This card type is currently disabled in Settings.
+              {tDir("tooltipDisabled")}
             </p>
           )}
         </>
@@ -64,6 +65,16 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
     </div>
   );
 }
+
+/** Resolve a CardDirection to its localised label from the practice catalogue. */
+type DirectionLabelKey = "name" | "evolution" | "reverseEvolution" | "reverse" | "cry";
+const DIRECTION_TO_KEY: Record<CardDirection, DirectionLabelKey> = {
+  name: "name",
+  evolution: "evolution",
+  "reverse-evolution": "reverseEvolution",
+  reverse: "reverse",
+  cry: "cry",
+};
 
 /**
  * Horizontal bar chart of recall accuracy per card direction, with the raw
@@ -74,24 +85,29 @@ function TooltipBody({ datum }: { datum: ChartDatum }) {
  */
 export function DirectionBreakdownChart({ rows }: Props) {
   const t = useTranslations("stats");
+  const tDir = useTranslations("stats.directionBreakdown");
+  const tPracticeDir = useTranslations("practice.direction");
   // Only show directions that have at least one review. Directions with zero
   // reviews (never used, or disabled before any history was recorded) are pure
   // clutter and are hidden entirely.
   const visibleRows = rows.filter((r) => r.total > 0);
   const total = totalDirectionReviews(visibleRows);
 
-  const data: ChartDatum[] = visibleRows.map((row) => ({
-    // Append "(disabled)" when the direction has history but is switched off,
-    // so the user understands why a type they turned off still appears.
-    label: row.disabled
-      ? `${DIRECTION_LABELS[row.direction]} (disabled)`
-      : DIRECTION_LABELS[row.direction],
-    accuracyPct: row.accuracy === null ? 0 : Math.round(row.accuracy * 100),
-    total: row.total,
-    passes: row.passes,
-    hasData: row.total > 0,
-    disabled: row.disabled,
-  }));
+  const data: ChartDatum[] = visibleRows.map((row) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- key resolved from known map
+    const dirLabel = tPracticeDir(DIRECTION_TO_KEY[row.direction] as any);
+    const label = row.disabled
+      ? tDir("disabledLabel", { direction: dirLabel })
+      : dirLabel;
+    return {
+      label,
+      accuracyPct: row.accuracy === null ? 0 : Math.round(row.accuracy * 100),
+      total: row.total,
+      passes: row.passes,
+      hasData: row.total > 0,
+      disabled: row.disabled,
+    };
+  });
 
   return (
     <section aria-labelledby="direction-heading">
@@ -99,29 +115,33 @@ export function DirectionBreakdownChart({ rows }: Props) {
         id="direction-heading"
         className="mb-1 text-base font-semibold text-foreground"
       >
-        Accuracy by card direction
+        {tDir("heading")}
       </h2>
       <p className={`mb-3 ${mutedTextXs}`}>
-        How your recall compares across name, reverse, cry and evolution cards.
+        {tDir("description")}
       </p>
 
       <div className={cardPanel}>
         {total === 0 ? (
           <p className={mutedText}>
-            No reviews recorded yet. Grade some cards to see your breakdown.
+            {tDir("noData")}
           </p>
         ) : (
           <>
             <div
               role="img"
-              aria-label={`Accuracy by card direction: ${visibleRows
+              aria-label={`${tDir("heading")}: ${visibleRows
                 .map(
-                  (r) =>
-                    `${DIRECTION_LABELS[r.direction]}${r.disabled ? " (disabled)" : ""} ${
+                  (r) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- key resolved from known map
+                    const dLabel = tPracticeDir(DIRECTION_TO_KEY[r.direction] as any);
+                    const fullLabel = r.disabled ? tDir("disabledLabel", { direction: dLabel }) : dLabel;
+                    return `${fullLabel} ${
                       r.accuracy === null
-                        ? "no reviews"
-                        : `${Math.round(r.accuracy * 100)}% over ${r.total} reviews`
-                    }`,
+                        ? tDir("noReviewsLabel")
+                        : `${Math.round(r.accuracy * 100)}% ${t("directionReviewCount", { count: r.total })}`
+                    }`;
+                  },
                 )
                 .join(", ")}`}
             >
@@ -180,22 +200,28 @@ export function DirectionBreakdownChart({ rows }: Props) {
               role="list"
               className={`mt-3 grid grid-cols-2 gap-x-4 gap-y-1 ${mutedTextXs} sm:grid-cols-3`}
             >
-              {visibleRows.map((row) => (
-                <li
-                  key={row.direction}
-                  className="flex items-center justify-between gap-2 tabular-nums"
-                >
-                  <span>
-                    {DIRECTION_LABELS[row.direction]}
-                    {row.disabled && (
-                      <span className="ml-1 text-zinc-400 dark:text-zinc-500">(disabled)</span>
-                    )}
-                  </span>
-                  <span>
-                    {t("directionReviewCount", { count: row.total })}
-                  </span>
-                </li>
-              ))}
+              {visibleRows.map((row) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- key resolved from known map
+                const dLabel = tPracticeDir(DIRECTION_TO_KEY[row.direction] as any);
+                return (
+                  <li
+                    key={row.direction}
+                    className="flex items-center justify-between gap-2 tabular-nums"
+                  >
+                    <span>
+                      {dLabel}
+                      {row.disabled && (
+                        <span className="ml-1 text-zinc-400 dark:text-zinc-500">
+                          {tDir("disabledMark")}
+                        </span>
+                      )}
+                    </span>
+                    <span>
+                      {t("directionReviewCount", { count: row.total })}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}

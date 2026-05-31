@@ -19,19 +19,6 @@ function pct(num: number, den: number): number {
   return den === 0 ? 0 : Math.round((num / den) * 100);
 }
 
-const GEN_NAMES: Record<number, string> = {
-  1: "Generation I",
-  2: "Generation II",
-  3: "Generation III",
-  4: "Generation IV",
-  5: "Generation V",
-  6: "Generation VI",
-  7: "Generation VII",
-  8: "Generation VIII",
-  9: "Generation IX",
-  0: "Other",
-};
-
 // ---------------------------------------------------------------------------
 // Row sub-component
 // ---------------------------------------------------------------------------
@@ -74,10 +61,27 @@ type GenGroup = {
   rows: GameStats[];
 };
 
+/** Map a numeric generation to its i18n key in stats.gameBreakdown. */
+const GEN_KEY: Record<number, string> = {
+  1: "gen1",
+  2: "gen2",
+  3: "gen3",
+  4: "gen4",
+  5: "gen5",
+  6: "gen6",
+  7: "gen7",
+  8: "gen8",
+  9: "gen9",
+  0: "genOther",
+};
+
 function GenAccordion({ group }: { group: GenGroup }) {
   const t = useTranslations("stats");
+  const tG = useTranslations("stats.gameBreakdown");
   const [open, setOpen] = useState(false);
-  const genName = GEN_NAMES[group.gen] ?? `Generation ${group.gen}`;
+  const genKey = GEN_KEY[group.gen];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- key is string from known map
+  const genName: string = genKey ? tG(genKey as any) : `Generation ${group.gen}`;
   const totalMastered = group.rows.reduce((s, r) => s + r.mastered, 0);
   const totalSpecies = group.rows.reduce((s, r) => s + r.total, 0);
   const uniqueGames = group.rows.length;
@@ -93,7 +97,7 @@ function GenAccordion({ group }: { group: GenGroup }) {
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-sm font-semibold text-foreground">{genName}</span>
           <span className={mutedTextXs}>
-            {t("gameCount", { count: uniqueGames })} · {totalMastered}/{totalSpecies} species mastered
+            {t("gameCount", { count: uniqueGames })} · {tG("speciesMastered", { mastered: totalMastered, total: totalSpecies })}
           </span>
         </div>
         <svg
@@ -114,7 +118,7 @@ function GenAccordion({ group }: { group: GenGroup }) {
         <ul
           role="list"
           className="px-4 pb-1 bg-background"
-          aria-label={`${genName} games`}
+          aria-label={tG("gameListAriaLabel", { name: genName })}
         >
           {group.rows.map((row) => (
             <GameRow key={row.slug} row={row} />
@@ -141,6 +145,8 @@ type Props = {
  * Data comes from `computePerGameStats` in `lib/stats/per-game.ts`.
  */
 export function GameBreakdown({ perGame }: Props) {
+  const tG = useTranslations("stats.gameBreakdown");
+
   // Sort rows by VERSION_GROUP_ORDER, then group by generation.
   const orderIndex = new Map<string, number>(
     VERSION_GROUP_ORDER.map((slug, i) => [slug, i]),
@@ -179,10 +185,10 @@ export function GameBreakdown({ perGame }: Props) {
           id="game-breakdown-heading"
           className="mb-3 text-base font-semibold text-foreground"
         >
-          By game
+          {tG("heading")}
         </h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          No game data available. Re-seed the Pokémon data to enable this view.
+          {tG("noData")}
         </p>
       </section>
     );
@@ -194,9 +200,9 @@ export function GameBreakdown({ perGame }: Props) {
         id="game-breakdown-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
-        By game
+        {tG("heading")}
       </h2>
-      <div className="flex flex-col gap-2" role="list" aria-label="Mastery by game generation">
+      <div className="flex flex-col gap-2" role="list" aria-label={tG("listAriaLabel")}>
         {groups.map((group) => (
           <div key={group.gen} role="listitem">
             <GenAccordion group={group} />

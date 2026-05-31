@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormatter } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { mutedText, sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
@@ -21,14 +21,16 @@ type Segment = {
 
 export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegments = false }: Props) {
   const format = useFormatter();
-  const heading = label ?? "Grade breakdown";
+  const t = useTranslations("stats.gradeBreakdown");
+  const tPractice = useTranslations("practice");
+  const heading = label ?? t("heading");
   const total = again + hard + good + easy;
 
   const segments: Segment[] = [
-    { key: "again", label: "Again", count: again, color: "bg-rose-500" },
-    { key: "hard",  label: "Hard",  count: hard,  color: "bg-amber-500" },
-    { key: "good",  label: "Good",  count: good,  color: "bg-blue-500" },
-    { key: "easy",  label: "Easy",  count: easy,  color: "bg-emerald-500" },
+    { key: "again", label: tPractice("again"), count: again, color: "bg-rose-500" },
+    { key: "hard",  label: tPractice("hard"),  count: hard,  color: "bg-amber-500" },
+    { key: "good",  label: tPractice("good"),  count: good,  color: "bg-blue-500" },
+    { key: "easy",  label: tPractice("easy"),  count: easy,  color: "bg-emerald-500" },
   ];
 
   const visibleSegments = hideZeroSegments ? segments.filter((s) => s.count > 0) : segments;
@@ -47,14 +49,20 @@ export function GradeBreakdownBar({ again, hard, good, easy, label, hideZeroSegm
       </h2>
 
       {total === 0 ? (
-        <p className={mutedText}>No grades yet.</p>
+        <p className={mutedText}>{t("noGrades")}</p>
       ) : (
         <>
           {/* Stacked bar */}
           <div
             className="flex h-6 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
             role="img"
-            aria-label={`${heading}: ${again} Again, ${hard} Hard, ${good} Good, ${easy} Easy`}
+            aria-label={t("ariaLabel", {
+              heading,
+              again,
+              hard,
+              good,
+              easy,
+            })}
           >
             {segments.map(({ key, count, color }) =>
               count > 0 ? (

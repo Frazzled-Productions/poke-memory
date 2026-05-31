@@ -555,6 +555,100 @@
       "eventEarned": "已獲得",
       "eventUsed": "已使用",
       "eventEarnedAndUsed": "獲得並使用"
+    },
+    "gradeBreakdown": {
+      "heading": "評分分佈",
+      "noGrades": "尚無評分。",
+      "ariaLabel": "{heading}: {again} 再來一次, {hard} 困難, {good} 良好, {easy} 簡單"
+    },
+    "accuracy": {
+      "heading": "近期正確率",
+      "windowAriaLabel": "正確率視窗",
+      "window7d": "7天",
+      "window30d": "30天",
+      "window1yr": "1年",
+      "window7dAriaLabel": "7天",
+      "window30dAriaLabel": "30天",
+      "window1yrAriaLabel": "1年",
+      "rollingLabel": "{window}滾動",
+      "sparklineAriaLabel": "{window}正確率迷你圖",
+      "noReviewsDays": "過去 {days} 天內尚無複習記錄。",
+      "noReviewsYear": "過去一年內尚無複習記錄。"
+    },
+    "retention": {
+      "heading": "記憶率 vs 目標",
+      "description": "過去一年內您的實際記憶率與調度器目標 {target} 保留率的比較。",
+      "recallLabel": "記憶率",
+      "noReviews": "過去一年內尚無複習記錄。評分一些卡片以查看記憶率走勢。",
+      "onTarget": "正好達到您的 {target} 保留目標。",
+      "above": "高於您的 {target} 目標 {delta}。",
+      "below": "低於您的 {target} 目標 {delta}。"
+    },
+    "masteryOverTime": {
+      "heading": "掌握數量變化",
+      "description": "累計掌握的種族數量（以最後複習日期近似替代掌握日期）。",
+      "noData": "尚無已掌握的種族。繼續複習，折線將開始上升。",
+      "ofTotalMastered": "共 {total} 種族中已掌握",
+      "speciesMastered": "種族已掌握",
+      "superuserMode": "超級使用者模式：顯示截至今日的總數。",
+      "reviewMoreCards": "繼續複習卡片以查看進度趨勢。",
+      "ariaLabel": "掌握數量變化：截至 {date}，{total} 種族中已掌握 {count} 種",
+      "tooltipMastered": "已掌握"
+    },
+    "gameBreakdown": {
+      "heading": "按遊戲",
+      "noData": "無遊戲資料。請重新植入 Pokémon 資料以啟用此視圖。",
+      "listAriaLabel": "按世代的掌握情況",
+      "speciesMastered": "{mastered}/{total} 種族已掌握",
+      "gameListAriaLabel": "{name} 遊戲列表",
+      "gen1": "第一世代",
+      "gen2": "第二世代",
+      "gen3": "第三世代",
+      "gen4": "第四世代",
+      "gen5": "第五世代",
+      "gen6": "第六世代",
+      "gen7": "第七世代",
+      "gen8": "第八世代",
+      "gen9": "第九世代",
+      "genOther": "其他"
+    },
+    "completionProjection": {
+      "heading": "圖鑑完成預測",
+      "complete": "完成！",
+      "completeCopy": "您已掌握所有種族。恭喜！",
+      "notAvailable": "預測暫不可用",
+      "notAvailableDescription": "至少掌握一個種族並堅持一週後可用。將種族複習至計劃間隔至少21天後算作掌握，之後7天再來查看。",
+      "estimatedDate": "預計完成日期",
+      "speciesRemaining": "種族剩餘",
+      "masteredPerWeek": "每週掌握數（近期速度）"
+    },
+    "directionBreakdown": {
+      "heading": "按卡片方向的正確率",
+      "description": "名稱、反向、叫聲和進化卡片的記憶率比較。",
+      "noData": "尚無複習記錄。評分一些卡片以查看分佈。",
+      "disabledLabel": "{direction}（已停用）",
+      "tooltipAccuracy": "正確率: {pct}%",
+      "tooltipReviews": "{total} 次中 {passes} 次通過",
+      "tooltipDisabled": "此卡片類型目前在設定中已停用。",
+      "noReviewsLabel": "無複習",
+      "disabledMark": "（已停用）"
+    },
+    "heatmap": {
+      "heading": "複習活動",
+      "less": "少",
+      "more": "多"
+    },
+    "gradeDistribution": {
+      "heading": "評分分佈",
+      "description": "隨時間推移按下再來一次、困難、良好、簡單的次數。良好和簡單比例越高，卡片越牢固。",
+      "noData": "尚無評分記錄。開始複習會話以查看分佈。",
+      "weeklyVolumeHeading": "每週量",
+      "weeklyVolumeHeadingWithCount": "{count, plural, other {每週量（迄今 {count} 週）}}",
+      "weeklyVolumeHeadingComplete": "每週量（{count} 週）",
+      "weeklyHistoryBuilding": "完成完整的一週複習後，每週歷史將積累。繼續加油！",
+      "tooltipWeekOf": "週 {weekStart}",
+      "tooltipTotal": "總計: {count}",
+      "allTimeMixAriaLabel": "歷史評分分佈: {again} 再來一次, {hard} 困難, {good} 良好, {easy} 簡單"
     }
   },
   "journey": {

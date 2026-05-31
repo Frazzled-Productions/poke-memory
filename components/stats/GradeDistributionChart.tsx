@@ -29,6 +29,7 @@ const GRADE_COLOURS = {
 
 type TooltipPayload = {
   weekStart: string;
+  weekLabel: string;
   again: number;
   hard: number;
   good: number;
@@ -38,20 +39,22 @@ type TooltipPayload = {
 
 function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonly unknown[] }) {
   const format = useFormatter();
+  const tGD = useTranslations("stats.gradeDistribution");
+  const tPractice = useTranslations("practice");
   if (!active || !payload || payload.length === 0) return null;
   const d = (payload[0] as { payload: TooltipPayload }).payload;
-  const rows: { label: string; key: keyof typeof GRADE_COLOURS; count: number }[] = [
-    { label: "Again", key: "again", count: d.again },
-    { label: "Hard",  key: "hard",  count: d.hard  },
-    { label: "Good",  key: "good",  count: d.good  },
-    { label: "Easy",  key: "easy",  count: d.easy  },
+  const gradeRows = [
+    { label: tPractice("again"), key: "again" as const, count: d.again },
+    { label: tPractice("hard"),  key: "hard" as const,  count: d.hard },
+    { label: tPractice("good"),  key: "good" as const,  count: d.good },
+    { label: tPractice("easy"),  key: "easy" as const,  count: d.easy },
   ];
   return (
     <div className={chartTooltipCard}>
       <p className="mb-1 font-semibold text-foreground">
-        w/c {d.weekStart}
+        {tGD("tooltipWeekOf", { weekStart: d.weekLabel ?? d.weekStart })}
       </p>
-      {rows.map(({ label, key, count }) => (
+      {gradeRows.map(({ label, key, count }) => (
         <p key={key} className={statValue}>
           <span
             className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
@@ -61,7 +64,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonl
         </p>
       ))}
       <p className="mt-1 border-t border-zinc-100 pt-1 tabular-nums text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-        Total: {format.number(d.total)}
+        {tGD("tooltipTotal", { count: format.number(d.total) })}
       </p>
     </div>
   );
@@ -88,22 +91,24 @@ type Props = {
 
 function OverallBar({ distribution }: { distribution: GradeDistribution }) {
   const format = useFormatter();
+  const tPractice = useTranslations("practice");
+  const tGD = useTranslations("stats.gradeDistribution");
   const { again, hard, good, easy, total } = distribution;
   if (total === 0) return null;
 
   const segments = [
-    { key: "again", label: "Again", count: again, color: "bg-rose-500" },
-    { key: "hard",  label: "Hard",  count: hard,  color: "bg-amber-500" },
-    { key: "good",  label: "Good",  count: good,  color: "bg-blue-500"  },
-    { key: "easy",  label: "Easy",  count: easy,  color: "bg-emerald-500" },
-  ] as const;
+    { key: "again" as const, label: tPractice("again"), count: again, color: "bg-rose-500" },
+    { key: "hard" as const,  label: tPractice("hard"),  count: hard,  color: "bg-amber-500" },
+    { key: "good" as const,  label: tPractice("good"),  count: good,  color: "bg-blue-500"  },
+    { key: "easy" as const,  label: tPractice("easy"),  count: easy,  color: "bg-emerald-500" },
+  ];
 
   return (
     <div className="mb-4">
       <div
         className="flex h-4 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
         role="img"
-        aria-label={`All-time grade mix: ${again} Again, ${hard} Hard, ${good} Good, ${easy} Easy`}
+        aria-label={tGD("allTimeMixAriaLabel", { again, hard, good, easy })}
       >
         {segments.map(({ key, count, color }) =>
           count > 0 ? (
@@ -147,6 +152,7 @@ function OverallBar({ distribution }: { distribution: GradeDistribution }) {
  */
 export function GradeDistributionChart({ distribution, trend }: Props) {
   const t = useTranslations("stats");
+  const tGD = useTranslations("stats.gradeDistribution");
   const format = useFormatter();
   // With leading zeros trimmed by `computeGradeTrend`, a non-empty `trend`
   // array always contains at least one week with data.
@@ -158,18 +164,18 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
     return `${parseInt(m)}/${parseInt(d)}`;
   }
 
+  const weekCount = trend.length;
+  const subheading =
+    weekCount === 0
+      ? tGD("weeklyVolumeHeading")
+      : weekCount === 12
+        ? tGD("weeklyVolumeHeadingComplete", { count: weekCount })
+        : tGD("weeklyVolumeHeadingWithCount", { count: weekCount });
+
   const chartData = trend.map((p) => ({
     ...p,
     weekLabel: weekLabel(p.weekStart),
   }));
-
-  const weekCount = trend.length;
-  const subheading =
-    weekCount === 0
-      ? "Weekly volume"
-      : weekCount === 1
-        ? "Weekly volume (1 week)"
-        : `Weekly volume (${weekCount} week${weekCount === 12 ? "s" : "s so far"})`;
 
   return (
     <section aria-labelledby="grade-dist-heading">
@@ -177,18 +183,16 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
         id="grade-dist-heading"
         className="mb-1 text-base font-semibold text-foreground"
       >
-        Grade distribution
+        {tGD("heading")}
       </h2>
       <p className={`mb-3 ${mutedTextXs}`}>
-        How often you pressed Again, Hard, Good, or Easy over time. A higher
-        Easy and Good share shows the cards are sticking.
+        {tGD("description")}
       </p>
 
       <div className={cardPanel}>
         {distribution.total === 0 ? (
           <p className={mutedText}>
-            No grades recorded yet. Start a review session to see your grade
-            breakdown here.
+            {tGD("noData")}
           </p>
         ) : (
           <>
@@ -201,11 +205,11 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
             {hasTrendData ? (
               <div
                 role="img"
-                aria-label={`Weekly grade volume: ${trend
+                aria-label={`${tGD("heading")}: ${trend
                   .filter((p) => p.total > 0)
                   .map(
                     (p) =>
-                      `week of ${p.weekStart}: ${t("weeklyGradeCount", { count: p.total })}`,
+                      `${tGD("tooltipWeekOf", { weekStart: weekLabel(p.weekStart) })}: ${t("weeklyGradeCount", { count: p.total })}`,
                   )
                   .join(", ")}`}
               >
@@ -269,8 +273,7 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
               </div>
             ) : (
               <p className={`mt-2 ${mutedTextXs}`}>
-                Weekly history builds up as you complete full weeks of reviews.
-                Keep going!
+                {tGD("weeklyHistoryBuilding")}
               </p>
             )}
           </>

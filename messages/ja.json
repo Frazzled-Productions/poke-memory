@@ -555,6 +555,100 @@
       "eventEarned": "獲得",
       "eventUsed": "使用",
       "eventEarnedAndUsed": "獲得＋使用"
+    },
+    "gradeBreakdown": {
+      "heading": "評価の内訳",
+      "noGrades": "まだ評価がありません。",
+      "ariaLabel": "{heading}: {again} 再度, {hard} 難しい, {good} 良い, {easy} 簡単"
+    },
+    "accuracy": {
+      "heading": "最近の正解率",
+      "windowAriaLabel": "正解率の期間",
+      "window7d": "7日",
+      "window30d": "30日",
+      "window1yr": "1年",
+      "window7dAriaLabel": "7日間",
+      "window30dAriaLabel": "30日間",
+      "window1yrAriaLabel": "1年間",
+      "rollingLabel": "{window}の移動平均",
+      "sparklineAriaLabel": "{window}の正解率スパークライン",
+      "noReviewsDays": "過去 {days} 日間にレビューがありません。",
+      "noReviewsYear": "過去1年間にレビューがありません。"
+    },
+    "retention": {
+      "heading": "記憶率 vs 目標",
+      "description": "過去1年間の実際の記憶率と、スケジューラーが目指す {target} の保持目標との比較。",
+      "recallLabel": "記憶率",
+      "noReviews": "過去1年間のレビューがありません。カードを評価して記憶率の推移を確認しましょう。",
+      "onTarget": "{target} の保持目標通りです。",
+      "above": "{target} の目標を {delta} 上回っています。",
+      "below": "{target} の目標を {delta} 下回っています。"
+    },
+    "masteryOverTime": {
+      "heading": "習得数の推移",
+      "description": "習得した種族数の累計（最終レビュー日を習得日の近似値として使用）。",
+      "noData": "まだ習得した種族がありません。レビューを続けると線が上がり始めます。",
+      "ofTotalMastered": "{total} 種族中習得済み",
+      "speciesMastered": "種族習得済み",
+      "superuserMode": "スーパーユーザーモード: 今日時点の合計を表示中。",
+      "reviewMoreCards": "カードをレビューして進捗の傾向を確認しましょう。",
+      "ariaLabel": "習得数の推移: {date} 時点で {total} 種族中 {count} 種族習得済み",
+      "tooltipMastered": "習得済み"
+    },
+    "gameBreakdown": {
+      "heading": "ゲーム別",
+      "noData": "ゲームデータがありません。Pokémon データを再シードしてください。",
+      "listAriaLabel": "世代別の習得状況",
+      "speciesMastered": "{mastered}/{total} 種族習得済み",
+      "gameListAriaLabel": "{name} のゲーム一覧",
+      "gen1": "第1世代",
+      "gen2": "第2世代",
+      "gen3": "第3世代",
+      "gen4": "第4世代",
+      "gen5": "第5世代",
+      "gen6": "第6世代",
+      "gen7": "第7世代",
+      "gen8": "第8世代",
+      "gen9": "第9世代",
+      "genOther": "その他"
+    },
+    "completionProjection": {
+      "heading": "図鑑完成予測",
+      "complete": "完成！",
+      "completeCopy": "全種族を習得しました。おめでとうございます！",
+      "notAvailable": "予測はまだ利用できません",
+      "notAvailableDescription": "少なくとも1種族を習得し、1週間継続した後に利用可能です。21日以上先のスケジュールになるまでレビューして習得し、7日後に戻ってきてください。",
+      "estimatedDate": "完成予定日",
+      "speciesRemaining": "種族残り",
+      "masteredPerWeek": "週あたりの習得数（最近のペース）"
+    },
+    "directionBreakdown": {
+      "heading": "カード方向別の正解率",
+      "description": "名前・逆引き・鳴き声・進化カードの記憶率の比較。",
+      "noData": "まだレビューがありません。カードを評価して内訳を確認しましょう。",
+      "disabledLabel": "{direction}（無効）",
+      "tooltipAccuracy": "正解率: {pct}%",
+      "tooltipReviews": "{total} 回中 {passes} 回正解",
+      "tooltipDisabled": "このカードタイプは設定で無効になっています。",
+      "noReviewsLabel": "レビューなし",
+      "disabledMark": "（無効）"
+    },
+    "heatmap": {
+      "heading": "レビュー活動",
+      "less": "少",
+      "more": "多"
+    },
+    "gradeDistribution": {
+      "heading": "評価の分布",
+      "description": "時間の経過とともに「再度」「難しい」「良い」「簡単」を押した回数。良いと簡単の割合が高いほどカードが定着しています。",
+      "noData": "まだ評価がありません。レビューセッションを開始して内訳を確認しましょう。",
+      "weeklyVolumeHeading": "週間ボリューム",
+      "weeklyVolumeHeadingWithCount": "{count, plural, other {週間ボリューム（これまで {count} 週）}}",
+      "weeklyVolumeHeadingComplete": "週間ボリューム（{count} 週）",
+      "weeklyHistoryBuilding": "完全な1週間のレビューが完了すると週間履歴が積み上がります。続けましょう！",
+      "tooltipWeekOf": "{weekStart} 週",
+      "tooltipTotal": "合計: {count}",
+      "allTimeMixAriaLabel": "全期間の評価の内訳: {again} 再度, {hard} 難しい, {good} 良い, {easy} 簡単"
     }
   },
   "journey": {
