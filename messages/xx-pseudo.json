@@ -826,6 +826,13 @@
       "lockedAriaLabel": "[Locked gym badges]",
       "hideLocked": "[Hide locked badges ({count})]",
       "viewAll": "[View all badges ({count} locked)]"
+    },
+    "masteryExplainer": {
+      "title": "[What the rings mean]",
+      "lockedBody": "[Locked: you haven't seen this Pokémon in a practice session yet.]",
+      "learningBody": "[Learning: you've seen it and are building the memory.]",
+      "masteredBody": "[Mastered: recalled correctly {reps} {reps, plural, one {time} other {times}} in a row with the next review at least 21 days out. That's when the scheduler is confident you've truly learnt it.]",
+      "introducedNote": "[Introduced counts any Pokémon you've seen at least once, whether or not it's fully mastered yet.]"
     }
   },
   "error": {
