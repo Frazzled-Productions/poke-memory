@@ -842,9 +842,9 @@
     },
     "getStarted": "Get started",
     "pwaInstallNudge": {
-      "ariaLabel": "Install Poke Memory",
+      "ariaLabel": "Install Poké Memory",
       "dismissAriaLabel": "Dismiss install nudge",
-      "heading": "Install Poke Memory",
+      "heading": "Install Poké Memory",
       "androidBody": "Add to your home screen for quick access, no app store needed.",
       "installButton": "Install app",
       "iosBodyShare": "Tap",

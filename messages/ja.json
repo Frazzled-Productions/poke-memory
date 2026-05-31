@@ -842,9 +842,9 @@
     },
     "getStarted": "はじめる",
     "pwaInstallNudge": {
-      "ariaLabel": "Poke Memory をインストール",
+      "ariaLabel": "Poké Memory をインストール",
       "dismissAriaLabel": "インストールの案内を閉じる",
-      "heading": "Poke Memory をインストール",
+      "heading": "Poké Memory をインストール",
       "androidBody": "ホーム画面に追加すれば、アプリストール不要ですぐアクセスできます。",
       "installButton": "アプリをインストール",
       "iosBodyShare": "「",

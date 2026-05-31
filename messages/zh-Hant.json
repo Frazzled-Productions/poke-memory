@@ -842,9 +842,9 @@
     },
     "getStarted": "開始",
     "pwaInstallNudge": {
-      "ariaLabel": "安裝 Poke Memory",
+      "ariaLabel": "安裝 Poké Memory",
       "dismissAriaLabel": "關閉安裝提示",
-      "heading": "安裝 Poke Memory",
+      "heading": "安裝 Poké Memory",
       "androidBody": "新增至主畫面即可快速存取，無需應用程式商店。",
       "installButton": "安裝應用程式",
       "iosBodyShare": "點選",
