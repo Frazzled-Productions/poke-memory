@@ -13,7 +13,7 @@
  *  - AC requirement: earn moment RENDERS (happy path asserted)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import { screen, act, fireEvent } from "@testing-library/react";
 import {
   renderWithIntl,
   renderJa,
@@ -25,7 +25,7 @@ import {
   saveSettings,
   loadSettings,
 } from "@/lib/settings/persistence";
-import { saveStreakData } from "@/lib/streak/persistence";
+import { saveStreakData, STREAK_UPDATED_EVENT } from "@/lib/streak/persistence";
 import { EARN_INTERVAL_DAYS, MAX_BALANCE, DEFAULT_STREAK_PROTECTION } from "@/lib/streak/tokens";
 
 // ---------------------------------------------------------------------------
@@ -213,6 +213,33 @@ describe("StreakBadge — token earned", () => {
       screen.queryByText(/streak protection token earned/i),
     ).toBeNull();
   });
+
+  it("does not re-fire the earn toast on a later streak event in the same visit", () => {
+    // The earn fires once on mount; the `hasShownTokenToastRef` guard must stop
+    // it re-appearing when a subsequent STREAK_UPDATED_EVENT triggers a refresh.
+    seedProtection({
+      balance: 0,
+      daysSinceLastEarn: EARN_INTERVAL_DAYS - 1,
+      streakDates: [FIXED_TODAY],
+    });
+
+    renderWithIntl(<StreakBadge />);
+
+    expect(screen.getByText(/streak protection token earned/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/dismiss token notice/i));
+    expect(
+      screen.queryByText(/streak protection token earned/i),
+    ).toBeNull();
+
+    // A later streak-updated event re-runs the protection refresh; the guard
+    // keeps the toast dismissed rather than re-showing it.
+    act(() => {
+      window.dispatchEvent(new Event(STREAK_UPDATED_EVENT));
+    });
+    expect(
+      screen.queryByText(/streak protection token earned/i),
+    ).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -335,7 +362,7 @@ describe("StreakBadge — locale: earn toast copy", () => {
     seedEarn();
     renderZhHans(<StreakBadge />);
     expect(
-      screen.getByText(/已獲得連続保護令牌|已获得连续保护令牌/),
+      screen.getByText(/已获得连续保护令牌/),
     ).toBeInTheDocument();
   });
 
