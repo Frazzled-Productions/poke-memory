@@ -649,6 +649,10 @@
       "tooltipWeekOf": "{weekStart} 週",
       "tooltipTotal": "合計: {count}",
       "allTimeMixAriaLabel": "全期間の評価の内訳: {again} 再度, {hard} 難しい, {good} 良い, {easy} 簡単"
+    },
+    "typeBreakdown": {
+      "heading": "タイプ別",
+      "meterAriaLabel": "{typeName}タイプの Pokémon の {masteredPct}% を習得"
     }
   },
   "journey": {

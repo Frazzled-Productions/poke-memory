@@ -649,6 +649,10 @@
       "tooltipWeekOf": "周 {weekStart}",
       "tooltipTotal": "总计: {count}",
       "allTimeMixAriaLabel": "历史评分分布: {again} 再来一次, {hard} 困难, {good} 良好, {easy} 简单"
+    },
+    "typeBreakdown": {
+      "heading": "按属性",
+      "meterAriaLabel": "{masteredPct}% 的 {typeName} 属性 Pokémon 已掌握"
     }
   },
   "journey": {

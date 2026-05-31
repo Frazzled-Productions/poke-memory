@@ -649,6 +649,10 @@
       "tooltipWeekOf": "[w/c {weekStart}]",
       "tooltipTotal": "[Total: {count}]",
       "allTimeMixAriaLabel": "[All-time grade mix: {again} Again, {hard} Hard, {good} Good, {easy} Easy]"
+    },
+    "typeBreakdown": {
+      "heading": "[By type]",
+      "meterAriaLabel": "[{masteredPct}% of {typeName}-type Pokémon mastered]"
     }
   },
   "journey": {
