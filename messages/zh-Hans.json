@@ -61,6 +61,15 @@
         "selected": "已选择",
         "setAsTheme": "设为主题",
         "remove": "移除"
+      },
+      "intensityPicker": {
+        "heading": "主题强度",
+        "accentsLabel": "仅使用细微强调色",
+        "accentsDescription": "主题色仅显示在导航栏和焦点环上，主体保持中性色调。",
+        "tintedLabel": "背景着色",
+        "tintedDescription": "主题色以淡淡的色调覆盖页面背景。",
+        "fullLabel": "完整主题",
+        "fullDescription": "主题色覆盖所有背景，个性鲜明。"
       }
     },
     "labs": {
@@ -183,10 +192,36 @@
         "off": "关闭",
         "fast": "快速",
         "default": "默认"
+      },
+      "ttsControls": {
+        "voiceLabel": "朗读语音",
+        "voiceAutoOption": "自动（系统默认）",
+        "voiceHint": "来自设备的英语语音列表。“自动”会选择可用的最高质量英式英语语音。此语音用于语音名称的备用朗读；预生成的名称音频使用固定的英式英语语音。",
+        "rateLabel": "朗读速度（{rate}倍）",
+        "hearSample": "试听",
+        "rateSlow": "0.5倍（慢速）",
+        "rateFast": "2.0倍（快速）",
+        "volumeLabel": "朗读音量（{pct}%）",
+        "volumeMute": "0%（静音）",
+        "volumeFull": "100%（最大）"
+      },
+      "voiceQualityHint": {
+        "heading": "语音听起来像机器人？",
+        "body": "大多数设备默认英语语音为低质量的“紧凑”版本。您可以在设备的辅助功能或朗读内容设置中下载更高质量（高级或增强型）的英式英语语音，安装后应用将自动选用。",
+        "dismissAriaLabel": "关闭提示"
       }
     },
     "offline": {
-      "downloadHeading": "下载"
+      "downloadHeading": "下载",
+      "downloadTitle": "下载离线内容",
+      "downloadDescription": "预先获取所有精灵图和叫声，以便在无网络时也能练习。建议在 Wi-Fi 下使用。约 166 MB。",
+      "storageUsage": "已使用 {usedMb}，共 {totalMb}。",
+      "downloadedOn": "已于 {date} 下载。",
+      "downloadButton": "下载",
+      "updateButton": "更新",
+      "downloadingProgress": "正在下载 {total} 中的 {done}",
+      "downloadProgressAriaLabel": "下载进度",
+      "stopButton": "停止"
     },
     "optimizerCooldown": "{count, plural, other {下次优化还需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {请在 # 天后重试。}}",

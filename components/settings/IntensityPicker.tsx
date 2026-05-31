@@ -1,29 +1,30 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { ThemeIntensity } from "@/lib/settings/persistence";
 import { colStack, colStackLg, mutedTextXs, sectionLabelSm } from "@/lib/utils/class-names";
 
 type Option = {
   value: ThemeIntensity;
-  label: string;
-  description: string;
+  labelKey: "accentsLabel" | "tintedLabel" | "fullLabel";
+  descriptionKey: "accentsDescription" | "tintedDescription" | "fullDescription";
 };
 
 const OPTIONS: Option[] = [
   {
     value: "accents",
-    label: "Subtle accents only",
-    description: "Mascot colours appear on the nav bar and focus rings; body stays neutral.",
+    labelKey: "accentsLabel",
+    descriptionKey: "accentsDescription",
   },
   {
     value: "tinted",
-    label: "Tinted backgrounds",
-    description: "A light wash of your mascot colour tints the page background.",
+    labelKey: "tintedLabel",
+    descriptionKey: "tintedDescription",
   },
   {
     value: "full",
-    label: "Full mascot theme",
-    description: "Your mascot colour drives all backgrounds: loud by design.",
+    labelKey: "fullLabel",
+    descriptionKey: "fullDescription",
   },
 ];
 
@@ -33,13 +34,15 @@ type Props = {
 };
 
 export function IntensityPicker({ value, onChange }: Props) {
+  const t = useTranslations("settings.appearance.intensityPicker");
+
   return (
     <section className={colStackLg} aria-labelledby="intensity-heading">
       <h2
         id="intensity-heading"
         className={sectionLabelSm}
       >
-        Theme intensity
+        {t("heading")}
       </h2>
       <div
         role="radiogroup"
@@ -70,9 +73,9 @@ export function IntensityPicker({ value, onChange }: Props) {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--theme-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
               />
               <div>
-                <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                <p className="text-sm font-medium text-foreground">{t(opt.labelKey)}</p>
                 <p className={`mt-0.5 ${mutedTextXs}`}>
-                  {opt.description}
+                  {t(opt.descriptionKey)}
                 </p>
               </div>
             </label>

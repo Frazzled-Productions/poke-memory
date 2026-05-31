@@ -61,6 +61,15 @@
         "selected": "Selected",
         "setAsTheme": "Set as theme",
         "remove": "Remove"
+      },
+      "intensityPicker": {
+        "heading": "Theme intensity",
+        "accentsLabel": "Subtle accents only",
+        "accentsDescription": "Mascot colours appear on the nav bar and focus rings; body stays neutral.",
+        "tintedLabel": "Tinted backgrounds",
+        "tintedDescription": "A light wash of your mascot colour tints the page background.",
+        "fullLabel": "Full mascot theme",
+        "fullDescription": "Your mascot colour drives all backgrounds: loud by design."
       }
     },
     "labs": {
@@ -183,10 +192,36 @@
         "off": "Off",
         "fast": "Fast",
         "default": "Default"
+      },
+      "ttsControls": {
+        "voiceLabel": "Pronunciation voice",
+        "voiceAutoOption": "Auto (system default)",
+        "voiceHint": "English voices from your device. \"Auto\" picks the highest-quality British English voice available. This voice is used for the spoken-name fallback; pre-generated name audio uses a fixed British English voice.",
+        "rateLabel": "Speech rate ({rate}x)",
+        "hearSample": "Hear sample",
+        "rateSlow": "0.5x slow",
+        "rateFast": "2.0x fast",
+        "volumeLabel": "Speech volume ({pct}%)",
+        "volumeMute": "0% mute",
+        "volumeFull": "100% full"
+      },
+      "voiceQualityHint": {
+        "heading": "Voice sounding robotic?",
+        "body": "The default English voice on most devices is a low-quality \"compact\" version. Your device's accessibility or spoken-content settings let you download a higher-quality (Premium or Enhanced) British English voice. Once installed, the app picks it automatically.",
+        "dismissAriaLabel": "Dismiss tip"
       }
     },
     "offline": {
-      "downloadHeading": "Download"
+      "downloadHeading": "Download",
+      "downloadTitle": "Download for offline use",
+      "downloadDescription": "Pre-fetches every sprite and cry so you can practise without a connection. Recommended on Wi-Fi. About 166 MB.",
+      "storageUsage": "Using {usedMb} of {totalMb} available.",
+      "downloadedOn": "Downloaded on {date}.",
+      "downloadButton": "Download",
+      "updateButton": "Update",
+      "downloadingProgress": "Downloading {done} of {total}",
+      "downloadProgressAriaLabel": "Download progress",
+      "stopButton": "Stop"
     },
     "optimizerCooldown": "{count, plural, one {Next optimisation in # day} other {Next optimisation in # days}}",
     "optimizerRetryAfter": "{count, plural, one {Try again in # day.} other {Try again in # days.}}",

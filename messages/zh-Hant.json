@@ -61,6 +61,15 @@
         "selected": "已選擇",
         "setAsTheme": "設為主題",
         "remove": "移除"
+      },
+      "intensityPicker": {
+        "heading": "主題強度",
+        "accentsLabel": "僅使用細微強調色",
+        "accentsDescription": "主題色僅顯示於導覽列和焦點環，主體保持中性色調。",
+        "tintedLabel": "背景著色",
+        "tintedDescription": "主題色以淡淡的色調覆蓋頁面背景。",
+        "fullLabel": "完整主題",
+        "fullDescription": "主題色覆蓋所有背景，個性鮮明。"
       }
     },
     "labs": {
@@ -183,10 +192,36 @@
         "off": "關閉",
         "fast": "快速",
         "default": "預設"
+      },
+      "ttsControls": {
+        "voiceLabel": "朗讀語音",
+        "voiceAutoOption": "自動（系統預設）",
+        "voiceHint": "來自裝置的英語語音清單。「自動」會選擇可用的最高品質英式英語語音。此語音用於語音名稱的備用朗讀；預先產生的名稱音訊使用固定的英式英語語音。",
+        "rateLabel": "朗讀速度（{rate}倍）",
+        "hearSample": "試聽",
+        "rateSlow": "0.5倍（慢速）",
+        "rateFast": "2.0倍（快速）",
+        "volumeLabel": "朗讀音量（{pct}%）",
+        "volumeMute": "0%（靜音）",
+        "volumeFull": "100%（最大）"
+      },
+      "voiceQualityHint": {
+        "heading": "語音聽起來像機器人？",
+        "body": "大多數裝置的預設英語語音為低品質的「緊湊」版本。您可以在裝置的輔助功能或朗讀內容設定中下載更高品質（進階或增強型）的英式英語語音，安裝後應用程式將自動選用。",
+        "dismissAriaLabel": "關閉提示"
       }
     },
     "offline": {
-      "downloadHeading": "下載"
+      "downloadHeading": "下載",
+      "downloadTitle": "下載離線內容",
+      "downloadDescription": "預先擷取所有精靈圖和叫聲，以便在無網路時也能練習。建議在 Wi-Fi 下使用。約 166 MB。",
+      "storageUsage": "已使用 {usedMb}，共 {totalMb}。",
+      "downloadedOn": "已於 {date} 下載。",
+      "downloadButton": "下載",
+      "updateButton": "更新",
+      "downloadingProgress": "正在下載 {total} 中的 {done}",
+      "downloadProgressAriaLabel": "下載進度",
+      "stopButton": "停止"
     },
     "optimizerCooldown": "{count, plural, other {下次最佳化還需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {請在 # 天後重試。}}",
