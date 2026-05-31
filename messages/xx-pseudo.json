@@ -13,7 +13,12 @@
     "mobileTabAriaLabel": "[Mobile tab navigation]",
     "whatsNew": "[What's new]",
     "privacy": "[Privacy]",
-    "terms": "[Terms]"
+    "terms": "[Terms]",
+    "openMenu": "[Open navigation menu]",
+    "closeMenu": "[Close navigation menu]",
+    "navigationMenu": "[Navigation menu]",
+    "mobileNavigation": "[Mobile navigation]",
+    "menuLabel": "[Menu]"
   },
   "auth": {
     "signingIn": "[Signing in…]",
@@ -433,7 +438,9 @@
       "learning": "[Learning]",
       "review": "[Review]",
       "ariaLabel": "[Queue counts]"
-    }
+    },
+    "storageFullBanner": "[Progress saving is disabled: storage is full.]",
+    "storageFullDismiss": "[Dismiss]"
   },
   "pokedex": {
     "title": "[Pokédex]",
@@ -466,7 +473,21 @@
     "generationAll": "[All]",
     "generationLabel": "[Gen {gen}]",
     "masteryCount": "[{mastered} / {total} mastered]",
-    "nextReviewInDays": "[{count, plural, one {Next review: in # day} other {Next review: in # days}}]"
+    "nextReviewInDays": "[{count, plural, one {Next review: in # day} other {Next review: in # days}}]",
+    "dueToday": "[Due today]",
+    "lockedHint": "[Start learning this Pokémon to reveal its details.]",
+    "typesAriaLabel": "[Types]",
+    "baseStatsHeading": "[Base Stats]",
+    "factsHeading": "[Facts]",
+    "evolutionChainHeading": "[Evolution Chain]",
+    "formsHeading": "[Forms]",
+    "lockedAriaLabel": "[#{number} (locked)]",
+    "statHp": "[HP]",
+    "statAttack": "[Attack]",
+    "statDefense": "[Defense]",
+    "statSpAtk": "[Sp. Atk]",
+    "statSpDef": "[Sp. Def]",
+    "statSpeed": "[Speed]"
   },
   "pasture": {
     "title": "[Pasture]",
@@ -507,6 +528,12 @@
       "backLabel": "[Pasture]",
       "backAriaLabel": "[Back to Pasture]",
       "emptyState": "[No mastered Pokémon in this biome yet. Keep practising!]"
+    },
+    "nextArrivals": {
+      "ariaLabel": "[Next arrivals]",
+      "heading": "[Next arrivals]",
+      "upcomingAriaLabel": "[Upcoming Pasture species]",
+      "allCaughtUp": "[All reviewed Pokémon are already in your Pasture.]"
     }
   },
   "stats": {
@@ -770,6 +797,16 @@
       "share": "[Share]",
       "copied": "[Copied to clipboard]",
       "copyError": "[Couldn't copy. Please try again.]"
+    },
+    "badges": {
+      "heading": "[Gym badges]",
+      "nextBadgeLabel": "[Next badge:]",
+      "nextBadgeRemaining": "[{count, plural, one {# more Pokémon to master} other {# more Pokémon to master}}]",
+      "noBadgesYet": "[No badges earned yet. Keep mastering Pokémon to unlock your first gym badge!]",
+      "earnedAriaLabel": "[Earned gym badges]",
+      "lockedAriaLabel": "[Locked gym badges]",
+      "hideLocked": "[Hide locked badges ({count})]",
+      "viewAll": "[View all badges ({count} locked)]"
     }
   },
   "error": {
@@ -803,7 +840,19 @@
       "heading": "[Your progress is saved on this device]",
       "body": "[Your progress is kept on this device. On iPhone and iPad, Safari may clear saved data after 7 days if you do not visit. Adding this page to your Home Screen prevents that. If you sign in, your progress is also saved online so you can use it on other devices.]"
     },
-    "getStarted": "[Get started]"
+    "getStarted": "[Get started]",
+    "pwaInstallNudge": {
+      "ariaLabel": "[Install Poke Memory]",
+      "dismissAriaLabel": "[Dismiss install nudge]",
+      "heading": "[Install Poke Memory]",
+      "androidBody": "[Add to your home screen for quick access, no app store needed.]",
+      "installButton": "[Install app]",
+      "iosBodyShare": "[Tap]",
+      "iosBodyShareAction": "[Share]",
+      "iosBodyThen": "[then]",
+      "iosBodyAddAction": "[Add to Home Screen]",
+      "iosBodySuffix": "[to install.]"
+    }
   },
   "sync": {
     "status": {

@@ -42,7 +42,7 @@ function voice(name: string, lang = "en-GB"): MockVoice {
 }
 
 function installSpeechAPI(voices: MockVoice[]): { fire: () => void } {
-  let current = [...voices];
+  const current = [...voices];
   const listeners: Array<() => void> = [];
   const synth = {
     getVoices: () => current,

@@ -13,7 +13,12 @@
     "mobileTabAriaLabel": "行動端分頁導覽",
     "whatsNew": "新功能",
     "privacy": "隱私",
-    "terms": "條款"
+    "terms": "條款",
+    "openMenu": "開啟導覽選單",
+    "closeMenu": "關閉導覽選單",
+    "navigationMenu": "導覽選單",
+    "mobileNavigation": "行動端導覽",
+    "menuLabel": "選單"
   },
   "auth": {
     "signingIn": "登入中…",
@@ -433,7 +438,9 @@
       "learning": "學習中",
       "review": "複習",
       "ariaLabel": "佇列數量"
-    }
+    },
+    "storageFullBanner": "儲存空間已滿，進度無法儲存。",
+    "storageFullDismiss": "關閉"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -466,7 +473,21 @@
     "generationAll": "全部",
     "generationLabel": "第 {gen} 代",
     "masteryCount": "{mastered} / {total} 已掌握",
-    "nextReviewInDays": "{count, plural, other {下次複習: # 天後}}"
+    "nextReviewInDays": "{count, plural, other {下次複習: # 天後}}",
+    "dueToday": "今日到期",
+    "lockedHint": "開始學習這隻寶可夢即可查看詳細資訊。",
+    "typesAriaLabel": "屬性",
+    "baseStatsHeading": "種族值",
+    "factsHeading": "資料",
+    "evolutionChainHeading": "進化鏈",
+    "formsHeading": "形態",
+    "lockedAriaLabel": "#{number}（已鎖定）",
+    "statHp": "HP",
+    "statAttack": "攻擊",
+    "statDefense": "防禦",
+    "statSpAtk": "特攻",
+    "statSpDef": "特防",
+    "statSpeed": "速度"
   },
   "pasture": {
     "title": "牧場",
@@ -507,6 +528,12 @@
       "backLabel": "牧場",
       "backAriaLabel": "返回牧場",
       "emptyState": "此生物群系中還沒有掌握的寶可夢。繼續練習吧！"
+    },
+    "nextArrivals": {
+      "ariaLabel": "即將到來",
+      "heading": "即將到來",
+      "upcomingAriaLabel": "即將加入牧場的寶可夢",
+      "allCaughtUp": "所有已複習的寶可夢都已在您的牧場中。"
     }
   },
   "stats": {
@@ -770,6 +797,16 @@
       "share": "分享",
       "copied": "已複製到剪貼簿",
       "copyError": "無法複製。請重試。"
+    },
+    "badges": {
+      "heading": "道館徽章",
+      "nextBadgeLabel": "下一個徽章:",
+      "nextBadgeRemaining": "{count, plural, other {還需掌握 # 隻寶可夢}}",
+      "noBadgesYet": "尚未獲得任何徽章。繼續掌握寶可夢來解鎖第一個道館徽章！",
+      "earnedAriaLabel": "已獲得的道館徽章",
+      "lockedAriaLabel": "未獲得的道館徽章",
+      "hideLocked": "隱藏未獲得的徽章（{count} 個）",
+      "viewAll": "查看所有徽章（{count} 個已鎖定）"
     }
   },
   "error": {
@@ -803,7 +840,19 @@
       "heading": "你的進度儲存在此裝置上",
       "body": "你的進度儲存在此裝置上。在 iPhone 和 iPad 上，如果 7 天沒有使用，Safari 可能會清除已儲存的資料。將此頁面新增到主畫面可以防止這種情況。如果你登入，進度還會在線上儲存，以便在其他裝置上使用。"
     },
-    "getStarted": "開始"
+    "getStarted": "開始",
+    "pwaInstallNudge": {
+      "ariaLabel": "安裝 Poke Memory",
+      "dismissAriaLabel": "關閉安裝提示",
+      "heading": "安裝 Poke Memory",
+      "androidBody": "新增至主畫面即可快速存取，無需應用程式商店。",
+      "installButton": "安裝應用程式",
+      "iosBodyShare": "點選",
+      "iosBodyShareAction": "分享",
+      "iosBodyThen": "，然後",
+      "iosBodyAddAction": "加入主畫面",
+      "iosBodySuffix": "即可安裝。"
+    }
   },
   "sync": {
     "status": {

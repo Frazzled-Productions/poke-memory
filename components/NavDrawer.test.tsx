@@ -11,7 +11,8 @@
  * - Pasture link re-derives on a SETTINGS_SAVED_EVENT (#868 follow-up)
  */
 
-import { act, render, screen, within, waitFor } from "@testing-library/react";
+import { act, screen, within, waitFor } from "@testing-library/react";
+import { renderWithIntl as render } from "@/components/test-utils/renderWithIntl";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

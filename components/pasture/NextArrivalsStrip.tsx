@@ -13,6 +13,7 @@
  */
 
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import type { NextArrival } from "@/lib/pasture/nextArrivals";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
@@ -70,22 +71,24 @@ type Props = {
  * pretendAllMastered is on), an all-caught-up message is shown instead.
  */
 export function NextArrivalsStrip({ arrivals }: Props) {
+  const t = useTranslations("pasture.nextArrivals");
+
   return (
     <section
-      aria-label="Next arrivals"
+      aria-label={t("ariaLabel")}
       className="mt-8 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 dark:border-zinc-700 dark:bg-zinc-900/50"
     >
       <h2 className="mb-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-        Next arrivals
+        {t("heading")}
       </h2>
 
       {arrivals.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          All reviewed Pokémon are already in your Pasture.
+          {t("allCaughtUp")}
         </p>
       ) : (
         <ol
-          aria-label="Upcoming Pasture species"
+          aria-label={t("upcomingAriaLabel")}
           className="flex flex-wrap gap-4"
         >
           {arrivals.map((arrival) => (

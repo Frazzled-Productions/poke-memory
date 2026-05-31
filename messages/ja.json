@@ -13,7 +13,12 @@
     "mobileTabAriaLabel": "モバイルタブナビゲーション",
     "whatsNew": "新機能",
     "privacy": "プライバシー",
-    "terms": "利用規約"
+    "terms": "利用規約",
+    "openMenu": "ナビゲーションメニューを開く",
+    "closeMenu": "ナビゲーションメニューを閉じる",
+    "navigationMenu": "ナビゲーションメニュー",
+    "mobileNavigation": "モバイルナビゲーション",
+    "menuLabel": "メニュー"
   },
   "auth": {
     "signingIn": "サインイン中…",
@@ -433,7 +438,9 @@
       "learning": "学習中",
       "review": "復習",
       "ariaLabel": "キュー数"
-    }
+    },
+    "storageFullBanner": "ストレージが満杯のため進捗の保存が無効になっています。",
+    "storageFullDismiss": "閉じる"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -466,7 +473,21 @@
     "generationAll": "すべて",
     "generationLabel": "第{gen}世代",
     "masteryCount": "{mastered} / {total} 習得済み",
-    "nextReviewInDays": "{count, plural, other {次のレビュー: # 日後}}"
+    "nextReviewInDays": "{count, plural, other {次のレビュー: # 日後}}",
+    "dueToday": "本日期限",
+    "lockedHint": "このポケモンの学習を開始すると詳細が表示されます。",
+    "typesAriaLabel": "タイプ",
+    "baseStatsHeading": "種族値",
+    "factsHeading": "データ",
+    "evolutionChainHeading": "進化チェーン",
+    "formsHeading": "フォーム",
+    "lockedAriaLabel": "#{number}（ロック中）",
+    "statHp": "HP",
+    "statAttack": "攻撃",
+    "statDefense": "防御",
+    "statSpAtk": "特攻",
+    "statSpDef": "特防",
+    "statSpeed": "素早さ"
   },
   "pasture": {
     "title": "牧場",
@@ -507,6 +528,12 @@
       "backLabel": "牧場",
       "backAriaLabel": "牧場に戻る",
       "emptyState": "このバイオームにはまだ習得済みの Pokémon がいません。練習を続けましょう！"
+    },
+    "nextArrivals": {
+      "ariaLabel": "次の到着",
+      "heading": "次の到着",
+      "upcomingAriaLabel": "牧場に来る予定のポケモン",
+      "allCaughtUp": "レビュー済みのポケモンはすでにすべて牧場にいます。"
     }
   },
   "stats": {
@@ -770,6 +797,16 @@
       "share": "シェア",
       "copied": "クリップボードにコピーしました",
       "copyError": "コピーできませんでした。もう一度お試しください。"
+    },
+    "badges": {
+      "heading": "ジムバッジ",
+      "nextBadgeLabel": "次のバッジ:",
+      "nextBadgeRemaining": "{count, plural, other {あと # 種の習得が必要}}",
+      "noBadgesYet": "まだバッジを獲得していません。ポケモンを習得してジムバッジを解放しましょう！",
+      "earnedAriaLabel": "獲得済みジムバッジ",
+      "lockedAriaLabel": "未獲得ジムバッジ",
+      "hideLocked": "未獲得バッジを隠す（{count}個）",
+      "viewAll": "すべてのバッジを表示（{count}個ロック中）"
     }
   },
   "error": {
@@ -803,7 +840,19 @@
       "heading": "進捗はこのデバイスに保存されます",
       "body": "進捗はこのデバイスに保存されます。iPhone や iPad では、7日間アクセスがないと Safari が保存データを削除する場合があります。このページをホーム画面に追加するとそれを防げます。サインインすると、進捗がオンラインにも保存され、他のデバイスでも使えるようになります。"
     },
-    "getStarted": "はじめる"
+    "getStarted": "はじめる",
+    "pwaInstallNudge": {
+      "ariaLabel": "Poke Memory をインストール",
+      "dismissAriaLabel": "インストールの案内を閉じる",
+      "heading": "Poke Memory をインストール",
+      "androidBody": "ホーム画面に追加すれば、アプリストール不要ですぐアクセスできます。",
+      "installButton": "アプリをインストール",
+      "iosBodyShare": "「",
+      "iosBodyShareAction": "共有",
+      "iosBodyThen": "」をタップし、",
+      "iosBodyAddAction": "「ホーム画面に追加」",
+      "iosBodySuffix": "でインストールできます。"
+    }
   },
   "sync": {
     "status": {

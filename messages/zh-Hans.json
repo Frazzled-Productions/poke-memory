@@ -13,7 +13,12 @@
     "mobileTabAriaLabel": "移动端标签导航",
     "whatsNew": "新功能",
     "privacy": "隐私",
-    "terms": "条款"
+    "terms": "条款",
+    "openMenu": "打开导航菜单",
+    "closeMenu": "关闭导航菜单",
+    "navigationMenu": "导航菜单",
+    "mobileNavigation": "移动端导航",
+    "menuLabel": "菜单"
   },
   "auth": {
     "signingIn": "登录中…",
@@ -433,7 +438,9 @@
       "learning": "学习中",
       "review": "复习",
       "ariaLabel": "队列数量"
-    }
+    },
+    "storageFullBanner": "存储空间已满，进度无法保存。",
+    "storageFullDismiss": "关闭"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -466,7 +473,21 @@
     "generationAll": "全部",
     "generationLabel": "第 {gen} 代",
     "masteryCount": "{mastered} / {total} 已掌握",
-    "nextReviewInDays": "{count, plural, other {下次复习: # 天后}}"
+    "nextReviewInDays": "{count, plural, other {下次复习: # 天后}}",
+    "dueToday": "今日到期",
+    "lockedHint": "开始学习这只宝可梦即可查看详细信息。",
+    "typesAriaLabel": "属性",
+    "baseStatsHeading": "种族值",
+    "factsHeading": "数据",
+    "evolutionChainHeading": "进化链",
+    "formsHeading": "形态",
+    "lockedAriaLabel": "#{number}（已锁定）",
+    "statHp": "HP",
+    "statAttack": "攻击",
+    "statDefense": "防御",
+    "statSpAtk": "特攻",
+    "statSpDef": "特防",
+    "statSpeed": "速度"
   },
   "pasture": {
     "title": "牧场",
@@ -507,6 +528,12 @@
       "backLabel": "牧场",
       "backAriaLabel": "返回牧场",
       "emptyState": "此生物群系中还没有掌握的宝可梦。继续练习吧！"
+    },
+    "nextArrivals": {
+      "ariaLabel": "即将到来",
+      "heading": "即将到来",
+      "upcomingAriaLabel": "即将加入牧场的宝可梦",
+      "allCaughtUp": "所有已复习的宝可梦都已在您的牧场中。"
     }
   },
   "stats": {
@@ -770,6 +797,16 @@
       "share": "分享",
       "copied": "已复制到剪贴板",
       "copyError": "无法复制。请重试。"
+    },
+    "badges": {
+      "heading": "道馆徽章",
+      "nextBadgeLabel": "下一个徽章:",
+      "nextBadgeRemaining": "{count, plural, other {还需掌握 # 只宝可梦}}",
+      "noBadgesYet": "尚未获得任何徽章。继续掌握宝可梦来解锁第一个道馆徽章！",
+      "earnedAriaLabel": "已获得的道馆徽章",
+      "lockedAriaLabel": "未获得的道馆徽章",
+      "hideLocked": "隐藏未获得的徽章（{count} 个）",
+      "viewAll": "查看所有徽章（{count} 个已锁定）"
     }
   },
   "error": {
@@ -803,7 +840,19 @@
       "heading": "你的进度保存在本设备上",
       "body": "你的进度保存在此设备上。在 iPhone 和 iPad 上，如果 7 天没有访问，Safari 可能会清除保存的数据。将此页面添加到主屏幕可以防止这种情况。如果你登录，进度还会在线保存，以便在其他设备上使用。"
     },
-    "getStarted": "开始"
+    "getStarted": "开始",
+    "pwaInstallNudge": {
+      "ariaLabel": "安装 Poke Memory",
+      "dismissAriaLabel": "关闭安装提示",
+      "heading": "安装 Poke Memory",
+      "androidBody": "添加到主屏幕即可快速访问，无需应用商店。",
+      "installButton": "安装应用",
+      "iosBodyShare": "点击",
+      "iosBodyShareAction": "分享",
+      "iosBodyThen": "，然后",
+      "iosBodyAddAction": "添加到主屏幕",
+      "iosBodySuffix": "即可安装。"
+    }
   },
   "sync": {
     "status": {
