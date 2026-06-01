@@ -251,6 +251,9 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
             <p className="text-sm text-zinc-600 dark:text-zinc-300">
               {t("addingSound.body")}
             </p>
+            <p className={`mt-1 ${mutedTextXs}`}>
+              {t("addingSound.pronunciationNote")}
+            </p>
             <Link
               href="/settings#audio-heading"
               onClick={dismiss}

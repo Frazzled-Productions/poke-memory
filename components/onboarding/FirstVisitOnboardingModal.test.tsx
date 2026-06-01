@@ -38,7 +38,7 @@ vi.mock("@/lib/i18n/useAppLocale", () => ({
 import { useAppLocale } from "@/lib/i18n/useAppLocale";
 
 // jsdom on this Node version does not ship localStorage out of the box, so
-// the component test provides its own stub (same pattern as VoiceQualityHint.test.tsx).
+// the component test provides its own stub (same pattern as deleteAccount-local.test.tsx).
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
   return {
@@ -355,6 +355,35 @@ describe("FirstVisitOnboardingModal", () => {
       await screen.findByRole("dialog");
       // Distinctive phrase from zh-Hant honestGradeNote: 如實作答
       expect(screen.getByText(/如實作答/)).toBeInTheDocument();
+    });
+  });
+
+  describe("i18n locale coverage: addingSound.pronunciationNote (#1536)", () => {
+    it("en: renders pronunciation note in English", async () => {
+      renderWithIntl(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      expect(screen.getByText(/AI-generated and still improving/i)).toBeInTheDocument();
+    });
+
+    it("ja: renders pronunciation note in Japanese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+      renderJa(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      expect(screen.getByText(/AI生成/)).toBeInTheDocument();
+    });
+
+    it("zh-Hans: renders pronunciation note in Simplified Chinese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("zh-Hans");
+      renderZhHans(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      expect(screen.getByText(/AI 生成的音频/)).toBeInTheDocument();
+    });
+
+    it("zh-Hant: renders pronunciation note in Traditional Chinese", async () => {
+      vi.mocked(useAppLocale).mockReturnValue("zh-Hant");
+      renderZhHant(<FirstVisitOnboardingModal />);
+      await screen.findByRole("dialog");
+      expect(screen.getByText(/AI 生成的音訊/)).toBeInTheDocument();
     });
   });
 

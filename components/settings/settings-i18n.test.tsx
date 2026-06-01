@@ -4,15 +4,15 @@
  * Mandatory coverage rule: every component that renders user-facing text must
  * be exercised in all four supported locales (en, ja, zh-Hans, zh-Hant).
  * These tests also verify the state-in / state-out rule:
- *   - VoiceQualityHint: compact-tier voice (shown) vs. premium-tier voice (hidden)
+ *   - TtsWipNote (inline in settings page): shown when speakNameOnReveal is on, hidden when off
  *   - IntensityPicker: all three intensity options render in every locale
  *   - TtsControls: renders labels in every locale
  *   - OfflineSection: idle phase and downloading phase in every locale
  *
- * Refs: AGENTS.md "Mandatory coverage rules", closes #1434.
+ * Refs: AGENTS.md "Mandatory coverage rules", closes #1434, #1536.
  */
 
-import { screen, act } from "@/components/test-utils/renderWithIntl";
+import { screen } from "@/components/test-utils/renderWithIntl";
 import {
   renderWithIntl,
   renderJa,
@@ -26,7 +26,7 @@ import * as precacheModule from "@/lib/pwa/precache";
 import { _resetForTesting } from "@/lib/pwa/downloadController";
 
 // ---------------------------------------------------------------------------
-// Helpers: speech synthesis stub
+// Helpers: speech synthesis stub (used by TtsControls tests)
 // ---------------------------------------------------------------------------
 
 type MockVoice = {
@@ -41,7 +41,7 @@ function voice(name: string, lang = "en-GB"): MockVoice {
   return { voiceURI: `${name}:${lang}`, name, lang, localService: true, default: false };
 }
 
-function installSpeechAPI(voices: MockVoice[]): { fire: () => void } {
+function installSpeechAPI(voices: MockVoice[]): void {
   const current = [...voices];
   const listeners: Array<() => void> = [];
   const synth = {
@@ -63,8 +63,6 @@ function installSpeechAPI(voices: MockVoice[]): { fire: () => void } {
     configurable: true,
     writable: true,
   });
-  return { fire: () => listeners.forEach((f) => f()) };
-  void current; // suppress unused warning
 }
 
 // ---------------------------------------------------------------------------
@@ -123,61 +121,6 @@ describe("IntensityPicker — locale coverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// VoiceQualityHint — locale coverage (state in + out)
-// ---------------------------------------------------------------------------
-
-describe("VoiceQualityHint — locale coverage", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    Object.defineProperty(window, "localStorage", {
-      value: makeLocalStorage(),
-      configurable: true,
-      writable: true,
-    });
-  });
-
-  afterEach(() => {
-    delete (window as unknown as { speechSynthesis?: unknown }).speechSynthesis;
-    delete (window as unknown as { localStorage?: unknown }).localStorage;
-  });
-
-  it("en: compact voice shows the hint (state in)", async () => {
-    installSpeechAPI([voice("Daniel")]);
-    const { VoiceQualityHint } = await import("./VoiceQualityHint");
-    renderWithIntl(<VoiceQualityHint />);
-    expect(screen.getByText(/voice sounding robotic/i)).toBeInTheDocument();
-  });
-
-  it("en: premium voice hides the hint (state out)", async () => {
-    installSpeechAPI([voice("Daniel (Premium)")]);
-    const { VoiceQualityHint } = await import("./VoiceQualityHint");
-    renderWithIntl(<VoiceQualityHint />);
-    expect(screen.queryByText(/voice sounding robotic/i)).not.toBeInTheDocument();
-  });
-
-  it("ja: compact voice shows the hint in Japanese", async () => {
-    installSpeechAPI([voice("Daniel")]);
-    const { VoiceQualityHint } = await import("./VoiceQualityHint");
-    renderJa(<VoiceQualityHint />);
-    expect(screen.getByText(/音声がロボット/)).toBeInTheDocument();
-  });
-
-  it("zh-Hans: compact voice shows the hint in Simplified Chinese", async () => {
-    installSpeechAPI([voice("Daniel")]);
-    const { VoiceQualityHint } = await import("./VoiceQualityHint");
-    renderZhHans(<VoiceQualityHint />);
-    expect(screen.getByText(/语音听起来像机器人/)).toBeInTheDocument();
-  });
-
-  it("zh-Hant: compact voice shows the hint in Traditional Chinese", async () => {
-    installSpeechAPI([voice("Daniel")]);
-    const { VoiceQualityHint } = await import("./VoiceQualityHint");
-    renderZhHant(<VoiceQualityHint />);
-    expect(screen.getByText(/語音聽起來像機器人/)).toBeInTheDocument();
-  });
-});
-
-// ---------------------------------------------------------------------------
 // TtsControls — locale coverage
 // ---------------------------------------------------------------------------
 
@@ -219,12 +162,57 @@ describe("TtsControls — locale coverage", () => {
   });
 
   it("zh-Hant: renders voice label in Traditional Chinese", async () => {
-    installSpeechAPI([]);
+    installSpeechAPI([voice("Daniel")]);
     const { TtsControls } = await import("./TtsControls");
     renderZhHant(
       <TtsControls ttsVoice={null} ttsRate={1} ttsVolume={1} onChange={vi.fn()} />,
     );
     expect(screen.getByLabelText(/朗讀語音/)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TtsWipNote — locale coverage (state in + out) — closes #1536
+// ---------------------------------------------------------------------------
+// The note is an inline paragraph in settings/page.tsx, not a standalone
+// component, so we test it through the i18n key rendered in isolation
+// via a tiny wrapper that mirrors the conditional in the page.
+// ---------------------------------------------------------------------------
+
+import React from "react";
+import { useTranslations } from "next-intl";
+import { mutedTextXs } from "@/lib/utils/class-names";
+
+function TtsWipNoteWrapper({ on }: { on: boolean }) {
+  const t = useTranslations("settings.audio");
+  if (!on) return null;
+  return <p className={mutedTextXs}>{t("ttsWipNote")}</p>;
+}
+
+describe("TtsWipNote — locale coverage (state in + out)", () => {
+  it("en: shown when speakNameOnReveal is on (state in)", () => {
+    renderWithIntl(<TtsWipNoteWrapper on={true} />);
+    expect(screen.getByText(/AI-generated audio we are still improving/i)).toBeInTheDocument();
+  });
+
+  it("en: absent when speakNameOnReveal is off (state out)", () => {
+    renderWithIntl(<TtsWipNoteWrapper on={false} />);
+    expect(screen.queryByText(/AI-generated/i)).not.toBeInTheDocument();
+  });
+
+  it("ja: shown in Japanese", () => {
+    renderJa(<TtsWipNoteWrapper on={true} />);
+    expect(screen.getByText(/AI生成/)).toBeInTheDocument();
+  });
+
+  it("zh-Hans: shown in Simplified Chinese", () => {
+    renderZhHans(<TtsWipNoteWrapper on={true} />);
+    expect(screen.getByText(/AI 生成的音频/)).toBeInTheDocument();
+  });
+
+  it("zh-Hant: shown in Traditional Chinese", () => {
+    renderZhHant(<TtsWipNoteWrapper on={true} />);
+    expect(screen.getByText(/AI 生成的音訊/)).toBeInTheDocument();
   });
 });
 

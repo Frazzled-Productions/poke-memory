@@ -200,6 +200,7 @@
         "label": "[Speak name on reveal]",
         "description": "[Reads the Pokémon's name aloud using your device's text-to-speech engine when you reveal a card. British English voice preferred.]"
       },
+      "ttsWipNote": "[Spoken names use AI-generated audio we are still improving, so some Pokémon may be mispronounced.]",
       "waitForAudio": {
         "label": "[Wait for audio before next card]",
         "description": "[When on (default), the next card waits until the cry and spoken name finish before appearing. Turn off for a faster swap: audio continues playing under the next card and is not cut off.]"
@@ -223,11 +224,6 @@
         "volumeLabel": "[Speech volume ({pct}%)]",
         "volumeMute": "[0% mute]",
         "volumeFull": "[100% full]"
-      },
-      "voiceQualityHint": {
-        "heading": "[Voice sounding robotic?]",
-        "body": "[The default English voice on most devices is a low-quality \"compact\" version. Your device's accessibility or spoken-content settings let you download a higher-quality (Premium or Enhanced) British English voice. Once installed, the app picks it automatically.]",
-        "dismissAriaLabel": "[Dismiss tip]"
       }
     },
     "offline": {
@@ -873,6 +869,7 @@
     "addingSound": {
       "heading": "[Adding sound (optional)]",
       "body": "[You can enable Pokémon cries on card reveal and spoken names via text-to-speech. You can also unlock cry cards, where the audio is the prompt.]",
+      "pronunciationNote": "[Spoken names are AI-generated and still improving, so some may sound off.]",
       "openAudioSettings": "[Open audio settings]"
     },
     "guestStorage": {

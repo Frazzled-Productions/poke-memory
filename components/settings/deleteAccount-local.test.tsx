@@ -20,7 +20,7 @@ function makeRpcClient(rpcError: null | object = null) {
 
 // jsdom on this Node version does not ship localStorage out of the box, so
 // the test provides its own in-memory stub — matching the pattern used in
-// CollapsibleSection.test.tsx / VoiceQualityHint.test.tsx.
+// CollapsibleSection.test.tsx.
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
   return {

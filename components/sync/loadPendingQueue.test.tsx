@@ -13,8 +13,7 @@
  *
  * jsdom on this Node version does not ship localStorage out of the box, so
  * the test provides its own in-memory stub — matching the pattern used in
- * components/settings/deleteAccount-local.test.tsx and
- * components/settings/VoiceQualityHint.test.tsx.
+ * components/settings/deleteAccount-local.test.tsx.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
