@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Project conventions and workflows
-    url: https://github.com/fraserbrookhouse/poke-memory/blob/main/AGENTS.md
+    url: https://github.com/Frazzled-Productions/poke-memory/blob/main/AGENTS.md
     about: Read AGENTS.md before filing — it covers sync, superuser, persistence, SRS, and the sub-agent playbook.
   - name: Changelog
-    url: https://github.com/fraserbrookhouse/poke-memory/blob/main/CHANGELOG.md
+    url: https://github.com/Frazzled-Productions/poke-memory/blob/main/CHANGELOG.md
     about: Look here first — your bug or request may already be released or queued.
