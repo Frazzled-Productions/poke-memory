@@ -54,6 +54,7 @@ import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { computePerGameStats, type GameStats } from "@/lib/stats/per-game";
 import { GameBreakdown } from "@/components/stats/GameBreakdown";
 import type { AppLocale } from "@/i18n/locales";
+import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 // ---------------------------------------------------------------------------
 // Lazily-loaded Recharts chart components.
@@ -160,8 +161,8 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
                 <Image
                   src={card.spriteUrl}
                   alt={card.name}
-                  width={48}
-                  height={48}
+                  width={STATS_SPRITE_SIZE}
+                  height={STATS_SPRITE_SIZE}
                   className="shrink-0 object-contain"
                 />
                 <div className="min-w-0 flex-1">

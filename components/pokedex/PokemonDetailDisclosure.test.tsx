@@ -322,3 +322,146 @@ describe("PokemonDetailDisclosure — sprite sizes (#931)", () => {
     expect(fullSprite).toHaveAttribute("height", String(POKEDEX_FORM_SPRITE_SIZE));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests — locked-state signposts (#1440)
+// ---------------------------------------------------------------------------
+
+describe("PokemonDetailDisclosure — locked-state signposts (#1440)", () => {
+  beforeEach(() => {
+    mockSpeakName.mockClear();
+    mockPlayCry.mockClear();
+    mockPretendAllMastered.value = false;
+  });
+
+  // ── Base Stats section ────────────────────────────────────────────────────
+
+  it("locked: Base Stats section shows unlock hint, not stat bars", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    expect(screen.getByRole("heading", { name: "Base Stats", level: 2 })).toBeInTheDocument();
+// Both Base Stats and Facts sections show the same hint (two occurrences)
+    const hints = screen.getAllByText("Unlocks when you master this Pokémon.");
+    expect(hints.length).toBeGreaterThanOrEqual(1);
+    // Stat bar list should NOT be present
+    expect(screen.queryByRole("definition")).not.toBeInTheDocument();
+  });
+
+  it("mastered: Base Stats section shows stat bars, not unlock hint", () => {
+    mockCardClass.value = "mastered";
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    expect(screen.getByRole("heading", { name: "Base Stats", level: 2 })).toBeInTheDocument();
+    // Stat labels rendered
+    expect(screen.getByText("HP")).toBeInTheDocument();
+    expect(screen.getByText("Speed")).toBeInTheDocument();
+    // Unlock hint should NOT appear for mastered
+    expect(screen.queryByText("Unlocks when you master this Pokémon.")).not.toBeInTheDocument();
+  });
+
+  it("learning (not mastered, not locked): Base Stats section is hidden", () => {
+    mockCardClass.value = "learning";
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    // learning state shows no stats section at all (neither mastered nor locked branch)
+    expect(screen.queryByRole("heading", { name: "Base Stats", level: 2 })).not.toBeInTheDocument();
+    expect(screen.queryByText("Unlocks when you master this Pokémon.")).not.toBeInTheDocument();
+  });
+
+  it("locked + pretendAllMastered on: stat bars shown, no locked hint", () => {
+    mockCardClass.value = "locked";
+    mockPretendAllMastered.value = true;
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    expect(screen.getByRole("heading", { name: "Base Stats", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText("HP")).toBeInTheDocument();
+    // No locked signpost
+    expect(screen.queryByText("Unlocks when you master this Pokémon.")).not.toBeInTheDocument();
+  });
+
+  // ── Facts section ─────────────────────────────────────────────────────────
+
+  it("locked: Facts section shows unlock hint", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    expect(screen.getByRole("heading", { name: "Facts", level: 2 })).toBeInTheDocument();
+    // Two occurrences of the hint: one for Base Stats, one for Facts
+    const hints = screen.getAllByText("Unlocks when you master this Pokémon.");
+    expect(hints.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("mastered: Facts section is rendered without unlock hint", () => {
+    mockCardClass.value = "mastered";
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    expect(screen.getByRole("heading", { name: "Facts", level: 2 })).toBeInTheDocument();
+    expect(screen.queryByText("Unlocks when you master this Pokémon.")).not.toBeInTheDocument();
+  });
+
+  // ── Evolution Chain section ───────────────────────────────────────────────
+
+  function makePokemonWithEvolution(): ReturnType<typeof makePokemon> {
+    return makePokemon({
+      evolutionChain: [
+        { speciesId: 1, name: "Bulbasaur", evolvesFromId: null },
+        { speciesId: 2, name: "Ivysaur", evolvesFromId: 1 },
+      ],
+    });
+  }
+
+  it("locked with multi-stage evo: Evolution Chain section shows unlock hint", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemonWithEvolution();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    expect(screen.getByRole("heading", { name: "Evolution Chain", level: 2 })).toBeInTheDocument();
+    const hints = screen.getAllByText("Unlocks when you master this Pokémon.");
+    expect(hints.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("mastered with multi-stage evo: Evolution Chain section shows chain", () => {
+    mockCardClass.value = "mastered";
+    const pokemon = makePokemonWithEvolution();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    expect(screen.getByRole("heading", { name: "Evolution Chain", level: 2 })).toBeInTheDocument();
+    expect(screen.queryByText("Unlocks when you master this Pokémon.")).not.toBeInTheDocument();
+  });
+
+  // ── Locale coverage ───────────────────────────────────────────────────────
+
+  it("locked: Base Stats hint renders in Japanese", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />, { locale: "ja" });
+
+    const hints = screen.getAllByText("この Pokémon を習得すると解放されます。");
+    expect(hints.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("locked: Base Stats hint renders in Simplified Chinese", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />, { locale: "zh-Hans" });
+
+    const hints = screen.getAllByText("掌握这只宝可梦后解锁。");
+    expect(hints.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("locked: Base Stats hint renders in Traditional Chinese", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />, { locale: "zh-Hant" });
+
+    const hints = screen.getAllByText("掌握這隻寶可夢後解鎖。");
+    expect(hints.length).toBeGreaterThanOrEqual(1);
+  });
+});

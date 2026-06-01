@@ -21,7 +21,7 @@ import {
 } from "@/lib/gradelog/persistence";
 import { KEY_GRADE_LOG } from "@/lib/storage/keys";
 import { todayString } from "@/lib/review/session";
-import { cardPanel } from "@/lib/utils/class-names";
+import { cardPanel, colStack, mutedText, colStackLg } from "@/lib/utils/class-names";
 
 // Grade colour mapping — colours only; labels are resolved via t() at render.
 const GRADE_COLOURS: Record<number, { dot: string; text: string }> = {
@@ -58,7 +58,7 @@ function gradeTextClass(grade: number): string {
 function StatRow({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-sm text-zinc-500 dark:text-zinc-400">{label}</span>
+      <span className={mutedText}>{label}</span>
       <span className="tabular-nums text-sm font-semibold text-foreground">{value}</span>
     </div>
   );
@@ -77,7 +77,7 @@ function GradeTallyRow({
   return (
     <div role="listitem" className="flex items-center gap-2">
       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${gradeDotClass(grade)}`} aria-hidden="true" />
-      <span className="text-sm text-zinc-500 dark:text-zinc-400 flex-1">{gradeLabel}</span>
+      <span className={`${mutedText} flex-1`}>{gradeLabel}</span>
       <span className={`tabular-nums text-sm font-semibold ${gradeTextClass(grade)}`}>{count}</span>
     </div>
   );
@@ -152,7 +152,7 @@ export const PracticeSidebar = memo(function PracticeSidebar() {
     return (
       <aside
         aria-label={tSidebar("sessionProgress")}
-        className="flex flex-col gap-4"
+        className={colStackLg}
       >
         <div className={`${cardPanel} animate-pulse flex flex-col gap-3`}>
           <div className="h-4 w-28 rounded bg-zinc-200 dark:bg-zinc-800" />
@@ -171,7 +171,7 @@ export const PracticeSidebar = memo(function PracticeSidebar() {
   return (
     <aside
       aria-label={tSidebar("sessionProgress")}
-      className="flex flex-col gap-4"
+      className={colStackLg}
     >
       <div className={`${cardPanel} flex flex-col gap-3`}>
         <h2 className="text-sm font-semibold text-foreground">{tSidebar("today")}</h2>
@@ -198,7 +198,7 @@ export const PracticeSidebar = memo(function PracticeSidebar() {
       </div>
 
       {recentDots.length > 0 && (
-        <div className={`${cardPanel} flex flex-col gap-2`}>
+        <div className={`${cardPanel} ${colStack}`}>
           <h2 className="text-sm font-semibold text-foreground">{tSidebar("recentGrades")}</h2>
           <div
             className="flex flex-wrap gap-1.5"

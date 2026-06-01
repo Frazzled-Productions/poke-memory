@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { MIN_REVIEWS_FOR_OPTIMIZATION, OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, sectionLabelSm } from "@/lib/utils/class-names";
+import { formatDate, todayInTimezone } from "@/lib/utils/format-date";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -58,6 +59,11 @@ export function FsrsOptimizerSection({
   // coarse day-granularity countdown, so a snapshot at mount is accurate
   // enough without a ticking timer.
   const [nowMs] = useState(() => Date.now());
+  // The "last optimized" label is a user-facing day boundary, so render the
+  // optimization timestamp's calendar date in the user's configured timezone
+  // (AGENTS.md: user-facing dates are tz-aware via user_settings.timezone),
+  // not UTC. Captured once at mount to keep the render body pure.
+  const [tz] = useState(() => loadSettings().timezone ?? "UTC");
   const cooldown = useMemo(
     () => computeCooldown(fsrsWeightsOptimizedAt, nowMs),
     [fsrsWeightsOptimizedAt, nowMs],
@@ -214,11 +220,11 @@ export function FsrsOptimizerSection({
               className={mutedTextXs}
             >
               Last optimized:{" "}
-              {new Date(cooldown.optimizedAt).toLocaleDateString("en-GB", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
+              {formatDate(
+                todayInTimezone(tz, new Date(cooldown.optimizedAt)),
+                "dmy-year",
+                "UTC",
+              )}
             </p>
           </div>
         ) : (
@@ -267,11 +273,11 @@ export function FsrsOptimizerSection({
                   className={mutedTextXs}
                 >
                   Last optimized:{" "}
-                  {new Date(fsrsWeightsOptimizedAt).toLocaleDateString("en-GB", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {formatDate(
+                    todayInTimezone(tz, new Date(fsrsWeightsOptimizedAt)),
+                    "dmy-year",
+                    "UTC",
+                  )}
                 </p>
               )}
             </div>

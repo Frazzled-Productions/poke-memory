@@ -9,6 +9,8 @@ import {
   SETTINGS_SAVED_EVENT,
 } from "@/lib/settings/persistence";
 import { DEFAULT_STREAK_PROTECTION } from "@/lib/streak";
+import { saveStreakData } from "@/lib/streak/persistence";
+import { todayString } from "@/lib/review/session";
 
 // jsdom on this Node version does not ship localStorage; provide a stub.
 function makeLocalStorage(): Storage {
@@ -471,5 +473,42 @@ describe("StreakProtectionCard — tokenCount ICU plural (#1408)", () => {
     expect(labelEl).toBeInTheDocument();
     // tokenCount in zh-Hans 'other' branch = "个令牌"
     expect(labelEl.nextElementSibling?.textContent).toContain("令牌");
+  });
+
+  // -------------------------------------------------------------------------
+  // Current-streak line + next-milestone signpost (#1443 QA — surfaced on
+  // Stats as well as Practice, instead of the removed nav chip).
+  // -------------------------------------------------------------------------
+
+  it("shows the start-your-streak prompt when there is no live streak", () => {
+    // No streak data → streak 0 → startStreakLabel, no milestone countdown.
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+
+    const line = screen.getByTestId("streak-protection-streak");
+    expect(line).toHaveTextContent(/start your streak/i);
+    expect(line).not.toHaveTextContent(/to your next milestone/i);
+  });
+
+  it("shows the current streak and the next-milestone signpost for a live streak", () => {
+    // Seed a single review for today → streak 1 → streakLabel + countdown.
+    const today = todayString(new Date(), loadSettings().timezone ?? "UTC");
+    saveStreakData([today]);
+
+    renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+
+    const line = screen.getByTestId("streak-protection-streak");
+    expect(line).toHaveTextContent(/1-day streak\./i);
+    expect(line).toHaveTextContent(/to your next milestone\./i);
+  });
+
+  it("ja: renders the streak line and milestone signpost in Japanese", () => {
+    const today = todayString(new Date(), loadSettings().timezone ?? "UTC");
+    saveStreakData([today]);
+
+    renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+
+    const line = screen.getByTestId("streak-protection-streak");
+    expect(line).toHaveTextContent(/1日連続。/);
+    expect(line).toHaveTextContent(/次の目標まであと/);
   });
 });

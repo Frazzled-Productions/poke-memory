@@ -21,6 +21,12 @@ type Props = {
   ctaHref?: string;
   ctaLabel?: string;
   /**
+   * Optional CTA action rendered as a primary button. Use instead of `ctaHref`
+   * when the call-to-action triggers an in-page action (e.g. expanding a
+   * collapsible) rather than navigating to a URL.
+   */
+  ctaOnClick?: () => void;
+  /**
    * `"hint"` = inline tip (default). `"callout"` = larger card used for the
    * home-page welcome message.
    */
@@ -39,6 +45,7 @@ export function OnboardingHint({
   children,
   ctaHref,
   ctaLabel,
+  ctaOnClick,
   tone = "hint",
 }: Props) {
   // `null` until we've read localStorage. Rendering `null` during the first
@@ -103,13 +110,24 @@ export function OnboardingHint({
       <div className="pr-8">
         {title && <p className={titleClass}>{title}</p>}
         <div className={bodyClass}>{children}</div>
-        {ctaHref && ctaLabel && (
-          <Link
-            href={ctaHref}
+        {ctaOnClick && ctaLabel ? (
+          <button
+            type="button"
+            onClick={ctaOnClick}
             className="mt-3 inline-flex min-h-[36px] items-center rounded-lg bg-foreground px-4 py-1.5 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >
             {ctaLabel}
-          </Link>
+          </button>
+        ) : (
+          ctaHref &&
+          ctaLabel && (
+            <Link
+              href={ctaHref}
+              className="mt-3 inline-flex min-h-[36px] items-center rounded-lg bg-foreground px-4 py-1.5 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            >
+              {ctaLabel}
+            </Link>
+          )
         )}
       </div>
     </div>

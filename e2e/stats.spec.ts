@@ -516,7 +516,42 @@ test.describe("Stats page — streak protection card (#1227)", () => {
       page.getByRole("heading", { level: 2, name: "Streak protection" }),
     ).toBeVisible({ timeout: 15_000 });
     // 0 + " tokens" — verified via the explicit aria-label on the count.
-    await expect(page.getByLabel("0 protection tokens")).toBeVisible();
+    // Scope the query to the card to stay robust against any other surface
+    // carrying a "protection tokens" label.
+    await expect(
+      page.getByTestId("streak-protection-card").getByLabel("0 protection tokens"),
+    ).toBeVisible();
+    // The relocated streak line (#1443) shows the start-your-streak prompt for a
+    // guest with no live streak, and no milestone countdown.
+    const streakLine = page.getByTestId("streak-protection-streak");
+    await expect(streakLine).toBeVisible();
+    await expect(streakLine).toContainText(/Start your streak/i);
+    await expect(streakLine).not.toContainText(/to your next milestone/i);
+  });
+
+  test("shows the current streak and milestone countdown for a live streak", async ({
+    page,
+  }) => {
+    // Seed a single review for today (UTC, the fresh-guest default timezone) so
+    // the streak is 1 and a next-milestone countdown is shown (#1443).
+    await page.addInitScript(() => {
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem("poke-memory:streak:v1", JSON.stringify([today]));
+      localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({
+          mobileNav: "bottom",
+          onboarding: { firstVisitOnboardingDismissed: true },
+        }),
+      );
+    });
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Streak protection" }),
+    ).toBeVisible({ timeout: 15_000 });
+    const streakLine = page.getByTestId("streak-protection-streak");
+    await expect(streakLine).toContainText(/1-day streak\./i);
+    await expect(streakLine).toContainText(/to your next milestone\./i);
   });
 
   test("reflects a seeded non-zero balance and shows the spend history line", async ({
@@ -556,7 +591,9 @@ test.describe("Stats page — streak protection card (#1227)", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Streak protection" }),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByLabel("2 protection tokens")).toBeVisible();
+    await expect(
+      page.getByTestId("streak-protection-card").getByLabel("2 protection tokens"),
+    ).toBeVisible();
     await expect(page.getByTestId("streak-protection-last-spend")).toBeVisible();
     await expect(page.getByTestId("streak-protection-last-spend")).toContainText(
       /Streak preserved on/,

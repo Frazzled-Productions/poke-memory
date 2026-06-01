@@ -18,7 +18,13 @@
     "closeMenu": "ナビゲーションメニューを閉じる",
     "navigationMenu": "ナビゲーションメニュー",
     "mobileNavigation": "モバイルナビゲーション",
-    "menuLabel": "メニュー"
+    "menuLabel": "メニュー",
+    "streakChip": {
+      "startStreakLabel": "連続を始めよう",
+      "streakLabel": "{count}日連続。",
+      "tokenLabel": "{count, plural, one {保護トークン#個。} other {保護トークン#個。}}",
+      "milestoneLabel": "{count, plural, one {次の目標まであと#日。} other {次の目標まであと#日。}}"
+    }
   },
   "auth": {
     "signingIn": "サインイン中…",
@@ -65,7 +71,10 @@
         "description": "Pokémon を習得済みにするとアプリのカラーテーマとして使用できるようになります。",
         "selected": "選択中",
         "setAsTheme": "テーマに設定",
-        "remove": "削除"
+        "remove": "削除",
+        "lockedHeading": "アプリテーマ",
+        "lockedBody": "最初の Pokémon を習得するとテーマが解放されます。",
+        "practiceLink": "練習へ"
       },
       "intensityPicker": {
         "heading": "テーマの強度",
@@ -170,7 +179,12 @@
       },
       "newPerDay": "1日の新規カード数",
       "reviewsPerDay": "1日のレビュー数",
-      "save": "保存"
+      "save": "保存",
+      "markWhatIKnowNudge": {
+        "title": "ヒント: すでに知っている Pokémon はキューをスキップできます",
+        "body": "下のクイックスタートクイズで、すでに知っている Pokémon をマークしてください。各 Pokémon は長い初回間隔でスケジューラーに登録され、新規カードキューをスキップできます。",
+        "cta": "クイックスタートクイズを開く"
+      }
     },
     "audio": {
       "cryCards": {
@@ -301,6 +315,10 @@
         "label": "次の連続記録マイルストーンを強制",
         "description": "実際の連続記録に関わらず、次回の練習訪問で最小の未表示連続記録セレブレーションを発動します。1回の発動後に自動クリアされます。スーパーユーザーをロックするとサインイン済みユーザーのローカル進捗がクラウド状態で上書きされます。"
       },
+      "forceTokenToast": {
+        "label": "トークン獲得トーストを表示",
+        "description": "次回の練習画面で、実際のトークン状態に関わらず「保護トークン獲得」のヘルプトーストを表示します。1回表示すると自動的に解除されます。"
+      },
       "forceCardsGraduated": {
         "label": "カードを卒業済みとして強制",
         "description": "すべてのカードを卒業済みとして扱います。学習ステップを経ずに入力テストをテストする際に使用します。"
@@ -428,6 +446,10 @@
       "recentGrades": "最近の採点",
       "recentGradesAriaLabel": "{count} 件の最近の採点（新しい順）",
       "viewFullStats": "全記録を見る"
+    },
+    "practiceScopeNudge": {
+      "title": "ヒント: 世代・タイプ・グループで絞り込めます",
+      "body": "下の「スコープ」を開いて、特定の世代・タイプ・スターターや未完成の進化チェーンなどのグループに絞って練習できます。"
     }
   },
   "review": {
@@ -440,7 +462,13 @@
       "ariaLabel": "キュー数"
     },
     "storageFullBanner": "ストレージが満杯のため進捗の保存が無効になっています。",
-    "storageFullDismiss": "閉じる"
+    "storageFullDismiss": "閉じる",
+    "tokenEarned": "連続ストリーク保護トークンを獲得しました。セーブされていない日を自動でカバーします。",
+    "tokenSpent": "{count, plural, other {保護トークンを使用して、{count}日連続のストリークを守りました。}}",
+    "tokenEarnedAndSpent": "連続ストリーク保護トークンを獲得して使用しました。{count}日連続は安全です。",
+    "tokenToastDismiss": "通知を閉じる",
+    "tokenEarnedHeading": "トークン獲得",
+    "tokenSpentHeading": "ストリーク保護"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -487,13 +515,14 @@
     "statDefense": "防御",
     "statSpAtk": "特攻",
     "statSpDef": "特防",
-    "statSpeed": "素早さ"
+    "statSpeed": "素早さ",
+    "lockedSectionHint": "この Pokémon を習得すると解放されます。"
   },
   "pasture": {
     "title": "牧場",
     "description": "習得済みの Pokémon がここに住んでいます。",
     "empty": "牧場は空です。Pokémon を習得するとここに表示されます。",
-    "emptyBody": "牧場は空です。練習で最初の Pokémon を習得するとここに表示されます。",
+    "emptyBody": "牧場はあなたが習得した Pokémon のコレクションです。練習で最初の Pokémon を習得するとここに表示されます。",
     "searchPlaceholder": "習得済みの Pokémon を検索...",
     "masteredCount": "{count}匹習得済み",
     "pokemonCount": "{count}匹",
@@ -807,6 +836,13 @@
       "lockedAriaLabel": "未獲得ジムバッジ",
       "hideLocked": "未獲得バッジを隠す（{count}個）",
       "viewAll": "すべてのバッジを表示（{count}個ロック中）"
+    },
+    "masteryExplainer": {
+      "title": "リングの意味",
+      "lockedBody": "未開始: まだ練習セッションで見ていないポケモンです。",
+      "learningBody": "学習中: すでに見たことがあり、記憶を定着させています。",
+      "masteredBody": "{reps}回連続して正しく思い出し、次のレビューが21日以上先に設定されると習得済みになります。スケジューラーが本当に覚えたと判断した時点です。",
+      "introducedNote": "表示済みは、完全に習得したかどうかに関わらず、少なくとも1回見たことのあるポケモンの数です。"
     }
   },
   "error": {

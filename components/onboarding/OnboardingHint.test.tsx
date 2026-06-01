@@ -74,6 +74,20 @@ describe("OnboardingHint", () => {
     expect(link.getAttribute("href")).toBe("/settings");
   });
 
+  it("renders a CTA button and invokes ctaOnClick when ctaOnClick + ctaLabel are provided", async () => {
+    const onClick = vi.fn();
+    render(
+      <OnboardingHint id="welcomeDismissed" ctaLabel="Open it" ctaOnClick={onClick}>
+        Body.
+      </OnboardingHint>,
+    );
+    const button = await screen.findByRole("button", { name: /open it/i });
+    // It is a button (in-page action), not a navigation link.
+    expect(screen.queryByRole("link", { name: /open it/i })).toBeNull();
+    await userEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
   it("re-renders when SETTINGS_SAVED_EVENT fires (e.g. after reset)", async () => {
     currentSettings = {
       ...DEFAULT_SETTINGS,

@@ -62,6 +62,7 @@ import { cardPanelPadded, colStackLg, mutedTextXs, sectionLabel } from "@/lib/ut
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
+import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -138,7 +139,7 @@ function ResetEarnedBadgesRow() {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-background px-5 py-4 dark:border-zinc-800">
+    <div className={cardPanelPadded}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-foreground">
@@ -202,7 +203,27 @@ function FavouritePicker({
     );
   });
 
-  if (unlockedEntries.length === 0) return null;
+  if (unlockedEntries.length === 0) {
+    return (
+      <div className="rounded-lg border border-zinc-200 bg-background px-4 py-5 dark:border-zinc-800">
+        <h3
+          id="theme-heading"
+          className="text-sm font-semibold text-foreground"
+        >
+          {t("settings.appearance.theme.lockedHeading")}
+        </h3>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          {t("settings.appearance.theme.lockedBody")}
+        </p>
+        <Link
+          href="/"
+          className="mt-3 inline-block text-sm font-medium text-foreground underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+        >
+          {t("settings.appearance.theme.practiceLink")}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -234,8 +255,8 @@ function FavouritePicker({
                 <Image
                   src={seed.spriteUrl}
                   alt={entry.name}
-                  width={64}
-                  height={64}
+                  width={POKEDEX_GRID_SPRITE_SIZE}
+                  height={POKEDEX_GRID_SPRITE_SIZE}
                   className="h-16 w-16 object-contain"
                 />
               ) : (
@@ -481,6 +502,35 @@ export default function SettingsPage() {
   // "Mark Pokémon I already know" quiz — collapsed by default so the long
   // sprite grid does not eat the Practice section.
   const [knownQuizOpen, setKnownQuizOpen] = useState<boolean>(false);
+
+  // Open the quiz and dismiss the discovery nudge (#1443): once the user has
+  // engaged with "Mark Pokémon I already know", the nudge has served its
+  // purpose, so persist its dismissal (the OnboardingHint re-syncs on the
+  // SETTINGS_SAVED_EVENT and hides itself).
+  function openKnownQuiz() {
+    // Expand the Practice category and open the quiz row, since the nudge lives
+    // at the top of the page.
+    setTargetCategoryId("practice-heading");
+    setKnownQuizOpen(true);
+    const settings = loadSettings();
+    const onboarding = settings.onboarding ?? { ...DEFAULT_ONBOARDING };
+    if (onboarding.markWhatIKnowNudgeDismissed !== true) {
+      saveSettings({
+        ...settings,
+        onboarding: { ...onboarding, markWhatIKnowNudgeDismissed: true },
+      });
+    }
+    // Scroll the quiz itself into view once the category has expanded and the
+    // quiz panel has rendered. The category's own forceOpen scroll targets the
+    // category heading (much higher up), so without this the user lands above
+    // the fold and never sees the quiz they asked to open (#1443 QA). This is a
+    // "use client" component, so window is always defined here.
+    window.setTimeout(() => {
+      document
+        .getElementById("known-quiz-heading")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 200);
+  }
 
   // Settings search/filter query.
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -807,6 +857,26 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* Discovery nudge (#1443): pointing users at the "Mark Pokémon I
+                already know" quiz. Rendered above the collapsible category list
+                so it is visible without expanding anything; its CTA expands the
+                Practice category, opens the quiz, and dismisses the nudge. Uses
+                its own flag so it reaches existing users (absent key → false via
+                the `=== true` coercion in validateOnboarding). Hidden while a
+                search filter is active to avoid cluttering results. */}
+            {!isFiltering && (
+              <div className="mb-3">
+                <OnboardingHint
+                  id="markWhatIKnowNudgeDismissed"
+                  title={t("settings.practice.markWhatIKnowNudge.title")}
+                  ctaLabel={t("settings.practice.markWhatIKnowNudge.cta")}
+                  ctaOnClick={openKnownQuiz}
+                >
+                  <p>{t("settings.practice.markWhatIKnowNudge.body")}</p>
+                </OnboardingHint>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
 
               {/* ── Appearance ─────────────────────────────────────────────── */}
@@ -1005,7 +1075,9 @@ export default function SettingsPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setKnownQuizOpen((open) => !open)}
+                        onClick={() =>
+                          knownQuizOpen ? setKnownQuizOpen(false) : openKnownQuiz()
+                        }
                         aria-expanded={knownQuizOpen}
                         aria-controls="known-quiz-panel"
                         className="min-h-[36px] shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
@@ -2111,6 +2183,44 @@ export default function SettingsPage() {
                           <span
                             className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
                               flags.forceNextStreakMilestone
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className={cn("mt-4", cardPanelPadded)}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {t("settings.developer.forceTokenToast.label")}
+                          </p>
+                          <p className={`mt-1 ${mutedTextXs}`}>
+                            {t("settings.developer.forceTokenToast.description")}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label={t("settings.developer.forceTokenToast.label")}
+                          aria-checked={flags.forceTokenToast}
+                          onClick={() =>
+                            void setFlag(
+                              "forceTokenToast",
+                              !flags.forceTokenToast,
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            flags.forceTokenToast
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              flags.forceTokenToast
                                 ? "translate-x-5"
                                 : "translate-x-0"
                             }`}

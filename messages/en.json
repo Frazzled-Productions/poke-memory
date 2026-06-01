@@ -18,7 +18,13 @@
     "closeMenu": "Close navigation menu",
     "navigationMenu": "Navigation menu",
     "mobileNavigation": "Mobile navigation",
-    "menuLabel": "Menu"
+    "menuLabel": "Menu",
+    "streakChip": {
+      "startStreakLabel": "Start your streak",
+      "streakLabel": "{count, plural, one {#-day streak.} other {#-day streak.}}",
+      "tokenLabel": "{count, plural, one {# protection token.} other {# protection tokens.}}",
+      "milestoneLabel": "{count, plural, one {# day to your next milestone.} other {# days to your next milestone.}}"
+    }
   },
   "auth": {
     "signingIn": "Signing in…",
@@ -65,7 +71,10 @@
         "description": "Master a Pokémon to unlock it as an app colour theme.",
         "selected": "Selected",
         "setAsTheme": "Set as theme",
-        "remove": "Remove"
+        "remove": "Remove",
+        "lockedHeading": "App Theme",
+        "lockedBody": "Master your first Pokémon to unlock themes.",
+        "practiceLink": "Go to Practice"
       },
       "intensityPicker": {
         "heading": "Theme intensity",
@@ -170,7 +179,12 @@
       },
       "newPerDay": "New cards per day",
       "reviewsPerDay": "Reviews per day",
-      "save": "Save"
+      "save": "Save",
+      "markWhatIKnowNudge": {
+        "title": "Did you know? Skip the queue for Pokémon you already know",
+        "body": "Use the Quickstart quiz below to mark Pokémon you already recognise. Each one graduates straight into the scheduler, so you skip the new-card queue for species you know cold.",
+        "cta": "Open Quickstart quiz"
+      }
     },
     "audio": {
       "cryCards": {
@@ -301,6 +315,10 @@
         "label": "Force next streak milestone",
         "description": "Fires the smallest un-seen streak celebration on the next visit to Practice, regardless of the real streak. Self-clears after one fire. Locking superuser overwrites local progress with cloud state for signed-in users."
       },
+      "forceTokenToast": {
+        "label": "Force token earned toast",
+        "description": "Fires the streak-protection token-earned helper toast on the next visit to Practice, regardless of real token state. Self-clears after one fire."
+      },
       "forceCardsGraduated": {
         "label": "Force cards graduated",
         "description": "Treat all cards as graduated. Use to test typed entry without grinding learning steps."
@@ -428,6 +446,10 @@
       "recentGrades": "Recent grades",
       "recentGradesAriaLabel": "{count} recent grades, newest first",
       "viewFullStats": "View full stats"
+    },
+    "practiceScopeNudge": {
+      "title": "Tip: filter by generation, type, or group",
+      "body": "Use the Scope control below to focus practice on a generation, type, or a group like Starters or Incomplete chains."
     }
   },
   "review": {
@@ -440,7 +462,13 @@
       "ariaLabel": "Queue counts"
     },
     "storageFullBanner": "Progress saving is disabled: storage is full.",
-    "storageFullDismiss": "Dismiss"
+    "storageFullDismiss": "Dismiss",
+    "tokenEarned": "Streak protection token earned - it will automatically cover one missed day.",
+    "tokenSpent": "{count, plural, one {We used a protection token to save your #-day streak.} other {We used a protection token to save your #-day streak.}}",
+    "tokenEarnedAndSpent": "Streak protection token earned and used - your {count}-day streak is safe.",
+    "tokenToastDismiss": "Dismiss token notice",
+    "tokenEarnedHeading": "Token earned",
+    "tokenSpentHeading": "Streak protected"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -487,13 +515,14 @@
     "statDefense": "Defense",
     "statSpAtk": "Sp. Atk",
     "statSpDef": "Sp. Def",
-    "statSpeed": "Speed"
+    "statSpeed": "Speed",
+    "lockedSectionHint": "Unlocks when you master this Pokémon."
   },
   "pasture": {
     "title": "Pasture",
     "description": "Pokémon you have mastered live here.",
     "empty": "Your pasture is empty. Master some Pokémon to see them here.",
-    "emptyBody": "Your pasture is empty. Master your first Pokémon in Practice to see it here.",
+    "emptyBody": "The Pasture is your mastered-Pokémon collection. Master your first Pokémon in Practice to see it here.",
     "searchPlaceholder": "Search mastered Pokémon...",
     "masteredCount": "{count} mastered",
     "pokemonCount": "{count} Pokémon",
@@ -807,6 +836,13 @@
       "lockedAriaLabel": "Locked gym badges",
       "hideLocked": "Hide locked badges ({count})",
       "viewAll": "View all badges ({count} locked)"
+    },
+    "masteryExplainer": {
+      "title": "What the rings mean",
+      "lockedBody": "Locked: you haven't seen this Pokémon in a practice session yet.",
+      "learningBody": "Learning: you've seen it and are building the memory.",
+      "masteredBody": "Mastered: recalled correctly {reps} {reps, plural, one {time} other {times}} in a row with the next review at least 21 days out. That's when the scheduler is confident you've truly learnt it.",
+      "introducedNote": "Introduced counts any Pokémon you've seen at least once, whether or not it's fully mastered yet."
     }
   },
   "error": {

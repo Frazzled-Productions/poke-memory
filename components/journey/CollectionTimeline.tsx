@@ -18,19 +18,18 @@ import { useTranslations, useFormatter } from "next-intl";
 import type { CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { snapshotAtPosition } from "@/lib/timeline/reconstruct";
 import { chartTickText, mutedTextXs } from "@/lib/utils/class-names";
+import { formatDate, isoDate } from "@/lib/utils/format-date";
 import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+// formatDate is imported from lib/utils/format-date (routes through the shared
+// helper instead of raw toLocaleDateString — #1456 lint rule).
+// Local wrapper converts milliseconds to ISO string for the lib helper.
+function formatDateMs(ms: number): string {
+  return formatDate(isoDate(new Date(ms)), "dmy-year", "UTC");
 }
 
 function pct(numerator: number, denominator: number): number {
@@ -180,13 +179,13 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
   // Accessible announcement for screen readers.
   const announcementText = isFuture
     ? tWidget("announcementRetained", {
-        date: formatDate(snapshot.atMs),
+        date: formatDateMs(snapshot.atMs),
         mastered: snapshot.mastered,
         pct: masteredPct,
         total: totalSpecies,
       })
     : tWidget("announcementBuilt", {
-        date: formatDate(snapshot.atMs),
+        date: formatDateMs(snapshot.atMs),
         introduced: snapshot.introduced,
         mastered: snapshot.mastered,
       });
@@ -210,7 +209,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
             {directionLabel}
           </span>
           <span className="text-sm tabular-nums text-zinc-500 dark:text-zinc-400">
-            {formatDate(snapshot.atMs)}
+            {formatDateMs(snapshot.atMs)}
           </span>
         </div>
 

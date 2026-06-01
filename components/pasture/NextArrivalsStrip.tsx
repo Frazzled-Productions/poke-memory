@@ -17,6 +17,7 @@ import { useTranslations } from "next-intl";
 import type { NextArrival } from "@/lib/pasture/nextArrivals";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { mutedText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Individual arrival tile
@@ -83,7 +84,7 @@ export function NextArrivalsStrip({ arrivals }: Props) {
       </h2>
 
       {arrivals.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={mutedText}>
           {t("allCaughtUp")}
         </p>
       ) : (

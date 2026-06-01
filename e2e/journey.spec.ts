@@ -636,3 +636,85 @@ test.describe("Journey page — navigation", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Journey page — mastery explainer hint (#1441)", () => {
+  test("explainer hint renders on the Journey page for a fresh guest session", async ({
+    page,
+  }) => {
+    await page.goto("/journey");
+    // Wait for hydration past the loading skeleton.
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // The hint has role="note" with an aria-label matching the title.
+    // We verify by the visible text of the title paragraph.
+    await expect(
+      page.getByText("What the rings mean"),
+    ).toBeVisible();
+  });
+
+  test("explainer hint shows Locked body copy", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    await expect(
+      page.getByText(/Locked:.*you haven't seen this Pokémon/i),
+    ).toBeVisible();
+  });
+
+  test("explainer hint is dismissible", async ({ page }) => {
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Hint is initially visible.
+    await expect(page.getByText("What the rings mean")).toBeVisible();
+
+    // Dismiss via the close button.
+    const dismissBtn = page.getByRole("button", { name: "Dismiss hint" }).first();
+    await dismissBtn.click();
+
+    // Hint disappears after dismissal.
+    await expect(page.getByText("What the rings mean")).not.toBeVisible();
+  });
+
+  test("explainer hint does not show when flag is pre-dismissed", async ({ page }) => {
+    // Pre-dismiss the flag before page load, simulating a user who already saw and dismissed it.
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (typeof parsed === "object" && parsed !== null) {
+              existing = parsed as Record<string, unknown>;
+            }
+          } catch { /* ignore */ }
+        }
+        const existingOnboarding =
+          typeof existing.onboarding === "object" && existing.onboarding !== null
+            ? (existing.onboarding as Record<string, unknown>)
+            : {};
+        existing.onboarding = {
+          ...existingOnboarding,
+          journeyMasteryExplainerDismissed: true,
+        };
+        localStorage.setItem(KEY, JSON.stringify(existing));
+      } catch { /* ignore */ }
+    });
+
+    await page.goto("/journey");
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Hint must be absent.
+    await expect(page.getByText("What the rings mean")).not.toBeVisible();
+  });
+});

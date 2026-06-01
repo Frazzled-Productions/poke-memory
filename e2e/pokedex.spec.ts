@@ -1148,3 +1148,63 @@ test.describe("Pokédex sort — sticky across navigation (#1314)", () => {
     await expect(sortSelectAfter).toHaveValue("alphabetical");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pokédex detail — locked-state signposts (#1440)
+// ---------------------------------------------------------------------------
+
+test.describe("Pokédex detail — locked-state signposts (#1440)", () => {
+  test("locked species: Base Stats section shows unlock hint instead of stat bars", async ({
+    page,
+  }) => {
+    // Empty session → all species are locked. Bulbasaur (id=1) is locked.
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+
+    // Page loads with locked state (??? heading)
+    await expect(
+      page.getByRole("heading", { level: 1, name: "???" }),
+    ).toBeVisible();
+
+    // Base Stats section heading is visible with the unlock hint
+    await expect(
+      page.getByRole("heading", { name: "Base Stats", level: 2 }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Unlocks when you master this Pokémon.").first(),
+    ).toBeVisible();
+  });
+
+  test("locked species: Facts section shows unlock hint", async ({ page }) => {
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+
+    await expect(
+      page.getByRole("heading", { name: "Facts", level: 2 }).first(),
+    ).toBeVisible();
+    // Multiple unlock hints appear (one per locked section)
+    await expect(
+      page.getByText("Unlocks when you master this Pokémon.").first(),
+    ).toBeVisible();
+  });
+});

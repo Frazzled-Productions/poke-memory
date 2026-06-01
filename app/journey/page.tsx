@@ -34,6 +34,7 @@ import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { detectTopMilestone } from "@/lib/journey/milestones";
 import { deriveCloseToMastery, type CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
 import { CloseToMastery } from "@/components/journey/CloseToMastery";
+import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, cardPanelPadded, mutedText, sectionLabel } from "@/lib/utils/class-names";
@@ -715,6 +716,21 @@ export default function JourneyPage() {
 
             {/* Mastery rings */}
             <MasteryRings stats={masterySnapshot} />
+
+            {/* Mastery-explainer hint — renders for all users (empty and populated)
+                until explicitly dismissed. Uses a dedicated flag so existing users
+                who pre-date this feature see it on their next Journey visit (#1441). */}
+            <OnboardingHint
+              id="journeyMasteryExplainerDismissed"
+              title={t("masteryExplainer.title")}
+            >
+              <p>{t("masteryExplainer.lockedBody")}</p>
+              <p className="mt-1">{t("masteryExplainer.learningBody")}</p>
+              <p className="mt-1">
+                {t.rich("masteryExplainer.masteredBody", { reps: masteryRepetitions ?? 3, em: (chunks) => <em>{chunks}</em> })}
+              </p>
+              <p className="mt-1">{t("masteryExplainer.introducedNote")}</p>
+            </OnboardingHint>
 
             {/* Introduced ring */}
             <IntroducedRing stats={masterySnapshot} />

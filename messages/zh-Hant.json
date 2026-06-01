@@ -18,7 +18,13 @@
     "closeMenu": "關閉導覽選單",
     "navigationMenu": "導覽選單",
     "mobileNavigation": "行動端導覽",
-    "menuLabel": "選單"
+    "menuLabel": "選單",
+    "streakChip": {
+      "startStreakLabel": "開始連續練習",
+      "streakLabel": "連續{count}天。",
+      "tokenLabel": "{count, plural, one {#個保護代幣。} other {#個保護代幣。}}",
+      "milestoneLabel": "{count, plural, one {距下一個里程碑還有#天。} other {距下一個里程碑還有#天。}}"
+    }
   },
   "auth": {
     "signingIn": "登入中…",
@@ -65,7 +71,10 @@
         "description": "掌握一隻寶可夢後，可將其解鎖為應用程式的配色主題。",
         "selected": "已選擇",
         "setAsTheme": "設為主題",
-        "remove": "移除"
+        "remove": "移除",
+        "lockedHeading": "應用程式主題",
+        "lockedBody": "掌握第一隻寶可夢後即可解鎖主題。",
+        "practiceLink": "前往練習"
       },
       "intensityPicker": {
         "heading": "主題強度",
@@ -170,7 +179,12 @@
       },
       "newPerDay": "每日新卡片數",
       "reviewsPerDay": "每日複習數",
-      "save": "儲存"
+      "save": "儲存",
+      "markWhatIKnowNudge": {
+        "title": "提示：跳過您已知寶可夢的新卡片佇列",
+        "body": "使用下方的快速開始測驗標記您已經認識的寶可夢。每隻寶可夢將直接進入排程器，讓您跳過新卡片佇列。",
+        "cta": "開啟快速開始測驗"
+      }
     },
     "audio": {
       "cryCards": {
@@ -301,6 +315,10 @@
         "label": "強制下一個連續記錄里程碑",
         "description": "無論實際連續記錄如何，在下次訪問練習時觸發最小的未顯示連續記錄慶祝。觸發一次後自動清除。鎖定超級使用者將用雲端狀態覆蓋已登入使用者的本地進度。"
       },
+      "forceTokenToast": {
+        "label": "強制顯示獲得令牌提示",
+        "description": "下次進入練習頁面時，無論實際令牌狀態如何，都會顯示「已獲得保護令牌」說明提示。顯示一次後自動清除。"
+      },
       "forceCardsGraduated": {
         "label": "強制卡片畢業",
         "description": "將所有卡片視為已畢業。用於在不經歷學習步驟的情況下測試輸入功能。"
@@ -428,6 +446,10 @@
       "recentGrades": "最近評分",
       "recentGradesAriaLabel": "{count} 條最近評分（最新優先）",
       "viewFullStats": "檢視完整統計"
+    },
+    "practiceScopeNudge": {
+      "title": "提示：可按世代、屬性或分組篩選",
+      "body": "使用下方的「範圍」控制項，將練習限定於特定世代、屬性，或「御三家」「未完成進化鏈」等分組。"
     }
   },
   "review": {
@@ -440,7 +462,13 @@
       "ariaLabel": "佇列數量"
     },
     "storageFullBanner": "儲存空間已滿，進度無法儲存。",
-    "storageFullDismiss": "關閉"
+    "storageFullDismiss": "關閉",
+    "tokenEarned": "已獲得連續保護令牌，它將自動補上一天未複習的記錄。",
+    "tokenSpent": "{count, plural, other {已使用保護令牌保住了你的 {count} 天連續記錄。}}",
+    "tokenEarnedAndSpent": "已獲得並使用連續保護令牌，你的 {count} 天連續記錄安全了。",
+    "tokenToastDismiss": "關閉提示",
+    "tokenEarnedHeading": "獲得令牌",
+    "tokenSpentHeading": "連續記錄已保護"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -487,13 +515,14 @@
     "statDefense": "防禦",
     "statSpAtk": "特攻",
     "statSpDef": "特防",
-    "statSpeed": "速度"
+    "statSpeed": "速度",
+    "lockedSectionHint": "掌握這隻寶可夢後解鎖。"
   },
   "pasture": {
     "title": "牧場",
     "description": "您已掌握的寶可夢住在這裡。",
     "empty": "牧場是空的。掌握一些寶可夢後，它們就會出現在這裡。",
-    "emptyBody": "牧場是空的。在練習中掌握第一隻寶可夢後，牠就會出現在這裡。",
+    "emptyBody": "牧場是你已掌握寶可夢的收藏。在練習中掌握第一隻寶可夢後，牠就會出現在這裡。",
     "searchPlaceholder": "搜尋已掌握的寶可夢...",
     "masteredCount": "已掌握 {count} 隻",
     "pokemonCount": "{count} 隻寶可夢",
@@ -807,6 +836,13 @@
       "lockedAriaLabel": "未獲得的道館徽章",
       "hideLocked": "隱藏未獲得的徽章（{count} 個）",
       "viewAll": "查看所有徽章（{count} 個已鎖定）"
+    },
+    "masteryExplainer": {
+      "title": "圓環含義",
+      "lockedBody": "未開始：您還未在練習中見過此寶可夢。",
+      "learningBody": "學習中：您已見過它，正在鞏固記憶。",
+      "masteredBody": "已掌握：連續答對 {reps} 次且下次複習間隔至少 21 天。這是排程器確認您真正學會的時間點。",
+      "introducedNote": "已引入統計您至少見過一次的寶可夢，無論是否已完全掌握。"
     }
   },
   "error": {

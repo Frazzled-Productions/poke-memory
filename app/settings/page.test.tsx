@@ -12,9 +12,9 @@
  * test is fast and focused on Settings-page logic, not those components.
  */
 
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Module mocks — declared before any imports so vi.mock hoisting works.
@@ -82,11 +82,21 @@ vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({ user: null, supabase: null, loading: false }),
 }));
 
+const { mockSuperuserFlags, mockSuperuserState, mockSetFlag } = vi.hoisted(
+  () => ({
+    mockSuperuserFlags: { pretendAllMastered: false } as Record<
+      string,
+      boolean
+    >,
+    mockSuperuserState: { unlocked: false },
+    mockSetFlag: vi.fn(),
+  }),
+);
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => ({
-    unlocked: false,
-    flags: { pretendAllMastered: false },
-    setFlag: vi.fn(),
+    unlocked: mockSuperuserState.unlocked,
+    flags: mockSuperuserFlags,
+    setFlag: mockSetFlag,
     anyFlagOn: false,
   }),
 }));
@@ -177,6 +187,10 @@ vi.mock("@/components/settings/FsrsOptimizerSection", () => ({
 
 vi.mock("@/components/settings/IntensityPicker", () => ({
   IntensityPicker: () => <div data-testid="intensity-picker" />,
+}));
+
+vi.mock("@/components/onboarding/KnownPokemonQuiz", () => ({
+  KnownPokemonQuiz: () => <div data-testid="known-pokemon-quiz" />,
 }));
 
 vi.mock("@/components/settings/VoiceQualityHint", () => ({
@@ -986,5 +1000,154 @@ describe("SettingsPage — preview suffix from catalog", () => {
     expect(suffix.length).toBeGreaterThan(0);
     // The Japanese suffix should use fullwidth brackets.
     expect(suffix).toContain("プレビュー");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Theme picker locked state (#1440)
+//
+// FavouritePicker renders a locked-state message when no Pokémon are mastered.
+// When pretendAllMastered is on (or mastered entries exist), the picker renders.
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — theme picker locked state (#1440)", () => {
+  // Helper to get the settings page rendered, waiting for load.
+  async function renderAndWait() {
+    render(<SettingsPage />);
+    // Wait for the async loadSession effect to complete
+    await waitFor(() => {
+      // The page renders content after settings load
+      expect(screen.getByText(/App Theme/i)).toBeInTheDocument();
+    });
+  }
+
+  it("shows locked-state message when no Pokémon are mastered", async () => {
+    // loadSession returns null → cardStateById is empty → unlockedEntries is empty
+    mockLoadSession.mockResolvedValue(null);
+
+    await renderAndWait();
+
+    expect(screen.getByText("Master your first Pokémon to unlock themes.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to Practice" })).toBeInTheDocument();
+  });
+
+  it("locked state: Practice link points to /", async () => {
+    mockLoadSession.mockResolvedValue(null);
+
+    await renderAndWait();
+
+    const link = screen.getByRole("link", { name: "Go to Practice" });
+    expect(link).toHaveAttribute("href", "/");
+  });
+
+  it("locked state: no theme picker grid rendered", async () => {
+    mockLoadSession.mockResolvedValue(null);
+
+    await renderAndWait();
+
+    expect(screen.queryByRole("button", { name: /Set as theme/i })).not.toBeInTheDocument();
+  });
+
+  it("pretendAllMastered on: picker grid renders, locked message absent", async () => {
+    // The superuser flag forces unlockedEntries to include every CURATED_POKEMON
+    // entry (the real, non-empty curated list), so the locked branch is skipped.
+    // This exercises the actual `flags.pretendAllMastered || isMastered(...)`
+    // guard in the component, not just catalogue-key presence.
+    mockLoadSession.mockResolvedValue(null);
+    mockSuperuserFlags.pretendAllMastered = true;
+    try {
+      await renderAndWait();
+
+      // The locked signpost must NOT show when the superuser flag is on.
+      expect(
+        screen.queryByText("Master your first Pokémon to unlock themes."),
+      ).not.toBeInTheDocument();
+      // The picker grid renders at least one selectable theme.
+      await waitFor(() => {
+        expect(
+          screen.getAllByRole("button", { name: /Set as theme/i }).length,
+        ).toBeGreaterThan(0);
+      });
+    } finally {
+      mockSuperuserFlags.pretendAllMastered = false;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mark-what-I-know discovery nudge auto-dismiss (#1443)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — mark-what-I-know nudge (#1443)", () => {
+  it("opening the Quickstart quiz persists markWhatIKnowNudgeDismissed", async () => {
+    // defaultSettings() omits the flag → the nudge is shown (absent → false).
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/App Theme/i)).toBeInTheDocument();
+    });
+
+    // Engaging with the quiz opens it AND dismisses the discovery nudge.
+    await userEvent.click(await screen.findByRole("button", { name: "Open quiz" }));
+
+    expect(screen.getByTestId("known-pokemon-quiz")).toBeInTheDocument();
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onboarding: expect.objectContaining({
+          markWhatIKnowNudgeDismissed: true,
+        }),
+      }),
+    );
+  });
+
+  it("scrolls the quiz into view after opening it", async () => {
+    const scrollIntoView = vi.fn();
+    // jsdom does not implement scrollIntoView; provide a spy so the deferred
+    // scroll (200ms after open) can be asserted.
+    Element.prototype.scrollIntoView = scrollIntoView;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/App Theme/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open quiz" }));
+    expect(screen.getByTestId("known-pokemon-quiz")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "center",
+    });
+    vi.useRealTimers();
+  });
+});
+
+describe("SettingsPage — forceTokenToast developer toggle (#1443)", () => {
+  beforeEach(() => {
+    mockSuperuserState.unlocked = true;
+    mockSuperuserFlags.forceTokenToast = false;
+    mockSetFlag.mockClear();
+  });
+  afterEach(() => {
+    mockSuperuserState.unlocked = false;
+    delete mockSuperuserFlags.forceTokenToast;
+  });
+
+  it("renders the developer toggle and flips the flag on click", async () => {
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+
+    const toggle = await screen.findByRole("switch", {
+      name: /force token earned toast/i,
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await userEvent.click(toggle);
+
+    expect(mockSetFlag).toHaveBeenCalledWith("forceTokenToast", true);
   });
 });

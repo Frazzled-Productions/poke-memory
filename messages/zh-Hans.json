@@ -18,7 +18,13 @@
     "closeMenu": "关闭导航菜单",
     "navigationMenu": "导航菜单",
     "mobileNavigation": "移动端导航",
-    "menuLabel": "菜单"
+    "menuLabel": "菜单",
+    "streakChip": {
+      "startStreakLabel": "开始连续练习",
+      "streakLabel": "连续{count}天。",
+      "tokenLabel": "{count, plural, one {#个保护令牌。} other {#个保护令牌。}}",
+      "milestoneLabel": "{count, plural, one {距下一个里程碑还有#天。} other {距下一个里程碑还有#天。}}"
+    }
   },
   "auth": {
     "signingIn": "登录中…",
@@ -65,7 +71,10 @@
         "description": "掌握一只 Pokémon 后，可将其解锁为应用配色主题。",
         "selected": "已选择",
         "setAsTheme": "设为主题",
-        "remove": "移除"
+        "remove": "移除",
+        "lockedHeading": "应用主题",
+        "lockedBody": "掌握第一只宝可梦后即可解锁主题。",
+        "practiceLink": "前往练习"
       },
       "intensityPicker": {
         "heading": "主题强度",
@@ -170,7 +179,12 @@
       },
       "newPerDay": "每日新卡片数",
       "reviewsPerDay": "每日复习数",
-      "save": "保存"
+      "save": "保存",
+      "markWhatIKnowNudge": {
+        "title": "提示：跳过您已知宝可梦的新卡片队列",
+        "body": "使用下方的快速开始测验标记您已经认识的宝可梦。每只宝可梦将直接进入调度器，让您跳过新卡片队列。",
+        "cta": "打开快速开始测验"
+      }
     },
     "audio": {
       "cryCards": {
@@ -301,6 +315,10 @@
         "label": "强制下一个连续记录里程碑",
         "description": "无论实际连续记录如何，在下次访问练习时触发最小的未显示连续记录庆祝。触发一次后自动清除。锁定超级用户将用云端状态覆盖已登录用户的本地进度。"
       },
+      "forceTokenToast": {
+        "label": "强制显示获得令牌提示",
+        "description": "下次进入练习页面时，无论实际令牌状态如何，都会显示「已获得保护令牌」帮助提示。显示一次后自动清除。"
+      },
       "forceCardsGraduated": {
         "label": "强制卡片毕业",
         "description": "将所有卡片视为已毕业。用于在不经历学习步骤的情况下测试输入功能。"
@@ -428,6 +446,10 @@
       "recentGrades": "最近评分",
       "recentGradesAriaLabel": "{count} 条最近评分（最新优先）",
       "viewFullStats": "查看完整统计"
+    },
+    "practiceScopeNudge": {
+      "title": "提示：可按世代、属性或分组筛选",
+      "body": "使用下方的「范围」控件，将练习限定于特定世代、属性，或「御三家」「未完成进化链」等分组。"
     }
   },
   "review": {
@@ -440,7 +462,13 @@
       "ariaLabel": "队列数量"
     },
     "storageFullBanner": "存储空间已满，进度无法保存。",
-    "storageFullDismiss": "关闭"
+    "storageFullDismiss": "关闭",
+    "tokenEarned": "已获得连续保护令牌，它将自动补上一天未复习的记录。",
+    "tokenSpent": "{count, plural, other {已使用保护令牌保住了你的 {count} 天连续记录。}}",
+    "tokenEarnedAndSpent": "已获得并使用连续保护令牌，你的 {count} 天连续记录安全了。",
+    "tokenToastDismiss": "关闭提示",
+    "tokenEarnedHeading": "获得令牌",
+    "tokenSpentHeading": "连续记录已保护"
   },
   "pokedex": {
     "title": "Pokédex",
@@ -487,13 +515,14 @@
     "statDefense": "防御",
     "statSpAtk": "特攻",
     "statSpDef": "特防",
-    "statSpeed": "速度"
+    "statSpeed": "速度",
+    "lockedSectionHint": "掌握这只宝可梦后解锁。"
   },
   "pasture": {
     "title": "牧场",
     "description": "您已掌握的 Pokémon 住在这里。",
     "empty": "牧场是空的。掌握一些 Pokémon 后，它们就会出现在这里。",
-    "emptyBody": "牧场是空的。在练习中掌握第一只宝可梦后，它就会出现在这里。",
+    "emptyBody": "牧场是你已掌握宝可梦的收藏。在练习中掌握第一只宝可梦后，它就会出现在这里。",
     "searchPlaceholder": "搜索已掌握的 Pokémon...",
     "masteredCount": "已掌握 {count} 个",
     "pokemonCount": "{count} 只宝可梦",
@@ -807,6 +836,13 @@
       "lockedAriaLabel": "未获得的道馆徽章",
       "hideLocked": "隐藏未获得的徽章（{count} 个）",
       "viewAll": "查看所有徽章（{count} 个已锁定）"
+    },
+    "masteryExplainer": {
+      "title": "圆环含义",
+      "lockedBody": "未开始：您还未在练习中见过此宝可梦。",
+      "learningBody": "学习中：您已见过它，正在巩固记忆。",
+      "masteredBody": "已掌握：连续答对 {reps} 次且下次复习间隔至少 21 天。这是调度器确认您真正学会的时间点。",
+      "introducedNote": "已引入统计您至少见过一次的宝可梦，无论是否已完全掌握。"
     }
   },
   "error": {

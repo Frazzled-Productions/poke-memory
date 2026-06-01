@@ -287,9 +287,7 @@ function BottomTabBarInner() {
                     : "text-theme-fg-on-primary opacity-55 [@media(hover:hover)]:hover:opacity-80",
                 ].join(" ")}
               >
-                <Icon
-                  className={isActive ? "opacity-100" : "opacity-70"}
-                />
+                <Icon className={isActive ? "opacity-100" : "opacity-70"} />
                 <span>{label}</span>
               </Link>
             </li>

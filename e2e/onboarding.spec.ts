@@ -10,7 +10,7 @@ const SETTINGS_KEY = "poke-memory:settings:v1";
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe("First-visit onboarding modal (#1103)", () => {
-  test("modal appears on a fresh visit and is dismissable", async ({
+  test("modal appears on a fresh visit and is dismissible", async ({
     page,
   }) => {
     await page.goto("/");
@@ -311,5 +311,155 @@ test.describe("Non-English locale in onboarding modal (#1369, #1390)", () => {
     await expect(banner).toBeVisible();
     // Verify the banner text is the Japanese translation (contains 自動的に作成).
     await expect(banner.getByText(/自動的に作成/)).toBeVisible();
+  });
+});
+
+test.describe("Discovery nudges (#1443)", () => {
+  test("markWhatIKnow nudge renders on settings page when flag is absent (existing-user reach)", async ({
+    page,
+  }) => {
+    // Seed with a realistic existing-user blob that predates #1443 — no
+    // markWhatIKnowNudgeDismissed key, so it resolves to false and shows.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            // markWhatIKnowNudgeDismissed deliberately absent
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/settings");
+    // The nudge is a role=note with the nudge title text.
+    const nudge = page.locator(`[role="note"]`, { hasText: /skip the queue/i });
+    await expect(nudge).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("markWhatIKnow nudge is absent when flag is true", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            markWhatIKnowNudgeDismissed: true,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/settings");
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /skip the queue/i }),
+    ).toHaveCount(0);
+  });
+
+  test("markWhatIKnow nudge is dismissible", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            markWhatIKnowNudgeDismissed: false,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/settings");
+    const nudge = page.locator(`[role="note"]`, { hasText: /skip the queue/i });
+    await expect(nudge).toBeVisible({ timeout: 10_000 });
+
+    await nudge.getByRole("button", { name: /dismiss hint/i }).click();
+    await expect(nudge).toHaveCount(0);
+
+    // Persisted to localStorage.
+    const stored = await page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }, SETTINGS_KEY);
+    expect(stored?.onboarding?.markWhatIKnowNudgeDismissed).toBe(true);
+  });
+
+  test("practiceScope nudge renders on practice page when firstVisitDone and flag is absent", async ({
+    page,
+  }) => {
+    // Seed with firstVisitOnboardingDismissed=true so the scope nudge shows.
+    // practiceScopeNudgeDismissed absent resolves to false.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            // practiceScopeNudgeDismissed deliberately absent
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    // Wait for the practice surface to hydrate.
+    const nudge = page.locator(`[role="note"]`, { hasText: /filter by generation/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("practiceScope nudge is absent when flag is true", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceScopeNudgeDismissed: true,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
+    ).toHaveCount(0);
+  });
+
+  test("practiceScope nudge is absent when first-visit onboarding not yet done", async ({
+    page,
+  }) => {
+    // firstVisitOnboardingDismissed absent (= false after coercion) means the
+    // first-visit modal has not been dismissed yet; the gate in ReviewSession
+    // must suppress the scope nudge so the user is not hit with two hints at once.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            // firstVisitOnboardingDismissed deliberately absent
+            practiceScopeNudgeDismissed: false,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    // Wait for the first-visit modal to confirm the practice surface has hydrated,
+    // then assert the scope nudge is absent (the two must not show simultaneously).
+    await expect(
+      page.getByRole("dialog", { name: /welcome to pok[eé] memory/i }),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
+    ).toHaveCount(0);
   });
 });
