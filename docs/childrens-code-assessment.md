@@ -177,6 +177,21 @@ A best-effort review of the onboarding modal (`onboarding` namespace in `message
 The Standard 4 status in the table above remains **Gap** for non-English locales until the native review is completed.
 
 ---
+**Expert (non-native) i18n review pass (2026-06-01, #1376)**
+
+A further i18n review pass was applied to the `onboarding` namespace in `messages/ja.json`, `messages/zh-Hans.json`, and `messages/zh-Hant.json` on 2026-06-01 as part of issue #1376. This pass replaced machine-translated values that carried technical jargon, non-standard vocabulary, or adult register with corrections targeting child-appropriate clarity and natural phrasing. Specific improvements:
+
+- **ja:** `howToGrade.honestGradeNote` — rephrased to remove technical phrasing ("的確にサポート") in favour of simpler, warmer wording; `addingSound.heading` — replaced formal "任意" (optional/arbitrary) with colloquial "なくてもOK"; `addingSound.body` — removed technical terms ("音声合成", "プロンプト") and rewrote in plain conversational Japanese; `pwaInstallNudge.androidBody` — corrected typo "ストール" (stall) to "ストア" (store).
+- **zh-Hans:** `intro` — rewrote to use 名字 (name, everyday usage) over 名称 (formal denomination), and restructured to active, child-natural phrasing; `addingSound.body` — removed 文字转语音 (technical TTS term) and replaced with plain "把名字读出来", replaced "以叫声为提示" with the more natural 听叫声猜名字 framing.
+- **zh-Hant:** same register improvements as zh-Hans, adapted to Traditional Chinese orthography.
+
+This review was conducted by a non-native expert and materially improves register and accuracy over the prior machine translation. However, it does **not** constitute a native-speaker review and does not satisfy the Standard 4 requirement for fluent human sign-off. The Standard 4 status for non-English locales remains **preview-quality, expert-reviewed** (not Met).
+
+**`ChildFriendlySummary` English-only gap (follow-on finding, #1376):** `components/privacy/ChildFriendlySummary.tsx` is hardcoded in English JSX with no i18n wiring. It is not machine-translated (it was therefore out of #1376's "review machine translation" scope), but non-English-locale users see English-only child-facing privacy copy on the Privacy page. This is filed as a separate follow-on issue (priority:later).
+
+**Full native-speaker sign-off is still recommended** before relaxing the "preview" locale-picker label or the `banner.machineTranslated` in-product banner for any of the three non-English locales.
+
+---
 **English-source onboarding copy simplified (#1431, 2026-05-30).** The `onboarding.intro`, `onboarding.howToGrade.honestGradeNote`, and `onboarding.guestStorage.body` strings in `messages/en.json` were rewritten to remove technical jargon ("spaced repetition", "scheduler", "surfaces each card") and reduce reading age. This edit improves the Standard 4 position on the English onboarding surface. The Standard 4 status for non-English locales remains Gap pending native-speaker review (tracked in #1376).
 
 ---

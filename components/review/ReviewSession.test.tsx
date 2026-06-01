@@ -3557,9 +3557,13 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
     stepStartedAt: Date.now() - 1000, // overdue by 1s — eligible immediately
   };
 
-  /** State for a graduated card (lastReview set, no learningStep). */
+  /** State for a graduated card (lastReview set, no learningStep).
+   * Must use valid FSRS field values (stability ≥ 1e-3, difficulty ∈ [1, 10])
+   * so the heal guard in hydrateSession does not re-init the card to "new". */
   const graduatedState = {
     ...brandNewState,
+    stability: 2.5,   // valid — above 1e-3
+    difficulty: 5,    // valid — within [1, 10]
     lastReview: "2026-05-26",
     firstSeen: "2026-05-26",
     scheduledDays: 1,

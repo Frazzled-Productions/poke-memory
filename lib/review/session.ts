@@ -1,5 +1,5 @@
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
-import { initialReviewState } from "@/lib/srs/scheduler";
+import { initialReviewState, isFsrsInvalidState } from "@/lib/srs/scheduler";
 import type { SeedPokemon, EvolutionCard, ReverseEvolutionCard } from "@/lib/pokemon/seed";
 import {
   SEED_EVOLUTION_CARDS,
@@ -245,13 +245,21 @@ export function buildSession(
 //
 // To deliberately reset progress for a re-enabled type, callers should reset
 // those card states to initialReviewState before calling hydrateSession.
+export type HydrateSessionResult = {
+  cards: ReviewableCard[];
+  /** True when at least one saved card had an invalid FSRS state and was healed
+   * to initialReviewState defaults. The caller should persist the returned
+   * cards so the corrected state survives the next session load. */
+  anyHealed: boolean;
+};
+
 export function hydrateSession(
   saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
   opts: BuildSessionOpts = {},
-): ReviewableCard[] {
+): HydrateSessionResult {
   const {
     reverseEnabled = false,
     nameEnabled = true,
@@ -334,6 +342,71 @@ export function hydrateSession(
     }
   });
 
+  // Belt-and-braces heal pass: if a saved card carries an FSRS state that
+  // ts-fsrs would reject (e.g. stability:0 on a non-new card from an older app
+  // version), perform a full re-init to a fresh new-card state so the next grade
+  // produces a self-consistent FSRS snapshot from a clean starting point.
+  //
+  // Re-init strategy (not just patching FSRS math fields): we set fsrsState to
+  // "new" and lastReview to null so the heal guard itself excludes the card on
+  // the NEXT load — giving the heal a stable fixed point. Without this, a card
+  // with stability:0 would re-trigger on every cold load producing a spurious
+  // saveSession write each time. Preserving the bogus history would also make the
+  // next grade self-inconsistent (e.g. reps > 0 but FSRS re-initialising).
+  //
+  // What is preserved: card identity fields (id, cardType, etc.), firstSeen (so
+  // the card is not double-counted as new for daily limits), hiddenSince, and
+  // seenInPasture. dueDate is reset to today so the re-init card is available
+  // immediately without the user having to wait for the old (bogus) due date.
+  //
+  // Only heal when the card is NOT already in the "brand-new / never-graded"
+  // state: toFsrsCard short-circuits to createEmptyCard for fsrsState="new" &&
+  // lastReview=null, so those cards are safe regardless of field values. Healing
+  // them here would wrongly discard progress on legitimate brand-new in-step cards.
+  //
+  // Signed-in note: re-init resets reps/lapses to 0 for the one poison card.
+  // The next cloud push of that card may be rejected by the migration-015 monotonic-
+  // reps regression trigger (silently, by design). This per-card cloud divergence
+  // is accepted — a crash is worse than a single card losing its history.
+  let anyHealed = false;
+  const todayStr = initialReviewState(now).dueDate; // "YYYY-MM-DD" in UTC
+  const healedRefreshed = refreshed.map((card) => {
+    const needsHeal =
+      (card.state.fsrsState !== "new" || card.state.lastReview !== null) &&
+      isFsrsInvalidState(card.state);
+    if (!needsHeal) return card;
+    anyHealed = true;
+    console.warn(
+      "[poke-memory] hydrateSession: healed invalid FSRS state on card",
+      card.id,
+      { stability: card.state.stability, difficulty: card.state.difficulty, fsrsState: card.state.fsrsState },
+    );
+    return {
+      ...card,
+      state: {
+        // Full re-init to a clean new-card state. The next grade will establish
+        // a proper initial stability/difficulty via createEmptyCard in toFsrsCard.
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "new" as const,
+        lastReview: null,
+        learningStep: null,
+        stepStartedAt: null,
+        // Preserve firstSeen so daily-limit counters don't double-count.
+        firstSeen: card.state.firstSeen,
+        // Set dueDate to today so the re-init card is immediately available.
+        dueDate: todayStr,
+        // Preserve snooze and pasture flags — these are display/UX state, not FSRS.
+        hiddenSince: card.state.hiddenSince,
+        seenInPasture: card.state.seenInPasture,
+      },
+    };
+  });
+
   const savedIds = new Set(allSaved.map((c) => c.id));
 
   const nameAdditions: NameReviewCard[] = nameEnabled
@@ -407,8 +480,8 @@ export function hydrateSession(
     ...reverseAdditions,
     ...cryAdditions,
   ];
-  if (additions.length === 0) return refreshed;
-  return [...refreshed, ...additions];
+  const cards = additions.length === 0 ? healedRefreshed : [...healedRefreshed, ...additions];
+  return { cards, anyHealed };
 }
 
 /**

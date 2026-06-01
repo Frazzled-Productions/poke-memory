@@ -393,9 +393,18 @@ export default function StatsPage() {
       runStreakProtection(todayString(new Date(), settings.timezone ?? "UTC"));
       if (settings.dateFormat) setUserDateFormat(settings.dateFormat);
       const saved = await loadSession();
-      const sessionCards = saved !== null
-        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled })
-        : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
+      let sessionCards: ReviewableCard[];
+      if (saved !== null) {
+        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
+        // Persist healed cards so the fixed point is durable across all entry
+        // points, not only Practice (#1506).
+        if (anyHealed) {
+          await saveSession({ cards: hydrated, limits: saved.limits });
+        }
+        sessionCards = hydrated;
+      } else {
+        sessionCards = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
+      }
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
       setPokemonNameLocale(settings.pokemonNameLocale);

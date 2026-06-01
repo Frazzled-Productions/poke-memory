@@ -193,10 +193,6 @@ vi.mock("@/components/onboarding/KnownPokemonQuiz", () => ({
   KnownPokemonQuiz: () => <div data-testid="known-pokemon-quiz" />,
 }));
 
-vi.mock("@/components/settings/VoiceQualityHint", () => ({
-  VoiceQualityHint: () => <div data-testid="voice-quality-hint" />,
-}));
-
 vi.mock("@/components/settings/TtsControls", () => ({
   TtsControls: () => <div data-testid="tts-controls" />,
 }));

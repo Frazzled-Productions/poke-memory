@@ -561,7 +561,7 @@ describe("Practice-load smoke: hydrateSession + buildSessionQueues do not throw 
 
       // Run through the real hydrate path (same as the Practice page load).
       // Pass reverseEnabled: true so reverse-type cards are not dropped.
-      const hydrated = hydrateSession(seededCards, SEED_POKEMON, SEED_EVOLUTION_CARDS, new Date(), {
+      const { cards: hydrated } = hydrateSession(seededCards, SEED_POKEMON, SEED_EVOLUTION_CARDS, new Date(), {
         reverseEnabled: true,
         nameEnabled: true,
         evolutionEnabled: true,
@@ -582,7 +582,7 @@ describe("Practice-load smoke: hydrateSession + buildSessionQueues do not throw 
     const payload = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build();
     const seededCards = payload.session!.cards as unknown as ReviewableCard[];
 
-    const hydrated = hydrateSession(seededCards, SEED_POKEMON, SEED_EVOLUTION_CARDS, new Date(), {
+    const { cards: hydrated } = hydrateSession(seededCards, SEED_POKEMON, SEED_EVOLUTION_CARDS, new Date(), {
       reverseEnabled: true,
     });
 
@@ -600,7 +600,7 @@ describe("Practice-load smoke: hydrateSession + buildSessionQueues do not throw 
       if (!payload.session) continue;
 
       const seededCards = payload.session.cards as unknown as ReviewableCard[];
-      const hydrated = hydrateSession(seededCards, SEED_POKEMON, SEED_EVOLUTION_CARDS, new Date(), {
+      const { cards: hydrated } = hydrateSession(seededCards, SEED_POKEMON, SEED_EVOLUTION_CARDS, new Date(), {
         reverseEnabled: true,
         nameEnabled: true,
         evolutionEnabled: true,

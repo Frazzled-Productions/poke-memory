@@ -166,7 +166,7 @@ export default function PasturePage() {
         // hydrateSession (backfill habitat, isDefaultForm, types, etc. onto
         // each saved card from SEED_POKEMON). Adding new cards here would bloat
         // session.cards with ~1 000 unseen species, hurting filterMastered perf.
-        const hydrated = hydrateSession(s.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+        const { cards: hydrated, anyHealed } = hydrateSession(s.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
           reverseEnabled: false,
           nameEnabled: false,
           evolutionEnabled: false,
@@ -178,6 +178,11 @@ export default function PasturePage() {
           // for completeness but is effectively dead in this refresh pass.
           locale: pokemonNameLocale,
         });
+        // Persist healed cards so the fixed point is durable across all entry
+        // points, not only Practice (#1506).
+        if (anyHealed) {
+          await saveSession({ cards: hydrated, limits: s.limits });
+        }
         setSession({ ...s, cards: hydrated });
       } else {
         setSession(null);

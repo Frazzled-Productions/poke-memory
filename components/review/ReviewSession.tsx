@@ -41,6 +41,7 @@ import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 import { GradeErrorBanner } from "@/components/review/GradeErrorBanner";
 import { recordReview } from "@/lib/streak";
 import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
+import type { AppLocale } from "@/i18n/locales";
 import { nextReview, type ReviewState } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, loadFlavorTexts, type PokemonFact } from "@/lib/pokemon/facts";
@@ -69,6 +70,8 @@ import { BadgeToast } from "@/components/badges/BadgeToast";
 import { triggerHaptic } from "@/lib/review/haptic";
 import { markSessionActive, markSessionInactive } from "@/lib/review/sessionActive";
 import { KEY_HAS_MASTERED, KEY_SETTINGS } from "@/lib/storage/keys";
+import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
+import { filterMastered } from "@/lib/pasture/arrivals";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
   loadDailySummary,
@@ -261,6 +264,28 @@ function writeHasMasteredFlag(val: boolean): void {
   } catch {
     // Quota or non-standard environment — silently skip.
   }
+}
+
+/**
+ * Write the per-locale mastered-species count to the lightweight localStorage
+ * cache after a grade changes mastery state. Called by the handleGrade
+ * persistence chain (where `newCards` is the post-grade card array) and on
+ * session mount (to populate the cache for existing users on upgrade).
+ *
+ * Uses `filterMastered` — the same authoritative derivation as
+ * `computeStats` — so the parity contract test in
+ * `components/profile/useProfileStatus.test.tsx` can hold.
+ *
+ * Only fires when not superuser-guarded (consistent with other localStorage
+ * writes in ReviewSession).
+ */
+function writeMasteredCountCache(
+  cards: ReviewableCard[],
+  locale: AppLocale,
+  masteryRepetitions: number,
+): void {
+  const count = filterMastered(cards, false, masteryRepetitions, locale).length;
+  writeMasteredCountForLocale(locale, count);
 }
 
 // ---------------------------------------------------------------------------
@@ -942,8 +967,9 @@ export function ReviewSession() {
       const settingsLimits = limitsFromSettings(settings);
 
       if (saved !== null) {
-        // Merge any seed cards added since the last save.
-        const hydrated = hydrateSession(
+        // Merge any seed cards added since the last save, and heal any invalid
+        // FSRS states written by older app versions (#1506).
+        const { cards: hydrated, anyHealed } = hydrateSession(
           saved.cards,
           SEED_POKEMON,
           SEED_EVOLUTION_CARDS,
@@ -957,7 +983,7 @@ export function ReviewSession() {
           },
         );
         sessionLimits = settingsLimits;
-        if (hydrated.length !== saved.cards.length) {
+        if (hydrated.length !== saved.cards.length || anyHealed) {
           notifySaveResult(await saveSession({ cards: hydrated, limits: sessionLimits }));
         }
         sessionCards = hydrated;
@@ -1098,6 +1124,18 @@ export function ReviewSession() {
       });
 
       setLearningQueue(initialLearning);
+
+      // Populate the per-locale mastered-count cache on mount so
+      // `useProfileStatus` returns an accurate count even before the first
+      // grade in this session (#1489). Skipped while superuser-guarded so QA
+      // sessions don't pollute local state.
+      if (!superuserGuarded) {
+        writeMasteredCountCache(
+          sessionCards,
+          (settings.pokemonNameLocale ?? "en") as AppLocale,
+          settings.masteryRepetitions,
+        );
+      }
     }
     void load();
   // notifySaveResult is stable (useCallback with no deps). The dep is listed to
@@ -2207,6 +2245,23 @@ export function ReviewSession() {
       if (!superuserGuarded) {
         writeHasMasteredFlag(true);
       }
+    }
+    // Update the per-locale mastered-count cache whenever a name or reverse
+    // card is graded (those are the only card types that affect mastery count).
+    // Written regardless of speciesJustMastered so lapse events (count going
+    // down) are also reflected, and so the cache is accurate for any grade.
+    // Skipped while superuser-guarded (consistent with other localStorage
+    // writes). Uses `filterMastered` — the same authoritative derivation as
+    // `computeStats` — so the parity contract test can hold (#1489).
+    if (
+      !superuserGuarded &&
+      (effectiveCard.cardType === "name" || effectiveCard.cardType === "reverse")
+    ) {
+      writeMasteredCountCache(
+        newCards,
+        (settings.pokemonNameLocale ?? "en") as AppLocale,
+        settings.masteryRepetitions,
+      );
     }
 
     // Update the learning queue based on the new state.
