@@ -1,5 +1,5 @@
 ---
-kind: patch
+kind: fixed
 ---
 
 ### Fixed

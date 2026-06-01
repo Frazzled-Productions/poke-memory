@@ -383,9 +383,11 @@ describe("SyncStatusLine", () => {
 
   // ─── 24-hour time format (#1537) ─────────────────────────────────────────
   //
-  // Use a fixed ISO timestamp and derive the expected 24h string via Intl so
-  // the assertion is timezone-agnostic: it verifies the *format* (no AM/PM,
-  // hour12: false) regardless of the system timezone the test runner uses.
+  // Use a fixed ISO timestamp (evening UTC, so the local hour is clearly > 12
+  // somewhere) and derive the expected HH:MM string via plain JS date methods.
+  // Using new Intl.DateTimeFormat() directly is banned inside components/** by
+  // the no-restricted-syntax rule; plain getHours/getMinutes are fine and give
+  // the same timezone-local result the component's fmt.dateTime produces.
 
   it("last-synced time renders in 24-hour format (no AM/PM)", async () => {
     const ISO = "2026-05-30T20:03:00.000Z";
@@ -402,15 +404,13 @@ describe("SyncStatusLine", () => {
     const text = el.textContent ?? "";
 
     // Must NOT contain AM/PM markers (case-insensitive, including narrow-NBSP variants).
-    expect(text).not.toMatch(/\bam\b|\bpm\b/i);
+    expect(text).not.toMatch(/[ap]\.?m\.?/i);
 
-    // Must contain the Intl-formatted 24h time for this timestamp.
-    const expected = new Intl.DateTimeFormat("en", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date(ISO));
-    expect(text).toContain(expected);
+    // Must contain the 24-hour HH:MM for this timestamp in the local timezone.
+    const d = new Date(ISO);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    expect(text).toContain(`${hh}:${mm}`);
   });
 
   it("failed/out-of-sync time suffix renders in 24-hour format (no AM/PM)", async () => {
@@ -430,15 +430,13 @@ describe("SyncStatusLine", () => {
     const text = btn.textContent ?? "";
 
     // Must NOT contain AM/PM markers.
-    expect(text).not.toMatch(/\bam\b|\bpm\b/i);
+    expect(text).not.toMatch(/[ap]\.?m\.?/i);
 
-    // Must contain the Intl-formatted 24h time for this timestamp.
-    const expected = new Intl.DateTimeFormat("en", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date(ISO));
-    expect(text).toContain(expected);
+    // Must contain the 24-hour HH:MM for this timestamp in the local timezone.
+    const d = new Date(ISO);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    expect(text).toContain(`${hh}:${mm}`);
   });
 
   // ─── Auxiliary leg errors must NOT set structuralSyncError ───────────────
