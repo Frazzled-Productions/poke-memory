@@ -421,6 +421,7 @@ const ALL_ANCHOR_IDS = [
   "regional-heading",
   "about-heading",
   "labs-heading",
+  "languages-learning",
   "developer-heading",
   "danger-zone-heading",
 ] as const;
@@ -449,6 +450,7 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "backup-heading": "account-data-heading",
   "regional-heading": "account-data-heading",
   "about-heading": "account-data-heading",
+  "languages-learning": "labs-heading",
   "developer-heading": "advanced-heading",
   "danger-zone-heading": "advanced-heading",
 };

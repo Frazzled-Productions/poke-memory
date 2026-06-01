@@ -2292,6 +2292,9 @@ export function ReviewSession() {
         settings.masteryRepetitions,
       );
     }
+    if (!superuserGuarded) {
+      writeDueCountCacheFromCards(newCards, today);
+    }
 
     // Update the learning queue based on the new state.
     setLearningQueue((prev) => {

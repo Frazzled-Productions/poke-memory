@@ -14,7 +14,7 @@
  * contract (role="dialog" + aria-modal, focus move-in, focus trap, Escape +
  * click-outside to close, focus return to the trigger) mirrors `NavDrawer`.
  *
- * Switching writes `pokemonNameLocale` via `saveSettings`, which dispatches
+ * Switching writes `activePokemonNameLocale` via `saveSettings`, which dispatches
  * `SETTINGS_SAVED_EVENT`; `PokemonLocaleProvider` listens and re-resolves, so
  * names update live across the app without a reload.
  */
