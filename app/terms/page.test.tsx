@@ -78,7 +78,7 @@ describe("Terms of Use page", () => {
       vi.mocked(resolveLocale).mockResolvedValueOnce("ja");
       await renderPage();
       // There may be multiple email links on the page; verify at least one is present.
-      const links = screen.getAllByRole("link", { name: /fbrookhouse@gmail\.com/ });
+      const links = screen.getAllByRole("link", { name: /privacy@pokememory.com/ });
       expect(links.length).toBeGreaterThan(0);
     });
   });
