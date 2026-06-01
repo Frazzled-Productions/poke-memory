@@ -130,7 +130,7 @@ describe("ProfileStatusBar — accessibility", () => {
 
   it("streak chip has an aria-label (populated state)", () => {
     renderWithIntl(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/7 day streak/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/7 days streak/i)).toBeInTheDocument();
   });
 
   it("token chip has an aria-label (populated state)", () => {

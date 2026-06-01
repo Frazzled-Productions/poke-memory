@@ -15,7 +15,7 @@ describe("StreakChip", () => {
   it("renders the terse day count with a full aria-label", () => {
     renderWithIntl(<StreakChip streak={7} />);
     expect(screen.getByText("7d")).toBeInTheDocument();
-    expect(screen.getByLabelText(/7 day streak/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/7 days streak/i)).toBeInTheDocument();
   });
 
   it("shows the start-streak prompt at zero", () => {
