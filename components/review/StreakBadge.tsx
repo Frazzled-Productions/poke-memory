@@ -24,6 +24,7 @@ import {
   TokenChip,
   MasteryChip,
 } from "@/components/profile/StatusChips";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { MilestoneCelebration } from "@/components/streak/MilestoneCelebration";
 import {
   ProtectionToast,
@@ -195,6 +196,9 @@ export function StreakBadge() {
             />
           )}
         {tokenBalance !== null && <TokenChip tokenBalance={tokenBalance} />}
+        {/* Learning-language switcher (Labs-gated inside the component) — here
+            too so it is reachable on mobile Practice, where the bar is hidden. */}
+        <LanguageSwitcher />
       </div>
       {daysToNextMilestone !== null && (
         <p className="mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400 sm:mb-4">

@@ -101,7 +101,7 @@
         "appLanguageLabel": "[App language]",
         "appLanguageDescription": "[Controls the app UI language. App UI translation is in progress.]",
         "pokemonNameLanguageLabel": "[Pokémon name language]",
-        "pokemonNameLanguageDescription": "[Pokémon names on cards will be shown in this language. Independent of the app language above.]",
+        "pokemonNameLanguageDescription": "[Switch the Pokémon-name language from the language pill in the status bar at the top of every page.]",
         "previewSuffix": "[(preview)]"
       }
     },
@@ -901,6 +901,14 @@
     "startStreakLabel": "[Start streak]",
     "tokenLabel": "[{count, number}]",
     "masteryLabel": "[{pct, number}%]"
+  },
+  "languageSwitcher": {
+    "heading": "[Pokémon name language]",
+    "pillAriaLabel": "[Pokémon name language: {language}. Tap to change.]",
+    "groupAriaLabel": "[Choose a Pokémon name language]",
+    "machineTranslation": "[Machine translation]",
+    "closeLabel": "[Close]",
+    "appLanguageHint": "[App language is in Settings.]"
   },
   "sync": {
     "status": {

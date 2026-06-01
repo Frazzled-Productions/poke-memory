@@ -2049,36 +2049,17 @@ export default function SettingsPage() {
                               </select>
                             </div>
 
-                            {/* Pokémon name language — writes pokemonNameLocale in settings */}
+                            {/* Pokémon name language is switched from the
+                                language pill in the status bar (Phase 2 of
+                                #1484); the picker was relocated out of Settings.
+                                This row points there. */}
                             <div>
-                              <label
-                                htmlFor="labs-pokemon-name-locale-select"
-                                className="block text-sm font-medium text-foreground"
-                              >
+                              <p className="block text-sm font-medium text-foreground">
                                 {t("settings.labs.languages.pokemonNameLanguageLabel")}
-                              </label>
+                              </p>
                               <p className={`mt-1 ${mutedTextXs}`}>
                                 {t("settings.labs.languages.pokemonNameLanguageDescription")}
                               </p>
-                              <select
-                                id="labs-pokemon-name-locale-select"
-                                value={settings.pokemonNameLocale}
-                                onChange={(e) => {
-                                  const next = e.target.value as AppLocale;
-                                  const updated = { ...settings, pokemonNameLocale: next };
-                                  setSettings(updated);
-                                  saveSettings(updated);
-                                }}
-                                className="mt-2 rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                              >
-                                {SUPPORTED_LOCALES.map((loc) => (
-                                  <option key={loc} value={loc}>
-                                    {loc === "en"
-                                      ? LOCALE_ENDONYMS[loc]
-                                      : `${LOCALE_ENDONYMS[loc]} ${t("settings.labs.languages.previewSuffix")}`}
-                                  </option>
-                                ))}
-                              </select>
                             </div>
                           </div>
                         )}

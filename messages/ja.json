@@ -101,7 +101,7 @@
         "appLanguageLabel": "アプリ言語",
         "appLanguageDescription": "アプリのUI言語を設定します。UI翻訳は進行中です。",
         "pokemonNameLanguageLabel": "Pokémon 名前の言語",
-        "pokemonNameLanguageDescription": "カードに表示される Pokémon の名前の言語です。アプリ言語とは独立しています。",
+        "pokemonNameLanguageDescription": "Pokémon の名前の言語は、各ページ上部のステータスバーにある言語ピルから切り替えられます。",
         "previewSuffix": "（プレビュー）"
       }
     },
@@ -901,6 +901,14 @@
     "startStreakLabel": "連続を始めよう",
     "tokenLabel": "{count, number}",
     "masteryLabel": "{pct, number}%"
+  },
+  "languageSwitcher": {
+    "heading": "Pokémon 名前の言語",
+    "pillAriaLabel": "Pokémon 名前の言語：{language}。タップして変更します。",
+    "groupAriaLabel": "Pokémon 名前の言語を選択",
+    "machineTranslation": "機械翻訳",
+    "closeLabel": "閉じる",
+    "appLanguageHint": "アプリの言語は設定にあります。"
   },
   "sync": {
     "status": {
