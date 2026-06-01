@@ -620,6 +620,8 @@ export function ReviewSession() {
   // (name/evo, cry, reverse) so it surfaces regardless of the first card.
   // Only shown after the first-visit onboarding modal is dismissed, so a
   // brand-new session is not hit with two simultaneous hints.
+  // Session-count gate (show only after N sessions without opening scope)
+  // is deferred to #1482.
   const scopeNudge = firstVisitDone ? (
     <OnboardingHint id="practiceScopeNudgeDismissed" title={t("practiceScopeNudge.title")}>
       <p>{t("practiceScopeNudge.body")}</p>
