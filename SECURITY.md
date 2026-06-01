@@ -6,7 +6,7 @@ poke-memory is a personal hobby project, but it does accept authenticated user d
 
 Use GitHub's private vulnerability reporting:
 
-**[Report a vulnerability](https://github.com/fraserbrookhouse/poke-memory/security/advisories/new)**
+**[Report a vulnerability](https://github.com/Frazzled-Productions/poke-memory/security/advisories/new)**
 
 Please include:
 

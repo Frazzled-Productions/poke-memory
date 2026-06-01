@@ -58,7 +58,7 @@ concurrency:
 jobs:
   harvest:
     name: Weekly Retro Harvest
-    if: github.repository == 'fraserbrookhouse/poke-memory'
+    if: github.repository == 'Frazzled-Productions/poke-memory'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -354,7 +354,7 @@ jobs:
 
             Filed automatically by `auto-retro-harvest.yml` because the same
             problem recurred across >= 3 retros. See the
-            [retrospectives digest](https://github.com/fraserbrookhouse/poke-memory/blob/qa/docs/retros.md).
+            [retrospectives digest](https://github.com/Frazzled-Productions/poke-memory/blob/qa/docs/retros.md).
             ```
 
             Then create the issue:

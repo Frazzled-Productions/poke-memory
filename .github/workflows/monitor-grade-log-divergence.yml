@@ -45,7 +45,7 @@ concurrency:
 
 jobs:
   check:
-    if: github.repository == 'fraserbrookhouse/poke-memory'
+    if: github.repository == 'Frazzled-Productions/poke-memory'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
