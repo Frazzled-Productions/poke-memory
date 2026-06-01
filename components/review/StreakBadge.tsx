@@ -152,6 +152,8 @@ export function StreakBadge() {
     setPendingToken(null);
     if (flags.forceTokenToast) {
       // QA fire: self-clear so the forced toast shows exactly once per toggle.
+      // Reset the ref so a subsequent forceTokenToast toggle produces a fresh fire.
+      hasShownTokenToastRef.current = false;
       void setFlag("forceTokenToast", false);
     }
   }, [flags.forceTokenToast, setFlag]);
