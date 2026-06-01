@@ -5,6 +5,7 @@ import type { NameReviewCard, ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { KnownPokemonQuiz } from "@/components/onboarding/KnownPokemonQuiz";
+import type { UserSettings } from "@/lib/settings/persistence";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Stubs
@@ -28,7 +29,11 @@ vi.mock("@/lib/review/persistence", async () => {
   };
 });
 
-// Default settings: 90% retention, no per-user weights.
+// Default settings: 90% retention, alternateFormsEnabled: false (matching the
+// real DEFAULT_SETTINGS default). Individual tests may override by assigning
+// `settingsOverride = { ... }` before rendering.
+let settingsOverride: Partial<UserSettings> = {};
+
 vi.mock("@/lib/settings/persistence", async () => {
   const actual = await vi.importActual<typeof import("@/lib/settings/persistence")>(
     "@/lib/settings/persistence",
@@ -38,6 +43,7 @@ vi.mock("@/lib/settings/persistence", async () => {
     loadSettings: vi.fn(() => ({
       ...actual.DEFAULT_SETTINGS,
       retentionTarget: 0.9,
+      ...settingsOverride,
     })),
   };
 });
@@ -85,23 +91,42 @@ vi.mock("next/image", () => ({
   ),
 }));
 
+// Stub useLocalePokemonName. The default returns the English name (fallback)
+// so existing tests are unaffected. Individual tests that need to verify
+// locale-aware rendering can swap the returned name via the `localeNameMap`
+// variable below.
+let localeNameMap: Map<number, string> | null = null;
+
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (speciesId: number | undefined, englishName: string) => ({
+    // When a locale map is active, look up the species-specific localised name;
+    // otherwise fall through to the English name unchanged.
+    name: (speciesId !== undefined && localeNameMap?.get(speciesId)) ?? englishName,
+    transliteration: null,
+  }),
+}));
+
 // ────────────────────────────────────────────────────────────────────────────
 // Fixtures
 // ────────────────────────────────────────────────────────────────────────────
 
 const NOW = new Date("2026-05-20T12:00:00Z");
 
+// Alolan Raichu — PokéAPI species id >= 10000 marks it as an alternate form.
+const ALT_FORM_ID = 10100;
+
 function makeNameCard(
   id: number,
   name: string,
   state: ReviewState = initialReviewState(NOW),
+  isDefaultForm = true,
 ): NameReviewCard {
   return {
     id,
     speciesId: id,
-    isDefaultForm: true,
-    formCategory: "default",
-    formSlug: null,
+    isDefaultForm,
+    formCategory: isDefaultForm ? "default" : "regional",
+    formSlug: isDefaultForm ? null : "alola",
     displayName: name,
     name,
     spriteUrl: `https://example.com/${id}.png`,
@@ -129,6 +154,24 @@ function makeNameCard(
   };
 }
 
+/**
+ * Alternate-form card fixture (Alolan Raichu).
+ *
+ * Real seed shape: `id=10100` (pokemon id), `speciesId=26` (parent species),
+ * `subjectKey="10100"` (id as text — the eligibility-gate key). The
+ * generationOf(speciesId=26) = 1, so it lands on the Gen I tab.
+ */
+function makeAltFormCard(state: ReviewState = initialReviewState(NOW)): NameReviewCard {
+  return {
+    ...makeNameCard(ALT_FORM_ID, "Alolan Raichu", state, false),
+    // speciesId is the parent species (Raichu = 26), not the alt-form pokemon id.
+    speciesId: 26,
+    // subjectKey is the pokemon id (10100), which is what isCardEligible
+    // compares against the ALT_FORM_ID_THRESHOLD (10000).
+    subjectKey: String(ALT_FORM_ID),
+  };
+}
+
 // jsdom does not implement HTMLDialogElement.showModal / close. Polyfill them
 // so the bulk-confirm dialog mounts.
 beforeEach(() => {
@@ -146,6 +189,8 @@ beforeEach(() => {
   appendedGradeEntries.length = 0;
   enqueueGradeSpy.mockClear();
   currentSession = null;
+  settingsOverride = {};
+  localeNameMap = null;
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -310,5 +355,78 @@ describe("KnownPokemonQuiz", () => {
     expect(
       screen.queryByRole("checkbox", { name: /i already know Ivysaur/i }),
     ).not.toBeInTheDocument();
+  });
+
+  // ── alternateFormsEnabled gate (#1481) ─────────────────────────────────────
+
+  it("excludes alternate-form cards when alternateFormsEnabled is false (the default)", async () => {
+    // DEFAULT_SETTINGS has alternateFormsEnabled: false. The settingsOverride
+    // default is empty, so this test exercises the default path.
+    currentSession = {
+      cards: [
+        makeNameCard(1, "Bulbasaur"),
+        makeAltFormCard(), // Alolan Raichu — id=10100, should be hidden
+      ],
+      limits: { name: {}, evolution: {}, reverse: {}, cry: {} },
+    };
+
+    render(<KnownPokemonQuiz client={null} userId={null} superuserPaused={false} />);
+
+    // Default-form card is shown.
+    expect(
+      await screen.findByRole("checkbox", { name: /i already know Bulbasaur/i }),
+    ).toBeInTheDocument();
+
+    // Alternate-form card must NOT appear — it is excluded from the eligible
+    // set when alternateFormsEnabled is false, matching the practice-queue gate.
+    expect(
+      screen.queryByRole("checkbox", { name: /i already know Alolan Raichu/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("includes alternate-form cards when alternateFormsEnabled is true", async () => {
+    settingsOverride = { alternateFormsEnabled: true };
+    currentSession = {
+      cards: [
+        makeNameCard(1, "Bulbasaur"),
+        makeAltFormCard(), // Alolan Raichu — id=10100, should now be shown
+      ],
+      limits: { name: {}, evolution: {}, reverse: {}, cry: {} },
+    };
+
+    render(<KnownPokemonQuiz client={null} userId={null} superuserPaused={false} />);
+
+    // Both cards are eligible when alternate forms are enabled.
+    expect(
+      await screen.findByRole("checkbox", { name: /i already know Bulbasaur/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: /i already know Alolan Raichu/i }),
+    ).toBeInTheDocument();
+  });
+
+  // ── Locale-name rendering ──────────────────────────────────────────────────
+
+  it("renders Pokémon names via the locale-aware path (Japanese locale simulation)", async () => {
+    // Simulate Japanese locale by mapping speciesId → Japanese name.
+    // In production this flows through useLocalePokemonName which reads from
+    // the locale-names sidecar. Here we verify the hook is called per tile so
+    // a locale change would propagate correctly (the mock is wired per-id).
+    localeNameMap = new Map([[1, "フシギダネ"]]);
+
+    currentSession = {
+      cards: [makeNameCard(1, "Bulbasaur")],
+      limits: { name: {}, evolution: {}, reverse: {}, cry: {} },
+    };
+
+    render(<KnownPokemonQuiz client={null} userId={null} superuserPaused={false} />);
+
+    // The Japanese name must appear in the tile's aria-label and visible text —
+    // confirming KnownPokemonCard routes through useLocalePokemonName rather
+    // than rendering card.displayName directly.
+    expect(
+      await screen.findByRole("checkbox", { name: /i already know フシギダネ/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("フシギダネ")).toBeInTheDocument();
   });
 });

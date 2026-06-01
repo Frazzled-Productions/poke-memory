@@ -609,6 +609,8 @@ describe('themeIntensity setting (#411)', () => {
           journeyMasteryExplainerDismissed: false,
           markWhatIKnowNudgeDismissed: false,
           practiceScopeNudgeDismissed: false,
+          scopeEverOpened: true,
+          practiceSessionsCount: 5,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -624,6 +626,8 @@ describe('themeIntensity setting (#411)', () => {
         journeyMasteryExplainerDismissed: false,
         markWhatIKnowNudgeDismissed: false,
         practiceScopeNudgeDismissed: false,
+        scopeEverOpened: true,
+        practiceSessionsCount: 5,
       });
     });
 
@@ -665,7 +669,68 @@ describe('themeIntensity setting (#411)', () => {
         journeyMasteryExplainerDismissed: false,
         markWhatIKnowNudgeDismissed: false,
         practiceScopeNudgeDismissed: false,
+        scopeEverOpened: false,
+        practiceSessionsCount: 0,
       });
+    });
+
+    it('absent scopeEverOpened coerces to false (#1482)', () => {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          ...DEFAULT_SETTINGS,
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            // scopeEverOpened deliberately absent
+          },
+        }),
+      );
+      expect(loadSettings().onboarding.scopeEverOpened).toBe(false);
+    });
+
+    it('absent practiceSessionsCount coerces to 0 (#1482)', () => {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          ...DEFAULT_SETTINGS,
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            // practiceSessionsCount deliberately absent
+          },
+        }),
+      );
+      expect(loadSettings().onboarding.practiceSessionsCount).toBe(0);
+    });
+
+    it('non-integer practiceSessionsCount coerces to 0 (#1482)', () => {
+      for (const bad of ['3', null, -1, 1.5, true]) {
+        mockLocalStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            ...DEFAULT_SETTINGS,
+            onboarding: {
+              firstVisitOnboardingDismissed: true,
+              practiceSessionsCount: bad,
+            },
+          }),
+        );
+        expect(loadSettings().onboarding.practiceSessionsCount).toBe(0);
+      }
+    });
+
+    it('non-boolean scopeEverOpened coerces to false — === true guard (#1482)', () => {
+      for (const bad of [1, 'true', null, 0]) {
+        mockLocalStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            ...DEFAULT_SETTINGS,
+            onboarding: {
+              scopeEverOpened: bad,
+            },
+          }),
+        );
+        expect(loadSettings().onboarding.scopeEverOpened).toBe(false);
+      }
     });
   });
 });

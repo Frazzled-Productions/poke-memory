@@ -523,12 +523,15 @@ export default function SettingsPage() {
     // Scroll the quiz itself into view once the category has expanded and the
     // quiz panel has rendered. The category's own forceOpen scroll targets the
     // category heading (much higher up), so without this the user lands above
-    // the fold and never sees the quiz they asked to open (#1443 QA). This is a
-    // "use client" component, so window is always defined here.
+    // the fold and never sees the quiz they asked to open (#1443 QA).
+    // Use block:"start" so the quiz heading + intro lands at/near the top of
+    // the viewport rather than centred — centring pushed the heading above
+    // the fold and landed the user mid-list (#1486). This is a "use client"
+    // component, so window is always defined here.
     window.setTimeout(() => {
       document
         .getElementById("known-quiz-heading")
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 200);
   }
 

@@ -57,6 +57,8 @@ type DueRow = {
   card_type: string;
   subject_key: string;
   first_seen: string | null;
+  /** Migration 029 locale column — part of the PK (#1480). */
+  locale: string;
 };
 
 /** Shape the route reads from user_settings. */
@@ -97,8 +99,8 @@ const ALL_ENABLED_SETTINGS: Record<string, unknown> = {
  *
  * Per-user counts come from counting eligible rows in the `.select()` result.
  * To configure a test where user-a has 3 due `name` cards, pass three
- * `{ user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null }`
- * rows in `due`. The helpers `dueRowsFor` / `dueRowsDetailed` build them.
+ * `{ user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" }`
+ * rows in `due`. The helper `dueRowsFor` builds them (always locale="en").
  */
 function buildAdminMock(opts: {
   subscriptions?: Array<Record<string, unknown>>;
@@ -158,9 +160,9 @@ function buildAdminMock(opts: {
 
 /**
  * Builds an array of due rows where each row is a `name` card with a
- * sequential subject_key, first_seen=null (not started today). Use this
- * for tests that just need N due cards without caring about card type or
- * alt-forms.
+ * sequential subject_key, first_seen=null (not started today), locale="en".
+ * Use this for tests that just need N due cards without caring about card
+ * type, alt-forms, or locale.
  */
 function dueRowsFor(counts: Record<string, number>): DueRow[] {
   const rows: DueRow[] = [];
@@ -171,6 +173,7 @@ function dueRowsFor(counts: Record<string, number>): DueRow[] {
         card_type: "name",
         subject_key: String(i + 1),
         first_seen: null,
+        locale: "en",
       });
     }
   }
@@ -514,11 +517,11 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         settings: ALL_ENABLED_SETTINGS,
       }],
       due: [
-        { user_id: "user-a", card_type: "name",                   subject_key: "1",   first_seen: null },
-        { user_id: "user-a", card_type: "reverse",                subject_key: "1",   first_seen: null },
-        { user_id: "user-a", card_type: "evolution-edge",         subject_key: "1>>>2", first_seen: null },
-        { user_id: "user-a", card_type: "reverse-evolution-edge", subject_key: "1>>>2", first_seen: null },
-        { user_id: "user-a", card_type: "cry",                    subject_key: "1",   first_seen: null },
+        { user_id: "user-a", card_type: "name",                   subject_key: "1",   first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "reverse",                subject_key: "1",   first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "evolution-edge",         subject_key: "1>>>2", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "reverse-evolution-edge", subject_key: "1>>>2", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "cry",                    subject_key: "1",   first_seen: null, locale: "en" },
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -552,9 +555,9 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name",    subject_key: "1", first_seen: null },
-        { user_id: "user-a", card_type: "reverse",  subject_key: "1", first_seen: null },
-        { user_id: "user-a", card_type: "reverse",  subject_key: "2", first_seen: null },
+        { user_id: "user-a", card_type: "name",    subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "reverse",  subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "reverse",  subject_key: "2", first_seen: null, locale: "en" },
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -586,9 +589,9 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "25",    first_seen: null }, // Pikachu — kept
-        { user_id: "user-a", card_type: "name", subject_key: "10004", first_seen: null }, // alt-form — excluded
-        { user_id: "user-a", card_type: "name", subject_key: "10098", first_seen: null }, // alt-form — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "25",    first_seen: null, locale: "en" }, // Pikachu — kept
+        { user_id: "user-a", card_type: "name", subject_key: "10004", first_seen: null, locale: "en" }, // alt-form — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "10098", first_seen: null, locale: "en" }, // alt-form — excluded
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -621,9 +624,9 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "133>>>134",     first_seen: null }, // Eevee→Vaporeon — kept
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "10027>>>10028", first_seen: null }, // alt-form — excluded
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "26>>>10023",    first_seen: null }, // post-evo alt-form — excluded
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "133>>>134",     first_seen: null, locale: "en" }, // Eevee→Vaporeon — kept
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "10027>>>10028", first_seen: null, locale: "en" }, // alt-form — excluded
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "26>>>10023",    first_seen: null, locale: "en" }, // post-evo alt-form — excluded
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -661,30 +664,30 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
       }],
       due: [
         // 3 name default
-        { user_id: "user-a", card_type: "name", subject_key: "1",  first_seen: null },
-        { user_id: "user-a", card_type: "name", subject_key: "4",  first_seen: null },
-        { user_id: "user-a", card_type: "name", subject_key: "7",  first_seen: null },
+        { user_id: "user-a", card_type: "name", subject_key: "1",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "4",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "7",  first_seen: null, locale: "en" },
         // 5 name alt-form (excluded by alt-forms gate)
-        { user_id: "user-a", card_type: "name", subject_key: "10004",  first_seen: null },
-        { user_id: "user-a", card_type: "name", subject_key: "10098",  first_seen: null },
-        { user_id: "user-a", card_type: "name", subject_key: "10116",  first_seen: null },
-        { user_id: "user-a", card_type: "name", subject_key: "10123",  first_seen: null },
-        { user_id: "user-a", card_type: "name", subject_key: "10176",  first_seen: null },
+        { user_id: "user-a", card_type: "name", subject_key: "10004",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "10098",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "10116",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "10123",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "10176",  first_seen: null, locale: "en" },
         // 5 reverse default (all eligible — reverse always on since #1234)
-        { user_id: "user-a", card_type: "reverse", subject_key: "25",  first_seen: null },
-        { user_id: "user-a", card_type: "reverse", subject_key: "26",  first_seen: null },
-        { user_id: "user-a", card_type: "reverse", subject_key: "27",  first_seen: null },
-        { user_id: "user-a", card_type: "reverse", subject_key: "28",  first_seen: null },
-        { user_id: "user-a", card_type: "reverse", subject_key: "29",  first_seen: null },
+        { user_id: "user-a", card_type: "reverse", subject_key: "25",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "reverse", subject_key: "26",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "reverse", subject_key: "27",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "reverse", subject_key: "28",  first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "reverse", subject_key: "29",  first_seen: null, locale: "en" },
         // 1 reverse alt-form (excluded by alt-forms gate)
-        { user_id: "user-a", card_type: "reverse", subject_key: "10027", first_seen: null },
+        { user_id: "user-a", card_type: "reverse", subject_key: "10027", first_seen: null, locale: "en" },
         // 4 evolution-edge (default ids — all pass)
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "1>>>2",   first_seen: null },
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "2>>>3",   first_seen: null },
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "4>>>5",   first_seen: null },
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "5>>>6",   first_seen: null },
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "1>>>2",   first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "2>>>3",   first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "4>>>5",   first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "5>>>6",   first_seen: null, locale: "en" },
         // 1 reverse-evolution-edge (default ids — passes)
-        { user_id: "user-a", card_type: "reverse-evolution-edge", subject_key: "4>>>5", first_seen: null },
+        { user_id: "user-a", card_type: "reverse-evolution-edge", subject_key: "4>>>5", first_seen: null, locale: "en" },
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -732,9 +735,9 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null },
-        { user_id: "user-a", card_type: "name", subject_key: "2", first_seen: null },
-        { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: null },
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "2", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: null, locale: "en" },
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -756,11 +759,11 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     // headroom contributes to the estimate, keeping the assertion deterministic.
     const today = "2026-05-20";
     const due: DueRow[] = [
-      { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: today },
-      { user_id: "user-a", card_type: "name", subject_key: "2", first_seen: today },
-      { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: today },
-      { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: today },
-      { user_id: "user-a", card_type: "name", subject_key: "5", first_seen: today },
+      { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: today, locale: "en" },
+      { user_id: "user-a", card_type: "name", subject_key: "2", first_seen: today, locale: "en" },
+      { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: today, locale: "en" },
+      { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: today, locale: "en" },
+      { user_id: "user-a", card_type: "name", subject_key: "5", first_seen: today, locale: "en" },
     ];
     const admin = buildAdminMock({
       subscriptions: [SUB],
@@ -805,12 +808,14 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
         card_type: "name",
         subject_key: String(i + 1),
         first_seen: today,
+        locale: "en",
       })),
       ...Array.from({ length: 10 }, (_, i) => ({
         user_id: "user-a",
         card_type: "reverse",
         subject_key: String(i + 1),
         first_seen: today,
+        locale: "en",
       })),
     ];
     const admin = buildAdminMock({
@@ -843,37 +848,33 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     expect(parsed.body).not.toContain("new");
   });
 
-  it("dual-evolution directions double-draw maxNewEvolutionPerDay (#1156)", async () => {
-    // When both evolutionCardsEnabled and reverseEvolutionCardsEnabled are on,
-    // computeNewEstimate sums the cap for each direction independently. The
-    // source comment on computeNewEstimate flags this as a deliberate
-    // simplification: the actual session cap is shared between the two
-    // directions but the push estimate doubles it. This test pins that
-    // behaviour so a future refactor that "fixes" the over-count does so
-    // intentionally rather than by accident.
-    //
-    // Name and reverse are always on since #1234. To isolate the evo estimate,
-    // their daily caps are zeroed (maxNewPerDay=0, maxNewReversePerDay=0) so
-    // the total = 7 (evo) + 7 (rev-evo) = 14. Distinct fixture values chosen
-    // so the doubled estimate (14) cannot collide with any other cap.
+  // ─── #1501: evolution-bucket double-count fix ──────────────────────────────
+  //
+  // Forward-evolution and reverse-evolution cards share ONE `maxNewEvolutionPerDay`
+  // bucket in `buildSessionQueues` (via `limitBucket`). `computeNewEstimate`
+  // must mirror this by adding the cap at most once.
+
+  it("both evolution directions enabled: evolution bucket counted once, not twice (#1501)", async () => {
+    // Regression test for #1501. Confirmed production scenario:
+    //   name=5, reverse=5, maxNewEvolutionPerDay=5, both evo directions on, cry off.
+    // The real session delivers 5 + 5 + 5 = 15 new cards per day.
+    // Before the fix, the notification reported 5 + 5 + 5 + 5 = 20.
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          evolutionCardsEnabled: true,         // draws maxNewEvolutionPerDay
-          reverseEvolutionCardsEnabled: true,  // draws maxNewEvolutionPerDay again
+          evolutionCardsEnabled: true,
+          reverseEvolutionCardsEnabled: true,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
-          maxNewPerDay: 0,          // zero name cap to isolate evo estimate
-          maxNewEvolutionPerDay: 7,
-          maxNewReversePerDay: 0,   // zero reverse cap to isolate evo estimate
-          maxNewCryPerDay: 13,
+          maxNewPerDay: 5,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 5,
+          maxNewCryPerDay: 10,
         },
       }],
-      // No due rows at all → dueCount = 0, body uses the new-only copy.
-      // No first_seen-today rows → both directions retain full headroom.
       due: [],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -883,9 +884,131 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // 7 (evolution) + 7 (reverse-evolution) = 14, even though the real
-    // session cap on evolution-direction cards is shared.
-    expect(parsed.body).toBe("14 new cards ready to practise.");
+    // name(5) + reverse(5) + evolution-bucket-once(5) = 15. Must NOT be 20.
+    expect(parsed.body).toBe("15 new cards ready to practise.");
+  });
+
+  it("only forward evolution enabled: evolution bucket counted once", async () => {
+    // Forward-only: evo term added once. name=0, reverse=0 to isolate.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: true,
+          reverseEvolutionCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 0,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 0,
+          maxNewCryPerDay: 10,
+        },
+      }],
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // evolution bucket once = 5.
+    expect(parsed.body).toBe("5 new cards ready to practise.");
+  });
+
+  it("only reverse-evolution enabled: evolution bucket still counted once", async () => {
+    // Reverse-only: evo term added once. name=0, reverse=0 to isolate.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: true,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 0,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 0,
+          maxNewCryPerDay: 10,
+        },
+      }],
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // evolution bucket once = 5.
+    expect(parsed.body).toBe("5 new cards ready to practise.");
+  });
+
+  it("neither evolution direction enabled: no evolution term in estimate", async () => {
+    // Both evo directions off. name=0, reverse=0, cry=0 → estimate = 0 → no notification.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 0,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 0,
+          maxNewCryPerDay: 10,
+        },
+      }],
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+
+    await POST(makeRequest());
+    // No due rows and no new headroom → no notification sent.
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it("name and reverse caps are independent: changing maxNewReversePerDay moves total independently", async () => {
+    // Verify name and reverse remain separate buckets. With both evo directions
+    // on and maxNewEvolutionPerDay=5, evo contributes 5. Set name=3, reverse=7
+    // and verify the total is 3 + 7 + 5 = 15 (not 3 + 5 + 5 = 13 or any other
+    // value that would imply name/reverse sharing).
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: true,
+          reverseEvolutionCardsEnabled: true,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 3,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 7,
+          maxNewCryPerDay: 10,
+        },
+      }],
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // name(3) + reverse(7) + evo-bucket-once(5) = 15.
+    expect(parsed.body).toBe("15 new cards ready to practise.");
   });
 });
 
@@ -920,9 +1043,9 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "1",   first_seen: null }, // Bulbasaur (Gen 1)
-        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null }, // Chikorita (Gen 2)
-        { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null }, // Treecko (Gen 3)
+        { user_id: "user-a", card_type: "name", subject_key: "1",   first_seen: null, locale: "en" }, // Bulbasaur (Gen 1)
+        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null, locale: "en" }, // Chikorita (Gen 2)
+        { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null, locale: "en" }, // Treecko (Gen 3)
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -962,10 +1085,10 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "1",   first_seen: null }, // Bulbasaur (Gen 1) — kept
-        { user_id: "user-a", card_type: "name", subject_key: "4",   first_seen: null }, // Charmander (Gen 1) — kept
-        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null }, // Chikorita (Gen 2) — excluded
-        { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null }, // Treecko (Gen 3) — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "1",   first_seen: null, locale: "en" }, // Bulbasaur (Gen 1) — kept
+        { user_id: "user-a", card_type: "name", subject_key: "4",   first_seen: null, locale: "en" }, // Charmander (Gen 1) — kept
+        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null, locale: "en" }, // Chikorita (Gen 2) — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null, locale: "en" }, // Treecko (Gen 3) — excluded
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -1006,9 +1129,9 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null }, // Bulbasaur (Grass) — excluded
-        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null }, // Charmander (Fire) — kept
-        { user_id: "user-a", card_type: "name", subject_key: "6", first_seen: null }, // Charizard (Fire/Flying) — kept
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" }, // Bulbasaur (Grass) — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" }, // Charmander (Fire) — kept
+        { user_id: "user-a", card_type: "name", subject_key: "6", first_seen: null, locale: "en" }, // Charizard (Fire/Flying) — kept
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -1050,9 +1173,9 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "4>>>5",   first_seen: null }, // Charmander(Fire)→Charmeleon — kept
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "1>>>2",   first_seen: null }, // Bulbasaur(Grass)→Ivysaur — excluded
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "5>>>6",   first_seen: null }, // Charmeleon(Fire)→Charizard — kept
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "4>>>5",   first_seen: null, locale: "en" }, // Charmander(Fire)→Charmeleon — kept
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "1>>>2",   first_seen: null, locale: "en" }, // Bulbasaur(Grass)→Ivysaur — excluded
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "5>>>6",   first_seen: null, locale: "en" }, // Charmeleon(Fire)→Charizard — kept
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -1103,8 +1226,8 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null }, // Chikorita (Gen 2) — excluded
-        { user_id: "user-a", card_type: "name", subject_key: "155", first_seen: null }, // Cyndaquil (Gen 2) — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null, locale: "en" }, // Chikorita (Gen 2) — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "155", first_seen: null, locale: "en" }, // Cyndaquil (Gen 2) — excluded
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -1242,5 +1365,299 @@ describe("POST /api/push/send-daily — per-user notification-hour gate (#1315)"
     expect(body.sent).toBe(0);
     expect(body.deleted).toBe(0);
     expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+});
+
+// ─── #1480: pokemonNameLocale due-count filtering ────────────────────────────
+
+describe("POST /api/push/send-daily — pokemonNameLocale locale filter (#1480)", () => {
+  const SUB = {
+    id: "sub-1",
+    user_id: "user-a",
+    endpoint: "https://push.example/a",
+    p256dh: "p256-a",
+    auth_secret: "auth-a",
+  };
+
+  it("en-only user: all en rows counted, due count unchanged", async () => {
+    // A user who has only ever practised in English. Their pokemonNameLocale
+    // is "en" (either set explicitly or absent — both default to "en"). All
+    // card_reviews rows have locale="en" (migration 029 backfill). No inflation.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          ...ALL_ENABLED_SETTINGS,
+          pokemonNameLocale: "en",
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "7", first_seen: null, locale: "en" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // All 3 en rows pass for an en user — count is 3, not inflated.
+    expect(parsed.body).toContain("3");
+    expect(parsed.body).not.toContain("6");
+  });
+
+  it("multi-locale user (en + ja): only active-locale (ja) rows counted", async () => {
+    // This is the core bug scenario (#1480). A user who has practised in both
+    // English and Japanese has independent FSRS rows per locale. Their current
+    // active pokemonNameLocale is "ja". The route must count only the ja rows
+    // (25 in this example) and exclude the en rows (25), producing "25 cards
+    // due" rather than "50 cards due".
+    const jaDue: DueRow[] = Array.from({ length: 25 }, (_, i) => ({
+      user_id: "user-a",
+      card_type: "name",
+      subject_key: String(i + 1),
+      first_seen: null,
+      locale: "ja",
+    }));
+    const enDue: DueRow[] = Array.from({ length: 25 }, (_, i) => ({
+      user_id: "user-a",
+      card_type: "name",
+      subject_key: String(i + 1),
+      first_seen: null,
+      locale: "en",
+    }));
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          ...ALL_ENABLED_SETTINGS,
+          pokemonNameLocale: "ja",
+        },
+      }],
+      // DB returns both locale sets; route must filter client-side.
+      due: [...jaDue, ...enDue],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // Only the 25 ja rows pass — not the inflated 50.
+    expect(parsed.body).toContain("25");
+    expect(parsed.body).not.toContain("50");
+  });
+
+  it("never-set-locale user (absent JSONB key): defaults to en, counts en backfilled rows", async () => {
+    // A user whose settings JSONB has no pokemonNameLocale key at all (pre-#1260
+    // record). parseEligibility falls back to DEFAULT_ELIGIBILITY.pokemonNameLocale
+    // = "en". Migration 029 backfilled all their card_reviews rows to locale="en".
+    // They must still see the correct count.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 10,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 10,
+          maxNewCryPerDay: 10,
+          // pokemonNameLocale deliberately absent — tests the default fallback
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // Both en rows pass for the default-en user.
+    expect(parsed.body).toContain("2");
+  });
+
+  it("user with no settings row: defaults to en, counts en rows", async () => {
+    // A user who has push_subscriptions but no user_settings row at all.
+    // The route falls back to DEFAULT_ELIGIBILITY (pokemonNameLocale = "en").
+    // Their legacy backfilled rows (locale="en") must still be counted.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [], // no user_settings row for this user
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "7", first_seen: null, locale: "en" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // All 3 en rows pass — DEFAULT_ELIGIBILITY uses "en".
+    expect(parsed.body).toContain("3");
+  });
+
+  it("invalid/unknown pokemonNameLocale in JSONB: falls back to en", async () => {
+    // An unknown locale value (e.g. "zh-CN" or "fr") must not crash and must
+    // fall back to "en", matching the validation in lib/settings/persistence.ts.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          ...ALL_ENABLED_SETTINGS,
+          pokemonNameLocale: "zh-CN", // invalid — not one of the four accepted values
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // Falls back to "en"; both en rows pass.
+    expect(parsed.body).toContain("2");
+  });
+
+  it("zh-Hans user: only zh-Hans rows counted; en rows excluded", async () => {
+    // Ensures the fix works for the zh-Hans locale (note: exact casing matters —
+    // DB CHECK constraint and app validator both use "zh-Hans", not "zh-CN").
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          ...ALL_ENABLED_SETTINGS,
+          pokemonNameLocale: "zh-Hans",
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "zh-Hans" },
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "zh-Hans" },
+        { user_id: "user-a", card_type: "name", subject_key: "7", first_seen: null, locale: "en" }, // excluded
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // Only 2 zh-Hans rows pass (not 3). The body starts with "2 cards due" in
+    // the combined form (dueCount=2 plus new-card estimate from caps). Assert
+    // the due count specifically rather than a bare digit to avoid false
+    // failures from the new-card estimate containing "3" as a substring.
+    expect(parsed.body).toMatch(/^2 cards? due/);
+    expect(parsed.body).not.toMatch(/^3 cards? due/);
+  });
+
+  it("zh-Hant user: only zh-Hant rows counted; other locale rows excluded", async () => {
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          ...ALL_ENABLED_SETTINGS,
+          pokemonNameLocale: "zh-Hant",
+        },
+      }],
+      due: [
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "zh-Hant" },
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "zh-Hant" },
+        { user_id: "user-a", card_type: "name", subject_key: "7", first_seen: null, locale: "zh-Hans" }, // excluded
+        { user_id: "user-a", card_type: "name", subject_key: "10", first_seen: null, locale: "en" },    // excluded
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // Only 2 zh-Hant rows pass. Assert the due count specifically rather than
+    // a bare digit to avoid false passes from the new-card estimate containing
+    // "2" as a substring (e.g. 20, 12, 21).
+    expect(parsed.body).toMatch(/^2 cards? due/);
+    expect(parsed.body).not.toMatch(/^4 cards? due/);
+  });
+
+  it("two users each with different locales in the same timezone bucket: each sees only their locale rows", async () => {
+    // Both users are in UTC (same timezone bucket) so their rows are returned
+    // in a single query. The per-user client-side filter must scope correctly
+    // to each user's own pokemonNameLocale independently.
+    //
+    // user-a: pokemonNameLocale="en", has 3 en + 3 ja rows → due = 3
+    // user-b: pokemonNameLocale="ja", has 3 en + 3 ja rows → due = 3
+    const admin = buildAdminMock({
+      subscriptions: [
+        SUB,
+        { id: "sub-2", user_id: "user-b", endpoint: "https://push.example/b", p256dh: "p256-b", auth_secret: "auth-b" },
+      ],
+      settings: [
+        { user_id: "user-a", timezone: "UTC", settings: { ...ALL_ENABLED_SETTINGS, pokemonNameLocale: "en" } },
+        { user_id: "user-b", timezone: "UTC", settings: { ...ALL_ENABLED_SETTINGS, pokemonNameLocale: "ja" } },
+      ],
+      due: [
+        // user-a: 3 en (match) + 3 ja (skip)
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "2", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: null, locale: "en" },
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "ja" },
+        { user_id: "user-a", card_type: "name", subject_key: "2", first_seen: null, locale: "ja" },
+        { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: null, locale: "ja" },
+        // user-b: 3 en (skip) + 3 ja (match)
+        { user_id: "user-b", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
+        { user_id: "user-b", card_type: "name", subject_key: "2", first_seen: null, locale: "en" },
+        { user_id: "user-b", card_type: "name", subject_key: "3", first_seen: null, locale: "en" },
+        { user_id: "user-b", card_type: "name", subject_key: "1", first_seen: null, locale: "ja" },
+        { user_id: "user-b", card_type: "name", subject_key: "2", first_seen: null, locale: "ja" },
+        { user_id: "user-b", card_type: "name", subject_key: "3", first_seen: null, locale: "ja" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    const body = (await res.json()) as { sent: number };
+    // Both users have 3 due cards in their active locale → 2 notifications sent.
+    expect(body.sent).toBe(2);
+    // Each push payload must contain "3", not "6" (which would indicate no locale filter).
+    for (const call of mockSendNotification.mock.calls) {
+      const parsed = JSON.parse(call[1] as string) as { body: string };
+      expect(parsed.body).toContain("3");
+      expect(parsed.body).not.toContain("6");
+    }
   });
 });

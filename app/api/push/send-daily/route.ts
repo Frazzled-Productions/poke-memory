@@ -190,6 +190,19 @@ type UserEligibility = {
    * Defaults to EMPTY_SCOPE so users without a stored scope value see all cards.
    */
   practiceScope: PracticeScope;
+  /**
+   * The user's active Pokémon name locale (#1480).
+   * Migration 029 added `locale` as part of the PK on `card_reviews`; a user
+   * who has practised in multiple locales (via the `languages` Labs flag) has
+   * independent FSRS rows per locale. The due-count query must filter to only
+   * the rows that match the user's current active locale, matching the
+   * behaviour of every other locale-aware surface (Mastery, Pasture, Stats).
+   *
+   * Accepted values: `'en' | 'ja' | 'zh-Hans' | 'zh-Hant'` (DB CHECK constraint).
+   * Falls back to `"en"` when absent/invalid — matches the migration 029 backfill
+   * which set `locale = 'en'` for all pre-existing rows.
+   */
+  pokemonNameLocale: string;
 };
 
 /** DEFAULT_SETTINGS-aligned fallbacks, used when a JSONB field is missing or invalid. */
@@ -203,6 +216,8 @@ const DEFAULT_ELIGIBILITY: UserEligibility = {
   maxNewReversePerDay: 10,
   maxNewCryPerDay: 10,
   practiceScope: EMPTY_SCOPE,
+  // "en" matches migration 029 backfill — legacy rows have locale = 'en'.
+  pokemonNameLocale: "en",
 };
 
 /**
@@ -282,6 +297,21 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
     const v = s[key];
     return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : defaultVal;
   }
+  // pokemonNameLocale: accept exactly the four DB-valid values; anything else
+  // falls back to "en". Mirrors the validation in lib/settings/persistence.ts.
+  // Do NOT use SUPPORTED_LOCALES (would import i18n/locales.ts which is fine
+  // here, but the inline check keeps this file self-contained and avoids any
+  // risk of a future locale being accepted before the DB CHECK constraint is
+  // updated).
+  const rawLocale = s.pokemonNameLocale;
+  const pokemonNameLocale: string =
+    rawLocale === "en" ||
+    rawLocale === "ja" ||
+    rawLocale === "zh-Hans" ||
+    rawLocale === "zh-Hant"
+      ? (rawLocale as string)
+      : DEFAULT_ELIGIBILITY.pokemonNameLocale;
+
   return {
     evolutionCardsEnabled:        boolField("evolutionCardsEnabled",        DEFAULT_ELIGIBILITY.evolutionCardsEnabled),
     reverseEvolutionCardsEnabled: boolField("reverseEvolutionCardsEnabled", DEFAULT_ELIGIBILITY.reverseEvolutionCardsEnabled),
@@ -292,6 +322,7 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
     maxNewReversePerDay:   numField("maxNewReversePerDay",   DEFAULT_ELIGIBILITY.maxNewReversePerDay),
     maxNewCryPerDay:       numField("maxNewCryPerDay",       DEFAULT_ELIGIBILITY.maxNewCryPerDay),
     practiceScope: parsePracticeScope(s.practiceScope),
+    pokemonNameLocale,
   };
 }
 
@@ -372,11 +403,14 @@ function rowIsEligible(
  * The result is floor'd at 0 so a user who has already hit their daily cap
  * contributes 0 to the estimate rather than a negative number.
  *
- * Note: reverse-evolution cards share the evolution daily-limit bucket with
- * forward evolution cards. The estimate sums the caps for both directions
- * independently — a deliberate simplification that may overcount slightly
- * when both are enabled, but is consistent with how `buildSessionQueues`
- * was written at the time of #1153.
+ * Evolution bucket: `limitBucket` in `lib/review/session.ts` maps
+ * `"reverse-evolution"` -> `"evolution"`, so forward-evolution and
+ * reverse-evolution new cards share ONE `maxNewEvolutionPerDay` cap in the
+ * real session. The estimate mirrors this: `maxNewEvolutionPerDay` is added
+ * at most ONCE, when either direction (or both) is enabled (#1501).
+ * The started-today count used for the evolution bucket is the sum of
+ * `"evolution-edge"` and `"reverse-evolution-edge"` rows started today,
+ * matching how `buildSessionQueues` accumulates `perType.evolution.newIntroducedToday`.
  */
 function computeNewEstimate(
   startedTodayCounts: Record<string, number>,
@@ -393,18 +427,19 @@ function computeNewEstimate(
     0,
     eligibility.maxNewReversePerDay - (startedTodayCounts["reverse"] ?? 0),
   );
-  if (eligibility.evolutionCardsEnabled) {
+
+  // Evolution bucket: forward and reverse directions share one cap (see docstring).
+  // Add the evolution term at most once, regardless of which directions are enabled.
+  if (eligibility.evolutionCardsEnabled || eligibility.reverseEvolutionCardsEnabled) {
+    const startedTodayEvo =
+      (startedTodayCounts["evolution-edge"] ?? 0) +
+      (startedTodayCounts["reverse-evolution-edge"] ?? 0);
     estimate += Math.max(
       0,
-      eligibility.maxNewEvolutionPerDay - (startedTodayCounts["evolution-edge"] ?? 0),
+      eligibility.maxNewEvolutionPerDay - startedTodayEvo,
     );
   }
-  if (eligibility.reverseEvolutionCardsEnabled) {
-    estimate += Math.max(
-      0,
-      eligibility.maxNewEvolutionPerDay - (startedTodayCounts["reverse-evolution-edge"] ?? 0),
-    );
-  }
+
   if (eligibility.cryCardsEnabled) {
     estimate += Math.max(
       0,
@@ -420,6 +455,8 @@ type DueRow = {
   card_type: string;
   subject_key: string;
   first_seen: string | null;
+  /** Migration 029 locale column — part of the PK (#1480). */
+  locale: string;
 };
 
 export async function POST(request: Request) {
@@ -574,7 +611,7 @@ export async function POST(request: Request) {
   for (const [today, userIds] of usersByDueDate) {
     const { data: dueData, error: dueError } = await admin
       .from("card_reviews")
-      .select("user_id, card_type, subject_key, first_seen")
+      .select("user_id, card_type, subject_key, first_seen, locale")
       .lte("due_date", today)
       .in("user_id", userIds)
       .is("hidden_since", null);
@@ -586,6 +623,13 @@ export async function POST(request: Request) {
     }
     for (const row of (dueData ?? []) as DueRow[]) {
       const eligibility = eligibilityByUser.get(row.user_id) ?? DEFAULT_ELIGIBILITY;
+      // Locale filter (#1480): skip rows that belong to a different locale than
+      // the user's current active pokemonNameLocale. This is a client-side
+      // per-user filter rather than a SQL WHERE clause because the bucket query
+      // covers MULTIPLE users who may each have a DIFFERENT active locale.
+      // The filter must come BEFORE the eligibility gate so ineligible rows
+      // from other locales do not inflate the due count.
+      if (row.locale !== eligibility.pokemonNameLocale) continue;
       if (!rowIsEligible(row.card_type, row.subject_key, eligibility)) continue;
 
       dueCountByUser.set(
