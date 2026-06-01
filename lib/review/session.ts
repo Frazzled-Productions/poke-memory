@@ -344,15 +344,32 @@ export function hydrateSession(
 
   // Belt-and-braces heal pass: if a saved card carries an FSRS state that
   // ts-fsrs would reject (e.g. stability:0 on a non-new card from an older app
-  // version), reset its FSRS math fields to initialReviewState defaults so the
-  // next grade produces a self-consistent state. Preserve firstSeen and dueDate
-  // so the card is not treated as brand-new by buildSessionQueues.
+  // version), perform a full re-init to a fresh new-card state so the next grade
+  // produces a self-consistent FSRS snapshot from a clean starting point.
   //
-  // Only heal when the card is NOT in the "brand-new / never-graduated" state:
-  // toFsrsCard already short-circuits to createEmptyCard for fsrsState="new" &&
+  // Re-init strategy (not just patching FSRS math fields): we set fsrsState to
+  // "new" and lastReview to null so the heal guard itself excludes the card on
+  // the NEXT load — giving the heal a stable fixed point. Without this, a card
+  // with stability:0 would re-trigger on every cold load producing a spurious
+  // saveSession write each time. Preserving the bogus history would also make the
+  // next grade self-inconsistent (e.g. reps > 0 but FSRS re-initialising).
+  //
+  // What is preserved: card identity fields (id, cardType, etc.), firstSeen (so
+  // the card is not double-counted as new for daily limits), hiddenSince, and
+  // seenInPasture. dueDate is reset to today so the re-init card is available
+  // immediately without the user having to wait for the old (bogus) due date.
+  //
+  // Only heal when the card is NOT already in the "brand-new / never-graded"
+  // state: toFsrsCard short-circuits to createEmptyCard for fsrsState="new" &&
   // lastReview=null, so those cards are safe regardless of field values. Healing
-  // them here would wrongly reset reps/lapses on legitimate brand-new in-step cards.
+  // them here would wrongly discard progress on legitimate brand-new in-step cards.
+  //
+  // Signed-in note: re-init resets reps/lapses to 0 for the one poison card.
+  // The next cloud push of that card may be rejected by the migration-015 monotonic-
+  // reps regression trigger (silently, by design). This per-card cloud divergence
+  // is accepted — a crash is worse than a single card losing its history.
   let anyHealed = false;
+  const todayStr = initialReviewState(now).dueDate; // "YYYY-MM-DD" in UTC
   const healedRefreshed = refreshed.map((card) => {
     const needsHeal =
       (card.state.fsrsState !== "new" || card.state.lastReview !== null) &&
@@ -364,21 +381,28 @@ export function hydrateSession(
       card.id,
       { stability: card.state.stability, difficulty: card.state.difficulty, fsrsState: card.state.fsrsState },
     );
-    const init = initialReviewState(now);
     return {
       ...card,
       state: {
-        ...card.state,
-        // Reset the FSRS math fields to zero — the next grade will establish
-        // a proper initial stability/difficulty via createEmptyCard.
-        stability: init.stability,
-        difficulty: init.difficulty,
-        elapsedDays: init.elapsedDays,
-        scheduledDays: init.scheduledDays,
-        reps: init.reps,
-        lapses: init.lapses,
-        // Preserve firstSeen, dueDate, lastReview, learningStep, stepStartedAt,
-        // hiddenSince, seenInPasture so queue placement is unchanged.
+        // Full re-init to a clean new-card state. The next grade will establish
+        // a proper initial stability/difficulty via createEmptyCard in toFsrsCard.
+        stability: 0,
+        difficulty: 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: 0,
+        lapses: 0,
+        fsrsState: "new" as const,
+        lastReview: null,
+        learningStep: null,
+        stepStartedAt: null,
+        // Preserve firstSeen so daily-limit counters don't double-count.
+        firstSeen: card.state.firstSeen,
+        // Set dueDate to today so the re-init card is immediately available.
+        dueDate: todayStr,
+        // Preserve snooze and pasture flags — these are display/UX state, not FSRS.
+        hiddenSince: card.state.hiddenSince,
+        seenInPasture: card.state.seenInPasture,
       },
     };
   });

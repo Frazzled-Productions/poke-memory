@@ -855,7 +855,8 @@
     "tryAgain": "もう一度試す",
     "goHome": "練習に戻る",
     "resetLocalData": "ローカルの練習データをリセット",
-    "resetLocalDataConfirm": "ローカルの練習の進捗を削除して最初からやり直します。続けますか？"
+    "resetLocalDataConfirm": "ローカルの練習の進捗を削除して最初からやり直します。続けますか？",
+    "signedInHealHint": "このエラーが壊れたカードデータによるものであれば、再読み込みすると自動的に修復されます。"
   },
   "onboarding": {
     "welcomeHeading": "Poké Memory へようこそ",

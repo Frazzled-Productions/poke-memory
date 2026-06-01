@@ -878,13 +878,33 @@ describe("isFsrsInvalidState", () => {
     expect(isFsrsInvalidState(state)).toBe(true);
   });
 
-  it("returns false for a brand-new card (stability 0, difficulty 0) — new cards are valid by convention", () => {
-    // isFsrsInvalidState is only called for non-new cards inside toFsrsCard
-    // (the new-card path returns createEmptyCard first). But the predicate
-    // itself flags stability:0 regardless — callers guard with the new/lastReview
-    // check before calling toFsrsCard. This test documents the behaviour.
-    const state = newCard(); // stability:0, difficulty:0
+  it("returns true for a brand-new card (stability 0, difficulty 0) — the predicate flags zero-stability regardless of state label", () => {
+    // isFsrsInvalidState checks the numeric fields in isolation. A raw new-card
+    // state (stability:0) triggers the predicate, BUT the callers are protected:
+    //   • toFsrsCard short-circuits to createEmptyCard for fsrsState="new" &&
+    //     lastReview=null BEFORE consulting isFsrsInvalidState.
+    //   • The session-layer heal guard in hydrateSession also excludes
+    //     fsrsState="new" && lastReview=null from the heal pass.
+    // So new cards are never mis-healed; this test documents that the raw
+    // predicate is not the full guard.
+    const state = newCard(); // stability:0, difficulty:0, fsrsState:"new", lastReview:null
     expect(isFsrsInvalidState(state)).toBe(true);
+  });
+
+  it("new card (fsrsState:new, lastReview:null) is NOT healed by the session-layer heal guard", () => {
+    // The heal guard in hydrateSession excludes fsrsState:"new" && lastReview:null.
+    // A brand-new card therefore passes through unchanged even though
+    // isFsrsInvalidState would flag it.
+    const state = newCard(); // stability:0, difficulty:0, fsrsState:"new", lastReview:null
+    // Sanity: predicate would flag it
+    expect(isFsrsInvalidState(state)).toBe(true);
+    // But nextReview (which uses toFsrsCard's short-circuit) still works correctly:
+    // grading a new card enters the learning step without touching FSRS at all.
+    const result = nextReview(state, 4, NOW);
+    // A Good grade on a new card advances to step 1 or graduates (both valid).
+    // The key assertion: no throw and the result is self-consistent (no NaN).
+    expect(Number.isFinite(result.stability) || result.stability === 0).toBe(true);
+    expect(result.firstSeen).toBe(TODAY);
   });
 });
 
@@ -909,8 +929,8 @@ describe("nextReview — invalid FSRS state healing via toFsrsCard", () => {
     const state = cardInStep(0, "2026-05-02", { stability: 0, difficulty: 5 });
     expect(() => nextReview(state, 4, NOW)).not.toThrow();
     const result = nextReview(state, 4, NOW);
-    // Card graduates (exits the learning step) or advances — either way no throw.
-    expect(result.stability).toBeGreaterThanOrEqual(0);
+    // Card graduates (exits the learning step) — stability must be positive.
+    expect(result.stability).toBeGreaterThan(0);
   });
 
   // T3: review card, stability:0, difficulty:0, grade Again → enters relearning

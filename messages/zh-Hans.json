@@ -855,7 +855,8 @@
     "tryAgain": "重试",
     "goHome": "前往练习",
     "resetLocalData": "重置本地练习数据",
-    "resetLocalDataConfirm": "这将删除您的本地练习进度并重新开始。是否继续？"
+    "resetLocalDataConfirm": "这将删除您的本地练习进度并重新开始。是否继续？",
+    "signedInHealHint": "如果此错误是由损坏的卡片数据引起的，重新加载将自动修复它。"
   },
   "onboarding": {
     "welcomeHeading": "欢迎使用 Poké Memory",

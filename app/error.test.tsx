@@ -33,6 +33,16 @@ vi.mock("@/lib/storage/reset", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock useAuth — default to guest (user: null) so most tests exercise the
+// guest path where the reset button is visible.
+// ---------------------------------------------------------------------------
+
+const mockUseAuth = vi.fn(() => ({ user: null, loading: false, supabase: null }));
+vi.mock("@/lib/auth/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+// ---------------------------------------------------------------------------
 // Subject under test
 // ---------------------------------------------------------------------------
 
@@ -59,6 +69,8 @@ const noop = () => {};
 afterEach(() => {
   // Restore to online so other tests aren't affected.
   setOnline(true);
+  // Restore to guest so tests that check the reset button see it.
+  mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
 });
 
 describe("Error page — online variant", () => {
@@ -301,8 +313,9 @@ describe("Error page — Traditional Chinese locale", () => {
   });
 });
 
-describe("Error page — Reset local practice data button", () => {
-  it("renders the Reset local practice data button when online", () => {
+describe("Error page — Reset local practice data button (guest user)", () => {
+  it("renders the Reset local practice data button when online and guest", () => {
+    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
@@ -312,6 +325,7 @@ describe("Error page — Reset local practice data button", () => {
   });
 
   it("does NOT render the Reset button in the offline variant", () => {
+    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
     setOnline(false);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
@@ -321,6 +335,7 @@ describe("Error page — Reset local practice data button", () => {
   });
 
   it("calls clearLocalProgress and reloads on confirm", async () => {
+    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
     const { clearLocalProgress } = await import("@/lib/storage/reset");
     const mockClear = vi.mocked(clearLocalProgress);
     mockClear.mockResolvedValue(undefined);
@@ -357,6 +372,7 @@ describe("Error page — Reset local practice data button", () => {
   });
 
   it("does NOT call clearLocalProgress when user cancels the confirm dialog", async () => {
+    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
     const { clearLocalProgress } = await import("@/lib/storage/reset");
     const mockClear = vi.mocked(clearLocalProgress);
     mockClear.mockClear();
@@ -373,5 +389,29 @@ describe("Error page — Reset local practice data button", () => {
     });
 
     expect(mockClear).not.toHaveBeenCalled();
+  });
+});
+
+describe("Error page — signed-in user (reset button hidden)", () => {
+  it("does NOT render the Reset local practice data button for a signed-in user", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, supabase: null });
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    expect(
+      screen.queryByRole("button", { name: /reset local practice data/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders the signed-in heal hint instead of the reset button", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, supabase: null });
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    expect(
+      screen.getByText(/reloading will repair it automatically/i),
+    ).toBeInTheDocument();
   });
 });

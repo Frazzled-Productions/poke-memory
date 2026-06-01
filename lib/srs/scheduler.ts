@@ -175,6 +175,9 @@ export function isFsrsInvalidState(state: ReviewState): boolean {
     !Number.isFinite(state.difficulty) ||
     state.stability < 1e-3 ||
     state.difficulty < 1 ||
+    // ts-fsrs clamps difficulty to [1, 10] internally rather than throwing, so
+    // difficulty > 10 is belt-and-braces: we re-init rather than silently
+    // passing a value outside the intended range to the scheduler.
     state.difficulty > 10
   );
 }

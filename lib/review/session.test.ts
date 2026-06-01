@@ -147,7 +147,39 @@ describe('hydrateSession', () => {
   });
 
   describe('heal pass (isFsrsInvalidState)', () => {
-    it('heals a saved card with stability:0 and flags anyHealed', () => {
+    const TODAY_STR = '2026-05-09'; // matches NOW = 2026-05-09T12:00:00Z
+
+    it('heals a poison card to a fresh new-card state and flags anyHealed', () => {
+      const poisonState: Partial<ReviewState> = {
+        stability: 0,
+        difficulty: 5,
+        fsrsState: 'review' as const,
+        lastReview: '2026-04-01',
+        firstSeen: '2026-03-15',
+        reps: 2,
+        lapses: 0,
+      };
+      const saved = [makeCard(makeSeedPokemon(1), poisonState)];
+      const seed = [makeSeedPokemon(1)];
+      const { cards, anyHealed } = hydrateSession(saved, seed, [], NOW);
+      expect(anyHealed).toBe(true);
+      // Full re-init: FSRS math fields zeroed, state reset to "new"
+      expect(cards[0].state.stability).toBe(0);
+      expect(cards[0].state.difficulty).toBe(0);
+      expect(cards[0].state.reps).toBe(0);
+      expect(cards[0].state.lapses).toBe(0);
+      expect(cards[0].state.fsrsState).toBe('new');
+      expect(cards[0].state.lastReview).toBeNull();
+      expect(cards[0].state.learningStep).toBeNull();
+      // firstSeen is preserved so daily-limit counters don't double-count
+      expect(cards[0].state.firstSeen).toBe('2026-03-15');
+      // dueDate is reset to today so the card is immediately available
+      expect(cards[0].state.dueDate).toBe(TODAY_STR);
+    });
+
+    it('healed card does NOT re-trigger on a second hydrateSession call (fixed-point assertion)', () => {
+      // After the first heal the card is fsrsState:"new" && lastReview:null,
+      // which the guard explicitly excludes. A second load must report anyHealed=false.
       const poisonState: Partial<ReviewState> = {
         stability: 0,
         difficulty: 5,
@@ -158,12 +190,23 @@ describe('hydrateSession', () => {
       };
       const saved = [makeCard(makeSeedPokemon(1), poisonState)];
       const seed = [makeSeedPokemon(1)];
+      // First load: heals
+      const { cards: healed, anyHealed: firstHeal } = hydrateSession(saved, seed, [], NOW);
+      expect(firstHeal).toBe(true);
+      // Second load: the healed card must not re-trigger
+      const { anyHealed: secondHeal } = hydrateSession(healed, seed, [], NOW);
+      expect(secondHeal).toBe(false);
+    });
+
+    it('does not heal a brand-new card (fsrsState:new, lastReview:null) — the guard excludes it', () => {
+      // A legitimately new card has stability:0 but must never be healed;
+      // isFsrsInvalidState would flag it but the guard checks fsrsState+lastReview first.
+      const saved = [makeCard(makeSeedPokemon(1))]; // initialReviewState: new, lastReview:null
+      const seed = [makeSeedPokemon(1)];
       const { cards, anyHealed } = hydrateSession(saved, seed, [], NOW);
-      expect(anyHealed).toBe(true);
-      expect(cards[0].state.stability).toBe(0); // reset to initialReviewState default
-      expect(cards[0].state.reps).toBe(0);       // reset
-      // firstSeen and dueDate are preserved
-      expect(cards[0].state.firstSeen).toBe(saved[0].state.firstSeen);
+      expect(anyHealed).toBe(false);
+      expect(cards[0].state.fsrsState).toBe('new');
+      expect(cards[0].state.lastReview).toBeNull();
     });
 
     it('does not heal a valid card and leaves anyHealed false', () => {
