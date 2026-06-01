@@ -23,6 +23,15 @@
  * view instead (see lib/pwa/cacheStrategy.ts). Large individual build chunks
  * are also skipped via `maximumFileSizeToCacheInBytes` and fall back to the
  * cache-first static handler at runtime.
+ *
+ * esbuild note: `useNativeEsbuild: true` switches the service-worker bundler
+ * from esbuild-wasm to native esbuild. The wasm variant spawns a long-lived
+ * child process speaking a binary stdio protocol. When the Next.js build
+ * finishes and the parent tears down, the wasm child can still be mid-write to
+ * the now-closed pipe, producing a spurious "Error: write EPIPE" in stderr.
+ * Native esbuild handles process teardown cleanly and is also significantly
+ * faster. The `esbuild` package is a build-time devDependency whose
+ * platform-specific binary is managed automatically by npm.
  */
 import { createSerwistRoute } from "@serwist/turbopack";
 
@@ -30,6 +39,9 @@ export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
   createSerwistRoute({
     // The service-worker source bundled into `/sw/sw.js`.
     swSrc: "app/sw.ts",
+    // Use native esbuild instead of esbuild-wasm to avoid a spurious EPIPE
+    // during build teardown. See the module comment above.
+    useNativeEsbuild: true,
     // Precache only the static build output (the app shell). The default
     // patterns also glob `public/**/*`, which would pull in every sprite.
     //

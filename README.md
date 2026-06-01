@@ -112,6 +112,22 @@ Sign in with GitHub or Google (the **Sign in** button in the nav) to sync your r
 
 ## Run locally
 
+**Node 24 is required** (matches `.nvmrc` and CI). The build fails fast with an
+actionable message if you run under a different major.
+
+```bash
+# With nvm:
+nvm install 24   # only needed once; skip if already installed
+nvm use          # picks up .nvmrc automatically
+
+# If nvm use appears to succeed but your node --version still shows the wrong
+# major, your ~/.nvm/versions/node directory may be empty (common when Node
+# was installed via Homebrew rather than nvm). Run nvm install 24 first.
+
+# With Homebrew node@24 (no nvm needed):
+export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
+```
+
 ```bash
 npm install
 npm run seed           # one-time fetch of all 1025 species from PokéAPI (~1–2 min)
