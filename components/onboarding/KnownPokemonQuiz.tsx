@@ -172,7 +172,11 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
       );
       // Quiz operates on name cards only — keep the grid scannable.
       const names = cards.filter((c): c is NameReviewCard => c.cardType === "name");
-      setEligibleCards(eligibleCardsForKnownQuiz(names) as NameReviewCard[]);
+      // Pass alternateFormsEnabled so alternate-form cards (Alolan, Galarian,
+      // Mega, etc.) are excluded from the grid when the user has not enabled
+      // them — matching the gate buildSessionQueues applies via isCardEligible
+      // (#1481).
+      setEligibleCards(eligibleCardsForKnownQuiz(names, settings.alternateFormsEnabled) as NameReviewCard[]);
       setLoaded(true);
     }
     void load();

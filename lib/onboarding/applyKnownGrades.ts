@@ -24,6 +24,7 @@
 
 import type { ReviewableCard } from "@/lib/review/session";
 import { nextReview, type NextReviewOptions } from "@/lib/srs/scheduler";
+import { isCardEligible } from "@/lib/eligibility/index";
 
 export type ApplyKnownGradesOptions = NextReviewOptions;
 
@@ -41,11 +42,35 @@ export function isEligibleForKnownQuiz(card: ReviewableCard): boolean {
  * Returns the subset of `cards` that the quiz is allowed to operate on.
  * Eligibility is calculated upfront so the UI shows a stable grid while the
  * underlying session may be mutating in the background.
+ *
+ * When `alternateFormsEnabled` is `false` (the default), alternate-form cards
+ * (species id >= 10000, e.g. Alolan Vulpix, Galarian Ponyta) are excluded from
+ * the result. This mirrors the same gate applied by `buildSessionQueues` via
+ * `isCardEligible` (#1481) — cards hidden from the practice queue must also be
+ * hidden from the known-quiz grid so the user cannot create orphaned FSRS
+ * states for cards that will never surface.
+ *
+ * The `isCardEligible` predicate from `lib/eligibility/index.ts` is the shared
+ * single source of truth for the alternate-forms gate; we delegate to it here
+ * rather than re-deriving the check.
  */
 export function eligibleCardsForKnownQuiz(
   cards: readonly ReviewableCard[],
+  alternateFormsEnabled: boolean = true,
 ): ReviewableCard[] {
-  return cards.filter(isEligibleForKnownQuiz);
+  return cards.filter(
+    (card) =>
+      isEligibleForKnownQuiz(card) &&
+      isCardEligible(
+        { cardType: card.cardType, subjectKey: card.subjectKey },
+        {
+          evolutionCardsEnabled: true,
+          reverseEvolutionCardsEnabled: true,
+          cryCardsEnabled: true,
+          alternateFormsEnabled,
+        },
+      ),
+  );
 }
 
 /**
