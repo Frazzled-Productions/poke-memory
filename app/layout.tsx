@@ -22,6 +22,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
 import { MachineTranslationBanner } from "@/components/i18n/MachineTranslationBanner";
+import { ProfileStatusBar } from "@/components/profile/ProfileStatusBar";
 import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
 import { StoragePersistenceRequester } from "@/components/pwa/StoragePersistenceRequester";
 import { PwaBadge } from "@/components/pwa/PwaBadge";
@@ -213,6 +214,14 @@ export default function RootLayout({
                     <FavouriteThemeProvider>
                       <ThemeWatermark />
                       <Nav />
+                      {/*
+                        ProfileStatusBar is a slim, read-only band showing streak,
+                        token balance, and mastery at a glance. Sourced entirely
+                        from useProfileStatus(). Hidden on mobile Practice (the
+                        StreakBadge already carries those signals there). Desktop
+                        shows it on all routes (#1490).
+                      */}
+                      <ProfileStatusBar />
                       {/*
                         MachineTranslationBanner is a client component that reads
                         the active locale from a cookie and shows a dismissible

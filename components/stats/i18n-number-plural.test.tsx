@@ -247,16 +247,17 @@ describe("StreakBadge — locale coverage (#1408)", () => {
     vi.mocked(computeStreak).mockReturnValue(5);
   });
 
-  it("en: renders '5 days streak' (count=5, 'other' branch)", () => {
+  it("en: renders the terse streak label '5d' (count=5)", () => {
     renderWithIntl(<StreakBadge />);
-    expect(screen.getByText(/5 days streak/)).toBeInTheDocument();
+    // The streak now renders via the shared StreakChip ("{count, number}d").
+    expect(screen.getByText("5d")).toBeInTheDocument();
   });
 
-  it("en: count=1 renders '1 day streak' ('one' branch)", () => {
+  it("en: count=1 renders '1d'", () => {
     // Override computeStreak to return 1 for this test only.
     vi.mocked(computeStreak).mockReturnValue(1);
     renderWithIntl(<StreakBadge />);
-    expect(screen.getByText(/1 day streak/)).toBeInTheDocument();
+    expect(screen.getByText("1d")).toBeInTheDocument();
   });
 
   it("ja: renders the streak badge without throwing", () => {

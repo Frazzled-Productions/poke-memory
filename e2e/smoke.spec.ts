@@ -909,9 +909,15 @@ test.describe("Streak status on Practice (#1443)", () => {
 
     await page.goto("/");
 
-    // Token-balance pip (nav.streakChip.tokenLabel, count 2).
-    await expect(page.getByText("2 protection tokens.")).toBeVisible();
-    // Next-milestone signpost (1 day from streak 2 to the first milestone, 3).
+    // Token balance now renders via the shared TokenChip (aria-label
+    // "2 protection tokens"). On desktop it sits in the ProfileStatusBar; on
+    // mobile it sits inline in StreakBadge (the bar is hidden on mobile
+    // Practice). The other copy is present-but-hidden, so match the VISIBLE one.
+    await expect(
+      page.locator('[aria-label="2 protection tokens"]:visible'),
+    ).toBeVisible();
+    // Next-milestone signpost (1 day from streak 2 to the first milestone, 3)
+    // still renders inline in StreakBadge on the Practice screen.
     await expect(
       page.getByText(/to your next milestone\./i),
     ).toBeVisible();
