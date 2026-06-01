@@ -37,6 +37,7 @@ Discoverability debt is a recurring, easy-to-miss surface here. A spaced-repetit
 2. Identify which UX axis the change engages — information architecture, discoverability, onboarding, empty/locked state, accessibility, or a combination. Say which.
 3. Ground the assessment in repo patterns: Grep/Glob for how comparable features are already surfaced (existing nav entries, onboarding steps, empty-state copy, tooltip components) and reuse the established pattern rather than inventing a new one. Check the change against the three debt patterns above.
 4. For UX/accessibility specifics not settled in the repo, use WebFetch to consult authoritative references (WCAG / WAI-ARIA Authoring Practices at w3.org, Nielsen Norman Group, platform HIG/Material guidance). Cite URLs.
+5. **Mock-up requirement (#1500).** When the change proposes a **new user-facing visual surface or a significant layout change**, your output must include a **mock-up** (ASCII art is fine) of the proposed surface — desktop and mobile where they differ — so the maintainer can annotate it before implementation. When reviewing a brief or ticket for such a change, raise the **absence** of a mock-up as a **Concern**. Pure logic/data/process work with no visible change is exempt.
 
 ## Output format
 
