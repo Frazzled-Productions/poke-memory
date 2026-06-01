@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
-import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { classifyCard } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
@@ -28,7 +28,13 @@ export default function PokedexPage() {
       setMasteryRepetitions(mr);
       const saved = await loadSession();
       if (saved !== null) {
-        setCards(hydrateSession(saved.cards, SEED_POKEMON, []).cards);
+        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, SEED_POKEMON, []);
+        // Persist healed cards so the fixed point is durable across all entry
+        // points, not only Practice (#1506).
+        if (anyHealed) {
+          await saveSession({ cards: hydrated, limits: saved.limits });
+        }
+        setCards(hydrated);
       } else {
         setCards(buildSession(SEED_POKEMON, []));
       }

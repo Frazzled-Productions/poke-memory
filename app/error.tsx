@@ -18,8 +18,13 @@ export default function Error({
   reset: () => void;
 }) {
   const t = useTranslations("error");
-  const { user } = useAuth();
-  const isSignedIn = user !== null;
+  const { user, loading: authLoading } = useAuth();
+  // Treat auth-loading as indeterminate: show neither the destructive guest
+  // button nor the signed-in hint until auth settles (~100–500 ms). This
+  // prevents a signed-in user from briefly seeing the destructive
+  // "Reset local practice data" button before auth resolves (#1506).
+  const authSettled = !authLoading;
+  const isSignedIn = authSettled && user !== null;
   const [offline, setOffline] = useState<boolean>(isOffline);
 
   useEffect(() => {
@@ -111,17 +116,19 @@ export default function Error({
           >
             {t("goHome")}
           </Link>
-          {isSignedIn ? (
-            <p className="text-xs text-red-500 dark:text-red-400">
-              {t("signedInHealHint")}
-            </p>
-          ) : (
-            <button
-              onClick={() => { void handleResetLocalData(); }}
-              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
-            >
-              {t("resetLocalData")}
-            </button>
+          {authSettled && (
+            isSignedIn ? (
+              <p className="text-xs text-red-500 dark:text-red-400">
+                {t("signedInHealHint")}
+              </p>
+            ) : (
+              <button
+                onClick={() => { void handleResetLocalData(); }}
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+              >
+                {t("resetLocalData")}
+              </button>
+            )
           )}
         </div>
       </div>

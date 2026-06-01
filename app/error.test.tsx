@@ -12,6 +12,7 @@
  */
 
 import { renderWithIntl, renderJa, renderZhHans, renderZhHant, screen, act } from "@/components/test-utils/renderWithIntl";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -353,13 +354,9 @@ describe("Error page — Reset local practice data button (guest user)", () => {
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
+    const user = userEvent.setup();
     const resetBtn = screen.getByRole("button", { name: /reset local practice data/i });
-    resetBtn.click();
-
-    // Wait for the async handler to complete
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await user.click(resetBtn);
 
     expect(mockClear).toHaveBeenCalledOnce();
     expect(reloadMock).toHaveBeenCalledOnce();
@@ -413,5 +410,47 @@ describe("Error page — signed-in user (reset button hidden)", () => {
     expect(
       screen.getByText(/reloading will repair it automatically/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe("Error page — auth loading (indeterminate state)", () => {
+  it("renders NEITHER the reset button NOR the signed-in hint while auth is loading", () => {
+    // While auth resolves (~100–500 ms), a signed-in user must not see the
+    // destructive guest-only reset button. Neither UI branch should render
+    // until auth settles (#1506 fix).
+    mockUseAuth.mockReturnValue({ user: null, loading: true, supabase: null });
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    expect(
+      screen.queryByRole("button", { name: /reset local practice data/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/reloading will repair it automatically/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the reset button once auth resolves as guest", () => {
+    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    expect(
+      screen.getByRole("button", { name: /reset local practice data/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the signed-in hint once auth resolves as signed-in", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, supabase: null });
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    expect(
+      screen.getByText(/reloading will repair it automatically/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /reset local practice data/i }),
+    ).not.toBeInTheDocument();
   });
 });

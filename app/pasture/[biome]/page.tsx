@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { HABITAT_ZONES } from "@/lib/pasture/zones";
 import { assignAnchors } from "@/lib/pasture/assign";
@@ -118,7 +118,7 @@ export default function BiomeLandscapePage({
           // isDefaultForm, etc.) that biomeStats and the biome filter depend on.
           // All *Enabled flags are false — only refresh existing cards from seed
           // (backfill habitat, isDefaultForm, etc.) without adding ~1 000 new unseen cards.
-          const { cards: hydrated } = hydrateSession(session.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+          const { cards: hydrated, anyHealed } = hydrateSession(session.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
             reverseEnabled: false,
             nameEnabled: false,
             evolutionEnabled: false,
@@ -130,6 +130,11 @@ export default function BiomeLandscapePage({
             // for completeness but is effectively dead in this refresh pass.
             locale: pokemonNameLocale,
           });
+          // Persist healed cards so the fixed point is durable across all entry
+          // points, not only Practice (#1506).
+          if (anyHealed) {
+            await saveSession({ cards: hydrated, limits: session.limits });
+          }
           const cards = filterMastered(
             hydrated,
             false,

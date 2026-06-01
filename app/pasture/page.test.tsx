@@ -166,6 +166,7 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { filterMastered } from "@/lib/pasture/arrivals";
+import { saveSession } from "@/lib/review/persistence";
 
 // ---------------------------------------------------------------------------
 // Fixtures for the hydrate→filter→count regression test
@@ -398,6 +399,37 @@ describe("PasturePage", () => {
       expect(screen.getByText(/master your first pokémon/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/1 pokémon/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Persistence fixed-point guard for #1506 — non-Practice entry paths.
+   *
+   * When hydrateSession reports anyHealed:true, the Pasture page must call
+   * saveSession with the healed cards so the fixed point is reached on the
+   * NEXT load (second hydrateSession → anyHealed:false) regardless of whether
+   * the user ever opens Practice first.
+   */
+  it("calls saveSession when hydrateSession reports anyHealed:true (#1506)", async () => {
+    const rawCards = [RAW_SAVED_NAME_CARD];
+    const healedCards = [{ ...RAW_SAVED_NAME_CARD, state: { ...RAW_SAVED_NAME_CARD.state, fsrsState: "new" as const, lastReview: null, reps: 0, lapses: 0, stability: 0, difficulty: 0 } }];
+
+    mockLoadSession.mockResolvedValue({
+      cards: rawCards,
+      limits: { name: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 }, reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 } },
+    });
+
+    // Simulate hydrateSession reporting a heal.
+    vi.mocked(hydrateSession).mockReturnValueOnce({ cards: healedCards as unknown as ReviewableCard[], anyHealed: true });
+
+    renderWithIntl(<PasturePage />);
+
+    // saveSession must be called with the healed cards so the corrected state
+    // persists — subsequent loads will find anyHealed:false and skip the write.
+    await waitFor(() => {
+      expect(saveSession).toHaveBeenCalledWith(
+        expect.objectContaining({ cards: healedCards }),
+      );
+    });
   });
 });
 
