@@ -51,3 +51,5 @@ export const GRAD_INTERVAL_GOOD = 1;
 
 /** Graduation interval after pressing Easy at any step (days). */
 export const GRAD_INTERVAL_EASY = 4;
+
+// org-transfer deploy probe (throwaway branch, do not merge)
