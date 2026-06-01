@@ -41,6 +41,7 @@ jobs:
               - '!changelog.d/**'
               - '!docs/**'
               - '!.claude/agents/**'
+              - 'changelog.d/unreleased/**'
             e2e_relevant:
               - 'app/**'
               - 'components/**'

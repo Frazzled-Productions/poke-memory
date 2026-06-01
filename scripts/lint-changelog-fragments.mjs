@@ -30,7 +30,7 @@ const VALID_KINDS = [
 ];
 
 // Files in the directory that are not fragments and must be skipped.
-const SKIP = new Set(["README.md", ".gitkeep"]);
+const SKIP = new Set([".gitkeep"]);
 
 /**
  * Validate a single fragment's text. Returns an array of human-readable
@@ -73,6 +73,7 @@ function problemsFor(text) {
     problems.push(
       `\`kind: ${kind || "(empty)"}\` is not valid; expected one of ${VALID_KINDS.join(", ")}`,
     );
+    return problems;
   }
 
   const body = lines.slice(closeIdx + 1);
