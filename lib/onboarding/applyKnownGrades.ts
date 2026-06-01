@@ -56,6 +56,7 @@ export function isEligibleForKnownQuiz(card: ReviewableCard): boolean {
  */
 export function eligibleCardsForKnownQuiz(
   cards: readonly ReviewableCard[],
+  // Default true for backwards-compat only — always pass settings.alternateFormsEnabled explicitly.
   alternateFormsEnabled: boolean = true,
 ): ReviewableCard[] {
   return cards.filter(

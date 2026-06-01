@@ -30,8 +30,8 @@ vi.mock("@/lib/review/persistence", async () => {
 });
 
 // Default settings: 90% retention, alternateFormsEnabled: false (matching the
-// real DEFAULT_SETTINGS default). Individual tests may override by calling
-// `mockLoadSettings(overrides)`.
+// real DEFAULT_SETTINGS default). Individual tests may override by assigning
+// `settingsOverride = { ... }` before rendering.
 let settingsOverride: Partial<UserSettings> = {};
 
 vi.mock("@/lib/settings/persistence", async () => {

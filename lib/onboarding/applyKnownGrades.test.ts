@@ -80,6 +80,7 @@ const ALT_FORM_ID = 10100; // Alolan Raichu
 function makeAltFormCard(state: ReviewState = initialReviewState(NOW)): NameReviewCard {
   return {
     ...makeNameCard(ALT_FORM_ID, state),
+    speciesId: 26, // Alolan Raichu's parent species (Raichu) — matches real seed shape
     isDefaultForm: false,
     formCategory: "regional",
     formSlug: "alola",
