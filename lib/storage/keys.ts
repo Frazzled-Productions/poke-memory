@@ -140,6 +140,23 @@ export const KEY_HAS_MASTERED = "poke-memory:has-mastered:v2";
  */
 export const KEY_QA_SEED_ACTIVE = "poke-memory:qa-seed-active";
 
+// ─── Mastered-count cache (per locale) ───────────────────────────────────────
+
+/**
+ * Lightweight per-locale mastered-species count cache. Holds a single JSON
+ * object `{ en: number, ja: number, "zh-Hans": number, "zh-Hant": number }`
+ * written by `ReviewSession` after each grade that changes mastery state.
+ *
+ * One key (one getItem) for all locales — cheaper than one key per locale
+ * and forward-compatible via the `v1` version suffix (a future format change
+ * is a key bump, not a migration). Mirrors the `has-mastered:v2` pattern.
+ *
+ * This is local-only derived state, re-computable from the card array.
+ * No migration, no sync leg required.
+ */
+export const KEY_MASTERED_COUNT_BY_LOCALE =
+  "poke-memory:mastered-count-by-locale:v1";
+
 // ─── Pokédex sort preference ──────────────────────────────────────────────────
 
 /**
