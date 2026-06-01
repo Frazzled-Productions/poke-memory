@@ -128,7 +128,7 @@ Read each **Code**-class issue's body and identify the primary file areas it tou
 
 ### Analysis and Exploration issues
 
-These are read-only — they produce a report and scoped follow-up issues, never a PR. Dispatch them as **background agents** (`run_in_background: true`) at the start of the run so they proceed concurrently with the code batches. Each such agent's prompt: do the analysis, post the report as a comment on the umbrella issue, file scoped follow-up issues (`priority:later` by default, never `auto`, never `priority:now`), and do **not** close the umbrella. Surface any `[USER-DECISION]` an exploration produces in the wrap-up.
+These are read-only — they produce a report and scoped follow-up issues, never a PR. Dispatch them as **background agents** (`run_in_background: true`) at the start of the run so they proceed concurrently with the code batches. Each such agent's prompt: do the analysis, post the report as a comment on the umbrella issue, file scoped follow-up issues (`priority:later` by default, never `auto`, never `priority:now`), and do **not** close the umbrella. Surface any `[USER-DECISION]` an exploration produces in the wrap-up. **When the exploration proposes a new user-facing visual surface or layout change, the report MUST include a mock-up (ASCII art is fine, or an attached image) of the proposed surface — desktop and mobile where they differ — so the maintainer can inspect and annotate it before any implementation ticket is written (#1500).** A prose-only proposal of a visible surface is incomplete.
 
 Present the plan to the user as a short bullet list — issue numbers per batch and per class — and proceed. The user has given standing autonomy for the implement → review → PR → merge loop in batch sessions.
 
