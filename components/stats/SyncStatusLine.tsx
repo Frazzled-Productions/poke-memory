@@ -136,7 +136,7 @@ export function SyncStatusLine({
         ? state.timeStr
         : null;
     const timeSuffix = timeStr
-      ? ` ${t("atTime", { time: fmt.dateTime(new Date(timeStr), { hour: "2-digit", minute: "2-digit" }) })}`
+      ? ` ${t("atTime", { time: fmt.dateTime(new Date(timeStr), { hour: "2-digit", minute: "2-digit", hour12: false }) })}`
       : "";
 
     const errorText =
@@ -163,7 +163,7 @@ export function SyncStatusLine({
   const statusText =
     state.kind === "lastSynced"
       ? t("lastSynced", {
-          time: fmt.dateTime(state.time, { hour: "2-digit", minute: "2-digit" }),
+          time: fmt.dateTime(state.time, { hour: "2-digit", minute: "2-digit", hour12: false }),
         })
       : t("notSyncedYet");
 
