@@ -1,7 +1,7 @@
 # poke-memory
 
-[![Release](https://img.shields.io/github/v/release/fraserbrookhouse/poke-memory)](https://github.com/fraserbrookhouse/poke-memory/releases)
-[![Users](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffraserbrookhouse%2Fpoke-memory%2Fmain%2F.github%2Fstats%2Fusers.json)](https://github.com/fraserbrookhouse/poke-memory/blob/main/.github/stats/users.json)
+[![Release](https://img.shields.io/github/v/release/Frazzled-Productions/poke-memory)](https://github.com/Frazzled-Productions/poke-memory/releases)
+[![Users](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFrazzled-Productions%2Fpoke-memory%2Fmain%2F.github%2Fstats%2Fusers.json)](https://github.com/Frazzled-Productions/poke-memory/blob/main/.github/stats/users.json)
 
 <p align="center">
   <img src="public/sprites/pokemon/25.png" width="110" alt="Pikachu" />
@@ -174,7 +174,7 @@ This repo doubles as a sandbox for practicing Claude Code sub-agent workflows. T
 
 ## Status
 
-Hobby project, work-in-progress. See [CHANGELOG.md](./CHANGELOG.md) for what's been built so far and [Releases](https://github.com/fraserbrookhouse/poke-memory/releases) for tagged versions.
+Hobby project, work-in-progress. See [CHANGELOG.md](./CHANGELOG.md) for what's been built so far and [Releases](https://github.com/Frazzled-Productions/poke-memory/releases) for tagged versions.
 
 ## Licence
 

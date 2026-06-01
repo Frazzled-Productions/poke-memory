@@ -1,6 +1,6 @@
 # Supabase capacity & launch-readiness assessment
 
-Issue [#677](https://github.com/fbrookhouse/poke-memory/issues/677) — verify the Supabase
+Issue [#677](https://github.com/Frazzled-Productions/poke-memory/issues/677) — verify the Supabase
 project can absorb a public-launch traffic spike before posting publicly.
 
 Assessment date: 2026-05-16. Project ref: `nvxvvtvnthsgdxgksmju`.
@@ -108,7 +108,7 @@ unindexed foreign keys, no slow-query warnings.
 ### Security — warnings, all non-material
 
 The `SECURITY DEFINER`-function lint count depends on what has merged: today the
-advisor reports two warnings, and once issue [#697](https://github.com/fbrookhouse/poke-memory/issues/697)
+advisor reports two warnings, and once issue [#697](https://github.com/Frazzled-Productions/poke-memory/issues/697)
 (PR #728) lands it becomes three. The two `SECURITY DEFINER`-class lints —
 `reset_all_progress` and, after #728, `delete_account` — are both intentional;
 the leaked-password lint does not apply.
@@ -132,7 +132,7 @@ the leaked-password lint does not apply.
 2. **`delete_account` is a `SECURITY DEFINER` function callable by signed-in
    users** (same
    [lint 0029](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable);
-   appears only once issue [#697](https://github.com/fbrookhouse/poke-memory/issues/697)
+   appears only once issue [#697](https://github.com/Frazzled-Productions/poke-memory/issues/697)
    / PR #728 and its migration `027_delete_account_rpc.sql` have merged — the
    migration is already applied to the live project).
    **Intentional — no action.** It gets the same treatment as

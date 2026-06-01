@@ -818,14 +818,14 @@ The signature is selective silence: `push` and `pull_request` events stop dispat
 Quick check — if the most-recent `push`-triggered run is >20 minutes old during active development, suspect the throttle:
 
 ```sh
-gh api "repos/fraserbrookhouse/poke-memory/actions/runs?event=push&per_page=1" \
+gh api "repos/Frazzled-Productions/poke-memory/actions/runs?event=push&per_page=1" \
   --jq '.workflow_runs[0].created_at'
 ```
 
 Compare against:
 
 ```sh
-gh api "repos/fraserbrookhouse/poke-memory/actions/runs?event=issues&per_page=1" \
+gh api "repos/Frazzled-Productions/poke-memory/actions/runs?event=issues&per_page=1" \
   --jq '.workflow_runs[0].created_at'
 ```
 
@@ -858,7 +858,7 @@ git push
 4. **Verify CI ran.** Confirm the `test` check appears:
 
 ```sh
-gh api "repos/fraserbrookhouse/poke-memory/commits/<sha>/check-runs?check_name=test" \
+gh api "repos/Frazzled-Productions/poke-memory/commits/<sha>/check-runs?check_name=test" \
   --jq '.check_runs[].status'
 ```
 
