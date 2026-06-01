@@ -6,6 +6,18 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.30] - 2026-06-01
+
+### Changed
+
+- Improved Japanese and Chinese (Simplified and Traditional) onboarding copy: replaced technical jargon and machine-translated register with child-appropriate, natural-language phrasing across the first-visit modal. An in-app "machine-translated" banner and "preview" locale label remain in place until full native-speaker sign-off is completed.
+- Added an inline note in Settings (Audio section) and the first-visit onboarding modal that spoken Pokémon names use AI-generated audio still being improved, so some may be mispronounced. Removed the stale "Voice sounding robotic?" hint, which addressed a device-TTS fallback that is rarely heard now that pre-generated name audio is fully covered.
+
+### Fixed
+
+- Fixed a crash where grading a card with an invalid FSRS state (stability 0 written by an older app version) threw `FSRSValidationError` and permanently bricked the Practice screen. Invalid states are now healed to a clean initial state on load, and the error boundary offers a "Reset local practice data" escape hatch as a last resort.
+- Stats "Last synced" and sync-error time stamps now render in 24-hour format (e.g. `20:03`) rather than 12-hour (e.g. `08:03PM`), consistent with the app's British-English convention.
+
 ## [0.10.29] - 2026-06-01
 
 ### Changed
@@ -1545,7 +1557,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.29...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.30...HEAD
+[0.10.30]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.30
 [0.10.29]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.29
 [0.10.28]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.28
 [0.10.27]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.27
