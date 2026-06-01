@@ -614,6 +614,16 @@ export function ReviewSession() {
   // brand-new session before the first-visit modal can show. Overwritten by
   // the session-load effect with the actual persisted value.
   const [firstVisitDone, setFirstVisitDone] = useState(true);
+  // Scope nudge (#1443): one-shot hint explaining the practice scope filter,
+  // rendered just above whichever ScopeControl the active card type shows
+  // (name/evo, cry, reverse) so it surfaces regardless of the first card.
+  // Only shown after the first-visit onboarding modal is dismissed, so a
+  // brand-new session is not hit with two simultaneous hints.
+  const scopeNudge = firstVisitDone ? (
+    <OnboardingHint id="practiceScopeNudgeDismissed" title={t("practiceScopeNudge.title")}>
+      <p>{t("practiceScopeNudge.body")}</p>
+    </OnboardingHint>
+  ) : null;
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -2373,6 +2383,7 @@ export function ReviewSession() {
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
             {/* Cry card wraps ScopeControl in a max-width column for alignment. */}
             <div className="flex w-full max-w-xl flex-col gap-2">
+              {scopeNudge}
               <ScopeControl
                 scope={scope}
                 onChange={handleScopeChange}
@@ -2497,6 +2508,7 @@ export function ReviewSession() {
               <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
             )}
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+            {scopeNudge}
             <ScopeControl
               scope={scope}
               onChange={handleScopeChange}
@@ -2603,17 +2615,7 @@ export function ReviewSession() {
             <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
           )}
           <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
-          {/* Scope nudge (#1443): one-shot hint explaining the scope filter.
-              Only shown after the first-visit onboarding modal is dismissed
-              so brand-new sessions are not hit with two simultaneous hints. */}
-          {firstVisitDone && (
-            <OnboardingHint
-              id="practiceScopeNudgeDismissed"
-              title={t("practiceScopeNudge.title")}
-            >
-              <p>{t("practiceScopeNudge.body")}</p>
-            </OnboardingHint>
-          )}
+          {scopeNudge}
           <ScopeControl
             scope={scope}
             onChange={handleScopeChange}

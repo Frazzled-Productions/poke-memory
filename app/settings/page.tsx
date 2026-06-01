@@ -541,6 +541,13 @@ export default function SettingsPage() {
     visibleSectionIds.add(targetCategoryId);
   }
 
+  // While the "Mark what I know" discovery nudge is still active (#1443), the
+  // Practice category auto-expands so the nudge — and the quiz it points at —
+  // are actually visible rather than buried in a collapsed section. Clears
+  // once the user dismisses the nudge or opens the quiz (which dismisses it).
+  const markWhatIKnowActive =
+    settings !== null && settings.onboarding?.markWhatIKnowNudgeDismissed !== true;
+
   useEffect(() => {
     setActiveLocale(readActiveLocale());
     const loaded = loadSettings();
@@ -929,7 +936,9 @@ export default function SettingsPage() {
               <CollapsibleSection
                 sectionId="practice-heading"
                 heading={t("settings.section.practice")}
-                forceOpen={targetCategoryId === "practice-heading"}
+                forceOpen={
+                  targetCategoryId === "practice-heading" || markWhatIKnowActive
+                }
                 transientOpen={isFiltering}
               >
                 {/* Scheduler knobs */}

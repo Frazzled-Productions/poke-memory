@@ -64,7 +64,7 @@ test.describe("i18n — MachineTranslationBanner (#1381)", () => {
     // The banner's visible text is the machine-translated caution message.
     // We assert it is not visible rather than not in the DOM, since the
     // component renders null for English — either way the text is absent.
-    await expect(page.getByRole("note")).not.toBeVisible();
+    await expect(page.getByTestId("machine-translation-banner")).not.toBeVisible();
   });
 
   test("banner text is visible when locale=ja is set via cookie", async ({ page, context }) => {
@@ -80,7 +80,7 @@ test.describe("i18n — MachineTranslationBanner (#1381)", () => {
     await page.goto("/");
 
     // The banner renders with role="note" and the localised caution message.
-    const banner = page.getByRole("note");
+    const banner = page.getByTestId("machine-translation-banner");
     await expect(banner).toBeVisible();
 
     // The visible paragraph contains the Japanese translation text.
@@ -103,7 +103,7 @@ test.describe("i18n — MachineTranslationBanner (#1381)", () => {
     await page.goto("/");
 
     // Confirm the banner is visible before dismissal.
-    const banner = page.getByRole("note");
+    const banner = page.getByTestId("machine-translation-banner");
     await expect(banner).toBeVisible();
 
     // Click the dismiss button (its accessible label is the catalogue "dismiss" key).
@@ -119,7 +119,7 @@ test.describe("i18n — MachineTranslationBanner (#1381)", () => {
 
     // Reload — banner must stay gone (localStorage persists the flag).
     await page.reload();
-    await expect(page.getByRole("note")).not.toBeVisible();
+    await expect(page.getByTestId("machine-translation-banner")).not.toBeVisible();
   });
 });
 

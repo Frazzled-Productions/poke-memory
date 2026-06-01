@@ -80,6 +80,7 @@ export function MachineTranslationBanner() {
   return (
     <div
       role="note"
+      data-testid="machine-translation-banner"
       className="w-full bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800"
     >
       <div className="mx-auto flex max-w-3xl items-start gap-3 px-4 py-3 sm:items-center">

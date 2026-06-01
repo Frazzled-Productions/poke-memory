@@ -334,7 +334,7 @@ test.describe("Discovery nudges (#1443)", () => {
 
     await page.goto("/settings");
     // The nudge is a role=note with the nudge title text.
-    const nudge = page.getByRole("note", { name: /skip the queue/i });
+    const nudge = page.locator(`[role="note"]`, { hasText: /skip the queue/i });
     await expect(nudge).toBeVisible({ timeout: 10_000 });
   });
 
@@ -355,7 +355,7 @@ test.describe("Discovery nudges (#1443)", () => {
 
     await page.goto("/settings");
     await expect(
-      page.getByRole("note", { name: /skip the queue/i }),
+      page.locator(`[role="note"]`, { hasText: /skip the queue/i }),
     ).toHaveCount(0);
   });
 
@@ -375,7 +375,7 @@ test.describe("Discovery nudges (#1443)", () => {
     }, SETTINGS_KEY);
 
     await page.goto("/settings");
-    const nudge = page.getByRole("note", { name: /skip the queue/i });
+    const nudge = page.locator(`[role="note"]`, { hasText: /skip the queue/i });
     await expect(nudge).toBeVisible({ timeout: 10_000 });
 
     await nudge.getByRole("button", { name: /dismiss hint/i }).click();
@@ -409,7 +409,7 @@ test.describe("Discovery nudges (#1443)", () => {
 
     await page.goto("/");
     // Wait for the practice surface to hydrate.
-    const nudge = page.getByRole("note", { name: /filter by generation/i });
+    const nudge = page.locator(`[role="note"]`, { hasText: /filter by generation/i });
     await expect(nudge).toBeVisible({ timeout: 20_000 });
   });
 
@@ -430,7 +430,7 @@ test.describe("Discovery nudges (#1443)", () => {
 
     await page.goto("/");
     await expect(
-      page.getByRole("note", { name: /filter by generation/i }),
+      page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
     ).toHaveCount(0);
   });
 });
