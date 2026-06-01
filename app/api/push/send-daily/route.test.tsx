@@ -1606,9 +1606,11 @@ describe("POST /api/push/send-daily — pokemonNameLocale locale filter (#1480)"
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // Only 2 zh-Hant rows pass; the body must not report 4 cards due.
-    expect(parsed.body).toContain("2");
-    expect(parsed.body).not.toContain("4 card");
+    // Only 2 zh-Hant rows pass. Assert the due count specifically rather than
+    // a bare digit to avoid false passes from the new-card estimate containing
+    // "2" as a substring (e.g. 20, 12, 21).
+    expect(parsed.body).toMatch(/^2 cards? due/);
+    expect(parsed.body).not.toMatch(/^4 cards? due/);
   });
 
   it("two users each with different locales in the same timezone bucket: each sees only their locale rows", async () => {
