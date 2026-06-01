@@ -20,13 +20,10 @@
     "mobileNavigation": "Mobile navigation",
     "menuLabel": "Menu",
     "streakChip": {
-      "startStreak": "Start your streak",
       "startStreakLabel": "Start your streak",
-      "streak": "{count, plural, one {# day} other {# days}}",
       "streakLabel": "{count, plural, one {#-day streak.} other {#-day streak.}}",
       "tokenLabel": "{count, plural, one {# protection token.} other {# protection tokens.}}",
-      "milestoneLabel": "{count, plural, one {# day to your next milestone.} other {# days to your next milestone.}}",
-      "milestoneBadge": "{count, plural, one {+#d} other {+#d}}"
+      "milestoneLabel": "{count, plural, one {# day to your next milestone.} other {# days to your next milestone.}}"
     }
   },
   "auth": {

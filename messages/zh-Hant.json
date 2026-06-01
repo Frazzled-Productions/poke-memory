@@ -20,13 +20,10 @@
     "mobileNavigation": "行動端導覽",
     "menuLabel": "選單",
     "streakChip": {
-      "startStreak": "開始連續練習",
       "startStreakLabel": "開始連續練習",
-      "streak": "{count}天",
       "streakLabel": "連續{count}天。",
       "tokenLabel": "{count, plural, one {#個保護代幣。} other {#個保護代幣。}}",
-      "milestoneLabel": "{count, plural, one {距下一個里程碑還有#天。} other {距下一個里程碑還有#天。}}",
-      "milestoneBadge": "+{count}天"
+      "milestoneLabel": "{count, plural, one {距下一個里程碑還有#天。} other {距下一個里程碑還有#天。}}"
     }
   },
   "auth": {

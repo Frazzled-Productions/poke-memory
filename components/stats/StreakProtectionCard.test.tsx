@@ -500,4 +500,15 @@ describe("StreakProtectionCard — tokenCount ICU plural (#1408)", () => {
     expect(line).toHaveTextContent(/1-day streak\./i);
     expect(line).toHaveTextContent(/to your next milestone\./i);
   });
+
+  it("ja: renders the streak line and milestone signpost in Japanese", () => {
+    const today = todayString(new Date(), loadSettings().timezone ?? "UTC");
+    saveStreakData([today]);
+
+    renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
+
+    const line = screen.getByTestId("streak-protection-streak");
+    expect(line).toHaveTextContent(/1日連続。/);
+    expect(line).toHaveTextContent(/次の目標まであと/);
+  });
 });

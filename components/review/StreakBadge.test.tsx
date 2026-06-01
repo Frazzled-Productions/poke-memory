@@ -445,6 +445,35 @@ describe("StreakBadge — token pip and milestone signpost", () => {
     expect(screen.queryByText(/protection token/i)).toBeNull();
     expect(screen.queryByText(/to your next milestone/i)).toBeNull();
   });
+
+  // Locale coverage for the inline pip + signpost copy (nav.streakChip.*).
+  function seedPipAndSignpost() {
+    seedProtection({
+      balance: 2,
+      streakDates: ["2026-05-29", "2026-05-30", FIXED_TODAY],
+    });
+  }
+
+  it("ja: renders the token pip and milestone signpost in Japanese", () => {
+    seedPipAndSignpost();
+    renderJa(<StreakBadge />);
+    expect(screen.getByText(/保護トークン2個。/)).toBeInTheDocument();
+    expect(screen.getByText(/次の目標まであと/)).toBeInTheDocument();
+  });
+
+  it("zh-Hans: renders the token pip and milestone signpost in Simplified Chinese", () => {
+    seedPipAndSignpost();
+    renderZhHans(<StreakBadge />);
+    expect(screen.getByText(/2个保护令牌。/)).toBeInTheDocument();
+    expect(screen.getByText(/距下一个里程碑还有/)).toBeInTheDocument();
+  });
+
+  it("zh-Hant: renders the token pip and milestone signpost in Traditional Chinese", () => {
+    seedPipAndSignpost();
+    renderZhHant(<StreakBadge />);
+    expect(screen.getByText(/2個保護代幣。/)).toBeInTheDocument();
+    expect(screen.getByText(/距下一個里程碑還有/)).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
