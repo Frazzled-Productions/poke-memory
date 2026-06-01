@@ -20,13 +20,10 @@
     "mobileNavigation": "モバイルナビゲーション",
     "menuLabel": "メニュー",
     "streakChip": {
-      "startStreak": "連続を始めよう",
       "startStreakLabel": "連続を始めよう",
-      "streak": "{count}日",
       "streakLabel": "{count}日連続。",
       "tokenLabel": "{count, plural, one {保護トークン#個。} other {保護トークン#個。}}",
-      "milestoneLabel": "{count, plural, one {次の目標まであと#日。} other {次の目標まであと#日。}}",
-      "milestoneBadge": "+{count}日"
+      "milestoneLabel": "{count, plural, one {次の目標まであと#日。} other {次の目標まであと#日。}}"
     }
   },
   "auth": {
@@ -318,6 +315,10 @@
         "label": "次の連続記録マイルストーンを強制",
         "description": "実際の連続記録に関わらず、次回の練習訪問で最小の未表示連続記録セレブレーションを発動します。1回の発動後に自動クリアされます。スーパーユーザーをロックするとサインイン済みユーザーのローカル進捗がクラウド状態で上書きされます。"
       },
+      "forceTokenToast": {
+        "label": "トークン獲得トーストを表示",
+        "description": "次回の練習画面で、実際のトークン状態に関わらず「保護トークン獲得」のヘルプトーストを表示します。1回表示すると自動的に解除されます。"
+      },
       "forceCardsGraduated": {
         "label": "カードを卒業済みとして強制",
         "description": "すべてのカードを卒業済みとして扱います。学習ステップを経ずに入力テストをテストする際に使用します。"
@@ -448,7 +449,7 @@
     },
     "practiceScopeNudge": {
       "title": "ヒント: 世代・タイプ・グループで絞り込めます",
-      "body": "上の「スコープ」ボタンをタップして、特定の世代・タイプ・スターターや未完成の進化チェーンなどのグループに絞って練習できます。"
+      "body": "下の「スコープ」を開いて、特定の世代・タイプ・スターターや未完成の進化チェーンなどのグループに絞って練習できます。"
     }
   },
   "review": {

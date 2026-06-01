@@ -10,6 +10,7 @@ import {
 } from "@/lib/streak";
 import { runStreakProtection } from "@/lib/streak/runProtection";
 import { findPendingMilestone } from "@/lib/streak/milestones";
+import { useStreakNavState } from "@/lib/streak/useStreakNavState";
 import { todayString } from "@/lib/review/session";
 import {
   loadSettings,
@@ -25,6 +26,11 @@ import {
 
 export function StreakBadge() {
   const t = useTranslations("review");
+  // Token balance + next-milestone signpost, surfaced here on the Practice
+  // screen (and on Stats) rather than in the nav bar (#1443 QA). Reuses the
+  // shared read-only hook and the `nav.streakChip.*` copy.
+  const tChip = useTranslations("nav.streakChip");
+  const { tokenBalance, daysToNextMilestone } = useStreakNavState();
   const [streak, setStreak] = useState<number | null>(null);
   const [pendingMilestone, setPendingMilestone] = useState<number | null>(null);
   const [pendingToken, setPendingToken] = useState<ProtectionToastKind | null>(
@@ -78,18 +84,37 @@ export function StreakBadge() {
       // Fire a token toast when the protection step earned or spent a token,
       // but only once per page visit (the ref guard prevents re-fires from
       // subsequent event dispatches within the same visit).
+      let realToastFired = false;
       if (!hasShownTokenToastRef.current && protectionResult != null) {
         const { earned, spent } = protectionResult;
         if (earned && spent) {
           setPendingToken("earned-and-spent");
           hasShownTokenToastRef.current = true;
+          realToastFired = true;
         } else if (earned) {
           setPendingToken("earned");
           hasShownTokenToastRef.current = true;
+          realToastFired = true;
         } else if (spent) {
           setPendingToken("spent");
           hasShownTokenToastRef.current = true;
+          realToastFired = true;
         }
+      }
+
+      // QA cheat: force the "token earned" helper toast regardless of actual
+      // token state, so the earn message is testable without a 30-day streak.
+      // Only fires when no genuine earn/spend toast was produced this pass (so
+      // it never masks a real "spent"/"earned-and-spent" event), and only once
+      // per visit via the same ref guard as the real path, making the "exactly
+      // once per toggle" invariant explicit. Self-clears on dismiss.
+      if (
+        flags.forceTokenToast &&
+        !realToastFired &&
+        !hasShownTokenToastRef.current
+      ) {
+        setPendingToken("earned");
+        hasShownTokenToastRef.current = true;
       }
     }
     refresh();
@@ -99,7 +124,7 @@ export function StreakBadge() {
       window.removeEventListener(STREAK_UPDATED_EVENT, refresh);
       window.removeEventListener(SETTINGS_SAVED_EVENT, refresh);
     };
-  }, [flags.forceNextStreakMilestone]);
+  }, [flags.forceNextStreakMilestone, flags.forceTokenToast]);
 
   const dismissMilestone = useCallback(() => {
     if (pendingMilestone === null) return;
@@ -125,19 +150,35 @@ export function StreakBadge() {
 
   const dismissToken = useCallback(() => {
     setPendingToken(null);
-  }, []);
+    if (flags.forceTokenToast) {
+      // QA fire: self-clear so the forced toast shows exactly once per toggle.
+      // Reset the ref so a subsequent forceTokenToast toggle produces a fresh fire.
+      hasShownTokenToastRef.current = false;
+      void setFlag("forceTokenToast", false);
+    }
+  }, [flags.forceTokenToast, setFlag]);
 
   if (streak === null) return null;
 
   return (
     <>
-      <div className="mb-2 flex items-center justify-center sm:mb-4">
+      <div className="mb-1 flex items-center justify-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
           {streak === 0
             ? t("startStreak")
             : t("streakDays", { count: streak })}
         </span>
+        {tokenBalance !== null && tokenBalance >= 1 && (
+          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            {tChip("tokenLabel", { count: tokenBalance })}
+          </span>
+        )}
       </div>
+      {daysToNextMilestone !== null && (
+        <p className="mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400 sm:mb-4">
+          {tChip("milestoneLabel", { count: daysToNextMilestone })}
+        </p>
+      )}
       {pendingMilestone !== null && (
         <MilestoneCelebration
           key={pendingMilestone}

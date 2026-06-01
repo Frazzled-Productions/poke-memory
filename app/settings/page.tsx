@@ -508,8 +508,8 @@ export default function SettingsPage() {
   // purpose, so persist its dismissal (the OnboardingHint re-syncs on the
   // SETTINGS_SAVED_EVENT and hides itself).
   function openKnownQuiz() {
-    // Expand the Practice category (forceOpen scrolls it into view) and open
-    // the quiz row, since the nudge now lives at the top of the page.
+    // Expand the Practice category and open the quiz row, since the nudge lives
+    // at the top of the page.
     setTargetCategoryId("practice-heading");
     setKnownQuizOpen(true);
     const settings = loadSettings();
@@ -520,6 +520,16 @@ export default function SettingsPage() {
         onboarding: { ...onboarding, markWhatIKnowNudgeDismissed: true },
       });
     }
+    // Scroll the quiz itself into view once the category has expanded and the
+    // quiz panel has rendered. The category's own forceOpen scroll targets the
+    // category heading (much higher up), so without this the user lands above
+    // the fold and never sees the quiz they asked to open (#1443 QA). This is a
+    // "use client" component, so window is always defined here.
+    window.setTimeout(() => {
+      document
+        .getElementById("known-quiz-heading")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 200);
   }
 
   // Settings search/filter query.
@@ -2173,6 +2183,44 @@ export default function SettingsPage() {
                           <span
                             className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
                               flags.forceNextStreakMilestone
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className={cn("mt-4", cardPanelPadded)}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {t("settings.developer.forceTokenToast.label")}
+                          </p>
+                          <p className={`mt-1 ${mutedTextXs}`}>
+                            {t("settings.developer.forceTokenToast.description")}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label={t("settings.developer.forceTokenToast.label")}
+                          aria-checked={flags.forceTokenToast}
+                          onClick={() =>
+                            void setFlag(
+                              "forceTokenToast",
+                              !flags.forceTokenToast,
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
+                            flags.forceTokenToast
+                              ? "bg-foreground"
+                              : "bg-zinc-300 dark:bg-zinc-600"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                              flags.forceTokenToast
                                 ? "translate-x-5"
                                 : "translate-x-0"
                             }`}

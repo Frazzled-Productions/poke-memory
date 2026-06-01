@@ -77,6 +77,13 @@ vi.mock("@/lib/streak/runProtection", () => ({
 vi.mock("@/lib/streak/milestones", () => ({
   findPendingMilestone: vi.fn(() => null),
 }));
+vi.mock("@/lib/streak/useStreakNavState", () => ({
+  useStreakNavState: () => ({
+    streak: null,
+    tokenBalance: null,
+    daysToNextMilestone: null,
+  }),
+}));
 vi.mock("@/lib/review/session", () => ({
   todayString: vi.fn(() => "2026-01-01"),
 }));

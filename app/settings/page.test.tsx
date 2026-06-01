@@ -12,9 +12,9 @@
  * test is fast and focused on Settings-page logic, not those components.
  */
 
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Module mocks — declared before any imports so vi.mock hoisting works.
@@ -82,14 +82,21 @@ vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({ user: null, supabase: null, loading: false }),
 }));
 
-const { mockSuperuserFlags } = vi.hoisted(() => ({
-  mockSuperuserFlags: { pretendAllMastered: false },
-}));
+const { mockSuperuserFlags, mockSuperuserState, mockSetFlag } = vi.hoisted(
+  () => ({
+    mockSuperuserFlags: { pretendAllMastered: false } as Record<
+      string,
+      boolean
+    >,
+    mockSuperuserState: { unlocked: false },
+    mockSetFlag: vi.fn(),
+  }),
+);
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => ({
-    unlocked: false,
+    unlocked: mockSuperuserState.unlocked,
     flags: mockSuperuserFlags,
-    setFlag: vi.fn(),
+    setFlag: mockSetFlag,
     anyFlagOn: false,
   }),
 }));
@@ -1091,5 +1098,56 @@ describe("SettingsPage — mark-what-I-know nudge (#1443)", () => {
         }),
       }),
     );
+  });
+
+  it("scrolls the quiz into view after opening it", async () => {
+    const scrollIntoView = vi.fn();
+    // jsdom does not implement scrollIntoView; provide a spy so the deferred
+    // scroll (200ms after open) can be asserted.
+    Element.prototype.scrollIntoView = scrollIntoView;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/App Theme/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open quiz" }));
+    expect(screen.getByTestId("known-pokemon-quiz")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "center",
+    });
+    vi.useRealTimers();
+  });
+});
+
+describe("SettingsPage — forceTokenToast developer toggle (#1443)", () => {
+  beforeEach(() => {
+    mockSuperuserState.unlocked = true;
+    mockSuperuserFlags.forceTokenToast = false;
+    mockSetFlag.mockClear();
+  });
+  afterEach(() => {
+    mockSuperuserState.unlocked = false;
+    delete mockSuperuserFlags.forceTokenToast;
+  });
+
+  it("renders the developer toggle and flips the flag on click", async () => {
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+
+    const toggle = await screen.findByRole("switch", {
+      name: /force token earned toast/i,
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await userEvent.click(toggle);
+
+    expect(mockSetFlag).toHaveBeenCalledWith("forceTokenToast", true);
   });
 });

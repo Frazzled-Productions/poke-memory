@@ -51,14 +51,16 @@ export function nextMilestoneAbove(streak: number): number | null {
 
 /**
  * Read-only hook that exposes current streak, token balance, and days-to-
- * next-milestone for the persistent nav `StreakNavChip`.
+ * next-milestone. Consumed by `StreakBadge` (Practice) and
+ * `StreakProtectionCard` (Stats), which surface these where the user acts on
+ * their streak rather than in the nav bar (#1443).
  *
  * Reads from persisted state on mount and re-reads on `STREAK_UPDATED_EVENT`
- * and `SETTINGS_SAVED_EVENT` so the chip stays in sync with Practice (which
+ * and `SETTINGS_SAVED_EVENT` so consumers stay in sync with Practice (which
  * writes those events after grading). Does NOT call `runStreakProtection` -
  * that responsibility stays in `StreakBadge`.
  *
- * Returns all-null until after the first client render so the chip renders
+ * Returns all-null until after the first client render so consumers render
  * nothing server-side (avoids a hydration mismatch since persisted state is
  * browser-only).
  */

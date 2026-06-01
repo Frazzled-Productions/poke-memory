@@ -20,13 +20,10 @@
     "mobileNavigation": "移动端导航",
     "menuLabel": "菜单",
     "streakChip": {
-      "startStreak": "开始连续练习",
       "startStreakLabel": "开始连续练习",
-      "streak": "{count}天",
       "streakLabel": "连续{count}天。",
       "tokenLabel": "{count, plural, one {#个保护令牌。} other {#个保护令牌。}}",
-      "milestoneLabel": "{count, plural, one {距下一个里程碑还有#天。} other {距下一个里程碑还有#天。}}",
-      "milestoneBadge": "+{count}天"
+      "milestoneLabel": "{count, plural, one {距下一个里程碑还有#天。} other {距下一个里程碑还有#天。}}"
     }
   },
   "auth": {
@@ -318,6 +315,10 @@
         "label": "强制下一个连续记录里程碑",
         "description": "无论实际连续记录如何，在下次访问练习时触发最小的未显示连续记录庆祝。触发一次后自动清除。锁定超级用户将用云端状态覆盖已登录用户的本地进度。"
       },
+      "forceTokenToast": {
+        "label": "强制显示获得令牌提示",
+        "description": "下次进入练习页面时，无论实际令牌状态如何，都会显示「已获得保护令牌」帮助提示。显示一次后自动清除。"
+      },
       "forceCardsGraduated": {
         "label": "强制卡片毕业",
         "description": "将所有卡片视为已毕业。用于在不经历学习步骤的情况下测试输入功能。"
@@ -448,7 +449,7 @@
     },
     "practiceScopeNudge": {
       "title": "提示：可按世代、属性或分组筛选",
-      "body": "点击上方的「范围」按钮，将练习限定于特定世代、属性，或「御三家」「未完成进化链」等分组。"
+      "body": "使用下方的「范围」控件，将练习限定于特定世代、属性，或「御三家」「未完成进化链」等分组。"
     }
   },
   "review": {

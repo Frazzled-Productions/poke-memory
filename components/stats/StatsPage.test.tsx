@@ -222,6 +222,13 @@ vi.mock("@/lib/streak", () => ({
   EARN_INTERVAL_DAYS: 30,
   MAX_BALANCE: 3,
 }));
+vi.mock("@/lib/streak/useStreakNavState", () => ({
+  useStreakNavState: () => ({
+    streak: null,
+    tokenBalance: null,
+    daysToNextMilestone: null,
+  }),
+}));
 
 vi.mock("@/lib/gradelog/persistence", () => ({
   loadGradeLog: vi.fn().mockResolvedValue([]),

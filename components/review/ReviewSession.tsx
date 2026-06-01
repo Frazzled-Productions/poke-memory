@@ -623,9 +623,11 @@ export function ReviewSession() {
   // Session-count gate (show only after N sessions without opening scope)
   // is deferred to #1482.
   const scopeNudge = firstVisitDone ? (
-    <OnboardingHint id="practiceScopeNudgeDismissed" title={t("practiceScopeNudge.title")}>
-      <p>{t("practiceScopeNudge.body")}</p>
-    </OnboardingHint>
+    <div className="mb-3">
+      <OnboardingHint id="practiceScopeNudgeDismissed" title={t("practiceScopeNudge.title")}>
+        <p>{t("practiceScopeNudge.body")}</p>
+      </OnboardingHint>
+    </div>
   ) : null;
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against

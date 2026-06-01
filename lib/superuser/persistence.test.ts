@@ -61,37 +61,37 @@ describe("loadFlags / saveFlags / clearFlags", () => {
   });
 
   it("round-trips a flag through save/load", () => {
-    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: false });
+    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: false });
     expect(loadFlags()).toEqual({
       pretendAllMastered: true,
       forceNextStreakMilestone: false,
       forceCardsGraduated: false,
-      qaSeedMode: false,
+      forceTokenToast: false, qaSeedMode: false,
     });
   });
 
   it("round-trips forceCardsGraduated through save/load", () => {
-    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: true, qaSeedMode: false });
+    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: true, forceTokenToast: false, qaSeedMode: false });
     expect(loadFlags()).toEqual({
       pretendAllMastered: false,
       forceNextStreakMilestone: false,
       forceCardsGraduated: true,
-      qaSeedMode: false,
+      forceTokenToast: false, qaSeedMode: false,
     });
   });
 
   it("round-trips qaSeedMode through save/load", () => {
-    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: true });
+    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: true });
     expect(loadFlags()).toEqual({
       pretendAllMastered: false,
       forceNextStreakMilestone: false,
       forceCardsGraduated: false,
-      qaSeedMode: true,
+      forceTokenToast: false, qaSeedMode: true,
     });
   });
 
   it("clearFlags removes the persisted key, returning to defaults", () => {
-    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: false });
+    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: false });
     clearFlags();
     expect(globalThis.localStorage.getItem(FLAGS_KEY)).toBeNull();
     expect(loadFlags()).toEqual(DEFAULT_FLAGS);
@@ -105,13 +105,13 @@ describe("loadFlags / saveFlags / clearFlags", () => {
   it("coerces non-boolean stored values to false", () => {
     globalThis.localStorage.setItem(
       FLAGS_KEY,
-      JSON.stringify({ pretendAllMastered: "yes", forceNextStreakMilestone: 1, forceCardsGraduated: "true", qaSeedMode: "true" }),
+      JSON.stringify({ pretendAllMastered: "yes", forceNextStreakMilestone: 1, forceCardsGraduated: "true", forceTokenToast: false, qaSeedMode: "true" }),
     );
     expect(loadFlags()).toEqual({
       pretendAllMastered: false,
       forceNextStreakMilestone: false,
       forceCardsGraduated: false,
-      qaSeedMode: false,
+      forceTokenToast: false, qaSeedMode: false,
     });
   });
 
@@ -132,6 +132,16 @@ describe("loadFlags / saveFlags / clearFlags", () => {
     );
     expect(loadFlags().qaSeedMode).toBe(false);
   });
+
+  it("defaults forceTokenToast to false when field is absent from stored blob", () => {
+    // Simulate an existing user's blob from before forceTokenToast was added
+    // (#1443): an absent field must coerce to false, never silently true.
+    globalThis.localStorage.setItem(
+      FLAGS_KEY,
+      JSON.stringify({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: false }),
+    );
+    expect(loadFlags().forceTokenToast).toBe(false);
+  });
 });
 
 describe("anyFlagTrue / isAnyFlagOn", () => {
@@ -141,32 +151,42 @@ describe("anyFlagTrue / isAnyFlagOn", () => {
 
   it("anyFlagTrue is true when any single flag is on", () => {
     expect(
-      anyFlagTrue({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: false }),
+      anyFlagTrue({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: false }),
     ).toBe(true);
     expect(
-      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: true, forceCardsGraduated: false, qaSeedMode: false }),
+      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: true, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: false }),
     ).toBe(true);
     expect(
-      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: true, qaSeedMode: false }),
+      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: true, forceTokenToast: false, qaSeedMode: false }),
     ).toBe(true);
     expect(
-      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: true }),
+      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: true, qaSeedMode: false }),
+    ).toBe(true);
+    expect(
+      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: true }),
     ).toBe(true);
   });
 
   it("isAnyFlagOn reads from localStorage", () => {
     expect(isAnyFlagOn()).toBe(false);
-    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: false });
+    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: false });
     expect(isAnyFlagOn()).toBe(true);
   });
 
   it("isAnyFlagOn is true when forceCardsGraduated is the only on flag", () => {
-    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: true, qaSeedMode: false });
+    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: true, forceTokenToast: false, qaSeedMode: false });
     expect(isAnyFlagOn()).toBe(true);
   });
 
   it("isAnyFlagOn is true when qaSeedMode is the only on flag", () => {
-    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: true });
+    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: true });
+    expect(isAnyFlagOn()).toBe(true);
+  });
+
+  it("isAnyFlagOn is true when forceTokenToast is the only on flag", () => {
+    // The sync write-guard suppresses cloud writes while any flag is on, so
+    // forceTokenToast must register through isAnyFlagOn like every other flag.
+    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: true, qaSeedMode: false });
     expect(isAnyFlagOn()).toBe(true);
   });
 });
