@@ -610,9 +610,10 @@ export function ReviewSession() {
   // this with the actual persisted value (default false for new users).
   const [mcCardOnboardingShown, setMcCardOnboardingShown] = useState(true);
   // Whether the first-visit onboarding modal has been dismissed (#1103).
-  // Default true pre-hydration so the scope nudge does not flash on a
-  // brand-new session before the first-visit modal can show. Overwritten by
-  // the session-load effect with the actual persisted value.
+  // Defaults true so a returning user (firstVisitOnboardingDismissed = true in
+  // storage) sees no blank gap while settings load. Brand-new users will briefly
+  // see the scope nudge until the session-load effect fires and sets this to
+  // false — acceptable given the short hydration window.
   const [firstVisitDone, setFirstVisitDone] = useState(true);
   // Scope nudge (#1443): one-shot hint explaining the practice scope filter,
   // rendered just above whichever ScopeControl the active card type shows
@@ -696,8 +697,13 @@ export function ReviewSession() {
     // Persist scope through user settings so it syncs cross-device (#333).
     // Read the latest settings before patching to avoid clobbering other
     // fields that may have been updated since this component mounted.
+    // Also dismiss the scope nudge — the user has found the feature.
     const current = loadSettings();
-    saveSettings({ ...current, practiceScope: next });
+    saveSettings({
+      ...current,
+      practiceScope: next,
+      onboarding: { ...current.onboarding, practiceScopeNudgeDismissed: true },
+    });
     // Recompute eligibility from the new scope against the current card
     // set + apply snooze reconciliation so hiddenSince / dueDate updates
     // are durable. Persist if any card mutated.

@@ -10,7 +10,7 @@ const SETTINGS_KEY = "poke-memory:settings:v1";
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe("First-visit onboarding modal (#1103)", () => {
-  test("modal appears on a fresh visit and is dismissable", async ({
+  test("modal appears on a fresh visit and is dismissible", async ({
     page,
   }) => {
     await page.goto("/");
@@ -359,7 +359,7 @@ test.describe("Discovery nudges (#1443)", () => {
     ).toHaveCount(0);
   });
 
-  test("markWhatIKnow nudge is dismissable", async ({
+  test("markWhatIKnow nudge is dismissible", async ({
     page,
   }) => {
     await page.addInitScript((key) => {
@@ -429,6 +429,35 @@ test.describe("Discovery nudges (#1443)", () => {
     }, SETTINGS_KEY);
 
     await page.goto("/");
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
+    ).toHaveCount(0);
+  });
+
+  test("practiceScope nudge is absent when first-visit onboarding not yet done", async ({
+    page,
+  }) => {
+    // firstVisitOnboardingDismissed absent (= false after coercion) means the
+    // first-visit modal has not been dismissed yet; the gate in ReviewSession
+    // must suppress the scope nudge so the user is not hit with two hints at once.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            // firstVisitOnboardingDismissed deliberately absent
+            practiceScopeNudgeDismissed: false,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    // Wait for the first-visit modal to confirm the practice surface has hydrated,
+    // then assert the scope nudge is absent (the two must not show simultaneously).
+    await expect(
+      page.getByRole("dialog", { name: /welcome to pok[eé] memory/i }),
+    ).toBeVisible({ timeout: 10_000 });
     await expect(
       page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
     ).toHaveCount(0);

@@ -9,6 +9,10 @@
  * Covers:
  *  - State IN: nudge visible when flag is false.
  *  - State OUT: nudge absent when flag is true.
+ *  - State OUT (gate): scope nudge absent when firstVisitOnboardingDismissed is
+ *    false — covered at e2e level in e2e/onboarding.spec.ts ("practiceScope nudge
+ *    is absent when first-visit onboarding not yet done") because the gate lives
+ *    in ReviewSession state, which requires the full component to exercise.
  *  - Existing-user reach: validateOnboarding coerces absent key to false.
  *  - Locale coverage: all four supported locales (en/ja/zh-Hans/zh-Hant).
  *  - Both flags reset via DEFAULT_ONBOARDING (all false).
