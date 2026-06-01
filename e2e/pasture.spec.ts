@@ -227,6 +227,15 @@ test.describe("Pasture page — sparkle clears on tap", () => {
 
     // Tap the sprite. This calls onMarkSeen → markSeenInPasture → saveSession,
     // so the updated flag persists in IndexedDB.
+    // Scroll the sprite to the viewport centre first: `scrollIntoViewIfNeeded`
+    // (Playwright's default for clicks) parks an off-screen element at the
+    // nearest edge, which on this short page can leave the sprite's centre under
+    // the fixed bottom tab bar. `force: true` skips the receives-events check, so
+    // the click would then land on the tab bar instead of the sprite. Centring it
+    // keeps the click target clear regardless of the page's height.
+    await spriteBtn.evaluate((el) =>
+      el.scrollIntoView({ block: "center", inline: "center" }),
+    );
     // `force: true` bypasses Playwright's actionability "stability" check, which
     // can time out when the CSS bob animation continuously moves the img child —
     // the button element itself is stable but Playwright's heuristic sees motion.
