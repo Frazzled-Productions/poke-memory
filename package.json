@@ -47,7 +47,7 @@
     "react-dom": "19.2.6",
     "recharts": "^3.8.1",
     "serwist": "^9.5.11",
-    "ts-fsrs": "^5.4.0",
+    "ts-fsrs": "^5.4.1",
     "web-push": "^3.6.7"
   },
   "overrides": {
