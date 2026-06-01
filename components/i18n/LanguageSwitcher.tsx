@@ -19,7 +19,7 @@
  * names update live across the app without a reload.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
@@ -74,6 +74,8 @@ export function LanguageSwitcher() {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const uid = useId();
+  const headingId = `${uid}heading`;
 
   const close = useCallback(() => {
     setOpen(false);
@@ -141,6 +143,26 @@ export function LanguageSwitcher() {
 
   if (!languagesEnabled) return null;
 
+  function onRadioKeyDown(
+    e: { key: string; preventDefault(): void },
+    idx: number,
+  ) {
+    const dir =
+      e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? 1
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+          ? -1
+          : 0;
+    if (dir === 0) return;
+    e.preventDefault();
+    const count = SUPPORTED_LOCALES.length;
+    const next = (idx + dir + count) % count;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const radios = panel.querySelectorAll<HTMLElement>('[role="radio"]');
+    radios[next]?.focus();
+  }
+
   function selectLocale(next: AppLocale) {
     const settings = loadSettings();
     if (settings.pokemonNameLocale !== next) {
@@ -171,18 +193,19 @@ export function LanguageSwitcher() {
         <div
           ref={panelRef}
           role="dialog"
-          aria-labelledby="language-switcher-heading"
+          aria-labelledby={headingId}
+          aria-modal="true"
           className="absolute right-0 top-full z-50 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-zinc-200 bg-background p-2 shadow-xl dark:border-zinc-700"
         >
           <h2
-            id="language-switcher-heading"
+            id={headingId}
             className="px-2 pb-1.5 pt-1 text-xs font-semibold text-foreground"
           >
             {t("heading")}
           </h2>
 
           <div role="radiogroup" aria-label={t("groupAriaLabel")}>
-            {SUPPORTED_LOCALES.map((loc) => {
+            {SUPPORTED_LOCALES.map((loc, idx) => {
               const selected = loc === locale;
               return (
                 <button
@@ -190,7 +213,9 @@ export function LanguageSwitcher() {
                   type="button"
                   role="radio"
                   aria-checked={selected}
+                  tabIndex={selected ? 0 : -1}
                   onClick={() => selectLocale(loc)}
+                  onKeyDown={(e) => onRadioKeyDown(e, idx)}
                   className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors [@media(hover:hover)]:hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:[@media(hover:hover)]:hover:bg-zinc-800"
                 >
                   <span className="flex flex-col">

@@ -907,7 +907,6 @@
     "pillAriaLabel": "Pokémon 名前の言語：{language}。タップして変更します。",
     "groupAriaLabel": "Pokémon 名前の言語を選択",
     "machineTranslation": "機械翻訳",
-    "closeLabel": "閉じる",
     "appLanguageHint": "アプリの言語は設定にあります。"
   },
   "sync": {

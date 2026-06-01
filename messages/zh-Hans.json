@@ -907,7 +907,6 @@
     "pillAriaLabel": "宝可梦名称语言：{language}。点按以更改。",
     "groupAriaLabel": "选择宝可梦名称语言",
     "machineTranslation": "机器翻译",
-    "closeLabel": "关闭",
     "appLanguageHint": "应用语言在设置中。"
   },
   "sync": {
