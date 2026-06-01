@@ -36,7 +36,7 @@
     "@open-spaced-repetition/binding": "^0.3.1",
     "@serwist/turbopack": "^9.5.11",
     "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.106.1",
+    "@supabase/supabase-js": "^2.106.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "esbuild-wasm": "^0.28.0",
