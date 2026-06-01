@@ -53,3 +53,5 @@ export const GRAD_INTERVAL_GOOD = 1;
 export const GRAD_INTERVAL_EASY = 4;
 
 // org-transfer deploy probe (throwaway branch, do not merge)
+
+// re-probe after Vercel git reconnect confirmed
