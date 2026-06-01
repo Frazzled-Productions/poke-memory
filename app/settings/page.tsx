@@ -38,7 +38,6 @@ import { IntensityPicker } from "@/components/settings/IntensityPicker";
 import { KnownPokemonQuiz } from "@/components/onboarding/KnownPokemonQuiz";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { DEFAULT_ONBOARDING } from "@/lib/settings/persistence";
-import { VoiceQualityHint } from "@/components/settings/VoiceQualityHint";
 import { TtsControls } from "@/components/settings/TtsControls";
 import { QaSeedSection } from "@/components/settings/QaSeedSection";
 import { CollapsibleSection } from "@/components/settings/CollapsibleSection";
@@ -1498,14 +1497,18 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 {settings.speakNameOnReveal && (
-                  <TtsControls
-                    ttsVoice={settings.ttsVoice}
-                    ttsRate={settings.ttsRate}
-                    ttsVolume={settings.ttsVolume}
-                    onChange={(patch) => setSettings({ ...settings, ...patch })}
-                  />
+                  <>
+                    <p className={`px-5 pb-1 ${mutedTextXs}`}>
+                      {t("settings.audio.ttsWipNote")}
+                    </p>
+                    <TtsControls
+                      ttsVoice={settings.ttsVoice}
+                      ttsRate={settings.ttsRate}
+                      ttsVolume={settings.ttsVolume}
+                      onChange={(patch) => setSettings({ ...settings, ...patch })}
+                    />
+                  </>
                 )}
-                <VoiceQualityHint />
                 {/* Audio-wait setting: only useful when cry or TTS is on */}
                 {(settings.playCryOnReveal || settings.speakNameOnReveal) && (
                 <div className={cardPanelPadded}>

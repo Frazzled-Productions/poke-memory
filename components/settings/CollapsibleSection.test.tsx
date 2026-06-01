@@ -6,8 +6,7 @@ import { CollapsibleSection } from "@/components/settings/CollapsibleSection";
 const STORAGE_KEY = "poke-memory:settings-section:test-section";
 
 // jsdom on this Node version does not ship localStorage out of the box, so
-// the component tests provide their own in-memory stub — matching the pattern
-// used in VoiceQualityHint.test.tsx.
+// the component tests provide their own in-memory stub.
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
   return {
