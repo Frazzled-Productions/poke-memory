@@ -6,6 +6,19 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.28] - 2026-06-01
+
+### Added
+
+- Streak protection token events are now surfaced as just-in-time toasts at the moment a token is earned or spent, so you always know when your streak is being protected.
+- Token balance and a "days to your next milestone" countdown now sit alongside your streak on the Practice screen and the Stats page, so streak status shows up where you act on it. Token balance appears only when you hold at least one token (not colour-only); the milestone countdown shows when you have an active streak.
+- Locked Pokédex detail sections (Base Stats, Facts, Evolution Chain) now show an "Unlocks when you master this Pokémon" placeholder rather than appearing empty.
+- The theme/mascot picker on Settings shows a "Master your first Pokémon to unlock themes" prompt with a link to Practice instead of rendering nothing.
+- Pasture's empty state now explains its purpose as your mastered-Pokémon collection.
+- Journey page now shows a dismissible "What the rings mean" explainer near the mastery rings, explaining Locked, Learning, Mastered, and Introduced. The hint is a one-shot hint with its own flag, so existing users see it on their next visit.
+- Settings Practice tab now shows a dismissible nudge above the Quickstart quiz, pointing users at "Mark Pokémon I already know" to fast-track species they already recognise.
+- Practice screen now shows a one-shot dismissible nudge pointing at the Scope control below it, surfacing generation, type, and group filters to users who have completed first-visit onboarding. Both nudges use dedicated flags so they appear for existing users and reset with "Show onboarding again".
+
 ## [0.10.27] - 2026-05-31
 
 ### Changed
@@ -1518,7 +1531,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.27...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.28...HEAD
+[0.10.28]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.28
 [0.10.27]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.27
 [0.10.26]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.26
 [0.10.25]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.25
