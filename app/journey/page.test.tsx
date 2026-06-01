@@ -90,7 +90,7 @@ vi.mock("@/lib/pokemon/seed", () => ({
 
 vi.mock("@/lib/review/session", () => ({
   buildSession: vi.fn(() => []),
-  hydrateSession: vi.fn(() => []),
+  hydrateSession: vi.fn(() => ({ cards: [], anyHealed: false })),
   todayString: vi.fn(() => "2026-01-01"),
   DEFAULT_LIMITS: {
     name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },

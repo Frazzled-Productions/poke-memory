@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { clearLocalProgress } from "@/lib/storage/reset";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 function isOffline(): boolean {
   return typeof navigator !== "undefined" && navigator.onLine === false;
@@ -16,6 +18,13 @@ export default function Error({
   reset: () => void;
 }) {
   const t = useTranslations("error");
+  const { user, loading: authLoading } = useAuth();
+  // Treat auth-loading as indeterminate: show neither the destructive guest
+  // button nor the signed-in hint until auth settles (~100–500 ms). This
+  // prevents a signed-in user from briefly seeing the destructive
+  // "Reset local practice data" button before auth resolves (#1506).
+  const authSettled = !authLoading;
+  const isSignedIn = authSettled && user !== null;
   const [offline, setOffline] = useState<boolean>(isOffline);
 
   useEffect(() => {
@@ -34,6 +43,15 @@ export default function Error({
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  // Escape hatch for a persisted-state crash (#1506): clear local practice
+  // data and reload. This is intentionally guest-safe only — signed-in users
+  // should use Settings > Reset to avoid leaving cloud data out of sync.
+  const handleResetLocalData = useCallback(async () => {
+    if (!window.confirm(t("resetLocalDataConfirm"))) return;
+    await clearLocalProgress();
+    window.location.reload();
+  }, [t]);
 
   if (offline) {
     return (
@@ -98,6 +116,20 @@ export default function Error({
           >
             {t("goHome")}
           </Link>
+          {authSettled && (
+            isSignedIn ? (
+              <p className="text-xs text-red-500 dark:text-red-400">
+                {t("signedInHealHint")}
+              </p>
+            ) : (
+              <button
+                onClick={() => { void handleResetLocalData(); }}
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+              >
+                {t("resetLocalData")}
+              </button>
+            )
+          )}
         </div>
       </div>
     </div>

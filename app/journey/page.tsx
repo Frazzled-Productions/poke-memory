@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore, useMemo } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { useCountUp } from "@/lib/stats/useCountUp";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS } from "@/lib/review/session";
-import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import type { MasterySnapshot } from "@/lib/stats/dashboard-snapshot";
 import { useDashboardSnapshot, useProvideDashboardSnapshotInput } from "@/components/stats/DashboardSnapshotContext";
@@ -427,9 +427,18 @@ export default function JourneyPage() {
       const settings = loadSettings();
       const saved = await loadSession();
       const localOpts = seedOptsFromSettings(settings);
-      const sessionCards = saved !== null
-        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts)
-        : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
+      let sessionCards: ReviewableCard[];
+      if (saved !== null) {
+        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
+        // Persist healed cards so the fixed point is durable across all entry
+        // points, not only Practice (#1506).
+        if (anyHealed) {
+          await saveSession({ cards: hydrated, limits: saved.limits });
+        }
+        sessionCards = hydrated;
+      } else {
+        sessionCards = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
+      }
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
       setPokemonNameLocale(settings.pokemonNameLocale);

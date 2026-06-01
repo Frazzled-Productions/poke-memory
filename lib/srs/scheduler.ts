@@ -159,8 +159,36 @@ const GRADE_TO_RATING: Record<Grade, FsrsGrade> = {
   5: Rating.Easy,
 };
 
+/**
+ * Returns true when the stored FSRS fields are outside the ranges ts-fsrs
+ * accepts. ts-fsrs rejects stability < 1e-3 or difficulty outside [1, 10];
+ * we also guard non-finite values which would cause silent NaN propagation.
+ *
+ * A card flagged here has an impossible/legacy state. The caller (toFsrsCard
+ * and the session-layer heal pass in hydrateSession) re-initialises it via
+ * createEmptyCard rather than clamping so FSRS always starts from a clean,
+ * self-consistent snapshot.
+ */
+export function isFsrsInvalidState(state: ReviewState): boolean {
+  return (
+    !Number.isFinite(state.stability) ||
+    !Number.isFinite(state.difficulty) ||
+    state.stability < 1e-3 ||
+    state.difficulty < 1 ||
+    // ts-fsrs clamps difficulty to [1, 10] internally rather than throwing, so
+    // difficulty > 10 is belt-and-braces: we re-init rather than silently
+    // passing a value outside the intended range to the scheduler.
+    state.difficulty > 10
+  );
+}
+
 function toFsrsCard(state: ReviewState, now: Date): FsrsCard {
   if (state.fsrsState === "new" && state.lastReview === null) {
+    return createEmptyCard(now);
+  }
+  // Heal any legacy/corrupted state that ts-fsrs would reject. Re-init to an
+  // empty card so the next grade produces a fully self-consistent FSRS state.
+  if (isFsrsInvalidState(state)) {
     return createEmptyCard(now);
   }
   return {

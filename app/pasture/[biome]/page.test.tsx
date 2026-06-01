@@ -70,7 +70,7 @@ vi.mock("@/lib/settings/persistence", () => ({
 }));
 
 vi.mock("@/lib/review/session", () => ({
-  hydrateSession: vi.fn((_saved: unknown[]) => []),
+  hydrateSession: vi.fn((_saved: unknown[]) => ({ cards: [], anyHealed: false })),
 }));
 
 vi.mock("@/lib/superuser/SuperuserContext", () => ({

@@ -853,7 +853,10 @@
       "body": "[Some pages aren't available without a connection. Cards you've seen before should still work.]"
     },
     "tryAgain": "[Try again]",
-    "goHome": "[Go to Practice]"
+    "goHome": "[Go to Practice]",
+    "resetLocalData": "[Reset local practice data]",
+    "resetLocalDataConfirm": "[This will delete your local practice progress and start fresh. Continue?]",
+    "signedInHealHint": "[If this error is caused by corrupted card data, reloading will repair it automatically.]"
   },
   "onboarding": {
     "welcomeHeading": "[Welcome to Poké Memory]",
