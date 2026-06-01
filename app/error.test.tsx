@@ -11,7 +11,7 @@
  * backed by real catalogue values.
  */
 
-import { renderWithIntl, renderJa, screen, act } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa, renderZhHans, renderZhHant, screen, act } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -22,6 +22,14 @@ vi.mock("next/link", () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={href}>{children}</a>
   ),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock clearLocalProgress — avoid real IndexedDB/localStorage I/O in tests.
+// ---------------------------------------------------------------------------
+
+vi.mock("@/lib/storage/reset", () => ({
+  clearLocalProgress: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ---------------------------------------------------------------------------
@@ -236,5 +244,134 @@ describe("Error page — Japanese locale", () => {
     expect(
       screen.getByRole("link", { name: /練習に戻る/ }),
     ).toBeInTheDocument();
+  });
+
+  it("renders the Reset local practice data button in Japanese", () => {
+    setOnline(true);
+    renderJa(<ErrorPage error={fakeError} reset={noop} />);
+
+    // ja: error.resetLocalData = "ローカルの練習データをリセット"
+    expect(
+      screen.getByRole("button", { name: /ローカルの練習データをリセット/ }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("Error page — Simplified Chinese locale", () => {
+  it("renders the error heading in Simplified Chinese", () => {
+    setOnline(true);
+    renderZhHans(<ErrorPage error={fakeError} reset={noop} />);
+
+    // zh-Hans: error.heading = "发生错误"
+    expect(
+      screen.getByRole("heading", { name: /发生错误/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Reset local practice data button in Simplified Chinese", () => {
+    setOnline(true);
+    renderZhHans(<ErrorPage error={fakeError} reset={noop} />);
+
+    // zh-Hans: error.resetLocalData = "重置本地练习数据"
+    expect(
+      screen.getByRole("button", { name: /重置本地练习数据/ }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("Error page — Traditional Chinese locale", () => {
+  it("renders the error heading in Traditional Chinese", () => {
+    setOnline(true);
+    renderZhHant(<ErrorPage error={fakeError} reset={noop} />);
+
+    // zh-Hant: error.heading = "發生錯誤"
+    expect(
+      screen.getByRole("heading", { name: /發生錯誤/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Reset local practice data button in Traditional Chinese", () => {
+    setOnline(true);
+    renderZhHant(<ErrorPage error={fakeError} reset={noop} />);
+
+    // zh-Hant: error.resetLocalData = "重置本地練習資料"
+    expect(
+      screen.getByRole("button", { name: /重置本地練習資料/ }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("Error page — Reset local practice data button", () => {
+  it("renders the Reset local practice data button when online", () => {
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    expect(
+      screen.getByRole("button", { name: /reset local practice data/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("does NOT render the Reset button in the offline variant", () => {
+    setOnline(false);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    expect(
+      screen.queryByRole("button", { name: /reset local practice data/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("calls clearLocalProgress and reloads on confirm", async () => {
+    const { clearLocalProgress } = await import("@/lib/storage/reset");
+    const mockClear = vi.mocked(clearLocalProgress);
+    mockClear.mockResolvedValue(undefined);
+
+    const reloadMock = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, reload: reloadMock },
+    });
+
+    // Confirm dialog returns true
+    window.confirm = vi.fn().mockReturnValue(true);
+
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    const resetBtn = screen.getByRole("button", { name: /reset local practice data/i });
+    resetBtn.click();
+
+    // Wait for the async handler to complete
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockClear).toHaveBeenCalledOnce();
+    expect(reloadMock).toHaveBeenCalledOnce();
+
+    // Restore
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    });
+  });
+
+  it("does NOT call clearLocalProgress when user cancels the confirm dialog", async () => {
+    const { clearLocalProgress } = await import("@/lib/storage/reset");
+    const mockClear = vi.mocked(clearLocalProgress);
+    mockClear.mockClear();
+
+    window.confirm = vi.fn().mockReturnValue(false);
+
+    setOnline(true);
+    renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
+
+    screen.getByRole("button", { name: /reset local practice data/i }).click();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockClear).not.toHaveBeenCalled();
   });
 });

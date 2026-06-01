@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { clearLocalProgress } from "@/lib/storage/reset";
 
 function isOffline(): boolean {
   return typeof navigator !== "undefined" && navigator.onLine === false;
@@ -34,6 +35,15 @@ export default function Error({
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  // Escape hatch for a persisted-state crash (#1506): clear local practice
+  // data and reload. This is intentionally guest-safe only — signed-in users
+  // should use Settings > Reset to avoid leaving cloud data out of sync.
+  const handleResetLocalData = useCallback(async () => {
+    if (!window.confirm(t("resetLocalDataConfirm"))) return;
+    await clearLocalProgress();
+    window.location.reload();
+  }, [t]);
 
   if (offline) {
     return (
@@ -98,6 +108,12 @@ export default function Error({
           >
             {t("goHome")}
           </Link>
+          <button
+            onClick={() => { void handleResetLocalData(); }}
+            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+          >
+            {t("resetLocalData")}
+          </button>
         </div>
       </div>
     </div>

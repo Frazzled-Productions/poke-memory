@@ -1,5 +1,5 @@
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
-import { initialReviewState } from "@/lib/srs/scheduler";
+import { initialReviewState, isFsrsInvalidState } from "@/lib/srs/scheduler";
 import type { SeedPokemon, EvolutionCard, ReverseEvolutionCard } from "@/lib/pokemon/seed";
 import {
   SEED_EVOLUTION_CARDS,
@@ -245,13 +245,21 @@ export function buildSession(
 //
 // To deliberately reset progress for a re-enabled type, callers should reset
 // those card states to initialReviewState before calling hydrateSession.
+export type HydrateSessionResult = {
+  cards: ReviewableCard[];
+  /** True when at least one saved card had an invalid FSRS state and was healed
+   * to initialReviewState defaults. The caller should persist the returned
+   * cards so the corrected state survives the next session load. */
+  anyHealed: boolean;
+};
+
 export function hydrateSession(
   saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
   evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
   now: Date = new Date(),
   opts: BuildSessionOpts = {},
-): ReviewableCard[] {
+): HydrateSessionResult {
   const {
     reverseEnabled = false,
     nameEnabled = true,
@@ -334,6 +342,47 @@ export function hydrateSession(
     }
   });
 
+  // Belt-and-braces heal pass: if a saved card carries an FSRS state that
+  // ts-fsrs would reject (e.g. stability:0 on a non-new card from an older app
+  // version), reset its FSRS math fields to initialReviewState defaults so the
+  // next grade produces a self-consistent state. Preserve firstSeen and dueDate
+  // so the card is not treated as brand-new by buildSessionQueues.
+  //
+  // Only heal when the card is NOT in the "brand-new / never-graduated" state:
+  // toFsrsCard already short-circuits to createEmptyCard for fsrsState="new" &&
+  // lastReview=null, so those cards are safe regardless of field values. Healing
+  // them here would wrongly reset reps/lapses on legitimate brand-new in-step cards.
+  let anyHealed = false;
+  const healedRefreshed = refreshed.map((card) => {
+    const needsHeal =
+      (card.state.fsrsState !== "new" || card.state.lastReview !== null) &&
+      isFsrsInvalidState(card.state);
+    if (!needsHeal) return card;
+    anyHealed = true;
+    console.warn(
+      "[poke-memory] hydrateSession: healed invalid FSRS state on card",
+      card.id,
+      { stability: card.state.stability, difficulty: card.state.difficulty, fsrsState: card.state.fsrsState },
+    );
+    const init = initialReviewState(now);
+    return {
+      ...card,
+      state: {
+        ...card.state,
+        // Reset the FSRS math fields to zero — the next grade will establish
+        // a proper initial stability/difficulty via createEmptyCard.
+        stability: init.stability,
+        difficulty: init.difficulty,
+        elapsedDays: init.elapsedDays,
+        scheduledDays: init.scheduledDays,
+        reps: init.reps,
+        lapses: init.lapses,
+        // Preserve firstSeen, dueDate, lastReview, learningStep, stepStartedAt,
+        // hiddenSince, seenInPasture so queue placement is unchanged.
+      },
+    };
+  });
+
   const savedIds = new Set(allSaved.map((c) => c.id));
 
   const nameAdditions: NameReviewCard[] = nameEnabled
@@ -407,8 +456,8 @@ export function hydrateSession(
     ...reverseAdditions,
     ...cryAdditions,
   ];
-  if (additions.length === 0) return refreshed;
-  return [...refreshed, ...additions];
+  const cards = additions.length === 0 ? healedRefreshed : [...healedRefreshed, ...additions];
+  return { cards, anyHealed };
 }
 
 /**

@@ -394,7 +394,7 @@ export default function StatsPage() {
       if (settings.dateFormat) setUserDateFormat(settings.dateFormat);
       const saved = await loadSession();
       const sessionCards = saved !== null
-        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled })
+        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled }).cards
         : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);

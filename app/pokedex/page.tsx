@@ -28,7 +28,7 @@ export default function PokedexPage() {
       setMasteryRepetitions(mr);
       const saved = await loadSession();
       if (saved !== null) {
-        setCards(hydrateSession(saved.cards, SEED_POKEMON, []));
+        setCards(hydrateSession(saved.cards, SEED_POKEMON, []).cards);
       } else {
         setCards(buildSession(SEED_POKEMON, []));
       }

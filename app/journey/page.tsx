@@ -428,7 +428,7 @@ export default function JourneyPage() {
       const saved = await loadSession();
       const localOpts = seedOptsFromSettings(settings);
       const sessionCards = saved !== null
-        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts)
+        ? hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts).cards
         : buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);

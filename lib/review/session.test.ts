@@ -15,6 +15,7 @@ import {
   type CryReviewCard,
   type ReviewableCard,
 } from '@/lib/review/session';
+import type { ReviewState } from '@/lib/srs/scheduler';
 import type { EvolutionCard, SeedPokemon } from '@/lib/pokemon/seed';
 import {
   REVERSE_ID_OFFSET,
@@ -97,7 +98,7 @@ describe('hydrateSession', () => {
     const saved = [makeCard(makeSeedPokemon(1))];
     const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
     // Pass empty evo seed so only name cards are counted
-    const result = hydrateSession(saved, seed, [], NOW);
+    const { cards: result } = hydrateSession(saved, seed, [], NOW);
     expect(result).toHaveLength(2);
     expect(result.map((c) => c.id)).toContain(2);
   });
@@ -105,7 +106,7 @@ describe('hydrateSession', () => {
   it('preserves review state on existing cards', () => {
     const saved = [makeCard(makeSeedPokemon(1), { reps:5, scheduledDays:10 })];
     const seed = [makeSeedPokemon(1)];
-    const result = hydrateSession(saved, seed, [], NOW);
+    const { cards: result } = hydrateSession(saved, seed, [], NOW);
     expect(result[0].state.reps).toBe(5);
     expect(result[0].state.scheduledDays).toBe(10);
   });
@@ -114,7 +115,7 @@ describe('hydrateSession', () => {
     const stale = makeSeedPokemon(1, { flavorTexts: undefined });
     const saved = [makeCard(stale)];
     const freshSeed = [makeSeedPokemon(1, { flavorTexts: ['New flavor text.'] })];
-    const result = hydrateSession(saved, freshSeed, [], NOW);
+    const { cards: result } = hydrateSession(saved, freshSeed, [], NOW);
     const card = result[0];
     if (card.cardType !== 'name') throw new Error('Expected name card');
     expect(card.flavorTexts).toEqual(['New flavor text.']);
@@ -124,14 +125,14 @@ describe('hydrateSession', () => {
   it('keeps cards whose id is not in the seed unchanged', () => {
     const saved = [makeCard(makeSeedPokemon(99))];
     const seed = [makeSeedPokemon(1)];
-    const result = hydrateSession(saved, seed, [], NOW);
+    const { cards: result } = hydrateSession(saved, seed, [], NOW);
     expect(result.find((c) => c.id === 99)).toBeDefined();
   });
 
   it('returns an unchanged copy when no additions and no refreshes needed', () => {
     const saved = [makeCard(makeSeedPokemon(1))];
     const seed = [makeSeedPokemon(1)];
-    const result = hydrateSession(saved, seed, [], NOW);
+    const { cards: result } = hydrateSession(saved, seed, [], NOW);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe(1);
   });
@@ -140,9 +141,47 @@ describe('hydrateSession', () => {
     const saved = [makeCard(makeSeedPokemon(1))];
     const seed = [makeSeedPokemon(1)];
     const evoSeed = [makeEvoEdge({ id: 1_500_001 })];
-    const result = hydrateSession(saved, seed, evoSeed, NOW);
+    const { cards: result } = hydrateSession(saved, seed, evoSeed, NOW);
     expect(result).toHaveLength(2);
     expect(result.find((c) => c.id === 1_500_001)).toBeDefined();
+  });
+
+  describe('heal pass (isFsrsInvalidState)', () => {
+    it('heals a saved card with stability:0 and flags anyHealed', () => {
+      const poisonState: Partial<ReviewState> = {
+        stability: 0,
+        difficulty: 5,
+        fsrsState: 'review' as const,
+        lastReview: '2026-04-01',
+        reps: 2,
+        lapses: 0,
+      };
+      const saved = [makeCard(makeSeedPokemon(1), poisonState)];
+      const seed = [makeSeedPokemon(1)];
+      const { cards, anyHealed } = hydrateSession(saved, seed, [], NOW);
+      expect(anyHealed).toBe(true);
+      expect(cards[0].state.stability).toBe(0); // reset to initialReviewState default
+      expect(cards[0].state.reps).toBe(0);       // reset
+      // firstSeen and dueDate are preserved
+      expect(cards[0].state.firstSeen).toBe(saved[0].state.firstSeen);
+    });
+
+    it('does not heal a valid card and leaves anyHealed false', () => {
+      const validState: Partial<ReviewState> = {
+        stability: 6,
+        difficulty: 5,
+        fsrsState: 'review' as const,
+        lastReview: '2026-04-01',
+        reps: 2,
+        lapses: 0,
+      };
+      const saved = [makeCard(makeSeedPokemon(1), validState)];
+      const seed = [makeSeedPokemon(1)];
+      const { cards, anyHealed } = hydrateSession(saved, seed, [], NOW);
+      expect(anyHealed).toBe(false);
+      expect(cards[0].state.stability).toBe(6);
+      expect(cards[0].state.reps).toBe(2);
+    });
   });
 });
 
@@ -188,7 +227,7 @@ describe('hydrateSession (evolution refresh)', () => {
       postEvoSpriteUrl: 'new-post',
       triggerPhrase: 'at level 16',
     });
-    const result = hydrateSession([stale], [], [freshEvo], NOW);
+    const { cards: result } = hydrateSession([stale], [], [freshEvo], NOW);
     expect(result).toHaveLength(1);
     const card = result[0];
     if (card.cardType !== 'evolution') throw new Error('Expected evolution card');
@@ -329,7 +368,7 @@ describe('hydrateSession (reverse cards)', () => {
 
   it('appends reverse cards when enabled and not in saved session', () => {
     const saved = [makeCard(makeSeedPokemon(1))];
-    const result = hydrateSession(saved, seed, [], NOW, { reverseEnabled: true });
+    const { cards: result } = hydrateSession(saved, seed, [], NOW, { reverseEnabled: true });
     const reverseCards = result.filter((c) => c.cardType === 'reverse');
     expect(reverseCards).toHaveLength(2);
   });
@@ -344,14 +383,14 @@ describe('hydrateSession (reverse cards)', () => {
       state: initialReviewState(NOW),
     };
     const saved = [makeCard(makeSeedPokemon(1)), revCard];
-    const result = hydrateSession(saved, seed, [], NOW, { reverseEnabled: false });
+    const { cards: result } = hydrateSession(saved, seed, [], NOW, { reverseEnabled: false });
     // Saved reverse cards are kept in storage so progress is not lost on re-enable.
     expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(1);
   });
 
   it('preserves reverse cards when toggle is turned off (build-then-disable path, #835)', () => {
     const built = buildSession(seed, [], NOW, { reverseEnabled: true });
-    const result = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
+    const { cards: result } = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
     // Cards are kept; filtering is done via eligibleCardIds in the queue builder.
     expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(seed.length);
     expect(result.filter((c) => c.cardType === 'name')).toHaveLength(seed.length);
@@ -366,7 +405,7 @@ describe('hydrateSession (reverse cards)', () => {
       subjectKey: '1',
       state: { ...initialReviewState(NOW), reps:4, scheduledDays:30 },
     };
-    const result = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: true });
+    const { cards: result } = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: true });
     const found = result.find((c) => c.id === REVERSE_ID_OFFSET + 1);
     expect(found?.state.reps).toBe(4);
     expect(found?.state.scheduledDays).toBe(30);
@@ -423,13 +462,13 @@ describe('reverse-evolution cards (#343)', () => {
 
   it('hydrateSession appends reverse-evolution cards when newly enabled', () => {
     const saved = [makeCard(makeSeedPokemon(1))];
-    const result = hydrateSession(saved, seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
+    const { cards: result } = hydrateSession(saved, seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
     expect(result.filter((c) => c.cardType === 'reverse-evolution')).toHaveLength(evoSeed.length);
   });
 
   it('hydrateSession preserves saved reverse-evolution cards when toggled off (non-destructive disable, #835)', () => {
     const built = buildSession(seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
-    const result = hydrateSession(built, seed, evoSeed, NOW, { reverseEvolutionEnabled: false });
+    const { cards: result } = hydrateSession(built, seed, evoSeed, NOW, { reverseEvolutionEnabled: false });
     // Cards are kept so progress survives a re-enable; the queue builder filters them.
     expect(result.filter((c) => c.cardType === 'reverse-evolution')).toHaveLength(evoSeed.length);
   });
@@ -442,7 +481,7 @@ describe('reverse-evolution cards (#343)', () => {
         ? { ...c, state: { ...c.state, reps: 5, scheduledDays: 21 } }
         : c,
     );
-    const result = hydrateSession(mutated, seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
+    const { cards: result } = hydrateSession(mutated, seed, evoSeed, NOW, { reverseEvolutionEnabled: true });
     const found = result.find((c) => c.id === reverseId);
     expect(found?.state.reps).toBe(5);
     expect(found?.state.scheduledDays).toBe(21);
@@ -511,7 +550,7 @@ describe('hydrateSession (name/evolution enabled flags)', () => {
       makeCard(makeSeedPokemon(1)),
       makeCard(makeSeedPokemon(2)),
     ];
-    const result = hydrateSession(saved, seed, evoSeed, NOW, { nameEnabled: false });
+    const { cards: result } = hydrateSession(saved, seed, evoSeed, NOW, { nameEnabled: false });
     // Saved name cards are kept so progress is available when re-enabled.
     expect(result.filter((c) => c.cardType === 'name')).toHaveLength(2);
   });
@@ -523,20 +562,20 @@ describe('hydrateSession (name/evolution enabled flags)', () => {
       state: initialReviewState(NOW),
     };
     const saved: ReviewableCard[] = [makeCard(makeSeedPokemon(1)), savedEvo];
-    const result = hydrateSession(saved, seed, evoSeed, NOW, { evolutionEnabled: false });
+    const { cards: result } = hydrateSession(saved, seed, evoSeed, NOW, { evolutionEnabled: false });
     // Saved evolution cards are kept so progress is available when re-enabled.
     expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(1);
   });
 
   it('hydrateSession does not add new name cards when nameEnabled: false', () => {
     // saved is empty — no saved name cards, but seed has 2 pokemon
-    const result = hydrateSession([], seed, [], NOW, { nameEnabled: false });
+    const { cards: result } = hydrateSession([], seed, [], NOW, { nameEnabled: false });
     expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
   });
 
   it('hydrateSession does not add new evolution cards when evolutionEnabled: false', () => {
     // saved is empty — no saved evo cards, but evoSeed has 1 entry
-    const result = hydrateSession([], seed, evoSeed, NOW, { evolutionEnabled: false });
+    const { cards: result } = hydrateSession([], seed, evoSeed, NOW, { evolutionEnabled: false });
     expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(0);
   });
 });
@@ -585,7 +624,7 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
       state: { ...initialReviewState(NOW), reps:3, scheduledDays:7 },
     };
 
-    const result = hydrateSession([slimCard], [fullSeed], [], NOW, { reverseEnabled: true, nameEnabled: false, evolutionEnabled: false });
+    const { cards: result } = hydrateSession([slimCard], [fullSeed], [], NOW, { reverseEnabled: true, nameEnabled: false, evolutionEnabled: false });
 
     expect(result).toHaveLength(1);
     const card = result[0];
@@ -1682,7 +1721,7 @@ describe('alternate-form cards (#447)', () => {
         subjectKey: '10100',
         state: { ...initialReviewState(NOW), reps: 3, scheduledDays: 10 },
       };
-      const result = hydrateSession([savedAltName], formSeed, [], NOW);
+      const { cards: result } = hydrateSession([savedAltName], formSeed, [], NOW);
       expect(result).toHaveLength(formSeed.length); // 2 total (saved + base raichu appended)
       const found = result.find((c) => c.id === 10100);
       expect(found).toBeDefined();
@@ -1703,7 +1742,7 @@ describe('alternate-form cards (#447)', () => {
         subjectKey: '10100',
         state: { ...initialReviewState(NOW), reps: 5, scheduledDays: 21 },
       };
-      const result = hydrateSession([savedAltReverse], formSeed, [], NOW, {
+      const { cards: result } = hydrateSession([savedAltReverse], formSeed, [], NOW, {
         reverseEnabled: true,
         nameEnabled: false,
         evolutionEnabled: false,
@@ -1718,7 +1757,7 @@ describe('alternate-form cards (#447)', () => {
     });
 
     it('hydrateSession adds missing form entries (both name cards) when saved session has none', () => {
-      const result = hydrateSession([], formSeed, [], NOW);
+      const { cards: result } = hydrateSession([], formSeed, [], NOW);
       expect(result).toHaveLength(2);
       const ids = result.map((c) => c.id);
       expect(ids).toContain(26);
@@ -2011,10 +2050,10 @@ describe('non-destructive re-enable: hydrateSession + cardTypeIsEnabled (#835)',
       state: { ...initialReviewState(NOW), reps: 8, scheduledDays: 30 },
     };
     // Disable — cards are preserved, not stripped.
-    const afterDisable = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: false });
+    const { cards: afterDisable } = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: false });
     expect(afterDisable.filter((c) => c.cardType === 'reverse')).toHaveLength(1);
     // Re-enable — cards already there, state intact.
-    const afterReEnable = hydrateSession(afterDisable, seed, [], NOW, { reverseEnabled: true });
+    const { cards: afterReEnable } = hydrateSession(afterDisable, seed, [], NOW, { reverseEnabled: true });
     const found = afterReEnable.find((c) => c.id === REVERSE_ID_OFFSET + 1);
     expect(found?.state.reps).toBe(8);
     expect(found?.state.scheduledDays).toBe(30);
@@ -2024,7 +2063,7 @@ describe('non-destructive re-enable: hydrateSession + cardTypeIsEnabled (#835)',
     // Build a session with name + reverse cards.
     const built = buildSession(seed, [], NOW, { reverseEnabled: true });
     // hydrate with reverse disabled — cards preserved in session.
-    const hydrated = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
+    const { cards: hydrated } = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
     expect(hydrated.filter((c) => c.cardType === 'reverse')).toHaveLength(2); // preserved
 
     // Build eligibleCardIds that excludes disabled types.
@@ -2067,12 +2106,12 @@ describe('non-destructive re-enable: hydrateSession + cardTypeIsEnabled (#835)',
 
   it('disabled name cards do not get new additions during disable period', () => {
     // No saved cards.
-    const result = hydrateSession([], seed, [], NOW, { nameEnabled: false });
+    const { cards: result } = hydrateSession([], seed, [], NOW, { nameEnabled: false });
     expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
   });
 
   it('disabled reverse cards do not get new additions during disable period', () => {
-    const result = hydrateSession([], seed, [], NOW, { reverseEnabled: false });
+    const { cards: result } = hydrateSession([], seed, [], NOW, { reverseEnabled: false });
     expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
   });
 });

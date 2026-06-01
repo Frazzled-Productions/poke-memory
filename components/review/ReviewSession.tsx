@@ -942,8 +942,9 @@ export function ReviewSession() {
       const settingsLimits = limitsFromSettings(settings);
 
       if (saved !== null) {
-        // Merge any seed cards added since the last save.
-        const hydrated = hydrateSession(
+        // Merge any seed cards added since the last save, and heal any invalid
+        // FSRS states written by older app versions (#1506).
+        const { cards: hydrated, anyHealed } = hydrateSession(
           saved.cards,
           SEED_POKEMON,
           SEED_EVOLUTION_CARDS,
@@ -957,7 +958,7 @@ export function ReviewSession() {
           },
         );
         sessionLimits = settingsLimits;
-        if (hydrated.length !== saved.cards.length) {
+        if (hydrated.length !== saved.cards.length || anyHealed) {
           notifySaveResult(await saveSession({ cards: hydrated, limits: sessionLimits }));
         }
         sessionCards = hydrated;

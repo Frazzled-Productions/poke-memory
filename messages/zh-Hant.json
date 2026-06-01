@@ -853,7 +853,9 @@
       "body": "沒有網路連線時，某些頁面無法使用。您之前查看過的卡片應該仍然可以正常使用。"
     },
     "tryAgain": "重試",
-    "goHome": "前往練習"
+    "goHome": "前往練習",
+    "resetLocalData": "重置本地練習資料",
+    "resetLocalDataConfirm": "這將刪除您的本地練習進度並重新開始。是否繼續？"
   },
   "onboarding": {
     "welcomeHeading": "歡迎使用 Poké Memory",

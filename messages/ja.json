@@ -853,7 +853,9 @@
       "body": "接続がないと一部のページは利用できません。以前に見たカードは引き続き機能するはずです。"
     },
     "tryAgain": "もう一度試す",
-    "goHome": "練習に戻る"
+    "goHome": "練習に戻る",
+    "resetLocalData": "ローカルの練習データをリセット",
+    "resetLocalDataConfirm": "ローカルの練習の進捗を削除して最初からやり直します。続けますか？"
   },
   "onboarding": {
     "welcomeHeading": "Poké Memory へようこそ",

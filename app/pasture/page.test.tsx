@@ -77,7 +77,7 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
 }));
 
 vi.mock("@/lib/review/session", () => ({
-  hydrateSession: vi.fn((_saved: unknown[], _seed: unknown[]) => []),
+  hydrateSession: vi.fn((_saved: unknown[], _seed: unknown[]) => ({ cards: [], anyHealed: false })),
 }));
 
 vi.mock("@/lib/pasture/arrivals", () => ({
@@ -331,7 +331,7 @@ describe("PasturePage", () => {
 
     // hydrateSession is called by the page with the raw cards; it returns the
     // enriched set. The mock simulates the real hydration step.
-    vi.mocked(hydrateSession).mockReturnValueOnce(hydratedCards as unknown as ReviewableCard[]);
+    vi.mocked(hydrateSession).mockReturnValueOnce({ cards: hydratedCards as unknown as ReviewableCard[], anyHealed: false });
 
     // filterMastered is called twice per render (once for masteredCount, once
     // for masteredCards). Use mockImplementation (not Once) so both calls
@@ -380,7 +380,7 @@ describe("PasturePage", () => {
     });
 
     // hydrateSession returns the raw cards unchanged — simulating its removal.
-    vi.mocked(hydrateSession).mockReturnValueOnce(rawCards as unknown as ReviewableCard[]);
+    vi.mocked(hydrateSession).mockReturnValueOnce({ cards: rawCards as unknown as ReviewableCard[], anyHealed: false });
 
     // filterMastered returns [] for un-hydrated cards (no habitat).
     vi.mocked(filterMastered).mockImplementation((cards) => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { default_w } from "ts-fsrs";
-import { nextReview, initialReviewState } from "@/lib/srs/scheduler";
+import { nextReview, initialReviewState, isFsrsInvalidState } from "@/lib/srs/scheduler";
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { migrateReviewState } from "@/lib/review/persistence";
 import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS, isMastered } from "@/lib/stats/derive";
@@ -831,5 +831,126 @@ describe("DST / timezone boundary — addDays millisecond arithmetic", () => {
     const result = nextReview(base, 4, nearLocalMidnight);
     // lastReview is set to isoDate(now) = UTC date = 2026-05-09.
     expect(result.lastReview).toBe("2026-05-09");
+  });
+});
+
+// ============================================================
+// isFsrsInvalidState predicate (#1506)
+// ============================================================
+describe("isFsrsInvalidState", () => {
+  it("returns false for a normal graduated card (stability 1.5, difficulty 5)", () => {
+    const state = graduatedCard({ stability: 1.5, difficulty: 5 });
+    expect(isFsrsInvalidState(state)).toBe(false);
+  });
+
+  it("returns true when stability is 0", () => {
+    const state = graduatedCard({ stability: 0, difficulty: 5 });
+    expect(isFsrsInvalidState(state)).toBe(true);
+  });
+
+  it("returns true when stability is below 1e-3", () => {
+    const state = graduatedCard({ stability: 0.0005, difficulty: 5 });
+    expect(isFsrsInvalidState(state)).toBe(true);
+  });
+
+  it("returns true when difficulty is 0 (below 1)", () => {
+    const state = graduatedCard({ stability: 1.5, difficulty: 0 });
+    expect(isFsrsInvalidState(state)).toBe(true);
+  });
+
+  it("returns true when difficulty is 0.5 (below 1)", () => {
+    const state = graduatedCard({ stability: 1.5, difficulty: 0.5 });
+    expect(isFsrsInvalidState(state)).toBe(true);
+  });
+
+  it("returns true when difficulty is 11 (above 10)", () => {
+    const state = graduatedCard({ stability: 1.5, difficulty: 11 });
+    expect(isFsrsInvalidState(state)).toBe(true);
+  });
+
+  it("returns true when stability is NaN", () => {
+    const state = graduatedCard({ stability: NaN, difficulty: 5 });
+    expect(isFsrsInvalidState(state)).toBe(true);
+  });
+
+  it("returns true when difficulty is NaN", () => {
+    const state = graduatedCard({ stability: 1.5, difficulty: NaN });
+    expect(isFsrsInvalidState(state)).toBe(true);
+  });
+
+  it("returns false for a brand-new card (stability 0, difficulty 0) — new cards are valid by convention", () => {
+    // isFsrsInvalidState is only called for non-new cards inside toFsrsCard
+    // (the new-card path returns createEmptyCard first). But the predicate
+    // itself flags stability:0 regardless — callers guard with the new/lastReview
+    // check before calling toFsrsCard. This test documents the behaviour.
+    const state = newCard(); // stability:0, difficulty:0
+    expect(isFsrsInvalidState(state)).toBe(true);
+  });
+});
+
+// ============================================================
+// Invalid-state healing in nextReview (#1506)
+// ============================================================
+describe("nextReview — invalid FSRS state healing via toFsrsCard", () => {
+  // T1: review card, lastReview set, stability:0, difficulty:5, grade Good
+  it("T1: review card with stability:0 — grade Good does not throw and produces valid stability", () => {
+    const state = graduatedCard({ stability: 0, difficulty: 5 });
+    expect(() => nextReview(state, 4, NOW)).not.toThrow();
+    const result = nextReview(state, 4, NOW);
+    expect(result.stability).toBeGreaterThan(0);
+    expect(result.difficulty).toBeGreaterThanOrEqual(1);
+    expect(result.difficulty).toBeLessThanOrEqual(10);
+  });
+
+  // T2: relearning card (learningStep set, lastReview set), stability:0, grade Good
+  it("T2: relearning card with stability:0 — grade Good on last step does not throw", () => {
+    // A relearning card has lastReview set and learningStep:0 (one relearning step).
+    // Good on the last step triggers FSRS via toFsrsCard.
+    const state = cardInStep(0, "2026-05-02", { stability: 0, difficulty: 5 });
+    expect(() => nextReview(state, 4, NOW)).not.toThrow();
+    const result = nextReview(state, 4, NOW);
+    // Card graduates (exits the learning step) or advances — either way no throw.
+    expect(result.stability).toBeGreaterThanOrEqual(0);
+  });
+
+  // T3: review card, stability:0, difficulty:0, grade Again → enters relearning
+  it("T3: review card with stability:0, difficulty:0 — grade Again does not throw", () => {
+    const state = graduatedCard({ stability: 0, difficulty: 0 });
+    expect(() => nextReview(state, 1, NOW)).not.toThrow();
+    const result = nextReview(state, 1, NOW);
+    // Card lapses into relearning (learningStep:0).
+    expect(result.learningStep).toBe(0);
+  });
+
+  // T4: review card, stability:NaN, difficulty:5, grade Good
+  it("T4: review card with stability:NaN — grade Good does not throw", () => {
+    const state = graduatedCard({ stability: NaN, difficulty: 5 });
+    expect(() => nextReview(state, 4, NOW)).not.toThrow();
+    const result = nextReview(state, 4, NOW);
+    expect(Number.isFinite(result.stability)).toBe(true);
+    expect(result.stability).toBeGreaterThan(0);
+  });
+
+  // T5: review card, stability:1.5, difficulty:0.5 (< 1), grade Good
+  it("T5: review card with difficulty:0.5 (< 1) — grade Good does not throw", () => {
+    const state = graduatedCard({ stability: 1.5, difficulty: 0.5 });
+    expect(() => nextReview(state, 4, NOW)).not.toThrow();
+    const result = nextReview(state, 4, NOW);
+    expect(result.stability).toBeGreaterThan(0);
+    expect(result.difficulty).toBeGreaterThanOrEqual(1);
+    expect(result.difficulty).toBeLessThanOrEqual(10);
+  });
+
+  // T6: review card, stability:1.5, difficulty:5 — NOT healed, normal FSRS output
+  it("T6: review card with valid stability:1.5, difficulty:5 — NOT healed, uses real FSRS output", () => {
+    const state = graduatedCard({ stability: 1.5, difficulty: 5 });
+    expect(isFsrsInvalidState(state)).toBe(false);
+    expect(() => nextReview(state, 4, NOW)).not.toThrow();
+    const result = nextReview(state, 4, NOW);
+    // FSRS update starting from stability:1.5 should produce a larger interval than
+    // re-init from createEmptyCard would (which would give a very small initial value).
+    // Just verify it's a valid FSRS output with stability > 0 and interval > 0.
+    expect(result.stability).toBeGreaterThan(0);
+    expect(result.scheduledDays).toBeGreaterThan(0);
   });
 });

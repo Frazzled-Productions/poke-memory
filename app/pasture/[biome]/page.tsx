@@ -118,7 +118,7 @@ export default function BiomeLandscapePage({
           // isDefaultForm, etc.) that biomeStats and the biome filter depend on.
           // All *Enabled flags are false — only refresh existing cards from seed
           // (backfill habitat, isDefaultForm, etc.) without adding ~1 000 new unseen cards.
-          const hydrated = hydrateSession(session.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+          const { cards: hydrated } = hydrateSession(session.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
             reverseEnabled: false,
             nameEnabled: false,
             evolutionEnabled: false,

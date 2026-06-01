@@ -166,7 +166,7 @@ export default function PasturePage() {
         // hydrateSession (backfill habitat, isDefaultForm, types, etc. onto
         // each saved card from SEED_POKEMON). Adding new cards here would bloat
         // session.cards with ~1 000 unseen species, hurting filterMastered perf.
-        const hydrated = hydrateSession(s.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+        const { cards: hydrated } = hydrateSession(s.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
           reverseEnabled: false,
           nameEnabled: false,
           evolutionEnabled: false,
