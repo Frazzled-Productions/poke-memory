@@ -132,6 +132,16 @@ describe("loadFlags / saveFlags / clearFlags", () => {
     );
     expect(loadFlags().qaSeedMode).toBe(false);
   });
+
+  it("defaults forceTokenToast to false when field is absent from stored blob", () => {
+    // Simulate an existing user's blob from before forceTokenToast was added
+    // (#1443): an absent field must coerce to false, never silently true.
+    globalThis.localStorage.setItem(
+      FLAGS_KEY,
+      JSON.stringify({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, qaSeedMode: false }),
+    );
+    expect(loadFlags().forceTokenToast).toBe(false);
+  });
 });
 
 describe("anyFlagTrue / isAnyFlagOn", () => {
@@ -148,6 +158,9 @@ describe("anyFlagTrue / isAnyFlagOn", () => {
     ).toBe(true);
     expect(
       anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: true, forceTokenToast: false, qaSeedMode: false }),
+    ).toBe(true);
+    expect(
+      anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: true, qaSeedMode: false }),
     ).toBe(true);
     expect(
       anyFlagTrue({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: true }),
@@ -167,6 +180,13 @@ describe("anyFlagTrue / isAnyFlagOn", () => {
 
   it("isAnyFlagOn is true when qaSeedMode is the only on flag", () => {
     saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: true });
+    expect(isAnyFlagOn()).toBe(true);
+  });
+
+  it("isAnyFlagOn is true when forceTokenToast is the only on flag", () => {
+    // The sync write-guard suppresses cloud writes while any flag is on, so
+    // forceTokenToast must register through isAnyFlagOn like every other flag.
+    saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: true, qaSeedMode: false });
     expect(isAnyFlagOn()).toBe(true);
   });
 });

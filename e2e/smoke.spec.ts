@@ -870,6 +870,54 @@ test.describe("Sign-in picker (#360)", () => {
   }
 });
 
+test.describe("Streak status on Practice (#1443)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
+  });
+
+  test("shows the token-balance pip and milestone countdown beside the streak", async ({
+    page,
+  }) => {
+    // Seed a live 2-day streak (below the first milestone, so no celebration
+    // overlay fires) plus two held tokens, so the relocated pip + signpost
+    // render on the Practice screen.
+    await page.addInitScript(() => {
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      const day = (offset: number) => {
+        const d = new Date();
+        d.setUTCDate(d.getUTCDate() + offset);
+        return iso(d);
+      };
+      localStorage.setItem(
+        "poke-memory:streak:v1",
+        JSON.stringify([day(-1), day(0)]),
+      );
+      localStorage.setItem(
+        "poke-memory:settings:v1",
+        JSON.stringify({
+          mobileNav: "bottom",
+          streakProtection: {
+            balance: 2,
+            spendDates: [],
+            daysSinceLastEarn: 5,
+            lastEarnCheckDate: day(-1),
+          },
+        }),
+      );
+    });
+    await addOnboardingPreDismiss(page);
+
+    await page.goto("/");
+
+    // Token-balance pip (nav.streakChip.tokenLabel, count 2).
+    await expect(page.getByText("2 protection tokens.")).toBeVisible();
+    // Next-milestone signpost (1 day from streak 2 to the first milestone, 3).
+    await expect(
+      page.getByText(/to your next milestone\./i),
+    ).toBeVisible();
+  });
+});
+
 test.describe("Streak milestone celebration (#419)", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => localStorage.clear());

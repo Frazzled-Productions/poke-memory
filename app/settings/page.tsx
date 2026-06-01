@@ -523,14 +523,13 @@ export default function SettingsPage() {
     // Scroll the quiz itself into view once the category has expanded and the
     // quiz panel has rendered. The category's own forceOpen scroll targets the
     // category heading (much higher up), so without this the user lands above
-    // the fold and never sees the quiz they asked to open (#1443 QA).
-    if (typeof window !== "undefined") {
-      window.setTimeout(() => {
-        document
-          .getElementById("known-quiz-heading")
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 200);
-    }
+    // the fold and never sees the quiz they asked to open (#1443 QA). This is a
+    // "use client" component, so window is always defined here.
+    window.setTimeout(() => {
+      document
+        .getElementById("known-quiz-heading")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 200);
   }
 
   // Settings search/filter query.

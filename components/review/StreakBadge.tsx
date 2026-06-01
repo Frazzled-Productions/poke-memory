@@ -104,11 +104,17 @@ export function StreakBadge() {
 
       // QA cheat: force the "token earned" helper toast regardless of actual
       // token state, so the earn message is testable without a 30-day streak.
-      // Only fires when no genuine earn/spend toast was produced this pass, so
-      // it never masks a real "spent" or "earned-and-spent" event QA may be
-      // observing. Self-clears on dismiss (see dismissToken).
-      if (flags.forceTokenToast && !realToastFired) {
+      // Only fires when no genuine earn/spend toast was produced this pass (so
+      // it never masks a real "spent"/"earned-and-spent" event), and only once
+      // per visit via the same ref guard as the real path, making the "exactly
+      // once per toggle" invariant explicit. Self-clears on dismiss.
+      if (
+        flags.forceTokenToast &&
+        !realToastFired &&
+        !hasShownTokenToastRef.current
+      ) {
         setPendingToken("earned");
+        hasShownTokenToastRef.current = true;
       }
     }
     refresh();
