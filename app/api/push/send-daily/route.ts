@@ -403,11 +403,14 @@ function rowIsEligible(
  * The result is floor'd at 0 so a user who has already hit their daily cap
  * contributes 0 to the estimate rather than a negative number.
  *
- * Note: reverse-evolution cards share the evolution daily-limit bucket with
- * forward evolution cards. The estimate sums the caps for both directions
- * independently — a deliberate simplification that may overcount slightly
- * when both are enabled, but is consistent with how `buildSessionQueues`
- * was written at the time of #1153.
+ * Evolution bucket: `limitBucket` in `lib/review/session.ts` maps
+ * `"reverse-evolution"` -> `"evolution"`, so forward-evolution and
+ * reverse-evolution new cards share ONE `maxNewEvolutionPerDay` cap in the
+ * real session. The estimate mirrors this: `maxNewEvolutionPerDay` is added
+ * at most ONCE, when either direction (or both) is enabled (#1501).
+ * The started-today count used for the evolution bucket is the sum of
+ * `"evolution-edge"` and `"reverse-evolution-edge"` rows started today,
+ * matching how `buildSessionQueues` accumulates `perType.evolution.newIntroducedToday`.
  */
 function computeNewEstimate(
   startedTodayCounts: Record<string, number>,
@@ -424,18 +427,19 @@ function computeNewEstimate(
     0,
     eligibility.maxNewReversePerDay - (startedTodayCounts["reverse"] ?? 0),
   );
-  if (eligibility.evolutionCardsEnabled) {
+
+  // Evolution bucket: forward and reverse directions share one cap (see docstring).
+  // Add the evolution term at most once, regardless of which directions are enabled.
+  if (eligibility.evolutionCardsEnabled || eligibility.reverseEvolutionCardsEnabled) {
+    const startedTodayEvo =
+      (startedTodayCounts["evolution-edge"] ?? 0) +
+      (startedTodayCounts["reverse-evolution-edge"] ?? 0);
     estimate += Math.max(
       0,
-      eligibility.maxNewEvolutionPerDay - (startedTodayCounts["evolution-edge"] ?? 0),
+      eligibility.maxNewEvolutionPerDay - startedTodayEvo,
     );
   }
-  if (eligibility.reverseEvolutionCardsEnabled) {
-    estimate += Math.max(
-      0,
-      eligibility.maxNewEvolutionPerDay - (startedTodayCounts["reverse-evolution-edge"] ?? 0),
-    );
-  }
+
   if (eligibility.cryCardsEnabled) {
     estimate += Math.max(
       0,
