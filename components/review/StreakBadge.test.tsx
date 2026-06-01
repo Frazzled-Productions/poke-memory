@@ -414,13 +414,13 @@ describe("StreakBadge — locale: spend toast copy", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Token-balance pip + next-milestone signpost (#1443 QA — surfaced here on
-// Practice rather than in the nav bar). IN and OUT of each state.
+// Milestone signpost (#1443 QA — token pip removed in #1490 de-dup, carried
+// by ProfileStatusBar). IN and OUT of the milestone signpost state.
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — token pip and milestone signpost", () => {
-  it("shows the token pip and milestone signpost when the user has tokens and a live streak", () => {
-    // 2 tokens, a 3-day consecutive run ending today → balance pip + countdown.
+describe("StreakBadge — milestone signpost (no token pip after #1490)", () => {
+  it("shows the milestone signpost when the user has a live streak", () => {
+    // 3-day consecutive run ending today → milestone countdown visible.
     seedProtection({
       balance: 2,
       streakDates: ["2026-05-29", "2026-05-30", FIXED_TODAY],
@@ -428,50 +428,56 @@ describe("StreakBadge — token pip and milestone signpost", () => {
 
     renderWithIntl(<StreakBadge />);
 
-    // Token-balance pip (nav.streakChip.tokenLabel, count 2).
-    expect(screen.getByText(/2 protection tokens\./i)).toBeInTheDocument();
-    // Next-milestone signpost (nav.streakChip.milestoneLabel).
+    // Token pip must NOT be present (de-duped to ProfileStatusBar in #1490).
+    expect(screen.queryByText(/2 protection tokens\./i)).toBeNull();
+    // Next-milestone signpost (nav.streakChip.milestoneLabel) remains.
     expect(
       screen.getByText(/to your next milestone\./i),
     ).toBeInTheDocument();
   });
 
-  it("hides the token pip at zero balance and the signpost at streak zero", () => {
-    // No tokens, no streak dates → tokenBalance 0, streak 0.
+  it("hides the signpost at streak zero (no milestone countdown without a streak)", () => {
+    // No streak dates → streak 0.
     seedProtection({ balance: 0 });
 
     renderWithIntl(<StreakBadge />);
 
-    expect(screen.queryByText(/protection token/i)).toBeNull();
     expect(screen.queryByText(/to your next milestone/i)).toBeNull();
   });
 
-  // Locale coverage for the inline pip + signpost copy (nav.streakChip.*).
-  function seedPipAndSignpost() {
+  // Token pip must be absent in all locales (de-duped #1490).
+  // Locale coverage for the milestone signpost copy (nav.streakChip.*).
+  function seedSignpost() {
     seedProtection({
       balance: 2,
       streakDates: ["2026-05-29", "2026-05-30", FIXED_TODAY],
     });
   }
 
-  it("ja: renders the token pip and milestone signpost in Japanese", () => {
-    seedPipAndSignpost();
+  it("ja: renders the milestone signpost in Japanese (no token pip)", () => {
+    seedSignpost();
     renderJa(<StreakBadge />);
-    expect(screen.getByText(/保護トークン2個。/)).toBeInTheDocument();
+    // Token pip must be absent.
+    expect(screen.queryByText(/保護トークン2個。/)).toBeNull();
+    // Milestone signpost remains.
     expect(screen.getByText(/次の目標まであと/)).toBeInTheDocument();
   });
 
-  it("zh-Hans: renders the token pip and milestone signpost in Simplified Chinese", () => {
-    seedPipAndSignpost();
+  it("zh-Hans: renders the milestone signpost in Simplified Chinese (no token pip)", () => {
+    seedSignpost();
     renderZhHans(<StreakBadge />);
-    expect(screen.getByText(/2个保护令牌。/)).toBeInTheDocument();
+    // Token pip must be absent.
+    expect(screen.queryByText(/2个保护令牌。/)).toBeNull();
+    // Milestone signpost remains.
     expect(screen.getByText(/距下一个里程碑还有/)).toBeInTheDocument();
   });
 
-  it("zh-Hant: renders the token pip and milestone signpost in Traditional Chinese", () => {
-    seedPipAndSignpost();
+  it("zh-Hant: renders the milestone signpost in Traditional Chinese (no token pip)", () => {
+    seedSignpost();
     renderZhHant(<StreakBadge />);
-    expect(screen.getByText(/2個保護代幣。/)).toBeInTheDocument();
+    // Token pip must be absent.
+    expect(screen.queryByText(/2個保護代幣。/)).toBeNull();
+    // Milestone signpost remains.
     expect(screen.getByText(/距下一個里程碑還有/)).toBeInTheDocument();
   });
 });

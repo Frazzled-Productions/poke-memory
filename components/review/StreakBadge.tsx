@@ -26,11 +26,11 @@ import {
 
 export function StreakBadge() {
   const t = useTranslations("review");
-  // Token balance + next-milestone signpost, surfaced here on the Practice
-  // screen (and on Stats) rather than in the nav bar (#1443 QA). Reuses the
-  // shared read-only hook and the `nav.streakChip.*` copy.
+  // Milestone signpost (days to next milestone) — surfaced here on Practice.
+  // The token balance pip was removed (#1490 de-dup): ProfileStatusBar carries
+  // it on all routes. Uses the shared `nav.streakChip.*` copy.
   const tChip = useTranslations("nav.streakChip");
-  const { tokenBalance, daysToNextMilestone } = useStreakNavState();
+  const { daysToNextMilestone } = useStreakNavState();
   const [streak, setStreak] = useState<number | null>(null);
   const [pendingMilestone, setPendingMilestone] = useState<number | null>(null);
   const [pendingToken, setPendingToken] = useState<ProtectionToastKind | null>(
@@ -168,11 +168,9 @@ export function StreakBadge() {
             ? t("startStreak")
             : t("streakDays", { count: streak })}
         </span>
-        {tokenBalance !== null && tokenBalance >= 1 && (
-          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            {tChip("tokenLabel", { count: tokenBalance })}
-          </span>
-        )}
+        {/* Token pip removed: ProfileStatusBar carries the token balance on all
+            routes and desktop Practice (#1490 de-dup). The milestone countdown
+            below is kept — that is Practice-specific context. */}
       </div>
       {daysToNextMilestone !== null && (
         <p className="mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400 sm:mb-4">

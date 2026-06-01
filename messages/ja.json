@@ -890,6 +890,18 @@
       "iosBodySuffix": "でインストールできます。"
     }
   },
+  "profileStatus": {
+    "barAriaLabel": "プロフィール状況",
+    "streakChipAriaLabel": "{count, plural, other {# 日連続}}",
+    "startStreakChipAriaLabel": "連続記録を始めよう",
+    "tokenChipAriaLabel": "{count, plural, other {保護トークン # 個}}",
+    "masteryChipAriaLabel": "{mastered} / {total} 種族習得済み",
+    "masteryZeroAriaLabel": "{total} 種族中 0 種族習得済み - レビューを始めよう",
+    "streakLabel": "{count, plural, other {# 日}}",
+    "startStreakLabel": "連続を始めよう",
+    "tokenLabel": "{count, plural, other {# 個}}",
+    "masteryLabel": "{mastered, number} / {total, number} 習得済み（{pct}%）"
+  },
   "sync": {
     "status": {
       "lastSynced": "最終同期: {time}",

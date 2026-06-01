@@ -890,6 +890,18 @@
       "iosBodySuffix": "[to install.]"
     }
   },
+  "profileStatus": {
+    "barAriaLabel": "[Profile status]",
+    "streakChipAriaLabel": "[{count, plural, one {# day streak} other {# day streak}}]",
+    "startStreakChipAriaLabel": "[Start your streak]",
+    "tokenChipAriaLabel": "[{count, plural, one {# protection token} other {# protection tokens}}]",
+    "masteryChipAriaLabel": "[{mastered} of {total} Pokemon mastered]",
+    "masteryZeroAriaLabel": "[0 of {total} Pokemon mastered - start reviewing to grow this]",
+    "streakLabel": "[{count, plural, one {#d streak} other {#d streak}}]",
+    "startStreakLabel": "[Start streak]",
+    "tokenLabel": "[{count, plural, one {# token} other {# tokens}}]",
+    "masteryLabel": "[{mastered, number} / {total, number} mastered ({pct}%)]"
+  },
   "sync": {
     "status": {
       "lastSynced": "[Last synced: {time}]",
