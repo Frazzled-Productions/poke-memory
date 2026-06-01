@@ -848,37 +848,33 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     expect(parsed.body).not.toContain("new");
   });
 
-  it("dual-evolution directions double-draw maxNewEvolutionPerDay (#1156)", async () => {
-    // When both evolutionCardsEnabled and reverseEvolutionCardsEnabled are on,
-    // computeNewEstimate sums the cap for each direction independently. The
-    // source comment on computeNewEstimate flags this as a deliberate
-    // simplification: the actual session cap is shared between the two
-    // directions but the push estimate doubles it. This test pins that
-    // behaviour so a future refactor that "fixes" the over-count does so
-    // intentionally rather than by accident.
-    //
-    // Name and reverse are always on since #1234. To isolate the evo estimate,
-    // their daily caps are zeroed (maxNewPerDay=0, maxNewReversePerDay=0) so
-    // the total = 7 (evo) + 7 (rev-evo) = 14. Distinct fixture values chosen
-    // so the doubled estimate (14) cannot collide with any other cap.
+  // ─── #1501: evolution-bucket double-count fix ──────────────────────────────
+  //
+  // Forward-evolution and reverse-evolution cards share ONE `maxNewEvolutionPerDay`
+  // bucket in `buildSessionQueues` (via `limitBucket`). `computeNewEstimate`
+  // must mirror this by adding the cap at most once.
+
+  it("both evolution directions enabled: evolution bucket counted once, not twice (#1501)", async () => {
+    // Regression test for #1501. Confirmed production scenario:
+    //   name=5, reverse=5, maxNewEvolutionPerDay=5, both evo directions on, cry off.
+    // The real session delivers 5 + 5 + 5 = 15 new cards per day.
+    // Before the fix, the notification reported 5 + 5 + 5 + 5 = 20.
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
         user_id: "user-a",
         timezone: "UTC",
         settings: {
-          evolutionCardsEnabled: true,         // draws maxNewEvolutionPerDay
-          reverseEvolutionCardsEnabled: true,  // draws maxNewEvolutionPerDay again
+          evolutionCardsEnabled: true,
+          reverseEvolutionCardsEnabled: true,
           cryCardsEnabled: false,
           alternateFormsEnabled: true,
-          maxNewPerDay: 0,          // zero name cap to isolate evo estimate
-          maxNewEvolutionPerDay: 7,
-          maxNewReversePerDay: 0,   // zero reverse cap to isolate evo estimate
-          maxNewCryPerDay: 13,
+          maxNewPerDay: 5,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 5,
+          maxNewCryPerDay: 10,
         },
       }],
-      // No due rows at all → dueCount = 0, body uses the new-only copy.
-      // No first_seen-today rows → both directions retain full headroom.
       due: [],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -888,9 +884,131 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // 7 (evolution) + 7 (reverse-evolution) = 14, even though the real
-    // session cap on evolution-direction cards is shared.
-    expect(parsed.body).toBe("14 new cards ready to practise.");
+    // name(5) + reverse(5) + evolution-bucket-once(5) = 15. Must NOT be 20.
+    expect(parsed.body).toBe("15 new cards ready to practise.");
+  });
+
+  it("only forward evolution enabled: evolution bucket counted once", async () => {
+    // Forward-only: evo term added once. name=0, reverse=0 to isolate.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: true,
+          reverseEvolutionCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 0,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 0,
+          maxNewCryPerDay: 10,
+        },
+      }],
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // evolution bucket once = 5.
+    expect(parsed.body).toBe("5 new cards ready to practise.");
+  });
+
+  it("only reverse-evolution enabled: evolution bucket still counted once", async () => {
+    // Reverse-only: evo term added once. name=0, reverse=0 to isolate.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: true,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 0,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 0,
+          maxNewCryPerDay: 10,
+        },
+      }],
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // evolution bucket once = 5.
+    expect(parsed.body).toBe("5 new cards ready to practise.");
+  });
+
+  it("neither evolution direction enabled: no evolution term in estimate", async () => {
+    // Both evo directions off. name=0, reverse=0, cry=0 → estimate = 0 → no notification.
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: false,
+          reverseEvolutionCardsEnabled: false,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 0,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 0,
+          maxNewCryPerDay: 10,
+        },
+      }],
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+
+    await POST(makeRequest());
+    // No due rows and no new headroom → no notification sent.
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it("name and reverse caps are independent: changing maxNewReversePerDay moves total independently", async () => {
+    // Verify name and reverse remain separate buckets. With both evo directions
+    // on and maxNewEvolutionPerDay=5, evo contributes 5. Set name=3, reverse=7
+    // and verify the total is 3 + 7 + 5 = 15 (not 3 + 5 + 5 = 13 or any other
+    // value that would imply name/reverse sharing).
+    const admin = buildAdminMock({
+      subscriptions: [SUB],
+      settings: [{
+        user_id: "user-a",
+        timezone: "UTC",
+        settings: {
+          evolutionCardsEnabled: true,
+          reverseEvolutionCardsEnabled: true,
+          cryCardsEnabled: false,
+          alternateFormsEnabled: true,
+          maxNewPerDay: 3,
+          maxNewEvolutionPerDay: 5,
+          maxNewReversePerDay: 7,
+          maxNewCryPerDay: 10,
+        },
+      }],
+      due: [],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    const parsed = JSON.parse(
+      mockSendNotification.mock.calls[0][1] as string,
+    ) as { body: string };
+    // name(3) + reverse(7) + evo-bucket-once(5) = 15.
+    expect(parsed.body).toBe("15 new cards ready to practise.");
   });
 });
 
@@ -1455,9 +1573,12 @@ describe("POST /api/push/send-daily — pokemonNameLocale locale filter (#1480)"
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // Only 2 zh-Hans rows pass.
-    expect(parsed.body).toContain("2");
-    expect(parsed.body).not.toContain("3");
+    // Only 2 zh-Hans rows pass (not 3). The body starts with "2 cards due" in
+    // the combined form (dueCount=2 plus new-card estimate from caps). Assert
+    // the due count specifically rather than a bare digit to avoid false
+    // failures from the new-card estimate containing "3" as a substring.
+    expect(parsed.body).toMatch(/^2 cards? due/);
+    expect(parsed.body).not.toMatch(/^3 cards? due/);
   });
 
   it("zh-Hant user: only zh-Hant rows counted; other locale rows excluded", async () => {
