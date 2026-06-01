@@ -393,15 +393,19 @@ test.describe("Discovery nudges (#1443)", () => {
   test("practiceScope nudge renders on practice page when firstVisitDone and flag is absent", async ({
     page,
   }) => {
-    // Seed with firstVisitOnboardingDismissed=true so the scope nudge shows.
-    // practiceScopeNudgeDismissed absent resolves to false.
+    // Seed the full #1482 show-precondition: firstVisitOnboardingDismissed=true
+    // AND practiceSessionsCount at/above the threshold (3), with scope empty and
+    // scopeEverOpened/practiceScopeNudgeDismissed absent (both resolve to false).
+    // The #1482 gate only shows the nudge once the user has completed enough
+    // sessions without ever opening the scope control.
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
         JSON.stringify({
           onboarding: {
             firstVisitOnboardingDismissed: true,
-            // practiceScopeNudgeDismissed deliberately absent
+            practiceSessionsCount: 3,
+            // practiceScopeNudgeDismissed and scopeEverOpened deliberately absent
           },
         }),
       );
