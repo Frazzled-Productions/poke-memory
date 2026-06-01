@@ -23,10 +23,10 @@ export default async function PrivacyPage() {
           This privacy notice is written in English only. It is the authoritative
           version. If you need help understanding it, please contact{" "}
           <a
-            href="mailto:fbrookhouse@gmail.com"
+            href="mailto:privacy@pokememory.com"
             className="underline underline-offset-2 hover:text-blue-700 dark:hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
           >
-            fbrookhouse@gmail.com
+            privacy@pokememory.com
           </a>
           .
         </p>
@@ -54,10 +54,10 @@ export default async function PrivacyPage() {
             Poké Memory is operated by Frazzled Productions. For questions
             about this notice or your personal data, contact{" "}
             <a
-              href="mailto:fbrookhouse@gmail.com"
+              href="mailto:privacy@pokememory.com"
               className={inlineLink}
             >
-              fbrookhouse@gmail.com
+              privacy@pokememory.com
             </a>
             .
           </p>
@@ -566,10 +566,10 @@ export default async function PrivacyPage() {
               signed in and require a complete copy of the data we hold for you
               in Supabase, please contact us at{" "}
               <a
-                href="mailto:fbrookhouse@gmail.com"
+                href="mailto:privacy@pokememory.com"
                 className={inlineLink}
               >
-                fbrookhouse@gmail.com
+                privacy@pokememory.com
               </a>{" "}
               and we will provide a full export.
             </li>
@@ -585,10 +585,10 @@ export default async function PrivacyPage() {
           <p className="mt-3">
             To exercise any of these rights, email{" "}
             <a
-              href="mailto:fbrookhouse@gmail.com"
+              href="mailto:privacy@pokememory.com"
               className={inlineLink}
             >
-              fbrookhouse@gmail.com
+              privacy@pokememory.com
             </a>{" "}
             from the email address associated with the GitHub or Google
             account you signed in with, so we can verify the request. We will
@@ -638,10 +638,10 @@ export default async function PrivacyPage() {
             above. If you believe a child under 13 has signed in, please
             contact us at{" "}
             <a
-              href="mailto:fbrookhouse@gmail.com"
+              href="mailto:privacy@pokememory.com"
               className={inlineLink}
             >
-              fbrookhouse@gmail.com
+              privacy@pokememory.com
             </a>{" "}
             and we will delete the data promptly.
           </p>

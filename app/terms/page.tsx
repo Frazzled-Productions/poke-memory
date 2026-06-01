@@ -22,10 +22,10 @@ export default async function TermsPage() {
           These Terms are written in English only. They are the authoritative
           version. If you need help understanding them, please contact{" "}
           <a
-            href="mailto:fbrookhouse@gmail.com"
+            href="mailto:privacy@pokememory.com"
             className="underline underline-offset-2 hover:text-blue-700 dark:hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
           >
-            fbrookhouse@gmail.com
+            privacy@pokememory.com
           </a>
           .
         </p>
@@ -264,10 +264,10 @@ export default async function TermsPage() {
           <p>
             For questions about these Terms, contact{" "}
             <a
-              href="mailto:fbrookhouse@gmail.com"
+              href="mailto:privacy@pokememory.com"
               className={inlineLink}
             >
-              fbrookhouse@gmail.com
+              privacy@pokememory.com
             </a>
             . For questions about how we handle your personal data, see our{" "}
             <a

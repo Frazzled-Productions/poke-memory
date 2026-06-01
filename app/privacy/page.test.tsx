@@ -117,7 +117,7 @@ describe("Privacy Notice page", () => {
       vi.mocked(resolveLocale).mockResolvedValueOnce("ja");
       await renderPage();
       // There are multiple email links on the privacy page; verify at least one is present.
-      const links = screen.getAllByRole("link", { name: /fbrookhouse@gmail\.com/ });
+      const links = screen.getAllByRole("link", { name: /privacy@pokememory.com/ });
       expect(links.length).toBeGreaterThan(0);
     });
   });
