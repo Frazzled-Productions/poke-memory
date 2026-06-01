@@ -35,7 +35,6 @@ import {
   validateOnboarding,
 } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
-import type { PracticeScope } from "@/lib/review/scope";
 
 // ---------------------------------------------------------------------------
 // Settings stub — same pattern as OnboardingHint.test.tsx

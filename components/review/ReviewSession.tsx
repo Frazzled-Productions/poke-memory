@@ -625,8 +625,8 @@ export function ReviewSession() {
   // false — acceptable given the short hydration window.
   const [firstVisitDone, setFirstVisitDone] = useState(true);
   // Scope-nudge gate signals (#1482). Read from settings on session load.
-  //  is true when the user has previously interacted with
-  // ScopeControl;  counts completed practice sessions
+  // `scopeEverOpened` is true when the user has previously interacted with
+  // ScopeControl; `practiceSessionsCount` counts completed practice sessions
   // (sessionStorage-guarded, incremented on first grade). Both default to the
   // suppressing value (true / large number) so the nudge never flashes before
   // settings are loaded. The session-load effect replaces them with real values.
@@ -738,6 +738,7 @@ export function ReviewSession() {
         scopeEverOpened: true,
       },
     });
+    setScopeEverOpened(true);
     // Recompute eligibility from the new scope against the current card
     // set + apply snooze reconciliation so hiddenSince / dueDate updates
     // are durable. Persist if any card mutated.
