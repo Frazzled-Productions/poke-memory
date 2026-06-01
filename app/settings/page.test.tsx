@@ -182,6 +182,10 @@ vi.mock("@/components/settings/IntensityPicker", () => ({
   IntensityPicker: () => <div data-testid="intensity-picker" />,
 }));
 
+vi.mock("@/components/onboarding/KnownPokemonQuiz", () => ({
+  KnownPokemonQuiz: () => <div data-testid="known-pokemon-quiz" />,
+}));
+
 vi.mock("@/components/settings/VoiceQualityHint", () => ({
   VoiceQualityHint: () => <div data-testid="voice-quality-hint" />,
 }));
@@ -1060,5 +1064,32 @@ describe("SettingsPage — theme picker locked state (#1440)", () => {
     } finally {
       mockSuperuserFlags.pretendAllMastered = false;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mark-what-I-know discovery nudge auto-dismiss (#1443)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — mark-what-I-know nudge (#1443)", () => {
+  it("opening the Quickstart quiz persists markWhatIKnowNudgeDismissed", async () => {
+    // defaultSettings() omits the flag → the nudge is shown (absent → false).
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/App Theme/i)).toBeInTheDocument();
+    });
+
+    // Engaging with the quiz opens it AND dismisses the discovery nudge.
+    await userEvent.click(await screen.findByRole("button", { name: "Open quiz" }));
+
+    expect(screen.getByTestId("known-pokemon-quiz")).toBeInTheDocument();
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onboarding: expect.objectContaining({
+          markWhatIKnowNudgeDismissed: true,
+        }),
+      }),
+    );
   });
 });

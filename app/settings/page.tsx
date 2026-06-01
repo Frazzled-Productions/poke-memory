@@ -503,6 +503,25 @@ export default function SettingsPage() {
   // sprite grid does not eat the Practice section.
   const [knownQuizOpen, setKnownQuizOpen] = useState<boolean>(false);
 
+  // Open the quiz and dismiss the discovery nudge (#1443): once the user has
+  // engaged with "Mark Pokémon I already know", the nudge has served its
+  // purpose, so persist its dismissal (the OnboardingHint re-syncs on the
+  // SETTINGS_SAVED_EVENT and hides itself).
+  function openKnownQuiz() {
+    // Expand the Practice category (forceOpen scrolls it into view) and open
+    // the quiz row, since the nudge now lives at the top of the page.
+    setTargetCategoryId("practice-heading");
+    setKnownQuizOpen(true);
+    const settings = loadSettings();
+    const onboarding = settings.onboarding ?? { ...DEFAULT_ONBOARDING };
+    if (onboarding.markWhatIKnowNudgeDismissed !== true) {
+      saveSettings({
+        ...settings,
+        onboarding: { ...onboarding, markWhatIKnowNudgeDismissed: true },
+      });
+    }
+  }
+
   // Settings search/filter query.
   const [searchQuery, setSearchQuery] = useState<string>("");
   // Normalised (trimmed, lower-cased) version used for matching.
@@ -828,6 +847,26 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* Discovery nudge (#1443): pointing users at the "Mark Pokémon I
+                already know" quiz. Rendered above the collapsible category list
+                so it is visible without expanding anything; its CTA expands the
+                Practice category, opens the quiz, and dismisses the nudge. Uses
+                its own flag so it reaches existing users (absent key → false via
+                the `=== true` coercion in validateOnboarding). Hidden while a
+                search filter is active to avoid cluttering results. */}
+            {!isFiltering && (
+              <div className="mb-3">
+                <OnboardingHint
+                  id="markWhatIKnowNudgeDismissed"
+                  title={t("settings.practice.markWhatIKnowNudge.title")}
+                  ctaLabel={t("settings.practice.markWhatIKnowNudge.cta")}
+                  ctaOnClick={openKnownQuiz}
+                >
+                  <p>{t("settings.practice.markWhatIKnowNudge.body")}</p>
+                </OnboardingHint>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
 
               {/* ── Appearance ─────────────────────────────────────────────── */}
@@ -1026,7 +1065,9 @@ export default function SettingsPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setKnownQuizOpen((open) => !open)}
+                        onClick={() =>
+                          knownQuizOpen ? setKnownQuizOpen(false) : openKnownQuiz()
+                        }
                         aria-expanded={knownQuizOpen}
                         aria-controls="known-quiz-panel"
                         className="min-h-[36px] shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"

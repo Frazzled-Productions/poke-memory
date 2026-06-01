@@ -182,7 +182,12 @@
       },
       "newPerDay": "1日の新規カード数",
       "reviewsPerDay": "1日のレビュー数",
-      "save": "保存"
+      "save": "保存",
+      "markWhatIKnowNudge": {
+        "title": "ヒント: すでに知っている Pokémon はキューをスキップできます",
+        "body": "下のクイックスタートクイズで、すでに知っている Pokémon をマークしてください。各 Pokémon は長い初回間隔でスケジューラーに登録され、新規カードキューをスキップできます。",
+        "cta": "クイックスタートクイズを開く"
+      }
     },
     "audio": {
       "cryCards": {
@@ -440,6 +445,10 @@
       "recentGrades": "最近の採点",
       "recentGradesAriaLabel": "{count} 件の最近の採点（新しい順）",
       "viewFullStats": "全記録を見る"
+    },
+    "practiceScopeNudge": {
+      "title": "ヒント: 世代・タイプ・グループで絞り込めます",
+      "body": "上の「スコープ」ボタンをタップして、特定の世代・タイプ・スターターや未完成の進化チェーンなどのグループに絞って練習できます。"
     }
   },
   "review": {

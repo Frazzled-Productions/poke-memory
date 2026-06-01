@@ -607,6 +607,8 @@ describe('themeIntensity setting (#411)', () => {
           cardTypesHintDismissed: true,
           guestStorageNoticeDismissed: false,
           journeyMasteryExplainerDismissed: false,
+          markWhatIKnowNudgeDismissed: false,
+          practiceScopeNudgeDismissed: false,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -620,6 +622,8 @@ describe('themeIntensity setting (#411)', () => {
         cardTypesHintDismissed: true,
         guestStorageNoticeDismissed: false,
         journeyMasteryExplainerDismissed: false,
+        markWhatIKnowNudgeDismissed: false,
+        practiceScopeNudgeDismissed: false,
       });
     });
 
@@ -659,6 +663,8 @@ describe('themeIntensity setting (#411)', () => {
         cardTypesHintDismissed: false,
         guestStorageNoticeDismissed: false,
         journeyMasteryExplainerDismissed: false,
+        markWhatIKnowNudgeDismissed: false,
+        practiceScopeNudgeDismissed: false,
       });
     });
   });

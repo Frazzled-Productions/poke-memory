@@ -609,6 +609,24 @@ export function ReviewSession() {
   // persisted setting is true. The session-load effect (~line 939) overwrites
   // this with the actual persisted value (default false for new users).
   const [mcCardOnboardingShown, setMcCardOnboardingShown] = useState(true);
+  // Whether the first-visit onboarding modal has been dismissed (#1103).
+  // Defaults true so a returning user (firstVisitOnboardingDismissed = true in
+  // storage) sees no blank gap while settings load. Brand-new users will briefly
+  // see the scope nudge until the session-load effect fires and sets this to
+  // false — acceptable given the short hydration window.
+  const [firstVisitDone, setFirstVisitDone] = useState(true);
+  // Scope nudge (#1443): one-shot hint explaining the practice scope filter,
+  // rendered just above whichever ScopeControl the active card type shows
+  // (name/evo, cry, reverse) so it surfaces regardless of the first card.
+  // Only shown after the first-visit onboarding modal is dismissed, so a
+  // brand-new session is not hit with two simultaneous hints.
+  // Session-count gate (show only after N sessions without opening scope)
+  // is deferred to #1482.
+  const scopeNudge = firstVisitDone ? (
+    <OnboardingHint id="practiceScopeNudgeDismissed" title={t("practiceScopeNudge.title")}>
+      <p>{t("practiceScopeNudge.body")}</p>
+    </OnboardingHint>
+  ) : null;
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -681,8 +699,13 @@ export function ReviewSession() {
     // Persist scope through user settings so it syncs cross-device (#333).
     // Read the latest settings before patching to avoid clobbering other
     // fields that may have been updated since this component mounted.
+    // Also dismiss the scope nudge — the user has found the feature.
     const current = loadSettings();
-    saveSettings({ ...current, practiceScope: next });
+    saveSettings({
+      ...current,
+      practiceScope: next,
+      onboarding: { ...current.onboarding, practiceScopeNudgeDismissed: true },
+    });
     // Recompute eligibility from the new scope against the current card
     // set + apply snooze reconciliation so hiddenSince / dueDate updates
     // are durable. Persist if any card mutated.
@@ -994,6 +1017,7 @@ export function ReviewSession() {
       setTimezone(settings.timezone ?? "UTC");
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
       setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
+      setFirstVisitDone(settings.onboarding?.firstVisitOnboardingDismissed === true);
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
@@ -2367,6 +2391,7 @@ export function ReviewSession() {
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
             {/* Cry card wraps ScopeControl in a max-width column for alignment. */}
             <div className="flex w-full max-w-xl flex-col gap-2">
+              {scopeNudge}
               <ScopeControl
                 scope={scope}
                 onChange={handleScopeChange}
@@ -2491,6 +2516,7 @@ export function ReviewSession() {
               <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
             )}
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+            {scopeNudge}
             <ScopeControl
               scope={scope}
               onChange={handleScopeChange}
@@ -2597,6 +2623,7 @@ export function ReviewSession() {
             <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
           )}
           <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+          {scopeNudge}
           <ScopeControl
             scope={scope}
             onChange={handleScopeChange}
