@@ -1118,9 +1118,10 @@ describe("SettingsPage — mark-what-I-know nudge (#1443)", () => {
     act(() => {
       vi.advanceTimersByTime(250);
     });
+    // block:"start" places the heading at/near the top of the viewport (#1486).
     expect(scrollIntoView).toHaveBeenCalledWith({
       behavior: "smooth",
-      block: "center",
+      block: "start",
     });
     vi.useRealTimers();
   });
