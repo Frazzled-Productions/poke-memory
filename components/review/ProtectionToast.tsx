@@ -2,6 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
+import {
+  cardPanel,
+  sectionLabel,
+  mutedText,
+} from "@/lib/utils/class-names";
 
 export type ProtectionToastKind = "earned" | "spent" | "earned-and-spent";
 
@@ -61,21 +66,17 @@ export function ProtectionToast({ kind, streakCount, onDismiss }: Props) {
         type="button"
         onClick={onDismiss}
         aria-label={t("tokenToastDismiss")}
-        className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-sky-300 bg-gradient-to-br from-sky-100 via-sky-50 to-indigo-50 px-4 py-3 text-left shadow-lg ring-1 ring-sky-200/60 transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-700 dark:from-sky-900/80 dark:via-sky-950/80 dark:to-indigo-950/80 dark:ring-sky-800/60"
+        className={`pointer-events-auto flex max-w-md items-start gap-3 text-left shadow-lg transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 ${cardPanel}`}
       >
         <span
           aria-hidden="true"
-          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-200 text-lg dark:bg-sky-700"
+          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-lg dark:bg-zinc-800"
         >
           🛡
         </span>
         <span className="flex flex-col gap-0.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
-            {heading}
-          </span>
-          <span className="text-sm text-zinc-700 dark:text-zinc-200">
-            {message}
-          </span>
+          <span className={sectionLabel}>{heading}</span>
+          <span className={mutedText}>{message}</span>
         </span>
       </button>
     </div>
