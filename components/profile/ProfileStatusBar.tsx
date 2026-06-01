@@ -31,6 +31,7 @@ import {
   TokenChip,
   MasteryChip,
 } from "@/components/profile/StatusChips";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -98,6 +99,10 @@ export function ProfileStatusBar() {
           masteryPercent={masteryPercent}
         />
         <TokenChip tokenBalance={tokenBalance} />
+        {/* Learning-language switcher — renders only when the languages Labs
+            flag is on (gated inside the component). Interactive pill, distinct
+            from the passive status chips. */}
+        <LanguageSwitcher />
       </div>
     </div>
   );

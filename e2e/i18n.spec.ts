@@ -149,29 +149,31 @@ test.describe("i18n — Languages Labs flag (#1260)", () => {
     await expect(page.getByText("Languages")).toBeVisible();
   });
 
-  test("enabling Languages flag reveals both locale selectors", async ({ page }) => {
+  test("enabling Languages flag reveals the app-language selector and the bar language pill", async ({
+    page,
+  }) => {
     await enableLanguagesFlag(page);
     await page.goto("/settings");
 
     // Expand Labs section.
     await page.getByRole("button", { name: /^labs$/i }).click();
 
-    // Both selectors should be visible because the flag is on.
+    // The app-language selector stays in Settings and offers all four locales.
     const appLocaleSelect = page.locator("#labs-app-locale-select");
-    const pokemonNameLocaleSelect = page.locator("#labs-pokemon-name-locale-select");
     await expect(appLocaleSelect).toBeVisible();
-    await expect(pokemonNameLocaleSelect).toBeVisible();
+    await expect(appLocaleSelect.locator('option[value="en"]')).toHaveCount(1);
+    await expect(appLocaleSelect.locator('option[value="ja"]')).toHaveCount(1);
+    await expect(appLocaleSelect.locator('option[value="zh-Hans"]')).toHaveCount(1);
+    await expect(appLocaleSelect.locator('option[value="zh-Hant"]')).toHaveCount(1);
 
-    // Both selectors must offer all four locales.
-    for (const select of [appLocaleSelect, pokemonNameLocaleSelect]) {
-      await expect(select.locator('option[value="en"]')).toHaveCount(1);
-      await expect(select.locator('option[value="ja"]')).toHaveCount(1);
-      await expect(select.locator('option[value="zh-Hans"]')).toHaveCount(1);
-      await expect(select.locator('option[value="zh-Hant"]')).toHaveCount(1);
-    }
+    // The Pokémon-name language was relocated out of Settings: it is now switched
+    // from the language pill in the status bar, visible on /settings.
+    await expect(
+      page.getByRole("button", { name: /Pokémon name language/ }),
+    ).toBeVisible();
   });
 
-  test("app language and Pokémon name language selectors are independent", async ({
+  test("app language (Settings) and Pokémon name language (bar pill) are independent", async ({
     page,
     context,
   }) => {
@@ -181,12 +183,16 @@ test.describe("i18n — Languages Labs flag (#1260)", () => {
     // Expand Labs section.
     await page.getByRole("button", { name: /^labs$/i }).click();
 
-    const appLocaleSelect = page.locator("#labs-app-locale-select");
-    const pokemonNameLocaleSelect = page.locator("#labs-pokemon-name-locale-select");
-    await expect(appLocaleSelect).toBeVisible();
-    await expect(pokemonNameLocaleSelect).toBeVisible();
+    // Switch the Pokémon name language to Simplified Chinese via the bar pill
+    // FIRST, while the chrome is still English (the pill's accessible name is
+    // localised, so interact before flipping the app language). Writes settings,
+    // NOT the locale cookie.
+    await page.getByRole("button", { name: /Pokémon name language/ }).click();
+    await page.getByRole("radio", { name: /简体中文/ }).click();
 
-    // Switch app language to Japanese — should write the cookie.
+    // Switch the app language to Japanese via the Settings selector — writes the cookie.
+    const appLocaleSelect = page.locator("#labs-app-locale-select");
+    await expect(appLocaleSelect).toBeVisible();
     await appLocaleSelect.selectOption("ja");
     await page.waitForFunction(
       () => document.cookie.includes("poke-memory:locale=ja"),
@@ -194,19 +200,16 @@ test.describe("i18n — Languages Labs flag (#1260)", () => {
       { timeout: 5_000 },
     );
 
-    // Switch Pokémon name language to Simplified Chinese — should write settings, NOT the cookie.
-    await pokemonNameLocaleSelect.selectOption("zh-Hans");
-
-    // Cookie should still be "ja" (only the app language select writes it).
+    // Cookie should be "ja" (only the app language select writes it).
     const cookies = await context.cookies();
     const localeCookie = cookies.find((c) => c.name === LOCALE_COOKIE);
     expect(localeCookie?.value).toBe("ja");
 
-    // The settings selector itself shows zh-Hans (controlled by localStorage).
-    await expect(pokemonNameLocaleSelect).toHaveValue("zh-Hans");
-
-    // Verify pokemonNameLocale was written to localStorage settings.
-    const settingsRaw = await page.evaluate((key) => localStorage.getItem(key), SETTINGS_KEY);
+    // Verify pokemonNameLocale was written to localStorage settings (independent).
+    const settingsRaw = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      SETTINGS_KEY,
+    );
     expect(settingsRaw).not.toBeNull();
     const settings = JSON.parse(settingsRaw!) as Record<string, unknown>;
     expect(settings.pokemonNameLocale).toBe("zh-Hans");

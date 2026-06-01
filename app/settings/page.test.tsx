@@ -879,46 +879,44 @@ describe("SettingsPage — i18n key resolution (#1369)", () => {
 // ---------------------------------------------------------------------------
 
 describe("SettingsPage — locale picker endonyms", () => {
-  it("shows each language in its own script in both locale pickers", async () => {
+  it("shows each language in its own script in the app-language picker", async () => {
+    // The Pokémon-name-language picker was relocated to the status-bar pill
+    // (#1484 Phase 2); only the app-language selector remains in Settings. The
+    // pill's endonyms are covered by LanguageSwitcher.test.tsx.
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
       pokemonNameLocale: "en",
-      labsFlags: { languages: true }, // enable the Languages labs flag to show the pickers
+      labsFlags: { languages: true }, // enable the Languages labs flag to show the picker
     });
 
     render(<SettingsPage />);
 
-    // Wait for the language pickers to appear.
+    // Wait for the language picker to appear.
     await waitFor(() => {
       expect(screen.getByLabelText(/app language/i)).toBeInTheDocument();
     });
 
     const appLocaleSelect = screen.getByLabelText(/app language/i);
-    const pokemonLocaleSelect = screen.getByLabelText(/pokémon name language/i);
+    const options = Array.from(appLocaleSelect.querySelectorAll("option"));
+    const texts = options.map((o) => o.textContent ?? "");
 
-    // Both pickers must show endonyms (native script), not English translations.
+    // The picker must show endonyms (native script), not English translations.
     // Non-English locales are marked "(preview)" — the endonym must still appear
     // as a substring of each option.
-    for (const select of [appLocaleSelect, pokemonLocaleSelect]) {
-      const options = Array.from(select.querySelectorAll("option"));
-      const texts = options.map((o) => o.textContent ?? "");
+    expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
+    expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
+    expect(texts.some((t) => t.startsWith("繁體中文"))).toBe(true);
 
-      // Endonym appears in each option (may be followed by " (preview)").
-      expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
-      expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
-      expect(texts.some((t) => t.startsWith("繁體中文"))).toBe(true);
+    // Non-English options must include the preview marker.
+    expect(texts.some((t) => t.includes("(preview)"))).toBe(true);
 
-      // Non-English options must include the preview marker.
-      expect(texts.some((t) => t.includes("(preview)"))).toBe(true);
+    // Must NOT contain English-translated labels.
+    expect(texts).not.toContain("Japanese");
+    expect(texts).not.toContain("Simplified Chinese");
+    expect(texts).not.toContain("Traditional Chinese");
 
-      // Must NOT contain English-translated labels.
-      expect(texts).not.toContain("Japanese");
-      expect(texts).not.toContain("Simplified Chinese");
-      expect(texts).not.toContain("Traditional Chinese");
-
-      // English option must have no preview marker.
-      expect(texts).toContain("English");
-    }
+    // English option must have no preview marker.
+    expect(texts).toContain("English");
   });
 });
 
