@@ -908,7 +908,7 @@
     "noResults": "没有符合筛选条件的宝可梦。"
   },
   "banner": {
-    "machineTranslated": "本应用的{language}翻译由机器自动生成，尚未经过完整审校。部分措辞可能有所偏差。发现错误？请发邮件至 fbrookhouse@gmail.com 告知我们。",
+    "machineTranslated": "本应用的{language}翻译由机器自动生成，尚未经过完整审校。部分措辞可能有所偏差。发现错误？请发邮件至 hello@pokememory.com 告知我们。",
     "dismiss": "关闭"
   },
   "types": {
