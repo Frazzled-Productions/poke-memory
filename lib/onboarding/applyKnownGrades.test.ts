@@ -73,8 +73,24 @@ describe("isEligibleForKnownQuiz", () => {
   });
 });
 
+// Alternate-form name cards use species ids >= 10000 (PokéAPI convention).
+// The ALT_FORM_ID_THRESHOLD constant from lib/eligibility mirrors this value.
+const ALT_FORM_ID = 10100; // Alolan Raichu
+
+function makeAltFormCard(state: ReviewState = initialReviewState(NOW)): NameReviewCard {
+  return {
+    ...makeNameCard(ALT_FORM_ID, state),
+    speciesId: 26, // Alolan Raichu's parent species (Raichu) — matches real seed shape
+    isDefaultForm: false,
+    formCategory: "regional",
+    formSlug: "alola",
+    displayName: "Alolan Raichu",
+    subjectKey: String(ALT_FORM_ID),
+  };
+}
+
 describe("eligibleCardsForKnownQuiz", () => {
-  it("returns only cards that have never been touched", () => {
+  it("returns only cards that have never been touched (no alternateFormsEnabled arg — defaults to true)", () => {
     const fresh = makeNameCard(1);
     const reviewed = makeNameCard(2, {
       ...initialReviewState(NOW),
@@ -88,6 +104,47 @@ describe("eligibleCardsForKnownQuiz", () => {
       learningStep: 0,
     });
     expect(eligibleCardsForKnownQuiz([fresh, reviewed, inStep]).map((c) => c.id)).toEqual([1]);
+  });
+
+  describe("alternateFormsEnabled gate (#1481)", () => {
+    it("excludes alternate-form cards when alternateFormsEnabled is false", () => {
+      const defaultForm = makeNameCard(1);
+      const altForm = makeAltFormCard();
+
+      const result = eligibleCardsForKnownQuiz([defaultForm, altForm], false);
+      expect(result.map((c) => c.id)).toEqual([1]);
+      // Alternate-form card must not appear
+      expect(result.find((c) => c.id === ALT_FORM_ID)).toBeUndefined();
+    });
+
+    it("includes alternate-form cards when alternateFormsEnabled is true", () => {
+      const defaultForm = makeNameCard(1);
+      const altForm = makeAltFormCard();
+
+      const result = eligibleCardsForKnownQuiz([defaultForm, altForm], true);
+      expect(result.map((c) => c.id)).toEqual([1, ALT_FORM_ID]);
+    });
+
+    it("defaults to including alternate forms when alternateFormsEnabled is omitted", () => {
+      // The default arg is true — callers that pre-date the parameter see no
+      // behavioural change (backwards-compatible default).
+      const altForm = makeAltFormCard();
+      const result = eligibleCardsForKnownQuiz([altForm]);
+      expect(result.map((c) => c.id)).toEqual([ALT_FORM_ID]);
+    });
+
+    it("still excludes already-reviewed alternate-form cards even when alternateFormsEnabled is true", () => {
+      // The FSRS-state gate and the alt-forms gate are independent; both must
+      // be satisfied for a card to appear.
+      const reviewedAltForm = makeAltFormCard({
+        ...initialReviewState(NOW),
+        lastReview: "2026-05-10",
+        firstSeen: "2026-05-10",
+        reps: 1,
+      });
+      const result = eligibleCardsForKnownQuiz([reviewedAltForm], true);
+      expect(result).toHaveLength(0);
+    });
   });
 });
 
