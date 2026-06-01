@@ -7,6 +7,51 @@ test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
 });
 
+test.describe("Mark Pokémon I already know — deferred scroll (#1483 / #1486)", () => {
+  // The quiz panel is collapsed by default and sits below many other settings
+  // rows. openKnownQuiz() calls scrollIntoView({ block: "start" }) after a
+  // 200ms timer to bring the heading + intro to the top of the viewport.
+  // This test asserts the heading lands near the TOP, not in the middle of
+  // the list (the block:"center" regression from #1486).
+  test("opening the quiz from a collapsed state scrolls the heading to near the top of the viewport", async ({
+    page,
+  }) => {
+    // Start at the settings page root — the Practice section is collapsed so
+    // the quiz heading is well below the viewport.
+    await page.goto("/settings");
+
+    // Expand the Practice section so the quiz row becomes visible.
+    await page.getByRole("button", { name: /^practice$/i }).click();
+
+    // Wait for the quiz row to appear (scroll hasn't fired yet).
+    const openBtn = page.getByRole("button", { name: /open quiz/i });
+    await expect(openBtn).toBeVisible();
+
+    // Click "Open quiz". This triggers openKnownQuiz() which sets a 200ms
+    // deferred scrollIntoView({ block: "start" }) on #known-quiz-heading.
+    await openBtn.click();
+
+    // Wait for the deferred scroll timer (200ms) plus a small buffer for
+    // smooth-scroll animation to settle (browsers may jump immediately
+    // when scroll distance is large or prefers-reduced-motion is set).
+    await page.waitForTimeout(600);
+
+    // Assert the quiz heading is near the top of the viewport. With
+    // block:"start" its bounding-box top should be close to 0. A lenient
+    // upper bound of 200px tolerates browser chrome (address bar on mobile)
+    // and any padding the page adds above sections.
+    const headingEl = page.locator("#known-quiz-heading");
+    await expect(headingEl).toBeVisible();
+    const box = await headingEl.boundingBox();
+    expect(box).not.toBeNull();
+    // Top should be positive (on-screen) and not more than 200px from the top
+    // — this rules out the block:"center" regression where the heading was
+    // centred and the user landed mid-list.
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y).toBeLessThan(200);
+  });
+});
+
 test.describe("Mark Pokémon I already know quiz (#1084)", () => {
   test("entry point renders in Practice section and opens the quiz", async ({
     page,
