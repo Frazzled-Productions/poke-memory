@@ -98,6 +98,23 @@ export type OnboardingFlags = {
    * but have never opened the scope control. `true` = user dismissed it.
    */
   practiceScopeNudgeDismissed: boolean;
+  /**
+   * Whether the user has ever opened the practice scope control (#1482).
+   * Set to `true` inside `handleScopeChange` the first time the user
+   * interacts with ScopeControl. Used to suppress the scope nudge
+   * permanently for users who already know about the feature.
+   * `false` (default) = user has never opened scope; absent in pre-#1482
+   * blobs resolves to `false` via `=== true` coercion.
+   */
+  scopeEverOpened: boolean;
+  /**
+   * Count of completed practice sessions (#1482). Incremented once per
+   * browser session (sessionStorage-guarded) on the first grade. Used to
+   * gate the scope nudge: shown only after N sessions. Default `0` —
+   * absent in pre-#1482 blobs resolves to `0` (below threshold) via
+   * integer coercion.
+   */
+  practiceSessionsCount: number;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -115,6 +132,12 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   markWhatIKnowNudgeDismissed: false,
   // Default false: absent in pre-#1443 blobs resolves to not-seen (nudge shows).
   practiceScopeNudgeDismissed: false,
+  // Default false: absent in pre-#1482 blobs resolves to false (user has not yet
+  // opened scope; nudge may still show subject to session-count gate).
+  scopeEverOpened: false,
+  // Default 0: absent in pre-#1482 blobs resolves to 0 (below threshold; nudge
+  // does not show until N sessions have been completed).
+  practiceSessionsCount: 0,
 };
 
 /**
@@ -671,6 +694,15 @@ export function validateOnboarding(value: unknown): OnboardingFlags {
     markWhatIKnowNudgeDismissed: v.markWhatIKnowNudgeDismissed === true,
     // === true coercion: absent key in pre-#1443 blobs resolves to false (nudge shows).
     practiceScopeNudgeDismissed: v.practiceScopeNudgeDismissed === true,
+    // === true coercion: absent key in pre-#1482 blobs resolves to false (never opened).
+    scopeEverOpened: v.scopeEverOpened === true,
+    // Integer coercion: absent key in pre-#1482 blobs resolves to 0 (below threshold).
+    practiceSessionsCount:
+      typeof v.practiceSessionsCount === 'number' &&
+      Number.isInteger(v.practiceSessionsCount) &&
+      v.practiceSessionsCount >= 0
+        ? v.practiceSessionsCount
+        : 0,
   };
 }
 

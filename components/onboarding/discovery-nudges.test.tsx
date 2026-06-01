@@ -210,6 +210,51 @@ describe("validateOnboarding — absent keys resolve to false (existing-user rea
     expect(result.markWhatIKnowNudgeDismissed).toBe(false);
     expect(result.practiceScopeNudgeDismissed).toBe(false);
   });
+
+  // New absent-key tests for #1482 gate signals.
+  it("absent scopeEverOpened coerces to false (#1482)", () => {
+    const result = validateOnboarding({
+      firstVisitOnboardingDismissed: true,
+      // scopeEverOpened deliberately absent
+    });
+    expect(result.scopeEverOpened).toBe(false);
+  });
+
+  it("absent practiceSessionsCount coerces to 0 (#1482)", () => {
+    const result = validateOnboarding({
+      firstVisitOnboardingDismissed: true,
+      // practiceSessionsCount deliberately absent
+    });
+    expect(result.practiceSessionsCount).toBe(0);
+  });
+
+  it("non-boolean scopeEverOpened coerces to false — === true guard (#1482)", () => {
+    const result = validateOnboarding({
+      scopeEverOpened: 1 as unknown as boolean,
+    });
+    expect(result.scopeEverOpened).toBe(false);
+  });
+
+  it("non-integer practiceSessionsCount coerces to 0 (#1482)", () => {
+    const result = validateOnboarding({
+      practiceSessionsCount: "5" as unknown as number,
+    });
+    expect(result.practiceSessionsCount).toBe(0);
+  });
+
+  it("valid practiceSessionsCount integer is preserved (#1482)", () => {
+    const result = validateOnboarding({
+      practiceSessionsCount: 7,
+    });
+    expect(result.practiceSessionsCount).toBe(7);
+  });
+
+  it("scopeEverOpened: true is preserved (#1482)", () => {
+    const result = validateOnboarding({
+      scopeEverOpened: true,
+    });
+    expect(result.scopeEverOpened).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

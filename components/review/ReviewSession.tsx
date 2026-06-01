@@ -95,6 +95,15 @@ import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 // Pull learning cards forward when due within this window (Anki default: 20 min).
 const LEARN_AHEAD_MS = 20 * 60_000;
 
+// Number of completed practice sessions required before the scope nudge shows (#1482).
+// Consistent with the appVisitCount threshold used by PwaInstallNudge.
+const SCOPE_NUDGE_SESSION_THRESHOLD = 3;
+
+// sessionStorage key guarding the per-session practice-count increment (#1482).
+// A new key (not reusing PwaInstallNudge's visit key) because this counts
+// sessions with at least one grade, not page visits.
+const SCOPE_NUDGE_SESSION_KEY = "poke-memory:practice-session-counted:v1";
+
 // Module-scoped seed lookup map. Built once at module load — the 1025-entry
 // Map would be wasteful to rebuild on every render of ReviewSession.
 const SEED_BY_ID = new Map(SEED_POKEMON.map((p) => [p.id, p]));
@@ -615,20 +624,15 @@ export function ReviewSession() {
   // see the scope nudge until the session-load effect fires and sets this to
   // false — acceptable given the short hydration window.
   const [firstVisitDone, setFirstVisitDone] = useState(true);
-  // Scope nudge (#1443): one-shot hint explaining the practice scope filter,
-  // rendered just above whichever ScopeControl the active card type shows
-  // (name/evo, cry, reverse) so it surfaces regardless of the first card.
-  // Only shown after the first-visit onboarding modal is dismissed, so a
-  // brand-new session is not hit with two simultaneous hints.
-  // Session-count gate (show only after N sessions without opening scope)
-  // is deferred to #1482.
-  const scopeNudge = firstVisitDone ? (
-    <div className="mb-3">
-      <OnboardingHint id="practiceScopeNudgeDismissed" title={t("practiceScopeNudge.title")}>
-        <p>{t("practiceScopeNudge.body")}</p>
-      </OnboardingHint>
-    </div>
-  ) : null;
+  // Scope-nudge gate signals (#1482). Read from settings on session load.
+  // `scopeEverOpened` is true when the user has previously interacted with
+  // ScopeControl; `practiceSessionsCount` counts completed practice sessions
+  // (sessionStorage-guarded, incremented on first grade). Both default to the
+  // suppressing value (true / large number) so the nudge never flashes before
+  // settings are loaded. The session-load effect replaces them with real values.
+  const [scopeEverOpened, setScopeEverOpened] = useState(true);
+  // Default to SESSION_THRESHOLD so nudge is hidden before hydration.
+  const [practiceSessionsCount, setPracticeSessionsCount] = useState(SCOPE_NUDGE_SESSION_THRESHOLD);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -696,18 +700,45 @@ export function ReviewSession() {
     />
   ) : null;
 
+  // Scope nudge (#1443, refined #1482): one-shot hint explaining the practice
+  // scope filter. Gate (in priority order):
+  //   1. practiceScope non-empty -> suppress (user already uses scope).
+  //   2. scopeEverOpened true    -> suppress (user has already opened scope).
+  //   3. sessions < threshold    -> suppress (new user, not yet engaged enough).
+  //   4. firstVisitDone false    -> suppress (first-visit modal still showing).
+  //   5. Otherwise: show.
+  // The OnboardingHint component handles the practiceScopeNudgeDismissed flag.
+  const scopeNudge = (
+    !isScopeEmpty(scope) ||
+    scopeEverOpened ||
+    practiceSessionsCount < SCOPE_NUDGE_SESSION_THRESHOLD ||
+    !firstVisitDone
+  ) ? null : (
+    <div className="mb-3">
+      <OnboardingHint id="practiceScopeNudgeDismissed" title={t("practiceScopeNudge.title")}>
+        <p>{t("practiceScopeNudge.body")}</p>
+      </OnboardingHint>
+    </div>
+  );
+
   function handleScopeChange(next: PracticeScope) {
     setScope(next);
     // Persist scope through user settings so it syncs cross-device (#333).
     // Read the latest settings before patching to avoid clobbering other
     // fields that may have been updated since this component mounted.
-    // Also dismiss the scope nudge — the user has found the feature.
+    // Also dismiss the scope nudge and mark scope as ever-opened — the user
+    // has found the feature, so the nudge must not show again (#1482).
     const current = loadSettings();
     saveSettings({
       ...current,
       practiceScope: next,
-      onboarding: { ...current.onboarding, practiceScopeNudgeDismissed: true },
+      onboarding: {
+        ...current.onboarding,
+        practiceScopeNudgeDismissed: true,
+        scopeEverOpened: true,
+      },
     });
+    setScopeEverOpened(true);
     // Recompute eligibility from the new scope against the current card
     // set + apply snooze reconciliation so hiddenSince / dueDate updates
     // are durable. Persist if any card mutated.
@@ -1020,6 +1051,9 @@ export function ReviewSession() {
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
       setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
       setFirstVisitDone(settings.onboarding?.firstVisitOnboardingDismissed === true);
+      // Scope-nudge gate signals (#1482). Read from persisted settings.
+      setScopeEverOpened(settings.onboarding?.scopeEverOpened === true);
+      setPracticeSessionsCount(settings.onboarding?.practiceSessionsCount ?? 0);
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
@@ -1925,6 +1959,23 @@ export function ReviewSession() {
     // Re-narrow cards inside the closure — TS doesn't carry the outer
     // null-check through a function that captures a useState variable.
     if (cards === null) return;
+
+    // Increment the practice-sessions counter once per browser session (#1482).
+    // Guarded by sessionStorage so a page reload or navigation within the same
+    // tab does not double-count. Skipped under superuser so QA sessions do not
+    // inflate the counter. The scope nudge gate checks practiceSessionsCount in
+    // component state; update both localStorage and local state so the nudge
+    // can appear within the same session once the threshold is crossed.
+    if (!superuserGuarded && !sessionStorage.getItem(SCOPE_NUDGE_SESSION_KEY)) {
+      sessionStorage.setItem(SCOPE_NUDGE_SESSION_KEY, "1");
+      const settingsForCount = loadSettings();
+      const newCount = (settingsForCount.onboarding?.practiceSessionsCount ?? 0) + 1;
+      saveSettings({
+        ...settingsForCount,
+        onboarding: { ...settingsForCount.onboarding, practiceSessionsCount: newCount },
+      });
+      setPracticeSessionsCount(newCount);
+    }
 
     // Warm up speechSynthesis on the first grade gesture. This satisfies the
     // browser's autoplay policy (Chromium / WebKit) so that speakNameOnReveal
