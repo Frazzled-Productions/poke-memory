@@ -6,6 +6,20 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.29] - 2026-06-01
+
+### Changed
+
+- Streak protection token toast now matches the app's design language: uses the shared card panel, neutral icon background, and standard typography tokens instead of bespoke blue accent colours.
+
+### Fixed
+
+- Push notification due-count now reflects only the cards in the user's active Pokémon name locale, preventing inflated counts for users who have practised in multiple locales.
+- Alternate-form Pokémon (Alolan, Galarian, Mega variants) no longer appear in the "Mark Pokémon I already know" quiz when alternate forms are disabled (the default). Previously, tapping those cards created FSRS states for cards that would never surface in practice.
+- The practice scope nudge now only appears after 3 completed sessions, and is suppressed permanently if the scope control was already used or a non-empty scope is already saved.
+- Settings: opening the "Mark Pokémon I already know" quiz now scrolls the heading and intro to the top of the screen instead of centring them (which hid the heading above the fold and left the user mid-list).
+- Fixed push notification over-reporting new cards when both forward-evolution and reverse-evolution are enabled. The notification now correctly shows the shared evolution bucket total rather than counting it twice.
+
 ## [0.10.28] - 2026-06-01
 
 ### Added
@@ -1531,7 +1545,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.28...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.29...HEAD
+[0.10.29]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.29
 [0.10.28]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.28
 [0.10.27]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.27
 [0.10.26]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.26
