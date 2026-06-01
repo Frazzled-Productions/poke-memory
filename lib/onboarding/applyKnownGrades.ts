@@ -43,7 +43,7 @@ export function isEligibleForKnownQuiz(card: ReviewableCard): boolean {
  * Eligibility is calculated upfront so the UI shows a stable grid while the
  * underlying session may be mutating in the background.
  *
- * When `alternateFormsEnabled` is `false` (the default), alternate-form cards
+ * When `alternateFormsEnabled` is `false` (the default user setting), alternate-form cards
  * (species id >= 10000, e.g. Alolan Vulpix, Galarian Ponyta) are excluded from
  * the result. This mirrors the same gate applied by `buildSessionQueues` via
  * `isCardEligible` (#1481) — cards hidden from the practice queue must also be
