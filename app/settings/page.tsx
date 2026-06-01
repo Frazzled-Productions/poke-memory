@@ -508,6 +508,9 @@ export default function SettingsPage() {
   // purpose, so persist its dismissal (the OnboardingHint re-syncs on the
   // SETTINGS_SAVED_EVENT and hides itself).
   function openKnownQuiz() {
+    // Expand the Practice category (forceOpen scrolls it into view) and open
+    // the quiz row, since the nudge now lives at the top of the page.
+    setTargetCategoryId("practice-heading");
     setKnownQuizOpen(true);
     const settings = loadSettings();
     const onboarding = settings.onboarding ?? { ...DEFAULT_ONBOARDING };
@@ -540,13 +543,6 @@ export default function SettingsPage() {
   if (targetCategoryId !== null) {
     visibleSectionIds.add(targetCategoryId);
   }
-
-  // While the "Mark what I know" discovery nudge is still active (#1443), the
-  // Practice category auto-expands so the nudge — and the quiz it points at —
-  // are actually visible rather than buried in a collapsed section. Clears
-  // once the user dismisses the nudge or opens the quiz (which dismisses it).
-  const markWhatIKnowActive =
-    settings !== null && settings.onboarding?.markWhatIKnowNudgeDismissed !== true;
 
   useEffect(() => {
     setActiveLocale(readActiveLocale());
@@ -851,6 +847,26 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* Discovery nudge (#1443): pointing users at the "Mark Pokémon I
+                already know" quiz. Rendered above the collapsible category list
+                so it is visible without expanding anything; its CTA expands the
+                Practice category, opens the quiz, and dismisses the nudge. Uses
+                its own flag so it reaches existing users (absent key → false via
+                the `=== true` coercion in validateOnboarding). Hidden while a
+                search filter is active to avoid cluttering results. */}
+            {!isFiltering && (
+              <div className="mb-3">
+                <OnboardingHint
+                  id="markWhatIKnowNudgeDismissed"
+                  title={t("settings.practice.markWhatIKnowNudge.title")}
+                  ctaLabel={t("settings.practice.markWhatIKnowNudge.cta")}
+                  ctaOnClick={openKnownQuiz}
+                >
+                  <p>{t("settings.practice.markWhatIKnowNudge.body")}</p>
+                </OnboardingHint>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
 
               {/* ── Appearance ─────────────────────────────────────────────── */}
@@ -936,9 +952,7 @@ export default function SettingsPage() {
               <CollapsibleSection
                 sectionId="practice-heading"
                 heading={t("settings.section.practice")}
-                forceOpen={
-                  targetCategoryId === "practice-heading" || markWhatIKnowActive
-                }
+                forceOpen={targetCategoryId === "practice-heading"}
                 transientOpen={isFiltering}
               >
                 {/* Scheduler knobs */}
@@ -1035,17 +1049,6 @@ export default function SettingsPage() {
                     grinding through the new-card queue. Each selection runs
                     the brand-new card through the simulated-Easy FSRS path —
                     real graduated state, not synthesised mastery. */}
-                {/* Contextual nudge pointing users at the quickstart quiz (#1443).
-                    Uses its own flag so it shows for existing users who have never
-                    opened the quiz (absent key resolves to false via === true coercion). */}
-                <OnboardingHint
-                  id="markWhatIKnowNudgeDismissed"
-                  title={t("settings.practice.markWhatIKnowNudge.title")}
-                  ctaLabel={t("settings.practice.markWhatIKnowNudge.cta")}
-                  ctaOnClick={openKnownQuiz}
-                >
-                  <p>{t("settings.practice.markWhatIKnowNudge.body")}</p>
-                </OnboardingHint>
                 <div id="known-quiz-heading" className={colStackLg}>
                   <p className={sectionLabel}>
                     {t("settings.practice.quickstart.heading")}
