@@ -43,6 +43,16 @@ vi.mock("@/lib/settings/persistence", () => ({
   saveSettings: vi.fn(),
 }));
 
+// apply.ts now also warms the streak + mastered-count caches; mock those
+// side-effect helpers so the test stays focused on the seed orchestration.
+vi.mock("@/lib/streak/persistence", () => ({
+  saveStreakData: vi.fn(),
+}));
+
+vi.mock("@/lib/profile/masteredCountCache", () => ({
+  writeMasteredCountForLocale: vi.fn(),
+}));
+
 vi.mock("@/lib/review/persistence", () => ({
   SESSION_CHANGED_EVENT: "poke-memory:session-changed",
 }));

@@ -890,6 +890,18 @@
       "iosBodySuffix": "即可安裝。"
     }
   },
+  "profileStatus": {
+    "barAriaLabel": "檔案狀態",
+    "streakChipAriaLabel": "{count, plural, other {連續 # 天}}",
+    "startStreakChipAriaLabel": "開始連續練習",
+    "tokenChipAriaLabel": "{count, plural, other {# 個保護代幣}}",
+    "masteryChipAriaLabel": "已掌握 {mastered} / {total} 種",
+    "masteryZeroAriaLabel": "已掌握 0 / {total} 種 - 開始複習來增加",
+    "streakLabel": "{count, number}天",
+    "startStreakLabel": "開始連續",
+    "tokenLabel": "{count, number}",
+    "masteryLabel": "{pct}%"
+  },
   "sync": {
     "status": {
       "lastSynced": "上次同步: {time}",

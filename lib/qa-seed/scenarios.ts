@@ -25,6 +25,8 @@
 
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { initialReviewState, nextReview } from "@/lib/srs/scheduler";
+import type { StreakProtection } from "@/lib/streak/tokens";
+import type { AppLocale } from "@/i18n/locales";
 import {
   SEED_POKEMON,
   SEED_EVOLUTION_CARDS,
@@ -93,6 +95,25 @@ export type SeedPayload = {
   session?: { cards: SeededCard[]; limits: DailyLimits };
   /** pokemonNameLocale to write into settings. null = do not touch settings. */
   pokemonNameLocale?: "en" | "ja" | "zh-Hans" | "zh-Hant" | null;
+  /**
+   * Consecutive review days, ending today, to seed into streak storage.
+   * Omit (or 0) to leave streak storage untouched. applySeedScenario expands
+   * this into the actual "YYYY-MM-DD" date array relative to today.
+   */
+  streakDays?: number;
+  /**
+   * Streak-protection state (token balance + history) to merge into settings.
+   * Omit to leave the user's existing protection state untouched.
+   */
+  streakProtection?: StreakProtection;
+  /**
+   * Per-locale mastered-species count to warm the `KEY_MASTERED_COUNT_BY_LOCALE`
+   * cache that `useProfileStatus` reads. Without this the ProfileStatusBar shows
+   * 0 mastered on non-Practice pages until ReviewSession (Practice) warms the
+   * cache. Must equal `filterMastered(...).length` for the seeded cards — the
+   * parity test in scenarios.test.ts enforces that.
+   */
+  masteredCountByLocale?: Partial<Record<AppLocale, number>>;
 };
 
 export type Scenario = {
@@ -308,6 +329,42 @@ const DEFAULT_LIMITS: DailyLimits = {
   cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
 };
 
+// ─── Believable streak + protection-token state ────────────────────────────────
+
+/**
+ * Consecutive review days seeded for the "populated" mastery scenarios. A run
+ * of 34 days alone earns one protection token (EARN_INTERVAL_DAYS = 30), and
+ * the months-old card history (firstSeen T0) makes a standing balance of 2
+ * faithful — so the seeded streak and token balance are internally consistent
+ * with real data, not a state real usage could not reach (#1421 faithfulness).
+ */
+const BELIEVABLE_STREAK_DAYS = 34;
+
+/**
+ * A faithful streak-protection state for an active, months-old learner: two
+ * tokens earned over the account's life, none spent, partway toward the next.
+ * Seeded alongside `BELIEVABLE_STREAK_DAYS` so the profile status bar renders
+ * a fully populated streak / token / mastery trio when a scenario is applied.
+ *
+ * Before this, applied scenarios left streak at 0 and tokens at 0, so the
+ * token chip was unreachable in-app for QA without hand-editing localStorage.
+ */
+function believableStreakProtection(): StreakProtection {
+  return {
+    balance: 2,
+    spendDates: [],
+    daysSinceLastEarn: 12,
+    // Today, so the once-per-day earn increment is already accounted for and
+    // mounting StreakBadge does not mutate the seeded counter.
+    lastEarnCheckDate: relativeDate(0),
+    protectionEvents: [
+      { date: relativeDate(-80), kind: "earned" },
+      { date: relativeDate(-44), kind: "earned" },
+    ],
+    lastAcknowledgedProtectionEventDate: null,
+  };
+}
+
 /**
  * Builds a name card from real SEED_POKEMON data.
  * name and spriteUrl come from the actual seed — no placeholders.
@@ -426,6 +483,10 @@ function buildFsrsLocaleMastery(): SeedPayload {
   return {
     session: { cards, limits: DEFAULT_LIMITS },
     pokemonNameLocale: "en",
+    streakDays: BELIEVABLE_STREAK_DAYS,
+    streakProtection: believableStreakProtection(),
+    // Both name + reverse mastered for each id → filterMastered counts them all.
+    masteredCountByLocale: { en: masteredIds.length },
   };
 }
 
@@ -561,6 +622,10 @@ function buildPastureProgression(): SeedPayload {
     // cards do not match the ja locale) — confirming per-locale FSRS storage
     // (#1259).
     pokemonNameLocale: "en",
+    streakDays: BELIEVABLE_STREAK_DAYS,
+    streakProtection: believableStreakProtection(),
+    // 40 species with both name + reverse mastered → filterMastered counts 40.
+    masteredCountByLocale: { en: masteredIds.length },
   };
 }
 
@@ -664,6 +729,11 @@ function buildMasteryGaps(): SeedPayload {
     // Set en so the mastered cards match the default locale; switching to
     // Japanese in Settings shows 0 mastered, confirming per-locale FSRS storage.
     pokemonNameLocale: "en",
+    streakDays: BELIEVABLE_STREAK_DAYS,
+    streakProtection: believableStreakProtection(),
+    // 15 fully mastered (name + reverse) pairs; the near-miss pairs have an
+    // un-mastered reverse so filterMastered excludes them.
+    masteredCountByLocale: { en: fullMasteredIds.length },
   };
 }
 

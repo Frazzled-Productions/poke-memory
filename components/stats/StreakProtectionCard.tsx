@@ -11,9 +11,7 @@ import {
   EARN_INTERVAL_DAYS,
   MAX_BALANCE,
   type StreakProtection,
-  type ProtectionEvent,
 } from "@/lib/streak";
-import { useStreakNavState } from "@/lib/streak/useStreakNavState";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, colStack, mutedText } from "@/lib/utils/class-names";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
@@ -39,10 +37,6 @@ type Props = {
  */
 export function StreakProtectionCard({ dateFormat, timezone }: Props) {
   const t = useTranslations("stats.streakProtection");
-  // Current streak + next-milestone signpost, surfaced here on Stats (and on
-  // the Practice StreakBadge) rather than in the nav bar (#1443 QA).
-  const tChip = useTranslations("nav.streakChip");
-  const { streak, daysToNextMilestone } = useStreakNavState();
   const [state, setState] = useState<StreakProtection | null>(null);
 
   useEffect(() => {
@@ -137,16 +131,9 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
             {balance >= MAX_BALANCE ? t("tokenMax") : ""}
           </span>
         </div>
-        {streak !== null && (
-          <p className={cn("text-xs", mutedText)} data-testid="streak-protection-streak">
-            {streak === 0
-              ? tChip("startStreakLabel")
-              : tChip("streakLabel", { count: streak })}
-            {daysToNextMilestone !== null
-              ? " " + tChip("milestoneLabel", { count: daysToNextMilestone })
-              : ""}
-          </p>
-        )}
+        {/* Streak line removed: ProfileStatusBar carries streak on all routes
+            (#1490 de-dup). The full token balance, earn rate, and event history
+            below are kept — those are Stats-specific context. */}
         <p className={cn("text-xs", mutedText)}>
           {t("earnDescription", { earnInterval: EARN_INTERVAL_DAYS, maxBalance: MAX_BALANCE })}
         </p>

@@ -11,6 +11,8 @@ import {
 } from "@/lib/review/session";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
+import { MAX_BALANCE, EARN_INTERVAL_DAYS } from "@/lib/streak/tokens";
+import { filterMastered } from "@/lib/pasture/arrivals";
 
 // ---------------------------------------------------------------------------
 // Scenario registry sanity checks
@@ -614,4 +616,64 @@ describe("Practice-load smoke: hydrateSession + buildSessionQueues do not throw 
       ).toBe(ids.length);
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// Streak + protection-token seeding (forcing function)
+//
+// The populated mastery scenarios must seed a coherent streak AND a token
+// balance so the profile status bar (streak / token / mastery) is reachable
+// in-app for QA. Before this, applied scenarios left streak 0 / tokens 0 and
+// the token chip could not be exercised without hand-editing localStorage.
+// ---------------------------------------------------------------------------
+
+describe("scenario streak + protection-token seeding", () => {
+  const populatedSlugs = [
+    "fsrs-locale-mastery",
+    "pasture-progression",
+    "mastery-gaps",
+  ];
+
+  for (const slug of populatedSlugs) {
+    it(`${slug}: seeds a streak long enough to have earned a token`, () => {
+      const payload = SCENARIO_BY_SLUG.get(slug)!.build();
+      // A run of at least EARN_INTERVAL_DAYS alone justifies >= 1 earned token,
+      // keeping the seeded balance faithful (#1421).
+      expect(payload.streakDays ?? 0).toBeGreaterThanOrEqual(EARN_INTERVAL_DAYS);
+    });
+
+    it(`${slug}: seeds a non-zero, in-range protection balance`, () => {
+      const payload = SCENARIO_BY_SLUG.get(slug)!.build();
+      const balance = payload.streakProtection?.balance ?? 0;
+      expect(balance).toBeGreaterThanOrEqual(1);
+      expect(balance).toBeLessThanOrEqual(MAX_BALANCE);
+    });
+  }
+
+  it("optimiser-stress: does not seed streak or tokens (bare optimiser tool)", () => {
+    const payload = SCENARIO_BY_SLUG.get("optimiser-stress")!.build();
+    expect(payload.streakDays ?? 0).toBe(0);
+    expect(payload.streakProtection).toBeUndefined();
+  });
+
+  // The declared mastered count (used to warm the ProfileStatusBar cache on
+  // apply) MUST equal what filterMastered actually computes for the seeded
+  // cards — otherwise the bar would show a count that disagrees with the
+  // Pasture/Stats. Parity forcing function (mirrors the #1489 contract test).
+  for (const slug of populatedSlugs) {
+    it(`${slug}: declared masteredCountByLocale.en matches filterMastered`, () => {
+      const payload = SCENARIO_BY_SLUG.get(slug)!.build();
+      const seededCards = (payload.session?.cards ?? []) as unknown as ReviewableCard[];
+      const { cards: hydrated } = hydrateSession(
+        seededCards,
+        SEED_POKEMON,
+        SEED_EVOLUTION_CARDS,
+        new Date(),
+        { reverseEnabled: true, nameEnabled: true, evolutionEnabled: true },
+      );
+      const actual = filterMastered(hydrated, false, MASTERY_REPETITIONS, "en").length;
+      expect(payload.masteredCountByLocale?.en).toBe(actual);
+      expect(actual).toBeGreaterThan(0);
+    });
+  }
 });

@@ -122,6 +122,7 @@ async function writeSeedToPage(page, seed) {
       session,
       gradeLog,
       streakDates,
+      masteredCountByLocale,
       keys,
       pikachuStepStartedAt,
     } = payload;
@@ -136,6 +137,13 @@ async function writeSeedToPage(page, seed) {
 
     // Streak dates (sorted ISO strings).
     localStorage.setItem(keys.KEY_STREAK, JSON.stringify(streakDates));
+
+    // Mastered-count cache so the ProfileStatusBar shows mastery on non-Practice
+    // surfaces (which never run ReviewSession to warm it).
+    localStorage.setItem(
+      keys.KEY_MASTERED_COUNT_BY_LOCALE,
+      JSON.stringify(masteredCountByLocale),
+    );
 
     // Has-mastered shortcut so the Pasture tab is visible in the nav.
     localStorage.setItem(keys.KEY_HAS_MASTERED, "true");
@@ -230,6 +238,7 @@ async function writeSeedToPage(page, seed) {
     session: seed.session,
     gradeLog: seed.gradeLog,
     streakDates: seed.streakDates,
+    masteredCountByLocale: seed.masteredCountByLocale,
     keys: seed.keys,
     // Compute the live timestamp in Node context (before passing to the page)
     // so the page's evaluate receives a plain number and does not call Date.now()

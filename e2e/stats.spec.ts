@@ -521,19 +521,19 @@ test.describe("Stats page — streak protection card (#1227)", () => {
     await expect(
       page.getByTestId("streak-protection-card").getByLabel("0 protection tokens"),
     ).toBeVisible();
-    // The relocated streak line (#1443) shows the start-your-streak prompt for a
-    // guest with no live streak, and no milestone countdown.
-    const streakLine = page.getByTestId("streak-protection-streak");
-    await expect(streakLine).toBeVisible();
-    await expect(streakLine).toContainText(/Start your streak/i);
-    await expect(streakLine).not.toContainText(/to your next milestone/i);
+    // The streak line was de-duped out of this card (#1490): the streak now
+    // lives in the ProfileStatusBar above, so the card no longer carries it.
+    await expect(
+      page.getByTestId("streak-protection-streak"),
+    ).toHaveCount(0);
   });
 
-  test("shows the current streak and milestone countdown for a live streak", async ({
+  test("the profile status bar carries the live streak on Stats (de-duped from the card)", async ({
     page,
   }) => {
     // Seed a single review for today (UTC, the fresh-guest default timezone) so
-    // the streak is 1 and a next-milestone countdown is shown (#1443).
+    // the streak is 1. Since #1490 the streak is shown in the ProfileStatusBar,
+    // not in the protection card; the milestone countdown is Practice-only.
     await page.addInitScript(() => {
       const today = new Date().toISOString().slice(0, 10);
       localStorage.setItem("poke-memory:streak:v1", JSON.stringify([today]));
@@ -549,9 +549,11 @@ test.describe("Stats page — streak protection card (#1227)", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Streak protection" }),
     ).toBeVisible({ timeout: 15_000 });
-    const streakLine = page.getByTestId("streak-protection-streak");
-    await expect(streakLine).toContainText(/1-day streak\./i);
-    await expect(streakLine).toContainText(/to your next milestone\./i);
+    // The bar (visible on non-Practice routes) shows the terse streak "1d".
+    const bar = page.getByRole("region", { name: /profile status/i });
+    await expect(bar.getByText("1d")).toBeVisible();
+    // The card no longer carries a streak line.
+    await expect(page.getByTestId("streak-protection-streak")).toHaveCount(0);
   });
 
   test("reflects a seeded non-zero balance and shows the spend history line", async ({

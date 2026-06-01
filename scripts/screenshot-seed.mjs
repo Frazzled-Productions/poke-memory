@@ -73,6 +73,13 @@ export const KEY_HAS_MASTERED   = "poke-memory:has-mastered:v2";
 export const KEY_CLIENT_SALT    = "poke-memory:client-salt:v1";
 export const KEY_SUPERUSER      = "poke-memory:superuser";
 export const KEY_SUPERUSER_FLAGS = "poke-memory:superuser:flags:v1";
+export const KEY_MASTERED_COUNT_BY_LOCALE = "poke-memory:mastered-count-by-locale:v1";
+
+// Number of mastered species the seed produces (MASTERED_IDS.length in
+// buildSessionCards). Warms the mastered-count cache so the ProfileStatusBar
+// shows correct mastery on non-Practice surfaces, which load without
+// ReviewSession ever running to warm the cache.
+export const SCREENSHOT_MASTERED_COUNT = 30;
 
 // Reverse-card ID offset -- must match lib/pokemon/seed.ts REVERSE_ID_OFFSET.
 const REVERSE_ID_OFFSET = 2_000_000;
@@ -425,6 +432,14 @@ export function buildScreenshotSeed() {
     },
     gradeLog: buildGradeLog(),
     streakDates: buildStreakDates(),
+    // Per-locale mastered-count cache (en only; other locales 0). Warms the
+    // ProfileStatusBar mastery on non-Practice surfaces.
+    masteredCountByLocale: {
+      en: SCREENSHOT_MASTERED_COUNT,
+      ja: 0,
+      "zh-Hans": 0,
+      "zh-Hant": 0,
+    },
     // Storage keys injected by the addInitScript.
     keys: {
       KEY_REVIEW_SESSION,
@@ -435,6 +450,7 @@ export function buildScreenshotSeed() {
       KEY_CLIENT_SALT,
       KEY_SUPERUSER,
       KEY_SUPERUSER_FLAGS,
+      KEY_MASTERED_COUNT_BY_LOCALE,
     },
   };
 }

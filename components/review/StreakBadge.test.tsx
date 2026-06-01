@@ -125,8 +125,8 @@ describe("StreakBadge — no toast states", () => {
 
     renderWithIntl(<StreakBadge />);
 
-    // The streak badge itself is present.
-    expect(screen.getByText("Start your streak!")).toBeInTheDocument();
+    // The streak chip itself is present (start-streak prompt at streak 0).
+    expect(screen.getByText(/start streak/i)).toBeInTheDocument();
     // No protection toast.
     expect(screen.queryByRole("status", { name: /dismiss token/i })).toBeNull();
   });
@@ -414,13 +414,15 @@ describe("StreakBadge — locale: spend toast copy", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Token-balance pip + next-milestone signpost (#1443 QA — surfaced here on
-// Practice rather than in the nav bar). IN and OUT of each state.
+// Mobile status chips + milestone signpost. Since Phase 1 the StreakBadge row
+// carries the shared streak/token/mastery chips (mobile-only; the bar carries
+// them on md+). The old standalone "N protection tokens." pip is gone, replaced
+// by the shared TokenChip. The milestone countdown is kept. IN and OUT covered.
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — token pip and milestone signpost", () => {
-  it("shows the token pip and milestone signpost when the user has tokens and a live streak", () => {
-    // 2 tokens, a 3-day consecutive run ending today → balance pip + countdown.
+describe("StreakBadge — mobile status chips + milestone signpost", () => {
+  it("shows the status chips and the milestone signpost on a live streak", () => {
+    // 3-day consecutive run ending today → milestone countdown visible.
     seedProtection({
       balance: 2,
       streakDates: ["2026-05-29", "2026-05-30", FIXED_TODAY],
@@ -428,50 +430,58 @@ describe("StreakBadge — token pip and milestone signpost", () => {
 
     renderWithIntl(<StreakBadge />);
 
-    // Token-balance pip (nav.streakChip.tokenLabel, count 2).
-    expect(screen.getByText(/2 protection tokens\./i)).toBeInTheDocument();
-    // Next-milestone signpost (nav.streakChip.milestoneLabel).
+    // The shared TokenChip is present (terse "2", full text in the aria-label).
+    expect(screen.getByLabelText(/2 protection tokens/i)).toBeInTheDocument();
+    // The old standalone "2 protection tokens." pip is gone.
+    expect(screen.queryByText(/2 protection tokens\./i)).toBeNull();
+    // Next-milestone signpost (nav.streakChip.milestoneLabel) remains.
     expect(
       screen.getByText(/to your next milestone\./i),
     ).toBeInTheDocument();
   });
 
-  it("hides the token pip at zero balance and the signpost at streak zero", () => {
-    // No tokens, no streak dates → tokenBalance 0, streak 0.
+  it("hides the signpost at streak zero (no milestone countdown without a streak)", () => {
+    // No streak dates → streak 0.
     seedProtection({ balance: 0 });
 
     renderWithIntl(<StreakBadge />);
 
-    expect(screen.queryByText(/protection token/i)).toBeNull();
     expect(screen.queryByText(/to your next milestone/i)).toBeNull();
   });
 
-  // Locale coverage for the inline pip + signpost copy (nav.streakChip.*).
-  function seedPipAndSignpost() {
+  // Token pip must be absent in all locales (de-duped #1490).
+  // Locale coverage for the milestone signpost copy (nav.streakChip.*).
+  function seedSignpost() {
     seedProtection({
       balance: 2,
       streakDates: ["2026-05-29", "2026-05-30", FIXED_TODAY],
     });
   }
 
-  it("ja: renders the token pip and milestone signpost in Japanese", () => {
-    seedPipAndSignpost();
+  it("ja: renders the milestone signpost in Japanese (no token pip)", () => {
+    seedSignpost();
     renderJa(<StreakBadge />);
-    expect(screen.getByText(/保護トークン2個。/)).toBeInTheDocument();
+    // Token pip must be absent.
+    expect(screen.queryByText(/保護トークン2個。/)).toBeNull();
+    // Milestone signpost remains.
     expect(screen.getByText(/次の目標まであと/)).toBeInTheDocument();
   });
 
-  it("zh-Hans: renders the token pip and milestone signpost in Simplified Chinese", () => {
-    seedPipAndSignpost();
+  it("zh-Hans: renders the milestone signpost in Simplified Chinese (no token pip)", () => {
+    seedSignpost();
     renderZhHans(<StreakBadge />);
-    expect(screen.getByText(/2个保护令牌。/)).toBeInTheDocument();
+    // Token pip must be absent.
+    expect(screen.queryByText(/2个保护令牌。/)).toBeNull();
+    // Milestone signpost remains.
     expect(screen.getByText(/距下一个里程碑还有/)).toBeInTheDocument();
   });
 
-  it("zh-Hant: renders the token pip and milestone signpost in Traditional Chinese", () => {
-    seedPipAndSignpost();
+  it("zh-Hant: renders the milestone signpost in Traditional Chinese (no token pip)", () => {
+    seedSignpost();
     renderZhHant(<StreakBadge />);
-    expect(screen.getByText(/2個保護代幣。/)).toBeInTheDocument();
+    // Token pip must be absent.
+    expect(screen.queryByText(/2個保護代幣。/)).toBeNull();
+    // Milestone signpost remains.
     expect(screen.getByText(/距下一個里程碑還有/)).toBeInTheDocument();
   });
 });

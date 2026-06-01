@@ -18,6 +18,12 @@ import {
   SETTINGS_SAVED_EVENT,
 } from "@/lib/settings/persistence";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { useProfileStatus } from "@/lib/profile/useProfileStatus";
+import {
+  StreakChip,
+  TokenChip,
+  MasteryChip,
+} from "@/components/profile/StatusChips";
 import { MilestoneCelebration } from "@/components/streak/MilestoneCelebration";
 import {
   ProtectionToast,
@@ -25,12 +31,19 @@ import {
 } from "@/components/review/ProtectionToast";
 
 export function StreakBadge() {
-  const t = useTranslations("review");
-  // Token balance + next-milestone signpost, surfaced here on the Practice
-  // screen (and on Stats) rather than in the nav bar (#1443 QA). Reuses the
-  // shared read-only hook and the `nav.streakChip.*` copy.
+  // Milestone signpost (days to next milestone) — surfaced here on Practice.
+  // Uses the shared `nav.streakChip.*` copy.
   const tChip = useTranslations("nav.streakChip");
-  const { tokenBalance, daysToNextMilestone } = useStreakNavState();
+  // Group label for the mobile status-chip cluster.
+  const tProfile = useTranslations("profileStatus");
+  const { daysToNextMilestone } = useStreakNavState();
+  // Streak / token / mastery chips, shown ONLY on mobile (md:hidden). On mobile
+  // Practice the ProfileStatusBar band is hidden (no room on the tight one-
+  // viewport layout), so the status chips surface inline here instead. On md+
+  // the band carries them, so this cluster is hidden — no duplication. Same
+  // shared StatusChips as the band, so the rendering can never diverge.
+  const { tokenBalance, masteryCount, totalSpecies, masteryPercent } =
+    useProfileStatus();
   const [streak, setStreak] = useState<number | null>(null);
   const [pendingMilestone, setPendingMilestone] = useState<number | null>(null);
   const [pendingToken, setPendingToken] = useState<ProtectionToastKind | null>(
@@ -162,17 +175,26 @@ export function StreakBadge() {
 
   return (
     <>
-      <div className="mb-1 flex items-center justify-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-          {streak === 0
-            ? t("startStreak")
-            : t("streakDays", { count: streak })}
-        </span>
-        {tokenBalance !== null && tokenBalance >= 1 && (
-          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            {tChip("tokenLabel", { count: tokenBalance })}
-          </span>
-        )}
+      {/* Mobile-only status chips (streak · mastery · token). The band carries
+          these on md+, so this cluster is md:hidden there to avoid duplication.
+          Compact labels keep all three on one line at 402px. Guarded on
+          non-null so they don't flash before useProfileStatus settles. */}
+      <div
+        role="group"
+        aria-label={tProfile("barAriaLabel")}
+        className="mb-1 flex items-center justify-center gap-2 md:hidden"
+      >
+        <StreakChip streak={streak} />
+        {masteryCount !== null &&
+          totalSpecies !== null &&
+          masteryPercent !== null && (
+            <MasteryChip
+              masteryCount={masteryCount}
+              totalSpecies={totalSpecies}
+              masteryPercent={masteryPercent}
+            />
+          )}
+        {tokenBalance !== null && <TokenChip tokenBalance={tokenBalance} />}
       </div>
       {daysToNextMilestone !== null && (
         <p className="mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400 sm:mb-4">
