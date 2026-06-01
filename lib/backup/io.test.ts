@@ -80,6 +80,8 @@ const VALID_SETTINGS: UserSettings = {
     journeyMasteryExplainerDismissed: false,
     markWhatIKnowNudgeDismissed: false,
     practiceScopeNudgeDismissed: false,
+    scopeEverOpened: false,
+    practiceSessionsCount: 0,
   },
   appVisitCount: 0,
   ttsVoice: null,

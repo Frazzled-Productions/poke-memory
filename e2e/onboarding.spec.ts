@@ -462,4 +462,108 @@ test.describe("Discovery nudges (#1443)", () => {
       page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
     ).toHaveCount(0);
   });
+
+  // #1482 — session-count and scope-opened gate tests.
+
+  test("practiceScope nudge is absent when practiceScope is non-empty (scope already in use)", async ({
+    page,
+  }) => {
+    // Seed: firstVisit done, plenty of sessions, never opened scope control
+    // explicitly (scopeEverOpened absent), BUT practiceScope is non-empty.
+    // The first gate (scope non-empty) must suppress the nudge.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          practiceScope: { gens: [1], types: [], presets: [], formCategories: { mode: "all" }, games: [] },
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceScopeNudgeDismissed: false,
+            practiceSessionsCount: 5,
+            // scopeEverOpened deliberately absent (resolves to false)
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
+    ).toHaveCount(0, { timeout: 20_000 });
+  });
+
+  test("practiceScope nudge is absent when scopeEverOpened is true", async ({
+    page,
+  }) => {
+    // Seed: firstVisit done, plenty of sessions, practiceScope empty, but
+    // scopeEverOpened is true — the user has already interacted with scope.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceScopeNudgeDismissed: false,
+            practiceSessionsCount: 5,
+            scopeEverOpened: true,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
+    ).toHaveCount(0, { timeout: 20_000 });
+  });
+
+  test("practiceScope nudge is absent when sessions < threshold (new user)", async ({
+    page,
+  }) => {
+    // Seed: firstVisit done, scope empty, scopeEverOpened absent (false),
+    // but practiceSessionsCount is 1 (below threshold of 3).
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceScopeNudgeDismissed: false,
+            practiceSessionsCount: 1,
+            // scopeEverOpened deliberately absent (resolves to false)
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /filter by generation/i }),
+    ).toHaveCount(0, { timeout: 20_000 });
+  });
+
+  test("practiceScope nudge shown when sessions >= threshold, scope empty, and never opened", async ({
+    page,
+  }) => {
+    // Seed: all suppress conditions cleared — firstVisit done, scope empty,
+    // scopeEverOpened absent (false), practiceSessionsCount >= 3.
+    // The nudge must show.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceScopeNudgeDismissed: false,
+            practiceSessionsCount: 3,
+            // scopeEverOpened deliberately absent (resolves to false)
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    const nudge = page.locator(`[role="note"]`, { hasText: /filter by generation/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+  });
 });
