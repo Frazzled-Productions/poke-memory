@@ -403,7 +403,7 @@ function rowIsEligible(
  * The result is floor'd at 0 so a user who has already hit their daily cap
  * contributes 0 to the estimate rather than a negative number.
  *
- * Evolution bucket: `bucketForCardType` in `lib/review/session.ts` maps
+ * Evolution bucket: `limitBucket` in `lib/review/session.ts` maps
  * `"reverse-evolution"` -> `"evolution"`, so forward-evolution and
  * reverse-evolution new cards share ONE `maxNewEvolutionPerDay` cap in the
  * real session. The estimate mirrors this: `maxNewEvolutionPerDay` is added
