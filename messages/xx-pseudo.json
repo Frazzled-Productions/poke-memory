@@ -318,6 +318,10 @@
         "label": "[Force next streak milestone]",
         "description": "[Fires the smallest un-seen streak celebration on the next visit to Practice, regardless of the real streak. Self-clears after one fire. Locking superuser overwrites local progress with cloud state for signed-in users.]"
       },
+      "forceTokenToast": {
+        "label": "[Force token earned toast]",
+        "description": "[Fires the streak-protection token-earned helper toast on the next visit to Practice, regardless of real token state. Self-clears after one fire.]"
+      },
       "forceCardsGraduated": {
         "label": "[Force cards graduated]",
         "description": "[Treat all cards as graduated. Use to test typed entry without grinding learning steps.]"
@@ -448,7 +452,7 @@
     },
     "practiceScopeNudge": {
       "title": "[Tip: filter by generation, type, or group]",
-      "body": "[Tap the Scope button above to focus practice on a generation, type, or a group like Starters or Incomplete chains.]"
+      "body": "[Use the Scope control below to focus practice on a generation, type, or a group like Starters or Incomplete chains.]"
     }
   },
   "review": {

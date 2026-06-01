@@ -19,6 +19,7 @@ export const FLAGS_KEY = KEY_SUPERUSER_FLAGS;
 export type SuperuserFlagKey =
   | "pretendAllMastered"
   | "forceNextStreakMilestone"
+  | "forceTokenToast"
   | "forceCardsGraduated"
   | "qaSeedMode";
 
@@ -29,6 +30,11 @@ export type SuperuserFlags = {
   // Self-clears after the celebration is dismissed so QA gets a single
   // forced fire per toggle. See #419.
   forceNextStreakMilestone: boolean;
+  // When true, the next render of StreakBadge fires the streak-protection
+  // "token earned" toast regardless of the actual token state, so QA can
+  // verify the earn helper message without grinding a 30-day streak.
+  // Self-clears after the toast is dismissed (one forced fire per toggle).
+  forceTokenToast: boolean;
   // When true, all cards are treated as graduated (learning phase bypassed).
   // isInLearningPhase returns false for every card, so typed-entry mode kicks
   // in immediately for name cards. Use to QA the typed-entry surface without
@@ -43,6 +49,7 @@ export type SuperuserFlags = {
 export const DEFAULT_FLAGS: SuperuserFlags = {
   pretendAllMastered: false,
   forceNextStreakMilestone: false,
+  forceTokenToast: false,
   forceCardsGraduated: false,
   qaSeedMode: false,
 };
@@ -69,6 +76,7 @@ export function loadFlags(): SuperuserFlags {
       return {
         pretendAllMastered: parsed?.pretendAllMastered === true,
         forceNextStreakMilestone: parsed?.forceNextStreakMilestone === true,
+        forceTokenToast: parsed?.forceTokenToast === true,
         forceCardsGraduated: parsed?.forceCardsGraduated === true,
         qaSeedMode: parsed?.qaSeedMode === true,
       };

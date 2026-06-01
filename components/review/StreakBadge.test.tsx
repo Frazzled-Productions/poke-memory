@@ -34,7 +34,7 @@ import { EARN_INTERVAL_DAYS, MAX_BALANCE, DEFAULT_STREAK_PROTECTION } from "@/li
 
 // Stub out SuperuserContext so the component renders outside the provider.
 const mockUseSuperuser = vi.fn(() => ({
-  flags: { forceNextStreakMilestone: false },
+  flags: { forceNextStreakMilestone: false, forceTokenToast: false },
   setFlag: vi.fn(),
 }));
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
@@ -410,5 +410,98 @@ describe("StreakBadge — locale: spend toast copy", () => {
     seedSpend();
     renderZhHant(<StreakBadge />);
     expect(screen.getByText(/已使用保護令牌/)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token-balance pip + next-milestone signpost (#1443 QA — surfaced here on
+// Practice rather than in the nav bar). IN and OUT of each state.
+// ---------------------------------------------------------------------------
+
+describe("StreakBadge — token pip and milestone signpost", () => {
+  it("shows the token pip and milestone signpost when the user has tokens and a live streak", () => {
+    // 2 tokens, a 3-day consecutive run ending today → balance pip + countdown.
+    seedProtection({
+      balance: 2,
+      streakDates: ["2026-05-29", "2026-05-30", FIXED_TODAY],
+    });
+
+    renderWithIntl(<StreakBadge />);
+
+    // Token-balance pip (nav.streakChip.tokenLabel, count 2).
+    expect(screen.getByText(/2 protection tokens\./i)).toBeInTheDocument();
+    // Next-milestone signpost (nav.streakChip.milestoneLabel).
+    expect(
+      screen.getByText(/to your next milestone\./i),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the token pip at zero balance and the signpost at streak zero", () => {
+    // No tokens, no streak dates → tokenBalance 0, streak 0.
+    seedProtection({ balance: 0 });
+
+    renderWithIntl(<StreakBadge />);
+
+    expect(screen.queryByText(/protection token/i)).toBeNull();
+    expect(screen.queryByText(/to your next milestone/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Superuser forceTokenToast flag (#1443 QA) — forces the earn helper toast so
+// QA can verify the copy without grinding a 30-day streak. Self-clears on
+// dismiss. IN (flag on, no real earn) and OUT (flag off) covered.
+// ---------------------------------------------------------------------------
+
+describe("StreakBadge — forceTokenToast superuser flag", () => {
+  // Reset to a known-off default before each test so a per-test
+  // mockReturnValue override cannot leak into the next test.
+  beforeEach(() => {
+    mockUseSuperuser.mockReturnValue({
+      flags: { forceNextStreakMilestone: false, forceTokenToast: false },
+      setFlag: vi.fn(),
+    });
+  });
+
+  it("fires the earn toast on mount when the flag is on, with no real earn activity", () => {
+    const setFlag = vi.fn();
+    mockUseSuperuser.mockReturnValue({
+      flags: { forceNextStreakMilestone: false, forceTokenToast: true },
+      setFlag,
+    });
+    // Plain state: nothing to earn or spend on its own.
+    seedProtection({ balance: 0 });
+
+    renderWithIntl(<StreakBadge />);
+
+    expect(
+      screen.getByText(/streak protection token earned/i),
+    ).toBeInTheDocument();
+  });
+
+  it("self-clears the flag when the forced toast is dismissed", () => {
+    const setFlag = vi.fn();
+    mockUseSuperuser.mockReturnValue({
+      flags: { forceNextStreakMilestone: false, forceTokenToast: true },
+      setFlag,
+    });
+    seedProtection({ balance: 0 });
+
+    renderWithIntl(<StreakBadge />);
+
+    fireEvent.click(screen.getByLabelText(/dismiss token notice/i));
+
+    expect(setFlag).toHaveBeenCalledWith("forceTokenToast", false);
+  });
+
+  it("fires no forced toast when the flag is off", () => {
+    // Default mock: forceTokenToast undefined/false. Plain state → no toast.
+    seedProtection({ balance: 0 });
+
+    renderWithIntl(<StreakBadge />);
+
+    expect(
+      screen.queryByText(/streak protection token earned/i),
+    ).toBeNull();
   });
 });

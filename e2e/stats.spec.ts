@@ -516,8 +516,8 @@ test.describe("Stats page — streak protection card (#1227)", () => {
       page.getByRole("heading", { level: 2, name: "Streak protection" }),
     ).toBeVisible({ timeout: 15_000 });
     // 0 + " tokens" — verified via the explicit aria-label on the count.
-    // Scope to the card: the persistent nav StreakNavChip (#1439) also carries a
-    // "protection tokens" aria-label, so an unscoped query is ambiguous.
+    // Scope the query to the card to stay robust against any other surface
+    // carrying a "protection tokens" label.
     await expect(
       page.getByTestId("streak-protection-card").getByLabel("0 protection tokens"),
     ).toBeVisible();
