@@ -79,6 +79,13 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      # Node 24 to match engines.node ("24.x") + engine-strict (#1512); without
+      # this the runner defaults to Node 22 and `npm install` below fails EBADENGINE,
+      # which broke the release job (#210). Pin matches ci.yml / .nvmrc.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
       - name: Configure git identity
         run: |
           git config user.name "poke-memory-bot[bot]"
