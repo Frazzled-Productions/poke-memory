@@ -892,15 +892,15 @@
   },
   "profileStatus": {
     "barAriaLabel": "Profile status",
-    "streakChipAriaLabel": "{count, plural, one {# day streak} other {# day streak}}",
+    "streakChipAriaLabel": "{count, plural, one {# day streak} other {# days streak}}",
     "startStreakChipAriaLabel": "Start your streak",
     "tokenChipAriaLabel": "{count, plural, one {# protection token} other {# protection tokens}}",
-    "masteryChipAriaLabel": "{mastered} of {total} Pokemon mastered",
-    "masteryZeroAriaLabel": "0 of {total} Pokemon mastered - start reviewing to grow this",
+    "masteryChipAriaLabel": "{mastered} of {total} Pokémon mastered",
+    "masteryZeroAriaLabel": "0 of {total} Pokémon mastered, start reviewing to grow this",
     "streakLabel": "{count, number}d",
     "startStreakLabel": "Start streak",
     "tokenLabel": "{count, number}",
-    "masteryLabel": "{pct}%"
+    "masteryLabel": "{pct, number}%"
   },
   "sync": {
     "status": {

@@ -900,7 +900,7 @@
     "streakLabel": "{count, number}日",
     "startStreakLabel": "連続を始めよう",
     "tokenLabel": "{count, number}",
-    "masteryLabel": "{pct}%"
+    "masteryLabel": "{pct, number}%"
   },
   "sync": {
     "status": {
