@@ -175,6 +175,8 @@ describe('loadSettings migration', () => {
       mcCardOnboardingShown: false,
       labsFlags: { ...DEFAULT_LABS_FLAGS },
       pokemonNameLocale: 'ja' as const,
+      learningLocales: ['en' as const, 'ja' as const],
+      activePokemonNameLocale: 'ja' as const,
       pushNotificationHour: 20,
       dismissedMtBannerLocales: ['ja', 'zh-Hans'],
     };
@@ -908,9 +910,66 @@ describe('loadSettings: pokemonNameLocale (#1260)', () => {
     }
   });
 
-  it('saveSettings + loadSettings round-trips pokemonNameLocale: "ja"', () => {
-    saveSettings({ ...DEFAULT_SETTINGS, pokemonNameLocale: 'ja' });
-    expect(loadSettings().pokemonNameLocale).toBe('ja');
+  it('saveSettings mirrors the deprecated pokemonNameLocale from the active learning locale (#1484)', () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      learningLocales: ['en', 'ja'],
+      activePokemonNameLocale: 'ja',
+    });
+    const loaded = loadSettings();
+    expect(loaded.activePokemonNameLocale).toBe('ja');
+    // The deprecated scalar is kept in sync with the active locale on save.
+    expect(loaded.pokemonNameLocale).toBe('ja');
+  });
+});
+
+describe('learningLocales + activePokemonNameLocale (#1484)', () => {
+  it('defaults to ["en"] / "en" for a fresh record', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    const s = loadSettings();
+    expect(s.learningLocales).toEqual(['en']);
+    expect(s.activePokemonNameLocale).toBe('en');
+  });
+
+  it('back-fills the set from a legacy non-English pokemonNameLocale (returning user)', () => {
+    // A pre-#1484 record with no learningLocales but a Japanese pokemonNameLocale.
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ pokemonNameLocale: 'ja' }),
+    );
+    const s = loadSettings();
+    expect(s.learningLocales).toEqual(['en', 'ja']);
+    expect(s.activePokemonNameLocale).toBe('ja');
+  });
+
+  it('always keeps English enrolled and drops unknown / duplicate locales', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ learningLocales: ['ja', 'ja', 'fr', 'zh-Hans'] }),
+    );
+    expect(loadSettings().learningLocales).toEqual(['en', 'ja', 'zh-Hans']);
+  });
+
+  it('falls back the active locale to an enrolled member when it is not enrolled', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        learningLocales: ['en', 'ja'],
+        activePokemonNameLocale: 'zh-Hans', // not enrolled
+      }),
+    );
+    expect(loadSettings().activePokemonNameLocale).toBe('en');
+  });
+
+  it('round-trips an enrolled active locale through save/load', () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      learningLocales: ['en', 'zh-Hant'],
+      activePokemonNameLocale: 'zh-Hant',
+    });
+    const s = loadSettings();
+    expect(s.learningLocales).toEqual(['en', 'zh-Hant']);
+    expect(s.activePokemonNameLocale).toBe('zh-Hant');
   });
 });
 

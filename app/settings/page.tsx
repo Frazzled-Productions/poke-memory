@@ -2049,6 +2049,88 @@ export default function SettingsPage() {
                               </select>
                             </div>
 
+                            {/* Languages I'm learning — enrolment set (#1484
+                                Phase 3). English is always included; toggling a
+                                language adds/removes it from learningLocales. The
+                                bar switcher flips the active one. */}
+                            <div id="languages-learning" className="scroll-mt-24">
+                              <p className="block text-sm font-medium text-foreground">
+                                {t("settings.labs.languages.enrolment.heading")}
+                              </p>
+                              <p className={`mt-1 ${mutedTextXs}`}>
+                                {t("settings.labs.languages.enrolment.description")}
+                              </p>
+                              <ul className="mt-2 flex flex-col gap-1">
+                                {SUPPORTED_LOCALES.map((loc) => {
+                                  // Guard against a settings object predating the
+                                  // learningLocales field (#1484 back-compat).
+                                  const enrolled = (
+                                    settings.learningLocales ?? ["en"]
+                                  ).includes(loc);
+                                  const isEnglish = loc === "en";
+                                  return (
+                                    <li
+                                      key={loc}
+                                      className="flex items-center justify-between gap-3 py-1"
+                                    >
+                                      <span className="flex flex-col">
+                                        <span
+                                          lang={loc}
+                                          className="text-sm font-medium text-foreground"
+                                        >
+                                          {LOCALE_ENDONYMS[loc]}
+                                        </span>
+                                        <span className={mutedTextXs}>
+                                          {isEnglish
+                                            ? t(
+                                                "settings.labs.languages.enrolment.lockedEnglishNote",
+                                              )
+                                            : t(
+                                                "settings.labs.languages.enrolment.machineTranslationNote",
+                                              )}
+                                        </span>
+                                      </span>
+                                      <input
+                                        type="checkbox"
+                                        checked={enrolled}
+                                        disabled={isEnglish}
+                                        aria-label={t(
+                                          "settings.labs.languages.enrolment.checkboxAriaLabel",
+                                          { language: LOCALE_ENDONYMS[loc] },
+                                        )}
+                                        onChange={(e) => {
+                                          const checked = e.target.checked;
+                                          const current =
+                                            settings.learningLocales ?? ["en"];
+                                          let next = checked
+                                            ? current.includes(loc)
+                                              ? current
+                                              : [...current, loc]
+                                            : current.filter((l) => l !== loc);
+                                          if (!next.includes("en")) {
+                                            next = ["en", ...next];
+                                          }
+                                          const activeStored =
+                                            settings.activePokemonNameLocale ?? "en";
+                                          const active = next.includes(activeStored)
+                                            ? activeStored
+                                            : "en";
+                                          const updated = {
+                                            ...settings,
+                                            learningLocales: next,
+                                            activePokemonNameLocale: active,
+                                          };
+                                          setSettings(updated);
+                                          saveSettings(updated);
+                                        }}
+                                        className="size-4 shrink-0 accent-[var(--theme-accent)] disabled:opacity-50"
+                                      />
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+
                             {/* Pokémon name language is switched from the
                                 language pill in the status bar (Phase 2 of
                                 #1484); the picker was relocated out of Settings.

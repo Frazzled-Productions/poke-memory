@@ -71,6 +71,7 @@ import { triggerHaptic } from "@/lib/review/haptic";
 import { markSessionActive, markSessionInactive } from "@/lib/review/sessionActive";
 import { KEY_HAS_MASTERED, KEY_SETTINGS } from "@/lib/storage/keys";
 import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
+import { writeDueCounts, type DueCountByLocale } from "@/lib/profile/dueCountCache";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
@@ -286,6 +287,33 @@ function writeMasteredCountCache(
 ): void {
   const count = filterMastered(cards, false, masteryRepetitions, locale).length;
   writeMasteredCountForLocale(locale, count);
+}
+
+/**
+ * Computes per-locale due-today review counts from the hydrated card array and
+ * writes them to the due-count cache read by the LanguageSwitcher badges
+ * (#1484). Purely additive + read-only — it does not touch the queue logic.
+ * Counts graduated cards (learningStep === null) that have been reviewed before
+ * and are due on or before today, excluding cards already reviewed today.
+ */
+function writeDueCountCacheFromCards(
+  cards: ReviewableCard[],
+  today: string,
+): void {
+  const counts: DueCountByLocale = { en: 0, ja: 0, "zh-Hans": 0, "zh-Hant": 0 };
+  for (const c of cards) {
+    const loc = c.locale ?? "en";
+    const s = c.state;
+    if (
+      s.lastReview !== null &&
+      s.learningStep === null &&
+      s.dueDate <= today &&
+      s.lastReview !== today
+    ) {
+      counts[loc] += 1;
+    }
+  }
+  writeDueCounts(counts);
 }
 
 // ---------------------------------------------------------------------------
@@ -1135,6 +1163,7 @@ export function ReviewSession() {
           (settings.pokemonNameLocale ?? "en") as AppLocale,
           settings.masteryRepetitions,
         );
+        writeDueCountCacheFromCards(sessionCards, today);
       }
     }
     void load();
