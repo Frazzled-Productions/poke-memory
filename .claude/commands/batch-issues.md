@@ -83,11 +83,17 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 7. **Pre-existing CI noise + stale-preview pre-flight.** Two advisory checks so this session is not blamed for unrelated red signals or a stale preview:
 
    ```bash
-   # 6a. Workflows that have been red on qa for multiple runs — known noise,
-   #     not introduced by this batch. Treat as out-of-scope unless the user
-   #     explicitly asks for an investigation in this session.
-   gh run list --branch=qa --status=failure --limit 20 --json conclusion,headSha,createdAt,name \
-     --jq 'group_by(.name) | map({workflow:.[0].name, recent_failures:length}) | map(select(.recent_failures >= 3))'
+   # 6a. Workflows whose LATEST qa run is a failure (genuinely red NOW). Querying
+   #     by failure-status alone is blind to later successes, so a long-fixed
+   #     failure burst gets re-surfaced every session (#1510 — the Perf-budget
+   #     false positive). Take the latest run per workflow across ALL conclusions
+   #     and flag only those whose most recent run failed.
+   gh run list --branch=qa --limit 60 --json conclusion,createdAt,name \
+     --jq 'group_by(.name)
+           | map({workflow:.[0].name,
+                  latest:(max_by(.createdAt).conclusion),
+                  recent_failures:(map(select(.conclusion=="failure"))|length)})
+           | map(select(.latest=="failure"))'
 
    # 6b. Preview-deploy freshness — is the last QA Preview Deploy behind origin/qa?
    gh run list --workflow="QA Preview Deploy" --limit 1 --json headSha --jq '.[0].headSha'
