@@ -8,17 +8,22 @@
  * Recharts is mocked to avoid the ResizeObserver dependency that jsdom
  * cannot satisfy. The Tooltip mock invokes its content render prop with
  * synthetic payload so TooltipBody (and its `statValue` line) executes.
+ * An empty-payload variant exercises the #1521 null-guard branch.
+ *
+ * Locale coverage: the typed DIRECTION_TO_KEY map (#1519) is exercised in
+ * Japanese to confirm key resolution works across locales.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
-import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa, renderZhHans, renderZhHant } from "@/components/test-utils/renderWithIntl";
 import { DirectionBreakdownChart } from "@/components/stats/DirectionBreakdownChart";
 import type { DirectionBreakdownRow } from "@/lib/stats/direction-breakdown";
 
 // ---------------------------------------------------------------------------
 // Recharts mock — lightweight stubs so the component can render in jsdom.
-// The Tooltip mock fires its content prop so TooltipBody runs.
+// Two Tooltip variants: one fires with populated payload, one with an empty
+// array to exercise the #1521 length-guard path.
 // ---------------------------------------------------------------------------
 
 type ChartDatum = {
@@ -38,6 +43,10 @@ const MOCK_DATUM: ChartDatum = {
   hasData: true,
   disabled: false,
 };
+
+/** Controls which payload the Tooltip mock sends to its content prop. */
+let tooltipPayload: { payload: ChartDatum }[] = [{ payload: MOCK_DATUM }];
+let tooltipActive = true;
 
 vi.mock("recharts", () => ({
   BarChart: ({ children }: { children: React.ReactNode }) => (
@@ -59,7 +68,7 @@ vi.mock("recharts", () => ({
     }) => React.ReactNode;
   }) => (
     <div data-testid="tooltip">
-      {content({ active: true, payload: [{ payload: MOCK_DATUM }] })}
+      {content({ active: tooltipActive, payload: tooltipPayload })}
     </div>
   ),
   XAxis: ({ className }: { className?: string }) => (
@@ -74,6 +83,11 @@ const ROWS: readonly DirectionBreakdownRow[] = [
 ];
 
 describe("DirectionBreakdownChart", () => {
+  beforeEach(() => {
+    tooltipPayload = [{ payload: MOCK_DATUM }];
+    tooltipActive = true;
+  });
+
   it("renders the Accuracy by card direction heading", () => {
     renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     expect(
@@ -103,8 +117,76 @@ describe("DirectionBreakdownChart", () => {
     expect(screen.getByText(/accuracy: 85%/i)).toBeInTheDocument();
   });
 
+  // #1521: guard against empty payload array — Recharts passes [] during
+  // chart transitions, which would previously crash with a TypeError.
+  it("renders null without throwing when the Tooltip receives an empty payload", () => {
+    tooltipPayload = [];
+    expect(() =>
+      renderWithIntl(<DirectionBreakdownChart rows={ROWS} />),
+    ).not.toThrow();
+    // The tooltip container is rendered by the mock but its content is null.
+    expect(screen.getByTestId("tooltip")).toBeEmptyDOMElement();
+  });
+
+  // #1521: guard also fires when active is false.
+  it("renders null without throwing when the Tooltip is inactive", () => {
+    tooltipActive = false;
+    expect(() =>
+      renderWithIntl(<DirectionBreakdownChart rows={ROWS} />),
+    ).not.toThrow();
+    expect(screen.getByTestId("tooltip")).toBeEmptyDOMElement();
+  });
+
   it("renders the per-direction review count list", () => {
     renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     expect(screen.getByRole("list")).toBeInTheDocument();
+  });
+
+  // Locale coverage (#1519): typed DIRECTION_TO_KEY keys must resolve in
+  // non-English locales; if the map value type were widened to `string` the
+  // key lookup would still compile but this verifies the runtime path.
+  it("renders the heading in Japanese", () => {
+    renderJa(<DirectionBreakdownChart rows={ROWS} />);
+    expect(
+      screen.getByRole("heading", { name: /カード方向別の正解率/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a direction label in Japanese via typed key lookup", () => {
+    renderJa(<DirectionBreakdownChart rows={ROWS} />);
+    // "name" direction maps to "この Pokémon の名前は？" in Japanese.
+    expect(
+      screen.getByText(/この Pokémon の名前は？/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the heading in Simplified Chinese", () => {
+    renderZhHans(<DirectionBreakdownChart rows={ROWS} />);
+    expect(
+      screen.getByRole("heading", { name: /按卡片方向的正确率/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a direction label in Simplified Chinese via typed key lookup", () => {
+    renderZhHans(<DirectionBreakdownChart rows={ROWS} />);
+    // "name" direction maps to "这是哪只 Pokémon？" in Simplified Chinese.
+    expect(
+      screen.getByText(/这是哪只 Pokémon？/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the heading in Traditional Chinese", () => {
+    renderZhHant(<DirectionBreakdownChart rows={ROWS} />);
+    expect(
+      screen.getByRole("heading", { name: /按卡片方向的正確率/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a direction label in Traditional Chinese via typed key lookup", () => {
+    renderZhHant(<DirectionBreakdownChart rows={ROWS} />);
+    // "name" direction maps to "這是哪隻寶可夢？" in Traditional Chinese.
+    expect(
+      screen.getByText(/這是哪隻寶可夢？/),
+    ).toBeInTheDocument();
   });
 });
