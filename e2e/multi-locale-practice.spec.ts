@@ -121,12 +121,12 @@ async function applyFsrsLocaleMasterySeed(page: Page): Promise<void> {
 
 test.describe("Per-locale practice session (#1562)", () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage first so no prior test's state leaks into this one.
-    // addInitScript fires on every goto, so this clear runs before any
-    // navigation in the test body.
-    await page.addInitScript(() => localStorage.clear());
-    // Re-seed onboarding dismissal after the clear so the first-visit modal
-    // does not block the practice surface or the language pill.
+    // Each Playwright test runs in a fresh, isolated browser context, so
+    // localStorage already starts empty — no explicit clear is needed (and a
+    // clear via addInitScript would be HARMFUL here: it re-fires on every
+    // navigation, so it would wipe the settings the QA seed writes via the app
+    // on the post-seed reload, hiding the language pill). Just pre-dismiss the
+    // first-visit onboarding modal so it does not block the practice surface.
     await addOnboardingPreDismiss(page);
   });
 
