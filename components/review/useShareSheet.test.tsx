@@ -88,7 +88,7 @@ describe("useShareSheet — populated state", () => {
   });
 
   it("memoises — returns the same object references when inputs are unchanged", () => {
-    const seq = [4, 5];
+    const seq: (1 | 2 | 4 | 5)[] = [4, 5];
     const { result, rerender } = renderHook(
       ({ gradeSeq }) => useShareSheet(gradeSeq, 0, 0, "UTC"),
       { initialProps: { gradeSeq: seq } },
