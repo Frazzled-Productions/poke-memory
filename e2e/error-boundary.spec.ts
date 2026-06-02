@@ -61,20 +61,24 @@ test.describe("Error boundary (#1533)", () => {
   }) => {
     await page.goto("/test-error");
 
-    // Register a dialog handler BEFORE clicking so the event is not missed.
-    // Accept the confirm dialog and verify its message.
-    const dialogPromise = page.waitForEvent("dialog");
+    // Register the handler BEFORE clicking so the dialog event is never missed.
+    let capturedDialog: import("@playwright/test").Dialog | undefined;
+    page.on("dialog", (dialog) => {
+      capturedDialog = dialog;
+      // Dismiss (cancel) so the page does not reload in this test.
+      void dialog.dismiss();
+    });
 
     await page.getByRole("button", { name: /reset local practice data/i }).click();
 
-    const dialog = await dialogPromise;
-    expect(dialog.type()).toBe("confirm");
-    expect(dialog.message()).toMatch(
+    // Give Playwright a tick to invoke the handler.
+    await page.waitForFunction(() => true);
+
+    expect(capturedDialog).toBeDefined();
+    expect(capturedDialog!.type()).toBe("confirm");
+    expect(capturedDialog!.message()).toMatch(
       /delete your local practice progress/i,
     );
-
-    // Dismiss (cancel) so the page does not reload in this test.
-    await dialog.dismiss();
   });
 
   test("confirming the Reset dialog reloads the page", async ({ page }) => {
