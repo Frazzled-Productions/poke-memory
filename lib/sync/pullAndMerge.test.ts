@@ -540,7 +540,10 @@ describe("pullAndMerge", () => {
 
     await pullAndMerge(fakeClient, fakeUserId);
 
-    // Cloud returned all-null — no fields changed, saveSettings must not fire.
+    // Cloud returned all-null regional prefs — no fields changed, saveSettings must not fire.
+    // This assertion is sound because mockPullUserSettingsRow defaults to null (set in
+    // beforeEach), which suppresses the LWW/locale-merge saveSettings path entirely —
+    // only the regional-prefs leg is active here.
     expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 

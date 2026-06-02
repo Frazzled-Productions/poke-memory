@@ -90,9 +90,14 @@ describe("getStructuralSyncError", () => {
     expect(getStructuralSyncError()).toBeNull();
   });
 
-  it("returns null when window is undefined (SSR path)", () => {
-    vi.unstubAllGlobals();
-    expect(getStructuralSyncError()).toBeNull();
+  describe("SSR path", () => {
+    beforeEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("returns null when window is undefined", () => {
+      expect(getStructuralSyncError()).toBeNull();
+    });
   });
 
   it("returns the stored code when structuralSyncError is set", () => {
@@ -159,10 +164,15 @@ describe("markStructuralSyncError", () => {
     expect(stored.structuralSyncError).toBe("23505");
   });
 
-  it("is a no-op when window is undefined (SSR path)", () => {
-    vi.unstubAllGlobals();
-    // Should not throw; localStorage is inaccessible.
-    expect(() => markStructuralSyncError("42P10")).not.toThrow();
+  describe("SSR path", () => {
+    beforeEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("is a no-op when window is undefined", () => {
+      // Should not throw; localStorage is inaccessible.
+      expect(() => markStructuralSyncError("42P10")).not.toThrow();
+    });
   });
 
   it("patchSyncStatus recovers gracefully when stored value is invalid JSON", () => {
@@ -208,7 +218,11 @@ describe("clearStructuralSyncError", () => {
     // Capture the state after the first clear.
     const afterFirst = storage.getItem(KEY_SYNC_STATUS);
 
-    // Intercept setItem to detect any further write attempt.
+    // The spy works because beforeEach stubs both global.localStorage and
+    // window.localStorage with the same `storage` object reference, so any
+    // write via window.localStorage.setItem is intercepted here. If either stub
+    // were changed to a separate object the spy would be inert and a genuine
+    // double-write would become a false-positive pass.
     const setItemSpy = vi.spyOn(storage, "setItem");
     clearStructuralSyncError(); // second call: error already null, must not write
 
@@ -243,8 +257,13 @@ describe("clearStructuralSyncError", () => {
     expect(stored.lastPushFailed).toBe(true);
   });
 
-  it("is a no-op when window is undefined (SSR path)", () => {
-    vi.unstubAllGlobals();
-    expect(() => clearStructuralSyncError()).not.toThrow();
+  describe("SSR path", () => {
+    beforeEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("is a no-op when window is undefined", () => {
+      expect(() => clearStructuralSyncError()).not.toThrow();
+    });
   });
 });

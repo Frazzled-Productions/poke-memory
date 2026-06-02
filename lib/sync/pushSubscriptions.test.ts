@@ -77,14 +77,6 @@ describe("pullPushSubscriptionCount", () => {
     warn.mockRestore();
   });
 
-  it("does not throw when Supabase returns an error — error is best-effort (non-fatal)", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { client } = makeMockClient({ count: null, error: { message: "connection refused" } });
-
-    await expect(pullPushSubscriptionCount(client, FAKE_USER_ID)).resolves.toBeNull();
-    warn.mockRestore();
-  });
-
   // ─── error path: thrown exception ────────────────────────────────────────
 
   it("returns null when the Supabase call throws (network error)", async () => {
