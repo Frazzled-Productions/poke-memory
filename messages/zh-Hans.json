@@ -98,17 +98,21 @@
           "zh-Hant": "繁體中文"
         },
         "selectLocale": "语言",
-        "appLanguageLabel": "应用语言",
-        "appLanguageDescription": "控制应用界面语言。界面翻译仍在进行中。",
+        "appLanguageLabel": "应用界面语言",
+        "appLanguageDescription": "控制应用的 UI 文字。",
         "pokemonNameLanguageLabel": "宝可梦名称语言",
         "pokemonNameLanguageDescription": "宝可梦名称语言可从每个页面顶部状态栏中的语言按钮切换。",
         "previewSuffix": "（预览）",
         "enrolment": {
-          "heading": "我正在学习的语言",
-          "description": "始终包含英语。添加一种语言即可用该文字练习宝可梦名称。",
+          "heading": "宝可梦名称练习语言",
+          "description": "从状态栏中的语言按钮切换当前语言。",
           "lockedEnglishNote": "始终包含",
           "machineTranslationNote": "机器翻译",
-          "checkboxAriaLabel": "用 {language} 练习宝可梦名称"
+          "checkboxAriaLabel": "用 {language} 练习宝可梦名称",
+          "masteredCount": "已掌握 {count, number}",
+          "unenrolConfirmMessage": "删除 {language} 后，练习将切换回英语。继续吗？",
+          "unenrolConfirm": "确认",
+          "unenrolCancel": "取消"
         }
       }
     },
@@ -923,6 +927,8 @@
     "addLanguage": "添加语言",
     "dueToday": "{count, plural, =0 {已完成} other {今日 {count, number} 张}}",
     "dueTodayAriaLabel": "{language}：{count, plural, =0 {今日无待复习} other {今日 {count, number} 张待复习}}",
+    "noCardsYet": "暂无卡片",
+    "noCardsYetAriaLabel": "{language}：暂无卡片",
     "cardRevealedLock": "请先完成当前卡片，再切换语言。"
   },
   "sync": {

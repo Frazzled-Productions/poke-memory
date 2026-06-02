@@ -177,6 +177,18 @@ vi.mock("@/lib/utils/format-date", async (importOriginal) => {
   };
 });
 
+const { mockReadMasteredCountCache } = vi.hoisted(() => ({
+  mockReadMasteredCountCache: vi.fn(() => ({
+    en: 0,
+    ja: 0,
+    "zh-Hans": 0,
+    "zh-Hant": 0,
+  })),
+}));
+vi.mock("@/lib/profile/masteredCountCache", () => ({
+  readMasteredCountCache: () => mockReadMasteredCountCache(),
+}));
+
 // ---------------------------------------------------------------------------
 // Stub heavy sub-components that have their own test coverage.
 // ---------------------------------------------------------------------------
@@ -893,10 +905,10 @@ describe("SettingsPage — locale picker endonyms", () => {
 
     // Wait for the language picker to appear.
     await waitFor(() => {
-      expect(screen.getByLabelText(/app language/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/app interface language/i)).toBeInTheDocument();
     });
 
-    const appLocaleSelect = screen.getByLabelText(/app language/i);
+    const appLocaleSelect = screen.getByLabelText(/app interface language/i);
     const options = Array.from(appLocaleSelect.querySelectorAll("option"));
     const texts = options.map((o) => o.textContent ?? "");
 
@@ -967,10 +979,10 @@ describe("SettingsPage — preview suffix from catalog", () => {
     render(<SettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/app language/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/app interface language/i)).toBeInTheDocument();
     });
 
-    const select = screen.getByLabelText(/app language/i);
+    const select = screen.getByLabelText(/app interface language/i);
     const options = Array.from(select.querySelectorAll("option"));
     const nonEnglishTexts = options
       .filter((o) => o.getAttribute("value") !== "en")
@@ -1144,5 +1156,262 @@ describe("SettingsPage — forceTokenToast developer toggle (#1443)", () => {
     await userEvent.click(toggle);
 
     expect(mockSetFlag).toHaveBeenCalledWith("forceTokenToast", true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 1: Settings relabelling (clarity polish)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — clarity polish: Settings labels (item 1)", () => {
+  it("app-language heading reads 'App interface language'", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+    });
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText(/app interface language/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("enrolment heading reads 'Pokémon name practice languages'", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+    });
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Pokémon name practice languages/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("enrolment description reads 'Switch the active one from the language pill'", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+    });
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/switch the active one from the language pill/i),
+      ).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 2: pretendAllMastered guard on enrolment mastery counts (clarity polish)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — clarity polish: enrolment mastery count respects pretendAllMastered (item 2)", () => {
+  // The settings page shows a per-locale mastered count badge next to each
+  // enrolled locale in the enrolment list (e.g. "5 mastered"). When the
+  // pretendAllMastered flag is on it must show the full SEED_POKEMON.length
+  // count instead of the real cached count, mirroring how ProfileStatusBar
+  // and useProfileStatus derive mastery.
+
+  it("flag OFF: renders the mastered count badge when the real cached count is > 0", async () => {
+    // Override the cache mock to return a non-zero count for English. The flag
+    // is off by default (pretendAllMastered: false in mockSuperuserFlags).
+    mockReadMasteredCountCache.mockReturnValue({
+      en: 42,
+      ja: 0,
+      "zh-Hans": 0,
+      "zh-Hant": 0,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+      learningLocales: ["en", "ja"],
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    // The masteredCount badge is only rendered when masteredCount > 0. With the
+    // real cached count = 42 and the flag OFF, the badge is present. The t()
+    // mock returns the ICU template string literally ("{count, number} mastered")
+    // so we assert that string is present in the enrolment section.
+    await waitFor(() => {
+      const enrolmentSection = document.getElementById("languages-learning");
+      expect(enrolmentSection).not.toBeNull();
+      // The badge renders the ICU string (unmolested by the simple mock t()).
+      expect(enrolmentSection!.textContent).toContain("mastered");
+    });
+
+    // Restore.
+    mockReadMasteredCountCache.mockReturnValue({ en: 0, ja: 0, "zh-Hans": 0, "zh-Hant": 0 });
+  });
+
+  it("flag ON: hides the mastered count badge even when the real cached count is > 0", async () => {
+    // SEED_POKEMON is mocked to [] (length 0), so pretendAllMastered resolves
+    // to 0. The real cached count is 42 but must not be used. Since masteredCount
+    // = 0 when the flag is on, the badge (only rendered for count > 0) must be absent.
+    mockSuperuserFlags.pretendAllMastered = true;
+    mockReadMasteredCountCache.mockReturnValue({
+      en: 42,
+      ja: 17,
+      "zh-Hans": 0,
+      "zh-Hant": 0,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+      learningLocales: ["en", "ja"],
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    // The badge (rendered when masteredCount > 0) must be absent because the
+    // all-mastered count is SEED_POKEMON.length = 0 in the test mock.
+    await waitFor(() => {
+      const enrolmentSection = document.getElementById("languages-learning");
+      expect(enrolmentSection).not.toBeNull();
+      expect(enrolmentSection!.textContent).not.toContain("mastered");
+    });
+
+    // Restore.
+    mockSuperuserFlags.pretendAllMastered = false;
+    mockReadMasteredCountCache.mockReturnValue({ en: 0, ja: 0, "zh-Hans": 0, "zh-Hant": 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 3: Unenrol-active-language confirmation (clarity polish)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — clarity polish: unenrol active language confirm (item 3)", () => {
+  function settingsWithJaActive() {
+    return {
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+      learningLocales: ["en", "ja"] as string[],
+      activePokemonNameLocale: "ja" as const,
+    };
+  }
+
+  it("does NOT show confirm for removing a non-active language", async () => {
+    // Active = ja; removing zh-Hans (not active) should apply immediately.
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+      learningLocales: ["en", "ja", "zh-Hans"] as string[],
+      activePokemonNameLocale: "ja" as const,
+    });
+    render(<SettingsPage />);
+
+    // Wait for enrolment list.
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    // Un-tick zh-Hans (not active): no confirm block should appear.
+    const zhHansCheckbox = screen.getByRole("checkbox", {
+      name: /简体中文/i,
+    });
+    await userEvent.click(zhHansCheckbox);
+
+    // Confirm block must NOT appear.
+    expect(screen.queryByRole("alert")).toBeNull();
+    // saveSettings must have been called immediately.
+    expect(mockSaveSettings).toHaveBeenCalled();
+  });
+
+  it("shows an inline confirm block when removing the active language", async () => {
+    mockLoadSettings.mockReturnValue(settingsWithJaActive());
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    // Un-tick ja (the active language).
+    const jaCheckbox = screen.getByRole("checkbox", {
+      name: /日本語/i,
+    });
+    await userEvent.click(jaCheckbox);
+
+    // Inline confirm block must appear (role=alert).
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+
+    // saveSettings must NOT have been called yet.
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it("confirming the unenrol applies the change and clears the confirm block", async () => {
+    mockLoadSettings.mockReturnValue(settingsWithJaActive());
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    const jaCheckbox = screen.getByRole("checkbox", { name: /日本語/i });
+    await userEvent.click(jaCheckbox);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+
+    // Click "Confirm".
+    const confirmBtn = screen.getByRole("button", { name: /^confirm$/i });
+    await userEvent.click(confirmBtn);
+
+    // Confirm block must disappear.
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    // saveSettings must have been called with ja removed and active set to en.
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activePokemonNameLocale: "en",
+        learningLocales: expect.not.arrayContaining(["ja"]),
+      }),
+    );
+  });
+
+  it("cancelling the unenrol confirm leaves the language enrolled and active", async () => {
+    mockLoadSettings.mockReturnValue(settingsWithJaActive());
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    const jaCheckbox = screen.getByRole("checkbox", { name: /日本語/i });
+    await userEvent.click(jaCheckbox);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+
+    // Click "Cancel".
+    await userEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    // Confirm block must disappear.
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    // saveSettings must NOT have been called.
+    expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 });

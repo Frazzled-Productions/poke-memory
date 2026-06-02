@@ -19,6 +19,7 @@ import {
 } from "@/lib/settings/persistence";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { useProfileStatus } from "@/lib/profile/useProfileStatus";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import {
   StreakChip,
   TokenChip,
@@ -45,6 +46,7 @@ export function StreakBadge() {
   // shared StatusChips as the band, so the rendering can never diverge.
   const { tokenBalance, masteryCount, totalSpecies, masteryPercent } =
     useProfileStatus();
+  const { languagesEnabled } = usePokemonLocaleContext();
   const [streak, setStreak] = useState<number | null>(null);
   const [pendingMilestone, setPendingMilestone] = useState<number | null>(null);
   const [pendingToken, setPendingToken] = useState<ProtectionToastKind | null>(
@@ -185,20 +187,49 @@ export function StreakBadge() {
         aria-label={tProfile("barAriaLabel")}
         className="mb-1 flex items-center justify-center gap-2 md:hidden"
       >
+        {/*
+          Single-language users (languagesEnabled === false): original order
+          streak · mastery · token. No divider.
+          Multi-language users (languagesEnabled === true): streak · token |
+          mastery · pill. Mirrors ProfileStatusBar so rendering never diverges.
+        */}
         <StreakChip streak={streak} />
-        {masteryCount !== null &&
-          totalSpecies !== null &&
-          masteryPercent !== null && (
-            <MasteryChip
-              masteryCount={masteryCount}
-              totalSpecies={totalSpecies}
-              masteryPercent={masteryPercent}
+        {languagesEnabled ? (
+          <>
+            {tokenBalance !== null && <TokenChip tokenBalance={tokenBalance} />}
+            {/* Hairline divider between global signals and per-language signals. */}
+            <span
+              aria-hidden="true"
+              className="h-4 w-px self-center border-l border-zinc-300 dark:border-zinc-600"
             />
-          )}
-        {tokenBalance !== null && <TokenChip tokenBalance={tokenBalance} />}
-        {/* Learning-language switcher (Labs-gated inside the component) — here
-            too so it is reachable on mobile Practice, where the bar is hidden. */}
-        <LanguageSwitcher />
+            {masteryCount !== null &&
+              totalSpecies !== null &&
+              masteryPercent !== null && (
+                <MasteryChip
+                  masteryCount={masteryCount}
+                  totalSpecies={totalSpecies}
+                  masteryPercent={masteryPercent}
+                />
+              )}
+            {/* Learning-language switcher (Labs-gated inside the component) —
+                here too so it is reachable on mobile Practice where the bar
+                is hidden. */}
+            <LanguageSwitcher />
+          </>
+        ) : (
+          <>
+            {masteryCount !== null &&
+              totalSpecies !== null &&
+              masteryPercent !== null && (
+                <MasteryChip
+                  masteryCount={masteryCount}
+                  totalSpecies={totalSpecies}
+                  masteryPercent={masteryPercent}
+                />
+              )}
+            {tokenBalance !== null && <TokenChip tokenBalance={tokenBalance} />}
+          </>
+        )}
       </div>
       {daysToNextMilestone !== null && (
         <p className="mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400 sm:mb-4">

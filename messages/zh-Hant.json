@@ -98,17 +98,21 @@
           "zh-Hant": "繁體中文"
         },
         "selectLocale": "語言",
-        "appLanguageLabel": "應用程式語言",
-        "appLanguageDescription": "控制應用程式介面語言。介面翻譯仍在進行中。",
+        "appLanguageLabel": "應用程式介面語言",
+        "appLanguageDescription": "控制應用程式的 UI 文字。",
         "pokemonNameLanguageLabel": "寶可夢名稱語言",
         "pokemonNameLanguageDescription": "寶可夢名稱語言可從每個頁面頂部狀態列中的語言按鈕切換。",
         "previewSuffix": "（預覽）",
         "enrolment": {
-          "heading": "我正在學習的語言",
-          "description": "始終包含英語。新增一種語言即可用該文字練習寶可夢名稱。",
+          "heading": "寶可夢名稱練習語言",
+          "description": "從狀態列中的語言按鈕切換目前語言。",
           "lockedEnglishNote": "始終包含",
           "machineTranslationNote": "機器翻譯",
-          "checkboxAriaLabel": "用 {language} 練習寶可夢名稱"
+          "checkboxAriaLabel": "用 {language} 練習寶可夢名稱",
+          "masteredCount": "已掌握 {count, number}",
+          "unenrolConfirmMessage": "移除 {language} 後，練習將切換回英語。繼續嗎？",
+          "unenrolConfirm": "確認",
+          "unenrolCancel": "取消"
         }
       }
     },
@@ -923,6 +927,8 @@
     "addLanguage": "新增語言",
     "dueToday": "{count, plural, =0 {已完成} other {今日 {count, number} 張}}",
     "dueTodayAriaLabel": "{language}：{count, plural, =0 {今日無待複習} other {今日 {count, number} 張待複習}}",
+    "noCardsYet": "尚無卡片",
+    "noCardsYetAriaLabel": "{language}：尚無卡片",
     "cardRevealedLock": "請先完成目前的卡片，再切換語言。"
   },
   "sync": {
