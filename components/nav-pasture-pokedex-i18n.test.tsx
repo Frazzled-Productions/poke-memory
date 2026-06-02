@@ -344,6 +344,7 @@ vi.mock("@/lib/pokemon/seed", () => ({
 }));
 vi.mock("@/lib/pokemon/facts", () => ({
   getPokemonFacts: () => [],
+  isFlavorTextsReady: () => false,
   loadFlavorTexts: () => Promise.resolve(new Map()),
 }));
 vi.mock("@/lib/review/useNextReviewDate", () => ({

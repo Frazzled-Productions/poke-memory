@@ -51,6 +51,11 @@ export async function loadFlavorTexts(): Promise<Map<number, FlavorTextEntry[]>>
   return _flavorLoadPromise;
 }
 
+/** Returns true if the flavour cache has already been populated. */
+export function isFlavorTextsReady(): boolean {
+  return _flavorCache !== null;
+}
+
 /** Return flavor text entries for a given Pokémon id, or an empty array if not yet loaded. */
 export function getFlavorTexts(pokemonId: number): FlavorTextEntry[] {
   return _flavorCache?.get(pokemonId) ?? [];

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -10,7 +10,7 @@ import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
 import { colStack, mutedTextXs, sectionLabelSmSubtle } from "@/lib/utils/class-names";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
-import { getPokemonFacts, loadFlavorTexts } from "@/lib/pokemon/facts";
+import { getPokemonFacts, isFlavorTextsReady, loadFlavorTexts } from "@/lib/pokemon/facts";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import type { CardClassOrPending } from "@/lib/review/useCardClass";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
@@ -230,11 +230,23 @@ export function PokemonDetailDisclosure({
   // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
   const { name: pokemonLocaleName } = useLocalePokemonName(pokemon.speciesId, pokemon.displayName);
 
-  // Kick off flavor-text fetch the first time any disclosure opens. The cache
+  // Kick off flavour-text fetch the first time any disclosure opens. The cache
   // is shared across all instances so concurrent disclosures only fetch once.
+  // `flavorLoaded` is stored in state so the component re-renders once the async
+  // load resolves — without this, game labels never appear on a cold first visit
+  // because `getPokemonFacts` reads the module-level cache synchronously at render
+  // time and the mastery re-render races the network fetch (#1559).
+  const [flavorLoaded, setFlavorLoaded] = useState(isFlavorTextsReady);
   useEffect(() => {
-    void loadFlavorTexts();
-  }, []);
+    if (flavorLoaded) return;
+    let cancelled = false;
+    void loadFlavorTexts().then(() => {
+      if (!cancelled) setFlavorLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [flavorLoaded]);
 
   const facts = getPokemonFacts(pokemon);
   const stages = buildStages(evolutionChain);

@@ -1283,40 +1283,17 @@ test.describe("Pokédex detail — game-label facts (#1559)", () => {
     await awaitSeedIdb(page);
     await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
 
-    // Wait for the flavour JSON fetch to complete. The component calls
-    // loadFlavorTexts() in a useEffect; on first mount in Chromium the IDB
-    // mastery-state read (useCardClass) races the network fetch and the
-    // "mastered" re-render fires while _flavorCache is still null — so game
-    // labels are absent from that render and, because loadFlavorTexts() does
-    // not store its result in React state, no subsequent re-render is
-    // scheduled to pick them up (#1559 flake).
-    //
-    // Fix: wait for the response (warm the module-level cache), then navigate
-    // away and back via client-side Next.js links. This preserves the
-    // _flavorCache singleton; the second mount calls loadFlavorTexts() again,
-    // which returns the already-populated cache synchronously, so game labels
-    // are present when the "mastered" re-render fires.
+    // Wait for the flavour JSON fetch to complete. Once the response arrives,
+    // the component's `flavorLoaded` state flips to true and triggers a re-render
+    // that picks up the now-populated cache. No round-trip navigation is needed.
     await flavorResponsePromise;
-
-    // Client-side navigation away and back — click any "Pokédex" link (the back
-    // link in the content area or the nav link both go to /pokedex) then click
-    // the Bulbasaur tile. Both are Next.js <Link>s so the JS module context
-    // (and _flavorCache) survive across the navigations.
-    await page.getByRole("link", { name: "Pokédex" }).first().click();
-    await page.waitForURL("**/pokedex");
-    // Bulbasaur is id=1 in the grid; its aria-label is "Bulbasaur" when not locked.
-    await page.getByRole("link", { name: "Bulbasaur" }).first().click();
-    await page.waitForURL("**/pokedex/1");
-    await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
 
     // The game-label feature (#1559) replaces the repeated "Pokédex entry" dt
     // label with the source game name(s) from generated-flavor.json.
     // Bulbasaur's first flavour text is shared by Red, Blue, and LeafGreen →
     // formatted as "Red · Blue · LeafGreen".
-    // Cache is warm from the first load, so this appears on the mastered
-    // re-render with no further network round-trip required.
     await expect(page.getByText("Red · Blue · LeafGreen")).toBeVisible({
-      timeout: 5_000,
+      timeout: 10_000,
     });
     // The generic fallback label must not appear for any flavour-text row now
     // that the full game-label data is confirmed loaded.
