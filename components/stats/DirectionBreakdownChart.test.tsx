@@ -14,9 +14,9 @@
  * Japanese to confirm key resolution works across locales.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
-import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa, renderZhHans, renderZhHant } from "@/components/test-utils/renderWithIntl";
 import { DirectionBreakdownChart } from "@/components/stats/DirectionBreakdownChart";
 import type { DirectionBreakdownRow } from "@/lib/stats/direction-breakdown";
 
@@ -83,9 +83,12 @@ const ROWS: readonly DirectionBreakdownRow[] = [
 ];
 
 describe("DirectionBreakdownChart", () => {
-  it("renders the Accuracy by card direction heading", () => {
+  beforeEach(() => {
     tooltipPayload = [{ payload: MOCK_DATUM }];
     tooltipActive = true;
+  });
+
+  it("renders the Accuracy by card direction heading", () => {
     renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     expect(
       screen.getByRole("heading", { name: /accuracy by card direction/i }),
@@ -104,15 +107,11 @@ describe("DirectionBreakdownChart", () => {
   });
 
   it("renders the bar chart when rows have data", () => {
-    tooltipPayload = [{ payload: MOCK_DATUM }];
-    tooltipActive = true;
     renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     expect(screen.getByTestId("bar-chart")).toBeInTheDocument();
   });
 
   it("renders the TooltipBody content (statValue line) via the mocked Tooltip", () => {
-    tooltipPayload = [{ payload: MOCK_DATUM }];
-    tooltipActive = true;
     renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     // TooltipBody renders "Accuracy: 85%" using the statValue class when hasData is true.
     expect(screen.getByText(/accuracy: 85%/i)).toBeInTheDocument();
@@ -122,7 +121,6 @@ describe("DirectionBreakdownChart", () => {
   // chart transitions, which would previously crash with a TypeError.
   it("renders null without throwing when the Tooltip receives an empty payload", () => {
     tooltipPayload = [];
-    tooltipActive = true;
     expect(() =>
       renderWithIntl(<DirectionBreakdownChart rows={ROWS} />),
     ).not.toThrow();
@@ -132,7 +130,6 @@ describe("DirectionBreakdownChart", () => {
 
   // #1521: guard also fires when active is false.
   it("renders null without throwing when the Tooltip is inactive", () => {
-    tooltipPayload = [{ payload: MOCK_DATUM }];
     tooltipActive = false;
     expect(() =>
       renderWithIntl(<DirectionBreakdownChart rows={ROWS} />),
@@ -141,8 +138,6 @@ describe("DirectionBreakdownChart", () => {
   });
 
   it("renders the per-direction review count list", () => {
-    tooltipPayload = [{ payload: MOCK_DATUM }];
-    tooltipActive = true;
     renderWithIntl(<DirectionBreakdownChart rows={ROWS} />);
     expect(screen.getByRole("list")).toBeInTheDocument();
   });
@@ -151,8 +146,6 @@ describe("DirectionBreakdownChart", () => {
   // non-English locales; if the map value type were widened to `string` the
   // key lookup would still compile but this verifies the runtime path.
   it("renders the heading in Japanese", () => {
-    tooltipPayload = [{ payload: MOCK_DATUM }];
-    tooltipActive = true;
     renderJa(<DirectionBreakdownChart rows={ROWS} />);
     expect(
       screen.getByRole("heading", { name: /カード方向別の正解率/ }),
@@ -160,12 +153,40 @@ describe("DirectionBreakdownChart", () => {
   });
 
   it("renders a direction label in Japanese via typed key lookup", () => {
-    tooltipPayload = [{ payload: MOCK_DATUM }];
-    tooltipActive = true;
     renderJa(<DirectionBreakdownChart rows={ROWS} />);
     // "name" direction maps to "この Pokémon の名前は？" in Japanese.
     expect(
       screen.getByText(/この Pokémon の名前は？/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the heading in Simplified Chinese", () => {
+    renderZhHans(<DirectionBreakdownChart rows={ROWS} />);
+    expect(
+      screen.getByRole("heading", { name: /按卡片方向的正确率/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a direction label in Simplified Chinese via typed key lookup", () => {
+    renderZhHans(<DirectionBreakdownChart rows={ROWS} />);
+    // "name" direction maps to "这是哪只 Pokémon？" in Simplified Chinese.
+    expect(
+      screen.getByText(/这是哪只 Pokémon？/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the heading in Traditional Chinese", () => {
+    renderZhHant(<DirectionBreakdownChart rows={ROWS} />);
+    expect(
+      screen.getByRole("heading", { name: /按卡片方向的正確率/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a direction label in Traditional Chinese via typed key lookup", () => {
+    renderZhHant(<DirectionBreakdownChart rows={ROWS} />);
+    // "name" direction maps to "這是哪隻寶可夢？" in Traditional Chinese.
+    expect(
+      screen.getByText(/這是哪隻寶可夢？/),
     ).toBeInTheDocument();
   });
 });

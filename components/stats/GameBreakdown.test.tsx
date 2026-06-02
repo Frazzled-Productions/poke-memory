@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
-import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa, renderZhHans, renderZhHant } from "@/components/test-utils/renderWithIntl";
 import { GameBreakdown } from "@/components/stats/GameBreakdown";
 import type { GameStats } from "@/lib/stats/per-game";
 
@@ -125,5 +125,31 @@ describe("GameBreakdown", () => {
     renderJa(<GameBreakdown perGame={[RED_BLUE]} />);
     // gen1 key resolves to "第1世代" in Japanese.
     expect(screen.getByText("第1世代")).toBeInTheDocument();
+  });
+
+  it("renders the section heading in Simplified Chinese", () => {
+    renderZhHans(<GameBreakdown perGame={[RED_BLUE]} />);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "按游戏" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the generation label using the typed key in Simplified Chinese", () => {
+    renderZhHans(<GameBreakdown perGame={[RED_BLUE]} />);
+    // gen1 key resolves to "第一世代" in Simplified Chinese.
+    expect(screen.getByText("第一世代")).toBeInTheDocument();
+  });
+
+  it("renders the section heading in Traditional Chinese", () => {
+    renderZhHant(<GameBreakdown perGame={[RED_BLUE]} />);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "按遊戲" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the generation label using the typed key in Traditional Chinese", () => {
+    renderZhHant(<GameBreakdown perGame={[RED_BLUE]} />);
+    // gen1 key resolves to "第一世代" in Traditional Chinese.
+    expect(screen.getByText("第一世代")).toBeInTheDocument();
   });
 });

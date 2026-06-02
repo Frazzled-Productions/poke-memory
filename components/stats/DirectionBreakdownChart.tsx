@@ -171,8 +171,8 @@ export function DirectionBreakdownChart({ rows }: Props) {
                   <Tooltip
                     cursor={{ fill: "currentColor", fillOpacity: 0.06 }}
                     content={({ active, payload }) => {
-                      if (!payload?.length) return null;
                       if (!active) return null;
+                      if (!payload?.length) return null;
                       return <TooltipBody datum={payload[0].payload as ChartDatum} />;
                     }}
                   />
