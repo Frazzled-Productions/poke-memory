@@ -71,7 +71,13 @@ import { triggerHaptic } from "@/lib/review/haptic";
 import { markSessionActive, markSessionInactive, markCardRevealed } from "@/lib/review/sessionActive";
 import { KEY_HAS_MASTERED, KEY_SETTINGS } from "@/lib/storage/keys";
 import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
-import { writeDueCounts, readDueCountCache, type DueCountByLocale } from "@/lib/profile/dueCountCache";
+import {
+  writeDueCounts,
+  writeHasHistory,
+  readDueCountCache,
+  type DueCountByLocale,
+  type HasHistoryByLocale,
+} from "@/lib/profile/dueCountCache";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
@@ -308,9 +314,18 @@ function writeDueCountCacheFromCards(
   today: string,
 ): void {
   const counts: DueCountByLocale = { en: 0, ja: 0, "zh-Hans": 0, "zh-Hant": 0 };
+  const hasHistory: HasHistoryByLocale = {
+    en: false,
+    ja: false,
+    "zh-Hans": false,
+    "zh-Hant": false,
+  };
   for (const c of cards) {
     const loc = c.locale ?? "en";
     const s = c.state;
+    if (s.lastReview !== null) {
+      hasHistory[loc] = true;
+    }
     if (
       s.lastReview !== null &&
       s.learningStep === null &&
@@ -321,6 +336,7 @@ function writeDueCountCacheFromCards(
     }
   }
   writeDueCounts(counts);
+  writeHasHistory(hasHistory);
 }
 
 // ---------------------------------------------------------------------------
@@ -2453,7 +2469,11 @@ export function ReviewSession() {
       );
     }
     if (!superuserGuarded) {
-      writeDueCountCacheFromCards(newCards, today);
+      // MULTI-LOCALE: this writes the due-count + has-history cache for ALL
+      // locales, so it must see the full multi-locale array — not the
+      // active-locale-filtered `newCards`, which would zero every other
+      // language's badge on each grade (#1484 clarity follow-up review).
+      writeDueCountCacheFromCards(fullSessionRef.current, today);
     }
 
     // Update the learning queue based on the new state.

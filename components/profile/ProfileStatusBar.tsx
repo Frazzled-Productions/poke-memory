@@ -26,6 +26,7 @@
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useProfileStatus } from "@/lib/profile/useProfileStatus";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import {
   StreakChip,
   TokenChip,
@@ -50,6 +51,7 @@ export function ProfileStatusBar() {
   const pathname = usePathname();
   const { streak, tokenBalance, masteryCount, totalSpecies, masteryPercent } =
     useProfileStatus();
+  const { languagesEnabled } = usePokemonLocaleContext();
 
   // Mobile-only Practice hide: on small viewports the Practice page (/) already
   // carries streak/token in the inline StreakBadge. Desktop always shows the bar.
@@ -88,21 +90,41 @@ export function ProfileStatusBar() {
       <div
         className={`mx-auto flex ${BAR_HEIGHT_CLASS} max-w-5xl items-center justify-center gap-3 px-4`}
       >
-        {/* Order: streak · mastery · token. Mastery is always rendered (stable
-            anchor); the token chip appears/disappears on the trailing edge so
-            mastery never shifts position. Shared StatusChips keep this identical
-            to the inline StreakBadge group (single-source convention). */}
+        {/*
+          Single-language users (languagesEnabled === false): original order,
+          byte-for-byte unchanged — streak · mastery · token. No divider.
+          Multi-language users (languagesEnabled === true): streak · token |
+          mastery · pill. The hairline divider separates global signals from
+          per-language signals.
+        */}
         <StreakChip streak={streak} />
-        <MasteryChip
-          masteryCount={masteryCount}
-          totalSpecies={totalSpecies}
-          masteryPercent={masteryPercent}
-        />
-        <TokenChip tokenBalance={tokenBalance} />
-        {/* Learning-language switcher — renders only when the languages Labs
-            flag is on (gated inside the component). Interactive pill, distinct
-            from the passive status chips. */}
-        <LanguageSwitcher />
+        {languagesEnabled ? (
+          <>
+            <TokenChip tokenBalance={tokenBalance} />
+            <span
+              aria-hidden="true"
+              className="h-4 w-px self-center border-l border-zinc-300 dark:border-zinc-600"
+            />
+            <MasteryChip
+              masteryCount={masteryCount}
+              totalSpecies={totalSpecies}
+              masteryPercent={masteryPercent}
+            />
+            {/* Learning-language switcher — renders only when the languages Labs
+                flag is on (gated inside the component). Interactive pill, distinct
+                from the passive status chips. */}
+            <LanguageSwitcher />
+          </>
+        ) : (
+          <>
+            <MasteryChip
+              masteryCount={masteryCount}
+              totalSpecies={totalSpecies}
+              masteryPercent={masteryPercent}
+            />
+            <TokenChip tokenBalance={tokenBalance} />
+          </>
+        )}
       </div>
     </div>
   );

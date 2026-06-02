@@ -98,17 +98,21 @@
           "zh-Hant": "繁體中文"
         },
         "selectLocale": "言語",
-        "appLanguageLabel": "アプリ言語",
-        "appLanguageDescription": "アプリのUI言語を設定します。UI翻訳は進行中です。",
+        "appLanguageLabel": "アプリのインターフェース言語",
+        "appLanguageDescription": "アプリの UI テキストを制御します。",
         "pokemonNameLanguageLabel": "Pokémon 名前の言語",
         "pokemonNameLanguageDescription": "Pokémon の名前の言語は、各ページ上部のステータスバーにある言語ピルから切り替えられます。",
         "previewSuffix": "（プレビュー）",
         "enrolment": {
-          "heading": "学習中の言語",
-          "description": "英語は常に含まれます。言語を追加すると、その文字でポケモンの名前を練習できます。",
+          "heading": "ポケモン名前練習言語",
+          "description": "バーの言語ピルからアクティブな言語を切り替えます。",
           "lockedEnglishNote": "常に含まれます",
           "machineTranslationNote": "機械翻訳",
-          "checkboxAriaLabel": "{language} でポケモンの名前を練習"
+          "checkboxAriaLabel": "{language} でポケモンの名前を練習",
+          "masteredCount": "{count, number} 習得済み",
+          "unenrolConfirmMessage": "{language} を削除すると、練習が英語に切り替わります。続けますか？",
+          "unenrolConfirm": "確認",
+          "unenrolCancel": "キャンセル"
         }
       }
     },
@@ -923,6 +927,8 @@
     "addLanguage": "言語を追加",
     "dueToday": "{count, plural, =0 {完了} other {本日 {count, number} 件}}",
     "dueTodayAriaLabel": "{language}：{count, plural, =0 {本日の予定なし} other {本日 {count, number} 件の予定}}",
+    "noCardsYet": "カードなし",
+    "noCardsYetAriaLabel": "{language}：カードなし",
     "cardRevealedLock": "このカードを終えてから言語を切り替えてください。"
   },
   "sync": {

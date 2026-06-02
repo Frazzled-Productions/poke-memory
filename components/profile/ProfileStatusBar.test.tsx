@@ -13,6 +13,7 @@
  * descriptive text lives in each chip's aria-label.
  */
 
+import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import {
@@ -39,6 +40,25 @@ vi.mock("@/lib/profile/useProfileStatus", () => ({
 const mockUsePathname = vi.fn(() => "/");
 vi.mock("next/navigation", () => ({
   usePathname: () => mockUsePathname(),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock: usePokemonLocaleContext (lib/i18n/PokemonLocaleContext)
+// ---------------------------------------------------------------------------
+
+const mockUsePokemonLocaleContext = vi.fn(() => ({
+  locale: "en" as const,
+  languagesEnabled: false,
+  learningLocales: ["en"],
+}));
+vi.mock("@/lib/i18n/PokemonLocaleContext", () => ({
+  usePokemonLocaleContext: () => mockUsePokemonLocaleContext(),
+}));
+
+// Stub LanguageSwitcher — its own test covers it; here we just need it to
+// render something stable so we can test the bar structure around it.
+vi.mock("@/components/i18n/LanguageSwitcher", () => ({
+  LanguageSwitcher: () => <span data-testid="language-switcher" />,
 }));
 
 // ---------------------------------------------------------------------------
@@ -84,6 +104,11 @@ const ALL_MASTERED_STATE = {
 beforeEach(() => {
   mockUseProfileStatus.mockReturnValue(POPULATED_STATE);
   mockUsePathname.mockReturnValue("/stats");
+  mockUsePokemonLocaleContext.mockReturnValue({
+    locale: "en" as const,
+    languagesEnabled: false,
+    learningLocales: ["en"],
+  });
 });
 
 afterEach(() => {
@@ -322,5 +347,43 @@ describe("ProfileStatusBar — locale rendering", () => {
     renderWithIntl(<ProfileStatusBar />);
     const bar = screen.getByRole("region", { name: /profile status/i });
     expect(bar.textContent).toMatch(/\d/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 2: Status-bar divider — present when languages flag on, absent when off
+// ---------------------------------------------------------------------------
+
+describe("ProfileStatusBar — clarity polish: global/per-language divider (item 2)", () => {
+  beforeEach(() => {
+    mockUseProfileStatus.mockReturnValue(POPULATED_STATE);
+    mockUsePathname.mockReturnValue("/stats");
+  });
+
+  it("renders the divider when the languages Labs flag is on", () => {
+    mockUsePokemonLocaleContext.mockReturnValue({
+      locale: "en" as const,
+      languagesEnabled: true,
+      learningLocales: ["en", "ja"],
+    });
+    renderWithIntl(<ProfileStatusBar />);
+
+    const bar = screen.getByRole("region", { name: /profile status/i });
+    // The divider is a <span aria-hidden="true"> with a border-l class.
+    const divider = bar.querySelector('[aria-hidden="true"][class*="border-l"]');
+    expect(divider).not.toBeNull();
+  });
+
+  it("does NOT render the divider when the languages Labs flag is off", () => {
+    mockUsePokemonLocaleContext.mockReturnValue({
+      locale: "en" as const,
+      languagesEnabled: false,
+      learningLocales: ["en"],
+    });
+    renderWithIntl(<ProfileStatusBar />);
+
+    const bar = screen.getByRole("region", { name: /profile status/i });
+    const divider = bar.querySelector('[aria-hidden="true"][class*="border-l"]');
+    expect(divider).toBeNull();
   });
 });

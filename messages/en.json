@@ -98,17 +98,21 @@
           "zh-Hant": "Traditional Chinese"
         },
         "selectLocale": "Language",
-        "appLanguageLabel": "App language",
-        "appLanguageDescription": "Controls the app UI language. App UI translation is in progress.",
+        "appLanguageLabel": "App interface language",
+        "appLanguageDescription": "Controls the app's UI text.",
         "pokemonNameLanguageLabel": "Pokémon name language",
         "pokemonNameLanguageDescription": "Switch the Pokémon-name language from the language pill in the status bar at the top of every page.",
         "previewSuffix": "(preview)",
         "enrolment": {
-          "heading": "Languages I'm learning",
-          "description": "English is always included. Add a language to practise Pokémon names in that script.",
+          "heading": "Pokémon name practice languages",
+          "description": "Switch the active one from the language pill in the bar.",
           "lockedEnglishNote": "Always included",
           "machineTranslationNote": "Machine translation",
-          "checkboxAriaLabel": "Practise Pokémon names in {language}"
+          "checkboxAriaLabel": "Practise Pokémon names in {language}",
+          "masteredCount": "{count, number} mastered",
+          "unenrolConfirmMessage": "Removing {language} will switch your practice to English. Continue?",
+          "unenrolConfirm": "Confirm",
+          "unenrolCancel": "Cancel"
         }
       }
     },
@@ -923,6 +927,8 @@
     "addLanguage": "Add a language",
     "dueToday": "{count, plural, =0 {Caught up} one {{count, number} due today} other {{count, number} due today}}",
     "dueTodayAriaLabel": "{language}: {count, plural, =0 {caught up} one {{count, number} card due today} other {{count, number} cards due today}}",
+    "noCardsYet": "No cards yet",
+    "noCardsYetAriaLabel": "{language}: no cards yet",
     "cardRevealedLock": "Finish this card first, then switch language."
   },
   "sync": {

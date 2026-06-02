@@ -41,6 +41,19 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => mockUseSuperuser(),
 }));
 
+// Stub PokemonLocaleContext — StreakBadge reads languagesEnabled to render the
+// global/per-language divider. Exposed as a vi.fn() so individual tests can
+// override the return value (e.g. to enable the multi-language branch).
+// Default to languagesEnabled: false so existing tests are unaffected.
+const mockUsePokemonLocaleContext = vi.fn(() => ({
+  locale: "en" as const,
+  languagesEnabled: false,
+  learningLocales: ["en"],
+}));
+vi.mock("@/lib/i18n/PokemonLocaleContext", () => ({
+  usePokemonLocaleContext: () => mockUsePokemonLocaleContext(),
+}));
+
 // Pin todayString to a fixed date so tests are deterministic.
 const FIXED_TODAY = "2026-05-31";
 vi.mock("@/lib/review/session", async (importOriginal) => {
@@ -483,6 +496,89 @@ describe("StreakBadge — mobile status chips + milestone signpost", () => {
     expect(screen.queryByText(/2個保護代幣。/)).toBeNull();
     // Milestone signpost remains.
     expect(screen.getByText(/距下一個里程碑還有/)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// languagesEnabled: divider and per-language chip order (mirrors ProfileStatusBar)
+// ---------------------------------------------------------------------------
+
+describe("StreakBadge — languagesEnabled chip order and divider", () => {
+  function seedLiveStreak() {
+    // Seed a live 3-day streak so the token chip (balance=2) is rendered and
+    // we can assert its position relative to the divider.
+    seedProtection({
+      balance: 2,
+      streakDates: ["2026-05-29", "2026-05-30", FIXED_TODAY],
+    });
+  }
+
+  it("single-language (off): does NOT render the hairline divider", () => {
+    seedLiveStreak();
+    // Default mock has languagesEnabled: false — no override needed.
+    renderWithIntl(<StreakBadge />);
+
+    const group = document.querySelector("[role='group']");
+    expect(group).not.toBeNull();
+    const divider = group!.querySelector('[aria-hidden="true"][class*="border-l"]');
+    expect(divider).toBeNull();
+  });
+
+  it("multi-language (on): DOES render the hairline divider between global and per-language chips", () => {
+    seedLiveStreak();
+    // Use mockReturnValue (not Once) so every re-render triggered by the
+    // useEffect state updates in StreakBadge consistently returns the enabled
+    // state — mockReturnValueOnce is consumed on the first call.
+    mockUsePokemonLocaleContext.mockReturnValue({
+      locale: "en" as const,
+      languagesEnabled: true,
+      learningLocales: ["en", "ja"],
+    });
+
+    renderWithIntl(<StreakBadge />);
+
+    const group = document.querySelector("[role='group']");
+    expect(group).not.toBeNull();
+    const divider = group!.querySelector('[aria-hidden="true"][class*="border-l"]');
+    expect(divider).not.toBeNull();
+
+    // Restore default so subsequent tests are unaffected.
+    mockUsePokemonLocaleContext.mockReturnValue({
+      locale: "en" as const,
+      languagesEnabled: false,
+      learningLocales: ["en"],
+    });
+  });
+
+  it("multi-language (on): TokenChip appears before the divider and MasteryChip after", () => {
+    seedLiveStreak();
+    mockUsePokemonLocaleContext.mockReturnValue({
+      locale: "en" as const,
+      languagesEnabled: true,
+      learningLocales: ["en", "ja"],
+    });
+
+    renderWithIntl(<StreakBadge />);
+
+    const group = document.querySelector("[role='group']");
+    expect(group).not.toBeNull();
+    const divider = group!.querySelector('[aria-hidden="true"][class*="border-l"]');
+    expect(divider).not.toBeNull();
+
+    // The token chip (balance=2) must appear BEFORE the divider.
+    const tokenChip = group!.querySelector('[aria-label*="protection token"]');
+    expect(tokenChip).not.toBeNull();
+    // DOCUMENT_POSITION_FOLLOWING (4) means divider follows token in DOM order.
+    const tokenBeforeDivider =
+      (tokenChip!.compareDocumentPosition(divider!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(tokenBeforeDivider).toBe(true);
+
+    // Restore default so subsequent tests are unaffected.
+    mockUsePokemonLocaleContext.mockReturnValue({
+      locale: "en" as const,
+      languagesEnabled: false,
+      learningLocales: ["en"],
+    });
   });
 });
 

@@ -165,6 +165,16 @@ export const KEY_MASTERED_COUNT_BY_LOCALE =
 export const KEY_DUE_COUNT_BY_LOCALE =
   "poke-memory:due-count-by-locale:v1";
 
+/**
+ * Per-locale "has review history" flag — `true` when the locale has at least
+ * one card with `state.lastReview !== null`. Written by ReviewSession alongside
+ * the due-count cache. Read by the LanguageSwitcher to distinguish a freshly-
+ * enrolled language (no history) from a caught-up one (history, all due counts
+ * zero). Local-only derived state; no sync leg.
+ */
+export const KEY_HAS_HISTORY_BY_LOCALE =
+  "poke-memory:has-history-by-locale:v1";
+
 // ─── Card-revealed flag (#1562) ───────────────────────────────────────────────
 
 /**

@@ -17,7 +17,10 @@
  */
 
 import type { AppLocale } from "@/i18n/locales";
-import { KEY_DUE_COUNT_BY_LOCALE } from "@/lib/storage/keys";
+import {
+  KEY_DUE_COUNT_BY_LOCALE,
+  KEY_HAS_HISTORY_BY_LOCALE,
+} from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
 
@@ -75,4 +78,64 @@ export function writeDueCounts(partial: Partial<DueCountByLocale>): void {
 /** Convenience single-locale writer (mirrors the mastered-count cache API). */
 export function writeDueCountForLocale(locale: AppLocale, count: number): void {
   writeDueCounts({ [locale]: count });
+}
+
+// ─── Has-history cache ────────────────────────────────────────────────────────
+
+/**
+ * Per-locale "has review history" flags. `true` means the locale has at least
+ * one card with `state.lastReview !== null` — i.e. the user has done at least
+ * one review in that language. Used to distinguish "Caught up" from "No cards
+ * yet" in the LanguageSwitcher due-badge.
+ */
+export type HasHistoryByLocale = {
+  en: boolean;
+  ja: boolean;
+  "zh-Hans": boolean;
+  "zh-Hant": boolean;
+};
+
+const EMPTY_HAS_HISTORY: HasHistoryByLocale = {
+  en: false,
+  ja: false,
+  "zh-Hans": false,
+  "zh-Hant": false,
+};
+
+/**
+ * Read the cached per-locale has-history flags from localStorage. Returns
+ * all-false when absent or malformed.
+ */
+export function readHasHistoryCache(): HasHistoryByLocale {
+  return readLocalStorage(
+    KEY_HAS_HISTORY_BY_LOCALE,
+    (raw) => {
+      const parsed = JSON.parse(raw) as unknown;
+      if (
+        parsed === null ||
+        typeof parsed !== "object" ||
+        Array.isArray(parsed)
+      ) {
+        return EMPTY_HAS_HISTORY;
+      }
+      const obj = parsed as Record<string, unknown>;
+      return {
+        en: obj["en"] === true,
+        ja: obj["ja"] === true,
+        "zh-Hans": obj["zh-Hans"] === true,
+        "zh-Hant": obj["zh-Hant"] === true,
+      };
+    },
+    EMPTY_HAS_HISTORY,
+  );
+}
+
+/**
+ * Write has-history flags for all locales at once. One localStorage write +
+ * synthetic StorageEvent so same-tab subscribers refresh. ReviewSession
+ * computes the whole enrolled set in one pass and writes it together with the
+ * due counts.
+ */
+export function writeHasHistory(flags: HasHistoryByLocale): void {
+  writeLocalStorage(KEY_HAS_HISTORY_BY_LOCALE, flags, { notify: true });
 }

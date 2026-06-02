@@ -28,9 +28,14 @@ import { LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { mutedTextXs } from "@/lib/utils/class-names";
 import {
   readDueCountCache,
+  readHasHistoryCache,
   type DueCountByLocale,
+  type HasHistoryByLocale,
 } from "@/lib/profile/dueCountCache";
-import { KEY_DUE_COUNT_BY_LOCALE } from "@/lib/storage/keys";
+import {
+  KEY_DUE_COUNT_BY_LOCALE,
+  KEY_HAS_HISTORY_BY_LOCALE,
+} from "@/lib/storage/keys";
 import { isCardRevealed } from "@/lib/review/sessionActive";
 
 // ─── Icons (lucide-style) ──────────────────────────────────────────────────────
@@ -77,6 +82,7 @@ export function LanguageSwitcher() {
     usePokemonLocaleContext();
   const [open, setOpen] = useState(false);
   const [dueCounts, setDueCounts] = useState<DueCountByLocale | null>(null);
+  const [hasHistory, setHasHistory] = useState<HasHistoryByLocale | null>(null);
   // Tracks whether a review card is currently mid-reveal so we can block
   // locale switches until the card is graded (#1562).
   const [cardRevealed, setCardRevealed] = useState(false);
@@ -151,16 +157,18 @@ export function LanguageSwitcher() {
     (checked ?? panel.querySelector<HTMLElement>("button"))?.focus();
   }, [open]);
 
-  // Read the per-locale due-count cache when the dropdown opens, and keep it
-  // live while open (ReviewSession writes the cache after grades). The cache is
-  // a lightweight read, not a full card-array parse.
+  // Read the per-locale due-count cache and has-history flags when the dropdown
+  // opens, and keep them live while open (ReviewSession writes the caches after
+  // grades). Both are lightweight reads, not full card-array parses.
   useEffect(() => {
     if (!open) return;
     setDueCounts(readDueCountCache());
+    setHasHistory(readHasHistoryCache());
     // Check whether a card is currently mid-reveal. If so, block switching (#1562).
     setCardRevealed(isCardRevealed());
     function onStorage(e: StorageEvent) {
       if (e.key === KEY_DUE_COUNT_BY_LOCALE) setDueCounts(readDueCountCache());
+      if (e.key === KEY_HAS_HISTORY_BY_LOCALE) setHasHistory(readHasHistoryCache());
     }
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -223,6 +231,29 @@ export function LanguageSwitcher() {
             {learningLocales.map((loc) => {
               const selected = loc === locale;
               const due = dueCounts?.[loc] ?? 0;
+              const locHasHistory = hasHistory?.[loc] ?? false;
+              // "No cards yet" when count is 0 AND no history (freshly enrolled);
+              // "Caught up" when count is 0 AND has history (finished all reviews).
+              const badgeText =
+                due > 0
+                  ? t("dueToday", { count: due })
+                  : locHasHistory
+                    ? t("dueToday", { count: 0 })
+                    : t("noCardsYet");
+              const badgeAriaLabel =
+                due > 0
+                  ? t("dueTodayAriaLabel", {
+                      language: LOCALE_ENDONYMS[loc],
+                      count: due,
+                    })
+                  : locHasHistory
+                    ? t("dueTodayAriaLabel", {
+                        language: LOCALE_ENDONYMS[loc],
+                        count: 0,
+                      })
+                    : t("noCardsYetAriaLabel", {
+                        language: LOCALE_ENDONYMS[loc],
+                      });
               return (
                 <button
                   key={loc}
@@ -230,10 +261,7 @@ export function LanguageSwitcher() {
                   role="radio"
                   aria-checked={selected}
                   aria-disabled={cardRevealed && !selected ? true : undefined}
-                  aria-label={t("dueTodayAriaLabel", {
-                    language: LOCALE_ENDONYMS[loc],
-                    count: due,
-                  })}
+                  aria-label={badgeAriaLabel}
                   onClick={() => selectLocale(loc)}
                   className={`flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:[@media(hover:hover)]:hover:bg-zinc-800 ${cardRevealed && !selected ? "opacity-50 cursor-not-allowed" : "[@media(hover:hover)]:hover:bg-zinc-100"}`}
                 >
@@ -252,7 +280,7 @@ export function LanguageSwitcher() {
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
                     <span className={mutedTextXs} aria-hidden="true">
-                      {t("dueToday", { count: due })}
+                      {badgeText}
                     </span>
                     {selected && <CheckIcon />}
                   </span>
