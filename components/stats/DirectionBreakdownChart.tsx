@@ -94,8 +94,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
   const total = totalDirectionReviews(visibleRows);
 
   const data: ChartDatum[] = visibleRows.map((row) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- key resolved from known map
-    const dirLabel = tPracticeDir(DIRECTION_TO_KEY[row.direction] as any);
+    const dirLabel = tPracticeDir(DIRECTION_TO_KEY[row.direction]);
     const label = row.disabled
       ? tDir("disabledLabel", { direction: dirLabel })
       : dirLabel;
@@ -133,8 +132,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
               aria-label={`${tDir("heading")}: ${visibleRows
                 .map(
                   (r) => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- key resolved from known map
-                    const dLabel = tPracticeDir(DIRECTION_TO_KEY[r.direction] as any);
+                    const dLabel = tPracticeDir(DIRECTION_TO_KEY[r.direction]);
                     const fullLabel = r.disabled ? tDir("disabledLabel", { direction: dLabel }) : dLabel;
                     return `${fullLabel} ${
                       r.accuracy === null
@@ -172,11 +170,11 @@ export function DirectionBreakdownChart({ rows }: Props) {
                   />
                   <Tooltip
                     cursor={{ fill: "currentColor", fillOpacity: 0.06 }}
-                    content={({ active, payload }) =>
-                      active && payload && payload.length > 0 ? (
-                        <TooltipBody datum={payload[0].payload as ChartDatum} />
-                      ) : null
-                    }
+                    content={({ active, payload }) => {
+                      if (!payload?.length) return null;
+                      if (!active) return null;
+                      return <TooltipBody datum={payload[0].payload as ChartDatum} />;
+                    }}
                   />
                   <Bar dataKey="accuracyPct" radius={[0, 4, 4, 0]} isAnimationActive={false}>
                     {data.map((d) => (
@@ -201,8 +199,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
               className={`mt-3 grid grid-cols-2 gap-x-4 gap-y-1 ${mutedTextXs} sm:grid-cols-3`}
             >
               {visibleRows.map((row) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- key resolved from known map
-                const dLabel = tPracticeDir(DIRECTION_TO_KEY[row.direction] as any);
+                const dLabel = tPracticeDir(DIRECTION_TO_KEY[row.direction]);
                 return (
                   <li
                     key={row.direction}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
-import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 import { GameBreakdown } from "@/components/stats/GameBreakdown";
 import type { GameStats } from "@/lib/stats/per-game";
 
@@ -110,5 +110,20 @@ describe("GameBreakdown", () => {
     const button = screen.getByRole("button", { name: /Generation II/i });
     fireEvent.click(button);
     expect(screen.getByText("0%")).toBeInTheDocument();
+  });
+
+  // Locale coverage (#1519): the typed GEN_KEY map must resolve in non-English
+  // locales; confirms the key lookup works without an as-any cast.
+  it("renders the section heading in Japanese", () => {
+    renderJa(<GameBreakdown perGame={[RED_BLUE]} />);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "ゲーム別" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the generation label using the typed key in Japanese", () => {
+    renderJa(<GameBreakdown perGame={[RED_BLUE]} />);
+    // gen1 key resolves to "第1世代" in Japanese.
+    expect(screen.getByText("第1世代")).toBeInTheDocument();
   });
 });

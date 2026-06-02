@@ -61,8 +61,11 @@ type GenGroup = {
   rows: GameStats[];
 };
 
+/** Typed keys that exist under `stats.gameBreakdown` in the message catalogue. */
+type GenKey = "gen1" | "gen2" | "gen3" | "gen4" | "gen5" | "gen6" | "gen7" | "gen8" | "gen9" | "genOther";
+
 /** Map a numeric generation to its i18n key in stats.gameBreakdown. */
-const GEN_KEY: Record<number, string> = {
+const GEN_KEY: Record<number, GenKey | undefined> = {
   1: "gen1",
   2: "gen2",
   3: "gen3",
@@ -80,8 +83,7 @@ function GenAccordion({ group }: { group: GenGroup }) {
   const tG = useTranslations("stats.gameBreakdown");
   const [open, setOpen] = useState(false);
   const genKey = GEN_KEY[group.gen];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- key is string from known map
-  const genName: string = genKey ? tG(genKey as any) : `Generation ${group.gen}`;
+  const genName: string = genKey ? tG(genKey) : `Generation ${group.gen}`;
   const totalMastered = group.rows.reduce((s, r) => s + r.mastered, 0);
   const totalSpecies = group.rows.reduce((s, r) => s + r.total, 0);
   const uniqueGames = group.rows.length;
